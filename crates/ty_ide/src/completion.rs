@@ -465,7 +465,7 @@ impl<'db> CompletionBuilder<'db> {
                         Type::SpecialForm(
                             SpecialFormType::Protocol
                                 | SpecialFormType::Generic
-                                | SpecialFormType::TypedDict
+                                | SpecialFormType::TypedDict(_)
                                 | SpecialFormType::NamedTuple
                         )
                     );
@@ -973,10 +973,7 @@ impl<'m> ContextCursor<'m> {
             ast::AnyNodeRef::StmtAnnAssign(stmt) => {
                 contains(&stmt.annotation)
                     || (stmt.value.as_deref().is_some_and(contains)
-                        && matches!(
-                            stmt.annotation.inferred_type(model),
-                            Some(Type::SpecialForm(SpecialFormType::TypeAlias))
-                        ))
+                        && model.is_type_alias_annotation(&stmt.annotation))
             }
             ast::AnyNodeRef::StmtFunctionDef(stmt) => stmt.returns.as_deref().is_some_and(contains),
             ast::AnyNodeRef::StmtTypeAlias(stmt) => contains(&stmt.value),
@@ -3086,7 +3083,7 @@ fn is_name_like_token(token: &Token) -> bool {
 /// on `CompletionBuilder`.
 fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<CompletionKind> {
     type CompletionKindVisitor<'db> =
-        CycleDetector<CompletionKind, Type<'db>, Option<CompletionKind>>;
+        CycleDetector<CompletionKind, Type<'db>, Option<CompletionKind>, 3>;
 
     fn imp<'db>(
         db: &'db dyn Db,
@@ -5125,6 +5122,39 @@ bar(o<CURSOR>
         foo
         "
         );
+    }
+
+    // Regression test for https://github.com/astral-sh/ty/issues/3803
+    #[test]
+    fn call_keyword_only_argument_between_variadic_parameters() {
+        completion_test_builder(
+            "\
+def func(*args, special, **kw): ...
+
+func(sp<CURSOR>
+",
+        )
+        .skip_keywords()
+        .skip_builtins()
+        .skip_auto_import()
+        .build()
+        .contains("special");
+    }
+
+    #[test]
+    fn call_keyword_only_argument_between_variadic_parameters_after_positional_argument() {
+        completion_test_builder(
+            "\
+def func(arg1, *arg2, special, **kw): ...
+
+func(sp<CURSOR>
+",
+        )
+        .skip_keywords()
+        .skip_builtins()
+        .skip_auto_import()
+        .build()
+        .contains("special");
     }
 
     #[test]

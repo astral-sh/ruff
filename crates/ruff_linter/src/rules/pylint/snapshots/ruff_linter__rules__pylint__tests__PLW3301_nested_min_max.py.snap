@@ -11,12 +11,12 @@ PLW3301 [*] Nested `min` calls can be flattened
 4 | min(1, foo("a", "b"), min(3, 4))
   |
 help: Flatten nested `min` calls
+  |
 1 | min(1, 2, 3)
   - min(1, min(2, 3))
 2 + min(1, 2, 3)
 3 | min(1, min(2, min(3, 4)))
-4 | min(1, foo("a", "b"), min(3, 4))
-5 | min(1, max(2, 3))
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 PLW3301 [*] Nested `min` calls can be flattened
@@ -30,13 +30,12 @@ PLW3301 [*] Nested `min` calls can be flattened
 5 | min(1, max(2, 3))
   |
 help: Flatten nested `min` calls
-1 | min(1, 2, 3)
+  |
 2 | min(1, min(2, 3))
   - min(1, min(2, min(3, 4)))
 3 + min(1, 2, 3, 4)
 4 | min(1, foo("a", "b"), min(3, 4))
-5 | min(1, max(2, 3))
-6 | max(1, 2, 3)
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 PLW3301 [*] Nested `min` calls can be flattened
@@ -50,13 +49,12 @@ PLW3301 [*] Nested `min` calls can be flattened
 5 | min(1, max(2, 3))
   |
 help: Flatten nested `min` calls
-1 | min(1, 2, 3)
+  |
 2 | min(1, min(2, 3))
   - min(1, min(2, min(3, 4)))
 3 + min(1, min(2, 3, 4))
 4 | min(1, foo("a", "b"), min(3, 4))
-5 | min(1, max(2, 3))
-6 | max(1, 2, 3)
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 PLW3301 [*] Nested `min` calls can be flattened
@@ -70,14 +68,12 @@ PLW3301 [*] Nested `min` calls can be flattened
 6 | max(1, 2, 3)
   |
 help: Flatten nested `min` calls
-1 | min(1, 2, 3)
-2 | min(1, min(2, 3))
+  |
 3 | min(1, min(2, min(3, 4)))
   - min(1, foo("a", "b"), min(3, 4))
 4 + min(1, foo("a", "b"), 3, 4)
 5 | min(1, max(2, 3))
-6 | max(1, 2, 3)
-7 | max(1, max(2, 3))
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 PLW3301 [*] Nested `max` calls can be flattened
@@ -91,14 +87,12 @@ PLW3301 [*] Nested `max` calls can be flattened
 9 | max(1, foo("a", "b"), max(3, 4))
   |
 help: Flatten nested `max` calls
-4  | min(1, foo("a", "b"), min(3, 4))
-5  | min(1, max(2, 3))
-6  | max(1, 2, 3)
-   - max(1, max(2, 3))
-7  + max(1, 2, 3)
-8  | max(1, max(2, max(3, 4)))
-9  | max(1, foo("a", "b"), max(3, 4))
-10 |
+  |
+6 | max(1, 2, 3)
+  - max(1, max(2, 3))
+7 + max(1, 2, 3)
+8 | max(1, max(2, max(3, 4)))
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 PLW3301 [*] Nested `max` calls can be flattened
@@ -111,14 +105,12 @@ PLW3301 [*] Nested `max` calls can be flattened
 9 | max(1, foo("a", "b"), max(3, 4))
   |
 help: Flatten nested `max` calls
-5  | min(1, max(2, 3))
-6  | max(1, 2, 3)
-7  | max(1, max(2, 3))
-   - max(1, max(2, max(3, 4)))
-8  + max(1, 2, 3, 4)
-9  | max(1, foo("a", "b"), max(3, 4))
-10 |
-11 | # These should not trigger; we do not flag cases with keyword args.
+  |
+7 | max(1, max(2, 3))
+  - max(1, max(2, max(3, 4)))
+8 + max(1, 2, 3, 4)
+9 | max(1, foo("a", "b"), max(3, 4))
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 PLW3301 [*] Nested `max` calls can be flattened
@@ -131,14 +123,12 @@ PLW3301 [*] Nested `max` calls can be flattened
 9 | max(1, foo("a", "b"), max(3, 4))
   |
 help: Flatten nested `max` calls
-5  | min(1, max(2, 3))
-6  | max(1, 2, 3)
-7  | max(1, max(2, 3))
-   - max(1, max(2, max(3, 4)))
-8  + max(1, max(2, 3, 4))
-9  | max(1, foo("a", "b"), max(3, 4))
-10 |
-11 | # These should not trigger; we do not flag cases with keyword args.
+  |
+7 | max(1, max(2, 3))
+  - max(1, max(2, max(3, 4)))
+8 + max(1, max(2, 3, 4))
+9 | max(1, foo("a", "b"), max(3, 4))
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 PLW3301 [*] Nested `max` calls can be flattened
@@ -152,14 +142,12 @@ PLW3301 [*] Nested `max` calls can be flattened
 11 | # These should not trigger; we do not flag cases with keyword args.
    |
 help: Flatten nested `max` calls
-6  | max(1, 2, 3)
-7  | max(1, max(2, 3))
+   |
 8  | max(1, max(2, max(3, 4)))
    - max(1, foo("a", "b"), max(3, 4))
 9  + max(1, foo("a", "b"), 3, 4)
 10 |
-11 | # These should not trigger; we do not flag cases with keyword args.
-12 | min(1, min(2, 3), key=test)
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PLW3301 [*] Nested `min` calls can be flattened
@@ -173,14 +161,12 @@ PLW3301 [*] Nested `min` calls can be flattened
 17 | # The fix is already unsafe, so deleting comments is okay.
    |
 help: Flatten nested `min` calls
-12 | min(1, min(2, 3), key=test)
-13 | min(1, min(2, 3, key=test))
+   |
 14 | # This will still trigger, to merge the calls without keyword args.
    - min(1, min(2, 3, key=test), min(4, 5))
 15 + min(1, min(2, 3, key=test), 4, 5)
 16 |
-17 | # The fix is already unsafe, so deleting comments is okay.
-18 | min(
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PLW3301 [*] Nested `min` calls can be flattened
@@ -196,8 +182,7 @@ PLW3301 [*] Nested `min` calls can be flattened
 23 |   # Handle iterable expressions.
    |
 help: Flatten nested `min` calls
-15 | min(1, min(2, 3, key=test), min(4, 5))
-16 |
+   |
 17 | # The fix is already unsafe, so deleting comments is okay.
    - min(
    -     1,  # This is a comment.
@@ -205,8 +190,7 @@ help: Flatten nested `min` calls
    - )
 18 + min(1, 2, 3)
 19 |
-20 | # Handle iterable expressions.
-21 | min(1, min(a))
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PLW3301 [*] Nested `min` calls can be flattened
@@ -219,14 +203,12 @@ PLW3301 [*] Nested `min` calls can be flattened
 26 | max(1, max(a))
    |
 help: Flatten nested `min` calls
-21 | )
-22 |
+   |
 23 | # Handle iterable expressions.
    - min(1, min(a))
 24 + min(1, *a)
 25 | min(1, min(i for i in range(10)))
-26 | max(1, max(a))
-27 | max(1, max(i for i in range(10)))
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PLW3301 [*] Nested `min` calls can be flattened
@@ -240,14 +222,12 @@ PLW3301 [*] Nested `min` calls can be flattened
 27 | max(1, max(i for i in range(10)))
    |
 help: Flatten nested `min` calls
-22 |
-23 | # Handle iterable expressions.
+   |
 24 | min(1, min(a))
    - min(1, min(i for i in range(10)))
 25 + min(1, *(i for i in range(10)))
 26 | max(1, max(a))
-27 | max(1, max(i for i in range(10)))
-28 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PLW3301 [*] Nested `max` calls can be flattened
@@ -260,14 +240,12 @@ PLW3301 [*] Nested `max` calls can be flattened
 27 | max(1, max(i for i in range(10)))
    |
 help: Flatten nested `max` calls
-23 | # Handle iterable expressions.
-24 | min(1, min(a))
+   |
 25 | min(1, min(i for i in range(10)))
    - max(1, max(a))
 26 + max(1, *a)
 27 | max(1, max(i for i in range(10)))
-28 |
-29 | tuples_list = [
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PLW3301 [*] Nested `max` calls can be flattened
@@ -281,14 +259,12 @@ PLW3301 [*] Nested `max` calls can be flattened
 29 | tuples_list = [
    |
 help: Flatten nested `max` calls
-24 | min(1, min(a))
-25 | min(1, min(i for i in range(10)))
+   |
 26 | max(1, max(a))
    - max(1, max(i for i in range(10)))
 27 + max(1, *(i for i in range(10)))
 28 |
-29 | tuples_list = [
-30 |     (1, 2),
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PLW3301 [*] Nested `max` calls can be flattened
@@ -301,14 +277,12 @@ PLW3301 [*] Nested `max` calls can be flattened
 43 | import builtins
    |
 help: Flatten nested `max` calls
-38 | max(max(tuples_list))
-39 |
+   |
 40 | # Starred argument should be copied as it is.
    - max(1, max(*a))
 41 + max(1, *a)
 42 |
-43 | import builtins
-44 | builtins.min(1, min(2, 3))
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PLW3301 [*] Nested `min` calls can be flattened
@@ -319,14 +293,12 @@ PLW3301 [*] Nested `min` calls can be flattened
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Flatten nested `min` calls
-41 | max(1, max(*a))
-42 |
+   |
 43 | import builtins
    - builtins.min(1, min(2, 3))
 44 + builtins.min(1, 2, 3)
 45 |
-46 |
-47 | # PLW3301
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PLW3301 [*] Nested `max` calls can be flattened
@@ -343,8 +315,7 @@ PLW3301 [*] Nested `max` calls can be flattened
 53 |   # OK
    |
 help: Flatten nested `max` calls
-45 |
-46 |
+   |
 47 | # PLW3301
    - max_word_len = max(
    -     max(len(word) for word in "blah blah blah".split(" ")),
@@ -352,6 +323,5 @@ help: Flatten nested `max` calls
    - )
 48 + max_word_len = max(*(len(word) for word in "blah blah blah".split(" ")), len("Done!"))
 49 |
-50 | # OK
-51 | max_word_len = max(
+   |
 note: This is an unsafe fix and may change runtime behavior

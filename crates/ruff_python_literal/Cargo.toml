@@ -1,8 +1,7 @@
 [package]
 name = "ruff_python_literal"
-version = "0.0.0"
-publish = false
-description = "Common literal handling utilities mostly useful for unparse and repr."
+version = "0.0.3"
+description = "This is an internal component crate of Ruff"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>", "RustPython Team"]
 edition = { workspace = true }
 rust-version = { workspace = true }

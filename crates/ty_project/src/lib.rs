@@ -190,6 +190,44 @@ impl Project {
             .new(db)
     }
 
+    /// Permanently freezes the most heavily read immutable project inputs.
+    ///
+    /// This is intentionally not exhaustive.
+    pub(crate) fn freeze(self, db: &mut dyn Db) {
+        let durability = Durability::NEVER_CHANGE;
+        let metadata = Box::new(self.metadata(db).clone());
+        let settings = Box::new(self.settings(db).clone());
+        let included_paths = self.included_paths_list(db).to_vec();
+        let open_files = self.open_fileset(db).clone();
+        let check_mode = self.check_mode(db);
+        let verbose = self.verbose_flag(db);
+        let force_exclude = self.force_exclude_flag(db);
+
+        self.set_metadata(db)
+            .with_durability(durability)
+            .to(metadata);
+        self.set_settings(db)
+            .with_durability(durability)
+            .to(settings);
+        self.set_included_paths_list(db)
+            .with_durability(durability)
+            .to(included_paths);
+        self.set_open_fileset(db)
+            .with_durability(durability)
+            .to(open_files);
+        self.set_check_mode(db)
+            .with_durability(durability)
+            .to(check_mode);
+        self.set_verbose_flag(db)
+            .with_durability(durability)
+            .to(verbose);
+        self.set_force_exclude_flag(db)
+            .with_durability(durability)
+            .to(force_exclude);
+
+        IndexedFiles::freeze(db, self);
+    }
+
     pub fn root(self, db: &dyn Db) -> &SystemPath {
         self.metadata(db).root()
     }

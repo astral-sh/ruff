@@ -62,10 +62,19 @@ impl Settings {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct TerminalSettings {
     pub output_format: OutputFormat,
     pub error_on_warning: bool,
+}
+
+impl Default for TerminalSettings {
+    fn default() -> Self {
+        Self {
+            output_format: OutputFormat::default(),
+            error_on_warning: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]

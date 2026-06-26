@@ -17,6 +17,7 @@ use smallvec::{SmallVec, smallvec};
 
 use crate::checkers::ast::{DiagnosticGuard, LintContext};
 use crate::codes::Rule;
+use crate::comments::shebang::leading_shebang_range;
 use crate::fix::edits::delete_comment;
 use crate::preview::{is_human_readable_names_enabled, is_ruff_ignore_enabled};
 use crate::rule_redirects::get_redirect_target;
@@ -782,7 +783,17 @@ impl<'a> SuppressionsBuilder<'a> {
                         .is_some()
                     {
                         // own-line ignore
-                        Self::standalone_comment_range(suppression.range, before, after)
+                        let mut range =
+                            Self::standalone_comment_range(suppression.range, before, after);
+
+                        // Allow an ignore to suppress diagnostics on a leading shebang.
+                        if let Some(shebang) = leading_shebang_range(self.source, tokens)
+                            && shebang.end() == self.source.line_start(suppression.range.start())
+                        {
+                            range = shebang.cover(range);
+                        }
+
+                        range
                     } else {
                         // trailing ignore
                         self.trailing_comment_range(suppression.token_range, before)
@@ -1270,6 +1281,21 @@ impl Iterator for SuppressionParser<'_> {
 
         Some(self.parse_comment())
     }
+}
+
+/// Returns the range of the rule identifier at `offset` within a `noqa` or Ruff suppression
+/// comment.
+pub fn rule_identifier_range_at_offset(
+    source: &str,
+    comment_range: TextRange,
+    offset: TextSize,
+) -> Option<TextRange> {
+    crate::noqa::rule_identifier_range_at_offset(source, comment_range, offset).or_else(|| {
+        SuppressionParser::new(source, comment_range)
+            .filter_map(Result::ok)
+            .flat_map(|comment| comment.codes)
+            .find(|range| range.contains(offset))
+    })
 }
 
 #[cfg(test)]

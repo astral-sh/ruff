@@ -78,7 +78,7 @@ impl FileRoots {
 
         // Insert a new source root
         let root = FileRoot::builder(path.into(), kind)
-            .durability(Durability::HIGH)
+            .durability(Durability::NEVER_CHANGE)
             .new(db);
 
         // Insert a path that matches the root itself

@@ -1,3 +1,4 @@
+use compact_str::CompactString;
 use itertools::{Either, Itertools};
 use ruff_db::{
     diagnostic::Span,
@@ -22,13 +23,14 @@ use crate::{
         GenericContext, KnownClass, KnownInstanceType, MaterializationKind, MemberLookupPolicy,
         MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType,
         Signature, SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
-        TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        TypeMapping, TypeVarVariance, TypedDictModule, UnionBuilder, UnionType,
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
-            ClassMemberResult, CodeGeneratorKind, DisjointBase, DynamicTypedDictLiteral, Field,
-            FieldKind, InstanceMemberResult, MetaclassError, MetaclassErrorKind, MethodDecorator,
-            MroLookup, NamedTupleField, SlotsKind, synthesize_namedtuple_class_member,
+            ClassInstanceFlags, ClassMemberResult, CodeGeneratorKind, DisjointBase,
+            DynamicTypedDictLiteral, Field, FieldKind, InstanceMemberResult, MetaclassError,
+            MetaclassErrorKind, MethodDecorator, MroLookup, NamedTupleField, SlotsKind,
+            synthesize_namedtuple_class_member,
             typed_dict::{TypedDictFields, synthesize_typed_dict_method, typed_dict_class_member},
         },
         context::InferContext,
@@ -157,7 +159,7 @@ impl<'db> StaticClassLiteral<'db> {
     ) -> Self {
         Self::new(
             db,
-            self.name(db).clone(),
+            self.name(db),
             self.body_scope(db),
             self.known(db),
             self.deprecated(db),
@@ -529,13 +531,16 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// Iterate over this class's explicit bases, filtering out any bases that are not class
-    /// objects, and applying default specialization to any unspecialized generic class literals.
+    /// Iterate over this class's explicit bases, resolving them in the same way as MRO
+    /// construction, filtering out any bases that are not fully static class objects.
     fn fully_static_explicit_bases(self, db: &'db dyn Db) -> impl Iterator<Item = ClassType<'db>> {
         self.explicit_bases(db)
             .iter()
             .copied()
-            .filter_map(|ty| ty.to_class_type(db))
+            .filter_map(move |ty| {
+                ClassBase::try_from_type(db, ty, Some(ClassLiteral::Static(self)))
+                    .and_then(ClassBase::into_class)
+            })
     }
 
     /// Determine if this class is a protocol.
@@ -693,22 +698,54 @@ impl<'db> StaticClassLiteral<'db> {
             .contains(&ClassBase::Class(other))
     }
 
-    /// Return `true` if this class constitutes a typed dict specification (inherits from
-    /// `typing.TypedDict`, either directly or indirectly).
-    pub fn is_typed_dict(self, db: &'db dyn Db) -> bool {
-        #[salsa::tracked(cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
-        fn is_typed_dict_inner<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
-            class.iter_mro(db, None).contains(&ClassBase::TypedDict)
+    /// Return the properties that affect how instances of this class are represented.
+    pub(super) fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
+        #[salsa::tracked(
+            cycle_initial=|_, _, _| ClassInstanceFlags::empty(),
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn instance_flags_inner<'db>(
+            db: &'db dyn Db,
+            class: StaticClassLiteral<'db>,
+        ) -> ClassInstanceFlags {
+            let mut flags = ClassInstanceFlags::empty();
+            for base in class.iter_mro(db, None) {
+                if base.is_typed_dict() {
+                    flags.insert(ClassInstanceFlags::TYPED_DICT);
+                }
+                if base.is_explicit_any_base() {
+                    flags.insert(ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY);
+                }
+            }
+            flags
         }
 
         if let Some(known) = self.known(db) {
-            return known.is_typed_dict_subclass();
+            return if known.is_typed_dict_subclass() {
+                ClassInstanceFlags::TYPED_DICT
+            } else {
+                ClassInstanceFlags::empty()
+            };
         }
 
         if !self.has_explicit_bases(db) {
-            return false;
+            return ClassInstanceFlags::empty();
         }
-        is_typed_dict_inner(db, self)
+        instance_flags_inner(db, self)
+    }
+
+    /// Return the module defining the `TypedDict` base of this class.
+    #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn typed_dict_module(self, db: &'db dyn Db) -> Option<TypedDictModule> {
+        self.iter_mro(db, None)
+            .find_map(ClassBase::typed_dict_module)
+    }
+
+    /// Return `true` if this class constitutes a typed dict specification (inherits from
+    /// `typing.TypedDict` or `typing_extensions.TypedDict`, either directly or indirectly).
+    pub fn is_typed_dict(self, db: &'db dyn Db) -> bool {
+        self.instance_flags(db)
+            .contains(ClassInstanceFlags::TYPED_DICT)
     }
 
     /// Return `true` if this class is, or inherits from, a `NamedTuple` (inherits from
@@ -1106,13 +1143,9 @@ impl<'db> StaticClassLiteral<'db> {
 
         match result {
             ClassMemberResult::Done(result) => result.finalize(db),
-            ClassMemberResult::TypedDict => typed_dict_class_member(
-                db,
-                TypedDictType::new(self.identity_specialization(db)),
-                ClassLiteral::Static(self),
-                policy,
-                name,
-            ),
+            ClassMemberResult::TypedDict(module) => {
+                typed_dict_class_member(db, self.identity_specialization(db), module, policy, name)
+            }
         }
     }
 
@@ -1778,7 +1811,10 @@ impl<'db> StaticClassLiteral<'db> {
                 }
                 None => self.identity_specialization(db),
             };
-            typed_dict_class_member(db, TypedDictType::new(class), self.into(), policy, name)
+            let Some(module) = self.typed_dict_module(db) else {
+                return Place::Undefined.into();
+            };
+            typed_dict_class_member(db, class, module, policy, name)
         }
     }
 
@@ -2044,7 +2080,7 @@ impl<'db> StaticClassLiteral<'db> {
                     default_ty = field.default_type(db);
                     init = field.init(db);
                     kw_only = field.kw_only(db);
-                    alias = field.alias(db);
+                    alias.clone_from(field.alias(db));
                     converter = field.converter(db);
                 }
 
@@ -2171,25 +2207,25 @@ impl<'db> StaticClassLiteral<'db> {
 
         Self::implicit_attribute_inner(
             db,
-            class_body_scope,
-            name.to_string(),
-            target_method_decorator,
+            ImplicitAttributeName::new(db, class_body_scope, name, target_method_decorator),
         )
     }
 
     #[salsa::tracked(
         cycle_fn=implicit_attribute_cycle_recover,
-        cycle_initial=|_, id, _, _, _| Member {
+        cycle_initial=|_, id, _| Member {
             inner: Place::bound(Type::divergent(id)).into(),
         },
         heap_size=ruff_memory_usage::heap_size,
     )]
-    pub(super) fn implicit_attribute_inner(
+    fn implicit_attribute_inner(
         db: &'db dyn Db,
-        class_body_scope: ScopeId<'db>,
-        name: String,
-        target_method_decorator: MethodDecorator,
+        attribute: ImplicitAttributeName<'db>,
     ) -> Member<'db> {
+        let class_body_scope = attribute.class_body_scope(db);
+        let name = attribute.name(db);
+        let target_method_decorator = attribute.target_method_decorator(db);
+
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of the raw types inferred from all bindings of that
         // attribute, then apply public-type promotion to the final union.
@@ -2248,7 +2284,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         // First check declarations
         for (attribute_declarations, method_scope_id) in
-            attribute_declarations(db, class_body_scope, &name)
+            attribute_declarations(db, class_body_scope, name)
         {
             let method_scope = index.scope(method_scope_id);
             if !is_valid_scope(method_scope) {
@@ -2308,7 +2344,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         for (attribute_assignments, attribute_binding_scope_id) in
-            attribute_assignments(db, class_body_scope, &name)
+            attribute_assignments(db, class_body_scope, name)
         {
             let binding_scope = index.scope(attribute_binding_scope_id);
             if !is_valid_scope(binding_scope) {
@@ -3152,6 +3188,17 @@ fn explicit_bases_cycle_fn<'db>(
     }
 }
 
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct ImplicitAttributeName<'db> {
+    class_body_scope: ScopeId<'db>,
+    #[returns(deref)]
+    name: CompactString,
+    target_method_decorator: MethodDecorator,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ImplicitAttributeName<'_> {}
+
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 fn implicit_attribute_names<'db>(db: &'db dyn Db, class_body_scope: ScopeId<'db>) -> Box<[Name]> {
     let index = semantic_index(db, class_body_scope.file(db));
@@ -3176,9 +3223,7 @@ fn implicit_attribute_cycle_recover<'db>(
     cycle: &salsa::Cycle,
     previous_member: &Member<'db>,
     member: Member<'db>,
-    _class_body_scope: ScopeId<'db>,
-    _name: String,
-    _target_method_decorator: MethodDecorator,
+    _attribute: ImplicitAttributeName<'db>,
 ) -> Member<'db> {
     let inner = member
         .inner

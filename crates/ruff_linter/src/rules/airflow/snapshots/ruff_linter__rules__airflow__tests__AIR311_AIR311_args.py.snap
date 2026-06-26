@@ -8,16 +8,14 @@ AIR311 [*] `airflow.DAG` is removed in Airflow 3.0; It still works in Airflow 3.
    | ^^^
    |
 help: `DAG` has been moved to `airflow.sdk` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
-2  |
-3  | from datetime import timedelta
-4  |
-   - from airflow import DAG, dag
-5  + from airflow import dag
-6  | from airflow.operators.datetime import BranchDateTimeOperator
-7  + from airflow.sdk import DAG
-8  |
-9  |
-10 | def sla_callback(*arg, **kwargs):
+  |
+4 |
+  - from airflow import DAG, dag
+5 + from airflow import dag
+6 | from airflow.operators.datetime import BranchDateTimeOperator
+7 + from airflow.sdk import DAG
+8 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 `sla_miss_callback` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.

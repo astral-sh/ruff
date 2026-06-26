@@ -9,7 +9,7 @@ use ruff_python_trivia::CommentRanges;
 use crate::Locator;
 use crate::Violation;
 use crate::checkers::ast::LintContext;
-use crate::preview::is_type_comment_in_non_stub_enabled;
+use crate::preview::is_legacy_type_comment_in_non_stub_enabled;
 
 /// ## What it does
 /// Checks for the use of type comments (e.g., `x = 1  # type: int`).
@@ -36,9 +36,9 @@ use crate::preview::is_type_comment_in_non_stub_enabled;
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.254")]
-pub(crate) struct TypeCommentInStub;
+pub(crate) struct LegacyTypeComment;
 
-impl Violation for TypeCommentInStub {
+impl Violation for LegacyTypeComment {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Don't use type comments".to_string()
@@ -46,13 +46,13 @@ impl Violation for TypeCommentInStub {
 }
 
 /// PYI033
-pub(crate) fn type_comment_in_stub(
+pub(crate) fn legacy_type_comment(
     context: &LintContext,
     locator: &Locator,
     comment_ranges: &CommentRanges,
     source_type: PySourceType,
 ) {
-    if !source_type.is_stub() && !is_type_comment_in_non_stub_enabled(context.settings()) {
+    if !source_type.is_stub() && !is_legacy_type_comment_in_non_stub_enabled(context.settings()) {
         return;
     }
 
@@ -60,7 +60,7 @@ pub(crate) fn type_comment_in_stub(
         let comment = locator.slice(range);
 
         if TYPE_COMMENT_REGEX.is_match(comment) && !TYPE_IGNORE_REGEX.is_match(comment) {
-            context.report_diagnostic(TypeCommentInStub, range);
+            context.report_diagnostic(LegacyTypeComment, range);
         }
     }
 }

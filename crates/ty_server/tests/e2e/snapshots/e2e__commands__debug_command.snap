@@ -40,7 +40,7 @@ Settings: Settings {
     rules: <RULES>,
     terminal: TerminalSettings {
         output_format: Full,
-        error_on_warning: false,
+        error_on_warning: true,
     },
     src: SrcSettings {
         respect_ignore_files: true,

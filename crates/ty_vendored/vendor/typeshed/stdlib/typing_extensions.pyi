@@ -59,7 +59,6 @@ from typing import (  # noqa: Y022,Y037,Y038,Y039,UP035
     Tuple as Tuple,
     Type as Type,
     TypeAlias as TypeAlias,
-    TypedDict as TypedDict,
     TypeGuard as TypeGuard,
     TypeVar as _TypeVar,
     Union as Union,
@@ -71,6 +70,9 @@ from typing import (  # noqa: Y022,Y037,Y038,Y039,UP035
     overload as overload,
     type_check_only,
 )
+
+if sys.version_info >= (3, 14):
+    from _typeshed import EvaluateFunc
 
 # Please keep order the same as at runtime.
 __all__ = [
@@ -143,6 +145,7 @@ __all__ = [
     "override",
     "Protocol",
     "Sentinel",
+    "sentinel",
     "reveal_type",
     "runtime",
     "runtime_checkable",
@@ -366,6 +369,57 @@ impose restrictions.
 """
 
 def IntVar(name: str) -> Any: ...  # returns a new TypeVar
+
+# Kept as a distinct symbol to `typing.TypedDict` so that type checkers can more easily
+# distinguish between the two on Python 3.14, on which `typing_extensions.TypedDict`
+# exposes `__closed__` and `__extra_items__` but `typing.TypedDict` does not
+TypedDict: _SpecialForm
+"""A simple typed namespace. At runtime it is equivalent to a plain dict.
+
+TypedDict creates a dictionary type such that a type checker will expect all
+instances to have a certain set of keys, where each key is
+associated with a value of a consistent type. This expectation
+is not checked at runtime.
+
+Usage::
+
+    class Point2D(TypedDict):
+        x: int
+        y: int
+        label: str
+
+    a: Point2D = {'x': 1, 'y': 2, 'label': 'good'}  # OK
+    b: Point2D = {'z': 3, 'label': 'bad'}           # Fails type check
+
+    assert Point2D(x=1, y=2, label='first') == dict(x=1, y=2, label='first')
+
+The type info can be accessed via the Point2D.__annotations__ dict, and
+the Point2D.__required_keys__ and Point2D.__optional_keys__ frozensets.
+TypedDict supports an additional equivalent form::
+
+    Point2D = TypedDict('Point2D', {'x': int, 'y': int, 'label': str})
+
+By default, all keys must be present in a TypedDict. It is possible
+to override this by specifying totality::
+
+    class Point2D(TypedDict, total=False):
+        x: int
+        y: int
+
+This means that a Point2D TypedDict can have any of the keys omitted. A type
+checker is only expected to support a literal False or True as the value of
+the total argument. True is the default, and makes all items defined in the
+class body be required.
+
+The Required and NotRequired special forms can also be used to mark
+individual keys as being required or not required::
+
+    class Point2D(TypedDict):
+        x: int  # the "x" key must always be present (Required is the default)
+        y: NotRequired[int]  # the "y" key can be omitted
+
+See PEP 655 for more details on Required and NotRequired.
+"""
 
 # Internal mypy fallback type for all typed dicts (does not exist at runtime)
 # N.B. Keep this mostly in sync with typing._TypedDict/mypy_extensions._TypedDict
@@ -1064,7 +1118,6 @@ if sys.version_info >= (3, 13):
         ReadOnly as ReadOnly,
         TypeIs as TypeIs,
         TypeVar as TypeVar,
-        TypeVarTuple as TypeVarTuple,
         get_protocol_members as get_protocol_members,
         is_protocol as is_protocol,
     )
@@ -1094,8 +1147,8 @@ else:
             >>> class P(Protocol):
             ...     def a(self) -> str: ...
             ...     b: int
-            >>> get_protocol_members(P)
-            frozenset({'a', 'b'})
+            >>> get_protocol_members(P) == frozenset({'a', 'b'})
+            True
 
         Raise a TypeError for arguments that are not Protocols.
         """
@@ -1243,19 +1296,6 @@ else:
         def has_default(self) -> bool: ...
         def __typing_prepare_subst__(self, alias: Any, args: Any) -> tuple[Any, ...]: ...
 
-    @final
-    class TypeVarTuple:
-        """Type variable tuple."""
-
-        @property
-        def __name__(self) -> str: ...
-        @property
-        def __default__(self) -> AnnotationForm: ...
-        def __init__(self, name: str, *, default: AnnotationForm = ...) -> None: ...
-        def __iter__(self) -> Any: ...  # Unpack[Self]
-        def has_default(self) -> bool: ...
-        def __typing_prepare_subst__(self, alias: Any, args: Any) -> tuple[Any, ...]: ...
-
     ReadOnly: _SpecialForm
     """A special typing construct to mark an item of a TypedDict as read-only.
 
@@ -1309,6 +1349,58 @@ else:
     ``TypeIs`` also works with type variables.  For more information, see
     PEP 742 (Narrowing types with TypeIs).
     """
+
+if sys.version_info >= (3, 15):
+    from typing import TypeVarTuple as TypeVarTuple
+else:
+    @final
+    class TypeVarTuple:
+        """Type variable tuple."""
+
+        @property
+        def __name__(self) -> str: ...
+        @property
+        def __bound__(self) -> AnnotationForm | None: ...
+        @property
+        def __covariant__(self) -> bool: ...
+        @property
+        def __contravariant__(self) -> bool: ...
+        @property
+        def __infer_variance__(self) -> bool: ...
+        @property
+        def __default__(self) -> AnnotationForm: ...
+        if sys.version_info >= (3, 11):
+            def __new__(
+                cls,
+                name: str,
+                *,
+                bound: AnnotationForm | None = None,
+                covariant: bool = False,
+                contravariant: bool = False,
+                infer_variance: bool = False,
+                default: AnnotationForm = ...,
+            ) -> Self: ...
+        else:
+            def __init__(
+                self,
+                name: str,
+                *,
+                bound: AnnotationForm | None = None,
+                covariant: bool = False,
+                contravariant: bool = False,
+                infer_variance: bool = False,
+                default: AnnotationForm = ...,
+            ) -> None: ...
+
+        def __iter__(self) -> Any: ...  # Unpack[Self]
+        def has_default(self) -> bool: ...
+        if sys.version_info >= (3, 11):
+            def __typing_subst__(self, arg: Never, /) -> Never: ...
+
+        def __typing_prepare_subst__(self, alias: Any, args: Any, /) -> tuple[Any, ...]: ...
+        if sys.version_info >= (3, 14):
+            @property
+            def evaluate_default(self) -> EvaluateFunc | None: ...
 
 # TypeAliasType was added in Python 3.12, but had significant changes in 3.14.
 if sys.version_info >= (3, 14):
@@ -1560,19 +1652,27 @@ else:
         """
 
 # PEP 661
-class Sentinel:
-    """Create a unique sentinel object.
+if sys.version_info >= (3, 15):
+    from builtins import sentinel as sentinel
+else:
+    class sentinel:
+        """Create a unique sentinel object.
 
-    *name* should be the name of the variable to which the return value shall be assigned.
+        *name* should be the name of the variable to which the return value
+        shall be assigned.
+        """
 
-    *repr*, if supplied, will be used for the repr of the sentinel object.
-    If not provided, "<name>" will be used.
-    """
+        def __init__(self, name: str, /, *, repr: str | None = None) -> None: ...
+        __name__: str
+        __module__: str
+        if sys.version_info >= (3, 14):
+            # `other`` can be any type form legal for unions.
+            # `x | x` creates a `sentinel` instance if `x` is a sentinel, not a `UnionType` instance
+            def __or__(self, other: Any) -> UnionType | sentinel: ...
+            def __ror__(self, other: Any) -> UnionType | sentinel: ...
+        else:
+            # other can be any type form legal for unions
+            def __or__(self, other: Any) -> _SpecialForm: ...
+            def __ror__(self, other: Any) -> _SpecialForm: ...
 
-    def __init__(self, name: str, repr: str | None = None) -> None: ...
-    if sys.version_info >= (3, 14):
-        def __or__(self, other: Any) -> UnionType: ...  # other can be any type form legal for unions
-        def __ror__(self, other: Any) -> UnionType: ...  # other can be any type form legal for unions
-    else:
-        def __or__(self, other: Any) -> _SpecialForm: ...  # other can be any type form legal for unions
-        def __ror__(self, other: Any) -> _SpecialForm: ...  # other can be any type form legal for unions
+Sentinel = sentinel

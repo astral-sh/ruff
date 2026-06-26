@@ -23,9 +23,10 @@ use get_size2::GetSize;
 ///
 /// This trick adds O(1.5) bits of overhead per large vector element on 64-bit platforms, and O(2)
 /// bits of overhead on 32-bit platforms.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, GetSize)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, GetSize, salsa::Update)]
 pub struct RankBitBox {
     #[get_size(size_fn = bit_box_size)]
+    #[update(fallback)]
     bits: RankBitBoxStorage,
     chunk_ranks: Box<[u32]>,
 }
@@ -34,7 +35,7 @@ pub type RankBitBoxStorage = BitBox<Chunk, Msb0>;
 pub type RankBitBoxVec = BitVec<Chunk, Msb0>;
 
 fn bit_box_size(bits: &RankBitBoxStorage) -> usize {
-    bits.as_raw_slice().get_heap_size()
+    std::mem::size_of_val(bits.as_raw_slice())
 }
 
 // bitvec does not support `u64` as a Store type on 32-bit platforms
@@ -44,21 +45,6 @@ type Chunk = u64;
 type Chunk = u32;
 
 const CHUNK_SIZE: usize = Chunk::BITS as usize;
-
-// SAFETY: This is the standard pattern for implementing salsa::Update. Salsa ensures that the
-// `old_pointer` we are provided can safely be used as a mutable reference to the old value.
-#[expect(unsafe_code)]
-unsafe impl salsa::Update for RankBitBox {
-    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        let old_ref = unsafe { &mut *old_pointer };
-        if *old_ref != new_value {
-            *old_ref = new_value;
-            true
-        } else {
-            false
-        }
-    }
-}
 
 impl RankBitBox {
     pub fn bits_with_capacity(cap: usize) -> RankBitBoxVec {
@@ -116,5 +102,26 @@ impl RankBitBox {
         let chunk_mask = Chunk::MAX << (CHUNK_SIZE - index_within_chunk);
         let rank_within_chunk = (chunk & chunk_mask).count_ones();
         chunk_rank + rank_within_chunk
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::mem::size_of;
+
+    use get_size2::GetSize;
+
+    use super::{CHUNK_SIZE, Chunk, RankBitBox};
+
+    #[test]
+    fn heap_size_includes_bits_and_chunk_ranks() {
+        let bit_count = CHUNK_SIZE + 1;
+        let bits = RankBitBox::from_bits(RankBitBox::bits_with_capacity(bit_count));
+        let chunk_count = bit_count.div_ceil(CHUNK_SIZE);
+
+        assert_eq!(
+            bits.get_heap_size(),
+            chunk_count * (size_of::<Chunk>() + size_of::<u32>())
+        );
     }
 }

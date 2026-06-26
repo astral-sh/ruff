@@ -141,6 +141,9 @@ Running `ruff check --select F401` would result in Ruff enforcing `F401`, and no
 Running `ruff check --extend-select B` would result in Ruff enforcing the `E`, `F`, and `B` rules,
 with the exception of `F401`.
 
+When [preview mode](preview.md) is enabled, rule selectors also accept the human-readable name of a
+rule (e.g., `unused-import`).
+
 ## Fixes
 
 Ruff supports automatic fixes for a variety of lint errors. For example, Ruff can remove unused

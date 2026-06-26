@@ -427,8 +427,8 @@ fn user_configuration() -> anyhow::Result<()> {
     assert_cmd_snapshot!(
         case.command().arg("--verbose").current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
         @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> main.py:2:5

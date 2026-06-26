@@ -12,8 +12,7 @@ TC003 [*] Move standard library import `typing.Final` into a type-checking block
 7 | Const: Final[dict] = {}
   |
 help: Move into type-checking block
-2  |
-3  | from __future__ import annotations
+   |
 4  |
    - from typing import Final, Mapping
 5  + from typing import Mapping
@@ -22,5 +21,5 @@ help: Move into type-checking block
 8  + if TYPE_CHECKING:
 9  +     from typing import Final
 10 |
-11 | Const: Final[dict] = {}
+   |
 note: This is an unsafe fix and may change runtime behavior

@@ -713,7 +713,6 @@ if sys.version_info >= (3, 15):
         """Gets the global lazy imports mode.
 
         Returns "all" if all top level imports are potentially lazy.
-        Returns "none" if all explicitly marked lazy imports are suppressed.
         Returns "normal" if only explicitly marked imports are lazy.
         """
 
@@ -996,7 +995,6 @@ if sys.version_info >= (3, 15):
 
         The mode parameter must be one of the following strings:
         - "all": All top-level imports become potentially lazy
-        - "none": All lazy imports are suppressed (even explicitly marked ones)
         - "normal": Only explicitly marked imports (with 'lazy' keyword) are
           lazy
 

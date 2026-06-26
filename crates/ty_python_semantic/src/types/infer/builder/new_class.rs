@@ -147,7 +147,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let has_exec_body = exec_body_arg.is_some_and(|arg| !arg.is_none_literal_expr());
         let members: Box<[(ast::name::Name, Type<'db>)]> = Box::new([]);
         let dynamic_class =
-            DynamicClassLiteral::new(db, name.clone(), anchor, members, has_exec_body, None);
+            DynamicClassLiteral::new(db, &name, anchor, members, has_exec_body, None);
 
         // For dangling calls, validate bases eagerly. For assigned calls, validation is
         // deferred along with bases inference.

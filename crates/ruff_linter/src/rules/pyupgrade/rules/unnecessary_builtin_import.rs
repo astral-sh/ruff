@@ -10,11 +10,12 @@ use crate::rules::pyupgrade::rules::is_import_required_by_isort;
 use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
-/// Checks for unnecessary imports of builtins.
+/// Checks for imports of Python 3 builtins from Python 2 compatibility shims
+/// such as `python-future` and `six`.
 ///
 /// ## Why is this bad?
-/// Builtins are always available. Importing them is unnecessary and should be
-/// removed to avoid confusion.
+/// These shims existed to access Python 3 builtins from code that also ran on
+/// Python 2. On Python 3-only code, the imports are redundant.
 ///
 /// ## Example
 /// ```python

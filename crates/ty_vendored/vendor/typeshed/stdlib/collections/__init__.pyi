@@ -376,7 +376,7 @@ class deque(MutableSequence[_T]):
     def __ge__(self, value: deque[_T], /) -> bool: ...
     def __eq__(self, value: object, /) -> bool: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """deques are generic over the type of their contents"""
 
 class Counter(dict[_T, int], Generic[_T]):
     """Dict subclass for counting hashable items.  Sometimes called a bag

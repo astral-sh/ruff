@@ -16,6 +16,7 @@ I001 [*] Import block is un-sorted or un-formatted
   | |________________________________________________^
   |
 help: Organize imports
+   |
 1  | # Wrong heading
 2  + # Standard library imports
 3  | import os
@@ -28,3 +29,4 @@ help: Organize imports
 10 |
 11 + # First party imports
 12 | from my_first_party import my_first_party_object
+   |

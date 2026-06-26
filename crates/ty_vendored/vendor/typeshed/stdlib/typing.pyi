@@ -2133,8 +2133,8 @@ else:
     ) -> dict[str, Any]:  # AnnotationForm
         """Return type hints for an object.
 
-        This is often the same as obj.__annotations__, but it handles
-        forward references encoded as string literals and recursively replaces all
+        This is often the same as inspect.get_annotations(obj) or obj.__annotations__,
+        but it handles forward references encoded as string literals and recursively replaces all
         'Annotated[T, ...]' with 'T' (unless 'include_extras=True').
 
         The argument may be a module, class, method, or function. The annotations

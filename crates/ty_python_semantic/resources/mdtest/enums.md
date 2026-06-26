@@ -694,6 +694,44 @@ class Child(Base):
     GITHUB = "github"  # error: [invalid-assignment]
 ```
 
+### Data-type mixin `__new__`
+
+A user-defined `__new__` on a data-type mixin constructs the scalar payload and can transform the
+declared member value. Members are validated against its signature, and their `.value` types remain
+dynamic when we cannot model the transformation:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+class OffsetInt(int):
+    def __new__(cls, value: int) -> "OffsetInt":
+        return int.__new__(cls, value + 1)
+
+class OffsetEnum(OffsetInt, Enum):
+    VALID = 1
+    INVALID = "not an int"  # error: [invalid-assignment]
+
+reveal_type(OffsetEnum.VALID.value)  # revealed: Any
+
+class WeirdInt(int):
+    def __new__(cls, value: int) -> "WeirdInt":
+        return int.__new__(cls, 100 if value is False else value)
+
+class EmptyWeirdEnum(WeirdInt, Enum):
+    pass
+
+class InheritedWeirdEnum(EmptyWeirdEnum):
+    FROM_BOOL = False
+    FROM_INT = 0
+    OTHER = 2
+
+reveal_type(InheritedWeirdEnum.FROM_BOOL.value)  # revealed: Any
+reveal_type(InheritedWeirdEnum.FROM_INT)  # revealed: Literal[InheritedWeirdEnum.FROM_INT]
+# revealed: tuple[Literal["FROM_BOOL"], Literal["FROM_INT"], Literal["OTHER"]]
+reveal_type(enum_members(InheritedWeirdEnum))
+```
+
 ### Assigned `__new__`
 
 Assigning to `__new__` can prevent us from validating members against its signature or inferring
@@ -1017,6 +1055,26 @@ reveal_type(enum_members(Color))
 
 # revealed: Literal[Color.RED]
 reveal_type(Color.red)
+```
+
+Literal metadata does not affect aliasing at runtime. A value returned from a function is therefore
+still an alias of the same literal written directly in the class body:
+
+```py
+from enum import Enum
+from typing import Literal
+from ty_extensions import enum_members
+
+def make_alias_value() -> Literal["value"]:
+    return "value"
+
+class RuntimeAlias(Enum):
+    FIRST = make_alias_value()
+    SECOND = "value"
+
+# revealed: tuple[Literal["FIRST"]]
+reveal_type(enum_members(RuntimeAlias))
+reveal_type(RuntimeAlias.SECOND)  # revealed: RuntimeAlias
 ```
 
 Multiple aliases to the same member are also supported. This is a regression test for

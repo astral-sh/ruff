@@ -9,14 +9,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `_S`
   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Replace TypeVar `_S` with `Self`
-4  | _S2 = TypeVar("_S2", BadClass, GoodClass)
-5  |
-6  | class BadClass:
-   -     def __new__(cls: type[_S], *args: str, **kwargs: int) -> _S: ...  # PYI019
-7  +     def __new__(cls, *args: str, **kwargs: int) -> Self: ...  # PYI019
-8  |
-9  |
-10 |     def bad_instance_method(self: _S, arg: bytes) -> _S: ...  # PYI019
+  |
+6 | class BadClass:
+  -     def __new__(cls: type[_S], *args: str, **kwargs: int) -> _S: ...  # PYI019
+7 +     def __new__(cls, *args: str, **kwargs: int) -> Self: ...  # PYI019
+8 |
+  |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `_S`
   --> PYI019_0.pyi:10:28
@@ -25,14 +23,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `_S`
    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Replace TypeVar `_S` with `Self`
-7  |     def __new__(cls: type[_S], *args: str, **kwargs: int) -> _S: ...  # PYI019
-8  |
+   |
 9  |
    -     def bad_instance_method(self: _S, arg: bytes) -> _S: ...  # PYI019
 10 +     def bad_instance_method(self, arg: bytes) -> Self: ...  # PYI019
 11 |
-12 |
-13 |     @classmethod
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `_S`
   --> PYI019_0.pyi:14:25
@@ -42,14 +38,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `_S`
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Replace TypeVar `_S` with `Self`
-11 |
-12 |
+   |
 13 |     @classmethod
    -     def bad_class_method(cls: type[_S], arg: int) -> _S: ...  # PYI019
 14 +     def bad_class_method(cls, arg: int) -> Self: ...  # PYI019
 15 |
-16 |
-17 |     @classmethod
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `_S`
   --> PYI019_0.pyi:18:33
@@ -59,14 +53,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `_S`
    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Replace TypeVar `_S` with `Self`
-15 |
-16 |
+   |
 17 |     @classmethod
    -     def bad_posonly_class_method(cls: type[_S], /) -> _S: ...  # PYI019
 18 +     def bad_posonly_class_method(cls, /) -> Self: ...  # PYI019
 19 |
-20 |
-21 |     @classmethod
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
   --> PYI019_0.pyi:39:14
@@ -77,14 +69,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Replace TypeVar `S` with `Self`
-36 |
-37 | # Python > 3.12
+   |
 38 | class PEP695BadDunderNew[T]:
    -   def __new__[S](cls: type[S], *args: Any, ** kwargs: Any) -> S: ...  # PYI019
 39 +   def __new__(cls, *args: Any, ** kwargs: Any) -> Self: ...  # PYI019
 40 |
-41 |
-42 |   def generic_instance_method[S](self: S) -> S: ...  # PYI019
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
   --> PYI019_0.pyi:42:30
@@ -93,14 +83,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
    |                              ^^^^^^^^^^^^^^^^^
    |
 help: Replace TypeVar `S` with `Self`
-39 |   def __new__[S](cls: type[S], *args: Any, ** kwargs: Any) -> S: ...  # PYI019
-40 |
+   |
 41 |
    -   def generic_instance_method[S](self: S) -> S: ...  # PYI019
 42 +   def generic_instance_method(self) -> Self: ...  # PYI019
 43 |
-44 |
-45 | class PEP695GoodDunderNew[T]:
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
   --> PYI019_0.pyi:54:11
@@ -111,14 +99,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
    |           ^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Replace TypeVar `S` with `Self`
-51 |    # due to `foo_classmethod being listed in `pep8_naming.classmethod-decorators`
-52 |    # in the settings for this test:
+   |
 53 |    @foo_classmethod
    -    def foo[S](cls: type[S]) -> S: ...  # PYI019
 54 +    def foo(cls) -> Self: ...  # PYI019
 55 |
-56 |
-57 | _S695 = TypeVar("_S695", bound="PEP695Fix")
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
   --> PYI019_0.pyi:61:16
@@ -130,14 +116,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 63 |     def __init_subclass__[S](cls: type[S]) -> S: ...
    |
 help: Replace TypeVar `S` with `Self`
-58 |
-59 |
+   |
 60 | class PEP695Fix:
    -     def __new__[S: PEP695Fix](cls: type[S]) -> S: ...
 61 +     def __new__(cls) -> Self: ...
 62 |
-63 |     def __init_subclass__[S](cls: type[S]) -> S: ...
-64 |
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
   --> PYI019_0.pyi:63:26
@@ -150,14 +134,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 65 |     def __neg__[S: PEP695Fix](self: S) -> S: ...
    |
 help: Replace TypeVar `S` with `Self`
-60 | class PEP695Fix:
-61 |     def __new__[S: PEP695Fix](cls: type[S]) -> S: ...
+   |
 62 |
    -     def __init_subclass__[S](cls: type[S]) -> S: ...
 63 +     def __init_subclass__(cls) -> Self: ...
 64 |
-65 |     def __neg__[S: PEP695Fix](self: S) -> S: ...
-66 |
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
   --> PYI019_0.pyi:65:16
@@ -170,14 +152,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 67 |     def __pos__[S](self: S) -> S: ...
    |
 help: Replace TypeVar `S` with `Self`
-62 |
-63 |     def __init_subclass__[S](cls: type[S]) -> S: ...
+   |
 64 |
    -     def __neg__[S: PEP695Fix](self: S) -> S: ...
 65 +     def __neg__(self) -> Self: ...
 66 |
-67 |     def __pos__[S](self: S) -> S: ...
-68 |
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
   --> PYI019_0.pyi:67:16
@@ -190,14 +170,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 69 |     def __add__[S: PEP695Fix](self: S, other: S) -> S: ...
    |
 help: Replace TypeVar `S` with `Self`
-64 |
-65 |     def __neg__[S: PEP695Fix](self: S) -> S: ...
+   |
 66 |
    -     def __pos__[S](self: S) -> S: ...
 67 +     def __pos__(self) -> Self: ...
 68 |
-69 |     def __add__[S: PEP695Fix](self: S, other: S) -> S: ...
-70 |
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
   --> PYI019_0.pyi:69:16
@@ -210,14 +188,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 71 |     def __sub__[S](self: S, other: S) -> S: ...
    |
 help: Replace TypeVar `S` with `Self`
-66 |
-67 |     def __pos__[S](self: S) -> S: ...
+   |
 68 |
    -     def __add__[S: PEP695Fix](self: S, other: S) -> S: ...
 69 +     def __add__(self, other: Self) -> Self: ...
 70 |
-71 |     def __sub__[S](self: S, other: S) -> S: ...
-72 |
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
   --> PYI019_0.pyi:71:16
@@ -230,14 +206,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 73 |     @classmethod
    |
 help: Replace TypeVar `S` with `Self`
-68 |
-69 |     def __add__[S: PEP695Fix](self: S, other: S) -> S: ...
+   |
 70 |
    -     def __sub__[S](self: S, other: S) -> S: ...
 71 +     def __sub__(self, other: Self) -> Self: ...
 72 |
-73 |     @classmethod
-74 |     def class_method_bound[S: PEP695Fix](cls: type[S]) -> S: ...
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
   --> PYI019_0.pyi:74:27
@@ -249,14 +223,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 76 |     @classmethod
    |
 help: Replace TypeVar `S` with `Self`
-71 |     def __sub__[S](self: S, other: S) -> S: ...
-72 |
+   |
 73 |     @classmethod
    -     def class_method_bound[S: PEP695Fix](cls: type[S]) -> S: ...
 74 +     def class_method_bound(cls) -> Self: ...
 75 |
-76 |     @classmethod
-77 |     def class_method_unbound[S](cls: type[S]) -> S: ...
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
   --> PYI019_0.pyi:77:29
@@ -268,14 +240,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 79 |     def instance_method_bound[S: PEP695Fix](self: S) -> S: ...
    |
 help: Replace TypeVar `S` with `Self`
-74 |     def class_method_bound[S: PEP695Fix](cls: type[S]) -> S: ...
-75 |
+   |
 76 |     @classmethod
    -     def class_method_unbound[S](cls: type[S]) -> S: ...
 77 +     def class_method_unbound(cls) -> Self: ...
 78 |
-79 |     def instance_method_bound[S: PEP695Fix](self: S) -> S: ...
-80 |
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
   --> PYI019_0.pyi:79:30
@@ -288,14 +258,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 81 |     def instance_method_unbound[S](self: S) -> S: ...
    |
 help: Replace TypeVar `S` with `Self`
-76 |     @classmethod
-77 |     def class_method_unbound[S](cls: type[S]) -> S: ...
+   |
 78 |
    -     def instance_method_bound[S: PEP695Fix](self: S) -> S: ...
 79 +     def instance_method_bound(self) -> Self: ...
 80 |
-81 |     def instance_method_unbound[S](self: S) -> S: ...
-82 |
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
   --> PYI019_0.pyi:81:32
@@ -308,14 +276,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 83 |     def instance_method_bound_with_another_parameter[S: PEP695Fix](self: S, other: S) -> S: ...
    |
 help: Replace TypeVar `S` with `Self`
-78 |
-79 |     def instance_method_bound[S: PEP695Fix](self: S) -> S: ...
+   |
 80 |
    -     def instance_method_unbound[S](self: S) -> S: ...
 81 +     def instance_method_unbound(self) -> Self: ...
 82 |
-83 |     def instance_method_bound_with_another_parameter[S: PEP695Fix](self: S, other: S) -> S: ...
-84 |
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
   --> PYI019_0.pyi:83:53
@@ -328,14 +294,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 85 |     def instance_method_unbound_with_another_parameter[S](self: S, other: S) -> S: ...
    |
 help: Replace TypeVar `S` with `Self`
-80 |
-81 |     def instance_method_unbound[S](self: S) -> S: ...
+   |
 82 |
    -     def instance_method_bound_with_another_parameter[S: PEP695Fix](self: S, other: S) -> S: ...
 83 +     def instance_method_bound_with_another_parameter(self, other: Self) -> Self: ...
 84 |
-85 |     def instance_method_unbound_with_another_parameter[S](self: S, other: S) -> S: ...
-86 |
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
   --> PYI019_0.pyi:85:55
@@ -348,14 +312,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 87 |     def multiple_type_vars[S, *Ts, T](self: S, other: S, /, *args: *Ts, a: T, b: list[T]) -> S: ...
    |
 help: Replace TypeVar `S` with `Self`
-82 |
-83 |     def instance_method_bound_with_another_parameter[S: PEP695Fix](self: S, other: S) -> S: ...
+   |
 84 |
    -     def instance_method_unbound_with_another_parameter[S](self: S, other: S) -> S: ...
 85 +     def instance_method_unbound_with_another_parameter(self, other: Self) -> Self: ...
 86 |
-87 |     def multiple_type_vars[S, *Ts, T](self: S, other: S, /, *args: *Ts, a: T, b: list[T]) -> S: ...
-88 |
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
   --> PYI019_0.pyi:87:27
@@ -368,14 +330,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 89 |     def mixing_old_and_new_style_type_vars[T](self: _S695, a: T, b: T) -> _S695: ...
    |
 help: Replace TypeVar `S` with `Self`
-84 |
-85 |     def instance_method_unbound_with_another_parameter[S](self: S, other: S) -> S: ...
+   |
 86 |
    -     def multiple_type_vars[S, *Ts, T](self: S, other: S, /, *args: *Ts, a: T, b: list[T]) -> S: ...
 87 +     def multiple_type_vars[*Ts, T](self, other: Self, /, *args: *Ts, a: T, b: list[T]) -> Self: ...
 88 |
-89 |     def mixing_old_and_new_style_type_vars[T](self: _S695, a: T, b: T) -> _S695: ...
-90 |
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `_S695`
   --> PYI019_0.pyi:89:43
@@ -386,14 +346,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `_S695`
    |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Replace TypeVar `_S695` with `Self`
-86 |
-87 |     def multiple_type_vars[S, *Ts, T](self: S, other: S, /, *args: *Ts, a: T, b: list[T]) -> S: ...
+   |
 88 |
    -     def mixing_old_and_new_style_type_vars[T](self: _S695, a: T, b: T) -> _S695: ...
 89 +     def mixing_old_and_new_style_type_vars[T](self, a: T, b: T) -> Self: ...
 90 |
-91 |
-92 | class InvalidButWeDoNotPanic:
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
   --> PYI019_0.pyi:94:10
@@ -405,14 +363,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 95 |     def n(self: S) -> S[int]: ...
    |
 help: Replace TypeVar `S` with `Self`
-91 |
-92 | class InvalidButWeDoNotPanic:
+   |
 93 |     @classmethod
    -     def m[S](cls: type[S], /) -> S[int]: ...
 94 +     def m(cls, /) -> Self[int]: ...
 95 |     def n(self: S) -> S[int]: ...
-96 |
-97 |
+   |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
    --> PYI019_0.pyi:114:10
@@ -423,14 +379,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Replace TypeVar `S` with `Self`
-111 |
-112 | class SubscriptReturnType:
+    |
 113 |     @classmethod
     -     def m[S](cls: type[S]) -> type[S]: ...  # PYI019
 114 +     def m(cls) -> type[Self]: ...  # PYI019
 115 |
-116 |
-117 | class PEP695TypeParameterAtTheVeryEndOfTheList:
+    |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
    --> PYI019_0.pyi:118:10
@@ -440,14 +394,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
     |          ^^^^^^^^^^^^^^^^^^^^
     |
 help: Replace TypeVar `S` with `Self`
-115 |
-116 |
+    |
 117 | class PEP695TypeParameterAtTheVeryEndOfTheList:
     -     def f[T, S](self: S) -> S: ...
 118 +     def f[T](self) -> Self: ...
 119 |
-120 |
-121 | class PEP695Again:
+    |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `_S695`
    --> PYI019_0.pyi:122:26
@@ -458,14 +410,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `_S695`
 123 |     def also_uses_s695_but_should_not_be_edited(self, v: set[tuple[_S695]]) -> _S695: ...
     |
 help: Replace TypeVar `_S695` with `Self`
-119 |
-120 |
+    |
 121 | class PEP695Again:
     -     def mixing_and_nested[T](self: _S695, a: list[_S695], b: dict[_S695, str | T | set[_S695]]) -> _S695: ...
 122 +     def mixing_and_nested[T](self, a: list[Self], b: dict[Self, str | T | set[Self]]) -> Self: ...
 123 |     def also_uses_s695_but_should_not_be_edited(self, v: set[tuple[_S695]]) -> _S695: ...
-124 |
-125 |     @classmethod
+    |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
    --> PYI019_0.pyi:126:29
@@ -484,8 +434,7 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 134 |       def comment_outside_fix_range[T, S](
     |
 help: Replace TypeVar `S` with `Self`
-123 |     def also_uses_s695_but_should_not_be_edited(self, v: set[tuple[_S695]]) -> _S695: ...
-124 |
+    |
 125 |     @classmethod
     -     def comment_in_fix_range[T, S](
     -         cls: type[  # Lorem ipsum
@@ -499,8 +448,7 @@ help: Replace TypeVar `S` with `Self`
 129 +         b: tuple[Self, T]
 130 +     ) -> Self: ...
 131 |
-132 |     def comment_outside_fix_range[T, S](
-133 |         self: S,
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
@@ -520,8 +468,7 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
     | |__________^
     |
 help: Replace TypeVar `S` with `Self`
-131 |         b: tuple[S, T]
-132 |     ) -> S: ...
+    |
 133 |
     -     def comment_outside_fix_range[T, S](
     -         self: S,
@@ -536,8 +483,7 @@ help: Replace TypeVar `S` with `Self`
     -     ) -> S: ...
 141 +     ) -> Self: ...
 142 |
-143 |
-144 | class SelfNotUsedInReturnAnnotation:
+    |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
    --> PYI019_0.pyi:145:10
@@ -549,14 +495,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 147 |     def n[S](cls: type[S], other: S) -> int: ...
     |
 help: Replace TypeVar `S` with `Self`
-142 |
-143 |
+    |
 144 | class SelfNotUsedInReturnAnnotation:
     -     def m[S](self: S, other: S) -> int: ...
 145 +     def m(self, other: Self) -> int: ...
 146 |     @classmethod
-147 |     def n[S](cls: type[S], other: S) -> int: ...
-148 |
+    |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
    --> PYI019_0.pyi:147:10
@@ -567,14 +511,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Replace TypeVar `S` with `Self`
-144 | class SelfNotUsedInReturnAnnotation:
-145 |     def m[S](self: S, other: S) -> int: ...
+    |
 146 |     @classmethod
     -     def n[S](cls: type[S], other: S) -> int: ...
 147 +     def n(cls, other: Self) -> int: ...
 148 |
-149 |
-150 | class _NotATypeVar: ...
+    |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
    --> PYI019_0.pyi:161:10
@@ -586,14 +528,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 163 |     def n[S](cls: type[S], other: S): ...
     |
 help: Replace TypeVar `S` with `Self`
-158 |     def y(self: type[_NotATypeVar]) -> _NotATypeVar: ...
-159 |
+    |
 160 | class NoReturnAnnotations:
     -     def m[S](self: S, other: S): ...
 161 +     def m(self, other: Self): ...
 162 |     @classmethod
-163 |     def n[S](cls: type[S], other: S): ...
-164 |
+    |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
    --> PYI019_0.pyi:163:10
@@ -606,14 +546,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 165 | class MultipleBoundParameters:
     |
 help: Replace TypeVar `S` with `Self`
-160 | class NoReturnAnnotations:
-161 |     def m[S](self: S, other: S): ...
+    |
 162 |     @classmethod
     -     def n[S](cls: type[S], other: S): ...
 163 +     def n(cls, other: Self): ...
 164 |
-165 | class MultipleBoundParameters:
-166 |     def m[S: int, T: int](self: S, other: T) -> S: ...
+    |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
    --> PYI019_0.pyi:166:10
@@ -624,14 +562,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 167 |     def n[T: (int, str), S: (int, str)](self: S, other: T) -> S: ...
     |
 help: Replace TypeVar `S` with `Self`
-163 |     def n[S](cls: type[S], other: S): ...
-164 |
+    |
 165 | class MultipleBoundParameters:
     -     def m[S: int, T: int](self: S, other: T) -> S: ...
 166 +     def m[T: int](self, other: T) -> Self: ...
 167 |     def n[T: (int, str), S: (int, str)](self: S, other: T) -> S: ...
-168 |
-169 |
+    |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
    --> PYI019_0.pyi:167:10
@@ -642,14 +578,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Replace TypeVar `S` with `Self`
-164 |
-165 | class MultipleBoundParameters:
+    |
 166 |     def m[S: int, T: int](self: S, other: T) -> S: ...
     -     def n[T: (int, str), S: (int, str)](self: S, other: T) -> S: ...
 167 +     def n[T: (int, str)](self, other: T) -> Self: ...
 168 |
-169 |
-170 | MetaType = TypeVar("MetaType")
+    |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `_S`
    --> PYI019_0.pyi:181:52
@@ -661,14 +595,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `_S`
 183 |     @classmethod
     |
 help: Replace TypeVar `_S` with `Self`
-178 |
-179 |
+    |
 180 | class BadClassWithStringTypeHints:
     -     def bad_instance_method_with_string_annotations(self: "_S", arg: str) -> "_S": ... # PYI019
 181 +     def bad_instance_method_with_string_annotations(self, arg: str) -> "Self": ... # PYI019
 182 |
-183 |     @classmethod
-184 |     def bad_class_method_with_string_annotations(cls: "type[_S]") -> "_S": ... # PYI019
+    |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `_S`
    --> PYI019_0.pyi:184:49
@@ -678,14 +610,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `_S`
     |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Replace TypeVar `_S` with `Self`
-181 |     def bad_instance_method_with_string_annotations(self: "_S", arg: str) -> "_S": ... # PYI019
-182 |
+    |
 183 |     @classmethod
     -     def bad_class_method_with_string_annotations(cls: "type[_S]") -> "_S": ... # PYI019
 184 +     def bad_class_method_with_string_annotations(cls) -> "Self": ... # PYI019
 185 |
-186 |
-187 |     @classmethod
+    |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `_S`
    --> PYI019_0.pyi:188:50
@@ -695,14 +625,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `_S`
     |                                                  ^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Replace TypeVar `_S` with `Self`
-185 |
-186 |
+    |
 187 |     @classmethod
     -     def bad_class_method_with_mixed_annotations_1(cls: "type[_S]") -> _S: ... # PYI019
 188 +     def bad_class_method_with_mixed_annotations_1(cls) -> Self: ... # PYI019
 189 |
-190 |
-191 |     @classmethod
+    |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `_S`
    --> PYI019_0.pyi:192:50
@@ -712,14 +640,12 @@ PYI019 [*] Use `Self` instead of custom TypeVar `_S`
     |                                                  ^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Replace TypeVar `_S` with `Self`
-189 |
-190 |
+    |
 191 |     @classmethod
     -     def bad_class_method_with_mixed_annotations_1(cls: type[_S]) -> "_S": ... # PYI019
 192 +     def bad_class_method_with_mixed_annotations_1(cls) -> "Self": ... # PYI019
 193 |
-194 |
-195 | class BadSubscriptReturnTypeWithStringTypeHints:
+    |
 
 PYI019 [*] Use `Self` instead of custom TypeVar `S`
    --> PYI019_0.pyi:197:10
@@ -730,11 +656,9 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Replace TypeVar `S` with `Self`
-194 |
-195 | class BadSubscriptReturnTypeWithStringTypeHints:
+    |
 196 |     @classmethod
     -     def m[S](cls: "type[S]") -> "type[S]": ...  # PYI019
 197 +     def m(cls) -> "type[Self]": ...  # PYI019
 198 |
-199 |
-200 | class GoodClassWithStringTypeHints:
+    |

@@ -1,10 +1,13 @@
 //! Utilities for locating (and extracting configuration from) a pyproject.toml.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use log::debug;
 use pep440_rs::{Operator, Version, VersionSpecifiers};
+use ruff_db::system::SystemPathBuf;
+use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
@@ -43,6 +46,14 @@ impl Pyproject {
 
 fn parse_toml<P: AsRef<Path>, T: DeserializeOwned>(path: P, table_path: &[&str]) -> Result<T> {
     let path = path.as_ref();
+
+    let _guard = ValueSourceGuard::new(
+        ValueSource::File(Arc::new(SystemPathBuf::from_path_buf_lossy(
+            path.to_path_buf(),
+        ))),
+        true,
+    );
+
     let contents = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read {}", path.display()))?;
 
@@ -271,20 +282,27 @@ fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option
 mod tests {
     use std::fs;
     use std::str::FromStr;
+    use std::sync::Arc;
 
     use anyhow::{Context, Result};
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
-    use ruff_linter::codes;
+    use ruff_db::system::SystemPathBuf;
+    use ruff_linter::UnresolvedRuleSelector;
     use ruff_linter::line_width::LineLength;
     use ruff_linter::settings::types::PatternPrefixPair;
+    use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 
     use crate::options::{Flake8BuiltinsOptions, LintCommonOptions, LintOptions, Options};
     use crate::pyproject::{Pyproject, Tools, find_settings_toml, parse_pyproject_toml};
 
     #[test]
     fn deserialize() -> Result<()> {
+        let _guard = ValueSourceGuard::new(
+            ValueSource::File(Arc::new(SystemPathBuf::from("<filename>"))),
+            true,
+        );
         let pyproject: Pyproject = toml::from_str(r"")?;
         assert_eq!(pyproject.tool, None);
 
@@ -355,7 +373,7 @@ select = ["E501"]
                 ruff: Some(Options {
                     lint: Some(LintOptions {
                         common: LintCommonOptions {
-                            select: Some(vec![codes::Pycodestyle::E501.into()]),
+                            select: Some(vec![UnresolvedRuleSelector::cli("E501")]),
                             ..LintCommonOptions::default()
                         },
                         ..LintOptions::default()
@@ -379,8 +397,8 @@ ignore = ["E501"]
                 ruff: Some(Options {
                     lint: Some(LintOptions {
                         common: LintCommonOptions {
-                            extend_select: Some(vec![codes::Ruff::_100.into()]),
-                            ignore: Some(vec![codes::Pycodestyle::E501.into()]),
+                            extend_select: Some(vec![UnresolvedRuleSelector::cli("RUF100",)]),
+                            ignore: Some(vec![UnresolvedRuleSelector::cli("E501")]),
                             ..LintCommonOptions::default()
                         },
                         ..LintOptions::default()
@@ -458,7 +476,7 @@ line_length = 79
 select = ["E123"]
 "#,
             )
-            .is_err()
+            .is_ok()
         );
 
         assert!(
@@ -560,7 +578,7 @@ per-file-ignores = { "__init__.py" = ["F401"] }
                     common: LintCommonOptions {
                         per_file_ignores: Some(FxHashMap::from_iter([(
                             "__init__.py".to_string(),
-                            vec![codes::Pyflakes::_401.into()]
+                            vec![UnresolvedRuleSelector::cli("F401")]
                         )])),
                         ..LintCommonOptions::default()
                     },
@@ -580,7 +598,7 @@ per-file-ignores = { "__init__.py" = ["F401"] }
         let result = PatternPrefixPair::from_str("foo: E501");
         assert!(result.is_ok());
         let result = PatternPrefixPair::from_str("E501:foo");
-        assert!(result.is_err());
+        assert!(result.is_ok());
         let result = PatternPrefixPair::from_str("E501");
         assert!(result.is_err());
         let result = PatternPrefixPair::from_str("foo");
@@ -590,6 +608,6 @@ per-file-ignores = { "__init__.py" = ["F401"] }
         let result = PatternPrefixPair::from_str("**/bar:E501");
         assert!(result.is_ok());
         let result = PatternPrefixPair::from_str("bar:E503");
-        assert!(result.is_err());
+        assert!(result.is_ok());
     }
 }

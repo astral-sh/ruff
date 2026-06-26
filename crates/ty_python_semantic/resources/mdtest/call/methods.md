@@ -245,6 +245,8 @@ class SubclassOfAny(Any):
 a = SubclassOfAny()
 assert_type(a.method(), int)
 
+value: str = a.method()  # error: [invalid-assignment]
+
 assert_type(a.non_existing_method(), Any)
 ```
 

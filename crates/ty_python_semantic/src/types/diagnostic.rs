@@ -968,7 +968,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/call-abstract-method.md")]
     pub(crate) static CALL_ABSTRACT_METHOD = {
         summary: "detects calls to abstract methods with trivial bodies on class objects",
-        status: LintStatus::preview("0.0.16"),
+        status: LintStatus::stable("0.0.16"),
         default_level: Level::Error,
     }
 }
@@ -986,7 +986,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/missing-override-decorator.md")]
     pub(crate) static MISSING_OVERRIDE_DECORATOR = {
         summary: "detects methods that override a superclass member without an `@override` annotation",
-        status: LintStatus::preview("0.0.41"),
+        status: LintStatus::stable("0.0.41"),
         default_level: Level::Ignore,
     }
 }
@@ -1103,7 +1103,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/unused-awaitable.md")]
     pub(crate) static UNUSED_AWAITABLE = {
         summary: "detects awaitable objects that are used as expression statements without being awaited",
-        status: LintStatus::preview("0.0.21"),
+        status: LintStatus::stable("0.0.21"),
         default_level: Level::Warn,
     }
 }
@@ -1423,29 +1423,10 @@ pub(crate) fn is_invalid_typed_dict_literal(
 fn report_invalid_assignment_with_message<'db, 'ctx: 'db, T: Ranged>(
     context: &'ctx InferContext,
     node: T,
-    target_ty: Type<'db>,
     message: std::fmt::Arguments,
 ) -> Option<LintDiagnosticGuard<'db, 'ctx>> {
     let builder = context.report_lint(&INVALID_ASSIGNMENT, node)?;
-
-    let mut diag = builder.into_diagnostic(message);
-
-    match target_ty {
-        Type::ClassLiteral(class) => {
-            diag.info(format_args!(
-                "Implicit shadowing of class `{}`. Add an annotation to make it explicit if this is intentional",
-                class.name(context.db()),
-            ));
-        }
-        Type::FunctionLiteral(function) => {
-            diag.info(format_args!(
-                "Implicit shadowing of function `{}`. Add an annotation to make it explicit if this is intentional",
-                function.name(context.db()),
-            ));
-        }
-        _ => {}
-    }
-    Some(diag)
+    Some(builder.into_diagnostic(message))
 }
 
 pub(super) fn note_numbers_module_not_supported<'db>(
@@ -1619,7 +1600,6 @@ pub(super) fn report_invalid_assignment<'db>(
     let Some(mut diag) = report_invalid_assignment_with_message(
         context,
         diagnostic_range,
-        target_ty,
         format_args!(
             "Object of type `{}` is not assignable to `{}`",
             value_ty.display_with(context.db(), settings.clone()),
@@ -1628,6 +1608,24 @@ pub(super) fn report_invalid_assignment<'db>(
     ) else {
         return;
     };
+
+    if matches!(target_node, AnyNodeRef::ExprName(_)) {
+        match target_ty {
+            Type::ClassLiteral(class) => {
+                diag.info(format_args!(
+                    "Implicit shadowing of class `{}`. Add an annotation to make it explicit if this is intentional",
+                    class.name(context.db()),
+                ));
+            }
+            Type::FunctionLiteral(function) => {
+                diag.info(format_args!(
+                    "Implicit shadowing of function `{}`. Add an annotation to make it explicit if this is intentional",
+                    function.name(context.db()),
+                ));
+            }
+            _ => {}
+        }
+    }
 
     if value_node.is_some() {
         match definition_kind {
@@ -1681,7 +1679,6 @@ pub(super) fn report_invalid_attribute_assignment(
     let Some(mut diag) = report_invalid_assignment_with_message(
         context,
         range,
-        target_ty,
         format_args!(
             "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
             source_ty.display(context.db()),
@@ -2816,7 +2813,6 @@ pub(crate) fn report_undeclared_protocol_member(
     };
 
     let symbol_name = class_symbol_table.symbol(symbol_id).name();
-    let class_name = protocol_class.name(db);
 
     let mut diagnostic = builder
         .into_diagnostic("Cannot assign to undeclared variable in the body of a protocol class");
@@ -2842,11 +2838,52 @@ pub(crate) fn report_undeclared_protocol_member(
         ));
     }
 
-    let mut class_def_diagnostic = SubDiagnostic::new(
-        SubDiagnosticSeverity::Info,
-        "Assigning to an undeclared variable in a protocol class \
-    leads to an ambiguous interface",
+    add_undeclared_protocol_member_context(
+        &mut diagnostic,
+        db,
+        protocol_class,
+        symbol_name,
+        "Assigning to an undeclared variable in a protocol class leads to an ambiguous interface",
     );
+}
+
+pub(crate) fn report_undeclared_protocol_attribute(
+    context: &InferContext,
+    target: &ast::ExprAttribute,
+    protocol_class: ProtocolClass,
+) {
+    let db = context.db();
+    let Some(builder) = context.report_lint(&AMBIGUOUS_PROTOCOL_MEMBER, target) else {
+        return;
+    };
+
+    let symbol_name = target.attr.as_str();
+    let mut diagnostic =
+        builder.into_diagnostic("Cannot assign to an undeclared attribute in a protocol method");
+    diagnostic.set_primary_message(format_args!(
+        "`{symbol_name}` is not declared as a protocol member"
+    ));
+
+    add_undeclared_protocol_member_context(
+        &mut diagnostic,
+        db,
+        protocol_class,
+        symbol_name,
+        "Assigning to an undeclared attribute in a protocol method leads to an ambiguous interface",
+    );
+}
+
+fn add_undeclared_protocol_member_context(
+    diagnostic: &mut Diagnostic,
+    db: &dyn Db,
+    protocol_class: ProtocolClass,
+    symbol_name: &str,
+    ambiguity_message: &'static str,
+) {
+    let class_name = protocol_class.name(db);
+
+    let mut class_def_diagnostic =
+        SubDiagnostic::new(SubDiagnosticSeverity::Info, ambiguity_message);
     class_def_diagnostic.annotate(
         Annotation::primary(protocol_class.definition_span(db))
             .message(format_args!("`{class_name}` declared as a protocol here")),

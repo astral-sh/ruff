@@ -10,7 +10,7 @@ use rustc_hash::FxHashSet;
 use ty_python_core::definition::{DefinitionCategory, DefinitionKind, DefinitionState};
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
-use ty_python_core::{SemanticIndex, get_loop_header, semantic_index};
+use ty_python_core::{SemanticIndex, semantic_index};
 
 /// Returns `true` for definition kinds that create user-facing bindings we consider for
 /// unused-binding diagnostics.
@@ -113,7 +113,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
                     continue;
                 };
 
-                let loop_header = get_loop_header(db, loop_header_definition.loop_token());
+                let loop_header = use_def_map.loop_header(loop_header_definition.loop_header_id());
                 for live_binding in loop_header.bindings_for_place(loop_header_definition.place()) {
                     if is_reachable(db, use_def_map, live_binding.reachability_constraint()) {
                         loop_header_used_definition_ids.insert(live_binding.binding());

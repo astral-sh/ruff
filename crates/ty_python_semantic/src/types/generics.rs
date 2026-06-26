@@ -11,7 +11,7 @@ use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
-    ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+    ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
     PathBounds, Solutions,
 };
 use crate::types::infer::original_class_type;
@@ -1113,6 +1113,42 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> Specialization<'db> {
+    /// Merge cycle iterations that differ only by gradual `Unknown` type arguments.
+    ///
+    /// Known argument mismatches are not merged because doing so would be unsound for invariant
+    /// type variables; the caller must retain the outer semantic union in that case.
+    pub(super) fn merge_cycle_recovery(self, db: &'db dyn Db, previous: Self) -> Option<Self> {
+        if self.generic_context(db) != previous.generic_context(db)
+            || self.materialization_kind(db) != previous.materialization_kind(db)
+            || self.tuple_inner(db) != previous.tuple_inner(db)
+        {
+            return None;
+        }
+
+        let types: Box<[_]> = previous
+            .types(db)
+            .iter()
+            .zip(self.types(db))
+            .map(|(previous, current)| match (*previous, *current) {
+                (previous, current) if previous == current => Some(current),
+                (previous, current)
+                    if previous == Type::unknown() || current == Type::unknown() =>
+                {
+                    Some(Type::unknown())
+                }
+                _ => None,
+            })
+            .collect::<Option<Box<[_]>>>()?;
+
+        Some(Self::new(
+            db,
+            self.generic_context(db),
+            types,
+            self.materialization_kind(db),
+            self.tuple_inner(db),
+        ))
+    }
+
     /// Maps the specialization's types, returning [`Cow::Borrowed`] without allocating if every
     /// type is unchanged and [`Cow::Owned`] otherwise.
     fn map_types(
@@ -1912,10 +1948,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     pub(crate) fn build_with(
         &mut self,
         generic_context: GenericContext<'db>,
-        mut choose: impl FnMut(
-            BoundTypeVarInstance<'db>,
-            Option<ConstraintBounds<'db>>,
-        ) -> Option<Type<'db>>,
+        mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> Specialization<'db> {
         let types = self.solve_pending_with(generic_context, &mut choose);
         let specialization =
@@ -1935,10 +1968,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     fn solve_pending_with(
         &mut self,
         generic_context: GenericContext<'db>,
-        choose: &mut impl FnMut(
-            BoundTypeVarInstance<'db>,
-            Option<ConstraintBounds<'db>>,
-        ) -> Option<Type<'db>>,
+        choose: &mut impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
         if generic_context
             .variables_inner(self.db)
@@ -1964,12 +1994,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             .pending
             .remove_noninferable(self.db, self.constraints, self.inferable);
         let solutions =
-            match pending.solutions_with(self.db, self.constraints, |typevar, _variance, bounds| {
-                if let Some(ty) = choose(typevar, Some(bounds)) {
+            match pending.solutions_with(self.db, self.constraints, |_variance, path_bound| {
+                let typevar = path_bound.bound_typevar;
+                if let Some(ty) = choose(typevar, Some(path_bound)) {
                     return Ok(Some(ty));
                 }
 
-                PathBounds::default_solve(self.db, self.constraints, typevar, bounds)
+                PathBounds::default_solve(self.db, self.constraints, path_bound)
             }) {
                 Solutions::Unsatisfiable | Solutions::Unconstrained => {
                     return self.solve_hash_map_with(generic_context, choose);
@@ -2166,10 +2197,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     fn solve_hash_map_with(
         &mut self,
         generic_context: GenericContext<'db>,
-        choose: &mut impl FnMut(
-            BoundTypeVarInstance<'db>,
-            Option<ConstraintBounds<'db>>,
-        ) -> Option<Type<'db>>,
+        choose: &mut impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
     ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
         generic_context
             .variables_inner(self.db)
@@ -2180,8 +2208,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     .get_mut(identity)
                     .map(|accumulator| accumulator.get_or_build(self.db));
                 let chosen = match mapped_ty {
-                    Some(mapped_ty) => choose(*variable, Some(ConstraintBounds::exact(mapped_ty)))
-                        .unwrap_or(mapped_ty),
+                    Some(mapped_ty) => {
+                        let path_bound = PathBound::exact(*variable, mapped_ty);
+                        choose(*variable, Some(&path_bound)).unwrap_or(mapped_ty)
+                    }
                     None => choose(*variable, None)?,
                 };
                 Some((*identity, chosen))
@@ -2828,6 +2858,20 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 return self.infer_map_impl(formal, actual_instance, polarity, seen);
             }
 
+            (
+                formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
+                Type::KnownInstance(known_instance @ KnownInstanceType::Range { .. }),
+            ) => {
+                // `range(...)` is a known instance only to preserve its truthiness; use the
+                // ordinary `range` instance when inferring through generic nominal/protocol types.
+                return self.infer_map_impl(
+                    formal,
+                    known_instance.instance_fallback(self.db),
+                    polarity,
+                    seen,
+                );
+            }
+
             (formal, Type::ProtocolInstance(actual_protocol)) => {
                 // TODO: This will only handle protocol classes that explicit inherit
                 // from other generic protocol classes by listing it as a base class.
@@ -2844,7 +2888,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
-            (formal, Type::NominalInstance(actual_nominal)) => {
+            (
+                formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
+                Type::NominalInstance(actual_nominal),
+            ) => {
                 // Special case: `formal` and `actual` are both tuples.
                 if let (Some(formal_tuple), Some(actual_tuple)) = (
                     formal.tuple_instance_spec(self.db),

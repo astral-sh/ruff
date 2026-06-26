@@ -597,6 +597,31 @@ reveal_type(B.__class__)  # revealed: <class 'M'>
 reveal_type(C.__class__)  # revealed: <class 'M'>
 ```
 
+## Inheritance from an intersection type
+
+Narrowing can cause a class object to have an intersection type. A class that inherits from this
+intersection should still inherit the class object's metaclass.
+
+```py
+from typing import Any
+
+class Meta(type):
+    meta_attr: int = 1
+
+class Base(metaclass=Meta):
+    base_attr: str = ""
+
+def f(other: Any):
+    if Base is other:
+        reveal_type(Base)  # revealed: <class 'Base'> & Any
+
+        class Child(Base): ...
+
+        reveal_type(Child.base_attr)  # revealed: str
+        reveal_type(Child.__class__)  # revealed: <class 'Meta'>
+        reveal_type(Child.meta_attr)  # revealed: int
+```
+
 ## Conflict (1)
 
 The metaclass of a derived class must be a (non-strict) subclass of the metaclasses of all its

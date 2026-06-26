@@ -66,22 +66,34 @@ Checks for protocol classes with members that will lead to ambiguous interfaces.
 **Why is this bad?**
 
 
-Assigning to an undeclared variable in a protocol class leads to an ambiguous
-interface which may lead to the type checker inferring unexpected things. It's
-recommended to ensure that all members of a protocol class are explicitly declared.
+Assigning to an undeclared variable in a protocol class, or to an undeclared attribute
+through a protocol method's `self` or `cls` receiver, leads to an ambiguous interface
+which may lead to the type checker inferring unexpected things. It's recommended to
+ensure that all members of a protocol class are explicitly declared.
 
 **Examples**
 
 
 ```py
-from typing import Protocol
+from typing import ClassVar, Protocol
 
 
 class BaseProto(Protocol):
     a: int  # fine (explicitly declared as `int`)
+    instance_member: str
+    class_member: ClassVar[str]
 
     # fine: a method definition using `def` is considered a declaration
     def method_member(self) -> int: ...
+
+    def method(self) -> None:
+        self.instance_member = "value"  # fine (declared in the class body)
+        self.implicit = "value"  # error: [ambiguous-protocol-member]
+
+    @classmethod
+    def class_method(cls) -> None:
+        cls.class_member = "value"  # fine (declared in the class body)
+        cls.implicit_class = "value"  # error: [ambiguous-protocol-member]
 
     # no explicit declaration, leading to ambiguity
     c = "some variable"  # error
@@ -151,7 +163,7 @@ def _(x: int):
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/0.0.16">0.0.16</a>) ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.16">0.0.16</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22call-abstract-method%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L967" target="_blank">View source</a>
 </small>
@@ -1139,6 +1151,9 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.
 Checks for assignments to class variables from instances
 and assignments to instance-only attributes from their class.
 
+An "instance-only" variable is one which is only ever assigned to or declared
+when accessed via `self` in an instance method.
+
 **Why is this bad?**
 
 
@@ -1153,18 +1168,29 @@ from typing import ClassVar
 
 
 class C:
+    instance_var: int
     class_var: ClassVar[int] = 1
 
     def __init__(self):
-        self.instance_var: int = 42
+        # instance variable declared in the class body
+        self.instance_var = 42
+
+        # instance-only variable not declared in the class body
+        self.instance_only_var: int = 42
 
 
 C.class_var = 3  # okay
-# Cannot assign to class variable
+
+C.instance_var = 56  # okay
+C().instance_var = 72  # okay
+
+C().instance_only_var = 100  # okay
+
+# Cannot assign to class variable from instance
 C().class_var = 3  # error
-C().instance_var = 56
+
 # Cannot assign to instance-only variable from class
-C.instance_var = 56  # error
+C.instance_only_var = 56  # error
 ```
 
 ## `invalid-attribute-override`
@@ -3472,7 +3498,7 @@ func()  # error
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
-Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/0.0.41">0.0.41</a>) ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.41">0.0.41</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22missing-override-decorator%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L985" target="_blank">View source</a>
 </small>
@@ -4060,7 +4086,7 @@ false positives it can produce.
 
 
 ```python
-for i in range(0):
+for i in range(int(input())):
     x = i
 
 # NameError: name 'x' is not defined
@@ -4955,7 +4981,7 @@ A() + A()  # error
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/0.0.21">0.0.21</a>) ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.21">0.0.21</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22unused-awaitable%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1102" target="_blank">View source</a>
 </small>

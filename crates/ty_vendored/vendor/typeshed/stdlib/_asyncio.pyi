@@ -121,7 +121,7 @@ class Future(Awaitable[_T]):
     @property
     def _loop(self) -> AbstractEventLoop: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """Futures are generic over the type of their results"""
 
 if sys.version_info >= (3, 12):
     _TaskCompatibleCoro: TypeAlias = Coroutine[Any, Any, _T_co]
@@ -220,7 +220,7 @@ class Task(Future[_T_co]):  # type: ignore[type-var]  # pyright: ignore[reportIn
             """
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """Tasks are generic over the return type of their wrapped coroutines"""
 
 def get_event_loop() -> AbstractEventLoop:
     """Return an asyncio event loop.

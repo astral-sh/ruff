@@ -54,7 +54,7 @@ pub(crate) const fn is_bad_version_info_in_non_stub_enabled(settings: &LinterSet
 }
 
 // https://github.com/astral-sh/ruff/issues/4460
-pub(crate) const fn is_type_comment_in_non_stub_enabled(settings: &LinterSettings) -> bool {
+pub(crate) const fn is_legacy_type_comment_in_non_stub_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
@@ -370,5 +370,10 @@ pub(crate) const fn is_pep604_future_annotations_fix_enabled(settings: &LinterSe
 
 // https://github.com/astral-sh/ruff/pull/25614
 pub const fn is_human_readable_names_enabled(preview: PreviewMode) -> bool {
+    preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/26113
+pub const fn is_warn_on_unknown_selectors_enabled(preview: PreviewMode) -> bool {
     preview.is_enabled()
 }

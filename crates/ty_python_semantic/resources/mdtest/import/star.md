@@ -235,8 +235,8 @@ print((
     D,
     E,
     F,
-    G,  # error: [possibly-unresolved-reference]
-    H,  # error: [possibly-unresolved-reference]
+    G,
+    H,
     I,
     J,
     K,

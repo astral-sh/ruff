@@ -332,7 +332,7 @@ fn check_class_declaration<'db>(
         for class_base in class.iter_mro(db).skip(1) {
             let superclass = match class_base {
                 ClassBase::Protocol | ClassBase::Generic => continue,
-                ClassBase::Dynamic(_) => {
+                ClassBase::Any | ClassBase::Dynamic(_) => {
                     has_dynamic_superclass = true;
                     continue;
                 }
@@ -340,7 +340,7 @@ fn check_class_declaration<'db>(
                     has_dynamic_superclass = true;
                     continue;
                 }
-                ClassBase::TypedDict => {
+                ClassBase::TypedDict(_) => {
                     has_typeddict_in_mro = true;
                     continue;
                 }

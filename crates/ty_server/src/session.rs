@@ -1169,6 +1169,16 @@ impl Session {
             .map(|(_, document)| DocumentHandle::from_text_document(document))
     }
 
+    /// Iterates over all open file-level documents.
+    ///
+    /// Notebook cells are excluded because their file-level representation is the containing
+    /// notebook.
+    pub(super) fn file_document_handles(&self) -> impl Iterator<Item = DocumentHandle> + '_ {
+        self.index()
+            .file_documents()
+            .map(DocumentHandle::from_document)
+    }
+
     /// Returns a handle to the document specified by its URI.
     ///
     /// # Errors

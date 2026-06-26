@@ -2,6 +2,7 @@ use std::ops::Deref;
 
 use bitflags::bitflags;
 use rustc_hash::{FxBuildHasher, FxHashSet};
+use thin_vec::ThinVec;
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
@@ -805,6 +806,15 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lpar);
 
+        if self.eat(TokenKind::Rpar) {
+            return ast::Arguments {
+                range: self.node_range(start),
+                node_index: AtomicNodeIndex::NONE,
+                args: Box::default(),
+                keywords: ThinVec::default(),
+            };
+        }
+
         let mut args = vec![];
         let mut keywords = vec![];
         let mut seen_keyword_argument = false; // foo = 1
@@ -925,6 +935,11 @@ impl<'src> Parser<'src> {
                                     &parsed_expr,
                                 );
                             }
+                        }
+                        // Reserve exactly one slot for the first positional argument, while
+                        // avoiding any allocation for keyword-only calls.
+                        if args.is_empty() {
+                            args.reserve_exact(1);
                         }
                         args.push(parsed_expr.expr);
                     }
@@ -1362,76 +1377,60 @@ impl<'src> Parser<'src> {
         ]);
 
         let start = self.node_start();
-        let mut strings = vec![];
+        let first = self.parse_string();
+
+        if !self.at_ts(STRING_START_SET) {
+            return first.into();
+        }
+
+        let mut strings = Vec::with_capacity(2);
+        strings.push(first);
 
         let mut progress = ParserProgress::default();
 
         while self.at_ts(STRING_START_SET) {
             progress.assert_progressing(self);
-
-            if self.at(TokenKind::String) {
-                strings.push(self.parse_string_or_byte_literal());
-            } else if self.at(TokenKind::FStringStart) {
-                strings.push(StringType::FString(
-                    self.parse_interpolated_string(InterpolatedStringKind::FString)
-                        .into(),
-                ));
-            } else if self.at(TokenKind::TStringStart) {
-                // test_ok template_strings_py314
-                // # parse_options: {"target-version": "3.14"}
-                // t"{hey}"
-                // t'{there}'
-                // t"""what's
-                // happening?"""
-
-                // test_err template_strings_py313
-                // # parse_options: {"target-version": "3.13"}
-                // t"{hey}"
-                // t'{there}'
-                // t"""what's
-                // happening?"""
-                let string_type = StringType::TString(
-                    self.parse_interpolated_string(InterpolatedStringKind::TString)
-                        .into(),
-                );
-                self.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::TemplateStrings,
-                    string_type.range(),
-                );
-                strings.push(string_type);
-            }
+            strings.push(self.parse_string());
         }
 
         let range = self.node_range(start);
+        self.handle_implicitly_concatenated_strings(strings, range)
+    }
 
-        match strings.len() {
-            // This is not possible as the function was called by matching against a
-            // `String`, `FStringStart`, or `TStringStart` token.
-            0 => unreachable!("Expected to parse at least one string"),
-            // We need a owned value, hence the `pop` here.
-            1 => match strings.pop().unwrap() {
-                StringType::Str(string) => Expr::StringLiteral(ast::ExprStringLiteral {
-                    value: ast::StringLiteralValue::single(string),
-                    range,
-                    node_index: AtomicNodeIndex::NONE,
-                }),
-                StringType::Bytes(bytes) => Expr::BytesLiteral(ast::ExprBytesLiteral {
-                    value: ast::BytesLiteralValue::single(bytes),
-                    range,
-                    node_index: AtomicNodeIndex::NONE,
-                }),
-                StringType::FString(fstring) => Expr::FString(ast::ExprFString {
-                    value: ast::FStringValue::single(fstring),
-                    range,
-                    node_index: AtomicNodeIndex::NONE,
-                }),
-                StringType::TString(tstring) => Expr::TString(ast::ExprTString {
-                    value: ast::TStringValue::single(tstring),
-                    range,
-                    node_index: AtomicNodeIndex::NONE,
-                }),
-            },
-            _ => self.handle_implicitly_concatenated_strings(strings, range),
+    /// Parses a single string, byte literal, f-string, or t-string.
+    fn parse_string(&mut self) -> StringType {
+        if self.at(TokenKind::String) {
+            self.parse_string_or_byte_literal()
+        } else if self.at(TokenKind::FStringStart) {
+            StringType::FString(
+                self.parse_interpolated_string(InterpolatedStringKind::FString)
+                    .into(),
+            )
+        } else if self.at(TokenKind::TStringStart) {
+            // test_ok template_strings_py314
+            // # parse_options: {"target-version": "3.14"}
+            // t"{hey}"
+            // t'{there}'
+            // t"""what's
+            // happening?"""
+
+            // test_err template_strings_py313
+            // # parse_options: {"target-version": "3.13"}
+            // t"{hey}"
+            // t'{there}'
+            // t"""what's
+            // happening?"""
+            let string_type = StringType::TString(
+                self.parse_interpolated_string(InterpolatedStringKind::TString)
+                    .into(),
+            );
+            self.add_unsupported_syntax_error(
+                UnsupportedSyntaxErrorKind::TemplateStrings,
+                string_type.range(),
+            );
+            string_type
+        } else {
+            unreachable!("Expected to parse a string")
         }
     }
 
