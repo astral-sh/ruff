@@ -2,8 +2,8 @@
 
 ## Too many positional subpatterns
 
-The diagnostic is emitted when the positional limit comes from a direct, unconditional,
-unannotated tuple-literal assignment in the matched class body.
+The diagnostic is emitted when the positional limit comes from a direct, unconditional, unannotated
+tuple-literal assignment in the matched class body.
 
 ```py
 class Point:
