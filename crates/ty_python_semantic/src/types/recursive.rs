@@ -210,10 +210,10 @@ impl<'db> RecursiveType<'db> {
             replacement,
         };
         let folded_body = unfolded_result.apply_type_mapping(db, &mapping, TypeContext::default());
+        let marker = Type::divergent(self.binder_id(db));
         if folded_body == self.body(db) {
             Type::Recursive(self)
         } else {
-            let marker = Type::divergent(self.binder_id(db));
             match self.origin(db) {
                 RecursiveOrigin::Implicit => folded_body.drop_top_level_cycle_markers(db, marker),
                 RecursiveOrigin::TypeAlias(_) if folded_body.contains_cycle_marker(db, marker) => {
@@ -302,7 +302,7 @@ mod tests {
     }
 
     #[test]
-    fn fold_collapses_implicit_nested_generic_arguments_that_contain_recursive_positions() {
+    fn fold_preserves_non_recursive_union_members_in_nested_generic_arguments() {
         let db = setup_db();
         let binder_id = salsa::plumbing::Id::from_bits(1);
         let body = Type::homogeneous_tuple(&db, Type::divergent(binder_id));
@@ -313,7 +313,13 @@ mod tests {
 
         let element = UnionType::from_elements(&db, [Type::int_literal(1), recursive_ty]);
         let derived = KnownClass::List.to_specialized_instance(&db, &[element]);
-        let expected = KnownClass::List.to_specialized_instance(&db, &[Type::divergent(binder_id)]);
+        let expected = KnownClass::List.to_specialized_instance(
+            &db,
+            &[UnionType::from_elements(
+                &db,
+                [Type::int_literal(1), Type::divergent(binder_id)],
+            )],
+        );
         let folded = recursive.fold(&db, derived);
 
         assert_eq!(folded, expected);

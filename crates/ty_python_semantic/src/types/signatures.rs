@@ -4018,44 +4018,29 @@ impl<'db> Parameter<'db> {
                 .recursive_type_normalized_impl(db, div, true)
                 .unwrap_or(div)
         };
+        let default_type_normalized = |default_type: Option<Type<'db>>| {
+            // Default-value types are used for diagnostics and display, not callable compatibility.
+            // Preserve the callable shape when only the default value is recursive.
+            default_type.map(|ty| {
+                ty.recursive_type_normalized_impl(db, div, true)
+                    .unwrap_or(div)
+            })
+        };
 
         let kind = match kind {
             ParameterKind::PositionalOnly { name, default_type } => ParameterKind::PositionalOnly {
                 name: name.clone(),
-                default_type: match default_type {
-                    Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
-                    Some(ty) => Some(
-                        ty.recursive_type_normalized_impl(db, div, true)
-                            .unwrap_or(div),
-                    ),
-                    None => None,
-                },
+                default_type: default_type_normalized(*default_type),
             },
             ParameterKind::PositionalOrKeyword { name, default_type } => {
                 ParameterKind::PositionalOrKeyword {
                     name: name.clone(),
-                    default_type: match default_type {
-                        Some(ty) if nested => {
-                            Some(ty.recursive_type_normalized_impl(db, div, true)?)
-                        }
-                        Some(ty) => Some(
-                            ty.recursive_type_normalized_impl(db, div, true)
-                                .unwrap_or(div),
-                        ),
-                        None => None,
-                    },
+                    default_type: default_type_normalized(*default_type),
                 }
             }
             ParameterKind::KeywordOnly { name, default_type } => ParameterKind::KeywordOnly {
                 name: name.clone(),
-                default_type: match default_type {
-                    Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
-                    Some(ty) => Some(
-                        ty.recursive_type_normalized_impl(db, div, true)
-                            .unwrap_or(div),
-                    ),
-                    None => None,
-                },
+                default_type: default_type_normalized(*default_type),
             },
             ParameterKind::Variadic { name } => ParameterKind::Variadic { name: name.clone() },
             ParameterKind::KeywordVariadic { name } => {

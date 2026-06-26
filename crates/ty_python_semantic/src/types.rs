@@ -2384,7 +2384,7 @@ impl<'db> Type<'db> {
             Type::Recursive(recursive) => {
                 let marker = Type::divergent(recursive.binder_id(db));
                 if marker.same_divergent_marker(div) {
-                    Some(marker)
+                    if nested { None } else { Some(marker) }
                 } else {
                     let body = recursive.body(db);
                     let folded_body = body

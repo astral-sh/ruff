@@ -341,7 +341,7 @@ NestedDict: TypeAlias = dict[K, Union[V, "NestedDict[K, V]"]]
 
 def _(nested: NestedDict[str, int]):
     # TODO should be `dict[str, int | NestedDict[str, int]]`
-    reveal_type(nested)  # revealed: dict[@Todo(specialized recursive generic type alias), Divergent]
+    reveal_type(nested)  # revealed: dict[@Todo(specialized recursive generic type alias), <class 'dict[@Todo(specialized recursive generic type alias), Divergent]'>]
 
 my_isinstance(1, int)
 my_isinstance(1, int | str)
