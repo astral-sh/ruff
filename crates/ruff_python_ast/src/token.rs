@@ -7,14 +7,12 @@
 
 use std::fmt;
 
-use bitflags::bitflags;
-
 use crate::str::{Quote, TripleQuotes};
 use crate::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix, TStringPrefix,
 };
 use crate::{AnyStringFlags, BoolOp, Operator, StringFlags, UnaryOp};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 mod parentheses;
 mod tokens;
@@ -25,29 +23,35 @@ pub use tokens::{TokenAt, TokenIterWithContext, Tokens};
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Token {
-    /// The kind of the token.
-    kind: TokenKind,
-    /// The range of the token.
-    range: TextRange,
-    /// The set of flags describing this token.
-    flags: TokenFlags,
+    /// The start and end offsets as native-endian bytes.
+    ///
+    /// Byte arrays keep the token byte-aligned instead of adding two bytes of trailing padding.
+    start: [u8; 4],
+    end: [u8; 4],
+    /// The token kind and flags, encoded together because flags are only used by strings,
+    /// non-ASCII names, and a few recovery tokens.
+    kind_and_flags: u8,
 }
 
 impl Token {
     pub fn new(kind: TokenKind, range: TextRange, flags: TokenFlags) -> Token {
-        Self { kind, range, flags }
+        Self {
+            start: u32::from(range.start()).to_ne_bytes(),
+            end: u32::from(range.end()).to_ne_bytes(),
+            kind_and_flags: Self::encode_kind_and_flags(kind, flags),
+        }
     }
 
     /// Returns the token kind.
     #[inline]
     pub const fn kind(&self) -> TokenKind {
-        self.kind
+        self.kind_and_flags().0
     }
 
     /// Returns the token as a tuple of (kind, range).
     #[inline]
     pub const fn as_tuple(&self) -> (TokenKind, TextRange) {
-        (self.kind, self.range)
+        (self.kind(), self.range())
     }
 
     /// Returns `true` if the current token is a triple-quoted string of any kind.
@@ -81,7 +85,7 @@ impl Token {
     /// Returns true if the current token is a string and it is raw.
     pub fn string_flags(self) -> Option<AnyStringFlags> {
         if self.is_any_string() {
-            Some(self.flags.as_any_string_flags())
+            Some(self.kind_and_flags().1.as_any_string_flags())
         } else {
             None
         }
@@ -91,7 +95,7 @@ impl Token {
     /// tokens in t-strings (which do not have type `str`).
     const fn is_any_string(self) -> bool {
         matches!(
-            self.kind,
+            self.kind(),
             TokenKind::String
                 | TokenKind::FStringStart
                 | TokenKind::FStringMiddle
@@ -105,17 +109,184 @@ impl Token {
 
 impl Ranged for Token {
     fn range(&self) -> TextRange {
-        self.range
+        self.range()
+    }
+}
+
+impl Token {
+    const fn range(&self) -> TextRange {
+        TextRange::new(
+            TextSize::new(u32::from_ne_bytes(self.start)),
+            TextSize::new(u32::from_ne_bytes(self.end)),
+        )
+    }
+
+    const DIRECT_KIND_COUNT: u8 = TokenKind::Unknown as u8 + 1;
+    const NON_ASCII_NAME: u8 = Self::DIRECT_KIND_COUNT;
+    const STRING_START: u8 = Self::NON_ASCII_NAME + 1;
+    const INTERPOLATED_STRING_START: u8 = Self::STRING_START + 7 * 8;
+    const UNCLOSED_NEWLINE: u8 = Self::INTERPOLATED_STRING_START + 6 * 12;
+    const UNCLOSED_NON_LOGICAL_NEWLINE: u8 = Self::UNCLOSED_NEWLINE + 1;
+    const UNPREFIXED_INTERPOLATED_STRING_START: u8 = Self::UNCLOSED_NON_LOGICAL_NEWLINE + 1;
+
+    /// Encodes flag-free kinds directly, followed by compact ranges for each valid flagged kind.
+    fn encode_kind_and_flags(kind: TokenKind, flags: TokenFlags) -> u8 {
+        if kind == TokenKind::Name && flags == TokenFlags::NON_ASCII_NAME {
+            return Self::NON_ASCII_NAME;
+        }
+        if kind == TokenKind::Newline && flags == TokenFlags::UNCLOSED_STRING {
+            return Self::UNCLOSED_NEWLINE;
+        }
+        if kind == TokenKind::NonLogicalNewline && flags == TokenFlags::UNCLOSED_STRING {
+            return Self::UNCLOSED_NON_LOGICAL_NEWLINE;
+        }
+
+        if kind == TokenKind::String {
+            let prefix = match flags.prefix() {
+                AnyStringPrefix::Regular(StringLiteralPrefix::Empty) => 0,
+                AnyStringPrefix::Regular(StringLiteralPrefix::Unicode) => 1,
+                AnyStringPrefix::Bytes(ByteStringPrefix::Regular) => 2,
+                AnyStringPrefix::Regular(StringLiteralPrefix::Raw { uppercase: false }) => 3,
+                AnyStringPrefix::Regular(StringLiteralPrefix::Raw { uppercase: true }) => 4,
+                AnyStringPrefix::Bytes(ByteStringPrefix::Raw { uppercase_r: false }) => 5,
+                AnyStringPrefix::Bytes(ByteStringPrefix::Raw { uppercase_r: true }) => 6,
+                _ => unreachable!("non-interpolated string has an interpolated prefix"),
+            };
+            debug_assert!(!flags.is_non_ascii_name());
+            return Self::STRING_START + prefix * 8 + flags.string_status();
+        }
+
+        let phase = match kind {
+            TokenKind::FStringStart => Some(0),
+            TokenKind::FStringMiddle => Some(1),
+            TokenKind::FStringEnd => Some(2),
+            TokenKind::TStringStart => Some(3),
+            TokenKind::TStringMiddle => Some(4),
+            TokenKind::TStringEnd => Some(5),
+            _ => None,
+        };
+        if let Some(phase) = phase {
+            if flags.is_empty() || flags == TokenFlags::UNCLOSED_STRING {
+                return Self::UNPREFIXED_INTERPOLATED_STRING_START
+                    + phase * 2
+                    + u8::from(flags == TokenFlags::UNCLOSED_STRING);
+            }
+            let prefix = match flags.prefix() {
+                AnyStringPrefix::Format(FStringPrefix::Regular)
+                | AnyStringPrefix::Template(TStringPrefix::Regular) => 0,
+                AnyStringPrefix::Format(FStringPrefix::Raw { uppercase_r: false })
+                | AnyStringPrefix::Template(TStringPrefix::Raw { uppercase_r: false }) => 1,
+                AnyStringPrefix::Format(FStringPrefix::Raw { uppercase_r: true })
+                | AnyStringPrefix::Template(TStringPrefix::Raw { uppercase_r: true }) => 2,
+                _ => unreachable!(
+                    "interpolated string has a non-interpolated prefix: {kind:?} {flags:?}"
+                ),
+            };
+            debug_assert!(!flags.is_unclosed());
+            debug_assert!(!flags.is_non_ascii_name());
+            return Self::INTERPOLATED_STRING_START
+                + phase * 12
+                + prefix * 4
+                + flags.quote_status();
+        }
+
+        debug_assert!(flags.is_empty(), "{kind:?} {flags:?}");
+        kind as u8
+    }
+
+    #[expect(
+        unsafe_code,
+        reason = "decoding a compact contiguous TokenKind discriminant requires a transmute"
+    )]
+    const fn kind_and_flags(&self) -> (TokenKind, TokenFlags) {
+        let encoded = self.kind_and_flags;
+        if encoded < Self::DIRECT_KIND_COUNT {
+            // SAFETY: `TokenKind` has a contiguous `u8` representation from zero through
+            // `Unknown`, and the bound above restricts `encoded` to that range.
+            return (
+                unsafe { std::mem::transmute::<u8, TokenKind>(encoded) },
+                TokenFlags::empty(),
+            );
+        }
+        if encoded == Self::NON_ASCII_NAME {
+            return (TokenKind::Name, TokenFlags::NON_ASCII_NAME);
+        }
+        if encoded == Self::UNCLOSED_NEWLINE {
+            return (TokenKind::Newline, TokenFlags::UNCLOSED_STRING);
+        }
+        if encoded == Self::UNCLOSED_NON_LOGICAL_NEWLINE {
+            return (TokenKind::NonLogicalNewline, TokenFlags::UNCLOSED_STRING);
+        }
+        if encoded >= Self::UNPREFIXED_INTERPOLATED_STRING_START {
+            let encoded = encoded - Self::UNPREFIXED_INTERPOLATED_STRING_START;
+            let kind = match encoded / 2 {
+                0 => TokenKind::FStringStart,
+                1 => TokenKind::FStringMiddle,
+                2 => TokenKind::FStringEnd,
+                3 => TokenKind::TStringStart,
+                4 => TokenKind::TStringMiddle,
+                5 => TokenKind::TStringEnd,
+                _ => unreachable!(),
+            };
+            let flags = if encoded.is_multiple_of(2) {
+                TokenFlags::empty()
+            } else {
+                TokenFlags::UNCLOSED_STRING
+            };
+            return (kind, flags);
+        }
+        if encoded < Self::INTERPOLATED_STRING_START {
+            let encoded = encoded - Self::STRING_START;
+            let prefix = match encoded / 8 {
+                0 => TokenFlags::empty(),
+                1 => TokenFlags::UNICODE_STRING,
+                2 => TokenFlags::BYTE_STRING,
+                3 => TokenFlags::RAW_STRING_LOWERCASE,
+                4 => TokenFlags::RAW_STRING_UPPERCASE,
+                5 => TokenFlags::BYTE_STRING.union(TokenFlags::RAW_STRING_LOWERCASE),
+                6 => TokenFlags::BYTE_STRING.union(TokenFlags::RAW_STRING_UPPERCASE),
+                _ => unreachable!(),
+            };
+            return (
+                TokenKind::String,
+                TokenFlags::with_string_status(prefix, encoded % 8),
+            );
+        }
+
+        let encoded = encoded - Self::INTERPOLATED_STRING_START;
+        let phase = encoded / 12;
+        let prefix = (encoded % 12) / 4;
+        let status = encoded % 4;
+        let kind = match phase {
+            0 => TokenKind::FStringStart,
+            1 => TokenKind::FStringMiddle,
+            2 => TokenKind::FStringEnd,
+            3 => TokenKind::TStringStart,
+            4 => TokenKind::TStringMiddle,
+            5 => TokenKind::TStringEnd,
+            _ => unreachable!(),
+        };
+        let prefix = match (phase < 3, prefix) {
+            (true, 0) => TokenFlags::F_STRING,
+            (true, 1) => TokenFlags::F_STRING.union(TokenFlags::RAW_STRING_LOWERCASE),
+            (true, 2) => TokenFlags::F_STRING.union(TokenFlags::RAW_STRING_UPPERCASE),
+            (false, 0) => TokenFlags::T_STRING,
+            (false, 1) => TokenFlags::T_STRING.union(TokenFlags::RAW_STRING_LOWERCASE),
+            (false, 2) => TokenFlags::T_STRING.union(TokenFlags::RAW_STRING_UPPERCASE),
+            _ => unreachable!(),
+        };
+        (kind, TokenFlags::with_string_status(prefix, status))
     }
 }
 
 impl fmt::Debug for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?} {:?}", self.kind, self.range)?;
-        if !self.flags.is_empty() {
+        let (kind, flags) = self.kind_and_flags();
+        write!(f, "{kind:?} {:?}", self.range())?;
+        if !flags.is_empty() {
             f.write_str(" (flags = ")?;
             let mut first = true;
-            for (name, _) in self.flags.iter_names() {
+            for (name, _) in flags.iter_names() {
                 if first {
                     first = false;
                 } else {
@@ -131,6 +302,7 @@ impl fmt::Debug for Token {
 
 /// A kind of a token.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
+#[repr(u8)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum TokenKind {
     /// Token kind for a name, commonly known as an identifier.
@@ -736,7 +908,7 @@ impl fmt::Display for TokenKind {
     }
 }
 
-bitflags! {
+bitflags::bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub struct TokenFlags: u16 {
         /// The token is a string with double quotes (`"`).
@@ -764,7 +936,31 @@ bitflags! {
 
         /// The token is a raw string i.e., prefixed with `r` or `R`
         const RAW_STRING = Self::RAW_STRING_LOWERCASE.bits() | Self::RAW_STRING_UPPERCASE.bits();
+    }
+}
 
+impl TokenFlags {
+    const fn string_status(self) -> u8 {
+        self.contains(Self::DOUBLE_QUOTES) as u8
+            | ((self.contains(Self::TRIPLE_QUOTED_STRING) as u8) << 1)
+            | ((self.contains(Self::UNCLOSED_STRING) as u8) << 2)
+    }
+
+    const fn quote_status(self) -> u8 {
+        self.string_status() & 0b11
+    }
+
+    const fn with_string_status(mut self, status: u8) -> Self {
+        if status & 0b001 != 0 {
+            self = self.union(Self::DOUBLE_QUOTES);
+        }
+        if status & 0b010 != 0 {
+            self = self.union(Self::TRIPLE_QUOTED_STRING);
+        }
+        if status & 0b100 != 0 {
+            self = self.union(Self::UNCLOSED_STRING);
+        }
+        self
     }
 }
 
@@ -859,5 +1055,102 @@ impl TokenFlags {
     #[inline]
     pub const fn is_non_ascii_name(self) -> bool {
         self.intersects(TokenFlags::NON_ASCII_NAME)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::mem::size_of;
+
+    use ruff_text_size::{TextRange, TextSize};
+
+    use super::{Token, TokenFlags, TokenKind};
+
+    #[test]
+    fn token_is_nine_bytes() {
+        assert_eq!(size_of::<Token>(), 9);
+    }
+
+    #[test]
+    fn kind_and_flags_round_trip() {
+        fn assert_round_trip(kind: TokenKind, flags: TokenFlags) {
+            let range = TextRange::new(TextSize::new(1), TextSize::new(u32::MAX));
+            let token = Token::new(kind, range, flags);
+            assert_eq!(token.kind_and_flags(), (kind, flags));
+            assert_eq!(token.as_tuple(), (kind, range));
+        }
+
+        for encoded in 0..Token::DIRECT_KIND_COUNT {
+            let token = Token {
+                start: [0; 4],
+                end: [0; 4],
+                kind_and_flags: encoded,
+            };
+            let (kind, flags) = token.kind_and_flags();
+            assert_eq!(kind as u8, encoded);
+            assert!(flags.is_empty());
+        }
+        assert_round_trip(TokenKind::Name, TokenFlags::NON_ASCII_NAME);
+        assert_round_trip(TokenKind::Newline, TokenFlags::UNCLOSED_STRING);
+        assert_round_trip(TokenKind::NonLogicalNewline, TokenFlags::UNCLOSED_STRING);
+
+        let string_prefixes = [
+            TokenFlags::empty(),
+            TokenFlags::UNICODE_STRING,
+            TokenFlags::BYTE_STRING,
+            TokenFlags::RAW_STRING_LOWERCASE,
+            TokenFlags::RAW_STRING_UPPERCASE,
+            TokenFlags::BYTE_STRING.union(TokenFlags::RAW_STRING_LOWERCASE),
+            TokenFlags::BYTE_STRING.union(TokenFlags::RAW_STRING_UPPERCASE),
+        ];
+        for prefix in string_prefixes {
+            for status in 0..8 {
+                assert_round_trip(
+                    TokenKind::String,
+                    TokenFlags::with_string_status(prefix, status),
+                );
+            }
+        }
+
+        let interpolated = [
+            (
+                [
+                    TokenKind::FStringStart,
+                    TokenKind::FStringMiddle,
+                    TokenKind::FStringEnd,
+                ],
+                [
+                    TokenFlags::F_STRING,
+                    TokenFlags::F_STRING.union(TokenFlags::RAW_STRING_LOWERCASE),
+                    TokenFlags::F_STRING.union(TokenFlags::RAW_STRING_UPPERCASE),
+                ],
+            ),
+            (
+                [
+                    TokenKind::TStringStart,
+                    TokenKind::TStringMiddle,
+                    TokenKind::TStringEnd,
+                ],
+                [
+                    TokenFlags::T_STRING,
+                    TokenFlags::T_STRING.union(TokenFlags::RAW_STRING_LOWERCASE),
+                    TokenFlags::T_STRING.union(TokenFlags::RAW_STRING_UPPERCASE),
+                ],
+            ),
+        ];
+        for (kinds, prefixes) in interpolated {
+            for kind in kinds {
+                for prefix in prefixes {
+                    for quote_status in 0..4 {
+                        assert_round_trip(
+                            kind,
+                            TokenFlags::with_string_status(prefix, quote_status),
+                        );
+                    }
+                }
+                assert_round_trip(kind, TokenFlags::empty());
+                assert_round_trip(kind, TokenFlags::UNCLOSED_STRING);
+            }
+        }
     }
 }
