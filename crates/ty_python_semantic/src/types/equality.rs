@@ -1535,11 +1535,7 @@ fn enum_literal_value<'db>(db: &'db dyn Db, literal: EnumLiteralType<'db>) -> Op
     if metadata.member_value_may_be_transformed(name) {
         return None;
     }
-    if metadata.auto_members.contains(name) {
-        metadata.value_type(db, name)
-    } else {
-        metadata.members.get(name).copied()
-    }
+    metadata.value_type(db, name)
 }
 
 /// Return whether two enum literals resolve to the same member, including aliases.

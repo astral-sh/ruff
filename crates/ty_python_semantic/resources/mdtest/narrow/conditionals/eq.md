@@ -203,6 +203,7 @@ class CoercingAlias(str, Enum):
     SECOND = "1"
 
 reveal_type(CoercingAlias.FIRST == CoercingAlias.SECOND)  # revealed: Literal[True]
+reveal_type(CoercingAlias.SECOND == "1")  # revealed: Literal[True]
 ```
 
 Equality can transfer restrictions on enum members, but other intersection elements must stay on the
