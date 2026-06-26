@@ -8,15 +8,15 @@ use ruff_python_ast::token::parentheses_iterator;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, walk_expr};
 use ruff_python_ast::{self as ast};
 use ruff_python_ast::{AnyNodeRef, Expr, ExprRef, Operator};
-use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::TriviaRanges;
 use ruff_text_size::Ranged;
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{LeadingDanglingTrailingComments, leading_comments, trailing_comments};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::{
-    NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize, is_expression_parenthesized,
-    is_expression_parenthesized_in_source, optional_parentheses, parenthesized,
+    NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize, optional_parentheses,
+    parenthesized,
 };
 use crate::prelude::*;
 use crate::preview::is_hug_parens_with_braces_and_square_brackets_enabled;
@@ -112,7 +112,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::IpyEscapeCommand(expr) => expr.format().fmt(f),
         });
         let parenthesize = match parentheses {
-            Parentheses::Preserve => is_expression_parenthesized(expression.into(), f.context()),
+            Parentheses::Preserve => f.context().is_expression_parenthesized(expression.into()),
             Parentheses::Always => true,
             // Fluent style means we already have parentheses
             Parentheses::Never => false,
@@ -351,7 +351,8 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
         } = self;
 
         let preserve_parentheses = parenthesize.is_optional()
-            && is_expression_parenthesized((*expression).into(), f.context());
+            && f.context()
+                .is_expression_parenthesized((*expression).into());
 
         // If we want to preserve parentheses, short-circuit.
         if preserve_parentheses {
@@ -795,7 +796,7 @@ impl<'input> SourceOrderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'i
         self.last = Some(expr);
 
         // Rule only applies for non-parenthesized expressions.
-        if is_expression_parenthesized(expr.into(), self.context) {
+        if self.context.is_expression_parenthesized(expr.into()) {
             self.any_parenthesized_expressions = true;
         } else {
             self.visit_subexpression(expr);
@@ -1030,7 +1031,7 @@ impl CallChainLayout {
                     // data[:100].T
                     // ^^^^^^^^^^ value
                     // ```
-                    if is_expression_parenthesized(value.into(), context) {
+                    if context.is_expression_parenthesized(value.into()) {
                         // `(a).b`. We preserve these parentheses so don't recurse
                         root_value_parenthesized = true;
                         break;
@@ -1053,7 +1054,7 @@ impl CallChainLayout {
                     // We preserve these parentheses so don't recurse
                     // e.g. (a)[0].x().y().z()
                     //         ^stop here
-                    if is_expression_parenthesized(inner.into(), context) {
+                    if context.is_expression_parenthesized(inner.into()) {
                         break;
                     }
 
@@ -1170,7 +1171,7 @@ pub(crate) fn has_parentheses(expr: &Expr, context: &PyFormatContext) -> Option<
 
     // Otherwise, if the node lacks parentheses (e.g., `(1)`) or only contains empty parentheses
     // (e.g., `([])`), we need to check for surrounding parentheses.
-    if is_expression_parenthesized(expr.into(), context) {
+    if context.is_expression_parenthesized(expr.into()) {
         return Some(OwnParentheses::NonEmpty);
     }
 
@@ -1384,7 +1385,7 @@ pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -
 
         Expr::Call(ast::ExprCall {
             arguments, func, ..
-        }) => !arguments.is_empty() || is_expression_parenthesized(func.as_ref().into(), context),
+        }) => !arguments.is_empty() || context.is_expression_parenthesized(func.as_ref().into()),
 
         // String like literals can expand if they are implicit concatenated.
         Expr::FString(fstring) => fstring.value.is_implicit_concatenated(),
@@ -1402,7 +1403,7 @@ pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -
         | Expr::Attribute(ast::ExprAttribute {
             value: expression, ..
         }) => {
-            is_expression_parenthesized(expression.into(), context)
+            context.is_expression_parenthesized(expression.into())
                 || is_splittable_expression(expression.as_ref(), context)
         }
     }
@@ -1427,8 +1428,7 @@ pub(crate) const fn is_invalid_type_expression(expr: &Expr) -> bool {
 /// most expression for `(a + b) * c` is `a + b` and not `a`.
 pub(crate) fn left_most<'expr>(
     expression: &'expr Expr,
-    comment_ranges: &CommentRanges,
-    source: &str,
+    trivia_ranges: &TriviaRanges,
 ) -> &'expr Expr {
     let mut current = expression;
     loop {
@@ -1478,7 +1478,7 @@ pub(crate) fn left_most<'expr>(
             break current;
         };
 
-        if is_expression_parenthesized_in_source(left.into(), comment_ranges, source) {
+        if trivia_ranges.is_parenthesized(left.range()) {
             break current;
         }
 

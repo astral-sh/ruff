@@ -97,7 +97,7 @@ pub(crate) use format::{
 };
 use ruff_formatter::{SourceCode, SourceCodeSlice};
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_trivia::{CommentLinePosition, CommentRanges, SuppressionKind};
+use ruff_python_trivia::{CommentLinePosition, SuppressionKind, TriviaRanges};
 use ruff_text_size::{Ranged, TextRange};
 pub(crate) use visitor::collect_comments;
 
@@ -219,53 +219,54 @@ pub(crate) struct Comments<'a> {
 }
 
 impl<'a> Comments<'a> {
-    fn new(comments: CommentsMap<'a>, comment_ranges: &'a CommentRanges) -> Self {
+    fn new(comments: CommentsMap<'a>, trivia_ranges: &'a TriviaRanges) -> Self {
         Self {
             data: Rc::new(CommentsData {
                 comments,
-                comment_ranges,
+                trivia_ranges,
             }),
         }
     }
 
     /// Effectively a [`Default`] implementation that works around the lifetimes for tests
     #[cfg(test)]
-    pub(crate) fn from_ranges(comment_ranges: &'a CommentRanges) -> Self {
+    pub(crate) fn from_ranges(trivia_ranges: &'a TriviaRanges) -> Self {
         Self {
             data: Rc::new(CommentsData {
                 comments: CommentsMap::default(),
-                comment_ranges,
+                trivia_ranges,
             }),
         }
     }
 
-    pub(crate) fn ranges(&self) -> &'a CommentRanges {
-        self.data.comment_ranges
+    pub(crate) fn ranges(&self) -> &'a TriviaRanges {
+        self.data.trivia_ranges
     }
 
     /// Extracts the comments from the AST.
     pub(crate) fn from_ast(
         root: impl Into<AnyNodeRef<'a>>,
         source_code: SourceCode<'a>,
-        comment_ranges: &'a CommentRanges,
+        trivia_ranges: &'a TriviaRanges,
     ) -> Self {
         fn collect_comments<'a>(
             root: AnyNodeRef<'a>,
             source_code: SourceCode<'a>,
-            comment_ranges: &'a CommentRanges,
+            trivia_ranges: &'a TriviaRanges,
         ) -> Comments<'a> {
-            let map = if comment_ranges.is_empty() {
+            let map = if trivia_ranges.is_empty() {
                 CommentsMap::new()
             } else {
-                let mut builder = CommentsMapBuilder::new(source_code.as_str(), comment_ranges);
-                CommentsVisitor::new(source_code, comment_ranges, &mut builder).visit(root);
+                let mut builder = CommentsMapBuilder::new(source_code.as_str(), trivia_ranges);
+                CommentsVisitor::new(source_code, trivia_ranges.comments(), &mut builder)
+                    .visit(root);
                 builder.finish()
             };
 
-            Comments::new(map, comment_ranges)
+            Comments::new(map, trivia_ranges)
         }
 
-        collect_comments(root.into(), source_code, comment_ranges)
+        collect_comments(root.into(), source_code, trivia_ranges)
     }
 
     /// Returns `true` if the given `node` has any comments.
@@ -498,7 +499,7 @@ struct CommentsData<'a> {
     comments: CommentsMap<'a>,
 
     /// We need those for backwards lexing
-    comment_ranges: &'a CommentRanges,
+    trivia_ranges: &'a TriviaRanges,
 }
 
 pub(crate) fn has_skip_comment(trailing_comments: &[SourceComment], source: &str) -> bool {
@@ -518,13 +519,13 @@ mod tests {
     use ruff_formatter::SourceCode;
     use ruff_python_ast::{Mod, PySourceType};
     use ruff_python_parser::{ParseOptions, Parsed, parse};
-    use ruff_python_trivia::CommentRanges;
+    use ruff_python_trivia::TriviaRanges;
 
     use crate::comments::Comments;
 
     struct CommentsTestCase<'a> {
         parsed: Parsed<Mod>,
-        comment_ranges: CommentRanges,
+        trivia_ranges: TriviaRanges,
         source_code: SourceCode<'a>,
     }
 
@@ -534,17 +535,17 @@ mod tests {
             let source_type = PySourceType::Python;
             let parsed = parse(source, ParseOptions::from(source_type))
                 .expect("Expect source to be valid Python");
-            let comment_ranges = CommentRanges::from(parsed.tokens());
+            let trivia_ranges = TriviaRanges::from(parsed.tokens());
 
             CommentsTestCase {
                 parsed,
-                comment_ranges,
+                trivia_ranges,
                 source_code,
             }
         }
 
         fn to_comments(&self) -> Comments<'_> {
-            Comments::from_ast(self.parsed.syntax(), self.source_code, &self.comment_ranges)
+            Comments::from_ast(self.parsed.syntax(), self.source_code, &self.trivia_ranges)
         }
     }
 

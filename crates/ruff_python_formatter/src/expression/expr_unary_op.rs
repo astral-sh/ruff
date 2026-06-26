@@ -5,9 +5,7 @@ use ruff_python_ast::token::parenthesized_range;
 use ruff_text_size::Ranged;
 
 use crate::comments::trailing_comments;
-use crate::expression::parentheses::{
-    NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized,
-};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -90,7 +88,7 @@ impl NeedsParentheses for ExprUnaryOp {
             return OptionalParentheses::Always;
         }
 
-        if is_expression_parenthesized(self.operand.as_ref().into(), context) {
+        if context.is_expression_parenthesized(self.operand.as_ref().into()) {
             return OptionalParentheses::Never;
         }
 
@@ -116,6 +114,6 @@ fn needs_line_break(item: &ExprUnaryOp, context: &PyFormatContext) -> bool {
     });
 
     !leading_operand_comments.is_empty()
-        && !is_expression_parenthesized(item.operand.as_ref().into(), context)
+        && !context.is_expression_parenthesized(item.operand.as_ref().into())
         || has_leading_comments_before_parens
 }

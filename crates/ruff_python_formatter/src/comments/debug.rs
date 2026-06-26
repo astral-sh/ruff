@@ -186,7 +186,7 @@ mod tests {
     use ruff_formatter::SourceCode;
     use ruff_python_ast::{AnyNodeRef, AtomicNodeIndex};
     use ruff_python_ast::{StmtBreak, StmtContinue};
-    use ruff_python_trivia::{CommentLinePosition, CommentRanges};
+    use ruff_python_trivia::{CommentLinePosition, TriviaRanges};
     use ruff_text_size::{TextRange, TextSize};
 
     use crate::comments::map::MultiMap;
@@ -238,8 +238,8 @@ break;
             ),
         );
 
-        let comment_ranges = CommentRanges::default();
-        let comments = Comments::new(comments_map, &comment_ranges);
+        let trivia_ranges = TriviaRanges::default();
+        let comments = Comments::new(comments_map, &trivia_ranges);
 
         assert_debug_snapshot!(comments.debug(source_code));
     }

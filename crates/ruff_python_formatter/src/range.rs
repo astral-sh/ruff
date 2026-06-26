@@ -8,7 +8,7 @@ use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal
 use ruff_python_ast::{AnyNodeRef, Stmt, StmtMatch, StmtTry};
 use ruff_python_parser::{ParseOptions, parse};
 use ruff_python_trivia::{
-    BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind, indentation_at_offset,
+    BackwardsTokenizer, SimpleToken, SimpleTokenKind, TriviaRanges, indentation_at_offset,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -76,8 +76,8 @@ pub fn format_range(
 
     let parsed = parse(source, ParseOptions::from(options.source_type()))?;
     let source_code = SourceCode::new(source);
-    let comment_ranges = CommentRanges::from(parsed.tokens());
-    let comments = Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
+    let trivia_ranges = TriviaRanges::from(parsed.tokens());
+    let comments = Comments::from_ast(parsed.syntax(), source_code, &trivia_ranges);
 
     let mut context = PyFormatContext::new(
         options.with_source_map_generation(SourceMapGeneration::Enabled),

@@ -15,7 +15,6 @@ use crate::expression::OperatorPrecedence;
 use crate::expression::parentheses::{
     Parentheses, in_parentheses_only_group, in_parentheses_only_if_group_breaks,
     in_parentheses_only_soft_line_break, in_parentheses_only_soft_line_break_or_space,
-    is_expression_parenthesized, is_expression_parenthesized_in_source,
     write_in_parentheses_only_group_end_tag, write_in_parentheses_only_group_start_tag,
 };
 use crate::prelude::*;
@@ -32,17 +31,12 @@ impl<'a> BinaryLike<'a> {
     /// Flattens the hierarchical binary expression into a flat operand, operator, operand... sequence.
     ///
     /// See [`FlatBinaryExpressionSlice`] for an in depth explanation.
-    fn flatten(
-        self,
-        comments: &'a Comments<'a>,
-        context: &PyFormatContext,
-    ) -> FlatBinaryExpression<'a> {
+    fn flatten(self, comments: &'a Comments<'a>) -> FlatBinaryExpression<'a> {
         fn recurse_compare<'a>(
             compare: &'a ExprCompare,
             leading_comments: &'a [SourceComment],
             trailing_comments: &'a [SourceComment],
             comments: &'a Comments,
-            context: &PyFormatContext,
             parts: &mut SmallVec<[OperandOrOperator<'a>; 8]>,
         ) {
             parts.reserve(compare.comparators.len() * 2 + 1);
@@ -53,7 +47,6 @@ impl<'a> BinaryLike<'a> {
                     leading_comments,
                 },
                 comments,
-                context,
                 parts,
             );
 
@@ -72,7 +65,7 @@ impl<'a> BinaryLike<'a> {
                         trailing_comments: &[],
                     }));
 
-                    rec(Operand::Middle { expression }, comments, context, parts);
+                    rec(Operand::Middle { expression }, comments, parts);
                 }
 
                 parts.push(OperandOrOperator::Operator(Operator {
@@ -86,7 +79,6 @@ impl<'a> BinaryLike<'a> {
                         trailing_comments,
                     },
                     comments,
-                    context,
                     parts,
                 );
             }
@@ -97,7 +89,6 @@ impl<'a> BinaryLike<'a> {
             leading_comments: &'a [SourceComment],
             trailing_comments: &'a [SourceComment],
             comments: &'a Comments,
-            context: &PyFormatContext,
             parts: &mut SmallVec<[OperandOrOperator<'a>; 8]>,
         ) {
             parts.reserve(bool_expression.values.len() * 2 - 1);
@@ -109,7 +100,6 @@ impl<'a> BinaryLike<'a> {
                         leading_comments,
                     },
                     comments,
-                    context,
                     parts,
                 );
 
@@ -120,7 +110,7 @@ impl<'a> BinaryLike<'a> {
 
                 if let Some((right, middle)) = rest.split_last() {
                     for expression in middle {
-                        rec(Operand::Middle { expression }, comments, context, parts);
+                        rec(Operand::Middle { expression }, comments, parts);
                         parts.push(OperandOrOperator::Operator(Operator {
                             symbol: OperatorSymbol::Bool(bool_expression.op),
                             trailing_comments: &[],
@@ -133,7 +123,6 @@ impl<'a> BinaryLike<'a> {
                             trailing_comments,
                         },
                         comments,
-                        context,
                         parts,
                     );
                 }
@@ -145,7 +134,6 @@ impl<'a> BinaryLike<'a> {
             leading_comments: &'a [SourceComment],
             trailing_comments: &'a [SourceComment],
             comments: &'a Comments,
-            context: &PyFormatContext,
             parts: &mut SmallVec<[OperandOrOperator<'a>; 8]>,
         ) {
             rec(
@@ -154,7 +142,6 @@ impl<'a> BinaryLike<'a> {
                     expression: &binary.left,
                 },
                 comments,
-                context,
                 parts,
             );
 
@@ -169,7 +156,6 @@ impl<'a> BinaryLike<'a> {
                     trailing_comments,
                 },
                 comments,
-                context,
                 parts,
             );
         }
@@ -177,12 +163,11 @@ impl<'a> BinaryLike<'a> {
         fn rec<'a>(
             operand: Operand<'a>,
             comments: &'a Comments,
-            context: &PyFormatContext,
             parts: &mut SmallVec<[OperandOrOperator<'a>; 8]>,
         ) {
             let expression = operand.expression();
             match expression {
-                Expr::BinOp(binary) if !is_expression_parenthesized(expression.into(), context) => {
+                Expr::BinOp(binary) if !comments.ranges().is_parenthesized(expression.range()) => {
                     let leading_comments = operand
                         .leading_binary_comments()
                         .unwrap_or_else(|| comments.leading(binary));
@@ -191,17 +176,10 @@ impl<'a> BinaryLike<'a> {
                         .trailing_binary_comments()
                         .unwrap_or_else(|| comments.trailing(binary));
 
-                    recurse_binary(
-                        binary,
-                        leading_comments,
-                        trailing_comments,
-                        comments,
-                        context,
-                        parts,
-                    );
+                    recurse_binary(binary, leading_comments, trailing_comments, comments, parts);
                 }
                 Expr::Compare(compare)
-                    if !is_expression_parenthesized(expression.into(), context) =>
+                    if !comments.ranges().is_parenthesized(expression.range()) =>
                 {
                     let leading_comments = operand
                         .leading_binary_comments()
@@ -216,12 +194,11 @@ impl<'a> BinaryLike<'a> {
                         leading_comments,
                         trailing_comments,
                         comments,
-                        context,
                         parts,
                     );
                 }
                 Expr::BoolOp(bool_op)
-                    if !is_expression_parenthesized(expression.into(), context) =>
+                    if !comments.ranges().is_parenthesized(expression.range()) =>
                 {
                     let leading_comments = operand
                         .leading_binary_comments()
@@ -236,7 +213,6 @@ impl<'a> BinaryLike<'a> {
                         leading_comments,
                         trailing_comments,
                         comments,
-                        context,
                         parts,
                     );
                 }
@@ -250,14 +226,14 @@ impl<'a> BinaryLike<'a> {
         match self {
             BinaryLike::Binary(binary) => {
                 // Leading and trailing comments are handled by the binary's ``FormatNodeRule` implementation.
-                recurse_binary(binary, &[], &[], comments, context, &mut parts);
+                recurse_binary(binary, &[], &[], comments, &mut parts);
             }
             BinaryLike::Compare(compare) => {
                 // Leading and trailing comments are handled by the compare's ``FormatNodeRule` implementation.
-                recurse_compare(compare, &[], &[], comments, context, &mut parts);
+                recurse_compare(compare, &[], &[], comments, &mut parts);
             }
             BinaryLike::Bool(bool) => {
-                recurse_bool(bool, &[], &[], comments, context, &mut parts);
+                recurse_bool(bool, &[], &[], comments, &mut parts);
             }
         }
 
@@ -272,13 +248,12 @@ impl<'a> BinaryLike<'a> {
 impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let comments = f.context().comments().clone();
-        let flat_binary = self.flatten(&comments, f.context());
+        let flat_binary = self.flatten(&comments);
 
         if self.is_bool_op() {
             return in_parentheses_only_group(&&*flat_binary).fmt(f);
         }
 
-        let source = f.context().source();
         let mut string_operands = flat_binary
             .operands()
             .filter_map(|(index, operand)| {
@@ -286,11 +261,7 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
                     .ok()
                     .filter(|string| {
                         string.is_implicit_concatenated()
-                            && !is_expression_parenthesized_in_source(
-                                string.into(),
-                                comments.ranges(),
-                                source,
-                            )
+                            && !comments.ranges().is_parenthesized(string.range())
                     })
                     .map(|string| (index, string, operand))
             })
@@ -433,10 +404,9 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
                         right_operator.fmt(f)?;
 
                         if (right_operand_has_leading_comments
-                            && !is_expression_parenthesized(
-                                right_operand.expression().into(),
-                                f.context(),
-                            ))
+                            && !f
+                                .context()
+                                .is_expression_parenthesized(right_operand.expression().into()))
                             || right_operator.has_trailing_comments()
                         {
                             hard_line_break().fmt(f)?;
@@ -474,8 +444,8 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
 fn is_simple_power_expression(left: &Expr, right: &Expr, context: &PyFormatContext) -> bool {
     is_simple_power_operand(left)
         && is_simple_power_operand(right)
-        && !is_expression_parenthesized(left.into(), context)
-        && !is_expression_parenthesized(right.into(), context)
+        && !context.is_expression_parenthesized(left.into())
+        && !context.is_expression_parenthesized(right.into())
 }
 
 /// Return `true` if an [`Expr`] adheres to [Black's definition](https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#line-breaks-binary-operators)
@@ -812,7 +782,7 @@ impl<'a> Operand<'a> {
             } => !leading_comments.is_empty(),
             Operand::Middle { expression } | Operand::Right { expression, .. } => {
                 let leading = comments.leading(*expression);
-                if is_expression_parenthesized((*expression).into(), context) {
+                if context.is_expression_parenthesized((*expression).into()) {
                     leading.iter().any(|comment| {
                         !comment.is_formatted()
                             && matches!(
@@ -859,7 +829,7 @@ impl Format<PyFormatContext<'_>> for Operand<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let expression = self.expression();
 
-        if is_expression_parenthesized(expression.into(), f.context()) {
+        if f.context().is_expression_parenthesized(expression.into()) {
             let comments = f.context().comments().clone();
             let expression_comments = comments.leading_dangling_trailing(expression);
 

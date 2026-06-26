@@ -5,10 +5,10 @@ use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
 use ruff_python_ast::ExprRef;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::Tokens;
+use ruff_text_size::Ranged;
 
 use crate::PyFormatOptions;
 use crate::comments::Comments;
-use crate::expression::parentheses::ParenthesesIndex;
 use crate::other::interpolated_string::InterpolatedStringContext;
 
 pub struct PyFormatContext<'a> {
@@ -16,7 +16,6 @@ pub struct PyFormatContext<'a> {
     contents: &'a str,
     comments: Comments<'a>,
     tokens: &'a Tokens,
-    parentheses: ParenthesesIndex,
     node_level: NodeLevel,
     indent_level: IndentLevel,
     /// Set to a non-None value when the formatter is running on a code
@@ -44,7 +43,6 @@ impl<'a> PyFormatContext<'a> {
             contents,
             comments,
             tokens,
-            parentheses: ParenthesesIndex::from_tokens(tokens),
             node_level: NodeLevel::TopLevel(TopLevelStatementPosition::Other),
             indent_level: IndentLevel::new(0),
             docstring: None,
@@ -81,7 +79,7 @@ impl<'a> PyFormatContext<'a> {
     }
 
     pub(crate) fn is_expression_parenthesized(&self, expression: ExprRef) -> bool {
-        self.parentheses.is_expression_parenthesized(expression)
+        self.comments.ranges().is_parenthesized(expression.range())
     }
 
     /// Returns a non-None value only if the formatter is running on a code

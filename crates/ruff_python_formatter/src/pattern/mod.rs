@@ -1,9 +1,8 @@
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions};
 use ruff_python_ast::{AnyNodeRef, Expr, PatternMatchAs};
 use ruff_python_ast::{MatchCase, Pattern};
-use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{
-    BackwardsTokenizer, SimpleToken, SimpleTokenKind, first_non_trivia_token,
+    BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind, first_non_trivia_token,
 };
 use ruff_text_size::Ranged;
 use std::cmp::Ordering;
