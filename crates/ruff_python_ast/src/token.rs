@@ -198,19 +198,10 @@ impl Token {
         }
     }
 
-    #[expect(
-        unsafe_code,
-        reason = "decoding a compact contiguous TokenKind discriminant requires a transmute"
-    )]
     const fn kind_and_flags(&self) -> (TokenKind, TokenFlags) {
         let encoded = self.kind_and_flags;
-        if encoded < Self::DIRECT_KIND_COUNT {
-            // SAFETY: `TokenKind` has a contiguous `u8` representation from zero through
-            // `Unknown`, and the bound above restricts `encoded` to that range.
-            return (
-                unsafe { std::mem::transmute::<u8, TokenKind>(encoded) },
-                TokenFlags::empty(),
-            );
+        if let Some(kind) = TokenKind::from_repr(encoded) {
+            return (kind, TokenFlags::empty());
         }
         if encoded == Self::NON_ASCII_NAME {
             return (TokenKind::Name, TokenFlags::NON_ASCII_NAME);
@@ -294,7 +285,7 @@ impl fmt::Debug for Token {
 }
 
 /// A kind of a token.
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord, strum_macros::FromRepr)]
 #[repr(u8)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum TokenKind {

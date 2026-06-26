@@ -35,6 +35,7 @@ salsa = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
+strum_macros = { workspace = true }
 thiserror = { workspace = true }
 thin-vec = { workspace = true }
 
