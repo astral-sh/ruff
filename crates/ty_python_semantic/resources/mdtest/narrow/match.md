@@ -1897,7 +1897,7 @@ def builtin_positional_behavior_comes_from_pattern_class(
     # error: [invalid-return-type]
 ) -> int:
     match value:
-        case PlainBase(_):
+        case PlainBase(_):  # error: [invalid-match-pattern]
             return 1
 ```
 

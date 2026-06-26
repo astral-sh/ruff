@@ -61,12 +61,12 @@ use crate::types::diagnostic::{
     report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_invalid_exception_tuple_caught,
     report_invalid_generator_yield_type, report_invalid_key_on_typed_dict,
-    report_invalid_type_checking_constant,
+    report_invalid_match_args_type, report_invalid_type_checking_constant,
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_mismatched_type_name,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
-    report_too_many_positional_patterns_for_callable_class_pattern,
-    report_unsupported_augmented_assignment, report_unsupported_comparison,
+    report_too_many_positional_patterns_for_class_pattern, report_unsupported_augmented_assignment,
+    report_unsupported_comparison,
 };
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
@@ -85,6 +85,7 @@ use crate::types::infer::{
     TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
     nearest_enclosing_function, original_class_type,
 };
+use crate::types::match_pattern::{ClassPatternPositionalResult, class_pattern_positional_result};
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::narrow::pattern_success_types;
 use crate::types::newtype::NewType;
@@ -2444,10 +2445,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn validate_class_pattern(&mut self, pattern: &ast::PatternMatchClass, cls_ty: Type<'db>) {
         if let Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) = cls_ty {
             if let Some(first_excess_pattern) = pattern.arguments.patterns.first() {
-                report_too_many_positional_patterns_for_callable_class_pattern(
+                report_too_many_positional_patterns_for_class_pattern(
                     &self.context,
                     first_excess_pattern,
+                    0,
                     pattern.arguments.patterns.len(),
+                    "collections.abc.Callable",
                 );
             }
             return;
@@ -2456,7 +2459,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Type::ClassLiteral(class) = cls_ty {
             if class.is_typed_dict(self.db()) {
                 report_match_pattern_against_typed_dict(&self.context, &*pattern.cls, class);
-            } else if let Some(protocol_class) = class.into_protocol_class(self.db())
+                return;
+            }
+            if let Some(protocol_class) = class.into_protocol_class(self.db())
                 && !protocol_class.is_runtime_checkable(self.db())
             {
                 report_match_pattern_against_non_runtime_checkable_protocol(
@@ -2464,6 +2469,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &*pattern.cls,
                     protocol_class,
                 );
+                return;
+            }
+
+            let positional_patterns = &pattern.arguments.patterns;
+            if let [first_positional_pattern, ..] = positional_patterns.as_slice()
+                && let Some(result) = class_pattern_positional_result(self.db(), class)
+            {
+                match result {
+                    ClassPatternPositionalResult::Limit(limit) => {
+                        if let Some(first_excess_pattern) = positional_patterns.get(limit) {
+                            report_too_many_positional_patterns_for_class_pattern(
+                                &self.context,
+                                first_excess_pattern,
+                                limit,
+                                positional_patterns.len(),
+                                cls_ty.display(self.db()),
+                            );
+                        }
+                    }
+                    ClassPatternPositionalResult::InvalidType(match_args_ty) => {
+                        report_invalid_match_args_type(
+                            &self.context,
+                            first_positional_pattern,
+                            match_args_ty,
+                            cls_ty,
+                        );
+                    }
+                }
             }
         } else if !cls_ty.is_assignable_to(self.db(), KnownClass::Type.to_instance(self.db())) {
             report_invalid_class_match_pattern(&self.context, &*pattern.cls, cls_ty);
