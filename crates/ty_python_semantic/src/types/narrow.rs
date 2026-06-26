@@ -1503,8 +1503,8 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 }
             }
 
-            if context.class.is_some_and(|pattern_class| {
-                pattern_class
+            if let Some(pattern_class) = context.class
+                && pattern_class
                     .generic_context(self.db)
                     .and_then(|generic_context| {
                         pattern_class
@@ -1517,11 +1517,35 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                             .ignore_possibly_undefined()
                     })
                     .is_some_and(|ty| ty.has_typevar(self.db))
-            }) {
-                // The pattern subclass's default specialization loses the type arguments from the
-                // subject's generic base. Prefer a member type already known from the subject;
-                // otherwise, do not treat the subclass's fallback as a declared type.
-                member_ty = Some(original_member_ty.unwrap_or_else(Type::unknown));
+            {
+                let specializes_original_class = original_subject_ty
+                    .nominal_class(self.db)
+                    .is_some_and(|original_class| {
+                        pattern_class
+                            .default_specialization(self.db)
+                            .is_subtype_of_class_literal(
+                                self.db,
+                                original_class.class_literal(self.db),
+                            )
+                    });
+                if specializes_original_class {
+                    // The pattern subclass's default specialization loses the type arguments from
+                    // the subject's generic base. Prefer a member type already known from the
+                    // subject; otherwise, do not treat the subclass's fallback as a declared type.
+                    member_ty = Some(original_member_ty.unwrap_or_else(Type::unknown));
+                } else if let Some(pattern_member_ty) = context
+                    .class_ty
+                    .member(self.db, name.as_str())
+                    .place
+                    .ignore_possibly_undefined()
+                {
+                    // Unrelated classes can overlap through multiple inheritance, so retain the
+                    // generic pattern class's member as a possible runtime value.
+                    member_ty = Some(UnionType::from_elements(
+                        self.db,
+                        member_ty.into_iter().chain([pattern_member_ty]),
+                    ));
+                }
             }
             member_ty.or_else(|| (!subject_is_final).then_some(Type::unknown()))
         };

@@ -1076,6 +1076,10 @@ Two unrelated non-final classes can have a common subclass through multiple inhe
 successful pattern therefore preserves both class types:
 
 ```py
+from typing import Generic, TypeVar
+
+OverlapT = TypeVar("OverlapT")
+
 class OverlapCaptureA: ...
 
 class OverlapCaptureB:
@@ -1101,6 +1105,24 @@ def test_match_class_capture_combines_overlapping_member_types(
     match value:
         case OverlapMemberB(member=item):
             reveal_type(item)  # revealed: int | str
+
+class GenericOverlapA:
+    member: int
+
+class GenericOverlapB(Generic[OverlapT]):
+    member: OverlapT
+
+class GenericOverlapC(GenericOverlapB[str], GenericOverlapA):
+    member: str
+
+def test_match_generic_class_capture_preserves_possible_multiple_inheritance(
+    value: GenericOverlapA,
+) -> None:
+    match value:
+        case GenericOverlapB(member=str() as item):
+            reveal_type(item)  # revealed: str
+            reveal_type(value)  # revealed: GenericOverlapA & Top[GenericOverlapB[Unknown]]
+            1 + "x"  # error: [unsupported-operator]
 ```
 
 ## Class pattern captures from `Any` and `Unknown`
