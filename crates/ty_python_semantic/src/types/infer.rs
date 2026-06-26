@@ -771,8 +771,13 @@ impl<'db> InferenceRegion<'db> {
 /// The inferred types for a scope region.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ScopeInference<'db> {
-    /// The types of every expression in this region.
+    /// Expression types retained as key-value entries.
+    ///
+    /// Completed results store exact `Unknown` types in `unknowns` instead.
     expressions: FrozenValueMap<ExpressionNodeKey, Type<'db>>,
+
+    /// Expressions whose inferred type is exactly `Unknown` in a completed result.
+    unknowns: FrozenSet<ExpressionNodeKey>,
 
     /// The extra data that is only present for few inference regions.
     extra: Option<Box<ScopeInferenceExtra<'db>>>,
@@ -810,6 +815,7 @@ impl<'db> ScopeInference<'db> {
                 ..ScopeInferenceExtra::default()
             })),
             expressions: FrozenValueMap::default(),
+            unknowns: FrozenSet::default(),
         }
     }
 
@@ -819,6 +825,19 @@ impl<'db> ScopeInference<'db> {
         previous_inference: &ScopeInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ScopeInference<'db> {
+        if self.unknowns.iter().next().is_some() {
+            let expressions = std::mem::take(&mut self.expressions);
+            self.expressions = expressions
+                .iter()
+                .chain(
+                    self.unknowns
+                        .iter()
+                        .map(|expression| (*expression, Type::unknown())),
+                )
+                .collect();
+            self.unknowns = FrozenSet::default();
+        }
+
         self.expressions.map_values(|expr, ty| {
             ty.cycle_normalized(db, previous_inference.expression_type(expr), cycle)
         });
@@ -850,9 +869,11 @@ impl<'db> ScopeInference<'db> {
         &self,
         expression: impl Into<ExpressionNodeKey>,
     ) -> Option<Type<'db>> {
+        let expression = expression.into();
         self.expressions
-            .get(&expression.into())
+            .get(&expression)
             .copied()
+            .or_else(|| self.unknowns.contains(&expression).then(Type::unknown))
             .or_else(|| self.fallback_type())
     }
 
