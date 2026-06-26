@@ -2606,24 +2606,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         assert_eq!(&self.current_assignments, &[]);
 
-        let mut place_tables: IndexVec<_, _> = self
-            .place_tables
-            .into_iter()
-            .map(|builder| Arc::new(builder.finish()))
-            .collect();
-
-        let mut use_def_maps: IndexVec<_, _> = self
-            .use_def_maps
-            .into_iter()
-            .map(|builder| Arc::new(builder.finish()))
-            .collect();
-
         let ast_ids = super::ast_ids::AstIds::from_builders(self.ast_ids);
 
-        self.scopes.shrink_to_fit();
-        place_tables.shrink_to_fit();
-        use_def_maps.shrink_to_fit();
-        self.scope_ids_by_scope.shrink_to_fit();
         let mut semantic_syntax_errors = self.semantic_syntax_errors.into_inner();
         semantic_syntax_errors.shrink_to_fit();
         let uses_by_collection = FrozenMap::from_entries(
@@ -2634,7 +2618,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         );
 
         SemanticIndex {
-            place_tables: place_tables.into(),
+            place_tables: self
+                .place_tables
+                .into_iter()
+                .map(|builder| Arc::new(builder.finish()))
+                .collect(),
             scopes: self.scopes.into(),
             definitions_by_node: DefinitionsByNode::from_map(self.definitions_by_node),
             expressions_by_node: self.expressions_by_node,
@@ -2644,7 +2632,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast_ids,
             scopes_by_expression: self.scopes_by_expression.build(),
             scopes_by_node: self.scopes_by_node,
-            use_def_maps: use_def_maps.into(),
+            use_def_maps: self
+                .use_def_maps
+                .into_iter()
+                .map(|builder| Arc::new(builder.finish()))
+                .collect(),
             enclosing_lambda_statements: FrozenMap::from(self.enclosing_lambda_statements),
             collections_by_use: FrozenMap::from(self.collections_by_use),
             uses_by_collection,
