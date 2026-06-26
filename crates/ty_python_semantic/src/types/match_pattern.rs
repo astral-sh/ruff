@@ -3,7 +3,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
 use ty_python_core::Truthiness;
-use ty_python_core::definition::Definition;
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::predicate::{
     ClassPatternPredicateKind, MappingPatternPredicateKind, PatternPredicateKind,
     SequencePatternPredicateKind,
@@ -12,16 +12,16 @@ use ty_python_core::reachability_constraints::ScopedReachabilityConstraintId;
 use ty_python_core::{place_table, semantic_index, use_def_map};
 
 use crate::Db;
-use crate::place::{DefinedPlace, Place, TypeOrigin};
+use crate::place::{DefinedPlace, Place};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::equality::{evaluate_type_equality, is_same_enum_domain};
 use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass,
-    Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext,
-    TypeVarBoundOrConstraints, TypedDictType, UnionType, binding_type, equality_truthiness,
-    infer_same_file_expression_type,
+    CallableType, ClassBase, ClassLiteral, DataclassFlags, EnumLiteralType, IntersectionBuilder,
+    KnownClass, Parameter, Parameters, Signature, SpecialFormType, StaticClassLiteral, Type,
+    TypeContext, TypeVarBoundOrConstraints, TypedDictType, UnionType, binding_type,
+    equality_truthiness, infer_same_file_expression_type,
 };
 
 pub(crate) fn singleton_pattern_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
@@ -354,64 +354,107 @@ fn class_has_match_self_flag(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
         })
 }
 
-/// Return the positional limit only when it is independent of runtime control flow.
+/// The statically known result of validating positional subpatterns for a class pattern.
+pub(crate) enum ClassPatternPositionalResult<'db> {
+    /// The maximum number of positional subpatterns accepted by the class.
+    Limit(usize),
+    /// A statically known non-tuple value used for `__match_args__`.
+    InvalidType(Type<'db>),
+}
+
+/// Validate positional subpatterns when the result is independent of runtime control flow.
 ///
-/// This intentionally supports match-self builtins and plain classes whose `__match_args__` is
-/// absent or assigned directly to an unconditional, unannotated tuple literal. Diagnosing broader
-/// cases requires correlating class-construction effects, runtime boundness, declarations,
-/// inheritance, synthesis, and alternate tuple values; an uncertain result is preferable to a
-/// false positive.
-pub(crate) fn class_pattern_positional_limit(
-    db: &dyn Db,
-    class: ClassLiteral<'_>,
-) -> Option<usize> {
+/// This intentionally supports match-self builtins, statically absent `__match_args__` attributes,
+/// and direct unconditional assignments in plain classes. An uncertain result is preferable to a
+/// false positive for inherited, synthesized, conditional, or otherwise indirect values.
+pub(crate) fn class_pattern_positional_result<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+) -> Option<ClassPatternPositionalResult<'db>> {
     let static_class = class.as_static()?;
     let is_plain_class = !static_class.has_decorators(db)
         && !static_class.has_explicit_bases(db)
         && !static_class.has_explicit_metaclass(db);
+    let has_local_binding = || {
+        let places = place_table(db, static_class.body_scope(db));
+        places
+            .symbol_id("__match_args__")
+            .is_some_and(|symbol_id| places.symbol(symbol_id).is_bound())
+    };
 
     let Place::Defined(place) = Type::ClassLiteral(class).member(db, "__match_args__").place else {
-        if place_table(db, static_class.body_scope(db))
-            .symbol_id("__match_args__")
-            .is_some()
-        {
+        if has_local_binding() {
             return None;
         }
         return if class.known(db).is_some() && class_has_match_self_flag(db, class) {
-            Some(1)
+            Some(ClassPatternPositionalResult::Limit(1))
+        } else if is_plain_class || class_is_plain_dataclass_without_match_args(db, static_class) {
+            Some(ClassPatternPositionalResult::Limit(0))
         } else {
-            is_plain_class.then_some(0)
+            None
         };
     };
-    if !is_plain_class || !place.is_definitely_defined() || place.origin != TypeOrigin::Inferred {
+    if !is_plain_class || !place.is_definitely_defined() {
         return None;
     }
     let definition = place.provenance.definition()?;
-    if !definition_is_unconditional_tuple_literal_binding(db, definition) {
-        return None;
+    if !definition_is_unconditional_match_args_binding(db, definition) {
+        return (!has_local_binding()).then_some(ClassPatternPositionalResult::Limit(0));
+    }
+    let match_args = binding_type(db, definition);
+
+    if let Some(tuple) = match_args.exact_tuple_instance_spec(db) {
+        tuple
+            .as_fixed_length()
+            .map(super::tuple::FixedLengthTuple::len)
+            .map(ClassPatternPositionalResult::Limit)
+    } else if match_args.is_disjoint_from(db, Type::homogeneous_tuple(db, Type::unknown())) {
+        Some(ClassPatternPositionalResult::InvalidType(match_args))
+    } else {
+        None
+    }
+}
+
+#[salsa::tracked]
+fn class_is_plain_dataclass_without_match_args(db: &dyn Db, class: StaticClassLiteral<'_>) -> bool {
+    if class.has_explicit_bases(db)
+        || class.has_explicit_metaclass(db)
+        || class
+            .dataclass_params(db)
+            .is_none_or(|params| params.flags(db).contains(DataclassFlags::MATCH_ARGS))
+    {
+        return false;
     }
 
-    binding_type(db, definition)
-        .exact_tuple_instance_spec(db)?
-        .as_fixed_length()
-        .map(super::tuple::FixedLengthTuple::len)
+    let scope = class.body_scope(db);
+    let module = parsed_module(db, scope.file(db)).load(db);
+    scope
+        .node(db)
+        .expect_class()
+        .node(&module)
+        .decorator_list
+        .len()
+        == 1
+        && class.find_dataclass_decorator_position(db) == Some(0)
 }
 
 /// Keep syntax inspection behind a tracked boundary so consumers depend only on this result.
 #[salsa::tracked]
-fn definition_is_unconditional_tuple_literal_binding<'db>(
+fn definition_is_unconditional_match_args_binding<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> bool {
     let file = definition.file(db);
     let module = parsed_module(db, file).load(db);
     let scope = definition.scope(db);
-    let Some(assignment) = definition.kind(db).as_unannotated_assignment() else {
-        return false;
+    let has_runtime_binding = match definition.kind(db) {
+        DefinitionKind::Assignment(_) => true,
+        DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(&module).is_some(),
+        _ => false,
     };
 
-    if file.is_stub(db)
-        || !matches!(assignment.value(&module), ast::Expr::Tuple(_))
+    if !has_runtime_binding
+        || file.is_stub(db)
         || semantic_index(db, file).is_in_type_checking_block(
             scope.file_scope_id(db),
             definition.full_range(db, &module).range(),
