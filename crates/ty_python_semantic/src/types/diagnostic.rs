@@ -44,8 +44,9 @@ use ruff_python_ast::token::parentheses_iterator;
 use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, StringFlags};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use std::fmt::{self, Formatter};
+use thin_vec::ThinVec;
 use ty_module_resolver::{KnownModule, Module, ModuleName, file_to_module};
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::{PlaceTable, ScopedPlaceId};
@@ -1256,9 +1257,19 @@ declare_lint! {
 /// A collection of type check diagnostics.
 #[derive(Default, Eq, PartialEq, get_size2::GetSize)]
 pub struct TypeCheckDiagnostics {
-    diagnostics: Vec<Diagnostic>,
-    used_suppressions: FxHashSet<FileSuppressionId>,
+    inner: Option<Box<TypeCheckDiagnosticsInner>>,
 }
+
+#[derive(Default, Eq, PartialEq, get_size2::GetSize)]
+struct TypeCheckDiagnosticsInner {
+    /// Most inference regions do not emit any diagnostics.
+    diagnostics: ThinVec<Diagnostic>,
+
+    /// Most inference regions do not use any suppressions.
+    used_suppressions: ThinVec<FileSuppressionId>,
+}
+
+static_assertions::assert_eq_size!(TypeCheckDiagnostics, Option<Box<()>>);
 
 pub(crate) fn report_mismatched_type_name<'db>(
     context: &InferContext<'db, '_>,
@@ -1287,41 +1298,76 @@ pub(crate) fn report_mismatched_type_name<'db>(
 
 impl TypeCheckDiagnostics {
     pub(crate) fn push(&mut self, diagnostic: Diagnostic) {
-        self.diagnostics.push(diagnostic);
+        self.inner
+            .get_or_insert_default()
+            .diagnostics
+            .push(diagnostic);
     }
 
     pub(super) fn extend(&mut self, other: &TypeCheckDiagnostics) {
-        self.diagnostics.extend_from_slice(&other.diagnostics);
-        self.used_suppressions.extend(&other.used_suppressions);
+        let Some(other) = other.inner.as_deref() else {
+            return;
+        };
+        let inner = self.inner.get_or_insert_default();
+        inner.diagnostics.extend_from_slice(&other.diagnostics);
+        inner
+            .used_suppressions
+            .extend_from_slice(&other.used_suppressions);
+        inner.used_suppressions.sort_unstable();
+        inner.used_suppressions.dedup();
     }
 
     pub(super) fn extend_diagnostics(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {
-        self.diagnostics.extend(diagnostics);
+        let mut diagnostics = diagnostics.into_iter();
+        let Some(first) = diagnostics.next() else {
+            return;
+        };
+        let inner = self.inner.get_or_insert_default();
+        inner.diagnostics.push(first);
+        inner.diagnostics.extend(diagnostics);
     }
 
     pub(crate) fn mark_used(&mut self, suppression_id: FileSuppressionId) {
-        self.used_suppressions.insert(suppression_id);
+        let used_suppressions = &mut self.inner.get_or_insert_default().used_suppressions;
+        if let Err(index) = used_suppressions.binary_search(&suppression_id) {
+            used_suppressions.insert(index, suppression_id);
+        }
     }
 
     pub(crate) fn is_used(&self, suppression_id: FileSuppressionId) -> bool {
-        self.used_suppressions.contains(&suppression_id)
+        self.inner.as_ref().is_some_and(|inner| {
+            inner
+                .used_suppressions
+                .binary_search(&suppression_id)
+                .is_ok()
+        })
     }
 
     pub(crate) fn used_len(&self) -> usize {
-        self.used_suppressions.len()
+        self.inner
+            .as_ref()
+            .map_or(0, |inner| inner.used_suppressions.len())
     }
 
     pub(crate) fn shrink_to_fit(&mut self) {
-        self.used_suppressions.shrink_to_fit();
-        self.diagnostics.shrink_to_fit();
+        if let Some(inner) = self.inner.as_mut() {
+            inner.used_suppressions.shrink_to_fit();
+            inner.diagnostics.shrink_to_fit();
+            if inner.diagnostics.is_empty() && inner.used_suppressions.is_empty() {
+                self.inner = None;
+            }
+        }
     }
 
     pub(crate) fn into_diagnostics(self) -> Vec<Diagnostic> {
-        self.diagnostics
+        self.inner
+            .map_or_else(Vec::new, |inner| inner.diagnostics.into())
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.diagnostics.is_empty() && self.used_suppressions.is_empty()
+        self.inner
+            .as_ref()
+            .is_none_or(|inner| inner.diagnostics.is_empty() && inner.used_suppressions.is_empty())
     }
 
     pub fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
@@ -1329,7 +1375,9 @@ impl TypeCheckDiagnostics {
     }
 
     fn diagnostics(&self) -> &[Diagnostic] {
-        self.diagnostics.as_slice()
+        self.inner
+            .as_ref()
+            .map_or(&[], |inner| inner.diagnostics.as_slice())
     }
 }
 
