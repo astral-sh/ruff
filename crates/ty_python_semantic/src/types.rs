@@ -2339,9 +2339,7 @@ impl<'db> Type<'db> {
         match self {
             Type::LiteralValue(literal) if literal.is_promotable() => literal.fallback_instance(db),
             Type::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(db)),
-            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
-                recursive.map(db, |ty| ty.promote_impl(db))
-            }
+            Type::Recursive(_) => self,
             _ => self,
         }
     }
@@ -2352,9 +2350,7 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance) if instance.is_singleton(db) => {
                 UnionType::from_two_elements(db, self, Type::unknown())
             }
-            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
-                recursive.map(db, |ty| ty.promote_singletons_impl(db))
-            }
+            Type::Recursive(_) => self,
             _ => self,
         }
     }
