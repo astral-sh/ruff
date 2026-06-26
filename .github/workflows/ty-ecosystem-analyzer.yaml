@@ -49,20 +49,14 @@ jobs:
     name: Build ty (${{ matrix.revision }})
     strategy:
       matrix:
-        include:
-          # For `pull_request`, `github.sha` is GitHub's synthetic merge commit;
-          # pair it with the base revision from the same event payload.
-          - revision: base
-            ref: ${{ github.event.pull_request.base.sha }}
-          - revision: pr
-            ref: ${{ github.sha }}
+        revision: [base, pr]
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
-          ref: ${{ matrix.ref }}
+          ref: ${{ github.sha }}
 
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
@@ -78,6 +72,18 @@ jobs:
         env:
           REVISION: ${{ matrix.revision }}
         run: |
+          if [[ "${REVISION}" == "base" ]]; then
+            # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
+            git fetch --no-tags --filter=blob:none --unshallow origin
+
+            MERGE_BASE="$(git merge-base "${GITHUB_SHA}" "origin/${GITHUB_BASE_REF}")"
+            echo "${MERGE_BASE}" > merge-base.txt
+            echo "Merge base: ${MERGE_BASE}"
+            echo "PR commit: ${GITHUB_SHA}"
+
+            git checkout "${MERGE_BASE}"
+          fi
+
           echo "Building ${REVISION} revision $(git rev-parse HEAD)"
           cargo build --package ty --profile profiling
           cp target/profiling/ty "ty-${REVISION}"
@@ -93,7 +99,9 @@ jobs:
         with:
           name: ty-build-base
           compression-level: 1
-          path: ty-base
+          path: |
+            ty-base
+            merge-base.txt
 
       - name: Upload PR ty binary, flaky project list, and config
         if: matrix.revision == 'pr'
@@ -115,7 +123,6 @@ jobs:
     timeout-minutes: 10
     env:
       EXCLUDE_NEWER: ${{ github.event.pull_request.updated_at }}
-      MERGE_BASE: ${{ github.event.pull_request.base.sha }}
     steps:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
@@ -137,6 +144,8 @@ jobs:
           cp ty-ecosystem.toml ~/.config/ty/ty.toml
 
           chmod +x ty-base ty-pr
+          MERGE_BASE="$(< merge-base.txt)"
+          echo "MERGE_BASE: ${MERGE_BASE}"
 
           uvx \
             --from "git+https://github.com/astral-sh/ecosystem-analyzer@${ECOSYSTEM_ANALYZER_COMMIT}" \
