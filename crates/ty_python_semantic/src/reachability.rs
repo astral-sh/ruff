@@ -1202,7 +1202,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
         PatternPredicateKind::Mapping(kind) => {
             let mapping_ty = mapping_pattern_type(db);
             if subject_ty.is_subtype_of(db, mapping_ty) {
-                if kind.is_empty() {
+                if kind.is_irrefutable() {
                     Truthiness::AlwaysTrue
                 } else {
                     Truthiness::Ambiguous
