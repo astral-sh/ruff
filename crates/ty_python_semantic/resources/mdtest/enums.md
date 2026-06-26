@@ -779,24 +779,6 @@ reveal_type(InheritedWeirdEnum.FROM_INT)  # revealed: Literal[InheritedWeirdEnum
 reveal_type(enum_members(InheritedWeirdEnum))
 ```
 
-### Data-type mixin `__init__`
-
-A user-defined `__init__` on an `int` data type can replace `_value_` after `int.__new__` runs.
-Without an explicit `_value_` annotation, `.value` falls back to `Any`:
-
-```py
-from enum import Enum
-
-class BooleanInt(int):
-    def __init__(self, value: int) -> None:
-        self._value_ = False
-
-class BooleanEnum(BooleanInt, Enum):
-    VALUE = False
-
-reveal_type(BooleanEnum.VALUE.value)  # revealed: Any
-```
-
 ### Built-in data types
 
 An enum with an `int` or `str` data type stores the value produced by that type's constructor.
@@ -843,8 +825,9 @@ reveal_type(enum_members(InheritedValues))
 
 ### User-defined data types
 
-For a user-defined subclass of `int`, `.value` has the subclass type. If the subclass inherits
-`int`'s equality and hashing methods, values that normalize to the same integer are aliases:
+User-defined data types remain opaque even when they inherit from `int` or `str` without overriding
+any methods. Their construction, attribute access, equality, and hashing can all differ from the
+built-in type:
 
 ```py
 from enum import Enum
@@ -857,101 +840,9 @@ class CustomValues(CustomInt, Enum):
     FALSE = False
     ZERO = 0
 
-reveal_type(CustomValues.FALSE.value)  # revealed: CustomInt
-# revealed: tuple[Literal["FALSE"]]
+reveal_type(CustomValues.FALSE.value)  # revealed: Any
+# revealed: tuple[Literal["FALSE"], Literal["ZERO"]]
 reveal_type(enum_members(CustomValues))
-```
-
-A separate base class does not become the enum's data type:
-
-```py
-class Behavior:
-    pass
-
-class ValuesWithBehavior(Behavior, int, Enum):
-    FALSE = False
-    ZERO = 0
-
-reveal_type(ValuesWithBehavior.FALSE.value)  # revealed: Literal[0]
-# revealed: tuple[Literal["FALSE"]]
-reveal_type(enum_members(ValuesWithBehavior))
-```
-
-### Custom equality and hashing
-
-If the data type overrides equality or hashing, the assigned literals are not enough to determine
-aliases. We therefore keep both names as possible members:
-
-```py
-from enum import Enum
-from ty_extensions import enum_members
-from typing import Literal
-
-class NeverEqualInt(int):
-    def __eq__(self, other: object) -> Literal[False]:
-        return False
-
-class CustomEquality(NeverEqualInt, Enum):
-    FIRST = 0
-    SECOND = 0
-
-# revealed: tuple[Literal["FIRST"], Literal["SECOND"]]
-reveal_type(enum_members(CustomEquality))
-
-class IdentityHashedInt(int):
-    def __init__(self, value: int) -> None:
-        self.hash_value = id(self)
-
-    def __hash__(self) -> int:
-        return self.hash_value
-
-class CustomHash(IdentityHashedInt, Enum):
-    FIRST = 0
-    SECOND = 0
-
-# revealed: tuple[Literal["FIRST"], Literal["SECOND"]]
-reveal_type(enum_members(CustomHash))
-```
-
-### Dataclass equality
-
-A frozen dataclass generates equality and hashing methods from its fields. In the first example, the
-field records whether the original value was a `bool` or an `int`, so the two members remain
-distinct. With `eq=False`, the subclass instead inherits the methods defined by `int`, and the
-second name becomes an alias:
-
-```py
-from dataclasses import dataclass
-from enum import Enum
-from ty_extensions import enum_members
-
-@dataclass(frozen=True)
-class ComparedInt(int):
-    input_type: type
-
-    def __init__(self, value: int) -> None:
-        object.__setattr__(self, "input_type", type(value))
-
-class GeneratedEquality(ComparedInt, Enum):
-    FROM_BOOL = False
-    FROM_INT = 0
-
-# revealed: tuple[Literal["FROM_BOOL"], Literal["FROM_INT"]]
-reveal_type(enum_members(GeneratedEquality))
-
-@dataclass(eq=False, frozen=True)
-class InheritedEqualityInt(int):
-    input_type: type
-
-    def __init__(self, value: int) -> None:
-        object.__setattr__(self, "input_type", type(value))
-
-class InheritedEquality(InheritedEqualityInt, Enum):
-    FROM_BOOL = False
-    FROM_INT = 0
-
-# revealed: tuple[Literal["FROM_BOOL"]]
-reveal_type(enum_members(InheritedEquality))
 ```
 
 ### Assigned `__new__`
