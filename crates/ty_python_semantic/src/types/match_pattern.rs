@@ -3,6 +3,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
 use ty_python_core::Truthiness;
+use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::predicate::{
     ClassPatternPredicateKind, MappingPatternPredicateKind, PatternPredicateKind,
@@ -482,15 +483,69 @@ fn class_is_plain_dataclass_without_match_args(db: &dyn Db, class: StaticClassLi
     }
 
     let scope = class.body_scope(db);
-    let module = parsed_module(db, scope.file(db)).load(db);
-    scope
-        .node(db)
-        .expect_class()
-        .node(&module)
-        .decorator_list
-        .len()
-        == 1
-        && class.find_dataclass_decorator_position(db) == Some(0)
+    let file = scope.file(db);
+    let module = parsed_module(db, file).load(db);
+    let class_node = scope.node(db).expect_class().node(&module);
+    let [decorator] = class_node.decorator_list.as_slice() else {
+        return false;
+    };
+    if class.find_dataclass_decorator_position(db) != Some(0) {
+        return false;
+    }
+
+    let callable = decorator
+        .expression
+        .as_call_expr()
+        .map_or(&decorator.expression, |call| &call.func);
+    let index = semantic_index(db, file);
+    let Some(file_scope) = index.try_expression_scope_id(callable) else {
+        return false;
+    };
+    let ast::Expr::Name(name) = callable else {
+        return false;
+    };
+    let mut bindings = use_def_map(db, file_scope.to_scope_id(db, file))
+        .bindings_at_use(name.scoped_use_id(db, file));
+    let Some(binding) = bindings.next() else {
+        return false;
+    };
+    if bindings.next().is_some()
+        || binding.reachability_constraint != ScopedReachabilityConstraintId::ALWAYS_TRUE
+    {
+        return false;
+    }
+    binding
+        .binding
+        .definition()
+        .is_some_and(|definition| definition_is_unconditional_runtime_binding(db, definition))
+}
+
+/// Return whether a definition is the sole unconditional runtime binding for its symbol.
+#[salsa::tracked]
+fn definition_is_unconditional_runtime_binding(db: &dyn Db, definition: Definition<'_>) -> bool {
+    let file = definition.file(db);
+    let module = parsed_module(db, file).load(db);
+    let scope = definition.scope(db);
+    let Some(symbol_id) = definition.place(db).as_symbol() else {
+        return false;
+    };
+    if file.is_stub(db)
+        || semantic_index(db, file).is_in_type_checking_block(
+            scope.file_scope_id(db),
+            definition.full_range(db, &module).range(),
+        )
+    {
+        return false;
+    }
+
+    use_def_map(db, scope)
+        .end_of_scope_symbol_bindings(symbol_id)
+        .any(|binding| {
+            binding
+                .binding
+                .is_defined_and(|candidate| candidate == definition)
+                && binding.reachability_constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE
+        })
 }
 
 /// Classify only direct literals whose runtime tuple-ness is independent of static type flow.
@@ -529,24 +584,10 @@ fn direct_match_args_binding<'db>(
         _ => return None,
     };
 
-    if file.is_stub(db)
-        || semantic_index(db, file).is_in_type_checking_block(
-            scope.file_scope_id(db),
-            definition.full_range(db, &module).range(),
-        )
-    {
+    if !definition_is_unconditional_runtime_binding(db, definition) {
         return None;
     }
-
-    use_def_map(db, scope)
-        .end_of_scope_symbol_bindings(symbol_id)
-        .any(|binding| {
-            binding
-                .binding
-                .is_defined_and(|candidate| candidate == definition)
-                && binding.reachability_constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE
-        })
-        .then_some(binding)
+    Some(binding)
 }
 
 /// Resolve the value supplied to each positional subpattern, preserving source order and length.

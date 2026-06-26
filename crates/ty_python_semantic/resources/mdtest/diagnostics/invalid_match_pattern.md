@@ -140,6 +140,42 @@ def describe(value: NoMatchArgs) -> None:
             pass
 ```
 
+## Type-checking-only dataclass decorator
+
+The decorator selected during type checking may be replaced by a runtime decorator that supplies
+`__match_args__`.
+
+```py
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from dataclasses import dataclass
+else:
+    from runtime_dataclass import dataclass
+
+@dataclass(match_args=False)
+class Model:
+    value: int
+
+def describe(model: Model) -> None:
+    match model:
+        case Model(_):
+            pass
+```
+
+`runtime_dataclass.py`:
+
+```py
+from typing import Any
+
+def dataclass(**kwargs: Any) -> Any:
+    def decorate(cls: Any) -> Any:
+        cls.__match_args__ = ("value",)
+        return cls
+
+    return decorate
+```
+
 ## Descriptor-provided `__match_args__`
 
 Descriptor lookup can produce a valid tuple even when the raw binding is not a tuple.
