@@ -86,7 +86,7 @@
 //!
 //! [duboc]: https://gldubc.github.io/#thesis
 
-use std::cell::{Ref, RefCell};
+use std::cell::{Cell, Ref, RefCell};
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
@@ -286,6 +286,7 @@ impl<'db> OwnedConstraintSet<'db> {
         };
         let builder = ConstraintSetBuilder {
             storage: RefCell::new(storage),
+            recent_typevars: Cell::default(),
         };
         let set = ConstraintSet::from_node(&builder, self.node);
         f(&builder, set)
@@ -680,6 +681,9 @@ impl Debug for ConstraintSet<'_, '_> {
 #[derive(Default)]
 pub(crate) struct ConstraintSetBuilder<'db> {
     storage: RefCell<ConstraintSetStorage<'db>>,
+    /// Exact-instance lookups avoid repeatedly resolving and hashing the logical identity. The
+    /// identity-keyed cache in `storage` remains the source of truth for materialized variants.
+    recent_typevars: Cell<[Option<(BoundTypeVarInstance<'db>, TypeVarId)>; 4]>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, get_size2::GetSize)]
@@ -938,16 +942,41 @@ impl<'db> ConstraintSetBuilder<'db> {
 
     /// Interns a single typevar, giving it a stable order in this builder
     fn intern_typevar(&self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarId {
+        if let Some(id) = self.recent_typevar_id(typevar) {
+            return id;
+        }
+
         let identity = typevar.identity(db);
         let mut storage = self.storage.borrow_mut();
         storage.ensure_overlay_identity_caches();
         if let Some(id) = storage.typevar_cache.get(&identity) {
-            return *id;
+            let id = *id;
+            drop(storage);
+            self.remember_typevar(typevar, id);
+            return id;
         }
         let id = storage.typevars.push(identity);
         let id = storage.adjusted_typevar_id(id);
         storage.typevar_cache.insert(identity, id);
+        drop(storage);
+        self.remember_typevar(typevar, id);
         id
+    }
+
+    fn recent_typevar_id(&self, typevar: BoundTypeVarInstance<'db>) -> Option<TypeVarId> {
+        self.recent_typevars
+            .get()
+            .into_iter()
+            .flatten()
+            .find_map(|(recent, id)| (recent == typevar).then_some(id))
+    }
+
+    fn remember_typevar(&self, typevar: BoundTypeVarInstance<'db>, id: TypeVarId) {
+        let [first, second, third, _] = self.recent_typevars.get();
+        if first.is_none_or(|(recent, _)| recent != typevar) {
+            self.recent_typevars
+                .set([Some((typevar, id)), first, second, third]);
+        }
     }
 
     /// Interns all of the typevars mentioned in a type in a stable order.
@@ -1032,14 +1061,21 @@ impl<'db> ConstraintSetBuilder<'db> {
     }
 
     fn typevar_id(&self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarId {
+        if let Some(id) = self.recent_typevar_id(typevar) {
+            return id;
+        }
+
         let identity = typevar.identity(db);
         let mut storage = self.storage.borrow_mut();
         storage.ensure_overlay_identity_caches();
-        storage
+        let id = storage
             .typevar_cache
             .get(&identity)
             .copied()
-            .expect("typevar should be interned before ordering")
+            .expect("typevar should be interned before ordering");
+        drop(storage);
+        self.remember_typevar(typevar, id);
+        id
     }
 
     fn constraint_data(&self, constraint: ConstraintId) -> Constraint<'db> {

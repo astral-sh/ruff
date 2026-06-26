@@ -1449,15 +1449,15 @@ struct DisplayBoundTypeVarIdentity<'db> {
 
 impl Display for DisplayBoundTypeVarIdentity<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(self.bound_typevar_identity.identity.name(self.db))?;
-        let binding_context = self.bound_typevar_identity.binding_context;
+        f.write_str(self.bound_typevar_identity.identity(self.db).name(self.db))?;
+        let binding_context = self.bound_typevar_identity.binding_context(self.db);
         if let Some(binding_context_name) = binding_context.name(self.db)
             && let Some(definition) = binding_context.definition()
             && !self.settings.active_scopes.contains(&definition)
         {
             write!(f, "@{binding_context_name}")?;
         }
-        if let Some(paramspec_attr) = self.bound_typevar_identity.paramspec_attr {
+        if let Some(paramspec_attr) = self.bound_typevar_identity.paramspec_attr(self.db) {
             write!(f, ".{paramspec_attr}")?;
         }
         Ok(())
