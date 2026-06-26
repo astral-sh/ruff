@@ -2891,6 +2891,175 @@ fn add_ignore_existing_own_line_ignore() -> Result<()> {
 }
 
 #[test]
+fn add_noqa_existing_noqa_with_reason() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "noqa.py",
+        r#"
+        def unused(x):  # noqa: ANN001, ARG001, D103 existing reason
+            pass
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .arg("--select=ANN001,ANN201,ARG001,D103")
+            .arg("noqa.py")
+            .arg("--add-noqa"),
+        @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        ----- stderr -----
+        Added 1 suppression comment.
+        ",
+    );
+
+    let test_code = fixture.read_file("noqa.py")?;
+    insta::assert_snapshot!(
+        test_code,
+        @"
+
+        def unused(x):  # noqa: ANN001, ANN201, ARG001, D103 existing reason
+            pass
+        ",
+    );
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_existing_noqa_with_nested_comment() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file("noqa.py", "import sys  # noqa: RUF100 # fmt:skip\n")?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .arg("--select=F401")
+            .arg("noqa.py")
+            .arg("--add-noqa"),
+        @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        ----- stderr -----
+        Added 1 suppression comment.
+        ",
+    );
+
+    let test_code = fixture.read_file("noqa.py")?;
+    insta::assert_snapshot!(test_code, @"import sys  # noqa: F401, RUF100 # fmt:skip");
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_existing_noqa_with_new_reason_and_nested_comment() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "noqa.py",
+        "import sys  # noqa: RUF100 existing reason  # fmt: skip\n",
+    )?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .arg("--select=F401")
+            .arg("noqa.py")
+            .arg("--add-noqa=new reason"),
+        @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        ----- stderr -----
+        Added 1 suppression comment.
+        ",
+    );
+
+    let test_code = fixture.read_file("noqa.py")?;
+    insta::assert_snapshot!(test_code, @"import sys  # noqa: F401, RUF100 new reason  # fmt: skip");
+
+    Ok(())
+}
+
+#[test]
+fn add_ignore_existing_ignore_with_reason() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "noqa.py",
+        r#"
+        def unused(x):  # ruff:ignore[ANN001, ARG001, D103] existing reason
+            pass
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .arg("--select=ANN001,ANN201,ARG001,D103")
+            .arg("noqa.py")
+            .arg("--preview")
+            .arg("--add-ignore"),
+        @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        ----- stderr -----
+        Added 1 suppression comment.
+        ",
+    );
+
+    let test_code = fixture.read_file("noqa.py")?;
+    insta::assert_snapshot!(
+        test_code,
+        @"
+
+        def unused(x):  # ruff:ignore[ANN001, ARG001, D103, missing-return-type-undocumented-public-function] existing reason
+            pass
+        ",
+    );
+
+    Ok(())
+}
+
+#[test]
+fn add_ignore_existing_ignore_with_nested_comment() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "noqa.py",
+        "import sys  # ruff:ignore[RUF100]  # fmt: skip\n",
+    )?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .arg("--select=F401")
+            .arg("noqa.py")
+            .arg("--preview")
+            .arg("--add-ignore"),
+        @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        ----- stderr -----
+        Added 1 suppression comment.
+        ",
+    );
+
+    let test_code = fixture.read_file("noqa.py")?;
+    insta::assert_snapshot!(test_code, @"import sys  # ruff:ignore[RUF100, unused-import]  # fmt: skip");
+
+    Ok(())
+}
+
+#[test]
 fn add_ignore_existing_noqa() -> Result<()> {
     let fixture = CliTest::new()?;
     fixture.write_file(

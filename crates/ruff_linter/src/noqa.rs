@@ -1030,6 +1030,7 @@ struct NoqaEdit<'a> {
     existing_codes: Vec<&'a str>,
     line_ending: LineEnding,
     reason: Option<&'a str>,
+    trailing_content: Option<&'a str>,
     blank_line: bool,
     suppression_kind: SuppressionKind,
 }
@@ -1064,6 +1065,11 @@ impl NoqaEdit<'_> {
         }
         if let Some(reason) = self.reason {
             write!(writer, " {reason}").unwrap();
+            if let Some(nested_comment) = self.trailing_content.and_then(nested_comment) {
+                write!(writer, "{nested_comment}").unwrap();
+            }
+        } else if let Some(trailing_content) = self.trailing_content {
+            write!(writer, "{trailing_content}").unwrap();
         }
         write!(writer, "{}", self.line_ending.as_str()).unwrap();
     }
@@ -1088,6 +1094,7 @@ fn generate_noqa_edit<'a>(
 
     let edit_range;
     let mut existing_codes = Vec::new();
+    let trailing_content;
     let blank_line;
 
     // Add codes.
@@ -1095,15 +1102,19 @@ fn generate_noqa_edit<'a>(
         (Some(ExistingDirective::Noqa(codes)), SuppressionKind::Noqa) => {
             (edit_range, blank_line) = suppression_edit_range(locator, line_range, codes.start());
             existing_codes.extend(codes.iter().map(Code::as_str));
+            trailing_content =
+                Some(locator.slice(TextRange::new(codes.end(), locator.line_end(offset))));
         }
         (Some(ExistingDirective::Ignore(comment)), SuppressionKind::Ignore) => {
             (edit_range, blank_line) = suppression_edit_range(locator, line_range, comment.start());
             existing_codes.extend(comment.codes_as_str(locator.contents()));
+            trailing_content = Some(comment.trailing_content(locator.contents()));
         }
         (None | Some(_), _) => {
             let trimmed_line = locator.slice(line_range).trim_end();
             blank_line = trimmed_line.trim_whitespace_start().is_empty();
             edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
+            trailing_content = None;
         }
     }
 
@@ -1113,6 +1124,7 @@ fn generate_noqa_edit<'a>(
         existing_codes,
         line_ending,
         reason,
+        trailing_content,
         blank_line,
         suppression_kind,
     }
@@ -1130,6 +1142,11 @@ fn suppression_edit_range(
         let edit_start = line_range.start() + TextSize::of(prefix.trim_end());
         (TextRange::new(edit_start, line_range.end()), false)
     }
+}
+
+fn nested_comment(trailing_content: &str) -> Option<&str> {
+    let (reason, _) = trailing_content.split_once('#')?;
+    Some(&trailing_content[reason.trim_end().len()..])
 }
 
 fn push_codes<I: Display>(writer: &mut dyn std::fmt::Write, codes: impl Iterator<Item = I>) {
