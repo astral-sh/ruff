@@ -2,6 +2,7 @@ use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 
 use itertools::Itertools;
+use rustc_hash::FxHashSet;
 
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -55,23 +56,18 @@ impl Debug for TriviaRanges {
 /// Index of source ranges enclosed by matching parentheses.
 #[derive(Clone, Default)]
 pub struct ParenthesizedExpressions {
-    ranges: Vec<TextRange>,
+    ranges: FxHashSet<TextRange>,
 }
 
 impl ParenthesizedExpressions {
     /// Creates an index from parenthesized expression ranges.
-    pub fn new(mut ranges: Vec<TextRange>) -> Self {
-        ranges.sort_unstable_by_key(|range| (range.start(), range.end()));
+    pub fn new(ranges: FxHashSet<TextRange>) -> Self {
         Self { ranges }
     }
 
     /// Returns `true` if the index contains `range`.
     pub fn contains(&self, range: TextRange) -> bool {
-        self.ranges
-            .binary_search_by_key(&(range.start(), range.end()), |range| {
-                (range.start(), range.end())
-            })
-            .is_ok()
+        self.ranges.contains(&range)
     }
 }
 
