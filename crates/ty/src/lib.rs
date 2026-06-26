@@ -166,9 +166,6 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     project_metadata.apply_overrides(&project_options_overrides);
 
     let mut db = ProjectDatabase::fallible(project_metadata, system)?;
-    if !watch {
-        ruff_db::disable_lru(&mut db);
-    }
     let project = db.project();
 
     project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
@@ -176,6 +173,12 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     if !check_paths.is_empty() {
         project.set_included_paths(&mut db, check_paths);
+    }
+
+    // Disabling LRU only assumes that the database is short-lived; unlike freezing below, it does
+    // not require immutable inputs.
+    if !watch {
+        ruff_db::disable_lru(&mut db);
     }
 
     // A one-shot check never mutates these heavily read inputs, so freezing them avoids recording
