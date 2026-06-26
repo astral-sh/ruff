@@ -7096,10 +7096,10 @@ Source with applied edits:
         Ts = TypeVarTuple([name=]'Ts')
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/typing.pyi:LL:30
+          --> stdlib/typing_extensions.pyi:LL:17
            |
-        LL |             def __new__(cls, name: str, *, default: Any = ...) -> Self: ...  # AnnotationForm
-           |                              ^^^^
+        LL |                 name: str,
+           |                 ^^^^
            |
         info: Source
           --> main2.py:LL:20
