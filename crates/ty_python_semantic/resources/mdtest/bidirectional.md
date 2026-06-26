@@ -474,8 +474,7 @@ def f1(x: list[int | str], y: str) -> str: ...
 def f1(x, y) -> int | str:
     raise NotImplementedError
 
-# TODO: We should reveal `list[int]` here.
-x1 = f1(reveal_type([1]), 1)  # revealed: list[int]
+x1 = f1(reveal_type([1]), 1)  # revealed: list[int | None]
 reveal_type(x1)  # revealed: int
 
 x2 = f1(reveal_type([1]), int_or_str())  # revealed: list[int]
@@ -502,8 +501,7 @@ def f3(x: TD, y: int) -> int: ...
 def f3(x: TD2, y: str) -> str: ...
 def f3(x, y) -> object: ...
 
-# TODO: We should reveal `TD2` here.
-x4 = f3(reveal_type({"x": [1]}), "1")  # revealed: dict[str, list[int]]
+x4 = f3(reveal_type({"x": [1]}), "1")  # revealed: TD2
 reveal_type(x4)  # revealed: str
 
 x5 = f3(reveal_type({"x": [1]}), int_or_str())  # revealed: dict[str, list[int]]
@@ -544,7 +542,7 @@ def list_or_set2[T, U](x: T, y: U) -> list[T] | set[U]:
 
 # TODO: We should not error here.
 # error: [no-matching-overload]
-x8 = f6(reveal_type(list_or_set2(1, 1)))  # revealed: list[int] | set[int]
+x8 = f6(reveal_type(list_or_set2(1, 1)))  # revealed: list[int | None] | set[int]
 reveal_type(x8)  # revealed: Unknown
 
 @overload
@@ -554,10 +552,7 @@ def f7[T](y: list[T]) -> list[T]: ...
 def f7(y: object) -> object:
     raise NotImplementedError
 
-# TODO: Re-infer arguments using the selected overload's context. Generic-call fixpoint inference
-# deliberately makes the same performance tradeoff as ordinary overload evaluation and commits the
-# context-free expression inference performed while considering multiple overloads.
-x9 = f7(reveal_type(["Sheet1"]))  # revealed: list[str]
+x9 = f7(reveal_type(["Sheet1"]))  # revealed: list[int | str]
 reveal_type(x9)  # revealed: list[int | str]
 
 def f8(xs: tuple[str, ...]) -> tuple[str, ...]:

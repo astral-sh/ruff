@@ -501,12 +501,22 @@ pub(crate) struct Bindings<'db> {
 
 /// The overload indexes that matched parameter shape before argument type inference.
 ///
-/// Generic-call fixpoint inference keeps this candidate set stable while each candidate's
-/// specialization evolves between rounds. This ensures that every fresh type check can retrieve
-/// an argument type inferred for its own declared parameter type.
+/// Call-argument inference keeps this candidate set stable while each candidate is inferred and,
+/// for generic calls, while its specialization evolves between fixpoint rounds. This ensures that
+/// every fresh type check can retrieve an argument type inferred for its own declared parameter
+/// type.
 #[derive(Debug)]
 pub(crate) struct CallArgumentInferenceCandidates {
     overload_indices: SmallVec<[SmallVec<[usize; 1]>; 1]>,
+}
+
+impl CallArgumentInferenceCandidates {
+    /// Returns `true` when argument type inference must consider multiple overload candidates.
+    pub(crate) fn requires_overload_selection(&self) -> bool {
+        self.overload_indices
+            .iter()
+            .any(|indices| indices.len() > 1)
+    }
 }
 
 impl<'db> Bindings<'db> {
@@ -3752,13 +3762,17 @@ impl<'db> CallableBinding<'db> {
                         matched_argument.iter().map(move |matched_parameter| {
                             // TODO: For an unannotated `self` / `cls` parameter, the type should be
                             // `typing.Self` / `type[typing.Self]`
-                            let parameter_type = overload.signature.parameters()
+                            let raw_parameter_type = overload.signature.parameters()
                                 [matched_parameter.index]
-                                .annotated_type()
+                                .annotated_type();
+                            let parameter_type = raw_parameter_type
                                 .apply_optional_specialization(db, overload.specialization);
                             OverloadFilterSlot {
                                 parameter: parameter_type,
-                                argument: argument_types.get_for_declared_type(parameter_type),
+                                // Contextual argument types are stored under the raw declared
+                                // parameter type. The specialized type is still used for overload
+                                // filtering below.
+                                argument: argument_types.get_for_declared_type(raw_parameter_type),
                                 variadic_argument: matched_parameter.argument_type,
                             }
                         })
@@ -3997,6 +4011,13 @@ impl<'db> CallableBinding<'db> {
             .iter()
             .enumerate()
             .filter(|(_, overload)| !overload.has_errors_affecting_overload_resolution())
+    }
+
+    /// Returns the overload whose context should be used for final argument inference when every
+    /// overload failed type checking.
+    pub(crate) fn best_failing_overload(&self) -> Option<&Binding<'db>> {
+        self.best_failing_overload_index(FailingOverloadSelection::AffectsOverloadResolution)
+            .and_then(|index| self.overloads.get(index))
     }
 
     /// Returns an iterator over all the mutable overloads that matched for this call binding.
