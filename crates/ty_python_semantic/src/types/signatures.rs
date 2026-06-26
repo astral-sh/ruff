@@ -34,9 +34,10 @@ use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annot
 use crate::types::typevar::{BoundTypeVarIdentity, max_typevar_freshness_matching_generic_context};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
-    ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind,
-    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping, TypeVarNonce,
-    TypedDictType, UnionBuilder, VarianceInferable, infer_complete_scope_types, todo_type,
+    ErrorContextTree, FindLegacyTypeVarsVisitor, Foldable, KnownClass, MaterializationKind,
+    ParamSpecAttrKind, ParameterDescription, RecursiveType, SelfBinding, TypeContext, TypeMapping,
+    TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable, infer_complete_scope_types,
+    todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -103,6 +104,16 @@ pub struct CallableSignature<'db> {
     /// The signatures of each overload of this callable. Will be empty if the type is not
     /// callable.
     pub(crate) overloads: SmallVec<[Signature<'db>; 1]>,
+}
+
+impl<'db> Foldable<'db> for CallableSignature<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        Self::from_overloads(
+            self.overloads
+                .into_iter()
+                .map(|signature| signature.fold(db, rec)),
+        )
+    }
 }
 
 /// The per-overload information needed to synthesize one reduced signature for
@@ -508,6 +519,12 @@ pub struct Signature<'db> {
 
     /// Return type. If no annotation was provided, this is `Unknown`.
     pub(crate) return_ty: Type<'db>,
+}
+
+impl<'db> Foldable<'db> for Signature<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        self.map_types(&mut |ty| ty.fold(db, rec))
+    }
 }
 
 /// Whether one callable signature's parameters are compatible with another's.

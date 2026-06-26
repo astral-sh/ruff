@@ -38,7 +38,9 @@ use crate::types::signatures::{
 };
 use crate::types::tuple::TupleSpec;
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams, FindLegacyTypeVarsVisitor, Foldable, IntersectionType, TypeContext, TypeMapping, TypedDictModule, UnionBuilder, VarianceInferable
+    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
+    FindLegacyTypeVarsVisitor, Foldable, IntersectionType, TypeContext, TypeMapping,
+    TypedDictModule, UnionBuilder, VarianceInferable,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet,
@@ -231,14 +233,7 @@ impl get_size2::GetSize for GenericAlias<'_> {}
 
 impl<'db> Foldable<'db> for GenericAlias<'db> {
     fn fold(self, db: &'db dyn Db, rec: super::RecursiveType<'db>) -> Self {
-        match Type::GenericAlias(self).fold(db, rec) {
-            Type::GenericAlias(alias) => alias,
-            Type::Recursive(recursive) => match recursive.body(db) {
-                Type::GenericAlias(alias) => alias,
-                ty => unreachable!("Expected `Type::GenericAlias` in recursive body, got {}", ty.display(db)),
-            }
-            ty => unreachable!("Expected `Type::GenericAlias`, got {}", ty.display(db)),
-        }
+        Self::new(db, self.origin(db), self.specialization(db).fold(db, rec))
     }
 }
 

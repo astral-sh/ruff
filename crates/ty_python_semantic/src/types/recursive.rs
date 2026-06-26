@@ -245,7 +245,7 @@ mod tests {
 
     use super::*;
     use crate::db::tests::setup_db;
-    use crate::types::{KnownClass, UnionType, visitor};
+    use crate::types::{CallableType, KnownClass, Parameters, Signature, UnionType, visitor};
 
     #[test]
     fn map_folds_operation_result_back_to_recursive_type() {
@@ -279,6 +279,31 @@ mod tests {
         let unfolded_body = Type::homogeneous_tuple(&db, recursive_ty);
 
         assert_eq!(recursive.fold(&db, unfolded_body), recursive_ty);
+    }
+
+    #[test]
+    fn callable_fold_rebinds_signature_types_without_folding_the_callable_payload() {
+        let db = setup_db();
+        let binder_id = salsa::plumbing::Id::from_bits(1);
+        let body = Type::single_callable(
+            &db,
+            Signature::new(Parameters::empty(), Type::divergent(binder_id)),
+        );
+        let recursive_ty = Type::recursive(&db, binder_id, RecursiveOrigin::Implicit, body);
+        let Type::Recursive(recursive) = recursive_ty else {
+            panic!("expected recursive type");
+        };
+
+        let unfolded_callable =
+            CallableType::single(&db, Signature::new(Parameters::empty(), recursive_ty));
+        let folded_callable = unfolded_callable.fold(&db, recursive);
+
+        assert_eq!(
+            folded_callable
+                .signatures(&db)
+                .overload_return_type_or_unknown(&db),
+            recursive_ty
+        );
     }
 
     #[test]

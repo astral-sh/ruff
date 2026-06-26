@@ -6,7 +6,15 @@ use crate::{
     Db, FxOrderSet,
     place::Place,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor, Foldable, FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, RecursiveType, Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType, constraints::{ConstraintSet, IteratorConstraintsExtension}, known_instance::FunctoolsPartialInstance, relation::{TypeRelation, TypeRelationChecker}, signatures::{CallableSignature, PartialSignatureApplication}, visitor, walk_signature
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
+        Foldable, FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, RecursiveType, Signature,
+        SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
+        constraints::{ConstraintSet, IteratorConstraintsExtension},
+        known_instance::FunctoolsPartialInstance,
+        relation::{TypeRelation, TypeRelationChecker},
+        signatures::{CallableSignature, PartialSignatureApplication},
+        visitor, walk_signature,
     },
 };
 use ty_python_core::definition::Definition;
@@ -706,14 +714,12 @@ impl<'db> CallableTypes<'db> {
 
 impl<'db> Foldable<'db> for CallableType<'db> {
     fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
-        match Type::Callable(self).fold(db, rec) {
-            Type::Callable(callable) => callable,
-            Type::Recursive(recursive) => match recursive.body(db) {
-                Type::Callable(callable) => callable,
-                ty => panic!("Expected `CallableType` in recursive body, got {}", ty.display(db)),
-            }
-            ty => panic!("Expected `CallableType`, got {}", ty.display(db)),
-        }
+        CallableType::new(
+            db,
+            self.signatures(db).clone().fold(db, rec),
+            self.kind(db),
+            self.provenance(db),
+        )
     }
 }
 
