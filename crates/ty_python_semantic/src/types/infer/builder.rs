@@ -6063,8 +6063,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Successfully narrowed to an element of the union.
             self.extend(speculative_builder);
-            argument_types.clone_from(&speculative_argument_types);
-            bindings.clone_from(&speculative_bindings);
+            *argument_types = speculative_argument_types;
+            *bindings = speculative_bindings;
             Some(checked_result)
         };
 
@@ -6095,7 +6095,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        argument_types.clone_from(&baseline_argument_types);
+        *argument_types = baseline_argument_types.clone();
         let inference_params = CallArgumentInferenceParams {
             constraints: &constraints,
             call_expression_tcx,
@@ -6192,7 +6192,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         let checked_argument_types = argument_types.clone();
-        argument_types.clone_from(baseline_argument_types);
+        *argument_types = baseline_argument_types.clone();
         self.infer_all_argument_types(
             ast_arguments,
             argument_types,
@@ -6238,7 +6238,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Some(&generic_fixpoint.candidates),
             inference_params,
         );
-        let mut next_argument_types = baseline_argument_types.clone();
+        let mut next_argument_types;
         let mut next_bindings = bindings.clone();
         let mut has_previous_checked_bindings = false;
 
@@ -6251,7 +6251,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut round = 0;
         let (checked_argument_types, final_round_builder) = 'fixpoint: loop {
             // Reset the argument buffer to the baseline before inferring this round.
-            next_argument_types.clone_from(&baseline_argument_types);
+            next_argument_types = baseline_argument_types.clone();
             let mut round_builder = self.speculate();
             round_builder.infer_all_argument_types_with_contexts(
                 (*ast_arguments).clone(),
@@ -6273,7 +6273,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if has_previous_checked_bindings {
                     break 'fixpoint (CheckedArgumentTypes::Context, round_builder);
                 }
-                next_bindings.clone_from(bindings);
+                next_bindings = bindings.clone();
                 next_bindings.check_types_for_argument_inference(
                     db,
                     inference_params.constraints,
@@ -6283,7 +6283,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 break 'fixpoint (CheckedArgumentTypes::Next, round_builder);
             }
 
-            next_bindings.clone_from(bindings);
+            next_bindings = bindings.clone();
             next_bindings.check_types_for_argument_inference(
                 db,
                 inference_params.constraints,
@@ -6328,7 +6328,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // original candidate. Re-infer only to commit the expression state and diagnostics for
             // the overloads that survived that check; this cannot cause a rejected overload to
             // re-enter.
-            argument_types.clone_from(&baseline_argument_types);
+            *argument_types = baseline_argument_types.clone();
             self.infer_all_argument_types(
                 (*ast_arguments).clone(),
                 argument_types,
@@ -6341,10 +6341,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             // With no overload selection, the converged round already used the only callable's
             // final context and specialization.
-            argument_types.clone_from(&next_argument_types);
+            *argument_types = next_argument_types;
             self.extend(final_round_builder);
         }
-        bindings.clone_from(&next_bindings);
+        *bindings = next_bindings;
 
         checked_result
     }
