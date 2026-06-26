@@ -534,13 +534,13 @@ impl<'a> PushComment<'a> for CommentsVecBuilder<'a> {
 pub(super) struct CommentsMapBuilder<'a> {
     comments: CommentsMap<'a>,
     /// We need those for backwards lexing
-    trivia_ranges: &'a TriviaRanges,
+    trivia: &'a TriviaRanges,
     source: &'a str,
 }
 
 impl<'a> PushComment<'a> for CommentsMapBuilder<'a> {
     fn push_comment(&mut self, placement: DecoratedComment<'a>) {
-        let placement = place_comment(placement, self.trivia_ranges, self.source);
+        let placement = place_comment(placement, self.trivia, self.source);
         match placement {
             CommentPlacement::Leading { node, comment } => {
                 self.push_leading_comment(node, comment);
@@ -602,10 +602,10 @@ impl<'a> PushComment<'a> for CommentsMapBuilder<'a> {
 }
 
 impl<'a> CommentsMapBuilder<'a> {
-    pub(crate) fn new(source: &'a str, trivia_ranges: &'a TriviaRanges) -> Self {
+    pub(crate) fn new(source: &'a str, trivia: &'a TriviaRanges) -> Self {
         Self {
             comments: CommentsMap::default(),
-            trivia_ranges,
+            trivia,
             source,
         }
     }

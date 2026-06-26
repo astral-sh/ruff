@@ -55,7 +55,7 @@ impl FormatRule<Pattern, PyFormatContext<'_>> for FormatPattern {
         let parenthesize = match self.parentheses {
             Parentheses::Preserve => is_pattern_parenthesized(
                 pattern,
-                f.context().comments().ranges(),
+                f.context().trivia().comments(),
                 f.context().source(),
             ),
             Parentheses::Always => true,
@@ -260,7 +260,7 @@ pub(crate) fn can_pattern_omit_optional_parentheses(
                 true
             } else {
                 // If the pattern has no own parentheses or it is empty (e.g. ([])), check for surrounding parentheses (that should be preserved).
-                is_pattern_parenthesized(pattern, context.comments().ranges(), context.source())
+                is_pattern_parenthesized(pattern, context.trivia().comments(), context.source())
             }
         }
 
@@ -344,7 +344,7 @@ impl<'a> CanOmitOptionalParenthesesVisitor<'a> {
         self.last = Some(pattern);
 
         // Rule only applies for non-parenthesized patterns.
-        if is_pattern_parenthesized(pattern, context.comments().ranges(), context.source()) {
+        if is_pattern_parenthesized(pattern, context.trivia().comments(), context.source()) {
             self.any_parenthesized_expressions = true;
         } else {
             self.visit_pattern(pattern, context);

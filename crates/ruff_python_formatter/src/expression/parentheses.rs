@@ -452,9 +452,9 @@ mod tests {
 
         for (source, expected) in cases {
             let parsed = parse_expression(source).unwrap();
-            let trivia_ranges = TriviaRanges::from(parsed.tokens());
+            let trivia = TriviaRanges::from(parsed.tokens());
             assert_eq!(
-                trivia_ranges.is_parenthesized(parsed.expr().range()),
+                trivia.parenthesized().contains(parsed.expr().range()),
                 expected,
                 "parentheses mismatch for {source:?}",
             );

@@ -7,7 +7,7 @@ use ruff_formatter::write;
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprBinOp, ExprBoolOp, ExprCompare, ExprUnaryOp, StringLike, UnaryOp,
 };
-use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer, TriviaRanges};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{Comments, SourceComment, leading_comments, trailing_comments};
@@ -31,12 +31,17 @@ impl<'a> BinaryLike<'a> {
     /// Flattens the hierarchical binary expression into a flat operand, operator, operand... sequence.
     ///
     /// See [`FlatBinaryExpressionSlice`] for an in depth explanation.
-    fn flatten(self, comments: &'a Comments<'a>) -> FlatBinaryExpression<'a> {
+    fn flatten(
+        self,
+        comments: &'a Comments<'a>,
+        trivia: &TriviaRanges,
+    ) -> FlatBinaryExpression<'a> {
         fn recurse_compare<'a>(
             compare: &'a ExprCompare,
             leading_comments: &'a [SourceComment],
             trailing_comments: &'a [SourceComment],
             comments: &'a Comments,
+            trivia: &TriviaRanges,
             parts: &mut SmallVec<[OperandOrOperator<'a>; 8]>,
         ) {
             parts.reserve(compare.comparators.len() * 2 + 1);
@@ -47,6 +52,7 @@ impl<'a> BinaryLike<'a> {
                     leading_comments,
                 },
                 comments,
+                trivia,
                 parts,
             );
 
@@ -65,7 +71,7 @@ impl<'a> BinaryLike<'a> {
                         trailing_comments: &[],
                     }));
 
-                    rec(Operand::Middle { expression }, comments, parts);
+                    rec(Operand::Middle { expression }, comments, trivia, parts);
                 }
 
                 parts.push(OperandOrOperator::Operator(Operator {
@@ -79,6 +85,7 @@ impl<'a> BinaryLike<'a> {
                         trailing_comments,
                     },
                     comments,
+                    trivia,
                     parts,
                 );
             }
@@ -89,6 +96,7 @@ impl<'a> BinaryLike<'a> {
             leading_comments: &'a [SourceComment],
             trailing_comments: &'a [SourceComment],
             comments: &'a Comments,
+            trivia: &TriviaRanges,
             parts: &mut SmallVec<[OperandOrOperator<'a>; 8]>,
         ) {
             parts.reserve(bool_expression.values.len() * 2 - 1);
@@ -100,6 +108,7 @@ impl<'a> BinaryLike<'a> {
                         leading_comments,
                     },
                     comments,
+                    trivia,
                     parts,
                 );
 
@@ -110,7 +119,7 @@ impl<'a> BinaryLike<'a> {
 
                 if let Some((right, middle)) = rest.split_last() {
                     for expression in middle {
-                        rec(Operand::Middle { expression }, comments, parts);
+                        rec(Operand::Middle { expression }, comments, trivia, parts);
                         parts.push(OperandOrOperator::Operator(Operator {
                             symbol: OperatorSymbol::Bool(bool_expression.op),
                             trailing_comments: &[],
@@ -123,6 +132,7 @@ impl<'a> BinaryLike<'a> {
                             trailing_comments,
                         },
                         comments,
+                        trivia,
                         parts,
                     );
                 }
@@ -134,6 +144,7 @@ impl<'a> BinaryLike<'a> {
             leading_comments: &'a [SourceComment],
             trailing_comments: &'a [SourceComment],
             comments: &'a Comments,
+            trivia: &TriviaRanges,
             parts: &mut SmallVec<[OperandOrOperator<'a>; 8]>,
         ) {
             rec(
@@ -142,6 +153,7 @@ impl<'a> BinaryLike<'a> {
                     expression: &binary.left,
                 },
                 comments,
+                trivia,
                 parts,
             );
 
@@ -156,6 +168,7 @@ impl<'a> BinaryLike<'a> {
                     trailing_comments,
                 },
                 comments,
+                trivia,
                 parts,
             );
         }
@@ -163,11 +176,12 @@ impl<'a> BinaryLike<'a> {
         fn rec<'a>(
             operand: Operand<'a>,
             comments: &'a Comments,
+            trivia: &TriviaRanges,
             parts: &mut SmallVec<[OperandOrOperator<'a>; 8]>,
         ) {
             let expression = operand.expression();
             match expression {
-                Expr::BinOp(binary) if !comments.ranges().is_parenthesized(expression.range()) => {
+                Expr::BinOp(binary) if !trivia.parenthesized().contains(expression.range()) => {
                     let leading_comments = operand
                         .leading_binary_comments()
                         .unwrap_or_else(|| comments.leading(binary));
@@ -176,11 +190,16 @@ impl<'a> BinaryLike<'a> {
                         .trailing_binary_comments()
                         .unwrap_or_else(|| comments.trailing(binary));
 
-                    recurse_binary(binary, leading_comments, trailing_comments, comments, parts);
+                    recurse_binary(
+                        binary,
+                        leading_comments,
+                        trailing_comments,
+                        comments,
+                        trivia,
+                        parts,
+                    );
                 }
-                Expr::Compare(compare)
-                    if !comments.ranges().is_parenthesized(expression.range()) =>
-                {
+                Expr::Compare(compare) if !trivia.parenthesized().contains(expression.range()) => {
                     let leading_comments = operand
                         .leading_binary_comments()
                         .unwrap_or_else(|| comments.leading(compare));
@@ -194,12 +213,11 @@ impl<'a> BinaryLike<'a> {
                         leading_comments,
                         trailing_comments,
                         comments,
+                        trivia,
                         parts,
                     );
                 }
-                Expr::BoolOp(bool_op)
-                    if !comments.ranges().is_parenthesized(expression.range()) =>
-                {
+                Expr::BoolOp(bool_op) if !trivia.parenthesized().contains(expression.range()) => {
                     let leading_comments = operand
                         .leading_binary_comments()
                         .unwrap_or_else(|| comments.leading(bool_op));
@@ -213,6 +231,7 @@ impl<'a> BinaryLike<'a> {
                         leading_comments,
                         trailing_comments,
                         comments,
+                        trivia,
                         parts,
                     );
                 }
@@ -226,14 +245,14 @@ impl<'a> BinaryLike<'a> {
         match self {
             BinaryLike::Binary(binary) => {
                 // Leading and trailing comments are handled by the binary's ``FormatNodeRule` implementation.
-                recurse_binary(binary, &[], &[], comments, &mut parts);
+                recurse_binary(binary, &[], &[], comments, trivia, &mut parts);
             }
             BinaryLike::Compare(compare) => {
                 // Leading and trailing comments are handled by the compare's ``FormatNodeRule` implementation.
-                recurse_compare(compare, &[], &[], comments, &mut parts);
+                recurse_compare(compare, &[], &[], comments, trivia, &mut parts);
             }
             BinaryLike::Bool(bool) => {
-                recurse_bool(bool, &[], &[], comments, &mut parts);
+                recurse_bool(bool, &[], &[], comments, trivia, &mut parts);
             }
         }
 
@@ -248,7 +267,8 @@ impl<'a> BinaryLike<'a> {
 impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let comments = f.context().comments().clone();
-        let flat_binary = self.flatten(&comments);
+        let trivia = f.context().trivia();
+        let flat_binary = self.flatten(&comments, trivia);
 
         if self.is_bool_op() {
             return in_parentheses_only_group(&&*flat_binary).fmt(f);
@@ -261,7 +281,7 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
                     .ok()
                     .filter(|string| {
                         string.is_implicit_concatenated()
-                            && !comments.ranges().is_parenthesized(string.range())
+                            && !trivia.parenthesized().contains(string.range())
                     })
                     .map(|string| (index, string, operand))
             })
@@ -495,7 +515,7 @@ impl<'a> Deref for FlatBinaryExpression<'a> {
 /// ```
 ///
 /// The slice representation of the above is closer to what you have in source. It's a simple sequence of operands and operators,
-/// entirely ignoring operator precedence (doesn't flatten parenthesized expressions):
+/// entirely ignoring operator precedence (doesn't flatten trivia expressions):
 ///
 /// ```text
 /// -----------------------------
@@ -772,7 +792,7 @@ impl<'a> Operand<'a> {
         }
     }
 
-    /// Returns `true` if the operand has any leading comments that are not parenthesized.
+    /// Returns `true` if the operand has any leading comments that are not trivia.
     fn has_unparenthesized_leading_comments(&self, context: &PyFormatContext) -> bool {
         let comments = context.comments();
         let source = context.source();

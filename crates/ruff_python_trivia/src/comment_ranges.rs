@@ -33,17 +33,9 @@ impl TriviaRanges {
         &self.comments
     }
 
-    /// Returns `true` if `range` is enclosed by matching parentheses.
-    pub fn is_parenthesized(&self, range: TextRange) -> bool {
-        self.parenthesized_expressions.contains(range)
-    }
-}
-
-impl Deref for TriviaRanges {
-    type Target = CommentRanges;
-
-    fn deref(&self) -> &Self::Target {
-        &self.comments
+    /// Returns the indexed parenthesized expression ranges.
+    pub fn parenthesized(&self) -> &ParenthesizedExpressions {
+        &self.parenthesized_expressions
     }
 }
 

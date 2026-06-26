@@ -70,15 +70,15 @@ pub fn format_and_debug_print(source: &str, cli: &Cli, source_path: &Path) -> Re
         .with_target_version(cli.target_version);
 
     let source_code = SourceCode::new(source);
-    let trivia_ranges = TriviaRanges::from(parsed.tokens());
-    let formatted = format_module_ast(&parsed, &trivia_ranges, source, options)
-        .context("Failed to format node")?;
+    let trivia = TriviaRanges::from(parsed.tokens());
+    let formatted =
+        format_module_ast(&parsed, &trivia, source, options).context("Failed to format node")?;
     if cli.print_ir {
         println!("{}", formatted.document().display(source_code));
     }
     if cli.print_comments {
         // Print preceding, following and enclosing nodes
-        let decorated_comments = collect_comments(parsed.syntax(), source_code, &trivia_ranges);
+        let decorated_comments = collect_comments(parsed.syntax(), source_code, trivia.comments());
         if !decorated_comments.is_empty() {
             println!("# Comment decoration: Range, Preceding, Following, Enclosing, Comment");
         }

@@ -1426,10 +1426,7 @@ pub(crate) const fn is_invalid_type_expression(expr: &Expr) -> bool {
 ///
 /// Parenthesized expressions are treated as belonging to the enclosing expression. Therefore, the left
 /// most expression for `(a + b) * c` is `a + b` and not `a`.
-pub(crate) fn left_most<'expr>(
-    expression: &'expr Expr,
-    trivia_ranges: &TriviaRanges,
-) -> &'expr Expr {
+pub(crate) fn left_most<'expr>(expression: &'expr Expr, trivia: &TriviaRanges) -> &'expr Expr {
     let mut current = expression;
     loop {
         let left = match current {
@@ -1478,7 +1475,7 @@ pub(crate) fn left_most<'expr>(
             break current;
         };
 
-        if trivia_ranges.is_parenthesized(left.range()) {
+        if trivia.parenthesized().contains(left.range()) {
             break current;
         }
 

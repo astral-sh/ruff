@@ -1015,12 +1015,13 @@ def trailing_func():
 ";
 
         let parsed = parse_module(source).unwrap();
-        let trivia_ranges = TriviaRanges::from(parsed.tokens());
+        let trivia = TriviaRanges::from(parsed.tokens());
 
         let context = PyFormatContext::new(
             PyFormatOptions::default(),
             source,
-            Comments::from_ranges(&trivia_ranges),
+            Comments::empty(),
+            &trivia,
             parsed.tokens(),
         );
 

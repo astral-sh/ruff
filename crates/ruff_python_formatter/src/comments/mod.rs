@@ -219,54 +219,41 @@ pub(crate) struct Comments<'a> {
 }
 
 impl<'a> Comments<'a> {
-    fn new(comments: CommentsMap<'a>, trivia_ranges: &'a TriviaRanges) -> Self {
+    fn new(comments: CommentsMap<'a>) -> Self {
         Self {
-            data: Rc::new(CommentsData {
-                comments,
-                trivia_ranges,
-            }),
+            data: Rc::new(CommentsData { comments }),
         }
     }
 
-    /// Effectively a [`Default`] implementation that works around the lifetimes for tests
+    /// Creates an empty comment map for tests.
     #[cfg(test)]
-    pub(crate) fn from_ranges(trivia_ranges: &'a TriviaRanges) -> Self {
-        Self {
-            data: Rc::new(CommentsData {
-                comments: CommentsMap::default(),
-                trivia_ranges,
-            }),
-        }
-    }
-
-    pub(crate) fn ranges(&self) -> &'a TriviaRanges {
-        self.data.trivia_ranges
+    pub(crate) fn empty() -> Self {
+        Self::new(CommentsMap::default())
     }
 
     /// Extracts the comments from the AST.
     pub(crate) fn from_ast(
         root: impl Into<AnyNodeRef<'a>>,
         source_code: SourceCode<'a>,
-        trivia_ranges: &'a TriviaRanges,
+        trivia: &'a TriviaRanges,
     ) -> Self {
         fn collect_comments<'a>(
             root: AnyNodeRef<'a>,
             source_code: SourceCode<'a>,
-            trivia_ranges: &'a TriviaRanges,
+            trivia: &'a TriviaRanges,
         ) -> Comments<'a> {
-            let map = if trivia_ranges.is_empty() {
+            let map = if trivia.comments().is_empty() {
                 CommentsMap::new()
             } else {
-                let mut builder = CommentsMapBuilder::new(source_code.as_str(), trivia_ranges);
-                CommentsVisitor::new(source_code, trivia_ranges.comments(), &mut builder)
-                    .visit(root);
+                let mut builder = CommentsMapBuilder::new(source_code.as_str(), trivia);
+                CommentsVisitor::new(source_code, trivia.comments(), &mut builder).visit(root);
                 builder.finish()
             };
 
-            Comments::new(map, trivia_ranges)
+            Comments::new(map)
         }
 
-        collect_comments(root.into(), source_code, trivia_ranges)
+        collect_comments(root.into(), source_code, trivia)
     }
 
     /// Returns `true` if the given `node` has any comments.
@@ -497,9 +484,6 @@ impl LeadingDanglingTrailingComments<'_> {
 #[derive(Debug)]
 struct CommentsData<'a> {
     comments: CommentsMap<'a>,
-
-    /// We need those for backwards lexing
-    trivia_ranges: &'a TriviaRanges,
 }
 
 pub(crate) fn has_skip_comment(trailing_comments: &[SourceComment], source: &str) -> bool {
@@ -525,7 +509,7 @@ mod tests {
 
     struct CommentsTestCase<'a> {
         parsed: Parsed<Mod>,
-        trivia_ranges: TriviaRanges,
+        trivia: TriviaRanges,
         source_code: SourceCode<'a>,
     }
 
@@ -535,17 +519,17 @@ mod tests {
             let source_type = PySourceType::Python;
             let parsed = parse(source, ParseOptions::from(source_type))
                 .expect("Expect source to be valid Python");
-            let trivia_ranges = TriviaRanges::from(parsed.tokens());
+            let trivia = TriviaRanges::from(parsed.tokens());
 
             CommentsTestCase {
                 parsed,
-                trivia_ranges,
+                trivia,
                 source_code,
             }
         }
 
         fn to_comments(&self) -> Comments<'_> {
-            Comments::from_ast(self.parsed.syntax(), self.source_code, &self.trivia_ranges)
+            Comments::from_ast(self.parsed.syntax(), self.source_code, &self.trivia)
         }
     }
 

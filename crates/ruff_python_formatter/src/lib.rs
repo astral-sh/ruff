@@ -139,23 +139,23 @@ pub fn format_module_source(
 ) -> Result<Printed, FormatModuleError> {
     let source_type = options.source_type();
     let parsed = parse(source, ParseOptions::from(source_type))?;
-    let trivia_ranges = TriviaRanges::from(parsed.tokens());
-    let formatted = format_module_ast(&parsed, &trivia_ranges, source, options)?;
+    let trivia = TriviaRanges::from(parsed.tokens());
+    let formatted = format_module_ast(&parsed, &trivia, source, options)?;
     Ok(formatted.print()?)
 }
 
 pub fn format_module_ast<'a>(
     parsed: &'a Parsed<Mod>,
-    trivia_ranges: &'a TriviaRanges,
+    trivia: &'a TriviaRanges,
     source: &'a str,
     options: PyFormatOptions,
 ) -> FormatResult<Formatted<PyFormatContext<'a>>> {
-    format_node(parsed, trivia_ranges, source, options)
+    format_node(parsed, trivia, source, options)
 }
 
 fn format_node<'a, N>(
     parsed: &'a Parsed<N>,
-    trivia_ranges: &'a TriviaRanges,
+    trivia: &'a TriviaRanges,
     source: &'a str,
     options: PyFormatOptions,
 ) -> FormatResult<Formatted<PyFormatContext<'a>>>
@@ -164,10 +164,10 @@ where
     &'a N: Into<AnyNodeRef<'a>>,
 {
     let source_code = SourceCode::new(source);
-    let comments = Comments::from_ast(parsed.syntax(), source_code, trivia_ranges);
+    let comments = Comments::from_ast(parsed.syntax(), source_code, trivia);
 
     let formatted = format!(
-        PyFormatContext::new(options, source, comments, parsed.tokens()),
+        PyFormatContext::new(options, source, comments, trivia, parsed.tokens()),
         [parsed.syntax().format()]
     )?;
     formatted
@@ -186,10 +186,10 @@ pub fn formatted_file(db: &dyn Db, file: File) -> Result<Option<String>, FormatM
         return Err(FormatModuleError::ParseError(first.clone()));
     }
 
-    let trivia_ranges = TriviaRanges::from(parsed.tokens());
+    let trivia = TriviaRanges::from(parsed.tokens());
     let source = source_text(db, file);
 
-    let formatted = format_node(&parsed, &trivia_ranges, &source, options)?;
+    let formatted = format_node(&parsed, &trivia, &source, options)?;
     let printed = formatted.print()?;
 
     if printed.as_code() == &*source {
@@ -200,9 +200,9 @@ pub fn formatted_file(db: &dyn Db, file: File) -> Result<Option<String>, FormatM
 }
 
 /// Public function for generating a printable string of the debug comments.
-pub fn pretty_comments(module: &Mod, trivia_ranges: &TriviaRanges, source: &str) -> String {
+pub fn pretty_comments(module: &Mod, trivia: &TriviaRanges, source: &str) -> String {
     let source_code = SourceCode::new(source);
-    let comments = Comments::from_ast(module, source_code, trivia_ranges);
+    let comments = Comments::from_ast(module, source_code, trivia);
 
     std::format!("{comments:#?}", comments = comments.debug(source_code))
 }
@@ -257,9 +257,9 @@ class A: ...
         // Parse the AST.
         let source_path = "code_inline.py";
         let parsed = parse(source, ParseOptions::from(source_type)).unwrap();
-        let trivia_ranges = TriviaRanges::from(parsed.tokens());
+        let trivia = TriviaRanges::from(parsed.tokens());
         let options = PyFormatOptions::from_extension(Path::new(source_path));
-        let formatted = format_module_ast(&parsed, &trivia_ranges, source, options).unwrap();
+        let formatted = format_module_ast(&parsed, &trivia, source, options).unwrap();
 
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR

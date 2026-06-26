@@ -76,13 +76,14 @@ pub fn format_range(
 
     let parsed = parse(source, ParseOptions::from(options.source_type()))?;
     let source_code = SourceCode::new(source);
-    let trivia_ranges = TriviaRanges::from(parsed.tokens());
-    let comments = Comments::from_ast(parsed.syntax(), source_code, &trivia_ranges);
+    let trivia = TriviaRanges::from(parsed.tokens());
+    let comments = Comments::from_ast(parsed.syntax(), source_code, &trivia);
 
     let mut context = PyFormatContext::new(
         options.with_source_map_generation(SourceMapGeneration::Enabled),
         source,
         comments,
+        &trivia,
         parsed.tokens(),
     );
 
@@ -506,7 +507,7 @@ impl NarrowRange<'_> {
             }) = BackwardsTokenizer::up_to(
                 first_child.start(),
                 self.context.source(),
-                self.context.comments().ranges(),
+                self.context.trivia().comments(),
             )
             .skip_trivia()
             .next()
