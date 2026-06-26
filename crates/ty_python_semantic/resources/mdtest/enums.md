@@ -823,6 +823,21 @@ reveal_type(InheritedValues.FALSE.value)  # revealed: Literal[0]
 reveal_type(enum_members(InheritedValues))
 ```
 
+Other built-in data types retain exact assigned values when no coercion is needed:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+class ByteValues(bytes, Enum):
+    VALUE = b"value"
+    ALIAS = b"value"
+
+reveal_type(ByteValues.VALUE.value)  # revealed: Literal[b"value"]
+# revealed: tuple[Literal["VALUE"]]
+reveal_type(enum_members(ByteValues))
+```
+
 ### User-defined data types
 
 User-defined data types remain opaque even when they inherit from `int` or `str` without overriding

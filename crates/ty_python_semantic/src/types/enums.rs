@@ -1251,14 +1251,15 @@ fn inherited_user_defined_value_annotation<'db>(
 enum InheritedEnumDataType {
     #[default]
     None,
+    DeclaredValue(KnownClass),
     Known(KnownEnumDataTypeMixin),
     Opaque,
 }
 
-/// Find the `int` or `str` data type selected for this enum.
+/// Find the data type selected for this enum.
 ///
 /// CPython searches each direct base independently. A user-defined class in the same base chain as
-/// `int` or `str` makes that data type opaque, while an unrelated behavior base does not.
+/// a built-in data type makes that data type opaque, while an unrelated behavior base does not.
 fn inherited_enum_data_type<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
@@ -1286,23 +1287,22 @@ fn inherited_enum_data_type<'db>(
                 continue;
             }
 
-            let known = match base.known(db) {
-                Some(KnownClass::Int) => Some(KnownEnumDataTypeMixin::Int),
-                Some(KnownClass::Str) => Some(KnownEnumDataTypeMixin::Str),
-                _ => {
+            let data_type = match base.known(db) {
+                Some(KnownClass::Int) => InheritedEnumDataType::Known(KnownEnumDataTypeMixin::Int),
+                Some(KnownClass::Str) => InheritedEnumDataType::Known(KnownEnumDataTypeMixin::Str),
+                Some(known) => InheritedEnumDataType::DeclaredValue(known),
+                None => {
                     has_preceding_class = true;
-                    None
+                    has_unsupported_data_type = true;
+                    continue;
                 }
             };
-            if let Some(known) = known {
-                candidate = Some(if has_preceding_class {
-                    InheritedEnumDataType::Opaque
-                } else {
-                    InheritedEnumDataType::Known(known)
-                });
-                break;
-            }
-            has_unsupported_data_type = true;
+            candidate = Some(if has_preceding_class {
+                InheritedEnumDataType::Opaque
+            } else {
+                data_type
+            });
+            break;
         }
 
         let Some(candidate) = candidate else {
@@ -1393,7 +1393,9 @@ fn inherited_data_type_mixin<'db>(
     class: StaticClassLiteral<'db>,
 ) -> InheritedDataTypeMixin<'db> {
     let mut result = match inherited_enum_data_type(db, class) {
-        InheritedEnumDataType::None => InheritedDataTypeMixin::default(),
+        InheritedEnumDataType::None | InheritedEnumDataType::DeclaredValue(_) => {
+            InheritedDataTypeMixin::default()
+        }
         InheritedEnumDataType::Known(known) => InheritedDataTypeMixin {
             known: Some(known),
             ..InheritedDataTypeMixin::default()
