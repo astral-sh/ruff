@@ -3399,6 +3399,16 @@ impl<'db> PathBound<'db> {
     pub(crate) fn has_upper(&self) -> bool {
         self.upper.has_explicit_bound()
     }
+
+    fn has_gradual_bound(&self, db: &'db dyn Db) -> bool {
+        self.lower
+            .is_some_and(|lower| lower.bottom_materialization(db) != lower.top_materialization(db))
+            || self
+                .upper
+                .clauses
+                .iter()
+                .any(|upper| upper.bottom_materialization(db) != upper.top_materialization(db))
+    }
 }
 
 impl<'db> Type<'db> {
@@ -3735,7 +3745,9 @@ impl<'db> PathBounds<'db> {
                     return Ok(Some(ty));
                 }
 
-                if fallback_on_ambiguous_constraints && multiple_compatible_constraints {
+                if multiple_compatible_constraints
+                    && (fallback_on_ambiguous_constraints || path_bound.has_gradual_bound(db))
+                {
                     return Ok(None);
                 }
 

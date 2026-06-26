@@ -1002,6 +1002,26 @@ def caller(value: Any) -> None:
     reveal_type(choose(value, 1))  # revealed: int
 ```
 
+## Ambiguous constrained TypeVar inference from a gradual callable return
+
+Constraint-set-native inference also preserves gradual evidence nested inside a callable. As above,
+we currently fall back to `Unknown` when that evidence matches multiple constraints.
+
+```py
+from typing import Any, Callable, TypeVar
+
+T = TypeVar("T", int, int | list[int])
+
+def call(callback: Callable[[], T]) -> T:
+    return callback()
+
+def callback() -> Any:
+    return 1
+
+# TODO: revealed: Any
+reveal_type(call(callback))  # revealed: Unknown
+```
+
 ## Bounded TypeVar with callable parameter
 
 When a bounded TypeVar appears in a `Callable` parameter's return type, the inferred type should be

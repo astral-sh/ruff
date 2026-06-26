@@ -1917,6 +1917,11 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     pending: ConstraintSet<'db, 'c>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
     /// Whether all non-placeholder evidence seen for each constrained TypeVar is gradual.
+    ///
+    /// TODO: Remove this sidecar when the legacy `infer_map_impl` TypeVar arms are replaced by
+    /// constraint-set-native inference. Those arms replace gradual evidence with concrete type
+    /// mappings before adding to `pending`; native constraint paths retain gradual bounds in
+    /// `PathBound`, where the solver can detect them directly.
     typevar_evidence_is_gradual: FxHashMap<BoundTypeVarIdentity<'db>, bool>,
     paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
 }
