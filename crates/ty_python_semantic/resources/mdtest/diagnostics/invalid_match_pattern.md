@@ -3,7 +3,8 @@
 ## Too many positional subpatterns
 
 The diagnostic is emitted when the positional limit comes from a direct, unconditional, unannotated
-tuple-literal assignment in the matched class body.
+tuple-literal assignment in the body of a plain class without decorators, explicit bases, or an
+explicit metaclass.
 
 ```py
 class Point:
@@ -12,7 +13,11 @@ class Point:
 class Empty:
     __match_args__ = ()
 
-def describe(point: Point, empty: Empty) -> None:
+class Reassigned:
+    __match_args__ = ("x",)
+    __match_args__ = ("x", "y")
+
+def describe(point: Point, empty: Empty, reassigned: Reassigned) -> None:
     match point:
         case Point(_, _):
             pass
@@ -24,6 +29,10 @@ def describe(point: Point, empty: Empty) -> None:
 
     match empty:
         case Empty(_):  # error: [invalid-match-pattern] "expected 0, got 1"
+            pass
+
+    match reassigned:
+        case Reassigned(_, _, _):  # error: [invalid-match-pattern] "expected 2, got 3"
             pass
 ```
 
@@ -43,9 +52,10 @@ def describe(value: InvalidElement) -> None:
 ## Deliberately conservative cases
 
 The diagnostic does not attempt to model alternate runtime states or infer exact runtime values from
-declarations. Inherited, metaclass, or synthesized values, declarations, conditional bindings,
-unions, variadic tuples, tuple subclasses, malformed or absent `__match_args__` values, and
-assignments whose value is not a tuple literal are deliberately left undiagnosed.
+declarations. Decorated classes, classes with explicit bases or metaclasses, inherited, metaclass,
+or synthesized values, declarations, conditional bindings, unions, variadic tuples, tuple
+subclasses, malformed or absent `__match_args__` values, and assignments whose value is not a tuple
+literal are deliberately left undiagnosed.
 
 ```toml
 [environment]
@@ -54,7 +64,7 @@ python-version = "3.11"
 
 ```py
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, TypeVar
 
 flag: bool = bool()
 
@@ -69,6 +79,21 @@ class Meta(type):
     __match_args__ = ("x",)
 
 class FromMeta(metaclass=Meta): ...
+
+T = TypeVar("T")
+
+def identity(cls: type[T]) -> type[T]:
+    return cls
+
+@identity
+class Decorated:
+    __match_args__ = ("x",)
+
+class ExplicitBase(object):
+    __match_args__ = ("x",)
+
+class ExplicitMetaclass(metaclass=type):
+    __match_args__ = ("x",)
 
 @dataclass
 class Synthesized:
@@ -127,6 +152,9 @@ def describe(
     missing: Missing,
     inherited: Inherited,
     from_meta: FromMeta,
+    decorated: Decorated,
+    explicit_base: ExplicitBase,
+    explicit_metaclass: ExplicitMetaclass,
     synthesized: Synthesized,
     annotation_only: AnnotationOnly,
     annotated_binding: AnnotatedBinding,
@@ -150,6 +178,15 @@ def describe(
             pass
     match from_meta:
         case FromMeta(_, _):
+            pass
+    match decorated:
+        case Decorated(_, _):
+            pass
+    match explicit_base:
+        case ExplicitBase(_, _):
+            pass
+    match explicit_metaclass:
+        case ExplicitMetaclass(_, _):
             pass
     match synthesized:
         case Synthesized(_, _):

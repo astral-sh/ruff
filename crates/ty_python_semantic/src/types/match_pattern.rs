@@ -356,20 +356,30 @@ fn class_has_match_self_flag(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
 
 /// Return the positional limit only when it is independent of runtime control flow.
 ///
-/// This intentionally supports only direct, unconditional, unannotated tuple-literal assignments.
-/// Diagnosing broader cases requires correlating runtime boundness, declarations, inheritance,
-/// synthesis, and alternate tuple values; an uncertain result is preferable to a false positive.
+/// This intentionally supports only direct, unconditional, unannotated tuple-literal assignments
+/// on plain classes without decorators, explicit bases, or an explicit metaclass. Diagnosing
+/// broader cases requires correlating class-construction effects, runtime boundness, declarations,
+/// inheritance, synthesis, and alternate tuple values; an uncertain result is preferable to a
+/// false positive.
 pub(crate) fn class_pattern_positional_limit(
     db: &dyn Db,
     class: ClassLiteral<'_>,
 ) -> Option<usize> {
+    let static_class = class.as_static()?;
+    if static_class.has_decorators(db)
+        || static_class.has_explicit_bases(db)
+        || static_class.has_explicit_metaclass(db)
+    {
+        return None;
+    }
+
     let match_args = match Type::ClassLiteral(class).member(db, "__match_args__").place {
         Place::Undefined => return None,
         Place::Defined(place)
             if place.is_definitely_defined() && place.origin == TypeOrigin::Inferred =>
         {
             let definition = place.provenance.definition()?;
-            if definition.scope(db) != class.as_static()?.body_scope(db)
+            if definition.scope(db) != static_class.body_scope(db)
                 || !definition_is_unconditional_tuple_literal_binding(db, definition)
             {
                 return None;
