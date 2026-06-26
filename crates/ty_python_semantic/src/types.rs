@@ -1453,7 +1453,15 @@ impl<'db> Type<'db> {
         (*self).cached_materialization(db, MaterializationKind::Bottom)
     }
 
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, materialization_kind| {
+            Type::Divergent(DivergentType::new(id).materialized(materialization_kind))
+        },
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, _| {
+            value.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
     fn cached_materialization(
         self,
         db: &'db dyn Db,
