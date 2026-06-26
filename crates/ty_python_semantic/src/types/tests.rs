@@ -60,7 +60,7 @@ fn oscillating_generic_alias_cycle_recover<'db>(
 }
 
 #[salsa::tracked(
-    cycle_initial=|_, id| Type::divergent(id),
+    cycle_initial=|db, id| Type::implicit_recursive(db, id, Type::divergent(id)),
     cycle_fn=oscillating_generic_alias_cycle_recover,
 )]
 fn oscillating_generic_alias(db: &dyn Db) -> Type<'_> {
