@@ -825,6 +825,24 @@ reveal_type(InheritedValues.FALSE.value)  # revealed: Literal[0]
 reveal_type(enum_members(InheritedValues))
 ```
 
+Non-member declarations do not make alias detection inconclusive:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+class ValuesWithHelper(int, Enum):
+    VALUE = 1
+
+    class Helper:
+        pass
+
+    ALIAS = 1
+
+# revealed: tuple[Literal["VALUE"]]
+reveal_type(enum_members(ValuesWithHelper))
+```
+
 When a built-in conversion cannot be modeled precisely, its aliases remain unknown:
 
 ```py

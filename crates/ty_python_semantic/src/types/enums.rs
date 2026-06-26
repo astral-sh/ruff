@@ -1156,6 +1156,24 @@ pub(crate) fn enum_metadata<'db>(
                 }
             };
 
+            let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
+
+            if !explicit_member_wrapper
+                && declarations.clone().any_reachable(db, |declaration| {
+                    declaration.is_defined_and(|declaration| {
+                        !matches!(
+                            declaration.kind(db),
+                            DefinitionKind::AnnotatedAssignment(assignment)
+                                if assignment
+                                    .value(&parsed_module(db, declaration.file(db)).load(db))
+                                    .is_some()
+                        )
+                    })
+                })
+            {
+                return None;
+            }
+
             // Track whether this member's value is a non-literal `int`, so a
             // following `auto()` knows to widen its result to `int`.
             prev_value_was_non_literal_int = value_ty.as_int_like_literal().is_none()
@@ -1179,24 +1197,6 @@ pub(crate) fn enum_metadata<'db>(
                     aliases_are_known = false;
                 }
                 None => {}
-            }
-
-            let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
-
-            if !explicit_member_wrapper
-                && declarations.clone().any_reachable(db, |declaration| {
-                    declaration.is_defined_and(|declaration| {
-                        !matches!(
-                            declaration.kind(db),
-                            DefinitionKind::AnnotatedAssignment(assignment)
-                                if assignment
-                                    .value(&parsed_module(db, declaration.file(db)).load(db))
-                                    .is_some()
-                        )
-                    })
-                })
-            {
-                return None;
             }
 
             Some((name.clone(), value_ty))
