@@ -341,6 +341,40 @@ fn divergent_type() {
 }
 
 #[test]
+fn recursive_alias_single_valued_check_terminates() {
+    use crate::db::tests::TestDb;
+    use crate::place::global_symbol;
+
+    fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> PEP695TypeAliasType<'db> {
+        let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
+        let ty = global_symbol(db, module, name).place.expect_type();
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
+            type_alias,
+        ))) = ty
+        else {
+            panic!("Expected `{name}` to be a type alias");
+        };
+        type_alias
+    }
+
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/a.py",
+        r#"
+type RecursiveSingleValuedTuple = tuple[None, RecursiveSingleValuedTuple]
+type A = tuple[B]
+type B = tuple[A]
+"#,
+    )
+    .unwrap();
+
+    let recursive = get_type_alias(&db, "RecursiveSingleValuedTuple").value_type(&db);
+    assert!(!recursive.is_single_valued(&db));
+    let recursive = get_type_alias(&db, "A").value_type(&db);
+    assert!(!recursive.is_single_valued(&db));
+}
+
+#[test]
 fn type_alias_variance() {
     use crate::db::tests::TestDb;
     use crate::place::global_symbol;

@@ -4,6 +4,7 @@ use std::borrow::Cow;
 use std::marker::PhantomData;
 
 use ruff_python_ast::name::Name;
+use rustc_hash::FxHashSet;
 use ty_module_resolver::{ModuleName, file_to_module};
 
 use super::protocol_class::ProtocolInterface;
@@ -423,16 +424,20 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn is_single_valued(self, db: &'db dyn Db) -> bool {
+    pub(super) fn is_single_valued_impl(
+        self,
+        db: &'db dyn Db,
+        seen: &mut FxHashSet<Type<'db>>,
+    ) -> bool {
         match self.0 {
-            NominalInstanceInner::ExactTuple(tuple) => tuple.is_single_valued(db),
+            NominalInstanceInner::ExactTuple(tuple) => tuple.is_single_valued_impl(db, seen),
             NominalInstanceInner::Object => false,
             NominalInstanceInner::SysVersionInfo => true,
             NominalInstanceInner::NonTuple(class) => class
                 .class(db)
                 .known(db)
                 .and_then(KnownClass::is_single_valued)
-                .or_else(|| Some(self.tuple_spec(db)?.is_single_valued(db)))
+                .or_else(|| Some(self.tuple_spec(db)?.is_single_valued_impl(db, seen)))
                 .unwrap_or_else(|| is_single_member_enum(db, class.class(db).class_literal(db))),
         }
     }

@@ -748,6 +748,23 @@ def _(x: X):
     reveal_type(x is x)  # revealed: bool
 ```
 
+### Recursive single-valued check
+
+```py
+type RecursiveSingleValuedTuple = tuple[None, RecursiveSingleValuedTuple]
+
+def _(x: object, y: RecursiveSingleValuedTuple):
+    if x == y:
+        reveal_type(x)  # revealed: object
+
+type A = tuple[B]
+type B = tuple[A]
+
+def _(x: object, y: A):
+    if x == y:
+        reveal_type(x)  # revealed: object
+```
+
 ### Recursive invariant
 
 ```py

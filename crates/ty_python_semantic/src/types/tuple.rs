@@ -21,6 +21,7 @@ use std::hash::Hash;
 use std::num::{NonZeroI32, NonZeroUsize};
 
 use itertools::{Either, EitherOrBoth, Itertools};
+use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec_inline};
 
 use crate::subscript::{
@@ -259,8 +260,12 @@ impl<'db> TupleType<'db> {
             .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
     }
 
-    pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
-        self.tuple(db).is_single_valued(db)
+    pub(super) fn is_single_valued_impl(
+        self,
+        db: &'db dyn Db,
+        seen: &mut FxHashSet<Type<'db>>,
+    ) -> bool {
+        self.tuple(db).is_single_valued_impl(db, seen)
     }
 }
 
@@ -767,8 +772,8 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         }
     }
 
-    fn is_single_valued(&self, db: &'db dyn Db) -> bool {
-        self.0.iter().all(|ty| ty.is_single_valued(db))
+    fn is_single_valued_impl(&self, db: &'db dyn Db, seen: &mut FxHashSet<Type<'db>>) -> bool {
+        self.0.iter().all(|ty| ty.is_single_valued_impl(db, seen))
     }
 }
 
@@ -2117,9 +2122,13 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    pub(crate) fn is_single_valued(&self, db: &'db dyn Db) -> bool {
+    pub(super) fn is_single_valued_impl(
+        &self,
+        db: &'db dyn Db,
+        seen: &mut FxHashSet<Type<'db>>,
+    ) -> bool {
         match self {
-            Tuple::Fixed(tuple) => tuple.is_single_valued(db),
+            Tuple::Fixed(tuple) => tuple.is_single_valued_impl(db, seen),
             Tuple::Variable(_) => false,
         }
     }

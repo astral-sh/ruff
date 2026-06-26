@@ -3017,12 +3017,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
 
             (formal @ Type::ProtocolInstance(_), Type::Recursive(recursive)) => {
-                return self.infer_map_impl(
-                    formal,
-                    recursive.body_with_origin_marker(self.db),
-                    polarity,
-                    seen,
-                );
+                return self.infer_map_impl(formal, recursive.body(self.db), polarity, seen);
             }
 
             // When the formal type is a protocol with a `__call__` method, infer the specialization

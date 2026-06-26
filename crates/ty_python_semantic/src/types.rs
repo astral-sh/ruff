@@ -1,7 +1,7 @@
 use compact_str::ToCompactString;
 use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use std::borrow::Cow;
 use std::cell::OnceCell;
@@ -1510,9 +1510,7 @@ impl<'db> Type<'db> {
             Type::TypedDict(typed_dict) => typed_dict
                 .defining_class()
                 .is_some_and(ClassType::is_generic),
-            Type::Recursive(recursive) => recursive
-                .body_with_origin_marker(db)
-                .is_specialized_generic(db),
+            Type::Recursive(recursive) => recursive.body(db).is_specialized_generic(db),
             Type::Dynamic(dynamic) => {
                 matches!(dynamic, DynamicType::UnknownGeneric(_))
             }
@@ -1558,7 +1556,7 @@ impl<'db> Type<'db> {
                 .positive(db)
                 .iter()
                 .any(|ty| ty.is_awaitable(db)),
-            Type::Recursive(recursive) => recursive.body_with_origin_marker(db).is_awaitable(db),
+            Type::Recursive(recursive) => recursive.body(db).is_awaitable(db),
             _ => false,
         }
     }
@@ -1570,9 +1568,7 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(f) => {
                 f.has_known_decorator(db, FunctionDecorators::TYPE_CHECK_ONLY)
             }
-            Type::Recursive(recursive) => {
-                recursive.body_with_origin_marker(db).is_type_check_only(db)
-            }
+            Type::Recursive(recursive) => recursive.body(db).is_type_check_only(db),
             _ => false,
         }
     }
@@ -1582,7 +1578,7 @@ impl<'db> Type<'db> {
         match self {
             Type::FunctionLiteral(f) => f.implementation_deprecated(db).is_some(),
             Type::ClassLiteral(c) => c.deprecated(db).is_some(),
-            Type::Recursive(recursive) => recursive.body_with_origin_marker(db).is_deprecated(db),
+            Type::Recursive(recursive) => recursive.body(db).is_deprecated(db),
             _ => false,
         }
     }
@@ -1647,9 +1643,7 @@ impl<'db> Type<'db> {
     /// e.g., nominal instances of a generic class, or callables.
     pub(crate) fn may_prefer_declared_type(self, db: &'db dyn Db) -> bool {
         if let Type::Recursive(recursive) = self {
-            recursive
-                .body_with_origin_marker(db)
-                .may_prefer_declared_type(db)
+            recursive.body(db).may_prefer_declared_type(db)
         } else {
             self.class_specialization(db).is_some() || self.expand_eagerly(db).is_callable_type()
         }
@@ -1987,9 +1981,7 @@ impl<'db> Type<'db> {
                 LiteralValueTypeKind::LiteralString => false,
             },
             Type::NominalInstance(_) => self.is_none(db) || self.is_bool(db) || self.is_enum(db),
-            Type::Recursive(recursive) => recursive
-                .body_with_origin_marker(db)
-                .is_literal_or_union_of_literals(db),
+            Type::Recursive(recursive) => recursive.body(db).is_literal_or_union_of_literals(db),
             _ => false,
         }
     }
@@ -2147,7 +2139,7 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(_)
             | Type::GenericAlias(_)
             | Type::KnownInstance(_) => false,
-            Type::Recursive(recursive) => recursive.body_with_origin_marker(db).is_spellable(db),
+            Type::Recursive(recursive) => recursive.body(db).is_spellable(db),
             Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_spellable(db)),
         }
     }
@@ -2219,7 +2211,7 @@ impl<'db> Type<'db> {
                 | DynamicType::TodoStarredExpression
                 | DynamicType::AmbiguousOverload => false,
             },
-            Type::Recursive(recursive) => recursive.body_with_origin_marker(db).is_hintable(db),
+            Type::Recursive(recursive) => recursive.body(db).is_hintable(db),
         }
     }
 
@@ -2566,7 +2558,7 @@ impl<'db> Type<'db> {
     pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
         match self {
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => false,
-            Type::Recursive(recursive) => recursive.body_with_origin_marker(db).is_singleton(db),
+            Type::Recursive(recursive) => recursive.body(db).is_singleton(db),
 
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(..)
@@ -2684,6 +2676,10 @@ impl<'db> Type<'db> {
 
     /// Return true if this type is non-empty and all inhabitants of this type compare equal.
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
+        self.is_single_valued_impl(db, &mut FxHashSet::default())
+    }
+
+    fn is_single_valued_impl(self, db: &'db dyn Db, seen: &mut FxHashSet<Type<'db>>) -> bool {
         match self {
             // All empty ranges compare equal, but non-empty ranges can contain different values.
             Type::KnownInstance(KnownInstanceType::Range { is_non_empty }) => !is_non_empty,
@@ -2729,7 +2725,7 @@ impl<'db> Type<'db> {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
                         .elements(db)
                         .iter()
-                        .all(|constraint| constraint.is_single_valued(db)),
+                        .all(|constraint| constraint.is_single_valued_impl(db, seen)),
                 }
             }
 
@@ -2738,8 +2734,10 @@ impl<'db> Type<'db> {
                 false
             }
 
-            Type::NominalInstance(instance) => instance.is_single_valued(db),
-            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_single_valued(db),
+            Type::NominalInstance(instance) => instance.is_single_valued_impl(db, seen),
+            Type::NewTypeInstance(newtype) => newtype
+                .concrete_base_type(db)
+                .is_single_valued_impl(db, seen),
 
             Type::BoundSuper(_) => {
                 // At runtime two super instances never compare equal, even if their arguments are identical.
@@ -2755,7 +2753,14 @@ impl<'db> Type<'db> {
             Type::TypeGuard(type_guard) => type_guard.is_bound(db),
             Type::TypeForm(_) => false,
 
-            Type::TypeAlias(alias) => alias.value_type(db).is_single_valued(db),
+            Type::TypeAlias(alias) => {
+                if !seen.insert(self) {
+                    return false;
+                }
+                let is_single_valued = alias.value_type(db).is_single_valued_impl(db, seen);
+                seen.remove(&self);
+                is_single_valued
+            }
 
             Type::Dynamic(_)
             | Type::Divergent(_)
@@ -2769,7 +2774,14 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_) => false,
             Type::Recursive(recursive) => {
-                recursive.body_with_origin_marker(db).is_single_valued(db)
+                if !seen.insert(self) {
+                    return false;
+                }
+                // Keep the binder marker in the body. Replacing it with the origin name can
+                // re-enter the same alias while proving single-valuedness.
+                let is_single_valued = recursive.body(db).is_single_valued_impl(db, seen);
+                seen.remove(&self);
+                is_single_valued
             }
 
             Type::Intersection(intersection) => intersection
@@ -3581,9 +3593,9 @@ impl<'db> Type<'db> {
             Type::Intersection(intersection) => intersection
                 .iter_positive(db)
                 .any(|ty| ty.is_data_descriptor_impl(db, any_of_union)),
-            Type::Recursive(recursive) => recursive
-                .body_with_origin_marker(db)
-                .is_data_descriptor_impl(db, any_of_union),
+            Type::Recursive(recursive) => {
+                recursive.body(db).is_data_descriptor_impl(db, any_of_union)
+            }
             _ => {
                 !self
                     .class_member_with_policy(
@@ -7721,9 +7733,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::TypeVar(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => TypeVarVariance::Bivariant,
-            Type::Recursive(recursive) => recursive
-                .body_with_origin_marker(db)
-                .variance_of(db, typevar),
+            Type::Recursive(recursive) => recursive.body(db).variance_of(db, typevar),
         };
 
         tracing::trace!(
