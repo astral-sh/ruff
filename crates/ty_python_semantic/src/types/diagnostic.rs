@@ -2500,10 +2500,9 @@ pub(crate) fn report_too_many_positional_patterns_for_class_pattern<T: Ranged>(
     let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, first_excess_pattern) else {
         return;
     };
-    let mut diagnostic = builder.into_diagnostic(format_args!(
+    builder.into_diagnostic(format_args!(
         "Too many positional subpatterns for `{class_display}`: expected {positional_limit}, got {positional_count}"
     ));
-    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
 }
 
 pub(crate) fn report_invalid_match_args_type<T: Ranged>(
@@ -2518,10 +2517,9 @@ pub(crate) fn report_invalid_match_args_type<T: Ranged>(
     let db = context.db();
     let class_display = cls_ty.display(db);
     let match_args_display = match_args_ty.display(db);
-    let mut diagnostic = builder.into_diagnostic(format_args!(
+    builder.into_diagnostic(format_args!(
         "`__match_args__` for `{class_display}` must be an exact tuple, not `{match_args_display}`"
     ));
-    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
 }
 
 pub(crate) fn add_type_expression_reference_link<'db, 'ctx>(

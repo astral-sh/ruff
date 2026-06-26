@@ -792,7 +792,7 @@
         },
         "invalid-match-pattern": {
           "title": "detect invalid match patterns",
-          "description": "## What it does\n\nChecks for invalid match patterns.\n\n## Why is this bad?\n\nMatching on invalid patterns will lead to a runtime error.\n\n## Examples\n\n```python\nclass Point:\n    __match_args__ = (\"x\", \"y\")\n\n\ndef describe(p: Point) -> None:\n    match p:\n        # TypeError at runtime: Point() accepts 2 positional sub-patterns (3 given)\n        case Point(x, y, z):  # error: [invalid-match-pattern]\n            ...\n```\n\n```python\nNotAClass = 42\n\nmatch object():\n    # TypeError at runtime: must be a class\n    case NotAClass():  # error\n        ...\n```",
+          "description": "## What it does\n\nChecks for statically invalid match patterns.\n\n## Why is this bad?\n\nInvalid patterns can raise an error at runtime. For class patterns, ty checks the statically known\ntype of `__match_args__`.\n\n## Examples\n\n```python\nclass Point:\n    __match_args__ = (\"x\", \"y\")\n\n\ndef describe(p: Point) -> None:\n    match p:\n        # TypeError at runtime: Point() accepts 2 positional sub-patterns (3 given)\n        case Point(x, y, z):  # error: [invalid-match-pattern]\n            ...\n```\n\n```python\nNotAClass = 42\n\nmatch object():\n    # TypeError at runtime: must be a class\n    case NotAClass():  # error\n        ...\n```",
           "default": "error",
           "oneOf": [
             {

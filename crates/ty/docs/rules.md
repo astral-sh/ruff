@@ -1992,12 +1992,13 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.18">0.0.18</a
 **What it does**
 
 
-Checks for invalid match patterns.
+Checks for statically invalid match patterns.
 
 **Why is this bad?**
 
 
-Matching on invalid patterns will lead to a runtime error.
+Invalid patterns can raise an error at runtime. For class patterns, ty checks the statically known
+type of `__match_args__`.
 
 **Examples**
 
