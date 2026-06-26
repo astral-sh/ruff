@@ -1518,20 +1518,25 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                     })
                     .is_some_and(|ty| ty.has_typevar(self.db))
             {
-                let specializes_original_class = original_subject_ty
+                // For example, `Child[int]` and `Base[T]` share a generic hierarchy, so a `Base`
+                // pattern can reuse `int` from the subject. This does not infer `Child[int]` from
+                // a `Base[int]` subject.
+                let shares_generic_hierarchy = original_subject_ty
                     .nominal_class(self.db)
                     .is_some_and(|original_class| {
-                        pattern_class
-                            .default_specialization(self.db)
-                            .is_subtype_of_class_literal(
-                                self.db,
-                                original_class.class_literal(self.db),
-                            )
+                        let pattern_class = pattern_class.default_specialization(self.db);
+                        pattern_class.is_subtype_of_class_literal(
+                            self.db,
+                            original_class.class_literal(self.db),
+                        ) || original_class.is_subtype_of_class_literal(
+                            self.db,
+                            pattern_class.class_literal(self.db),
+                        )
                     });
-                if specializes_original_class {
-                    // The pattern subclass's default specialization loses the type arguments from
-                    // the subject's generic base. Prefer a member type already known from the
-                    // subject; otherwise, do not treat the subclass's fallback as a declared type.
+                if shares_generic_hierarchy {
+                    // The pattern class's default specialization loses type arguments known
+                    // through the related subject type. Prefer the subject's member type;
+                    // otherwise, do not treat the generic fallback as a declared type.
                     member_ty = Some(original_member_ty.unwrap_or_else(Type::unknown));
                 } else if let Some(pattern_member_ty) = context
                     .class_ty

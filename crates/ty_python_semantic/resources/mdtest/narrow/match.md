@@ -845,6 +845,7 @@ class GenericMemberBase(Generic[GenericPatternT]):
     item: GenericPatternT
 
 class GenericMemberChild(GenericMemberBase[GenericPatternT]): ...
+class IntGenericMemberChild(GenericMemberBase[int]): ...
 
 def test_match_generic_subclass_capture(value: GenericPatternBase[int]) -> None:
     match value:
@@ -870,6 +871,14 @@ def test_match_inherited_generic_subclass_capture(
             return item
         case _:
             raise ValueError
+
+def test_match_generic_base_capture_preserves_subject_specialization(
+    value: IntGenericMemberChild,
+) -> None:
+    match value:
+        case GenericMemberBase(item=item):
+            reveal_type(item)  # revealed: int
+            item.bit_length()
 ```
 
 ## Positional class patterns
