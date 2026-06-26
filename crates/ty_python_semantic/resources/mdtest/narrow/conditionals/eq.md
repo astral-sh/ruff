@@ -669,9 +669,22 @@ def _(value: Foo | Shifted):
         reveal_type(value)  # revealed: Literal[Foo.Y] | Shifted
 ```
 
-An explicit `_value_` annotation can make `.value` precise, but it does not describe the scalar
-payload used by inherited comparison methods. We therefore cannot compare members transformed by a
-custom constructor using their annotated values:
+An explicit `_value_` annotation controls the public `.value` type without erasing a concrete
+comparison payload:
+
+```py
+from enum import IntEnum
+
+class AnnotatedInteger(IntEnum):
+    _value_: int
+    ONE = 1
+
+reveal_type(AnnotatedInteger.ONE.value)  # revealed: int
+reveal_type(AnnotatedInteger.ONE == 1)  # revealed: Literal[True]
+```
+
+When a custom constructor transforms the member, however, the annotation does not describe the
+scalar payload used by inherited comparison methods:
 
 ```py
 from enum import IntEnum

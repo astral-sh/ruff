@@ -516,13 +516,38 @@ impl<'db> EnumMetadata<'db> {
     /// matches an inherited `_value_` annotation; otherwise, the annotation describes the
     /// normalized value.
     pub(crate) fn value_type(&self, db: &'db dyn Db, member_name: &Name) -> Option<Type<'db>> {
-        let declared_value = self.members.get(member_name).copied()?;
+        if !self.members.contains_key(member_name) {
+            return None;
+        }
 
         if let Some(EnumValueAnnotation::UserDefined(annotation)) = self.value_annotation {
             return Some(annotation);
         }
-        if self.member_value_may_be_transformed(member_name) {
+        let Some(value) = self.concrete_value_type(db, member_name) else {
             return Some(Type::Dynamic(DynamicType::Any));
+        };
+
+        if let Some(EnumValueAnnotation::StandardLibrary(annotation)) = self.value_annotation
+            && !known_constructor_preserves_value_type(db, value, annotation)
+        {
+            Some(annotation)
+        } else {
+            Some(value)
+        }
+    }
+
+    /// Returns the normalized member payload when construction is known not to transform it.
+    ///
+    /// Unlike [`Self::value_type`], this does not substitute a `_value_` annotation for the
+    /// concrete payload.
+    pub(crate) fn concrete_value_type(
+        &self,
+        db: &'db dyn Db,
+        member_name: &Name,
+    ) -> Option<Type<'db>> {
+        let declared_value = self.members.get(member_name).copied()?;
+        if self.member_value_may_be_transformed(member_name) {
+            return None;
         }
         let value = if self.auto_members.contains(member_name)
             && self
@@ -535,17 +560,7 @@ impl<'db> EnumMetadata<'db> {
         } else {
             declared_value
         };
-        let Some(value) = self.value_construction.normalize_value(db, value) else {
-            return Some(Type::Dynamic(DynamicType::Any));
-        };
-
-        if let Some(EnumValueAnnotation::StandardLibrary(annotation)) = self.value_annotation
-            && !known_constructor_preserves_value_type(db, value, annotation)
-        {
-            Some(annotation)
-        } else {
-            Some(value)
-        }
+        self.value_construction.normalize_value(db, value)
     }
 
     /// Return whether enum construction may replace the value declared for `member_name`.

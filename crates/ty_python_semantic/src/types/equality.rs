@@ -1532,10 +1532,7 @@ fn enum_literal_value<'db>(db: &'db dyn Db, literal: EnumLiteralType<'db>) -> Op
     let enum_class_literal = literal.enum_class_literal(db);
     let metadata = enum_metadata(db, enum_class_literal.class_literal(db))?;
     let name = enum_class_literal.resolve_member(db, literal.name(db))?;
-    if metadata.member_value_may_be_transformed(name) {
-        return None;
-    }
-    metadata.value_type(db, name)
+    metadata.concrete_value_type(db, name)
 }
 
 /// Return whether two enum literals resolve to the same member, including aliases.
