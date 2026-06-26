@@ -1151,12 +1151,27 @@ class OverlapMemberA:
 class OverlapMemberB:
     member: str
 
+class CompatibleOverlapMemberA:
+    member: object = "x"
+
+class CompatibleOverlapMemberB:
+    member: int = 1
+
 def test_match_class_capture_combines_overlapping_member_types(
     value: OverlapMemberA,
 ) -> None:
     match value:
         case OverlapMemberB(member=item):
             reveal_type(item)  # revealed: int | str
+
+def test_match_class_capture_preserves_compatible_overlapping_member_types(
+    value: CompatibleOverlapMemberA,
+) -> None:
+    match value:
+        case CompatibleOverlapMemberB(member=str() as item):
+            reveal_type(item)  # revealed: str
+            # revealed: CompatibleOverlapMemberA & CompatibleOverlapMemberB
+            reveal_type(value)
 
 class GenericOverlapA:
     member: int
@@ -1179,7 +1194,7 @@ def test_match_generic_class_capture_preserves_possible_multiple_inheritance(
 ) -> None:
     match value:
         case GenericOverlapB(member=str() as item):
-            reveal_type(item)  # revealed: Unknown & str
+            reveal_type(item)  # revealed: str
             reveal_type(value)  # revealed: GenericOverlapA & Top[GenericOverlapB[Unknown]]
             1 + "x"  # error: [unsupported-operator]
 
