@@ -1756,6 +1756,9 @@ impl<'db> Type<'db> {
         match self.resolve_type_alias(db) {
             Type::Union(union) => Some(union),
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).as_union_like(db),
+            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
+                recursive.body_with_origin_marker(db).as_union_like(db)
+            }
             _ => None,
         }
     }

@@ -3015,6 +3015,25 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 return Ok(());
             }
 
+            (formal @ Type::ProtocolInstance(_), Type::TypeAlias(alias)) => {
+                return self.infer_map_impl(formal, alias.value_type(self.db), polarity, seen);
+            }
+
+            (Type::ProtocolInstance(_), Type::Recursive(recursive))
+                if recursive.is_non_contractive(self.db) =>
+            {
+                return Ok(());
+            }
+
+            (formal @ Type::ProtocolInstance(_), Type::Recursive(recursive)) => {
+                return self.infer_map_impl(
+                    formal,
+                    recursive.body_with_origin_marker(self.db),
+                    polarity,
+                    seen,
+                );
+            }
+
             // When the formal type is a protocol with a `__call__` method, infer the specialization
             // from matching the actual type's callable signature against the protocol's `__call__`
             // method signature.
