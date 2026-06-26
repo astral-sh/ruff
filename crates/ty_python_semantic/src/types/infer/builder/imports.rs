@@ -65,7 +65,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if level == 0 {
             if let Some(module_name) = module_name {
-                let program = self.analysis_file().program(db);
+                let program = self.program;
                 let typeshed_versions = program.search_paths(db).typeshed_versions();
 
                 // Loop over ancestors in case we have info on the parent module but not submodule
@@ -128,7 +128,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let verbose = db.verbose();
         let search_paths = ty_module_resolver::search_paths(
             db,
-            self.analysis_file().program(db).resolver(db),
+            self.program.resolver(db),
             ModuleResolveMode::StubsAllowed,
         );
 
@@ -362,7 +362,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let module_literal = ModuleLiteralType::new(
             db,
             module,
-            self.analysis_file().program(db),
+            self.program,
             module.kind(db).is_package().then_some(self.file()),
         );
         let module_ty = Type::ModuleLiteral(module_literal);
@@ -520,7 +520,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(full_submodule_name) = full_submodule_name {
             submodule_hint_added = hint_if_stdlib_submodule_exists_on_other_versions(
                 db,
-                self.analysis_file().program(db),
+                self.program,
                 &mut diagnostic,
                 &full_submodule_name,
                 module,
@@ -642,7 +642,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ));
         hint_if_stdlib_submodule_exists_on_other_versions(
             db,
-            self.analysis_file().program(db),
+            self.program,
             &mut diagnostic,
             &full_submodule_name,
             module,

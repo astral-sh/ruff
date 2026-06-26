@@ -56,7 +56,7 @@ pub(crate) use self::type_expansion::expand_type;
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, TypeOrigin,
-    builtins_module_scope, imported_symbol_in_environment, known_module_symbol,
+    builtins_module_scope, imported_symbol, known_module_symbol,
 };
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
@@ -8965,7 +8965,7 @@ impl<'db> ModuleLiteralType<'db> {
         // For module literals, we want to try calling the module's own `__getattr__` function
         // if it exists. First, we need to look up the `__getattr__` function in the module's scope.
         if self.module(db).file(db).is_some() {
-            let getattr_symbol = imported_symbol_in_environment(
+            let getattr_symbol = imported_symbol(
                 db,
                 self.program(db),
                 self.module_analysis_file(db),
@@ -9024,7 +9024,7 @@ impl<'db> ModuleLiteralType<'db> {
             return Place::bound(submodule).into();
         }
 
-        let place_and_qualifiers = imported_symbol_in_environment(
+        let place_and_qualifiers = imported_symbol(
             db,
             self.program(db),
             self.module_analysis_file(db),

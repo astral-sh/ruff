@@ -10,7 +10,6 @@ pub use db::Db;
 pub use diagnostic::{
     add_inferred_python_version_hint_to_diagnostic, inferred_python_version_source_annotation,
 };
-pub use environment::{AnalysisFile, InferenceSettings};
 pub use fixes::{fix_all_diagnostics, suppress_all_diagnostics};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
@@ -29,6 +28,7 @@ pub use suppression::{
 };
 use ty_module_resolver::ModuleGlobSet;
 use ty_python_core::definition::docstring_from_body;
+pub use ty_python_core::environment::{AnalysisFile, InferenceSettings};
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::Program;
 use ty_python_core::scope::ScopeId;
@@ -59,7 +59,6 @@ mod suppression;
 pub mod types;
 
 mod diagnostic;
-mod environment;
 #[cfg(feature = "testing")]
 pub mod pull_types;
 

@@ -524,13 +524,7 @@ impl ty_module_resolver::Db for ProjectDatabase {}
 #[salsa::db]
 impl SemanticDb for ProjectDatabase {
     fn check_file(&self, analysis_file: AnalysisFile<'_>) -> Vec<Diagnostic> {
-        let file = analysis_file.file(self);
-        if !self.project().should_check_file(self, file) {
-            return Vec::new();
-        }
-        crate::check_file_impl(self, analysis_file)
-            .map(<[Diagnostic]>::to_vec)
-            .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
+        self.project().check_analysis_file(self, analysis_file)
     }
 
     fn rule_selection(&self, file: File) -> &RuleSelection {
@@ -787,13 +781,7 @@ pub(crate) mod testing {
             &self,
             analysis_file: ty_python_core::environment::AnalysisFile<'_>,
         ) -> Vec<Diagnostic> {
-            let file = analysis_file.file(self);
-            if !self.project().should_check_file(self, file) {
-                return Vec::new();
-            }
-            crate::check_file_impl(self, analysis_file)
-                .map(<[Diagnostic]>::to_vec)
-                .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
+            self.project().check_analysis_file(self, analysis_file)
         }
 
         fn rule_selection(&self, _file: ruff_db::files::File) -> &RuleSelection {

@@ -31,10 +31,9 @@ use super::{
 use crate::diagnostic::format_enumeration;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
-    RequiresExplicitReExport, TypeOrigin, builtins_module_scope_in_environment,
-    builtins_symbol_in_environment, class_body_implicit_symbol_in_environment,
-    explicit_global_symbol, loop_header_reachability, module_type_implicit_global_declaration,
-    module_type_implicit_global_symbol_in_environment, place_by_id,
+    RequiresExplicitReExport, TypeOrigin, builtins_module_scope, builtins_symbol,
+    class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
     place_from_bindings_with_reachability_cache, place_from_declarations_with_reachability_cache,
     typing_extensions_symbol,
 };
@@ -668,8 +667,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn replace_imports_with_any(&self) -> &ty_module_resolver::ModuleGlobSet {
-        let environment = self.analysis_file().program(self.db());
-        &environment.settings(self.db()).replace_imports_with_any
+        &self.program.settings(self.db()).replace_imports_with_any
     }
 
     fn allowed_unresolved_imports(&self) -> &ty_module_resolver::ModuleGlobSet {
@@ -739,11 +737,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn defer_annotations(&self) -> bool {
         self.index.has_future_annotations()
             || self.in_stub()
-            || self
-                .analysis_file()
-                .program(self.db())
-                .python_version(self.db())
-                >= PythonVersion::PY314
+            || self.program.python_version(self.db()) >= PythonVersion::PY314
     }
 
     /// Are we currently in a context where name resolution should be deferred
@@ -1502,11 +1496,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let PlaceExprRef::Symbol(symbol) = &place
                 && scope.is_global()
             {
-                module_type_implicit_global_symbol_in_environment(
-                    self.db(),
-                    self.analysis_file().program(self.db()),
-                    symbol.name(),
-                )
+                module_type_implicit_global_symbol(self.db(), self.program, symbol.name())
             } else {
                 Place::Undefined.into()
             }
@@ -1563,9 +1553,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if let Some(module_type_implicit_declaration) = place
                         .as_symbol()
                         .map(|symbol| {
-                            module_type_implicit_global_symbol_in_environment(
+                            module_type_implicit_global_symbol(
                                 self.db(),
-                                self.analysis_file().program(self.db()),
+                                self.program,
                                 symbol.name(),
                             )
                         })
@@ -3521,7 +3511,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .known(db)
                     .is_some_and(KnownModule::is_builtins)
                 {
-                    builtins_symbol_in_environment(db, self.analysis_file().program(db), attribute)
+                    builtins_symbol(db, self.program, attribute)
                 } else {
                     module.static_member(db, self.program, attribute)
                 };
@@ -5586,13 +5576,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     continue;
                 }
             }
-            if !module_type_implicit_global_symbol_in_environment(
-                self.db(),
-                self.analysis_file().program(self.db()),
-                name,
-            )
-            .place
-            .is_undefined()
+            if !module_type_implicit_global_symbol(self.db(), self.program, name)
+                .place
+                .is_undefined()
             {
                 // This name is an implicit global like `__file__` (but not a built-in like `int`).
                 continue;
@@ -9837,12 +9823,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
             // These are looked up as attributes on `types.ModuleType`.
             .or_fall_back_to(db, self.program, || {
-                module_type_implicit_global_symbol_in_environment(
-                    db,
-                    self.analysis_file().program(db),
-                    symbol_name,
-                )
-                .map_type(|ty| {
+                module_type_implicit_global_symbol(db, self.program, symbol_name).map_type(|ty| {
                     self.narrow_place_with_applicable_constraints(
                         PlaceExprRef::from(&expr),
                         ty,
@@ -9853,16 +9834,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Not found in globals? Fallback to builtins
             // (without infinite recursion if we're already in builtins.)
             .or_fall_back_to(db, self.program, || {
-                if Some(self.scope())
-                    == builtins_module_scope_in_environment(db, self.analysis_file().program(db))
-                {
+                if Some(self.scope()) == builtins_module_scope(db, self.program) {
                     Place::Undefined.into()
                 } else {
-                    builtins_symbol_in_environment(
-                        db,
-                        self.analysis_file().program(db),
-                        symbol_name,
-                    )
+                    builtins_symbol(db, self.program, symbol_name)
                 }
             })
             // Still not found? It might be `reveal_type`...
@@ -9875,7 +9850,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             "This is allowed for debugging convenience but will fail at runtime",
                         );
                     }
-                    typing_extensions_symbol(db, self.analysis_file().program(db), symbol_name)
+                    typing_extensions_symbol(db, self.program, symbol_name)
                 } else {
                     Place::Undefined.into()
                 }
@@ -10325,11 +10300,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         if scope.node(db).scope_kind().is_class()
                             && let Some(symbol) = place_expr.as_symbol()
                         {
-                            let implicit = class_body_implicit_symbol_in_environment(
-                                db,
-                                self.analysis_file().program(db),
-                                symbol.name(),
-                            );
+                            let implicit =
+                                class_body_implicit_symbol(db, self.program, symbol.name());
                             if implicit.place.is_definitely_bound() {
                                 return implicit.map_type(|ty| {
                                     self.narrow_place_with_applicable_constraints(
@@ -10383,7 +10355,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ));
             add_inferred_python_version_hint_to_diagnostic(
                 self.db(),
-                self.analysis_file().program(self.db()),
+                self.program,
                 &mut diagnostic,
                 "resolving types",
             );
@@ -10394,12 +10366,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // ===
         // We don't need to check for typing_extensions.Type,
         // because it's already caught by typing.Type.
-        if self
-            .analysis_file()
-            .program(self.db())
-            .python_version(self.db())
-            >= PythonVersion::PY39
-        {
+        if self.program.python_version(self.db()) >= PythonVersion::PY39 {
             if let Some(("", builtin_name)) = as_pep_585_generic("typing", id) {
                 diagnostic.set_primary_message(format_args!("Did you mean `{builtin_name}`?"));
             }

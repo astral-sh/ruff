@@ -24,7 +24,7 @@ impl get_size2::GetSize for Module<'_> {}
 
 #[salsa::tracked]
 impl<'db> Module<'db> {
-    pub(crate) fn file_module_in_program(
+    pub(crate) fn file_module(
         db: &'db dyn Db,
         program: ResolverProgram<'db>,
         name: ModuleName,
@@ -45,7 +45,7 @@ impl<'db> Module<'db> {
         ))
     }
 
-    pub(crate) fn namespace_package_in_program(
+    pub(crate) fn namespace_package(
         db: &'db dyn Db,
         program: ResolverProgram<'db>,
         name: ModuleName,
@@ -223,7 +223,7 @@ fn all_submodule_names_for_package<'db>(
                         let file = system_path_to_file(db, &path).ok()?;
                         (ModuleKind::Module, file)
                     };
-                    Some(Module::file_module_in_program(
+                    Some(Module::file_module(
                         db,
                         module.program(db),
                         name,
@@ -261,7 +261,7 @@ fn all_submodule_names_for_package<'db>(
                     let file = vendored_path_to_file(db, entry.path()).ok()?;
                     (ModuleKind::Module, file)
                 };
-                Some(Module::file_module_in_program(
+                Some(Module::file_module(
                     db,
                     module.program(db),
                     name,

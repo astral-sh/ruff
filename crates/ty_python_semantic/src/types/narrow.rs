@@ -63,11 +63,7 @@ fn has_bytes_like_containment<'db>(
             .any(|element| has_bytes_like_containment(db, program, *element)),
         ty => {
             ty.is_subtype_of(db, program, KnownClass::Bytes.to_instance(db, program))
-                || ty.is_subtype_of(
-                    db,
-                    program,
-                    KnownClass::Bytearray.to_instance(db, program),
-                )
+                || ty.is_subtype_of(db, program, KnownClass::Bytearray.to_instance(db, program))
         }
     }
 }
@@ -2603,10 +2599,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         // before comparing it with `lhs_ty` would lose the correlation between this occurrence
         // and other occurrences in the same function.
         if let Type::TypeVar(typevar) = rhs_ty
-            && let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
-                typevar
-                    .typevar(self.db)
-                    .bound_or_constraints(self.db, self.program)
+            && let Some(TypeVarBoundOrConstraints::Constraints(constraints)) = typevar
+                .typevar(self.db)
+                .bound_or_constraints(self.db, self.program)
             && constraints.elements(self.db).iter().all(|constraint| {
                 evaluate_type_equality(self.db, self.program, lhs_ty, *constraint, true)
                     .is_some_and(|narrowed| {

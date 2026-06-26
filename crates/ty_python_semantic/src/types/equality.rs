@@ -153,8 +153,15 @@ pub(super) fn evaluate_type_equality<'db>(
         )
     })
     .or_else(|| {
-        evaluate_enum_domains(db, program, left, right, branch, ComparisonOperator::Equality)
-            .and_then(|result| result.constraint(branch))
+        evaluate_enum_domains(
+            db,
+            program,
+            left,
+            right,
+            branch,
+            ComparisonOperator::Equality,
+        )
+        .and_then(|result| result.constraint(branch))
     })
     .or_else(|| {
         if comparison_domain(db, program, left, right, ComparisonOperator::Equality)

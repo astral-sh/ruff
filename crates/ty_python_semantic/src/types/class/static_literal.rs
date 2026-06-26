@@ -376,16 +376,15 @@ impl<'db> StaticClassLiteral<'db> {
         self,
         db: &'db dyn Db,
     ) -> Option<GenericContext<'db>> {
-        let program = ClassLiteral::Static(self).program(db);
         #[salsa::tracked(
-            cycle_initial=|_, _, _, _| None,
+            cycle_initial=|_, _, _| None,
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn inherited_legacy_generic_context_inner<'db>(
             db: &'db dyn Db,
-            program: crate::Program<'db>,
             class: StaticClassLiteral<'db>,
         ) -> Option<GenericContext<'db>> {
+            let program = class.program(db);
             GenericContext::from_base_classes(
                 db,
                 program,
@@ -401,7 +400,7 @@ impl<'db> StaticClassLiteral<'db> {
         if !self.has_explicit_bases(db) {
             return None;
         }
-        inherited_legacy_generic_context_inner(db, program, self)
+        inherited_legacy_generic_context_inner(db, self)
     }
 
     /// Returns all of the typevars that are referenced in this class's base class list.
@@ -569,13 +568,12 @@ impl<'db> StaticClassLiteral<'db> {
     /// Were this not a salsa query, then the calling query
     /// would depend on the class's AST and rerun for every change in that file.
     pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> &'db [Type<'db>] {
-        let program = ClassLiteral::Static(self).program(db);
         #[salsa::tracked(returns(deref), cycle_initial=explicit_bases_cycle_initial, cycle_fn=explicit_bases_cycle_fn, heap_size=ruff_memory_usage::heap_size)]
         fn explicit_bases_inner<'db>(
             db: &'db dyn Db,
-            program: crate::Program<'db>,
             class: StaticClassLiteral<'db>,
         ) -> Box<[Type<'db>]> {
+            let program = class.program(db);
             tracing::trace!(
                 "StaticClassLiteral::explicit_bases_query: {}",
                 class.name(db)
@@ -597,7 +595,7 @@ impl<'db> StaticClassLiteral<'db> {
         if !self.has_explicit_bases(db) {
             return &[];
         }
-        explicit_bases_inner(db, program, self)
+        explicit_bases_inner(db, self)
     }
 
     /// Return `Some()` if this class is known to be a [`DisjointBase`], or `None` if it is not.
@@ -1041,18 +1039,17 @@ impl<'db> StaticClassLiteral<'db> {
         self,
         db: &'db dyn Db,
     ) -> Result<(Type<'db>, Option<MetaclassTransformInfo<'db>>), MetaclassError<'db>> {
-        let program = ClassLiteral::Static(self).program(db);
         #[salsa::tracked(
-            cycle_initial=|_, _, _, _| Err(MetaclassError {
+            cycle_initial=|_, _, _| Err(MetaclassError {
                 kind: MetaclassErrorKind::Cycle,
             }),
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn try_metaclass_inner<'db>(
             db: &'db dyn Db,
-            program: crate::Program<'db>,
             class: StaticClassLiteral<'db>,
         ) -> Result<(Type<'db>, Option<MetaclassTransformInfo<'db>>), MetaclassError<'db>> {
+            let program = class.program(db);
             tracing::trace!("StaticClassLiteral::try_metaclass: {}", class.name(db));
 
             // Identify the class's own metaclass (or take the first base class's metaclass).
@@ -1197,9 +1194,12 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         if !self.has_explicit_bases(db) && !self.has_explicit_metaclass(db) {
-            return Ok((KnownClass::Type.to_class_literal(db, program), None));
+            return Ok((
+                KnownClass::Type.to_class_literal(db, self.program(db)),
+                None,
+            ));
         }
-        try_metaclass_inner(db, program, self)
+        try_metaclass_inner(db, self)
     }
 
     /// Returns the class member of this class named `name`.
@@ -3380,7 +3380,6 @@ impl InheritanceCycle {
 fn explicit_bases_cycle_initial<'db>(
     db: &'db dyn Db,
     id: salsa::Id,
-    _program: crate::Program<'db>,
     literal: StaticClassLiteral<'db>,
 ) -> Box<[Type<'db>]> {
     let module = parsed_module_versioned(
@@ -3400,9 +3399,9 @@ fn explicit_bases_cycle_fn<'db>(
     cycle: &salsa::Cycle,
     previous: &[Type<'db>],
     current: Box<[Type<'db>]>,
-    program: crate::Program<'db>,
-    _literal: StaticClassLiteral<'db>,
+    literal: StaticClassLiteral<'db>,
 ) -> Box<[Type<'db>]> {
+    let program = literal.program(db);
     if previous.len() == current.len() {
         // As long as the length of bases hasn't changed, use the same "monotonic widening"
         // strategy that we use with most types, to avoid oscillations.

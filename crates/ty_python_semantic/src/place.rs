@@ -28,7 +28,7 @@ use ty_python_core::{
 };
 
 pub(crate) use implicit_globals::{
-    module_type_implicit_global_declaration, module_type_implicit_global_symbol_in_environment,
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol,
 };
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize)]
@@ -516,11 +516,17 @@ pub(crate) fn global_symbol<'db>(
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
     explicit_global_symbol(db, file, name).or_fall_back_to(db, file.program(db), || {
-        module_type_implicit_global_symbol_in_environment(db, file.program(db), name)
+        module_type_implicit_global_symbol(db, file.program(db), name)
     })
 }
 
-pub(crate) fn imported_symbol_in_environment<'db>(
+/// Infers the public type of an imported symbol.
+///
+/// If `requires_explicit_reexport` is [`None`], it will be inferred from the file's source type.
+/// Stub files require explicit re-exports, while non-stub files do not.
+///
+/// `file` should be [`None`] when looking up a symbol on a namespace package.
+pub(crate) fn imported_symbol<'db>(
     db: &'db dyn Db,
     program: Program<'db>,
     file: Option<ty_python_core::environment::AnalysisFile<'db>>,
@@ -554,7 +560,7 @@ pub(crate) fn imported_symbol_in_environment<'db>(
 
         symbol_impl(
             db,
-            ty_python_core::global_scope_in_environment(db, file),
+            ty_python_core::global_scope(db, file),
             name,
             requires_explicit_reexport,
             ConsideredDefinitions::EndOfScope,
@@ -602,42 +608,33 @@ pub(crate) fn imported_symbol_in_environment<'db>(
 /// Note that this function is only intended for use in the context of the builtins *namespace*
 /// and should not be used when a symbol is being explicitly imported from the `builtins` module
 /// (e.g. `from builtins import int`).
-#[cfg(test)]
 pub(crate) fn builtins_symbol<'db>(
     db: &'db dyn Db,
     program: Program<'db>,
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
-    builtins_symbol_in_environment(db, program, symbol)
-}
-
-pub(crate) fn builtins_symbol_in_environment<'db>(
-    db: &'db dyn Db,
-    environment: Program<'db>,
-    symbol: &str,
-) -> PlaceAndQualifiers<'db> {
     let resolver = |module: Module<'_>| {
         let file = module.file(db)?;
-        let analysis_file = ty_python_core::environment::AnalysisFile::new(db, environment, file);
+        let analysis_file = ty_python_core::environment::AnalysisFile::new(db, program, file);
         let found_symbol = symbol_impl(
             db,
-            ty_python_core::global_scope_in_environment(db, analysis_file),
+            ty_python_core::global_scope(db, analysis_file),
             symbol,
             RequiresExplicitReExport::Yes,
             ConsideredDefinitions::EndOfScope,
         )
-        .or_fall_back_to(db, environment, || {
+        .or_fall_back_to(db, program, || {
             // We're looking up in the builtins namespace and not the module, so we should
             // do the normal lookup in `types.ModuleType` and not the special one as in
             // `imported_symbol`.
-            module_type_implicit_global_symbol_in_environment(db, environment, symbol)
+            module_type_implicit_global_symbol(db, program, symbol)
         });
         // If this symbol is not present in project-level builtins, search in the default ones.
         found_symbol
             .ignore_possibly_undefined()
             .map(|_| found_symbol)
     };
-    let resolver_program = environment.resolver(db);
+    let resolver_program = program.resolver(db);
     resolve_module_confident(
         db,
         resolver_program,
@@ -660,25 +657,14 @@ pub(crate) fn known_module_symbol<'db>(
     known_module: KnownModule,
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
-    known_module_symbol_in_environment(db, program, known_module, symbol)
-}
-
-pub(crate) fn known_module_symbol_in_environment<'db>(
-    db: &'db dyn Db,
-    environment: Program<'db>,
-    known_module: KnownModule,
-    symbol: &str,
-) -> PlaceAndQualifiers<'db> {
-    resolve_module_confident(db, environment.resolver(db), &known_module.name())
+    resolve_module_confident(db, program.resolver(db), &known_module.name())
         .and_then(|module| {
             let file = module.file(db)?;
-            Some(imported_symbol_in_environment(
+            Some(imported_symbol(
                 db,
-                environment,
+                program,
                 Some(ty_python_core::environment::AnalysisFile::new(
-                    db,
-                    environment,
-                    file,
+                    db, program, file,
                 )),
                 symbol,
                 None,
@@ -719,28 +705,21 @@ pub(crate) fn builtins_module_scope<'db>(
     db: &'db dyn Db,
     program: Program<'db>,
 ) -> Option<ScopeId<'db>> {
-    builtins_module_scope_in_environment(db, program)
-}
-
-pub(crate) fn builtins_module_scope_in_environment<'db>(
-    db: &'db dyn Db,
-    environment: Program<'db>,
-) -> Option<ScopeId<'db>> {
-    core_module_scope_in_environment(db, environment, KnownModule::Builtins)
+    core_module_scope(db, program, KnownModule::Builtins)
 }
 
 /// Get the scope of a core stdlib module.
 ///
 /// Can return `None` if a custom typeshed is used that is missing the core module in question.
-fn core_module_scope_in_environment<'db>(
+fn core_module_scope<'db>(
     db: &'db dyn Db,
-    environment: Program<'db>,
+    program: Program<'db>,
     core_module: KnownModule,
 ) -> Option<ScopeId<'db>> {
-    let module = resolve_module_confident(db, environment.resolver(db), &core_module.name())?;
-    Some(ty_python_core::global_scope_in_environment(
+    let module = resolve_module_confident(db, program.resolver(db), &core_module.name())?;
+    Some(ty_python_core::global_scope(
         db,
-        ty_python_core::environment::AnalysisFile::new(db, environment, module.file(db)?),
+        ty_python_core::environment::AnalysisFile::new(db, program, module.file(db)?),
     ))
 }
 
@@ -2163,12 +2142,11 @@ pub(crate) mod implicit_globals {
     /// [`Place::Undefined`] for `__init__` and `__dict__` (which cannot be found in globals if
     /// the lookup is being done from the same file) -- but these symbols *are* available in the
     /// global scope if they're being imported **from a different file**.
-    pub(crate) fn module_type_implicit_global_symbol_in_environment<'db>(
+    pub(crate) fn module_type_implicit_global_symbol<'db>(
         db: &'db dyn Db,
-        environment: Program<'db>,
+        program: Program<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
-        let program = environment;
         match name {
             // We special-case `__file__` here because we know that for an internal implicit global
             // lookup in a Python module, it is always a string, even though typeshed says `str |
@@ -2298,8 +2276,7 @@ pub(crate) mod implicit_globals {
     /// for the current module, not `str | None`).
     pub(crate) fn all_implicit_module_globals<'db>(
         db: &'db dyn Db,
-        program: crate::Program<'db>,
-        environment: Program<'db>,
+        program: Program<'db>,
     ) -> impl Iterator<Item = (Name, Type<'db>)> + 'db {
         // Special-cased implicit globals that are not in `module_type_symbols`
         let special_cased = ["__builtins__", "__debug__", "__warningregistry__"]
@@ -2313,11 +2290,7 @@ pub(crate) mod implicit_globals {
         special_cased
             .chain(module_type_syms)
             .filter_map(move |name| {
-                let place = module_type_implicit_global_symbol_in_environment(
-                    db,
-                    environment,
-                    name.as_str(),
-                );
+                let place = module_type_implicit_global_symbol(db, program, name.as_str());
                 // Only include bound symbols
                 place.place.ignore_possibly_undefined().map(|ty| (name, ty))
             })
@@ -2350,12 +2323,11 @@ pub(crate) mod implicit_globals {
 /// class creation.
 ///
 /// See <https://docs.python.org/3/reference/datamodel.html#creating-the-class-object>
-pub(crate) fn class_body_implicit_symbol_in_environment<'db>(
+pub(crate) fn class_body_implicit_symbol<'db>(
     db: &'db dyn Db,
-    environment: Program<'db>,
+    program: Program<'db>,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
-    let program = environment;
     match name {
         "__qualname__" => Place::bound(KnownClass::Str.to_instance(db, program)).into(),
         "__module__" => Place::bound(KnownClass::Str.to_instance(db, program)).into(),

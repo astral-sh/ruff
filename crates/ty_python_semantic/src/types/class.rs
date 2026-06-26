@@ -109,7 +109,6 @@ impl<'db> CodeGeneratorKind<'db> {
     }
 
     fn from_static_class(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> Option<Self> {
-        let program = ClassLiteral::Static(class).program(db);
         if class.dataclass_params(db).is_none()
             && class.known(db).is_none()
             && !class.has_explicit_bases(db)
@@ -118,14 +117,14 @@ impl<'db> CodeGeneratorKind<'db> {
             return None;
         }
 
-        #[salsa::tracked(cycle_initial=|_, _, _, _| None,
+        #[salsa::tracked(cycle_initial=|_, _, _| None,
             heap_size=ruff_memory_usage::heap_size
         )]
         fn code_generator_of_static_class<'db>(
             db: &'db dyn Db,
-            program: crate::Program<'db>,
             class: StaticClassLiteral<'db>,
         ) -> Option<CodeGeneratorKind<'db>> {
+            let program = class.program(db);
             // If a class is directly decorated as a dataclass, it's a dataclass.
             // If a class' metaclass is a dataclass transformer, it's a dataclass.
             // If a class inherits from a base class that is a dataclass
@@ -168,7 +167,7 @@ impl<'db> CodeGeneratorKind<'db> {
             }
         }
 
-        code_generator_of_static_class(db, program, class)
+        code_generator_of_static_class(db, class)
     }
 
     fn from_dynamic_class(db: &'db dyn Db, class: DynamicClassLiteral<'db>) -> Option<Self> {

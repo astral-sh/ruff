@@ -313,6 +313,8 @@ impl ModuleName {
     /// Extracts a module name from the AST of a `from <module> import ...`
     /// statement.
     ///
+    /// `importing_file` must contain the import statement.
+    ///
     /// This handles relative import statements.
     pub fn from_import_statement<'db>(
         db: &'db dyn Db,

@@ -198,9 +198,7 @@ use std::cell::RefCell;
 use crate::{
     Db, Program,
     dunder_all::dunder_all_names,
-    place::{
-        DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol_in_environment,
-    },
+    place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
         ActiveRecursionDetector, CallableTypes, EnumClassLiteral, IntersectionBuilder,
         KnownInstanceType, NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
@@ -1406,7 +1404,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
                 None => None,
             };
 
-            match imported_symbol_in_environment(
+            match imported_symbol(
                 db,
                 referenced_file.program(db),
                 Some(referenced_file),

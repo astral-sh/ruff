@@ -245,12 +245,8 @@ pub fn attribute_scopes<'db>(
 }
 
 /// Returns the module global scope of `file`.
-pub fn global_scope<'db>(db: &'db dyn Db, analysis_file: AnalysisFile<'db>) -> ScopeId<'db> {
-    global_scope_in_environment(db, analysis_file)
-}
-
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-pub fn global_scope_in_environment<'db>(db: &'db dyn Db, file: AnalysisFile<'db>) -> ScopeId<'db> {
+pub fn global_scope<'db>(db: &'db dyn Db, file: AnalysisFile<'db>) -> ScopeId<'db> {
     let _span = tracing::trace_span!("global_scope", ?file).entered();
 
     FileScopeId::global().to_scope_id(db, file)

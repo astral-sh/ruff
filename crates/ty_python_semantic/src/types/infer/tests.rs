@@ -1,10 +1,8 @@
 use super::builder::TypeInferenceBuilder;
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::symbol;
-use crate::place::{
-    ConsideredDefinitions, Place, PlaceAndQualifiers, global_symbol as global_symbol_in_environment,
-};
-use crate::types::{KnownClass, KnownInstanceType, check_types as check_types_in_environment};
+use crate::place::{ConsideredDefinitions, Place, PlaceAndQualifiers};
+use crate::types::{KnownClass, KnownInstanceType};
 use ruff_db::Db as _;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::{File, system_path_to_file};
@@ -37,11 +35,11 @@ fn global_scope(db: &TestDb, file: File) -> ScopeId<'_> {
 }
 
 fn global_symbol<'db>(db: &'db TestDb, file: File, name: &str) -> PlaceAndQualifiers<'db> {
-    global_symbol_in_environment(db, analysis_file(db, file), name)
+    crate::place::global_symbol(db, analysis_file(db, file), name)
 }
 
 fn check_types(db: &TestDb, file: File) -> Vec<Diagnostic> {
-    check_types_in_environment(db, analysis_file(db, file))
+    crate::types::check_types(db, analysis_file(db, file))
 }
 
 #[track_caller]
@@ -128,11 +126,8 @@ fn one_file_can_be_analyzed_for_multiple_platforms() -> anyhow::Result<()> {
             },
         )
     };
-    let diagnostics = |platform| {
-        let environment =
-            program(platform).with_inference_settings(&db, InferenceSettings::default());
-        check_types_in_environment(&db, AnalysisFile::new(&db, environment, file))
-    };
+    let diagnostics =
+        |platform| crate::types::check_types(&db, AnalysisFile::new(&db, program(platform), file));
 
     let linux = diagnostics("linux");
     let windows = diagnostics("win32");
@@ -181,9 +176,7 @@ fn one_file_can_be_analyzed_for_multiple_python_versions() -> anyhow::Result<()>
                 search_paths: default.search_paths(&db).clone(),
             },
         );
-        let environment = program.with_inference_settings(&db, InferenceSettings::default());
-        let diagnostics =
-            check_types_in_environment(&db, AnalysisFile::new(&db, environment, file));
+        let diagnostics = crate::types::check_types(&db, AnalysisFile::new(&db, program, file));
         diagnostics
             .iter()
             .find(|diagnostic| diagnostic.id() == DiagnosticId::RevealedType)
@@ -215,13 +208,12 @@ fn known_classes_are_looked_up_in_the_selected_python_version() {
                 search_paths: default.search_paths(&db).clone(),
             },
         );
-        let environment = program.with_inference_settings(&db, InferenceSettings::default());
         let class = KnownClass::EnumType
-            .try_to_class_literal(&db, environment)
+            .try_to_class_literal(&db, program)
             .unwrap();
         assert_eq!(
             class.definition(&db).analysis_file(&db).program(&db),
-            environment
+            program
         );
         class.name(&db).to_string()
     };
@@ -258,9 +250,7 @@ fn imported_files_inherit_the_importers_search_paths() -> anyhow::Result<()> {
                 search_paths,
             },
         );
-        let environment = program.with_inference_settings(&db, InferenceSettings::default());
-        let diagnostics =
-            check_types_in_environment(&db, AnalysisFile::new(&db, environment, file));
+        let diagnostics = crate::types::check_types(&db, AnalysisFile::new(&db, program, file));
         Ok(diagnostics
             .iter()
             .find(|diagnostic| diagnostic.id() == DiagnosticId::RevealedType)
@@ -288,14 +278,13 @@ fn replace_imports_with_any_forks_inference_environments() -> anyhow::Result<()>
     let file = system_path_to_file(&db, "/src/main.py")?;
 
     let revealed = |replace_imports_with_any| {
-        let environment = db.program().with_inference_settings(
+        let program = db.program().with_inference_settings(
             &db,
             InferenceSettings {
                 replace_imports_with_any,
             },
         );
-        let diagnostics =
-            check_types_in_environment(&db, AnalysisFile::new(&db, environment, file));
+        let diagnostics = crate::types::check_types(&db, AnalysisFile::new(&db, program, file));
         diagnostics
             .iter()
             .find(|diagnostic| diagnostic.id() == DiagnosticId::RevealedType)

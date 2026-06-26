@@ -710,7 +710,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let arguments = &call_expr.arguments;
         let is_typing_extensions = known_class == KnownClass::ExtensionsParamSpec;
         let assume_all_features = self.in_stub() || is_typing_extensions;
-        let python_version = self.analysis_file().program(db).python_version(db);
+        let python_version = self.program.python_version(db);
         let have_features_from =
             |version: PythonVersion| assume_all_features || python_version >= version;
 
@@ -957,7 +957,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let arguments = &call_expr.arguments;
         let is_typing_extensions = known_class == KnownClass::ExtensionsTypeVar;
         let assume_all_features = self.in_stub() || is_typing_extensions;
-        let python_version = self.analysis_file().program(db).python_version(db);
+        let python_version = self.program.python_version(db);
         let have_features_from =
             |version: PythonVersion| assume_all_features || python_version >= version;
 

@@ -106,11 +106,9 @@ impl<'db> SameEnumComparison<'db> {
             Truthiness::Ambiguous if !self.supports_domain_narrowing() => {
                 Some(ComparisonResult::Ambiguous)
             }
-            Truthiness::Ambiguous if operator.condition_expects_equality(branch) => {
-                Some(ComparisonResult::CanNarrow(
-                    self.right.restriction_type(db, program),
-                ))
-            }
+            Truthiness::Ambiguous if operator.condition_expects_equality(branch) => Some(
+                ComparisonResult::CanNarrow(self.right.restriction_type(db, program)),
+            ),
             Truthiness::Ambiguous => Some(self.right.singleton_type(db).map_or(
                 ComparisonResult::Ambiguous,
                 |singleton| {
@@ -409,9 +407,12 @@ impl<'db> EnumValueSet<'db> {
             }
             EnumValueSetMembers::Included(members) => members
                 .iter()
-                .fold(UnionBuilder::new(db, program), |builder, (name, promotable)| {
-                    builder.add(self.member_type(db, name, *promotable))
-                })
+                .fold(
+                    UnionBuilder::new(db, program),
+                    |builder, (name, promotable)| {
+                        builder.add(self.member_type(db, name, *promotable))
+                    },
+                )
                 .build(),
             EnumValueSetMembers::AllExcept(complement) => {
                 if complement.rest(db).is_empty() {
@@ -468,11 +469,7 @@ struct EnumDomainSet<'db> {
 }
 
 impl<'db> EnumDomainSet<'db> {
-    fn from_type(
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-        ty: Type<'db>,
-    ) -> Option<Self> {
+    fn from_type(db: &'db dyn Db, program: crate::Program<'db>, ty: Type<'db>) -> Option<Self> {
         fn collect<'db>(
             db: &'db dyn Db,
             program: crate::Program<'db>,
@@ -634,19 +631,18 @@ impl<'db> ProjectedEnumComparison<'db> {
         match self.truthiness(operator) {
             Truthiness::AlwaysTrue => Some(ComparisonResult::AlwaysTrue),
             Truthiness::AlwaysFalse => Some(ComparisonResult::AlwaysFalse),
-            Truthiness::Ambiguous if operator.condition_expects_equality(branch) => {
-                Some(ComparisonResult::CanNarrow(
-                    self.left
-                        .restrict_for_equality(db, program, operator, &self.right_projection)?,
-                ))
-            }
-            Truthiness::Ambiguous if self.right_projection.single_key().is_some() => {
-                let equal_left = self.left.known_equal_type(
+            Truthiness::Ambiguous if operator.condition_expects_equality(branch) => Some(
+                ComparisonResult::CanNarrow(self.left.restrict_for_equality(
                     db,
                     program,
                     operator,
                     &self.right_projection,
-                )?;
+                )?),
+            ),
+            Truthiness::Ambiguous if self.right_projection.single_key().is_some() => {
+                let equal_left =
+                    self.left
+                        .known_equal_type(db, program, operator, &self.right_projection)?;
                 Some(ComparisonResult::CanNarrow(
                     IntersectionBuilder::new(db, program)
                         .add_positive(self.left.restriction_type(db, program))

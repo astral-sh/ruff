@@ -489,11 +489,20 @@ impl Project {
     }
 
     pub(crate) fn check_file(self, db: &dyn Db, file: File) -> Vec<Diagnostic> {
+        self.check_analysis_file(db, AnalysisFile::new(db, self.program(db), file))
+    }
+
+    pub(crate) fn check_analysis_file(
+        self,
+        db: &dyn Db,
+        analysis_file: AnalysisFile<'_>,
+    ) -> Vec<Diagnostic> {
+        let file = analysis_file.file(db);
         if !self.should_check_file(db, file) {
             return Vec::new();
         }
 
-        check_file_impl(db, AnalysisFile::new(db, self.program(db), file))
+        check_file_impl(db, analysis_file)
             .map(<[Diagnostic]>::to_vec)
             .unwrap_or_else(|diagnostic| vec![diagnostic.clone()])
     }

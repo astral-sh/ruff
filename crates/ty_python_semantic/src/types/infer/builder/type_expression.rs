@@ -336,7 +336,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                             ));
                                             add_inferred_python_version_hint_to_diagnostic(
                                                 self.db(),
-                                                self.analysis_file().program(self.db()),
+                                                self.program,
                                                 &mut diagnostic,
                                                 "inferring types",
                                             );

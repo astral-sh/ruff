@@ -1,6 +1,6 @@
 use crate::{
     Db, Program,
-    place::{DefinedPlace, Definedness, Place, known_module_symbol_in_environment},
+    place::{DefinedPlace, Definedness, Place, known_module_symbol},
     types::{
         Binding, ClassLiteral, ClassType, GenericContext, KnownInstanceType, StaticClassLiteral,
         SubclassOfType, Type, binding_type,
@@ -1103,18 +1103,10 @@ impl KnownClass {
         db: &'db dyn Db,
         program: Program<'db>,
     ) -> Result<StaticClassLiteral<'db>, KnownClassLookupError<'db>> {
-        self.try_to_class_literal_without_logging_in_environment(db, program)
-    }
-
-    fn try_to_class_literal_without_logging_in_environment<'db>(
-        self,
-        db: &'db dyn Db,
-        environment: Program<'db>,
-    ) -> Result<StaticClassLiteral<'db>, KnownClassLookupError<'db>> {
-        let python_version = environment.python_version(db);
-        let symbol = known_module_symbol_in_environment(
+        let python_version = program.python_version(db);
+        let symbol = known_module_symbol(
             db,
-            environment,
+            program,
             self.canonical_module_for_version(python_version),
             self.name_for_version(python_version),
         )
@@ -1145,14 +1137,6 @@ impl KnownClass {
         db: &'db dyn Db,
         program: Program<'db>,
     ) -> Option<StaticClassLiteral<'db>> {
-        self.try_to_class_literal_in_environment(db, program)
-    }
-
-    pub(crate) fn try_to_class_literal_in_environment<'db>(
-        self,
-        db: &'db dyn Db,
-        environment: Program<'db>,
-    ) -> Option<StaticClassLiteral<'db>> {
         #[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
         struct KnownClassArgument<'db> {
             program: Program<'db>,
@@ -1168,7 +1152,7 @@ impl KnownClass {
             let class = class.class(db);
             let python_version = program.python_version(db);
             class
-                .try_to_class_literal_without_logging_in_environment(db, program)
+                .try_to_class_literal_without_logging(db, program)
                 .or_else(|lookup_error| {
                     if matches!(
                         lookup_error,
@@ -1196,7 +1180,7 @@ impl KnownClass {
                 .ok()
         }
 
-        known_class_to_class_literal(db, KnownClassArgument::new(db, environment, self))
+        known_class_to_class_literal(db, KnownClassArgument::new(db, program, self))
     }
 
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
@@ -1712,6 +1696,7 @@ impl KnownClass {
             .find(|&candidate| candidate.check_module_for_version(python_version, module))
     }
 
+    /// Returns `true` if the module of `self` matches `module` for `python_version`.
     fn check_module_for_version(self, python_version: PythonVersion, module: KnownModule) -> bool {
         match self {
             Self::Bool

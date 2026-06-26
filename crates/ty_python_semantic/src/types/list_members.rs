@@ -13,8 +13,8 @@ use rustc_hash::FxHashSet;
 use crate::{
     Db, NameKind,
     place::{
-        DefinedPlace, Place, PlaceWithDefinition, imported_symbol_in_environment,
-        place_from_bindings, place_from_declarations,
+        DefinedPlace, Place, PlaceWithDefinition, imported_symbol, place_from_bindings,
+        place_from_declarations,
     },
     types::{
         ClassBase, ClassLiteral, KnownClass, KnownInstanceType, StaticClassLiteral,
@@ -427,7 +427,7 @@ impl<'db> AllMembers<'db> {
 
                 for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
                     let symbol_name = place_table.symbol(symbol_id).name();
-                    let Place::Defined(DefinedPlace { ty, .. }) = imported_symbol_in_environment(
+                    let Place::Defined(DefinedPlace { ty, .. }) = imported_symbol(
                         db,
                         literal.program(db),
                         Some(analysis_file),

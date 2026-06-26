@@ -15,7 +15,7 @@ use crate::ast_ids::ExpressionNodeKey;
 use crate::db::Db;
 use crate::environment::AnalysisFile;
 use crate::expression::Expression;
-use crate::global_scope_in_environment;
+use crate::global_scope;
 use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
 
@@ -324,7 +324,7 @@ impl<'db> StarImportPlaceholderPredicate<'db> {
     pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         // See doc-comment above [`StarImportPlaceholderPredicate::symbol_id`]:
         // valid `*`-import definitions can only take place in the global scope.
-        global_scope_in_environment(db, self.importing_file(db))
+        global_scope(db, self.importing_file(db))
     }
 }
 

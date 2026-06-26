@@ -1180,7 +1180,7 @@ impl ModuleResolutionCandidate {
         match self.module {
             ResolvedModule::NamespacePackage => {
                 tracing::trace!("Resolve namespace package `{name}`");
-                Module::namespace_package_in_program(db, program, name)
+                Module::namespace_package(db, program, name)
             }
             ResolvedModule::LegacyNamespacePackage(file) => {
                 // legacy namespace packages behave like regular packages
@@ -1189,7 +1189,7 @@ impl ModuleResolutionCandidate {
                     "Resolved legacy namespace package `{name}` to `{path}`",
                     path = file.path(db)
                 );
-                Module::file_module_in_program(
+                Module::file_module(
                     db,
                     program,
                     name,
@@ -1203,7 +1203,7 @@ impl ModuleResolutionCandidate {
                     "Resolved package `{name}` to `{path}`",
                     path = file.path(db)
                 );
-                Module::file_module_in_program(
+                Module::file_module(
                     db,
                     program,
                     name,
@@ -1214,7 +1214,7 @@ impl ModuleResolutionCandidate {
             }
             ResolvedModule::Module(file) => {
                 tracing::trace!("Resolved module `{name}` to `{path}`", path = file.path(db));
-                Module::file_module_in_program(
+                Module::file_module(
                     db,
                     program,
                     name,

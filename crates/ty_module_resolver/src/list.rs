@@ -185,7 +185,7 @@ impl<'db> Lister<'db> {
                 if let Some(file) = resolve_file_module(&module_path, &self.context()) {
                     self.add_module(
                         &module_path,
-                        Module::file_module_in_program(
+                        Module::file_module(
                             self.db,
                             self.program,
                             module_name,
@@ -232,7 +232,7 @@ impl<'db> Lister<'db> {
                 if !self.search_path.is_standard_library() {
                     self.add_module(
                         &module_path,
-                        Module::namespace_package_in_program(self.db, self.program, module_name),
+                        Module::namespace_package(self.db, self.program, module_name),
                     );
                 }
                 return;
@@ -258,7 +258,7 @@ impl<'db> Lister<'db> {
         };
         self.add_module(
             &module_path,
-            Module::file_module_in_program(
+            Module::file_module(
                 self.db,
                 self.program,
                 module_name,

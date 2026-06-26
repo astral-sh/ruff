@@ -301,18 +301,13 @@ impl<'db> SemanticModel<'db> {
         // correct types. These are added before builtins so that the deduplication
         // keeps the correct types (e.g., `__file__` is `str` for the current module,
         // not `str | None`).
-        completions.extend(
-            all_implicit_module_globals(
-                self.db,
-                self.analysis_file.program(self.db),
-                self.program(),
-            )
-            .map(|(name, ty)| Completion {
+        completions.extend(all_implicit_module_globals(self.db, self.program()).map(
+            |(name, ty)| Completion {
                 name,
                 ty: Some(ty),
                 builtin: true,
-            }),
-        );
+            },
+        ));
 
         // Builtins are available in all scopes.
         let builtins = ModuleName::new_static("builtins").expect("valid module name");
