@@ -659,6 +659,8 @@ A class pattern can use a variable whose type is `type[Class]`. Both the subject
 use the instance type described by that annotation.
 
 ```py
+from typing import Literal
+
 class IndirectPattern: ...
 
 def test_match_indirect_class_pattern(
@@ -669,6 +671,24 @@ def test_match_indirect_class_pattern(
         case PatternClass() as item:
             reveal_type(item)  # revealed: IndirectPattern
             reveal_type(value)  # revealed: IndirectPattern
+
+class IndirectIntPattern:
+    tag: Literal["int"]
+    payload: int
+
+class IndirectStrPattern:
+    tag: Literal["str"]
+    payload: str
+
+def test_match_union_class_pattern_preserves_member_correlation(
+    value: object,
+    PatternClass: type[IndirectIntPattern] | type[IndirectStrPattern],
+) -> None:
+    match value:
+        case PatternClass(tag="int", payload=item):
+            reveal_type(item)  # revealed: int
+            reveal_type(value)  # revealed: IndirectIntPattern
+            item.bit_length()
 ```
 
 ## Class pattern aliases
