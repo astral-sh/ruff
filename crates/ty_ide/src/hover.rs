@@ -2,7 +2,6 @@ use crate::docstring::{Docstring, DocstringFragment};
 use crate::goto::{Definitions, GotoTarget, docstring_for_call_definition, find_goto_target};
 use crate::{Db, MarkupKind, RangedValue};
 use ruff_db::files::FileRange;
-use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
@@ -21,7 +20,7 @@ pub fn hover<'db>(
 ) -> Option<RangedValue<Hover<'db>>> {
     let file = analysis_file.file(db);
     let program = analysis_file.program(db);
-    let parsed = parsed_module(db, file).load(db);
+    let parsed = analysis_file.parsed(db).load(db);
     let model = SemanticModel::new(db, analysis_file);
     let goto_target = find_goto_target(&model, &parsed, offset)?;
 
@@ -93,7 +92,7 @@ pub fn hover<'db>(
         let qualifiers = goto_target.type_qualifiers(&model);
         let inferred_type_hover_content = match ty {
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
-                typevar.bind_pep695(db, program).map_or(
+                typevar.bind_pep695(db).map_or(
                     HoverContent::Type {
                         ty,
                         variance: None,
@@ -108,7 +107,7 @@ pub fn hover<'db>(
             }
             Type::KnownInstance(KnownInstanceType::TypeAliasType(alias))
             | Type::TypeAlias(alias) => {
-                let value_ty = alias.value_type(db, program);
+                let value_ty = alias.value_type(db);
 
                 alias_docstring = Definitions::from_ty(db, program, ty)
                     .and_then(|def| def.docstring(db, program))
@@ -235,7 +234,6 @@ impl<'db> Hover<'db> {
     pub const fn display<'a>(&'a self, db: &'db dyn Db, kind: MarkupKind) -> DisplayHover<'db, 'a> {
         DisplayHover {
             db,
-            program: self.program,
             hover: self,
             kind,
         }
@@ -266,7 +264,6 @@ impl<'a, 'db> IntoIterator for &'a Hover<'db> {
 
 pub struct DisplayHover<'db, 'a> {
     db: &'db dyn Db,
-    program: Program<'db>,
     hover: &'a Hover<'db>,
     kind: MarkupKind,
 }
@@ -279,7 +276,9 @@ impl fmt::Display for DisplayHover<'_, '_> {
                 self.kind.horizontal_line().fmt(f)?;
             }
 
-            content.display(self.db, self.program, self.kind).fmt(f)?;
+            content
+                .display(self.db, self.hover.program, self.kind)
+                .fmt(f)?;
             first = false;
         }
 
@@ -401,7 +400,7 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
             }
             HoverContent::TypeAlias { alias, qualifiers } => {
                 let qualifier_suffix = create_qualifier_suffix(*qualifiers);
-                let declaration = alias.display_declaration(self.db, self.program);
+                let declaration = alias.display_declaration(self.db);
 
                 self.kind
                     .fenced_code_block(format!("{declaration}{qualifier_suffix}"), "python")

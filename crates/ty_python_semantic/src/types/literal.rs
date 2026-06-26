@@ -255,7 +255,7 @@ impl<'db> LiteralValueType<'db> {
             LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_instance(db, program),
             LiteralValueTypeKind::Int(_) => KnownClass::Int.to_instance(db, program),
             LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_instance(db, program),
-            LiteralValueTypeKind::Enum(literal) => literal.enum_class_instance(db, program),
+            LiteralValueTypeKind::Enum(literal) => literal.enum_class_instance(db),
         }
     }
 }
@@ -401,12 +401,8 @@ impl<'db> EnumLiteralType<'db> {
         self.enum_class_literal(db).class_literal(db)
     }
 
-    pub(crate) fn enum_class_instance(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> Type<'db> {
-        self.enum_class(db).to_non_generic_instance(db, program)
+    pub(crate) fn enum_class_instance(self, db: &'db dyn Db) -> Type<'db> {
+        self.enum_class(db).to_non_generic_instance(db)
     }
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {

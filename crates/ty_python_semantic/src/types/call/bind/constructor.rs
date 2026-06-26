@@ -123,7 +123,7 @@ impl<'db> ConstructorBinding<'db> {
             callable.matching_overloads().any(|(_, overload)| {
                 overload.return_ty == constructed_instance_type
                     || constructor_class_literal.is_some_and(|class_literal| {
-                        constructor_returns_instance(db, program, class_literal, overload.return_ty)
+                        constructor_returns_instance(db, class_literal, overload.return_ty)
                     })
             })
         }
@@ -208,12 +208,7 @@ impl<'db> ConstructorBinding<'db> {
             && let Some(constructor_class_literal) = self.constructed_class_literal(db, program)
         {
             let downstream_return = downstream.return_type(db, program);
-            if !constructor_returns_instance(
-                db,
-                program,
-                constructor_class_literal,
-                downstream_return,
-            ) {
+            if !constructor_returns_instance(db, constructor_class_literal, downstream_return) {
                 return downstream_return;
             }
         }
@@ -266,7 +261,7 @@ impl<'db> ConstructorBinding<'db> {
             };
             let return_specialization = static_class_literal
                 // Use the already-resolved overload return type when possible.
-                .and_then(|lit| overload.return_ty.specialization_of(db, program, lit));
+                .and_then(|lit| overload.return_ty.specialization_of(db, lit));
 
             // TODO All this handling of return-specialization vs self-specialization is a hacky
             // work-around to a situation that can occur with a case like `def __init__(self:
@@ -291,7 +286,7 @@ impl<'db> ConstructorBinding<'db> {
                         self_param_ty.apply_specialization(db, program, specialization)
                     })
                     .unwrap_or(self_param_ty);
-                resolved_self_param_ty.specialization_of(db, program, lit)
+                resolved_self_param_ty.specialization_of(db, lit)
             });
             let refined_self_parameter_specialization =
                 self_parameter_specialization.map(|specialization| {
@@ -300,8 +295,8 @@ impl<'db> ConstructorBinding<'db> {
                         .iter()
                         .copied()
                         .map(|mapped_ty| {
-                            let without_unknown = mapped_ty
-                                .filter_union(db, program, |element| !element.is_unknown());
+                            let without_unknown =
+                                mapped_ty.filter_union(db, |element| !element.is_unknown());
                             let mapped_ty = if without_unknown.is_never() {
                                 mapped_ty
                             } else {
@@ -450,7 +445,7 @@ impl<'db> ConstructorBinding<'db> {
         overload: &Binding<'db>,
     ) -> (Type<'db>, bool) {
         let return_ty = overload
-            .unspecialized_return_type(db, program)
+            .unspecialized_return_type(db)
             .apply_optional_specialization(
                 db,
                 program,
@@ -460,9 +455,7 @@ impl<'db> ConstructorBinding<'db> {
             );
         if self
             .constructed_class_literal(db, program)
-            .is_some_and(|class_literal| {
-                constructor_returns_instance(db, program, class_literal, return_ty)
-            })
+            .is_some_and(|class_literal| constructor_returns_instance(db, class_literal, return_ty))
         {
             return (
                 return_ty.apply_optional_specialization(
@@ -598,18 +591,18 @@ impl ConstructorCallableKind {
 /// explicit `Any` is considered "not an instance", but an `Unknown` is considered "an instance".
 fn constructor_returns_instance<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     class_literal: ClassLiteral<'db>,
     return_ty: Type<'db>,
 ) -> bool {
-    match return_ty.resolve_type_alias(db, program) {
+    let program = class_literal.program(db);
+    match return_ty.resolve_type_alias(db) {
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .all(|element| constructor_returns_instance(db, program, class_literal, *element)),
+            .all(|element| constructor_returns_instance(db, class_literal, *element)),
         Type::Intersection(intersection) => intersection
             .iter_positive(db)
-            .any(|element| constructor_returns_instance(db, program, class_literal, element)),
+            .any(|element| constructor_returns_instance(db, class_literal, element)),
         // Spec says an explicit `Any` return type should be considered non-instance.
         Type::Dynamic(DynamicType::Any) => false,
         // But a missing return annotation should be considered instance.
@@ -667,29 +660,20 @@ impl<'db> Binding<'db> {
     pub(super) fn set_constructor_context(
         &mut self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         constructor_context: ConstructorContext<'db>,
     ) {
         self.constructor_context = Some(constructor_context);
-        self.return_ty = self.initial_return_type(db, program);
+        self.return_ty = self.initial_return_type(db);
     }
 
-    pub(super) fn initial_return_type(
-        &self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> Type<'db> {
-        self.unspecialized_return_type(db, program)
+    pub(super) fn initial_return_type(&self, db: &'db dyn Db) -> Type<'db> {
+        self.unspecialized_return_type(db)
     }
 
     /// Return the declared return type after constructor normalization, but before applying any
     /// specialization inferred for this overload.
-    pub(super) fn unspecialized_return_type(
-        &self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> Type<'db> {
-        self.normalized_constructor_return(db, program)
+    pub(super) fn unspecialized_return_type(&self, db: &'db dyn Db) -> Type<'db> {
+        self.normalized_constructor_return(db)
             .unwrap_or(self.signature.return_ty)
     }
 
@@ -712,17 +696,13 @@ impl<'db> Binding<'db> {
     /// instance type.
     ///
     /// Return `None` if this is not a constructor call.
-    pub(crate) fn normalized_constructor_return(
-        &self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> Option<Type<'db>> {
+    pub(crate) fn normalized_constructor_return(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         let constructor_context = self.constructor_context?;
         let instance_type = constructor_context.instance_type();
 
         match (
             constructor_context.kind(),
-            self.signature.return_ty.resolve_type_alias(db, program),
+            self.signature.return_ty.resolve_type_alias(db),
         ) {
             (ConstructorCallableKind::Init, _) => Some(instance_type),
             (_, ty) if ty.is_unknown() => Some(instance_type),

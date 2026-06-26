@@ -86,7 +86,7 @@ pub(crate) fn expand_type<'db>(
                 .collect(),
         ),
         // For type aliases, expand the underlying value type.
-        Type::TypeAlias(alias) => expand_type(db, program, alias.value_type(db, program)),
+        Type::TypeAlias(alias) => expand_type(db, program, alias.value_type(db)),
         // We don't handle `type[A | B]` here because it's already stored in the expanded form
         // i.e., `type[A] | type[B]` which is handled by the `Type::Union` case.
         _ => None,

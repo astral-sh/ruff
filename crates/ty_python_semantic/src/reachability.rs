@@ -236,8 +236,9 @@ use ty_python_core::{
 /// rebuilding it from the union of all preceding patterns, which can repeatedly distribute the
 /// same intersections.
 #[salsa::tracked(
-    cycle_initial = |_, id, _, _, _| Type::divergent(id),
-    cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, program, _, _| {
+    cycle_initial = |_, id, _, _| Type::divergent(id),
+    cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
+        let program = predicate.analysis_file(db).program(db);
         result.cycle_normalized(
             db,
             program,
@@ -249,7 +250,6 @@ use ty_python_core::{
 )]
 pub(crate) fn type_narrowed_by_previous_patterns<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
@@ -258,12 +258,12 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
     };
     let previous = *previous;
     let narrowed_by_previous_patterns =
-        type_narrowed_by_previous_patterns(db, program, previous, subject_ty);
+        type_narrowed_by_previous_patterns(db, previous, subject_ty);
 
     if previous.guard(db).is_some() {
         narrowed_by_previous_patterns
     } else {
-        type_narrowed_by_pattern(db, program, previous, narrowed_by_previous_patterns)
+        type_narrowed_by_pattern(db, previous, narrowed_by_previous_patterns)
     }
 }
 
@@ -271,8 +271,9 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
 ///
 /// This result is also the preceding-pattern prefix for the next unguarded case.
 #[salsa::tracked(
-    cycle_initial = |_, id, _, _, _| Type::divergent(id),
-    cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, program, _, _| {
+    cycle_initial = |_, id, _, _| Type::divergent(id),
+    cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
+        let program = predicate.analysis_file(db).program(db);
         result.cycle_normalized(
             db,
             program,
@@ -284,10 +285,10 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
 )]
 fn type_narrowed_by_pattern<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
+    let program = predicate.analysis_file(db).program(db);
     pattern_binding_fallthrough_type(db, program, predicate.kind(db), subject_ty)
 }
 
@@ -298,7 +299,6 @@ fn type_narrowed_by_pattern<'db>(
 /// name so previous `match` cases can be compared by member identity.
 fn enum_literal_subject_names<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     subject_ty: Type<'db>,
 ) -> Option<(EnumClassLiteral<'db>, FxHashSet<Name>)> {
     fn add_enum_literal<'db>(
@@ -337,7 +337,7 @@ fn enum_literal_subject_names<'db>(
             }
         }
         Type::TypeAlias(alias) => {
-            return enum_literal_subject_names(db, program, alias.value_type(db, program));
+            return enum_literal_subject_names(db, alias.value_type(db));
         }
         _ => return None,
     }
@@ -352,10 +352,10 @@ fn enum_literal_subject_names<'db>(
 /// canonical member names before returning.
 fn enum_member_pattern_name<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     enum_class: EnumClassLiteral<'db>,
     kind: &PatternPredicateKind<'db>,
 ) -> Option<Name> {
+    let program = enum_class.class_literal(db).program(db);
     let value_ty = definite_match_pattern_type(db, program, kind);
     let enum_literal = value_ty.as_enum_literal()?;
     if enum_literal.enum_class_literal(db) != enum_class {
@@ -382,7 +382,6 @@ struct EnumMemberPatternCoverage {
 /// produces only a lower bound: it definitely matches `Color.GREEN`, but can match other members.
 fn enum_member_pattern_coverage<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     enum_class: EnumClassLiteral<'db>,
     kind: &PatternPredicateKind<'db>,
 ) -> EnumMemberPatternCoverage {
@@ -393,7 +392,7 @@ fn enum_member_pattern_coverage<'db>(
     match kind {
         PatternPredicateKind::Or(alts) => {
             for alt in alts {
-                let alt_coverage = enum_member_pattern_coverage(db, program, enum_class, alt);
+                let alt_coverage = enum_member_pattern_coverage(db, enum_class, alt);
                 coverage
                     .definitely_matched
                     .extend(alt_coverage.definitely_matched);
@@ -401,10 +400,10 @@ fn enum_member_pattern_coverage<'db>(
             }
         }
         PatternPredicateKind::As(Some(inner), _) => {
-            return enum_member_pattern_coverage(db, program, enum_class, inner);
+            return enum_member_pattern_coverage(db, enum_class, inner);
         }
         _ => {
-            if let Some(name) = enum_member_pattern_name(db, program, enum_class, kind) {
+            if let Some(name) = enum_member_pattern_name(db, enum_class, kind) {
                 coverage.definitely_matched.insert(name);
             } else {
                 coverage.is_exact = false;
@@ -421,13 +420,11 @@ fn enum_member_pattern_coverage<'db>(
 /// ambiguous because the guard can reject an otherwise matching enum member.
 fn analyze_enum_literal_union_pattern_predicate<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
 ) -> Option<Truthiness> {
-    let (enum_class, mut remaining_names) = enum_literal_subject_names(db, program, subject_ty)?;
-    let current_coverage =
-        enum_member_pattern_coverage(db, program, enum_class, predicate.kind(db));
+    let (enum_class, mut remaining_names) = enum_literal_subject_names(db, subject_ty)?;
+    let current_coverage = enum_member_pattern_coverage(db, enum_class, predicate.kind(db));
     let current_names = &current_coverage.definitely_matched;
     if current_names.is_empty() {
         return None;
@@ -442,7 +439,7 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
         }
 
         let previous_coverage =
-            enum_member_pattern_coverage(db, program, enum_class, previous_predicate.kind(db));
+            enum_member_pattern_coverage(db, enum_class, previous_predicate.kind(db));
         #[expect(
             clippy::iter_over_hash_type,
             reason = "set removal is independent of iteration order"
@@ -489,7 +486,7 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
         infer_same_file_expression_type(db, predicate.subject(db), TypeContext::default());
 
     if let Some(truthiness) =
-        analyze_enum_literal_union_pattern_predicate(db, program, predicate, subject_ty)
+        analyze_enum_literal_union_pattern_predicate(db, predicate, subject_ty)
     {
         return truthiness;
     }
@@ -498,7 +495,7 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
         .map(|types| UnionType::from_elements(db, program, types))
         .unwrap_or(subject_ty);
     let narrowed_subject_ty =
-        type_narrowed_by_previous_patterns(db, program, predicate, coverage_subject_ty);
+        type_narrowed_by_previous_patterns(db, predicate, coverage_subject_ty);
 
     // Consider a case where we match on a subject type of `Self` with an upper bound of `Answer`,
     // where `Answer` is a {YES, NO} enum. After a previous pattern matching on `NO`, the narrowed
@@ -509,8 +506,7 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
     // means that subsequent patterns can never match. And we know that if we reach this point,
     // the current pattern will have to match. We return `AlwaysTrue` here, since the call to
     // `analyze_single_pattern_predicate_kind` below would return `Ambiguous` in this case.
-    let next_narrowed_subject_ty =
-        type_narrowed_by_pattern(db, program, predicate, narrowed_subject_ty);
+    let next_narrowed_subject_ty = type_narrowed_by_pattern(db, predicate, narrowed_subject_ty);
     if !narrowed_subject_ty.is_never() && next_narrowed_subject_ty.is_never() {
         return Truthiness::AlwaysTrue;
     }
@@ -1215,9 +1211,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
         PatternPredicateKind::Class(kind) => {
             let class_ty =
                 match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
-                    Type::ClassLiteral(class) => {
-                        Type::instance(db, program, class.top_materialization(db, program))
-                    }
+                    Type::ClassLiteral(class) => Type::instance(db, class.top_materialization(db)),
                     Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
                         callable_pattern_type(db, program)
                     }

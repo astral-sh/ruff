@@ -300,7 +300,6 @@ impl<'db> CallableSignature<'db> {
                         definition: self_signature.definition,
                         parameters: Parameters::new(
                             db,
-                            program,
                             prefix_parameters
                                 .iter()
                                 .map(|param| {
@@ -359,7 +358,6 @@ impl<'db> CallableSignature<'db> {
                             } else {
                                 Parameters::new(
                                     db,
-                                    program,
                                     prefix_parameters
                                         .iter()
                                         .map(|param| {
@@ -512,7 +510,7 @@ impl<'db> CallableSignature<'db> {
             &signature_relation_visitor,
             &materialization_visitor,
         );
-        checker.check_callable_signature_pair_inner(db, program, &self.overloads, &other.overloads)
+        checker.check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
     }
 }
 
@@ -716,7 +714,6 @@ impl<'db> Signature<'db> {
     /// Return a typed signature from a function definition.
     pub(super) fn from_function(
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         pep695_generic_context: Option<GenericContext<'db>>,
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
@@ -725,7 +722,6 @@ impl<'db> Signature<'db> {
     ) -> Self {
         let parameters = Parameters::from_parameters(
             db,
-            program,
             definition,
             function_node.parameters.as_ref(),
             has_implicitly_positional_first_parameter,
@@ -736,7 +732,7 @@ impl<'db> Signature<'db> {
             .map(|returns| function_signature_expression_type(db, definition, returns.as_ref()))
             .unwrap_or_else(Type::unknown);
         let legacy_generic_context =
-            GenericContext::from_function_params(db, program, definition, &parameters, return_ty);
+            GenericContext::from_function_params(db, definition, &parameters, return_ty);
         let full_generic_context = GenericContext::merge_pep695_and_legacy(
             db,
             pep695_generic_context,
@@ -751,7 +747,6 @@ impl<'db> Signature<'db> {
                 // because we need to apply this heuristic to PEP-695 typevars as well.)
                 GenericContext::remove_callable_only_typevars(
                     db,
-                    program,
                     full_generic_context,
                     &parameters,
                     return_ty,
@@ -837,7 +832,6 @@ impl<'db> Signature<'db> {
         let parameters = if self.parameters.len() == previous.parameters.len() {
             Parameters::new(
                 db,
-                program,
                 self.parameters
                     .iter()
                     .zip(previous.parameters.iter())
@@ -876,7 +870,7 @@ impl<'db> Signature<'db> {
             for param in &self.parameters {
                 parameters.push(param.recursive_type_normalized_impl(db, program, div, nested)?);
             }
-            Parameters::new(db, program, parameters)
+            Parameters::new(db, parameters)
         };
         Some(Self {
             generic_context: self.generic_context,
@@ -1061,7 +1055,7 @@ impl<'db> Signature<'db> {
             parameters.next();
         }
 
-        let mut parameters = Parameters::new(db, program, parameters);
+        let mut parameters = Parameters::new(db, parameters);
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
         if let Some(self_type) = self_type
@@ -1279,8 +1273,7 @@ impl<'db> Signature<'db> {
 
         // Expand `P.args`/`P.kwargs` while the pair is still adjacent. The keyword-only reshuffle
         // below can separate them, which would otherwise prevent expansion.
-        let remaining =
-            Parameters::new(db, program, remaining).expand_paramspec_variadics(db, program);
+        let remaining = Parameters::new(db, remaining).expand_paramspec_variadics(db);
 
         let mut reordered = Vec::with_capacity(remaining.len());
         let mut keyword_only = Vec::new();
@@ -1308,7 +1301,7 @@ impl<'db> Signature<'db> {
         reordered.extend(keyword_variadic);
 
         signature
-            .with_parameters(Parameters::new(db, program, reordered))
+            .with_parameters(Parameters::new(db, reordered))
             .with_return_type(return_ty)
     }
 
@@ -1430,7 +1423,7 @@ impl<'db> Signature<'db> {
         );
 
         let is_consistent = checker
-            .check_signature_pair(db, program, &implementation, &overload)
+            .check_signature_pair(db, &implementation, &overload)
             .is_always_satisfied(db, program);
 
         if is_consistent {
@@ -1466,7 +1459,7 @@ impl<'db> Signature<'db> {
         );
 
         let is_consistent = checker
-            .check_type_pair(db, program, overload.return_ty, self.return_ty)
+            .check_type_pair(db, overload.return_ty, self.return_ty)
             .is_always_satisfied(db, program);
 
         if is_consistent {
@@ -1548,7 +1541,7 @@ impl<'db> Signature<'db> {
             &signature_relation_visitor,
             &materialization_visitor,
         );
-        checker.check_signature_pair(db, program, self, other)
+        checker.check_signature_pair(db, self, other)
     }
 
     /// Create a new signature with the given definition.
@@ -1620,10 +1613,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     fn try_unary_overload_aggregate_relation(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         source_signatures: &[Signature<'db>],
         target_signature: &Signature<'db>,
     ) -> Option<ConstraintSet<'db, 'c>> {
+        let program = self.program;
         let single_required_positional_parameter_type = |signature: &Signature<'db>| {
             if signature.parameters().len() != 1 {
                 return None;
@@ -1673,7 +1666,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
             let signatures_are_disjoint = self
                 .as_disjointness_checker()
-                .check_type_pair(db, program, self_parameter_type, other_parameter_type)
+                .check_type_pair(db, self_parameter_type, other_parameter_type)
                 .is_always_satisfied(db, program);
 
             if signatures_are_disjoint {
@@ -1690,20 +1683,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
 
         // Function assignability here is parameter-contravariant and return-covariant.
-        let parameters_cover_target = self.check_type_pair(
-            db,
-            program,
-            other_parameter_type,
-            parameter_type_union.build(),
-        );
-        let returns_match_target = || {
-            self.check_type_pair(
-                db,
-                program,
-                return_type_union.build(),
-                target_signature.return_ty,
-            )
-        };
+        let parameters_cover_target =
+            self.check_type_pair(db, other_parameter_type, parameter_type_union.build());
+        let returns_match_target =
+            || self.check_type_pair(db, return_type_union.build(), target_signature.return_ty);
         let aggregate_relation =
             parameters_cover_target.and(db, program, self.constraints, returns_match_target);
         aggregate_relation
@@ -1714,11 +1697,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     pub(super) fn check_callable_signature_pair(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         source: &CallableSignature<'db>,
         target: &CallableSignature<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.check_callable_signature_pair_inner(db, program, &source.overloads, &target.overloads)
+        self.check_callable_signature_pair_inner(db, &source.overloads, &target.overloads)
     }
 
     /// Implementation of subtyping and assignability between two, possible overloaded, callable
@@ -1726,10 +1708,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     fn check_callable_signature_pair_inner(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         source_overloads: &[Signature<'db>],
         target_overloads: &[Signature<'db>],
     ) -> ConstraintSet<'db, 'c> {
+        let program = self.program;
         if self.typevar_evaluation == TypeVarEvaluation::Lazy {
             // TODO: Oof, maybe ParamSpec needs to live at CallableSignature, not Signature?
             let source_is_single_paramspec =
@@ -1775,7 +1757,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 .iter()
                                 .map(|signature| signature.return_ty)
                                 .when_any(db, self.program, self.constraints, |target_return| {
-                                    self.check_type_pair(db, program, source_return, target_return)
+                                    self.check_type_pair(db, source_return, target_return)
                                 })
                         })
                     };
@@ -1801,7 +1783,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         .without_context_collection(|| {
                                             self.check_type_pair(
                                                 db,
-                                                program,
                                                 signature.return_ty,
                                                 target_return,
                                             )
@@ -1834,7 +1815,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 .iter()
                                 .map(|signature| signature.return_ty)
                                 .when_any(db, self.program, self.constraints, |source_return| {
-                                    self.check_type_pair(db, program, source_return, target_return)
+                                    self.check_type_pair(db, source_return, target_return)
                                 })
                         })
                     };
@@ -1865,7 +1846,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 {
                     self.check_signature_pair_inner(db, source_signature, target_signature)
                 } else {
-                    self.check_signature_pair(db, program, source_signature, target_signature)
+                    self.check_signature_pair(db, source_signature, target_signature)
                 }
             }
 
@@ -1873,7 +1854,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (_, [target_signature]) => {
                 if let Some(aggregate_relation) = self.try_unary_overload_aggregate_relation(
                     db,
-                    program,
                     source_overloads,
                     target_signature,
                 ) {
@@ -1890,7 +1870,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         |self_signature| {
                             self.check_callable_signature_pair_inner(
                                 db,
-                                program,
                                 std::slice::from_ref(self_signature),
                                 target_overloads,
                             )
@@ -1907,7 +1886,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 |target_signature| {
                     self.check_callable_signature_pair_inner(
                         db,
-                        program,
                         source_overloads,
                         std::slice::from_ref(target_signature),
                     )
@@ -1922,7 +1900,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 |target_signature| {
                     self.check_callable_signature_pair_inner(
                         db,
-                        program,
                         source_overloads,
                         std::slice::from_ref(target_signature),
                     )
@@ -1935,10 +1912,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     fn check_signature_pair(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let program = self.program;
         // If either signature is generic, freshen that signature's typevars before considering
         // them inferable for this relation. The relation only needs to find one specialization of
         // each generic callable that causes the check to succeed, but those callable-local
@@ -2118,8 +2095,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Avoid returning early after checking the return types in case there is a `ParamSpec` type
         // variable in either signature to ensure that the `ParamSpec` binding is still applied even
         // if the return types are incompatible.
-        let return_type_constraints =
-            self.check_type_pair(db, self.program, source.return_ty, target.return_ty);
+        let return_type_constraints = self.check_type_pair(db, source.return_ty, target.return_ty);
         let return_type_checks = !result
             .intersect(db, self.constraints, return_type_constraints)
             .is_never_satisfied(db, self.program);
@@ -2156,7 +2132,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 _ => {}
             }
 
-            let constraint_set = self.check_type_pair(db, self.program, target_ty, source_ty);
+            let constraint_set = self.check_type_pair(db, target_ty, source_ty);
             if constraint_set.is_never_satisfied(db, self.program) {
                 let parameter = ParameterDescription::new(target_index, target_name);
                 self.provide_context(|| ErrorContext::IncompatibleParameterTypes {
@@ -2567,7 +2543,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         db,
                         CallableSignature::single(Signature::new_generic(
                             source.generic_context,
-                            Parameters::new(db, self.program, source_params.cloned()),
+                            Parameters::new(db, source_params.cloned()),
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
@@ -2702,7 +2678,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         db,
                         CallableSignature::single(Signature::new_generic(
                             target.generic_context,
-                            Parameters::new(db, self.program, target_params.cloned()),
+                            Parameters::new(db, target_params.cloned()),
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
@@ -3405,14 +3381,13 @@ impl<'db> Parameters<'db> {
     /// `**kwargs` parameter for explicit extra items or an open `TypedDict`.
     pub(crate) fn new(
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
     ) -> Self {
         let parameters = parameters.into_iter();
         let mut value: Vec<Parameter<'db>> = Vec::with_capacity(parameters.size_hint().0);
 
         for parameter in parameters {
-            if let Some(unpacked_typed_dict) = parameter.unpacked_typed_dict(db, program) {
+            if let Some(unpacked_typed_dict) = parameter.unpacked_typed_dict(db) {
                 let kwargs_name = parameter
                     .name()
                     .expect("keyword variadic parameter always has a name")
@@ -3720,11 +3695,11 @@ impl<'db> Parameters<'db> {
 
     fn from_parameters(
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         definition: Definition<'db>,
         parameters: &ast::Parameters,
         has_implicitly_positional_first_parameter: bool,
     ) -> Self {
+        let program = definition.analysis_file(db).program(db);
         let ast::Parameters {
             posonlyargs,
             args,
@@ -3749,7 +3724,6 @@ impl<'db> Parameters<'db> {
         let pos_only_param = |param: &ast::ParameterWithDefault| {
             Parameter::from_node_and_kind(
                 db,
-                program,
                 definition,
                 &param.parameter,
                 ParameterKind::PositionalOnly {
@@ -3782,7 +3756,6 @@ impl<'db> Parameters<'db> {
         let positional_or_keyword = pos_or_keyword_iter.map(|arg| {
             Parameter::from_node_and_kind(
                 db,
-                program,
                 definition,
                 &arg.parameter,
                 ParameterKind::PositionalOrKeyword {
@@ -3795,7 +3768,6 @@ impl<'db> Parameters<'db> {
         let variadic = vararg.as_ref().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
-                program,
                 definition,
                 arg,
                 ParameterKind::Variadic {
@@ -3807,7 +3779,6 @@ impl<'db> Parameters<'db> {
         let keyword_only = kwonlyargs.iter().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
-                program,
                 definition,
                 &arg.parameter,
                 ParameterKind::KeywordOnly {
@@ -3820,7 +3791,6 @@ impl<'db> Parameters<'db> {
         let keywords = kwarg.as_ref().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
-                program,
                 definition,
                 arg,
                 ParameterKind::KeywordVariadic {
@@ -3831,7 +3801,6 @@ impl<'db> Parameters<'db> {
 
         Self::new(
             db,
-            program,
             positional_only
                 .into_iter()
                 .chain(positional_or_keyword)
@@ -3947,11 +3916,7 @@ impl<'db> Parameters<'db> {
     }
 
     /// Expands adjacent `P.args`/`P.kwargs` placeholders into their mapped parameters.
-    pub(crate) fn expand_paramspec_variadics(
-        &self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> Self {
+    pub(crate) fn expand_paramspec_variadics(&self, db: &'db dyn Db) -> Self {
         let mut variadic_index = None;
         let mut paramspec_callable = None;
 
@@ -4003,7 +3968,7 @@ impl<'db> Parameters<'db> {
         expanded.extend_from_slice(&self.data.value[..variadic_index]);
         expanded.extend_from_slice(mapped_signature.parameters().as_slice());
         expanded.extend_from_slice(&self.data.value[variadic_index + 2..]);
-        Parameters::new(db, program, expanded)
+        Parameters::new(db, expanded)
     }
 }
 
@@ -4292,7 +4257,6 @@ impl<'db> Parameter<'db> {
 
     fn from_node_and_kind(
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         function_definition: Definition<'db>,
         parameter: &ast::Parameter,
         kind: ParameterKind<'db>,
@@ -4314,7 +4278,6 @@ impl<'db> Parameter<'db> {
             && parameter.annotation().is_some_and(|annotation| {
                 extract_unpacked_typed_dict_keys_from_kwargs_annotation(
                     db,
-                    program,
                     annotated_type,
                     function_signature_type_expression_flags(db, function_definition, annotation),
                 )
@@ -4386,21 +4349,13 @@ impl<'db> Parameter<'db> {
         }
     }
 
-    fn unpacked_typed_dict(
-        &self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> Option<TypedDictType<'db>> {
+    fn unpacked_typed_dict(&self, db: &'db dyn Db) -> Option<TypedDictType<'db>> {
         (self.is_keyword_variadic()
             && matches!(
                 self.annotation_kind,
                 ParameterAnnotationKind::UnpackedTypedDictKwargs
             ))
-        .then(|| {
-            self.annotated_type
-                .resolve_type_alias(db, program)
-                .as_typed_dict()
-        })
+        .then(|| self.annotated_type.resolve_type_alias(db).as_typed_dict())
         .flatten()
     }
 
@@ -4700,12 +4655,11 @@ mod tests {
     fn empty() {
         let mut db = setup_db();
         db.write_dedented("/src/a.py", "def f(): ...").unwrap();
-        let program = db.program();
         let func = get_function_f(&db, "/src/a.py")
             .literal(&db)
             .last_definition;
 
-        let sig = func.signature(&db, program);
+        let sig = func.signature(&db);
 
         assert!(sig.return_ty.is_unknown());
         assert_params(&sig, &[]);
@@ -4731,7 +4685,7 @@ mod tests {
             .literal(&db)
             .last_definition;
 
-        let sig = func.signature(&db, program);
+        let sig = func.signature(&db);
 
         assert_eq!(sig.return_ty.display(&db, program).to_string(), "bytes");
         assert_params_have_definitions(&sig);
@@ -4785,7 +4739,7 @@ mod tests {
             .literal(&db)
             .last_definition;
 
-        let sig = func.signature(&db, program);
+        let sig = func.signature(&db);
 
         let [
             Parameter {
@@ -4824,7 +4778,7 @@ mod tests {
             .literal(&db)
             .last_definition;
 
-        let sig = func.signature(&db, program);
+        let sig = func.signature(&db);
 
         let [
             Parameter {
@@ -4863,7 +4817,7 @@ mod tests {
             .literal(&db)
             .last_definition;
 
-        let sig = func.signature(&db, program);
+        let sig = func.signature(&db);
 
         let [
             Parameter {
@@ -4908,7 +4862,7 @@ mod tests {
             .literal(&db)
             .last_definition;
 
-        let sig = func.signature(&db, program);
+        let sig = func.signature(&db);
 
         let [
             Parameter {
@@ -4942,11 +4896,10 @@ mod tests {
             ",
         )
         .unwrap();
-        let program = db.program();
         let func = get_function_f(&db, "/src/a.py");
 
         let overload = func.literal(&db).last_definition;
-        let expected_sig = overload.signature(&db, program);
+        let expected_sig = overload.signature(&db);
 
         // With no decorators, internal and external signature are the same
         assert_eq!(

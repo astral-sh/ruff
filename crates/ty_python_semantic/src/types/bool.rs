@@ -246,10 +246,7 @@ impl<'db> Type<'db> {
                 if td.items(db).values().any(TypedDictField::is_required) {
                     Truthiness::AlwaysTrue
                 } else if td.openness(db).is_closed()
-                    && td
-                        .items(db)
-                        .values()
-                        .all(|field| !field.may_be_present(db, program))
+                    && td.items(db).values().all(|field| !field.may_be_present(db))
                 {
                     Truthiness::AlwaysFalse
                 } else {
@@ -282,14 +279,14 @@ impl<'db> Type<'db> {
 
             Type::AlwaysFalsy => Truthiness::AlwaysFalse,
 
-            Type::ClassLiteral(class) => class.metaclass_instance_type(db, program).try_bool_impl(
+            Type::ClassLiteral(class) => class.metaclass_instance_type(db).try_bool_impl(
                 db,
                 program,
                 allow_short_circuit,
                 visitor,
             )?,
             Type::GenericAlias(alias) => ClassType::from(*alias)
-                .metaclass_instance_type(db, program)
+                .metaclass_instance_type(db)
                 .try_bool_impl(db, program, allow_short_circuit, visitor)?,
 
             Type::SubclassOf(subclass_of_ty) => {
@@ -310,7 +307,7 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db, program) {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => Truthiness::Ambiguous,
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         bound.try_bool_impl(db, program, allow_short_circuit, visitor)?
@@ -347,7 +344,7 @@ impl<'db> Type<'db> {
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::LiteralString => Truthiness::Ambiguous,
                 LiteralValueTypeKind::Enum(enum_type) => enum_type
-                    .enum_class_instance(db, program)
+                    .enum_class_instance(db)
                     .try_bool_impl(db, program, allow_short_circuit, visitor)?,
 
                 LiteralValueTypeKind::Int(num) => Truthiness::from(num.as_i64() != 0),
@@ -357,16 +354,16 @@ impl<'db> Type<'db> {
             },
 
             Type::TypeAlias(alias) => visitor.visit(*self, || {
-                alias.value_type(db, program).try_bool_impl(
-                    db,
-                    program,
-                    allow_short_circuit,
-                    visitor,
-                )
+                alias
+                    .value_type(db)
+                    .try_bool_impl(db, program, allow_short_circuit, visitor)
             })?,
-            Type::NewTypeInstance(newtype) => newtype
-                .concrete_base_type(db, program)
-                .try_bool_impl(db, program, allow_short_circuit, visitor)?,
+            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).try_bool_impl(
+                db,
+                program,
+                allow_short_circuit,
+                visitor,
+            )?,
         };
 
         Ok(truthiness)

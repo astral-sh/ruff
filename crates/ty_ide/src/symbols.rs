@@ -7,7 +7,6 @@ use std::ops::Range;
 use regex::Regex;
 
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::{Name, UnqualifiedName};
@@ -390,8 +389,7 @@ impl SymbolKind {
 /// converted into a hierarchical collection of symbols.
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn symbols_for_file(db: &dyn Db, analysis_file: AnalysisFile<'_>) -> FlatSymbols {
-    let file = analysis_file.file(db);
-    let parsed = parsed_module(db, file);
+    let parsed = analysis_file.parsed(db);
     let module = parsed.load(db);
 
     let mut visitor = SymbolVisitor::tree(db, analysis_file);
@@ -414,7 +412,7 @@ pub(crate) fn symbols_for_file_global_only(
     analysis_file: AnalysisFile<'_>,
 ) -> FlatSymbols {
     let file = analysis_file.file(db);
-    let parsed = parsed_module(db, file);
+    let parsed = analysis_file.parsed(db);
     let module = parsed.load(db);
 
     let mut visitor = SymbolVisitor::globals(db, analysis_file);

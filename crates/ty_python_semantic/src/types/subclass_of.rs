@@ -72,7 +72,7 @@ impl<'db> SubclassOfType<'db> {
         let subclass_of = match ty {
             Type::Dynamic(dynamic) => SubclassOfInner::Dynamic(dynamic),
             Type::ClassLiteral(literal) => {
-                SubclassOfInner::Class(literal.default_specialization(db, program))
+                SubclassOfInner::Class(literal.default_specialization(db))
             }
             Type::GenericAlias(generic) => SubclassOfInner::Class(ClassType::Generic(generic)),
             Type::SpecialForm(SpecialFormType::Any) => SubclassOfInner::Dynamic(DynamicType::Any),
@@ -158,10 +158,9 @@ impl<'db> SubclassOfType<'db> {
         program: crate::Program<'db>,
     ) -> Option<Type<'db>> {
         self.into_type_var()
-            .and_then(|typevar| typevar.typevar(db).upper_bound(db, program))
+            .and_then(|typevar| typevar.typevar(db).upper_bound(db))
             .and_then(|bound| {
-                let bound =
-                    Self::try_from_instance(db, program, bound.resolve_type_alias(db, program))?;
+                let bound = Self::try_from_instance(db, program, bound.resolve_type_alias(db))?;
                 matches!(bound, Type::ClassLiteral(_) | Type::GenericAlias(_)).then_some(bound)
             })
     }
@@ -178,7 +177,6 @@ impl<'db> SubclassOfType<'db> {
             SubclassOfInner::Class(class) => Type::SubclassOf(Self {
                 subclass_of: SubclassOfInner::Class(class.apply_type_mapping_impl(
                     db,
-                    program,
                     type_mapping,
                     tcx,
                     visitor,
@@ -209,7 +207,7 @@ impl<'db> SubclassOfType<'db> {
         match self.subclass_of {
             SubclassOfInner::Dynamic(_) => {}
             SubclassOfInner::Class(class) => {
-                class.find_legacy_typevars_impl(db, program, binding_context, typevars, visitor);
+                class.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
             SubclassOfInner::TypeVar(typevar) => {
                 Type::TypeVar(typevar).find_legacy_typevars_impl(
@@ -234,7 +232,7 @@ impl<'db> SubclassOfType<'db> {
             SubclassOfInner::Class(class) => Type::from(class),
             SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic),
             SubclassOfInner::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db, program) {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => unreachable!(),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound,
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
@@ -250,20 +248,19 @@ impl<'db> SubclassOfType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(Self {
             subclass_of: self
                 .subclass_of
-                .recursive_type_normalized_impl(db, program, div, nested)?,
+                .recursive_type_normalized_impl(db, div, nested)?,
         })
     }
 
-    pub(crate) fn to_instance(self, db: &'db dyn Db, program: crate::Program<'db>) -> Type<'db> {
+    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
         match self.subclass_of {
-            SubclassOfInner::Class(class) => Type::instance(db, program, class),
+            SubclassOfInner::Class(class) => Type::instance(db, class),
             SubclassOfInner::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type),
             SubclassOfInner::TypeVar(bound_typevar) => Type::TypeVar(bound_typevar),
         }
@@ -296,7 +293,7 @@ impl<'db> SubclassOfType<'db> {
                 SubclassOfType::from(db, program, SubclassOfInner::Dynamic(dynamic))
             }
             SubclassOfInner::Class(class) => {
-                SubclassOfType::try_from_type(db, program, class.metaclass(db, program))
+                SubclassOfType::try_from_type(db, program, class.metaclass(db))
                     .unwrap_or(SubclassOfType::subclass_of_unknown())
             }
             // For `type[T]` where `T` is a TypeVar, `with_transposed_type_var` transforms
@@ -304,7 +301,7 @@ impl<'db> SubclassOfType<'db> {
             // `T: A | B` becomes a TypeVar with bound `type[A] | type[B]`. The metatype is
             // then the metatype of that bound.
             SubclassOfInner::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db, program) {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
                     // `with_transposed_type_var` always adds a bound for unbounded TypeVars
                     None => unreachable!(),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
@@ -344,7 +341,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     pub(crate) fn check_subclassof_pair(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         source: SubclassOfType<'db>,
         target: SubclassOfType<'db>,
     ) -> ConstraintSet<'db, 'c> {
@@ -366,7 +362,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // and `type[int]` describes all possible runtime subclasses of the class `int`.
             // The first set is a subset of the second set, because `bool` is itself a subclass of `int`.
             (SubclassOfInner::Class(source), SubclassOfInner::Class(target)) => {
-                self.check_class_pair(db, program, source, target)
+                self.check_class_pair(db, source, target)
             }
 
             (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {
@@ -447,7 +443,7 @@ impl<'db> SubclassOfInner<'db> {
             Self::Dynamic(_) => None,
             Self::Class(class) => Some(class),
             Self::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db, program) {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => Some(ClassType::object(db, program)),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         Self::try_from_instance(db, program, bound)
@@ -521,23 +517,22 @@ impl<'db> SubclassOfInner<'db> {
             return self;
         };
 
-        let bound_typevar =
-            bound_typevar.map_bound_or_constraints(db, program, |bound_or_constraints| {
-                Some(match bound_or_constraints {
-                    None => TypeVarBoundOrConstraints::UpperBound(
-                        SubclassOfType::try_from_instance(db, program, Type::object())
-                            .unwrap_or(SubclassOfType::subclass_of_unknown()),
-                    ),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        TypeVarBoundOrConstraints::UpperBound(bound.to_meta_type(db, program))
-                    }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        TypeVarBoundOrConstraints::Constraints(
-                            constraints.map(db, |constraint| constraint.to_meta_type(db, program)),
-                        )
-                    }
-                })
-            });
+        let bound_typevar = bound_typevar.map_bound_or_constraints(db, |bound_or_constraints| {
+            Some(match bound_or_constraints {
+                None => TypeVarBoundOrConstraints::UpperBound(
+                    SubclassOfType::try_from_instance(db, program, Type::object())
+                        .unwrap_or(SubclassOfType::subclass_of_unknown()),
+                ),
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    TypeVarBoundOrConstraints::UpperBound(bound.to_meta_type(db, program))
+                }
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    TypeVarBoundOrConstraints::Constraints(
+                        constraints.map(db, |constraint| constraint.to_meta_type(db, program)),
+                    )
+                }
+            })
+        });
 
         Self::TypeVar(bound_typevar)
     }
@@ -545,13 +540,12 @@ impl<'db> SubclassOfInner<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
             Self::Class(class) => Some(Self::Class(
-                class.recursive_type_normalized_impl(db, program, div, nested)?,
+                class.recursive_type_normalized_impl(db, div, nested)?,
             )),
             Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
             Self::TypeVar(_) => Some(self),

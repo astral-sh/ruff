@@ -131,10 +131,10 @@ pub(crate) trait TypeVisitor<'db> {
     fn visit_bound_method_type(
         &self,
         db: &'db dyn Db,
-        program: Program<'db>,
+        _program: Program<'db>,
         method: BoundMethodType<'db>,
     ) {
-        walk_bound_method_type(db, program, method, self);
+        walk_bound_method_type(db, method, self);
     }
 
     fn visit_bound_super_type(

@@ -734,7 +734,7 @@ pub(super) fn qualified_name_components_from_scope(
     file_scope_id: FileScopeId,
     skip_count: usize,
 ) -> Vec<String> {
-    let module_ast = parsed_module(db, file.file(db)).load(db);
+    let module_ast = file.parsed(db).load(db);
     let index = semantic_index(db, file);
 
     let mut name_parts = vec![];
@@ -826,15 +826,11 @@ impl<'db> TypeAliasType<'db> {
     }
 
     /// Returns a source-style display of this type alias's declaration.
-    pub fn display_declaration(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> impl Display + 'db {
+    pub fn display_declaration(self, db: &'db dyn Db) -> impl Display + 'db {
+        let program = self.program(db);
         let value_ty = self.raw_value_type(db);
         DisplayTypeAliasDeclaration {
             db,
-            program,
             type_alias: self,
             value_ty,
             settings: DisplaySettings::from_possibly_ambiguous_types(
@@ -889,7 +885,6 @@ impl Display for TypeAliasDisplay<'_> {
 /// A source-style display of a type alias declaration.
 struct DisplayTypeAliasDeclaration<'db> {
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     type_alias: TypeAliasType<'db>,
     value_ty: Type<'db>,
     settings: DisplaySettings<'db>,
@@ -897,7 +892,11 @@ struct DisplayTypeAliasDeclaration<'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayTypeAliasDeclaration<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let program = self.program;
+        let program = self
+            .type_alias
+            .definition(self.db)
+            .analysis_file(self.db)
+            .program(self.db);
         let generic_context = self.type_alias.generic_context(self.db);
         let settings = self
             .settings
@@ -999,7 +998,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     (ClassType::NonGeneric(class), _) => {
                         class.display_with(self.db, self.settings.clone()).fmt_detailed(f)
                     },
-                    (ClassType::Generic(alias), _) => alias.display_with(self.db, program, self.settings.clone()).fmt_detailed(f),
+                    (ClassType::Generic(alias), _) => alias
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f),
                 }
             }
             Type::ProtocolInstance(protocol) => match protocol.inner {
@@ -1008,7 +1009,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f),
                     ClassType::Generic(alias) => alias
-                        .display_with(self.db, program, self.settings.clone())
+                        .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f),
                 },
                 Protocol::Synthesized(synthetic) => {
@@ -1057,7 +1058,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 let mut f = f.with_type(self.ty);
                 f.write_str("<class '")?;
                 generic
-                    .display_with(self.db, program, self.settings.clone())
+                    .display_with(self.db, self.settings.clone())
                     .fmt_detailed(&mut f)?;
                 f.write_str("'>")
             }
@@ -1076,7 +1077,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .write_str("type")?;
                     f.write_char('[')?;
                     alias
-                        .display_with(self.db, program, self.settings.clone())
+                        .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f)?;
                     f.write_char(']')
                 }
@@ -1110,7 +1111,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 .display_with(self.db, program, self.settings.clone())
                 .fmt_detailed(f),
             Type::FunctionLiteral(function) => function
-                .display_with(self.db, program, self.settings.clone())
+                .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
             Type::Callable(callable) => callable
                 .display_with(self.db, program, self.settings.clone())
@@ -1118,7 +1119,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::BoundMethod(bound_method) => {
                 let function = bound_method.function(self.db);
                 let self_ty = bound_method.self_instance(self.db);
-                let bound_signatures = bound_method.bound_signatures(self.db, program);
+                let bound_signatures = bound_method.bound_signatures(self.db);
 
                 match bound_signatures.overloads.as_slice() {
                     [signature] => {
@@ -1326,7 +1327,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     .fmt_detailed(f)
                 } else {
                     complement
-                        .to_intersection(self.db, program)
+                        .to_intersection(self.db)
                         .display_with(self.db, program, self.settings.clone())
                         .fmt_detailed(f)
                 }
@@ -1421,7 +1422,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     .display_with(self.db, self.settings.clone())
                     .fmt_detailed(f),
                 ClassType::Generic(alias) => alias
-                    .display_with(self.db, program, self.settings.clone())
+                    .display_with(self.db, self.settings.clone())
                     .fmt_detailed(f),
             },
             Type::TypedDict(TypedDictType::Synthesized(synthesized)) => {
@@ -1604,24 +1605,18 @@ impl Display for DisplayTuple<'_, '_> {
 impl<'db> OverloadLiteral<'db> {
     // Not currently used, but useful for debugging.
     #[expect(dead_code)]
-    pub(crate) fn display(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> DisplayOverloadLiteral<'db> {
-        Self::display_with(self, db, program, DisplaySettings::default())
+    pub(crate) fn display(self, db: &'db dyn Db) -> DisplayOverloadLiteral<'db> {
+        Self::display_with(self, db, DisplaySettings::default())
     }
 
     fn display_with(
         self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayOverloadLiteral<'db> {
         DisplayOverloadLiteral {
             literal: self,
             db,
-            program,
             settings,
         }
     }
@@ -1630,14 +1625,13 @@ impl<'db> OverloadLiteral<'db> {
 pub(crate) struct DisplayOverloadLiteral<'db> {
     literal: OverloadLiteral<'db>,
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayOverloadLiteral<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let program = self.program;
-        let signature = self.literal.signature(self.db, program);
+        let program = self.literal.body_scope(self.db).program(self.db);
+        let signature = self.literal.signature(self.db);
         let hide_unused_self = signature.should_hide_self_from_display(self.db, program);
         let type_parameters = DisplayOptionalGenericContext {
             generic_context: signature.generic_context.as_ref(),
@@ -1666,13 +1660,11 @@ impl<'db> FunctionType<'db> {
     fn display_with(
         self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayFunctionType<'db> {
         DisplayFunctionType {
             ty: self,
             db,
-            program,
             settings,
         }
     }
@@ -1681,7 +1673,6 @@ impl<'db> FunctionType<'db> {
 struct DisplayFunctionType<'db> {
     ty: FunctionType<'db>,
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -1691,7 +1682,7 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
         // and limit display depth for chains of different function types
         // (e.g. multiple redefinitions with `TypeOf[foo]` return types).
         const MAX_FUNCTION_TYPE_DISPLAY_DEPTH: usize = 4;
-        let program = self.program;
+        let program = self.ty.program(self.db);
         if self.settings.visited_function_types.contains(&self.ty)
             || self.settings.visited_function_types.len() >= MAX_FUNCTION_TYPE_DISPLAY_DEPTH
         {
@@ -1756,25 +1747,19 @@ impl Display for DisplayFunctionType<'_> {
 }
 
 impl<'db> GenericAlias<'db> {
-    pub(crate) fn display(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> DisplayGenericAlias<'db> {
-        self.display_with(db, program, DisplaySettings::default())
+    pub(crate) fn display(self, db: &'db dyn Db) -> DisplayGenericAlias<'db> {
+        self.display_with(db, DisplaySettings::default())
     }
 
     pub(crate) fn display_with(
         self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayGenericAlias<'db> {
         DisplayGenericAlias {
             origin: ClassLiteral::Static(self.origin(db)),
             specialization: self.specialization(db),
             db,
-            program,
             settings,
         }
     }
@@ -1784,13 +1769,12 @@ pub(crate) struct DisplayGenericAlias<'db> {
     origin: ClassLiteral<'db>,
     specialization: Specialization<'db>,
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let program = self.program;
+        let program = self.origin.program(self.db);
         if let Some(tuple) = self.specialization.tuple(self.db) {
             tuple
                 .display_with(self.db, program, self.settings.clone())
@@ -2867,7 +2851,7 @@ impl<'db> FmtDetailed<'db> for DisplaySubclassOfGroup<'db> {
                     join.entry(&class.display_with(self.db, self.settings.singleline()));
                 }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
-                    join.entry(&alias.display_with(self.db, program, self.settings.singleline()));
+                    join.entry(&alias.display_with(self.db, self.settings.singleline()));
                 }
                 SubclassOfInner::Dynamic(dynamic) => {
                     let rep = Type::Dynamic(dynamic).representation(
@@ -3478,7 +3462,7 @@ mod tests {
     ) -> String {
         let program = db.program();
         Signature::new(
-            Parameters::new(db, program, parameters),
+            Parameters::new(db, parameters),
             return_ty.unwrap_or(Type::unknown()),
         )
         .display(db, program)
@@ -3492,7 +3476,7 @@ mod tests {
     ) -> String {
         let program = db.program();
         Signature::new(
-            Parameters::new(db, program, parameters),
+            Parameters::new(db, parameters),
             return_ty.unwrap_or(Type::unknown()),
         )
         .display_with(db, program, super::DisplaySettings::default().multiline())

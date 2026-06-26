@@ -254,7 +254,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 let literal = match (left_type_value, right_type_value) {
                                     (Type::ClassLiteral(class), Type::LiteralValue(literal))
                                     | (Type::LiteralValue(literal), Type::ClassLiteral(class))
-                                        if class.metaclass(self.db(), self.program)
+                                        if class.metaclass(self.db())
                                             == KnownClass::Type
                                                 .to_class_literal(self.db(), self.program) =>
                                     {
@@ -1325,9 +1325,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             let class_type = self
                                 .infer_tuple_type_expression(subscript)
                                 .map(|tuple_type| tuple_type.to_class_type(self.db(), self.program))
-                                .unwrap_or_else(|| {
-                                    class_literal.default_specialization(self.db(), self.program)
-                                });
+                                .unwrap_or_else(|| class_literal.default_specialization(self.db()));
                             SubclassOfType::from(self.db(), self.program, class_type)
                         } else {
                             match class_literal.generic_context(self.db()) {
@@ -2686,7 +2684,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 match subscript_ty {
                     // type aliases to literal types
                     Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => {
-                        let value_ty = type_alias.value_type(self.db(), self.program);
+                        let value_ty = type_alias.value_type(self.db());
                         if value_ty.is_literal_or_union_of_literals(self.db(), self.program) {
                             return Ok(value_ty);
                         }
@@ -2777,7 +2775,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 } else {
                     Parameters::new(
                         self.db(),
-                        self.program,
                         parameter_types.iter().map(|param_type| {
                             Parameter::positional_only(None).with_annotated_type(*param_type)
                         }),

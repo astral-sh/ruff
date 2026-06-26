@@ -158,12 +158,10 @@ pub(super) fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     visitor: &V,
 ) {
     if let Some(bound_or_constraints) = if visitor.should_visit_lazy_type_attributes() {
-        typevar.bound_or_constraints(db, program)
+        typevar.bound_or_constraints(db)
     } else {
         match typevar._bound_or_constraints(db) {
-            _ if visitor.should_visit_lazy_type_attributes() => {
-                typevar.bound_or_constraints(db, program)
-            }
+            _ if visitor.should_visit_lazy_type_attributes() => typevar.bound_or_constraints(db),
             Some(TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints)) => {
                 Some(bound_or_constraints)
             }
@@ -240,28 +238,16 @@ impl<'db> TypeVarInstance<'db> {
         self.kind(db).is_paramspec()
     }
 
-    pub(crate) fn upper_bound(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> Option<Type<'db>> {
-        if let Some(TypeVarBoundOrConstraints::UpperBound(ty)) =
-            self.bound_or_constraints(db, program)
-        {
+    pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        if let Some(TypeVarBoundOrConstraints::UpperBound(ty)) = self.bound_or_constraints(db) {
             Some(ty)
         } else {
             None
         }
     }
 
-    pub(crate) fn constraints(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> Option<&'db [Type<'db>]> {
-        if let Some(TypeVarBoundOrConstraints::Constraints(tuple)) =
-            self.bound_or_constraints(db, program)
-        {
+    pub(crate) fn constraints(self, db: &'db dyn Db) -> Option<&'db [Type<'db>]> {
+        if let Some(TypeVarBoundOrConstraints::Constraints(tuple)) = self.bound_or_constraints(db) {
             Some(tuple.elements(db))
         } else {
             None
@@ -271,7 +257,6 @@ impl<'db> TypeVarInstance<'db> {
     pub(crate) fn bound_or_constraints(
         self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
     ) -> Option<TypeVarBoundOrConstraints<'db>> {
         self._bound_or_constraints(db).and_then(|w| match w {
             TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => {
@@ -281,7 +266,7 @@ impl<'db> TypeVarInstance<'db> {
                 .lazy_bound(db)
                 .map(TypeVarBoundOrConstraints::UpperBound),
             TypeVarBoundOrConstraintsEvaluation::LazyConstraints => self
-                .lazy_constraints(db, program)
+                .lazy_constraints(db)
                 .map(TypeVarBoundOrConstraints::Constraints),
         })
     }
@@ -291,9 +276,8 @@ impl<'db> TypeVarInstance<'db> {
     pub(crate) fn require_bound_or_constraints(
         self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
     ) -> TypeVarBoundOrConstraints<'db> {
-        self.bound_or_constraints(db, program)
+        self.bound_or_constraints(db)
             .unwrap_or_else(|| TypeVarBoundOrConstraints::UpperBound(Type::object()))
     }
 
@@ -340,7 +324,7 @@ impl<'db> TypeVarInstance<'db> {
                         })
                     }
                     TypeVarBoundOrConstraintsEvaluation::LazyConstraints => {
-                        self.lazy_constraints(db, program).map(|constraints| {
+                        self.lazy_constraints(db).map(|constraints| {
                             TypeVarBoundOrConstraints::Constraints(constraints)
                                 .materialize_impl(db, program, materialization_kind, visitor)
                                 .into()
@@ -362,7 +346,7 @@ impl<'db> TypeVarInstance<'db> {
     }
 
     fn to_instance(self, db: &'db dyn Db, program: crate::Program<'db>) -> Option<Self> {
-        let bound_or_constraints = match self.bound_or_constraints(db, program)? {
+        let bound_or_constraints = match self.bound_or_constraints(db)? {
             TypeVarBoundOrConstraints::UpperBound(upper_bound) => {
                 TypeVarBoundOrConstraints::UpperBound(upper_bound.to_instance(db, program)?)
             }
@@ -443,7 +427,7 @@ impl<'db> TypeVarInstance<'db> {
                 {
                     return true;
                 }
-                type_alias.value_type(state.db, state.program)
+                type_alias.value_type(state.db)
             } else if let Some(generic_context) = type_alias.generic_context(state.db)
                 && generic_context.variables(state.db).any(|typevar| {
                     typevar_default_is_self_referential(
@@ -553,15 +537,12 @@ impl<'db> TypeVarInstance<'db> {
     /// `lazy_constraints` checks if any of the constraint types are generic (generic constraints are not allowed).
     #[salsa::tracked(
         cycle_fn=lazy_constraints_cycle_recover,
-        cycle_initial=|_, _, _, _| None,
+        cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn lazy_constraints_unchecked(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> Option<TypeVarConstraints<'db>> {
+    fn lazy_constraints_unchecked(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
         let definition = self.definition(db)?;
+        let program = definition.analysis_file(db).program(db);
         let module =
             parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db);
         let constraints = match definition.kind(db) {
@@ -599,12 +580,9 @@ impl<'db> TypeVarInstance<'db> {
         Some(constraints)
     }
 
-    fn lazy_constraints(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> Option<TypeVarConstraints<'db>> {
-        let constraints = self.lazy_constraints_unchecked(db, program)?;
+    fn lazy_constraints(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
+        let program = self.definition(db)?.analysis_file(db).program(db);
+        let constraints = self.lazy_constraints_unchecked(db)?;
 
         if constraints
             .elements(db)
@@ -621,11 +599,7 @@ impl<'db> TypeVarInstance<'db> {
     /// `lazy_default` checks if the default type is not self-referential.
     #[salsa::tracked(cycle_initial=|_, id, _| Some(Type::divergent(id)), cycle_fn=lazy_default_cycle_recover, heap_size=ruff_memory_usage::heap_size)]
     fn lazy_default_unchecked(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        fn convert_type_to_paramspec_value<'db>(
-            db: &'db dyn Db,
-            program: crate::Program<'db>,
-            ty: Type<'db>,
-        ) -> Type<'db> {
+        fn convert_type_to_paramspec_value<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
             let parameters = match ty {
                 Type::NominalInstance(nominal_instance)
                     if nominal_instance.has_known_class(db, KnownClass::EllipsisType) =>
@@ -637,7 +611,6 @@ impl<'db> TypeVarInstance<'db> {
                     .map_or_else(Parameters::unknown, |tuple_spec| {
                         Parameters::new(
                             db,
-                            program,
                             tuple_spec
                                 .iter_all_elements()
                                 .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
@@ -669,7 +642,6 @@ impl<'db> TypeVarInstance<'db> {
             Type::paramspec_value_callable(db, parameters)
         }
 
-        let program = self.definition(db)?.analysis_file(db).program(db);
         let definition = self.definition(db)?;
         let module =
             parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db);
@@ -690,7 +662,7 @@ impl<'db> TypeVarInstance<'db> {
                     known_class,
                     Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec)
                 ) {
-                    convert_type_to_paramspec_value(db, program, default_type)
+                    convert_type_to_paramspec_value(db, default_type)
                 } else {
                     default_type
                 }
@@ -700,7 +672,7 @@ impl<'db> TypeVarInstance<'db> {
                 let paramspec_node = paramspec.node(&module);
                 let default_ty =
                     definition_expression_type(db, definition, paramspec_node.default.as_ref()?);
-                convert_type_to_paramspec_value(db, program, default_ty)
+                convert_type_to_paramspec_value(db, default_ty)
             }
             _ => return None,
         };
@@ -731,11 +703,7 @@ impl<'db> TypeVarInstance<'db> {
         Some(default)
     }
 
-    pub fn bind_pep695(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> Option<BoundTypeVarInstance<'db>> {
+    pub fn bind_pep695(self, db: &'db dyn Db) -> Option<BoundTypeVarInstance<'db>> {
         if !matches!(
             self.identity(db).kind(db),
             TypeVarKind::Pep695TypeVar | TypeVarKind::Pep695ParamSpec
@@ -747,7 +715,7 @@ impl<'db> TypeVarInstance<'db> {
         let (_, child) = index
             .child_scopes(typevar_definition.file_scope(db))
             .next()?;
-        GenericContext::of_node(db, program, child.node(), index)?.binds_typevar(db, self)
+        GenericContext::of_node(db, child.node(), index)?.binds_typevar(db, self)
     }
 }
 
@@ -1103,10 +1071,9 @@ impl<'db> BoundTypeVarInstance<'db> {
     pub(crate) fn map_bound_or_constraints(
         self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         f: impl FnOnce(Option<TypeVarBoundOrConstraints<'db>>) -> Option<TypeVarBoundOrConstraints<'db>>,
     ) -> Self {
-        let bound_or_constraints = f(self.typevar(db).bound_or_constraints(db, program));
+        let bound_or_constraints = f(self.typevar(db).bound_or_constraints(db));
         let typevar = TypeVarInstance::new(
             db,
             self.typevar(db).identity(db),
@@ -1310,7 +1277,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         let typevar = self.typevar(db);
-        let bound_or_constraints = typevar.bound_or_constraints(db, program);
+        let bound_or_constraints = typevar.bound_or_constraints(db);
         let default = self.default_type(db, program);
 
         if bound_or_constraints.is_none() && default.is_none() {
@@ -1439,9 +1406,9 @@ fn lazy_constraints_cycle_recover<'db>(
     cycle: &salsa::Cycle,
     previous: &Option<TypeVarConstraints<'db>>,
     current: Option<TypeVarConstraints<'db>>,
-    _typevar: TypeVarInstance<'db>,
-    program: crate::Program<'db>,
+    typevar: TypeVarInstance<'db>,
 ) -> Option<TypeVarConstraints<'db>> {
+    let program = typevar.definition(db)?.analysis_file(db).program(db);
     // Normalize the bounds/constraints to ensure cycle convergence.
     match (previous, current) {
         (Some(prev), Some(constraints)) => {

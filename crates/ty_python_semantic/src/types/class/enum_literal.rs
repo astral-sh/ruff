@@ -69,24 +69,29 @@ impl<'db> DynamicEnumAnchor<'db> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
-            Self::Definition { definition, spec } => Some(Self::Definition {
-                definition: *definition,
-                spec: spec.recursive_type_normalized_impl(db, program, div, nested)?,
-            }),
+            Self::Definition { definition, spec } => {
+                let program = definition.analysis_file(db).program(db);
+                Some(Self::Definition {
+                    definition: *definition,
+                    spec: spec.recursive_type_normalized_impl(db, program, div, nested)?,
+                })
+            }
             Self::ScopeOffset {
                 scope,
                 offset,
                 spec,
-            } => Some(Self::ScopeOffset {
-                scope: *scope,
-                offset: *offset,
-                spec: spec.recursive_type_normalized_impl(db, program, div, nested)?,
-            }),
+            } => {
+                let program = scope.program(db);
+                Some(Self::ScopeOffset {
+                    scope: *scope,
+                    offset: *offset,
+                    spec: spec.recursive_type_normalized_impl(db, program, div, nested)?,
+                })
+            }
         }
     }
 }
@@ -108,10 +113,10 @@ impl<'db> DynamicEnumLiteral<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        let program = self.scope(db).program(db);
         let mixin_type = match self.mixin_type(db) {
             Some(mixin) => {
                 let mixin = mixin.recursive_type_normalized_impl(db, program, div, true);
@@ -124,7 +129,7 @@ impl<'db> DynamicEnumLiteral<'db> {
             db,
             self.name(db),
             self.anchor(db)
-                .recursive_type_normalized_impl(db, program, div, nested)?,
+                .recursive_type_normalized_impl(db, div, nested)?,
             self.base_class(db),
             mixin_type,
         ))
@@ -147,6 +152,10 @@ impl<'db> DynamicEnumLiteral<'db> {
         }
     }
 
+    fn program(self, db: &'db dyn Db) -> crate::Program<'db> {
+        self.scope(db).program(db)
+    }
+
     pub(crate) fn spec(self, db: &'db dyn Db) -> EnumSpec<'db> {
         match self.anchor(db) {
             DynamicEnumAnchor::Definition { spec, .. }
@@ -154,11 +163,8 @@ impl<'db> DynamicEnumLiteral<'db> {
         }
     }
 
-    pub(crate) fn explicit_bases(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> Box<[Type<'db>]> {
+    pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
+        let program = self.program(db);
         let mut bases = Vec::with_capacity(2);
         if let Some(mixin) = self.mixin_type(db) {
             bases.push(mixin);
@@ -203,26 +209,24 @@ impl<'db> DynamicEnumLiteral<'db> {
     #[salsa::tracked(
         returns(ref),
         heap_size=ruff_memory_usage::heap_size,
-        cycle_initial=|db, _, self_: DynamicEnumLiteral<'db>, program| {
+        cycle_initial=|db, _, self_: DynamicEnumLiteral<'db>| {
+            let program = self_.scope(db).program(db);
             Ok(Mro::from([
                 ClassBase::Class(ClassType::NonGeneric(ClassLiteral::DynamicEnum(self_))),
                 ClassBase::object(db, program),
             ]))
         }
     )]
-    pub(crate) fn try_mro(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> Result<Mro<'db>, DynamicMroError<'db>> {
-        Mro::of_dynamic_enum(db, program, self)
+    pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
+        Mro::of_dynamic_enum(db, self)
     }
 
     fn has_known_members(self, db: &'db dyn Db) -> bool {
         self.spec(db).has_known_members(db)
     }
 
-    fn mixin_class(self, db: &'db dyn Db, program: crate::Program<'db>) -> Option<ClassType<'db>> {
+    fn mixin_class(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
+        let program = self.program(db);
         let mixin = self.mixin_type(db)?;
         let ClassBase::Class(class) = ClassBase::try_from_type(db, program, mixin, None)? else {
             return None;
@@ -268,18 +272,14 @@ impl<'db> DynamicEnumLiteral<'db> {
     ///
     /// If members are unknown and nothing was found in the MRO, returns `Unknown`
     /// as a last resort to avoid false `unresolved-attribute` errors.
-    pub(crate) fn class_member(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-        name: &str,
-    ) -> PlaceAndQualifiers<'db> {
+    pub(crate) fn class_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+        let program = self.program(db);
         let own = self.own_class_member(db, name);
         if !own.is_undefined() {
             return own.inner;
         }
-        if let Some(mixin_class) = self.mixin_class(db, program) {
-            let result = mixin_class.class_member(db, program, name, MemberLookupPolicy::default());
+        if let Some(mixin_class) = self.mixin_class(db) {
+            let result = mixin_class.class_member(db, name, MemberLookupPolicy::default());
             if !result.place.is_undefined() {
                 return result;
             }
@@ -288,7 +288,7 @@ impl<'db> DynamicEnumLiteral<'db> {
             .base_class(db)
             .to_class_literal(db, program)
             .as_class_literal()
-            .map(|cls| cls.class_member(db, program, name, MemberLookupPolicy::default()))
+            .map(|cls| cls.class_member(db, name, MemberLookupPolicy::default()))
             .unwrap_or_else(|| Place::Undefined.into());
 
         // When members are unknown (e.g. `Enum("E", some_var)`), any name could
@@ -302,14 +302,10 @@ impl<'db> DynamicEnumLiteral<'db> {
     ///
     /// If members are unknown and nothing was found, returns `Unknown`
     /// as a last resort.
-    pub(crate) fn instance_member(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-        name: &str,
-    ) -> PlaceAndQualifiers<'db> {
-        if let Some(mixin_class) = self.mixin_class(db, program) {
-            let result = mixin_class.instance_member(db, program, name);
+    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+        let program = self.program(db);
+        if let Some(mixin_class) = self.mixin_class(db) {
+            let result = mixin_class.instance_member(db, name);
             if !result.place.is_undefined() {
                 return result;
             }

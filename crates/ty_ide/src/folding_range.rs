@@ -1,5 +1,3 @@
-use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::token::{TokenKind, Tokens, parenthesized_range};
 use ruff_python_ast::visitor::source_order::{
@@ -11,6 +9,7 @@ use ruff_python_ast::{
 use ruff_python_trivia::{CommentLinePosition, is_python_whitespace};
 use ruff_source_file::{LineRanges, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use ty_python_core::environment::AnalysisFile;
 
 use crate::Db;
 
@@ -56,10 +55,11 @@ impl From<TextRange> for FoldingRange {
 /// Returns a list of folding ranges for the given file.
 pub fn folding_ranges(
     db: &dyn Db,
-    file: File,
+    analysis_file: AnalysisFile<'_>,
     range_filter: Option<TextRange>,
 ) -> Vec<FoldingRange> {
-    let parsed = parsed_module(db, file).load(db);
+    let file = analysis_file.file(db);
+    let parsed = analysis_file.parsed(db).load(db);
     let source = source_text(db, file);
 
     let mut visitor = FoldingRangeVisitor {
@@ -762,6 +762,7 @@ mod tests {
     use crate::tests::CursorTest;
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span};
+    use ruff_db::files::File;
 
     #[test]
     fn test_folding_range_class() {
@@ -2691,7 +2692,7 @@ with open("file.txt") as f:
 
     impl CursorTest {
         fn folding_ranges(&self) -> String {
-            let ranges = folding_ranges(&self.db, self.cursor.file, None);
+            let ranges = folding_ranges(&self.db, self.cursor_analysis_file(), None);
 
             if ranges.is_empty() {
                 return "No folding ranges found".to_string();

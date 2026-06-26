@@ -118,9 +118,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     if class_kind == Some(CodeGeneratorKind::NamedTuple) {
         let mut field_with_default_encountered = None;
 
-        for (field_name, field) in
-            class.own_fields(db, context.program(), None, CodeGeneratorKind::NamedTuple)
-        {
+        for (field_name, field) in class.own_fields(db, None, CodeGeneratorKind::NamedTuple) {
             if field_name.starts_with('_') {
                 report_named_tuple_field_with_leading_underscore(
                     context,
@@ -225,13 +223,8 @@ pub(crate) fn check_static_class_definitions<'db>(
     //     - Check for inheritance from a `@final` classes
     //     - If the class is a protocol class: check for inheritance from a non-protocol class
     //     - If the class is a NamedTuple class: check for multiple inheritance that isn't `Generic[]`
-    let expanded_base_entries = expanded_class_base_entries(
-        db,
-        context.program(),
-        class.known(db),
-        class_node,
-        class_definition,
-    );
+    let expanded_base_entries =
+        expanded_class_base_entries(db, class.known(db), class_node, class_definition);
     let check_explicit_base_variance = context.is_lint_enabled(&INVALID_GENERIC_CLASS);
     for (i, entry) in expanded_base_entries.iter().enumerate() {
         let source_node = entry.source_node();
@@ -355,7 +348,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             _ => continue,
         };
 
-        if let Some(disjoint_base) = base_class.nearest_disjoint_base(db, context.program()) {
+        if let Some(disjoint_base) = base_class.nearest_disjoint_base(db) {
             disjoint_bases.insert(disjoint_base, i, base_class.class_literal(db));
         }
 
@@ -419,12 +412,10 @@ pub(crate) fn check_static_class_definitions<'db>(
             );
         }
 
-        if let Some(ordered_base_class) =
-            ordered_dataclass_base_class(db, context.program(), base_class)
-        {
+        if let Some(ordered_base_class) = ordered_dataclass_base_class(db, base_class) {
             // Suppress the diagnostic if the child class manually overrides all comparison
             // methods, since the user has explicitly fixed the LSP violation.
-            if !class.has_own_comparison_methods(db, context.program())
+            if !class.has_own_comparison_methods(db)
                 && let Some(builder) =
                     context.report_lint(&SUBCLASS_OF_DATACLASS_WITH_ORDER, source_node)
             {
@@ -527,7 +518,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             }
         },
         Ok(_) => {
-            disjoint_bases.remove_redundant_entries(db, context.program());
+            disjoint_bases.remove_redundant_entries(db);
 
             if disjoint_bases.len() > 1 {
                 report_instance_layout_conflict(
@@ -552,7 +543,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     // Check that `@total_ordering` has a valid ordering method in the MRO
-    if class.total_ordering(db) && !class.has_ordering_method_in_mro(db, context.program(), None) {
+    if class.total_ordering(db) && !class.has_ordering_method_in_mro(db, None) {
         // Find the `@total_ordering` decorator to report the diagnostic at its location
         if let Some(decorator) = class_node.decorator_list.iter().find(|decorator| {
             file_expression_type(&decorator.expression)
@@ -867,9 +858,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             if let Some(generic_context) = class.generic_context(db) {
                 for self_typevar in generic_context.variables(db) {
                     let name = self_typevar.typevar(db).name(db);
-                    for enclosing in
-                        enclosing_generic_contexts(db, context.program(), index, parent)
-                    {
+                    for enclosing in enclosing_generic_contexts(db, index, parent) {
                         if let Some(other_typevar) = enclosing.binds_named_typevar(db, name) {
                             report_shadowed_type_variable(
                                 context,
@@ -889,7 +878,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             // variables from enclosing scopes (by identity).
             for base_typevar in class.typevars_referenced_in_bases(db) {
                 let typevar = base_typevar.typevar(db);
-                for enclosing in enclosing_generic_contexts(db, context.program(), index, parent) {
+                for enclosing in enclosing_generic_contexts(db, index, parent) {
                     if let Some(other_typevar) = enclosing.binds_typevar(db, typevar) {
                         report_shadowed_type_variable(
                             context,
@@ -917,7 +906,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         let mut required_after_default_field_names = vec![];
         let mut has_seen_default_field = false;
 
-        for (name, field) in class.own_fields(db, context.program(), specialization, field_policy) {
+        for (name, field) in class.own_fields(db, specialization, field_policy) {
             if field.is_kw_only_sentinel(db, context.program()) {
                 kw_only_sentinel_fields.push(name);
                 continue;
@@ -1049,7 +1038,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
     let table = index.place_table(scope);
     let use_def = index.use_def_map(scope);
 
-    let Some(metaclass) = metaclass.to_class_type(db, context.program()) else {
+    let Some(metaclass) = metaclass.to_class_type(db) else {
         return;
     };
 
@@ -1183,7 +1172,6 @@ fn check_class_namespace_against_metaclass_members<'db>(
 
 fn ordered_dataclass_base_class<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     base_class: ClassType<'db>,
 ) -> Option<ClassType<'db>> {
     for ancestor in base_class.iter_mro(db).filter_map(ClassBase::into_class) {
@@ -1195,7 +1183,7 @@ fn ordered_dataclass_base_class<'db>(
             return Some(ancestor);
         }
 
-        if ancestor_literal.has_own_comparison_methods(db, program) {
+        if ancestor_literal.has_own_comparison_methods(db) {
             return None;
         }
     }

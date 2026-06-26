@@ -271,12 +271,8 @@ impl SpecialFormType {
     }
 
     /// Return `true` if this symbol is an instance of `class`.
-    pub(super) fn is_instance_of(
-        self,
-        db: &dyn Db,
-        program: crate::Program<'_>,
-        class: ClassType,
-    ) -> bool {
+    pub(super) fn is_instance_of(self, db: &dyn Db, class: ClassType) -> bool {
+        let program = class.program(db);
         self.class().is_subclass_of(db, program, class)
     }
 
@@ -855,8 +851,7 @@ impl SpecialFormType {
                     ));
                 };
 
-                let typing_self =
-                    typing_self(db, program, scope_id, typevar_binding_context, class.into());
+                let typing_self = typing_self(db, scope_id, typevar_binding_context, class.into());
 
                 let in_staticmethod = typing_self.is_some_and(|typing_self| {
                     let Some(binding_definition) = typing_self.binding_context(db).definition()
@@ -878,10 +873,10 @@ impl SpecialFormType {
 
                 let is_in_metaclass = KnownClass::Type
                     .to_class_literal(db, program)
-                    .to_class_type(db, program)
+                    .to_class_type(db)
                     .is_some_and(|type_class| {
                         class
-                            .default_specialization(db, program)
+                            .default_specialization(db)
                             .is_subclass_of(db, type_class)
                     });
                 if is_in_metaclass {

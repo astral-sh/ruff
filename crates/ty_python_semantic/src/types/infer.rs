@@ -122,7 +122,6 @@ fn extend_collection_use_constraints<'db>(
     cycle_initial=|db, id, definition: Definition<'db>| {
         DefinitionInference::cycle_initial(
             db,
-            definition.analysis_file(db).program(db),
             definition,
             Type::divergent(id),
         )
@@ -130,7 +129,6 @@ fn extend_collection_use_constraints<'db>(
     cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
         inference.cycle_normalized(
             db,
-            definition.analysis_file(db).program(db),
             previous,
             cycle,
             definition,
@@ -269,7 +267,6 @@ impl<'db> FunctionDecoratorInference<'db> {
     cycle_initial=|db, id, definition: Definition<'db>| {
         DefinitionInference::cycle_initial(
             db,
-            definition.analysis_file(db).program(db),
             definition,
             Type::divergent(id),
         )
@@ -277,7 +274,6 @@ impl<'db> FunctionDecoratorInference<'db> {
     cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
         inference.cycle_normalized(
             db,
-            definition.analysis_file(db).program(db),
             previous,
             cycle,
             definition,
@@ -672,11 +668,11 @@ impl<'db> TypeContext<'db> {
         db: &'db dyn Db,
         program: crate::Program<'db>,
     ) -> Option<Cow<'db, [Type<'db>]>> {
-        let union = self.annotation?.as_union_like(db, program)?;
+        let union = self.annotation?.as_union_like(db)?;
 
         let targets = if union.has_aliases(db) {
             let expanded = union.expand_aliases(db, program);
-            if let Some(union) = expanded.as_union_like(db, program) {
+            if let Some(union) = expanded.as_union_like(db) {
                 Cow::Borrowed(union.elements(db))
             } else {
                 Cow::Owned(vec![expanded])
@@ -1353,10 +1349,10 @@ impl<'db> DefinitionInferenceExtra<'db> {
 impl<'db> DefinitionInference<'db> {
     fn cycle_initial(
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         definition: Definition<'db>,
         cycle_recovery: Type<'db>,
     ) -> Self {
+        let program = definition.analysis_file(db).program(db);
         let mut types = DefinitionTypes::Empty;
 
         // Eagerly store more precise types for collection literals to avoid an extra
@@ -1380,7 +1376,7 @@ impl<'db> DefinitionInference<'db> {
                         generic_context.repeat_specialization(db, cycle_recovery)
                     });
 
-                types = DefinitionTypes::Binding(Type::instance(db, program, divergent_collection));
+                types = DefinitionTypes::Binding(Type::instance(db, divergent_collection));
             }
         }
 
@@ -1401,11 +1397,11 @@ impl<'db> DefinitionInference<'db> {
     fn cycle_normalized(
         mut self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         previous_inference: &DefinitionInference<'db>,
         cycle: &salsa::Cycle,
         definition: Definition<'db>,
     ) -> DefinitionInference<'db> {
+        let program = definition.analysis_file(db).program(db);
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, program, previous_ty, cycle);

@@ -256,10 +256,9 @@ pub(crate) fn check_overloaded_function<'db>(
                 if let Some(decorator) = overload.find_known_decorator_span(db, known_function) {
                     diagnostic.annotate(Annotation::secondary(decorator));
                 }
-                let definition = function.definition(db);
-                let file = definition.file(db);
+                let file = function.file(db);
                 let module =
-                    parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db))
+                    parsed_module_versioned(db, function.analysis_file(db).versioned_file(db))
                         .load(db);
                 let node = first_overload.node(db, file, &module);
                 let span = if node.body.len() == 1 {
@@ -291,7 +290,7 @@ fn check_non_generic_overload_implementation_consistency<'db>(
     }
 
     let db = context.db();
-    let implementation_signature = implementation.signature(db, context.program());
+    let implementation_signature = implementation.signature(db);
 
     // TODO: Remove this temporary non-generic restriction once overload implementation consistency
     // handles type-variable domains.
@@ -301,7 +300,7 @@ fn check_non_generic_overload_implementation_consistency<'db>(
 
     let overload_signatures = overloads
         .iter()
-        .map(|overload| (overload, overload.signature(db, context.program())));
+        .map(|overload| (overload, overload.signature(db)));
 
     if overload_signatures
         .clone()

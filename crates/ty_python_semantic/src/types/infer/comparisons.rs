@@ -285,11 +285,11 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
 
         (Type::TypeAlias(alias), right) => Some(visitor.visit((left, op, right), || {
-            infer_binary_type_comparison(context, alias.value_type(db, program), op, right, range, visitor)
+            infer_binary_type_comparison(context, alias.value_type(db), op, right, range, visitor)
         })),
 
         (left, Type::TypeAlias(alias)) => Some(visitor.visit((left, op, right), || {
-            infer_binary_type_comparison(context, left, op, alias.value_type(db, program), range, visitor)
+            infer_binary_type_comparison(context, left, op, alias.value_type(db), range, visitor)
         })),
 
         // `try_dunder` works for almost all `NewType`s, but not for `NewType`s of `float` and
@@ -303,7 +303,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 visitor.visit((left, op, right), || {
                     infer_binary_type_comparison(
                         context,
-                        newtype.concrete_base_type(db, program),
+                        newtype.concrete_base_type(db),
                         op,
                         right,
                         range,
@@ -319,7 +319,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
                         context,
                         left,
                         op,
-                        newtype.concrete_base_type(db, program),
+                        newtype.concrete_base_type(db),
                         range,
                         visitor,
                     )
@@ -335,7 +335,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
         (Type::TypeVar(left_tvar), Type::TypeVar(right_tvar))
             if left_tvar.identity(db) == right_tvar.identity(db) =>
         {
-            match left_tvar.typevar(db).bound_or_constraints(db, program) {
+            match left_tvar.typevar(db).bound_or_constraints(db) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => Some(
                     try_dunder(MemberLookupPolicy::default()).or_else(|_| {
                         visitor.visit((left, op, right), || {
@@ -361,7 +361,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
         // When the left operand is a bounded TypeVar and the right is not a TypeVar,
         // delegate to the bound type.
         (Type::TypeVar(left_tvar), right) if !right.is_type_var() => {
-            match left_tvar.typevar(db).bound_or_constraints(db, program) {
+            match left_tvar.typevar(db).bound_or_constraints(db) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => Some(
                     try_dunder(MemberLookupPolicy::default()).or_else(|_| {
                         visitor.visit((left, op, right), || {
@@ -386,7 +386,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
         // When the right operand is a bounded TypeVar and the left is not a TypeVar,
         // delegate to the bound type.
         (left, Type::TypeVar(right_tvar)) if !left.is_type_var() => {
-            match right_tvar.typevar(db).bound_or_constraints(db, program) {
+            match right_tvar.typevar(db).bound_or_constraints(db) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => Some(
                     try_dunder(MemberLookupPolicy::default()).or_else(|_| {
                         visitor.visit((left, op, right), || {

@@ -1,7 +1,6 @@
 use crate::Db;
 use crate::goto::find_goto_target;
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{TextRange, TextSize};
 use ty_python_core::environment::AnalysisFile;
@@ -33,9 +32,8 @@ pub fn prepare_type_hierarchy(
     analysis_file: AnalysisFile<'_>,
     offset: TextSize,
 ) -> Option<TypeHierarchyItem> {
-    let file = analysis_file.file(db);
     let program = analysis_file.program(db);
-    let module = parsed_module(db, file).load(db);
+    let module = analysis_file.parsed(db).load(db);
     let model = SemanticModel::new(db, analysis_file);
     let goto_target = find_goto_target(&model, &module, offset)?;
     let ty = goto_target.inferred_type(&model)?;
@@ -85,8 +83,7 @@ fn resolve_type_at<'db>(
     analysis_file: AnalysisFile<'db>,
     offset: TextSize,
 ) -> Option<Type<'db>> {
-    let file = analysis_file.file(db);
-    let module = parsed_module(db, file).load(db);
+    let module = analysis_file.parsed(db).load(db);
     let model = SemanticModel::new(db, analysis_file);
 
     let goto_target = find_goto_target(&model, &module, offset)?;

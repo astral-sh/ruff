@@ -63,13 +63,9 @@ impl<'db> ProtocolClass<'db> {
     /// It is illegal for a protocol class to have any instance attributes that are not declared
     /// in the protocol's class body. If any are assigned to, they are not taken into account in
     /// the protocol's list of members.
-    pub(super) fn interface(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> ProtocolInterface<'db> {
+    pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         let _span = tracing::trace_span!("protocol_members", "class='{}'", self.name(db)).entered();
-        cached_protocol_interface(db, program, *self)
+        cached_protocol_interface(db, *self)
     }
 
     pub(super) fn is_runtime_checkable(self, db: &'db dyn Db) -> bool {
@@ -124,7 +120,7 @@ impl<'db> ProtocolClass<'db> {
     /// class body, or are declared in a superclass of the protocol class.
     pub(super) fn validate_members(self, context: &InferContext) {
         let db = context.db();
-        let interface = self.interface(db, context.program());
+        let interface = self.interface(db);
         let Some((class_literal, _)) = self.static_class_literal(db) else {
             return;
         };
@@ -157,27 +153,24 @@ impl<'db> ProtocolClass<'db> {
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self(
             self.0
-                .apply_type_mapping_impl(db, program, type_mapping, tcx, visitor),
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
         )
     }
 
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         Some(Self(
-            self.0
-                .recursive_type_normalized_impl(db, program, div, nested)?,
+            self.0.recursive_type_normalized_impl(db, div, nested)?,
         ))
     }
 }
@@ -221,11 +214,7 @@ impl<'db> ProtocolInterface<'db> {
     ///
     /// All created members will be covariant, read-only property members
     /// rather than method members or mutable attribute members.
-    pub(super) fn with_property_members<'a, M>(
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-        members: M,
-    ) -> Self
+    pub(super) fn with_property_members<'a, M>(db: &'db dyn Db, members: M) -> Self
     where
         M: IntoIterator<Item = (&'a str, Type<'db>)>,
     {
@@ -237,7 +226,6 @@ impl<'db> ProtocolInterface<'db> {
                 let property_getter_signature = Signature::new(
                     Parameters::new(
                         db,
-                        program,
                         [Parameter::positional_only(Some(Name::new_static("self")))],
                     ),
                     ty,
@@ -775,10 +763,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     pub(super) fn type_satisfies_protocol_member(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         ty: Type<'db>,
         member: &ProtocolMember<'_, 'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let program = self.program;
         let result = match &member.kind {
             ProtocolMemberKind::Method(method) => {
                 // `__call__` members must be special cased for several reasons:
@@ -839,7 +827,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     .when_some_and(db, self.constraints, |callables| {
                         self.check_callables_vs_callable(
                             db,
-                            program,
                             &callables
                                 .map(|callable| callable.apply_self(db, program, fallback_other)),
                             protocol_bind_self(db, program, *method, Some(fallback_other)),
@@ -877,10 +864,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     });
                     return self.never();
                 };
-                self.check_type_pair(db, program, *member_type, attribute_type)
-                    .and(db, program, self.constraints, || {
-                        self.check_type_pair(db, program, attribute_type, *member_type)
-                    })
+                self.check_type_pair(db, *member_type, attribute_type).and(
+                    db,
+                    program,
+                    self.constraints,
+                    || self.check_type_pair(db, attribute_type, *member_type),
+                )
             }
         };
         if result.is_never_satisfied(db, program) {
@@ -894,11 +883,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     pub(super) fn check_protocol_interface_pair(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         source_type: Type<'db>,
         source: ProtocolInterface<'db>,
         target: ProtocolInterface<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let program = self.program;
         if source.member_count(db) < target.member_count(db)
             && !self.is_context_collection_enabled()
         {
@@ -955,7 +944,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         .and(db, program, self.constraints, || {
                             self.check_type_pair(
                                 db,
-                                program,
                                 source_type,
                                 Type::Callable(protocol_bind_self(
                                     db,
@@ -971,7 +959,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             ProtocolMemberKind::Method(target_method),
                         ) => self.check_callable_pair(
                             db,
-                            program,
                             source_method.bind_self(db, program, None),
                             protocol_bind_self(db, program, target_method, None),
                         ),
@@ -979,11 +966,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         (
                             ProtocolMemberKind::Other(source_type),
                             ProtocolMemberKind::Other(target_type),
-                        ) => self
-                            .check_type_pair(db, program, source_type, target_type)
-                            .and(db, program, self.constraints, || {
-                                self.check_type_pair(db, program, target_type, source_type)
-                            }),
+                        ) => self.check_type_pair(db, source_type, target_type).and(
+                            db,
+                            program,
+                            self.constraints,
+                            || self.check_type_pair(db, target_type, source_type),
+                        ),
 
                         // TODO: finish assignability/subtyping between two `@property` members,
                         // and between a `@property` member and a member of a different kind.
@@ -1009,10 +997,10 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     pub(super) fn protocol_member_has_disjoint_type_from_ty(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         member: &ProtocolMember<'_, 'db>,
         ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let program = self.program;
         match &member.kind {
             // TODO: implement disjointness for property members as well as attribute/method members.
             ProtocolMemberKind::Property(_) => self.never(),
@@ -1029,19 +1017,12 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                             .when_all(db, program, self.constraints, |callable| {
                                 non_never_callable_return_type(db, program, *callable)
                                     .when_some_and(db, self.constraints, |return_type| {
-                                        self.check_type_pair(
-                                            db,
-                                            program,
-                                            method_return_type,
-                                            return_type,
-                                        )
+                                        self.check_type_pair(db, method_return_type, return_type)
                                     })
                             })
                     })
             }
-            ProtocolMemberKind::Other(other_type) => {
-                self.check_type_pair(db, program, ty, *other_type)
-            }
+            ProtocolMemberKind::Other(other_type) => self.check_type_pair(db, ty, *other_type),
         }
     }
 }
@@ -1099,15 +1080,15 @@ impl BoundOnClass {
 
 /// Inner Salsa query for [`ProtocolClass::interface`].
 #[salsa::tracked(
-    cycle_initial=|db, _, _, _| ProtocolInterface::empty(db),
+    cycle_initial=|db, _, _| ProtocolInterface::empty(db),
     cycle_fn=proto_interface_cycle_recover,
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn cached_protocol_interface<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
+    let program = class.class_literal(db).program(db);
     let mut members = BTreeMap::default();
 
     for (parent_scope, specialization) in class
@@ -1223,9 +1204,9 @@ fn proto_interface_cycle_recover<'db>(
     cycle: &salsa::Cycle,
     previous: &ProtocolInterface<'db>,
     value: ProtocolInterface<'db>,
-    program: crate::Program<'db>,
-    _class: ClassType<'db>,
+    class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
+    let program = class.class_literal(db).program(db);
     value.cycle_normalized(db, program, *previous, cycle)
 }
 
@@ -1260,12 +1241,7 @@ fn non_never_callable_return_type<'db>(
     callable
         .signatures(db)
         .iter()
-        .all(|signature| {
-            !signature
-                .return_ty
-                .resolve_type_alias(db, program)
-                .is_never()
-        })
+        .all(|signature| !signature.return_ty.resolve_type_alias(db).is_never())
         .then(|| {
             callable
                 .signatures(db)
@@ -1283,11 +1259,11 @@ pub(super) fn has_all_protocol_members_defined<'db>(
     ty: Type<'db>,
     protocol: ProtocolInstanceType<'db>,
 ) -> bool {
-    let target_interface = protocol.interface(db, program);
+    let target_interface = protocol.interface(db);
 
     match ty {
         Type::ProtocolInstance(source_protocol) => {
-            let source_interface = source_protocol.interface(db, program);
+            let source_interface = source_protocol.interface(db);
 
             source_interface.member_count(db) >= target_interface.member_count(db)
                 && target_interface

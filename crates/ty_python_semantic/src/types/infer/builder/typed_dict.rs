@@ -184,7 +184,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let annotation = self.infer_extra_items_kwarg(&kw.value);
                         extra_items = Some(TypedDictOpenness::extra(
                             db,
-                            self.program,
                             annotation.inner_type(),
                             annotation.qualifiers().contains(TypeQualifiers::READ_ONLY),
                         ));

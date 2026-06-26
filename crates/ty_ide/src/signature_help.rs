@@ -9,7 +9,6 @@
 use crate::Db;
 use crate::docstring::Docstring;
 use crate::goto::docstring_for_call_definition;
-use ruff_db::parsed::parsed_module;
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -78,8 +77,7 @@ pub fn signature_help<'db>(
     analysis_file: AnalysisFile<'db>,
     offset: TextSize,
 ) -> Option<SignatureHelpInfo<'db>> {
-    let file = analysis_file.file(db);
-    let parsed = parsed_module(db, file).load(db);
+    let parsed = analysis_file.parsed(db).load(db);
 
     // Get the call expression at the given position.
     let (call_expr, current_arg_index) = get_call_expr(&parsed, offset)?;

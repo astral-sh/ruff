@@ -110,7 +110,6 @@ impl<'db> DynamicClassAnchor<'db> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -121,6 +120,7 @@ impl<'db> DynamicClassAnchor<'db> {
                 offset,
                 explicit_bases,
             } => {
+                let program = scope.program(db);
                 let explicit_bases = explicit_bases
                     .iter()
                     .map(|base| {
@@ -175,6 +175,10 @@ impl<'db> DynamicClassLiteral<'db> {
             DynamicClassAnchor::Definition(definition) => definition.scope(db),
             DynamicClassAnchor::ScopeOffset { scope, .. } => *scope,
         }
+    }
+
+    fn program(self, db: &'db dyn Db) -> crate::Program<'db> {
+        self.scope(db).program(db)
     }
 
     /// Returns the explicit base classes of this dynamic class.
@@ -277,8 +281,8 @@ impl<'db> DynamicClassLiteral<'db> {
     /// that is a subclass of all other base metaclasses.
     ///
     /// See <https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass>
-    pub(crate) fn metaclass(self, db: &'db dyn Db, program: crate::Program<'db>) -> Type<'db> {
-        self.try_metaclass(db, program)
+    pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
+        self.try_metaclass(db)
             .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown())
     }
 
@@ -291,8 +295,8 @@ impl<'db> DynamicClassLiteral<'db> {
     pub(crate) fn try_metaclass(
         self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
     ) -> Result<Type<'db>, DynamicMetaclassConflict<'db>> {
+        let program = self.program(db);
         let original_bases = self.explicit_bases(db);
 
         // If no bases, metaclass is `type`.
@@ -303,7 +307,7 @@ impl<'db> DynamicClassLiteral<'db> {
         }
 
         // If there's an MRO error, return unknown to avoid cascading errors.
-        if self.try_mro(db, program).is_err() {
+        if self.try_mro(db).is_err() {
             return Ok(SubclassOfType::subclass_of_unknown());
         }
 
@@ -331,11 +335,11 @@ impl<'db> DynamicClassLiteral<'db> {
             let base_metaclass = base.metaclass(db, program);
 
             // Get the ClassType for comparison.
-            let Some(candidate_class) = candidate.to_class_type(db, program) else {
+            let Some(candidate_class) = candidate.to_class_type(db) else {
                 // If candidate isn't a class type, keep it as is.
                 continue;
             };
-            let Some(base_metaclass_class) = base_metaclass.to_class_type(db, program) else {
+            let Some(base_metaclass_class) = base_metaclass.to_class_type(db) else {
                 continue;
             };
 
@@ -372,12 +376,7 @@ impl<'db> DynamicClassLiteral<'db> {
     /// If the MRO cannot be computed (e.g., due to inconsistent ordering), falls back
     /// to iterating over base MROs sequentially with deduplication.
     pub(crate) fn iter_mro(self, db: &'db dyn Db) -> MroIterator<'db> {
-        MroIterator::new(
-            db,
-            ClassLiteral::Dynamic(self).program(db),
-            ClassLiteral::Dynamic(self),
-            None,
-        )
+        MroIterator::new(db, ClassLiteral::Dynamic(self), None)
     }
 
     /// Look up an instance member by iterating through the MRO.
@@ -470,7 +469,8 @@ impl<'db> DynamicClassLiteral<'db> {
     /// an error (duplicate bases or C3 linearization failure).
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|db, _, self_: DynamicClassLiteral<'db>, program| {
+        cycle_initial=|db, _, self_: DynamicClassLiteral<'db>| {
+            let program = self_.scope(db).program(db);
             Ok(Mro::from([
                 ClassBase::Class(ClassType::NonGeneric(ClassLiteral::Dynamic(self_))),
                 ClassBase::object(db, program),
@@ -478,12 +478,8 @@ impl<'db> DynamicClassLiteral<'db> {
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(crate) fn try_mro(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> Result<Mro<'db>, DynamicMroError<'db>> {
-        Mro::of_dynamic_class(db, program, self)
+    pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
+        Mro::of_dynamic_class(db, self)
     }
 
     /// Return `Some()` if this dynamic class is known to be a [`DisjointBase`].
@@ -493,11 +489,8 @@ impl<'db> DynamicClassLiteral<'db> {
     /// ```python
     /// X = type("X", (), {"__slots__": ("a",)})
     /// ```
-    pub(super) fn as_disjoint_base(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> Option<DisjointBase<'db>> {
+    pub(super) fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
+        let program = self.program(db);
         // Check if __slots__ is in the members
         for (name, ty) in self.members(db) {
             if name.as_str() == "__slots__" {
@@ -558,13 +551,13 @@ impl<'db> DynamicClassLiteral<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        let program = self.program(db);
         let anchor = self
             .anchor(db)
-            .recursive_type_normalized_impl(db, program, div, nested)?;
+            .recursive_type_normalized_impl(db, div, nested)?;
         let members = self
             .members(db)
             .iter()

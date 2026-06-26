@@ -13,7 +13,6 @@ pub use diagnostic::{
 pub use fixes::{fix_all_diagnostics, suppress_all_diagnostics};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
 use ruff_db::parsed::parsed_module_versioned;
 use ruff_db::source::{SourceTextError, source_text};
 use rustc_hash::FxHasher;
@@ -157,8 +156,8 @@ pub(crate) fn attribute_declarations<'db, 's>(
 }
 
 /// Get the module-level docstring for the given file.
-pub(crate) fn module_docstring(db: &dyn Db, file: File) -> Option<String> {
-    let module = parsed_module(db, file).load(db);
+pub(crate) fn module_docstring(db: &dyn Db, file: AnalysisFile<'_>) -> Option<String> {
+    let module = file.parsed(db).load(db);
     docstring_from_body(module.suite())
         .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
 }

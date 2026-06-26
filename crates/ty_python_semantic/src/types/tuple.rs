@@ -277,37 +277,31 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     pub(super) fn check_tuple_type_pair(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         source: TupleType<'db>,
         target: TupleType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.check_tuple_spec_pair(db, program, source.tuple(db), target.tuple(db))
+        self.check_tuple_spec_pair(db, source.tuple(db), target.tuple(db))
     }
 
     fn check_tuple_spec_pair(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         source: &TupleSpec<'db>,
         target: &TupleSpec<'db>,
     ) -> ConstraintSet<'db, 'c> {
         match source {
-            Tuple::Fixed(source) => {
-                self.check_fixed_length_tuple_vs_tuple_spec(db, program, source, target)
-            }
-            Tuple::Variable(source) => {
-                self.check_variable_length_vs_tuple_spec(db, program, source, target)
-            }
+            Tuple::Fixed(source) => self.check_fixed_length_tuple_vs_tuple_spec(db, source, target),
+            Tuple::Variable(source) => self.check_variable_length_vs_tuple_spec(db, source, target),
         }
     }
 
     fn check_fixed_length_tuple_vs_tuple_spec(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         source_tuple: &FixedLengthTuple<Type<'db>>,
         target_tuple: &TupleSpec<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let program = self.program;
         match target_tuple {
             Tuple::Fixed(target) => {
                 let equal_length = source_tuple.0.len() == target.0.len();
@@ -330,8 +324,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             program,
                             self.constraints,
                             |(&source, &target)| {
-                                let constraint_set =
-                                    self.check_type_pair(db, program, source, target);
+                                let constraint_set = self.check_type_pair(db, source, target);
                                 if constraint_set.is_never_satisfied(db, program) {
                                     self.provide_context(|| {
                                         ErrorContext::TupleElementNotCompatible {
@@ -361,8 +354,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let Some(&source_ty) = source_iter.next() else {
                         return self.never();
                     };
-                    let element_constraints =
-                        self.check_type_pair(db, program, source_ty, target_ty);
+                    let element_constraints = self.check_type_pair(db, source_ty, target_ty);
                     if result
                         .intersect(db, self.constraints, element_constraints)
                         .is_never_satisfied(db, program)
@@ -374,8 +366,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let Some(&source_ty) = source_iter.next_back() else {
                         return self.never();
                     };
-                    let element_constraints =
-                        self.check_type_pair(db, program, source_ty, target_ty);
+                    let element_constraints = self.check_type_pair(db, source_ty, target_ty);
                     if result
                         .intersect(db, self.constraints, element_constraints)
                         .is_never_satisfied(db, program)
@@ -388,7 +379,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // variable-length portion of the other tuple.
                 result.and(db, program, self.constraints, || {
                     source_iter.when_all(db, self.program, self.constraints, |&source_ty| {
-                        self.check_type_pair(db, program, source_ty, target.variable())
+                        self.check_type_pair(db, source_ty, target.variable())
                     })
                 })
             }
@@ -398,10 +389,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     fn check_variable_length_vs_tuple_spec(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         source: &VariableLengthTuple<Type<'db>>,
         target: &TupleSpec<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let program = self.program;
         match target {
             Tuple::Fixed(target) => {
                 // The `...` length specifier of a variable-length tuple type is interpreted
@@ -427,8 +418,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let Some(target_ty) = target_iter.next() else {
                         return self.never();
                     };
-                    let element_constraints =
-                        self.check_type_pair(db, program, source_ty, target_ty);
+                    let element_constraints = self.check_type_pair(db, source_ty, target_ty);
                     if result
                         .intersect(db, self.constraints, element_constraints)
                         .is_never_satisfied(db, program)
@@ -443,8 +433,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let Some(target_ty) = target_iter.next_back() else {
                         return self.never();
                     };
-                    let element_constraints =
-                        self.check_type_pair(db, program, source_ty, target_ty);
+                    let element_constraints = self.check_type_pair(db, source_ty, target_ty);
                     if result
                         .intersect(db, self.constraints, element_constraints)
                         .is_never_satisfied(db, program)
@@ -482,10 +471,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 for pair in pairwise {
                     let pair_constraints = match pair {
                         EitherOrBoth::Both(self_ty, other_ty) => {
-                            self.check_type_pair(db, program, self_ty, other_ty)
+                            self.check_type_pair(db, self_ty, other_ty)
                         }
                         EitherOrBoth::Left(self_ty) => {
-                            self.check_type_pair(db, program, self_ty, target.variable())
+                            self.check_type_pair(db, self_ty, target.variable())
                         }
                         EitherOrBoth::Right(other_ty) => {
                             // The rhs has a required element that the lhs is not guaranteed to
@@ -495,7 +484,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             if !self.is_eager_assignability() || !source.variable().is_dynamic() {
                                 return self.never();
                             }
-                            self.check_type_pair(db, program, source.variable(), other_ty)
+                            self.check_type_pair(db, source.variable(), other_ty)
                         }
                     };
                     if result
@@ -519,10 +508,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 for pair in pairwise {
                     let pair_constraints = match pair {
                         EitherOrBoth::Both(&source_ty, &target_ty) => {
-                            self.check_type_pair(db, program, source_ty, target_ty)
+                            self.check_type_pair(db, source_ty, target_ty)
                         }
                         EitherOrBoth::Left(&source_ty) => {
-                            self.check_type_pair(db, program, source_ty, target.variable())
+                            self.check_type_pair(db, source_ty, target.variable())
                         }
                         EitherOrBoth::Right(&target_ty) => {
                             // The rhs has a required element that the lhs is not guaranteed to
@@ -532,7 +521,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             if !self.is_eager_assignability() || !source.variable().is_dynamic() {
                                 return self.never();
                             }
-                            self.check_type_pair(db, program, source.variable(), target_ty)
+                            self.check_type_pair(db, source.variable(), target_ty)
                         }
                     };
                     if result
@@ -545,7 +534,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                 // And lastly, the variable-length portions must satisfy the relation.
                 result.and(db, program, self.constraints, || {
-                    self.check_type_pair(db, program, source.variable(), target.variable())
+                    self.check_type_pair(db, source.variable(), target.variable())
                 })
             }
         }
@@ -556,20 +545,19 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     pub(super) fn check_tuple_type_pair(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         left: TupleType<'db>,
         right: TupleType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.check_tuple_spec_pair(db, program, left.tuple(db), right.tuple(db))
+        self.check_tuple_spec_pair(db, left.tuple(db), right.tuple(db))
     }
 
     pub(super) fn check_tuple_spec_pair(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         left: &TupleSpec<'db>,
         right: &TupleSpec<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let program = self.program;
         // Two tuples with an incompatible number of required elements must always be disjoint.
         let (self_min, self_max) = left.len().size_hint();
         let (other_min, other_max) = right.len().size_hint();
@@ -587,18 +575,14 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     db,
                     program,
                     self.constraints,
-                    |(&left_elem, &right_elem)| {
-                        self.check_type_pair(db, program, left_elem, right_elem)
-                    },
+                    |(&left_elem, &right_elem)| self.check_type_pair(db, left_elem, right_elem),
                 )
             } else {
                 std::iter::zip(a, b).when_any(
                     db,
                     program,
                     self.constraints,
-                    |(&left_elem, &right_elem)| {
-                        self.check_type_pair(db, program, left_elem, right_elem)
-                    },
+                    |(&left_elem, &right_elem)| self.check_type_pair(db, left_elem, right_elem),
                 )
             }
         };

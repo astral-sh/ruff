@@ -14,7 +14,6 @@ pub(crate) mod outgoing_calls;
 use crate::goto::{GotoTarget, find_goto_target};
 use crate::{Db, SymbolKind};
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
 use ruff_python_ast::find_node::CoveringNode;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::Tokens;
@@ -36,8 +35,7 @@ pub fn prepare_call_hierarchy(
     analysis_file: AnalysisFile<'_>,
     offset: TextSize,
 ) -> Option<Vec<CallHierarchyItem>> {
-    let file = analysis_file.file(db);
-    let module = parsed_module(db, file).load(db);
+    let module = analysis_file.parsed(db).load(db);
     let model = SemanticModel::new(db, analysis_file);
     let goto_target = find_goto_target(&model, &module, offset)?;
     let definitions = goto_target
@@ -50,7 +48,7 @@ pub fn prepare_call_hierarchy(
             continue;
         };
 
-        let module_ref = parsed_module(db, def.file(db)).load(db);
+        let module_ref = def.analysis_file(db).parsed(db).load(db);
 
         if let Some(item) = CallHierarchyItem::from_definition(db, resolved, &module_ref) {
             items.push(item);

@@ -169,7 +169,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 report_inconsistent_dynamic_generic_bases(&self.context, dynamic_class, bases_arg);
 
                 // MRO succeeded, check for instance-layout-conflict.
-                disjoint_bases.remove_redundant_entries(db, self.program);
+                disjoint_bases.remove_redundant_entries(db);
                 if disjoint_bases.len() > 1 {
                     report_instance_layout_conflict(
                         &self.context,
@@ -186,7 +186,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 base1,
                 metaclass2,
                 base2,
-            }) = dynamic_class.try_metaclass(db, self.program)
+            }) = dynamic_class.try_metaclass(db)
             {
                 report_conflicting_metaclass_from_bases(
                     &self.context,

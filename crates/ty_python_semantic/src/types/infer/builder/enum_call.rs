@@ -474,7 +474,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let anchor = self.create_dynamic_enum_anchor(call_expr, definition, spec);
         let enum_lit = DynamicEnumLiteral::new(db, name, anchor, base_class, mixin_type);
-        if let Err(error) = enum_lit.try_mro(db, program) {
+        if let Err(error) = enum_lit.try_mro(db) {
             report_mro_error_kind(
                 &self.context,
                 error,
@@ -559,13 +559,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 return (None, false);
             }
 
-            let Some(mixin_class) = ty.to_class_type(db, program) else {
+            let Some(mixin_class) = ty.to_class_type(db) else {
                 return (Some(ty), true);
             };
-            let Some(enum_base) = base_class
-                .to_class_literal(db, program)
-                .to_class_type(db, program)
-            else {
+            let Some(enum_base) = base_class.to_class_literal(db, program).to_class_type(db) else {
                 return (Some(ty), true);
             };
             let constraints = ConstraintSetBuilder::new();

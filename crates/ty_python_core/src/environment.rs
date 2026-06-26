@@ -1,5 +1,5 @@
 use ruff_db::files::File;
-use ruff_db::parsed::VersionedFile;
+use ruff_db::parsed::{ParsedModule, VersionedFile, parsed_module_versioned};
 use ty_module_resolver::{ModuleGlobSet, ProgramFile};
 
 use crate::Db;
@@ -36,5 +36,9 @@ impl<'db> AnalysisFile<'db> {
 
     pub fn versioned_file(self, db: &'db dyn Db) -> VersionedFile<'db> {
         self.program(db).versioned_file(db, self.file(db))
+    }
+
+    pub fn parsed(self, db: &'db dyn Db) -> &'db ParsedModule {
+        parsed_module_versioned(db, self.versioned_file(db))
     }
 }

@@ -1,7 +1,6 @@
 use crate::goto::find_goto_target;
 use crate::{Db, HasNavigationTargets, NavigationTargets, RangedValue};
 use ruff_db::files::FileRange;
-use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use ty_python_core::environment::AnalysisFile;
 use ty_python_semantic::SemanticModel;
@@ -12,7 +11,7 @@ pub fn goto_type_definition(
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
     let file = analysis_file.file(db);
-    let module = parsed_module(db, file).load(db);
+    let module = analysis_file.parsed(db).load(db);
     let model = SemanticModel::new(db, analysis_file);
     let goto_target = find_goto_target(&model, &module, offset)?;
 

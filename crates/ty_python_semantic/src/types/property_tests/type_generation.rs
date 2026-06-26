@@ -91,12 +91,10 @@ pub(crate) enum CallableParams {
 
 impl CallableParams {
     pub(crate) fn into_parameters(self, db: &TestDb) -> Parameters<'_> {
-        let program = db.program();
         match self {
             CallableParams::GradualForm => Parameters::gradual_form(),
             CallableParams::List(params) => Parameters::new(
                 db,
-                program,
                 params.into_iter().map(|param| {
                     let parameter = match param.kind {
                         ParamKind::PositionalOnly => Parameter::positional_only(param.name),
@@ -239,7 +237,7 @@ impl Ty {
                     .place
                     .expect_type()
                     .expect_class_literal()
-                    .default_specialization(db, program),
+                    .default_specialization(db),
             ),
             Ty::SubclassOfAbcClass(s) => SubclassOfType::from(
                 db,
@@ -248,7 +246,7 @@ impl Ty {
                     .place
                     .expect_type()
                     .expect_class_literal()
-                    .default_specialization(db, program),
+                    .default_specialization(db),
             ),
             Ty::AlwaysTruthy => Type::AlwaysTruthy,
             Ty::AlwaysFalsy => Type::AlwaysFalsy,

@@ -40,7 +40,7 @@ pub(super) fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized
     type_alias: PEP695TypeAliasType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, program, type_alias.value_type(db, program));
+    visitor.visit_type(db, program, type_alias.value_type(db));
 }
 
 #[salsa::tracked]
@@ -52,8 +52,8 @@ impl<'db> PEP695TypeAliasType<'db> {
     }
 
     /// The RHS type of a PEP-695 style type alias with specialization applied.
-    pub(crate) fn value_type(self, db: &'db dyn Db, program: crate::Program<'db>) -> Type<'db> {
-        self.apply_function_specialization(db, program, self.raw_value_type(db))
+    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+        self.apply_function_specialization(db, self.raw_value_type(db))
     }
 
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.
@@ -76,12 +76,8 @@ impl<'db> PEP695TypeAliasType<'db> {
         definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
     }
 
-    fn apply_function_specialization(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-        ty: Type<'db>,
-    ) -> Type<'db> {
+    fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        let program = self.rhs_scope(db).analysis_file(db).program(db);
         if let Some(generic_context) = self.generic_context(db) {
             let specialization = self
                 .specialization(db)
@@ -241,6 +237,15 @@ pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> TypeAliasType<'db> {
+    pub(crate) fn program(self, db: &'db dyn Db) -> crate::Program<'db> {
+        match self {
+            TypeAliasType::PEP695(type_alias) => type_alias.rhs_scope(db).program(db),
+            TypeAliasType::ManualPEP695(type_alias) => {
+                type_alias.definition(db).analysis_file(db).program(db)
+            }
+        }
+    }
+
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.name(db),
@@ -255,9 +260,9 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub fn value_type(self, db: &'db dyn Db, program: crate::Program<'db>) -> Type<'db> {
+    pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            TypeAliasType::PEP695(type_alias) => type_alias.value_type(db, program),
+            TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
         }
     }
@@ -291,16 +296,9 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub(super) fn apply_function_specialization(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-        ty: Type<'db>,
-    ) -> Type<'db> {
+    pub(super) fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         match self {
-            TypeAliasType::PEP695(type_alias) => {
-                type_alias.apply_function_specialization(db, program, ty)
-            }
+            TypeAliasType::PEP695(type_alias) => type_alias.apply_function_specialization(db, ty),
             TypeAliasType::ManualPEP695(_) => ty,
         }
     }
@@ -324,20 +322,27 @@ impl<'db> TypeAliasType<'db> {
     }
 }
 
-#[salsa::tracked]
+#[salsa::tracked(
+    cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn type_alias_variance_of<'db>(
+    db: &'db dyn Db,
+    type_alias: TypeAliasType<'db>,
+    typevar: BoundTypeVarInstance<'db>,
+) -> TypeVarVariance {
+    let program = type_alias.program(db);
+    type_alias.value_type(db).variance_of(db, program, typevar)
+}
+
 impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
-    #[salsa::tracked(
-        cycle_initial=|_, _, _, _, _| TypeVarVariance::Bivariant,
-        heap_size=ruff_memory_usage::heap_size
-    )]
     fn variance_of(
         self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
+        _program: crate::Program<'db>,
         typevar: BoundTypeVarInstance<'db>,
     ) -> TypeVarVariance {
-        self.value_type(db, program)
-            .variance_of(db, program, typevar)
+        type_alias_variance_of(db, self, typevar)
     }
 }
 

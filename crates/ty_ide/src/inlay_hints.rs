@@ -4,8 +4,6 @@ use rustc_hash::FxHashMap;
 
 use crate::importer::{ImportAction, ImportRequest, Importer, MembersInScope};
 use crate::{Db, HasNavigationTargets, NavigationTarget};
-use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Stmt, UnaryOp};
@@ -36,11 +34,12 @@ impl InlayHint {
     ) -> Option<Self> {
         let InlayHintImportContext {
             db,
-            program,
-            file,
+            analysis_file,
             importer,
             dynamic_imports,
         } = context;
+        let program = analysis_file.program(db);
+        let file = analysis_file.file(db);
 
         let position = expr.range().end();
         // Render the type to a string, and get subspans for all the types that make it up
@@ -295,7 +294,7 @@ pub fn inlay_hints(
     settings: &InlayHintSettings,
 ) -> Vec<InlayHint> {
     let file = analysis_file.file(db);
-    let ast = parsed_module(db, file).load(db);
+    let ast = analysis_file.parsed(db).load(db);
 
     let source = source_text(db, file);
     let stylist = Stylist::from_tokens(ast.tokens(), source.as_str());
@@ -347,8 +346,7 @@ impl Default for InlayHintSettings {
 
 struct InlayHintImportContext<'a, 'db> {
     db: &'db dyn Db,
-    program: Program<'db>,
-    file: File,
+    analysis_file: AnalysisFile<'db>,
     importer: &'a Importer<'db>,
     dynamic_imports: &'a mut FxHashMap<DynamicallyImportedMember, ImportAction>,
 }
@@ -399,8 +397,7 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
 
         let context = InlayHintImportContext {
             db: self.db,
-            program: self.model.analysis_file().program(self.db),
-            file: self.model.file(),
+            analysis_file: self.model.analysis_file(),
             importer: &self.importer,
             dynamic_imports: &mut self.dynamic_imports,
         };

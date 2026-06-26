@@ -264,7 +264,11 @@ impl<'db> Definitions<'db> {
         let ty_def = ty.definition(db, program)?;
         let resolved = match ty_def {
             ty_python_semantic::types::TypeDefinition::Module(module) => {
-                ResolvedDefinition::Module(module.file(db)?)
+                ResolvedDefinition::Module(ty_python_core::environment::AnalysisFile::new(
+                    db,
+                    program,
+                    module.file(db)?,
+                ))
             }
             ty_python_semantic::types::TypeDefinition::StaticClass(definition)
             | ty_python_semantic::types::TypeDefinition::DynamicClass(definition)
@@ -357,8 +361,7 @@ impl<'db> Definitions<'db> {
             .into_iter()
             .map(|definition| match definition {
                 ResolvedDefinition::Definition(definition) => {
-                    let file = definition.file(db);
-                    let module = ruff_db::parsed::parsed_module(db, file).load(db);
+                    let module = definition.analysis_file(db).parsed(db).load(db);
 
                     let focus_range = definition.focus_range(db, &module);
                     let full_range = definition.full_range(db, &module);
@@ -370,7 +373,7 @@ impl<'db> Definitions<'db> {
                     }
                 }
                 ResolvedDefinition::Module(file) => {
-                    NavigationTarget::new(file, TextRange::default())
+                    NavigationTarget::new(file.file(db), TextRange::default())
                 }
                 ResolvedDefinition::FileWithRange(file_range) => NavigationTarget::from(file_range),
             })
@@ -1404,7 +1407,13 @@ fn definitions_for_module<'db>(
 ) -> Option<Vec<ResolvedDefinition<'db>>> {
     let module = model.resolve_module(module, level)?;
     let file = module.file(model.db())?;
-    Some(vec![ResolvedDefinition::Module(file)])
+    Some(vec![ResolvedDefinition::Module(
+        ty_python_core::environment::AnalysisFile::new(
+            model.db(),
+            model.analysis_file().program(model.db()),
+            file,
+        ),
+    )])
 }
 
 /// Helper function to extract module component information from a dotted module name

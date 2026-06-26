@@ -201,7 +201,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let report_not_in_init = || {
             let is_dataclass_like = object_ty
                 .nominal_class(db, self.program)
-                .or_else(|| object_ty.to_class_type(db, self.program))
+                .or_else(|| object_ty.to_class_type(db))
                 .and_then(|cls| cls.static_class_literal(db))
                 .is_some_and(|(class_literal, _)| class_literal.is_dataclass_like(db));
             let Some(builder) = self
@@ -239,8 +239,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // that happens to have the right type.
         let is_self_parameter = self.is_instance_attribute_assignment(target);
 
-        let class_instance_ty =
-            Type::instance(db, self.program, class_ty).top_materialization(db, self.program);
+        let class_instance_ty = Type::instance(db, class_ty).top_materialization(db, self.program);
         let object_instance_ty = object_ty.bind_self_typevars(db, self.program, class_instance_ty);
         let is_current_class_instance = is_self_parameter
             && object_instance_ty.is_subtype_of(db, self.program, class_instance_ty);

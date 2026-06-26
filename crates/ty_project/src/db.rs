@@ -75,15 +75,12 @@ impl ProjectDatabase {
 
     /// Permanently freezes the most heavily read inputs that are immutable during a one-shot check.
     ///
-    /// This is intentionally not exhaustive. It includes every [`Program`] input, the most heavily
-    /// read immutable [`Project`] inputs, and every field on files created after this call. Existing
-    /// files retain their durability. This must not be used by incremental consumers or checks that
-    /// apply fixes.
+    /// This is intentionally not exhaustive. It includes the most heavily read immutable
+    /// [`Project`] inputs and every field on files created after this call. Existing files retain
+    /// their durability. This must not be used by incremental consumers or checks that apply fixes.
     pub fn freeze(&mut self) {
-        let program = Program::try_get(self).expect("the program should be initialized");
         let project = self.project();
 
-        program.freeze(self);
         project.freeze(self);
         self.files.freeze();
     }
@@ -551,12 +548,15 @@ impl SemanticDb for ProjectDatabase {
         &self,
         program: ty_python_core::program::Program<'_>,
     ) -> ty_python_semantic::PythonVersionSource {
-        debug_assert_eq!(program, self.project().program(self));
-        self.project()
-            .program_settings(self)
-            .python_version
-            .source
-            .clone()
+        if program == self.project().program(self) {
+            self.project()
+                .program_settings(self)
+                .python_version
+                .source
+                .clone()
+        } else {
+            ty_python_semantic::PythonVersionSource::Default
+        }
     }
 
     fn verbose(&self) -> bool {
@@ -832,7 +832,11 @@ mod tests {
     use ruff_db::Db as _;
     use ruff_db::files::FileRootKind;
     use ruff_db::system::{SystemPathBuf, TestSystem};
+    use ruff_python_ast::PythonVersion;
     use ty_module_resolver::list_modules;
+    use ty_python_core::environment::InferenceSettings;
+    use ty_python_core::program::{Program, ProgramSettings};
+    use ty_python_semantic::{PythonVersionSource, PythonVersionWithSource};
 
     use crate::{ProjectDatabase, ProjectMetadata};
 
@@ -849,6 +853,37 @@ mod tests {
         db.freeze();
 
         assert_eq!(db.check().len(), 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn unknown_program_has_default_python_version_source() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let project = SystemPathBuf::from("/project");
+        system.memory_file_system().create_directory_all(&project)?;
+
+        let metadata = ProjectMetadata::discover(&project, &system)?;
+        let db = ProjectDatabase::fallible(metadata, system)?;
+        let project_program = db.project().program(&db);
+        let alternate_program = Program::from_settings(
+            &db,
+            &ProgramSettings {
+                python_version: PythonVersionWithSource {
+                    version: PythonVersion::PY310,
+                    source: PythonVersionSource::Cli,
+                },
+                python_platform: project_program.python_platform(&db).clone(),
+                search_paths: project_program.search_paths(&db).clone(),
+            },
+            &InferenceSettings::default(),
+        );
+
+        assert_ne!(alternate_program, project_program);
+        assert_eq!(
+            ty_python_semantic::Db::python_version_source(&db, alternate_program),
+            PythonVersionSource::Default
+        );
 
         Ok(())
     }

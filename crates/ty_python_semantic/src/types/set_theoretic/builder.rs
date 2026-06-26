@@ -277,7 +277,7 @@ fn normalize_enum_complement_unions<'db>(
 
         if !remove_indices.is_empty() {
             let mut builder = IntersectionBuilder::new(db, program)
-                .add_positive(enum_class.to_non_generic_instance(db, program));
+                .add_positive(enum_class.to_non_generic_instance(db));
             for rest in complement.rest(db) {
                 builder = builder.add_positive(*rest);
             }
@@ -652,6 +652,10 @@ impl<'db> UnionBuilder<'db> {
         self.elements.is_empty()
     }
 
+    pub(crate) fn program(&self) -> Program<'db> {
+        self.program
+    }
+
     /// Collapse the union to a single type: `object`.
     fn collapse_to_object(&mut self) {
         self.elements.clear();
@@ -673,7 +677,7 @@ impl<'db> UnionBuilder<'db> {
                 }
                 UnionElement::EnumLiterals { literals, .. } => {
                     let (enum_literal, _) = literals.first().unwrap();
-                    replace_with.push(enum_literal.enum_class_instance(self.db, self.program));
+                    replace_with.push(enum_literal.enum_class_instance(self.db));
                 }
                 UnionElement::Type(_) => {}
             }
@@ -739,7 +743,7 @@ impl<'db> UnionBuilder<'db> {
                     // leave out the recursive alias. TODO surface this error.
                 } else {
                     seen_aliases.push(ty);
-                    self.add_in_place_impl(alias.value_type(self.db, self.program), seen_aliases);
+                    self.add_in_place_impl(alias.value_type(self.db), seen_aliases);
                 }
             }
             Type::LiteralValue(literal) => {
@@ -931,7 +935,7 @@ impl<'db> UnionBuilder<'db> {
 
                         if members_are_exhaustive && enum_member_count == 1 {
                             self.add_in_place_impl(
-                                enum_member_to_add.enum_class_instance(self.db, self.program),
+                                enum_member_to_add.enum_class_instance(self.db),
                                 seen_aliases,
                             );
                             return;
@@ -950,8 +954,7 @@ impl<'db> UnionBuilder<'db> {
                                     }
                                     if should_widen(literals.len(), self.recursively_defined) {
                                         let (literal, _) = literals.first().unwrap();
-                                        let replace_with =
-                                            literal.enum_class_instance(self.db, self.program);
+                                        let replace_with = literal.enum_class_instance(self.db);
                                         self.add_in_place_impl(replace_with, seen_aliases);
                                         return;
                                     }
@@ -993,8 +996,7 @@ impl<'db> UnionBuilder<'db> {
 
                                     if members_are_exhaustive && found.len() == enum_member_count {
                                         self.add_in_place_impl(
-                                            enum_member_to_add
-                                                .enum_class_instance(self.db, self.program),
+                                            enum_member_to_add.enum_class_instance(self.db),
                                             seen_aliases,
                                         );
                                         return;
@@ -1300,7 +1302,7 @@ impl<'db> IntersectionBuilder<'db> {
                     return self;
                 }
                 seen_aliases.push(ty);
-                let value_type = alias.value_type(self.db, self.program);
+                let value_type = alias.value_type(self.db);
                 self.add_positive_impl(value_type, seen_aliases)
             }
             Type::Union(union) => {
@@ -1337,8 +1339,7 @@ impl<'db> IntersectionBuilder<'db> {
             }
             Type::EnumComplement(complement) => {
                 let db = self.db;
-                let program = self.program;
-                self.add_positive_impl(complement.to_intersection(db, program), seen_aliases)
+                self.add_positive_impl(complement.to_intersection(db), seen_aliases)
             }
             _ => {
                 // If we are already a union-of-intersections, distribute the new intersected element
@@ -1371,7 +1372,7 @@ impl<'db> IntersectionBuilder<'db> {
                     return self;
                 }
                 seen_aliases.push(ty);
-                let value_type = alias.value_type(self.db, self.program);
+                let value_type = alias.value_type(self.db);
                 self.add_negative_impl(value_type, seen_aliases)
             }
             Type::Union(union) => {
@@ -1416,8 +1417,7 @@ impl<'db> IntersectionBuilder<'db> {
             }
             Type::EnumComplement(complement) => {
                 let db = self.db;
-                let program = self.program;
-                self.add_negative_impl(complement.to_intersection(db, program), seen_aliases)
+                self.add_negative_impl(complement.to_intersection(db), seen_aliases)
             }
             _ => {
                 for inner in &mut self.intersections {
@@ -1561,7 +1561,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 if let Some(narrowed) = SubclassOfType::try_from_instance(
                     db,
                     program,
-                    typeform.type_argument(db).resolve_type_alias(db, program),
+                    typeform.type_argument(db).resolve_type_alias(db),
                 ) && self
                     .positive
                     .swap_remove(&KnownClass::Type.to_instance(db, program))
@@ -1578,7 +1578,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                             Type::TypeForm(typeform) => SubclassOfType::try_from_instance(
                                 db,
                                 program,
-                                typeform.type_argument(db).resolve_type_alias(db, program),
+                                typeform.type_argument(db).resolve_type_alias(db),
                             )
                             .map(|narrowed| (index, narrowed)),
                             _ => None,
@@ -1918,7 +1918,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 continue;
             };
             let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
-                bound_typevar.typevar(db).bound_or_constraints(db, program)
+                bound_typevar.typevar(db).bound_or_constraints(db)
             else {
                 continue;
             };
@@ -2106,9 +2106,7 @@ mod tests {
             .expect("SafeUUID has members");
         assert_widens(
             enum_literal,
-            enum_literal
-                .expect_enum_literal()
-                .enum_class_instance(&db, program),
+            enum_literal.expect_enum_literal().enum_class_instance(&db),
         );
     }
 
@@ -2344,9 +2342,7 @@ mod tests {
         assert_eq!(l_unknown.expect_enum_literal().name(&db), "unknown");
 
         // The enum itself: SafeUUID
-        let safe_uuid = l_safe
-            .expect_enum_literal()
-            .enum_class_instance(&db, program);
+        let safe_uuid = l_safe.expect_enum_literal().enum_class_instance(&db);
 
         {
             let actual = IntersectionBuilder::new(&db, program)

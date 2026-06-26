@@ -79,7 +79,7 @@ impl<'db> ExpectedReturnType<'db> {
             }
         }
 
-        let program = function.definition(db).analysis_file(db).program(db);
+        let program = function.program(db);
         let public = normalize(
             db,
             program,
@@ -433,7 +433,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_transformer_params,
             function.returns.is_some(),
         );
-        let function_literal = FunctionLiteral::new(db, self.program, overload_literal);
+        let function_literal = FunctionLiteral::new(db, overload_literal);
 
         let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(db, function_literal, None));
         if !decorator_list.is_empty() {
@@ -446,9 +446,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let current_scope = self.scope().file_scope_id(db);
             for type_param in type_params.iter() {
                 let param_name = type_param.name();
-                for enclosing in
-                    enclosing_generic_contexts(db, self.program, self.index, current_scope)
-                {
+                for enclosing in enclosing_generic_contexts(db, self.index, current_scope) {
                     if let Some(other_typevar) = enclosing.binds_named_typevar(db, &param_name.id) {
                         let kind = match type_param {
                             ast::TypeParam::TypeVar(_) => TypeVarKind::Pep695TypeVar,
@@ -687,7 +685,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let annotated_type = self.file_expression_type(annotation);
         let Some(unpacked_keys) = extract_unpacked_typed_dict_keys_from_kwargs_annotation(
             self.db(),
-            self.program,
             annotated_type,
             annotation_flags,
         ) else {
@@ -848,12 +845,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let default_ty = self.file_expression_type(default_expr);
 
                 // Avoid duplicate diagnostics: invalid TypedDict literals already emit specific errors.
-                let suppress_invalid_default = is_invalid_typed_dict_literal(
-                    db,
-                    self.program,
-                    declared_ty,
-                    default_expr.into(),
-                );
+                let suppress_invalid_default =
+                    is_invalid_typed_dict_literal(db, declared_ty, default_expr.into());
                 if !default_ty.is_assignable_to(db, self.program, declared_ty)
                     && !suppress_invalid_default
                     && !((self.in_stub()
@@ -1027,13 +1020,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let class_definition = self.index.expect_single_definition(class);
         let class_literal = original_class_type(db, class_definition)?;
 
-        let typing_self = typing_self(
-            db,
-            self.program,
-            self.scope(),
-            Some(method_definition),
-            class_literal,
-        );
+        let typing_self = typing_self(db, self.scope(), Some(method_definition), class_literal);
         if is_classmethod || function_name == "__new__" {
             typing_self.map(|typing_self| {
                 SubclassOfType::from(db, self.program, SubclassOfInner::TypeVar(typing_self))
@@ -1104,7 +1091,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             } else if extract_unpacked_typed_dict_keys_from_kwargs_annotation(
                 db,
-                self.program,
                 annotated_type,
                 self.file_type_expression_flags(annotation),
             )

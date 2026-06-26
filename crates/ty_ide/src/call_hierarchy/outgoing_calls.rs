@@ -35,8 +35,7 @@ pub fn outgoing_calls(
     analysis_file: AnalysisFile<'_>,
     offset: TextSize,
 ) -> Vec<OutgoingCall> {
-    let file = analysis_file.file(db);
-    let module = parsed_module(db, file).load(db);
+    let module = analysis_file.parsed(db).load(db);
     let model = SemanticModel::new(db, analysis_file);
     let Some(goto_target) = find_goto_target(&model, &module, offset) else {
         return Vec::new();
@@ -57,8 +56,7 @@ pub fn outgoing_calls(
         let Some(def) = resolved.definition() else {
             continue;
         };
-        let def_file = def.file(db);
-        let parsed = parsed_module(db, def_file).load(db);
+        let parsed = def.analysis_file(db).parsed(db).load(db);
 
         let model = SemanticModel::new(db, def.analysis_file(db));
         let mut finder = OutgoingCallsFinder {

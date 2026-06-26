@@ -547,11 +547,11 @@ impl<'db> Type<'db> {
             (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
 
             (Type::TypeAlias(alias), _) => {
-                Some(alias.value_type(db, program).subscript(db, program, slice_ty, expr_context))
+                Some(alias.value_type(db).subscript(db, program, slice_ty, expr_context))
             }
 
             (_, Type::TypeAlias(alias)) => {
-                Some(value_ty.subscript(db, program, alias.value_type(db, program), expr_context))
+                Some(value_ty.subscript(db, program, alias.value_type(db), expr_context))
             }
 
             (Type::Union(union), _) => Some(map_union_subscript(db, program, union, |element| {

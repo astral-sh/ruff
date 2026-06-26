@@ -177,7 +177,6 @@ fn references_for_keyword_arguments_in_file(
     target_text: &str,
     mode: ReferencesMode,
 ) -> Vec<ReferenceTarget> {
-    let file = analysis_file.file(db);
     // This path is used for cross-file parameter keyword-label references.
     // DocumentHighlights is same-file-only and should never route through here.
     debug_assert!(
@@ -185,7 +184,7 @@ fn references_for_keyword_arguments_in_file(
         "keyword-label cross-file scan should not run in DocumentHighlights mode"
     );
 
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let parsed = analysis_file.parsed(db);
     let module = parsed.load(db);
     let model = SemanticModel::new(db, analysis_file);
     let mut references = Vec::new();
@@ -244,8 +243,7 @@ fn references_for_file(
     target_text: &str,
     mode: ReferencesMode,
 ) -> Vec<ReferenceTarget> {
-    let file = analysis_file.file(db);
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let parsed = analysis_file.parsed(db);
     let module = parsed.load(db);
     let model = SemanticModel::new(db, analysis_file);
     let mut references = Vec::new();
@@ -300,10 +298,12 @@ fn parameter_owner_is_externally_visible_for_target(
     db: &dyn Db,
     definition: &ResolvedDefinition,
 ) -> bool {
-    let target = definition.focus_range(db);
-    let file = target.file();
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let Some(definition) = definition.definition() else {
+        return false;
+    };
+    let parsed = definition.analysis_file(db).parsed(db);
     let module = parsed.load(db);
+    let target = definition.focus_range(db, &module);
 
     let covering = covering_node(module.syntax().into(), target.range());
     let Ok(parameter_covering) =
@@ -608,7 +608,7 @@ impl<'a> LocalReferencesFinder<'a> {
         };
 
         let file = local_definition.file(db);
-        let module = ruff_db::parsed::parsed_module(db, file).load(db);
+        let module = local_definition.analysis_file(db).parsed(db).load(db);
         let kind = local_definition.kind(db);
         let category = kind.category(file.is_stub(db), &module);
 

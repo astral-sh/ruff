@@ -54,59 +54,54 @@ pub(crate) fn callable_pattern_type<'db>(
 /// `TypedDict` is not a nominal subtype of `dict` in the static type system, but every runtime
 /// value is a dictionary. A `TypedDict` therefore matches class patterns such as `dict()`,
 /// `Mapping()`, and `MutableMapping()`.
-pub(crate) fn typed_dict_matches_class_pattern(
-    db: &dyn Db,
-    program: crate::Program<'_>,
-    class: ClassLiteral<'_>,
-) -> bool {
+pub(crate) fn typed_dict_matches_class_pattern(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+    let program = class.program(db);
     let Some(dict) = KnownClass::Dict
         .to_class_literal(db, program)
         .as_class_literal()
     else {
         return false;
     };
-    Type::instance(db, program, dict.top_materialization(db, program)).is_subtype_of(
+    Type::instance(db, dict.top_materialization(db)).is_subtype_of(
         db,
         program,
-        Type::instance(db, program, class.top_materialization(db, program)),
+        Type::instance(db, class.top_materialization(db)),
     )
 }
 
 /// Return whether every value in `ty` belongs to a `TypedDict` domain accepted by `predicate`.
 fn typed_dict_pattern_domain_satisfies<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     ty: Type<'db>,
     predicate: &impl Fn(TypedDictType<'db>) -> bool,
 ) -> bool {
-    match ty.resolve_type_alias(db, program) {
+    match ty.resolve_type_alias(db) {
         Type::TypedDict(typed_dict) => predicate(typed_dict),
-        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db, program) {
+        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                typed_dict_pattern_domain_satisfies(db, program, bound, predicate)
+                typed_dict_pattern_domain_satisfies(db, bound, predicate)
             }
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                constraints.elements(db).iter().all(|constraint| {
-                    typed_dict_pattern_domain_satisfies(db, program, *constraint, predicate)
-                })
-            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                .elements(db)
+                .iter()
+                .all(|constraint| typed_dict_pattern_domain_satisfies(db, *constraint, predicate)),
             None => false,
         },
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .all(|element| typed_dict_pattern_domain_satisfies(db, program, *element, predicate)),
+            .all(|element| typed_dict_pattern_domain_satisfies(db, *element, predicate)),
         Type::Intersection(intersection) => intersection
             .positive(db)
             .iter()
-            .any(|element| typed_dict_pattern_domain_satisfies(db, program, *element, predicate)),
+            .any(|element| typed_dict_pattern_domain_satisfies(db, *element, predicate)),
         _ => false,
     }
 }
 
 /// Return whether every value in `ty` is represented by a `TypedDict` schema at runtime.
-fn is_typed_dict_pattern_domain(db: &dyn Db, program: crate::Program<'_>, ty: Type<'_>) -> bool {
-    typed_dict_pattern_domain_satisfies(db, program, ty, &|_| true)
+fn is_typed_dict_pattern_domain(db: &dyn Db, ty: Type<'_>) -> bool {
+    typed_dict_pattern_domain_satisfies(db, ty, &|_| true)
 }
 
 pub(crate) fn sequence_pattern_type_builder<'db>(
@@ -140,7 +135,6 @@ fn sequence_pattern_getitem_method<'db>(
             Signature::new(
                 Parameters::new(
                     db,
-                    program,
                     [
                         self_parameter(),
                         Parameter::positional_only(Some(Name::new_static("index")))
@@ -154,7 +148,6 @@ fn sequence_pattern_getitem_method<'db>(
         Signature::new(
             Parameters::new(
                 db,
-                program,
                 [
                     self_parameter(),
                     Parameter::positional_only(Some(Name::new_static("index")))
@@ -214,10 +207,7 @@ pub(crate) fn exact_sequence_pattern_type<'db>(
 
     let self_parameter = || Parameter::positional_only(Some(Name::new_static("self")));
 
-    let len_signature = Signature::new(
-        Parameters::new(db, program, [self_parameter()]),
-        length_type,
-    );
+    let len_signature = Signature::new(Parameters::new(db, [self_parameter()]), length_type);
     let len_method = CallableType::function_like(db, len_signature);
 
     let getitem_method = (element_types.len() > 0).then(|| {
@@ -283,14 +273,14 @@ pub(crate) fn starred_sequence_pattern_type<'db>(
 /// ```
 fn class_pattern_is_exhaustive(
     db: &dyn Db,
-    program: crate::Program<'_>,
     class: ClassLiteral<'_>,
     subject_ty: Type<'_>,
     kind: &ClassPatternPredicateKind<'_>,
 ) -> bool {
-    let class_instance_ty = Type::instance(db, program, class.top_materialization(db, program));
-    let is_typed_dict_match = is_typed_dict_pattern_domain(db, program, subject_ty)
-        && typed_dict_matches_class_pattern(db, program, class);
+    let program = class.program(db);
+    let class_instance_ty = Type::instance(db, class.top_materialization(db));
+    let is_typed_dict_match =
+        is_typed_dict_pattern_domain(db, subject_ty) && typed_dict_matches_class_pattern(db, class);
     if !is_typed_dict_match && !subject_ty.is_subtype_of(db, program, class_instance_ty) {
         return false;
     }
@@ -311,8 +301,7 @@ fn class_pattern_is_exhaustive(
         return false;
     }
 
-    let positional_sources =
-        class_pattern_positional_sources(db, program, class, kind.positional.len());
+    let positional_sources = class_pattern_positional_sources(db, class, kind.positional.len());
     kind.positional
         .iter()
         .zip(positional_sources)
@@ -362,11 +351,8 @@ pub(crate) enum ClassPatternPositionalSource {
 /// attributes, inferred assignments retain their literal binding type while an explicit annotation
 /// remains authoritative. `PossiblyUndefined` is distinct from `Undefined` because only a truly
 /// absent `__match_args__` enables match-self behavior.
-fn class_match_args_type<'db>(
-    db: &'db dyn Db,
-    program: crate::Program<'db>,
-    class: ClassLiteral<'db>,
-) -> ClassMatchArgs<'db> {
+fn class_match_args_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> ClassMatchArgs<'db> {
+    let program = class.program(db);
     match Type::ClassLiteral(class)
         .member(db, program, "__match_args__")
         .place
@@ -435,6 +421,7 @@ pub(crate) fn class_pattern_positional_result<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
 ) -> Option<ClassPatternPositionalResult<'db>> {
+    let program = class.program(db);
     match class_match_args_type(db, class) {
         ClassMatchArgs::Undefined if class_has_match_self_flag(db, class) => {
             Some(ClassPatternPositionalResult::Limit(1))
@@ -457,7 +444,7 @@ pub(crate) fn class_pattern_positional_result<'db>(
                 Some(ClassPatternPositionalResult::Limit(limit))
             } else {
                 match_args
-                    .is_disjoint_from(db, Type::homogeneous_tuple(db, Type::unknown()))
+                    .is_disjoint_from(db, program, Type::homogeneous_tuple(db, Type::unknown()))
                     .then_some(ClassPatternPositionalResult::InvalidType(match_args))
             }
         }
@@ -487,11 +474,10 @@ pub(crate) fn class_pattern_positional_result<'db>(
 /// ```
 pub(crate) fn class_pattern_positional_sources(
     db: &dyn Db,
-    program: crate::Program<'_>,
     class: ClassLiteral<'_>,
     positional_count: usize,
 ) -> Vec<ClassPatternPositionalSource> {
-    let fixed = match class_match_args_type(db, program, class) {
+    let fixed = match class_match_args_type(db, class) {
         ClassMatchArgs::Undefined if class_has_match_self_flag(db, class) => {
             return (0..positional_count)
                 .map(|index| {
@@ -566,7 +552,7 @@ fn mapping_pattern_is_exhaustive(
     kind: &MappingPatternPredicateKind<'_>,
     subject_ty: Type<'_>,
 ) -> bool {
-    typed_dict_pattern_domain_satisfies(db, program, subject_ty, &|typed_dict| {
+    typed_dict_pattern_domain_satisfies(db, subject_ty, &|typed_dict| {
         kind.entries.iter().all(|entry| {
             let key_ty = infer_same_file_expression_type(db, entry.key, TypeContext::default());
             let Some(key) = key_ty.as_string_literal() else {
@@ -672,7 +658,7 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
         return subject_independent_ty;
     }
 
-    let resolved_subject_ty = subject_ty.resolve_type_alias(db, program);
+    let resolved_subject_ty = subject_ty.resolve_type_alias(db);
     if let Type::Union(union) = resolved_subject_ty {
         return UnionType::from_elements(
             db,
@@ -696,7 +682,7 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
             let class_ty = infer_same_file_expression_type(db, kind.class, TypeContext::default());
             match class_ty {
                 Type::ClassLiteral(class) => {
-                    if class_pattern_is_exhaustive(db, program, class, resolved_subject_ty, kind) {
+                    if class_pattern_is_exhaustive(db, class, resolved_subject_ty, kind) {
                         return subject_ty;
                     }
                 }
@@ -841,7 +827,7 @@ fn sequence_pattern_binding_fallthrough_type<'db>(
     kind: &SequencePatternPredicateKind<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
-    let resolved = subject_ty.resolve_type_alias(db, program);
+    let resolved = subject_ty.resolve_type_alias(db);
     let narrowed = match resolved {
         Type::Union(union) => union.map(db, program, |element| {
             sequence_pattern_binding_fallthrough_type(db, program, kind, *element)
@@ -850,18 +836,15 @@ fn sequence_pattern_binding_fallthrough_type<'db>(
             sequence_pattern_binding_fallthrough_type(db, program, kind, *element)
         }),
         Type::TypeVar(typevar)
-            if typevar
-                .typevar(db)
-                .upper_bound(db, program)
-                .is_some_and(|bound| {
-                    pattern_fallthrough_type(
-                        db,
-                        program,
-                        &PatternPredicateKind::Sequence(kind.clone()),
-                        bound,
-                    )
-                    .is_never()
-                }) =>
+            if typevar.typevar(db).upper_bound(db).is_some_and(|bound| {
+                pattern_fallthrough_type(
+                    db,
+                    program,
+                    &PatternPredicateKind::Sequence(kind.clone()),
+                    bound,
+                )
+                .is_never()
+            }) =>
         {
             Type::Never
         }
@@ -899,10 +882,10 @@ fn is_same_enum_pattern_domain<'db>(
         return true;
     }
 
-    match ty.resolve_type_alias(db, program) {
+    match ty.resolve_type_alias(db) {
         Type::TypeVar(typevar) => typevar
             .typevar(db)
-            .upper_bound(db, program)
+            .upper_bound(db)
             .is_some_and(|bound| is_same_enum_domain(db, program, bound, right)),
         Type::Union(union) => union
             .elements(db)
@@ -930,10 +913,9 @@ fn subject_independent_definite_match_pattern_type<'db>(
         PatternPredicateKind::Class(kind) => {
             match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
                 Type::ClassLiteral(class) if kind.is_empty() => {
-                    let class_instance_ty =
-                        Type::instance(db, program, class.top_materialization(db, program));
+                    let class_instance_ty = Type::instance(db, class.top_materialization(db));
                     let typed_dict_adds_runtime_matches =
-                        typed_dict_matches_class_pattern(db, program, class)
+                        typed_dict_matches_class_pattern(db, class)
                             && !Type::object().is_subtype_of(db, program, class_instance_ty);
                     (!typed_dict_adds_runtime_matches).then_some(class_instance_ty)
                 }
@@ -996,7 +978,7 @@ pub(crate) fn definite_match_pattern_type<'db>(
         PatternPredicateKind::Class(kind) => {
             match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
                 Type::ClassLiteral(class) if kind.is_empty() => {
-                    Type::instance(db, program, class.top_materialization(db, program))
+                    Type::instance(db, class.top_materialization(db))
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) if kind.is_empty() => {
                     callable_pattern_type(db, program)

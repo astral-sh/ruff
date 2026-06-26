@@ -76,8 +76,7 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
 
     let class_specialized = class.identity_specialization(db);
     let scope = class.body_scope(db);
-    let own_class_members: FxHashSet<_> =
-        all_end_of_scope_members(db, context.program(), scope).collect();
+    let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
     let enum_info = enum_metadata(db, class.into());
 
     #[expect(
@@ -99,7 +98,6 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
 /// Returns the first inherited `NamedTuple` field in the MRO for `field_name`.
 fn conflicting_named_tuple_field_in_mro<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     class: StaticClassLiteral<'db>,
     field_name: &Name,
 ) -> Option<(ClassType<'db>, Option<Definition<'db>>)> {
@@ -115,12 +113,7 @@ fn conflicting_named_tuple_field_in_mro<'db>(
             match superclass_literal {
                 ClassLiteral::Static(superclass_literal) => {
                     if let Some(field) = superclass_literal
-                        .own_fields(
-                            db,
-                            program,
-                            superclass_specialization,
-                            CodeGeneratorKind::NamedTuple,
-                        )
+                        .own_fields(db, superclass_specialization, CodeGeneratorKind::NamedTuple)
                         .get(field_name)
                     {
                         return Some((superclass, field.first_declaration));
@@ -156,7 +149,7 @@ fn check_class_declaration<'db>(
         first_reachable_definition,
     } = member;
 
-    let instance_of_class = Type::instance(db, context.program(), class);
+    let instance_of_class = Type::instance(db, class);
 
     let subclass_instance_member = instance_of_class.member(db, context.program(), &member.name);
     let Place::Defined(DefinedPlace {
@@ -211,7 +204,7 @@ fn check_class_declaration<'db>(
 
     if configuration.check_invalid_named_tuple_field_overrides()
         && let Some((superclass, overridden_field_declaration)) =
-            conflicting_named_tuple_field_in_mro(db, context.program(), literal, &member.name)
+            conflicting_named_tuple_field_in_mro(db, literal, &member.name)
         && let Some(builder) = context.report_lint(
             &INVALID_NAMED_TUPLE_OVERRIDE,
             first_reachable_definition.focus_range(db, context.module()),
@@ -383,8 +376,8 @@ fn check_class_declaration<'db>(
                     .unwrap_or_default();
             }
 
-            let superclass_instance_member = Type::instance(db, context.program(), superclass)
-                .member(db, context.program(), &member.name);
+            let superclass_instance_member =
+                Type::instance(db, superclass).member(db, context.program(), &member.name);
             let Place::Defined(DefinedPlace {
                 ty: superclass_type,
                 ..
@@ -484,12 +477,9 @@ fn check_class_declaration<'db>(
             }
 
             if configuration.check_attribute_liskov_violations() {
-                if let Some(superclass_variable_kind) = effective_superclass_variable_kind(
-                    db,
-                    context.program(),
-                    superclass,
-                    member.name.clone(),
-                ) {
+                if let Some(superclass_variable_kind) =
+                    effective_superclass_variable_kind(db, superclass, member.name.clone())
+                {
                     if immediate_parent_variable_kind.is_none() {
                         immediate_parent_variable_kind =
                             Some((superclass, superclass_variable_kind));
@@ -712,12 +702,12 @@ impl VariableKind {
 /// Returns the variable kind for a superclass member.
 fn superclass_variable_kind<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     superclass_scope: ScopeId<'db>,
     superclass_symbol_id: Option<ScopedSymbolId>,
     class_member: PlaceAndQualifiers<'db>,
     instance_member: PlaceAndQualifiers<'db>,
 ) -> Option<VariableKind> {
+    let program = superclass_scope.program(db);
     // Method definitions and properties are not instance-variable declarations. Check the symbol
     // definition before class/instance member lookup can erase that distinction. For example,
     // resolving an abstract `@property def f(self) -> int` through instance-member lookup would
@@ -759,16 +749,16 @@ fn superclass_variable_kind<'db>(
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
 fn effective_superclass_variable_kind<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     superclass: ClassType<'db>,
     name: Name,
 ) -> Option<VariableKind> {
+    let program = superclass.class_literal(db).program(db);
     let inherited_variable_kind = || {
         superclass
             .iter_mro(db)
             .skip(1)
             .filter_map(ClassBase::into_class)
-            .find_map(|base| effective_superclass_variable_kind(db, program, base, name.clone()))
+            .find_map(|base| effective_superclass_variable_kind(db, base, name.clone()))
     };
 
     let (superclass_literal, superclass_specialization) = superclass.static_class_literal(db)?;
@@ -788,11 +778,10 @@ fn effective_superclass_variable_kind<'db>(
     if has_own_member {
         let superclass_variable_kind = superclass_variable_kind(
             db,
-            program,
             superclass_scope,
             superclass_symbol_id,
             superclass.own_class_member(db, None, &name).inner,
-            Type::instance(db, program, superclass).member(db, program, &name),
+            Type::instance(db, superclass).member(db, program, &name),
         );
 
         if superclass_variable_kind == Some(VariableKind::Instance)
@@ -1451,7 +1440,7 @@ fn check_post_init_signature<'db>(
     };
 
     let init_var_fields = static_class
-        .fields(db, context.program(), spec, policy)
+        .fields(db, spec, policy)
         .iter()
         .filter(|(_, field)| {
             matches!(
@@ -1464,7 +1453,7 @@ fn check_post_init_signature<'db>(
         });
 
     let first_parameter = Parameter::positional_only(Some(Name::new_static("self")))
-        .with_annotated_type(Type::instance(db, context.program(), class));
+        .with_annotated_type(Type::instance(db, class));
 
     let following_parameters = init_var_fields.map(|(name, field)| {
         Parameter::positional_only(Some(name.clone())).with_annotated_type(field.declared_ty)
@@ -1472,7 +1461,6 @@ fn check_post_init_signature<'db>(
 
     let parameters = Parameters::new(
         db,
-        context.program(),
         std::iter::chain([first_parameter], following_parameters),
     );
 

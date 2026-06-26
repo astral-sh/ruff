@@ -28,7 +28,6 @@
 
 use crate::Db;
 use bitflags::bitflags;
-use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, TraversalSignal, walk_arguments, walk_expr,
     walk_interpolated_string_element, walk_stmt,
@@ -188,8 +187,7 @@ pub fn semantic_tokens(
     analysis_file: AnalysisFile<'_>,
     range: Option<TextRange>,
 ) -> SemanticTokens {
-    let file = analysis_file.file(db);
-    let parsed = parsed_module(db, file).load(db);
+    let parsed = analysis_file.parsed(db).load(db);
     let model = SemanticModel::new(db, analysis_file);
 
     let mut visitor = SemanticTokenVisitor::new(&model, range);
@@ -324,7 +322,7 @@ impl<'db> SemanticTokenVisitor<'db> {
                 Some((SemanticTokenType::TypeParameter, modifiers))
             }
             DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) => {
-                let parsed = parsed_module(db, definition.file(db));
+                let parsed = definition.analysis_file(db).parsed(db);
                 let ty = parameter.node(&parsed.load(db)).inferred_type(&model);
 
                 if let Some(ty) = ty {
@@ -366,7 +364,7 @@ impl<'db> SemanticTokenVisitor<'db> {
                     modifiers |= SemanticTokenModifier::READONLY;
                 }
 
-                let parsed = parsed_module(db, definition.file(db));
+                let parsed = definition.analysis_file(db).parsed(db);
                 let parsed = parsed.load(db);
                 let value = match definition.kind(db) {
                     DefinitionKind::Assignment(assignment) => Some(assignment.value(&parsed)),

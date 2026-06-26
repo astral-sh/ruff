@@ -13,7 +13,7 @@ pub fn can_rename(
     offset: TextSize,
 ) -> Option<ruff_text_size::TextRange> {
     let file = analysis_file.file(db);
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let parsed = analysis_file.parsed(db);
     let module = parsed.load(db);
     let model = SemanticModel::new(db, analysis_file);
 
@@ -61,7 +61,7 @@ pub fn rename(
     new_name: &str,
 ) -> Option<Vec<ReferenceTarget>> {
     let file = analysis_file.file(db);
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let parsed = analysis_file.parsed(db);
     let module = parsed.load(db);
     let model = SemanticModel::new(db, analysis_file);
 

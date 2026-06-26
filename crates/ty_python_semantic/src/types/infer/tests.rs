@@ -497,12 +497,12 @@ fn pep695_type_params() {
 
         assert_eq!(
             typevar
-                .upper_bound(&db, program)
+                .upper_bound(&db)
                 .map(|ty| ty.display(&db, program).to_string()),
             upper_bound.map(std::borrow::ToOwned::to_owned)
         );
         assert_eq!(
-            typevar.constraints(&db, program).map(|tys| tys
+            typevar.constraints(&db).map(|tys| tys
                 .iter()
                 .map(|ty| ty.display(&db, program).to_string())
                 .collect::<Vec<_>>()),

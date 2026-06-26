@@ -53,9 +53,9 @@ impl<'db> Type<'db> {
         ) -> Option<Type<'db>> {
             match ty {
                 Type::TypeForm(type_form) => Some(type_form.type_argument(db)),
-                Type::TypeAlias(alias) => visitor.visit(ty, || {
-                    project(db, program, alias.value_type(db, program), visitor)
-                }),
+                Type::TypeAlias(alias) => {
+                    visitor.visit(ty, || project(db, program, alias.value_type(db), visitor))
+                }
                 Type::Union(union) => {
                     let mut elements = union
                         .elements(db)
@@ -76,7 +76,7 @@ impl<'db> Type<'db> {
                 Type::TypeVar(typevar) => visitor.visit(ty, || {
                     typevar
                         .typevar(db)
-                        .bound_or_constraints(db, program)
+                        .bound_or_constraints(db)
                         .and_then(|bound_or_constraints| {
                             project(
                                 db,

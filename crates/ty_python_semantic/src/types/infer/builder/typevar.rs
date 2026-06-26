@@ -256,8 +256,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Default TypeVar's upper bound must be assignable to outer's bound.
                     // If the default has constraints, all constraints must be assignable
                     // to the outer bound.
-                    if let Some(default_constraints) = default_typevar.constraints(db, self.program)
-                    {
+                    if let Some(default_constraints) = default_typevar.constraints(db) {
                         for constraint in default_constraints {
                             if !constraint.is_assignable_to(db, self.program, outer_bound) {
                                 if let Some(mut diagnostic) = not_assignable_to_upper_bound() {
@@ -299,9 +298,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
                     } else {
-                        let default_bound = default_typevar
-                            .upper_bound(db, self.program)
-                            .unwrap_or_else(Type::object);
+                        let default_bound =
+                            default_typevar.upper_bound(db).unwrap_or_else(Type::object);
                         if !default_bound.is_assignable_to(db, self.program, outer_bound) {
                             if let Some(mut diagnostic) = not_assignable_to_upper_bound() {
                                 annotate_default_definition(&mut diagnostic);
@@ -345,8 +343,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 TypeVarBoundOrConstraints::Constraints(outer_constraints) => {
                     // TypeVar default with constrained outer.
                     let outer = outer_constraints.elements(db);
-                    if let Some(default_constraints) = default_typevar.constraints(db, self.program)
-                    {
+                    if let Some(default_constraints) = default_typevar.constraints(db) {
                         // Default has constraints: outer constraints must be a superset.
                         for default_constraint in default_constraints {
                             if !outer
@@ -399,9 +396,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // incompatible with a constrained outer TypeVar per the typing spec.
                         if let Some(mut diagnostic) = inconsistent_with_constraints() {
                             annotate_default_definition(&mut diagnostic);
-                            if let Some(default_bound) =
-                                default_typevar.upper_bound(db, self.program)
-                            {
+                            if let Some(default_bound) = default_typevar.upper_bound(db) {
                                 diagnostic.set_primary_message(
                                     "Bounded TypeVar cannot be used as the default \
                                     for a constrained TypeVar",

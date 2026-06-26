@@ -1,6 +1,5 @@
 use crate::completion;
 
-use ruff_db::parsed::parsed_module;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::find_node::covering_node;
 use ruff_text_size::TextRange;
@@ -56,8 +55,7 @@ fn unresolved_fixes(
     analysis_file: AnalysisFile<'_>,
     diagnostic_range: TextRange,
 ) -> Option<impl Iterator<Item = QuickFix>> {
-    let file = analysis_file.file(db);
-    let parsed = parsed_module(db, file).load(db);
+    let parsed = analysis_file.parsed(db).load(db);
     let node = covering_node(parsed.syntax().into(), diagnostic_range).node();
     let symbol = &node.expr_name()?.id;
 

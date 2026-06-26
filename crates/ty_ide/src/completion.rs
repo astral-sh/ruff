@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, binary_heap};
 
-use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::{SourceText, source_text};
 use ruff_diagnostics::Edit;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
@@ -37,7 +37,7 @@ pub fn completion<'db>(
     offset: TextSize,
 ) -> Vec<Completion<'db>> {
     let file = analysis_file.file(db);
-    let parsed = parsed_module(db, file).load(db);
+    let parsed = analysis_file.parsed(db).load(db);
     let source = source_text(db, file);
 
     let Some(context) = Context::new(db, analysis_file, &parsed, &source, offset) else {
@@ -498,10 +498,9 @@ impl<'db> CompletionBuilder<'db> {
 
             self.deprecated = ty.is_deprecated(db);
         }
-        let kind = self.kind.or_else(|| {
-            self.ty
-                .and_then(|ty| completion_kind_from_type(db, program, ty))
-        });
+        let kind = self
+            .kind
+            .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
         let relevance = Relevance::new(ctx, query, &self);
         let label = self.insert.as_ref().unwrap_or(&self.name).clone();
         let (insert, insert_text_format) = if ctx.should_complete_callable_parentheses(kind) {
@@ -3121,17 +3120,12 @@ fn is_name_like_token(token: &Token) -> bool {
 /// general, if callers have more specific knowledge about the kind of
 /// a completion, then they should use that to explicitly set its kind
 /// on `CompletionBuilder`.
-fn completion_kind_from_type<'db>(
-    db: &'db dyn Db,
-    program: Program<'db>,
-    ty: Type<'db>,
-) -> Option<CompletionKind> {
+fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<CompletionKind> {
     type CompletionKindVisitor<'db> =
         CycleDetector<CompletionKind, Type<'db>, Option<CompletionKind>, 3>;
 
     fn imp<'db>(
         db: &'db dyn Db,
-        program: Program<'db>,
         ty: Type<'db>,
         visitor: &CompletionKindVisitor<'db>,
     ) -> Option<CompletionKind> {
@@ -3163,10 +3157,10 @@ fn completion_kind_from_type<'db>(
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .find_map(|&ty| imp(db, program, ty, visitor))?,
+                .find_map(|&ty| imp(db, ty, visitor))?,
             Type::Intersection(intersection) => intersection
                 .iter_positive(db)
-                .find_map(|ty| imp(db, program, ty, visitor))?,
+                .find_map(|ty| imp(db, ty, visitor))?,
             Type::Dynamic(_)
             | Type::Divergent(_)
             | Type::Never
@@ -3174,12 +3168,12 @@ fn completion_kind_from_type<'db>(
             | Type::KnownInstance(_)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => return None,
-            Type::TypeAlias(alias) => visitor.visit(ty, || {
-                imp(db, program, alias.value_type(db, program), visitor)
-            })?,
+            Type::TypeAlias(alias) => {
+                visitor.visit(ty, || imp(db, alias.value_type(db), visitor))?
+            }
         })
     }
-    imp(db, program, ty, &CompletionKindVisitor::default())
+    imp(db, ty, &CompletionKindVisitor::default())
 }
 
 /// Defines an ordering relating the two completions for ranking purposes.

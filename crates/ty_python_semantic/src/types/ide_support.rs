@@ -14,7 +14,6 @@ use crate::types::{
 use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticModel};
 use itertools::Either;
 use ruff_db::files::FileRange;
-use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::{self as ast, AnyNodeRef, name::Name};
 use ruff_text_size::{Ranged, TextRange};
@@ -547,7 +546,7 @@ pub fn definitions_and_overloads_for_function<'db>(
     {
         function_type
             .iter_overloads_and_implementation(model.db())
-            .filter_map(|overload| overload.signature(model.db(), model.program()).definition())
+            .filter_map(|overload| overload.signature(model.db()).definition())
             .map(ResolvedDefinition::Definition)
             .collect()
     } else {
@@ -1295,8 +1294,7 @@ pub fn inlay_hint_call_argument_details<'db>(
         };
 
         let parameter_label_offset = param.definition().map(|definition| {
-            let param_file = definition.file(db);
-            let module = parsed_module(db, param_file).load(db);
+            let module = definition.analysis_file(db).parsed(db).load(db);
             definition.focus_range(db, &module)
         });
 
@@ -1328,7 +1326,7 @@ mod resolve_definition {
 
     use indexmap::IndexSet;
     use ruff_db::files::{File, FileRange, vendored_path_to_file};
-    use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+    use ruff_db::parsed::ParsedModuleRef;
     use ruff_db::system::SystemPath;
     use ruff_db::vendored::VendoredPathBuf;
     use ruff_python_ast as ast;
@@ -1357,7 +1355,7 @@ mod resolve_definition {
         /// The import resolved to a specific definition within a module
         Definition(Definition<'db>),
         /// The import resolved to an entire module
-        Module(File),
+        Module(AnalysisFile<'db>),
         /// The import resolved to a file with a specific range
         FileWithRange(FileRange),
     }
@@ -1366,11 +1364,13 @@ mod resolve_definition {
         pub fn focus_range(&self, db: &dyn Db) -> FileRange {
             match self {
                 ResolvedDefinition::Definition(definition) => {
-                    let parsed = parsed_module(db, definition.file(db)).load(db);
+                    let parsed = definition.analysis_file(db).parsed(db).load(db);
                     definition.focus_range(db, &parsed)
                 }
                 // For modules, navigate to the start of the file
-                ResolvedDefinition::Module(module) => FileRange::new(*module, TextRange::default()),
+                ResolvedDefinition::Module(module) => {
+                    FileRange::new(module.file(db), TextRange::default())
+                }
                 ResolvedDefinition::FileWithRange(file_range) => *file_range,
             }
         }
@@ -1379,7 +1379,7 @@ mod resolve_definition {
             match self {
                 ResolvedDefinition::Definition(definition) => {
                     let file = definition.file(db);
-                    let parsed = parsed_module(db, file).load(db);
+                    let parsed = definition.analysis_file(db).parsed(db).load(db);
                     definition.kind(db).category(file.is_stub(db), &parsed)
                 }
                 ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => {
@@ -1399,7 +1399,7 @@ mod resolve_definition {
         fn file(&self, db: &'db dyn Db) -> File {
             match self {
                 ResolvedDefinition::Definition(definition) => definition.file(db),
-                ResolvedDefinition::Module(file) => *file,
+                ResolvedDefinition::Module(file) => file.file(db),
                 ResolvedDefinition::FileWithRange(file_range) => file_range.file(),
             }
         }
@@ -1508,8 +1508,7 @@ mod resolve_definition {
         match kind {
             DefinitionKind::Import(import_def) => {
                 let analysis_file = definition.analysis_file(db);
-                let file = analysis_file.file(db);
-                let module = parsed_module(db, file).load(db);
+                let module = analysis_file.parsed(db).load(db);
                 let alias = import_def.alias(&module);
 
                 if alias.asname.is_some()
@@ -1536,13 +1535,16 @@ mod resolve_definition {
 
                 // For simple imports like "import os", we want to navigate to the module itself.
                 // Return the module file directly instead of trying to find definitions within it.
-                vec![ResolvedDefinition::Module(module_file)]
+                vec![ResolvedDefinition::Module(AnalysisFile::new(
+                    db,
+                    analysis_file.program(db),
+                    module_file,
+                ))]
             }
 
             DefinitionKind::ImportFrom(import_from_def) => {
                 let analysis_file = definition.analysis_file(db);
-                let file = analysis_file.file(db);
-                let module = parsed_module(db, file).load(db);
+                let module = analysis_file.parsed(db).load(db);
                 let import_node = import_from_def.import(&module);
                 let alias = import_from_def.alias(&module);
 
@@ -1567,8 +1569,7 @@ mod resolve_definition {
             // For star imports, try to resolve to the specific symbol being accessed
             DefinitionKind::StarImport(star_import_def) => {
                 let analysis_file = definition.analysis_file(db);
-                let file = analysis_file.file(db);
-                let module = parsed_module(db, file).load(db);
+                let module = analysis_file.parsed(db).load(db);
                 let import_node = star_import_def.import(&module);
 
                 // If we have a symbol name, use the helper to resolve it in the target module
@@ -1686,7 +1687,11 @@ mod resolve_definition {
         let module = resolve_module(db, analysis_file.program_file(db), &full_submodule_name)?;
         let file = module.file(db)?;
 
-        Some(ResolvedDefinition::Module(file))
+        Some(ResolvedDefinition::Module(AnalysisFile::new(
+            db,
+            analysis_file.program(db),
+            file,
+        )))
     }
 
     /// Find definitions for a symbol name in a specific scope.
@@ -1804,7 +1809,7 @@ mod resolve_definition {
         let stub_ref;
         match *def {
             ResolvedDefinition::Definition(definition) => {
-                stub_parsed = parsed_module(db, stub_file);
+                stub_parsed = AnalysisFile::new(db, program, stub_file).parsed(db);
                 stub_ref = stub_parsed.load(db);
 
                 // Get the leaf of the path (the definition itself)
@@ -1836,7 +1841,9 @@ mod resolve_definition {
                     stub_file.path(db),
                     real_file.path(db)
                 );
-                return Some(vec![ResolvedDefinition::Module(real_file)]);
+                return Some(vec![ResolvedDefinition::Module(AnalysisFile::new(
+                    db, program, real_file,
+                ))]);
             }
             ResolvedDefinition::FileWithRange(_) => {
                 // Not yet implemented -- in this case we want to recover something like a Definition
@@ -1850,7 +1857,7 @@ mod resolve_definition {
         let mut definitions = Vec::new();
         let real_analysis_file = AnalysisFile::new(db, program, real_file);
         let index = semantic_index(db, real_analysis_file);
-        let real_parsed = parsed_module(db, real_file);
+        let real_parsed = real_analysis_file.parsed(db);
         let real_ref = real_parsed.load(db);
         // Start our search in the module (global) scope
         let mut scopes = vec![global_scope(db, real_analysis_file)];
@@ -2027,7 +2034,7 @@ pub fn type_hierarchy_supertypes<'db>(
     }
 
     let mut supertypes: Vec<TypeHierarchyClass> = class_literal
-        .explicit_bases(db, program)
+        .explicit_bases(db)
         .into_iter()
         .filter_map(|base| extract_class_literal(db, program, base))
         .map(|class_literal| class_literal_to_hierarchy_info(db, class_literal))
@@ -2092,7 +2099,8 @@ pub fn type_hierarchy_subtypes<'db>(
             continue;
         }
 
-        let index = semantic_index(db, AnalysisFile::new(db, program, file));
+        let analysis_file = AnalysisFile::new(db, program, file);
+        let index = semantic_index(db, analysis_file);
         for scope_id in index.scope_ids() {
             let scope = scope_id.node(db);
             let Some(class_node) = scope.as_class() else {
@@ -2105,7 +2113,7 @@ pub fn type_hierarchy_subtypes<'db>(
             }
 
             let file_scope_id = scope_id.file_scope_id(db);
-            let parsed = parsed_module(db, file).load(db);
+            let parsed = analysis_file.parsed(db).load(db);
             if !is_range_reachable(db, index, file_scope_id, class_node.node(&parsed).range()) {
                 continue;
             }
@@ -2115,7 +2123,7 @@ pub fn type_hierarchy_subtypes<'db>(
                 continue;
             };
 
-            let bases = class_ty.explicit_bases(db, program);
+            let bases = class_ty.explicit_bases(db);
             let is_subtype = if target_is_object
                 && bases.is_empty()
                 && !class_ty.is_known(db, KnownClass::Object)
@@ -2174,10 +2182,11 @@ fn class_literal_to_hierarchy_info(
 ) -> TypeHierarchyClass {
     let name = class_literal.name(db).clone();
     let file = class_literal.file(db);
+    let analysis_file = AnalysisFile::new(db, class_literal.program(db), file);
 
     let (full_range, selection_range) = match class_literal {
         ClassLiteral::Static(static_class) => {
-            let parsed = parsed_module(db, file).load(db);
+            let parsed = analysis_file.parsed(db).load(db);
             let header_range = static_class.header_range(db);
             let body_scope = static_class.body_scope(db);
 
@@ -2205,7 +2214,7 @@ fn class_literal_to_hierarchy_info(
         // (likely incorrectly) return the type hierarchy for `type` itself.
         ClassLiteral::Dynamic(dynamic_class) => {
             if let DynamicClassAnchor::Definition(definition) = dynamic_class.anchor(db) {
-                let parsed = parsed_module(db, file).load(db);
+                let parsed = analysis_file.parsed(db).load(db);
                 let kind = definition.kind(db);
                 (kind.full_range(&parsed), kind.target_range(&parsed))
             } else {
@@ -2217,7 +2226,7 @@ fn class_literal_to_hierarchy_info(
             if let DynamicNamedTupleAnchor::CollectionsDefinition { definition, .. }
             | DynamicNamedTupleAnchor::TypingDefinition(definition) = namedtuple.anchor(db)
             {
-                let parsed = parsed_module(db, file).load(db);
+                let parsed = analysis_file.parsed(db).load(db);
                 let kind = definition.kind(db);
                 (kind.full_range(&parsed), kind.target_range(&parsed))
             } else {
@@ -2231,7 +2240,7 @@ fn class_literal_to_hierarchy_info(
         }
         ClassLiteral::DynamicEnum(dynamic_enum) => {
             if let DynamicEnumAnchor::Definition { definition, .. } = dynamic_enum.anchor(db) {
-                let parsed = parsed_module(db, file).load(db);
+                let parsed = analysis_file.parsed(db).load(db);
                 let kind = definition.kind(db);
                 (kind.full_range(&parsed), kind.target_range(&parsed))
             } else {

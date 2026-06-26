@@ -78,14 +78,9 @@ pub(super) fn synthesize_typed_dict_method<'db>(
             typed_dict,
             fields(),
         )),
-        "clear" if typed_dict.supports_arbitrary_key_deletion(db) => {
-            Some(synthesize_typed_dict_no_argument_method(
-                db,
-                program,
-                typed_dict,
-                Type::none(db, program),
-            ))
-        }
+        "clear" if typed_dict.supports_arbitrary_key_deletion(db) => Some(
+            synthesize_typed_dict_no_argument_method(db, typed_dict, Type::none(db, program)),
+        ),
         "popitem" if typed_dict.supports_arbitrary_key_deletion(db) => {
             let return_ty = Type::heterogeneous_tuple(
                 db,
@@ -95,7 +90,7 @@ pub(super) fn synthesize_typed_dict_method<'db>(
                 ],
             );
             Some(synthesize_typed_dict_no_argument_method(
-                db, program, typed_dict, return_ty,
+                db, typed_dict, return_ty,
             ))
         }
         "__iter__" if typed_dict.openness(db).is_closed() => {
@@ -105,7 +100,7 @@ pub(super) fn synthesize_typed_dict_method<'db>(
                 &[typed_dict.key_type(db, program)],
             );
             Some(synthesize_typed_dict_no_argument_method(
-                db, program, typed_dict, return_ty,
+                db, typed_dict, return_ty,
             ))
         }
         "items" if !typed_dict.openness(db).is_implicitly_open() => Some(
@@ -208,7 +203,6 @@ fn synthesize_typed_dict_init<'db>(
     let map_overload = Signature::new(
         Parameters::new(
             db,
-            program,
             [self_param.clone(), map_param]
                 .into_iter()
                 .chain(params_with_default)
@@ -231,7 +225,6 @@ fn synthesize_typed_dict_init<'db>(
     let keyword_overload = Signature::new(
         Parameters::new(
             db,
-            program,
             std::iter::once(self_param)
                 .chain(keyword_field_params)
                 .chain(keyword_rest_param),
@@ -265,12 +258,11 @@ fn synthesize_typed_dict_getitem<'db>(
                 Parameter::positional_only(Some(Name::new_static("key")))
                     .with_annotated_type(key_type),
             ];
-            Signature::new(Parameters::new(db, program, parameters), field.declared_ty)
+            Signature::new(Parameters::new(db, parameters), field.declared_ty)
         })
         .chain(std::iter::once(Signature::new(
             Parameters::new(
                 db,
-                program,
                 [
                     Parameter::positional_only(Some(Name::new_static("self")))
                         .with_annotated_type(instance_ty),
@@ -316,10 +308,7 @@ fn synthesize_typed_dict_setitem<'db>(
             Parameter::positional_only(Some(Name::new_static("value")))
                 .with_annotated_type(Type::any()),
         ];
-        let signature = Signature::new(
-            Parameters::new(db, program, parameters),
-            Type::none(db, program),
-        );
+        let signature = Signature::new(Parameters::new(db, parameters), Type::none(db, program));
         return Type::function_like_callable(db, signature);
     }
 
@@ -334,10 +323,7 @@ fn synthesize_typed_dict_setitem<'db>(
                 Parameter::positional_only(Some(Name::new_static("value")))
                     .with_annotated_type(field.declared_ty),
             ];
-            Signature::new(
-                Parameters::new(db, program, parameters),
-                Type::none(db, program),
-            )
+            Signature::new(Parameters::new(db, parameters), Type::none(db, program))
         })
         .chain(arbitrary_key_mutation_type.map(|value_ty| {
             let parameters = [
@@ -348,10 +334,7 @@ fn synthesize_typed_dict_setitem<'db>(
                 Parameter::positional_only(Some(Name::new_static("value")))
                     .with_annotated_type(value_ty),
             ];
-            Signature::new(
-                Parameters::new(db, program, parameters),
-                Type::none(db, program),
-            )
+            Signature::new(Parameters::new(db, parameters), Type::none(db, program))
         }));
 
     Type::Callable(CallableType::new(
@@ -383,10 +366,7 @@ fn synthesize_typed_dict_delitem<'db>(
             Parameter::positional_only(Some(Name::new_static("key")))
                 .with_annotated_type(Type::Never),
         ];
-        let signature = Signature::new(
-            Parameters::new(db, program, parameters),
-            Type::none(db, program),
-        );
+        let signature = Signature::new(Parameters::new(db, parameters), Type::none(db, program));
         return Type::function_like_callable(db, signature);
     }
 
@@ -399,10 +379,7 @@ fn synthesize_typed_dict_delitem<'db>(
                 Parameter::positional_only(Some(Name::new_static("key")))
                     .with_annotated_type(key_type),
             ];
-            Signature::new(
-                Parameters::new(db, program, parameters),
-                Type::none(db, program),
-            )
+            Signature::new(Parameters::new(db, parameters), Type::none(db, program))
         })
         .chain(supports_arbitrary_key_deletion.then(|| {
             let parameters = [
@@ -411,10 +388,7 @@ fn synthesize_typed_dict_delitem<'db>(
                 Parameter::positional_only(Some(Name::new_static("key")))
                     .with_annotated_type(KnownClass::Str.to_instance(db, program)),
             ];
-            Signature::new(
-                Parameters::new(db, program, parameters),
-                Type::none(db, program),
-            )
+            Signature::new(Parameters::new(db, parameters), Type::none(db, program))
         }));
 
     Type::Callable(CallableType::new(
@@ -450,7 +424,7 @@ fn synthesize_typed_dict_get<'db>(
                     .with_annotated_type(key_type),
             ];
             let get_sig = Signature::new(
-                Parameters::new(db, program, get_sig_params),
+                Parameters::new(db, get_sig_params),
                 if field.is_required() {
                     field.declared_ty
                 } else {
@@ -479,7 +453,7 @@ fn synthesize_typed_dict_get<'db>(
             ];
             let get_with_default_sig = Signature::new_generic(
                 Some(GenericContext::from_typevar_instances(db, [t_default])),
-                Parameters::new(db, program, get_with_default_sig_params),
+                Parameters::new(db, get_with_default_sig_params),
                 if field.is_required() {
                     field.declared_ty
                 } else {
@@ -502,7 +476,6 @@ fn synthesize_typed_dict_get<'db>(
                 let get_with_typed_default_sig = Signature::new(
                     Parameters::new(
                         db,
-                        program,
                         [
                             Parameter::positional_only(Some(Name::new_static("self")))
                                 .with_annotated_type(instance_ty),
@@ -523,7 +496,6 @@ fn synthesize_typed_dict_get<'db>(
         .chain(std::iter::once(Signature::new(
             Parameters::new(
                 db,
-                program,
                 [
                     Parameter::positional_only(Some(Name::new_static("self")))
                         .with_annotated_type(instance_ty),
@@ -551,7 +523,7 @@ fn synthesize_typed_dict_get<'db>(
 
             Signature::new_generic(
                 Some(GenericContext::from_typevar_instances(db, [t_default])),
-                Parameters::new(db, program, parameterss),
+                Parameters::new(db, parameterss),
                 UnionType::from_two_elements(
                     db,
                     program,
@@ -633,10 +605,7 @@ fn synthesize_typed_dict_update<'db>(
     .into_iter()
     .chain(keyword_parameters);
 
-    let update_signature = Signature::new(
-        Parameters::new(db, program, parameters),
-        Type::none(db, program),
-    );
+    let update_signature = Signature::new(Parameters::new(db, parameters), Type::none(db, program));
     Type::function_like_callable(db, update_signature)
 }
 
@@ -654,7 +623,7 @@ fn synthesize_typed_dict_pop<'db>(
                 .with_annotated_type(instance_ty),
             Parameter::positional_only(Some(Name::new_static("key"))).with_annotated_type(key_ty),
         ];
-        let pop_sig = Signature::new(Parameters::new(db, program, pop_parameters), value_ty);
+        let pop_sig = Signature::new(Parameters::new(db, pop_parameters), value_ty);
 
         // Non-generic overload that accepts the value type as the default,
         // providing bidirectional inference context for the default argument.
@@ -666,7 +635,7 @@ fn synthesize_typed_dict_pop<'db>(
                 .with_annotated_type(value_ty),
         ];
         let pop_with_typed_default_sig = Signature::new(
-            Parameters::new(db, program, pop_with_typed_default_parameters),
+            Parameters::new(db, pop_with_typed_default_parameters),
             value_ty,
         );
 
@@ -681,7 +650,7 @@ fn synthesize_typed_dict_pop<'db>(
         ];
         let pop_with_default_sig = Signature::new_generic(
             Some(GenericContext::from_typevar_instances(db, [t_default])),
-            Parameters::new(db, program, pop_with_default_parameters),
+            Parameters::new(db, pop_with_default_parameters),
             UnionType::from_two_elements(db, program, value_ty, Type::TypeVar(t_default)),
         );
 
@@ -737,7 +706,7 @@ fn synthesize_typed_dict_setdefault<'db>(
                     .with_annotated_type(field.declared_ty),
             ];
 
-            Signature::new(Parameters::new(db, program, parameters), field.declared_ty)
+            Signature::new(Parameters::new(db, parameters), field.declared_ty)
         })
         .chain(
             typed_dict
@@ -752,7 +721,7 @@ fn synthesize_typed_dict_setdefault<'db>(
                             .with_annotated_type(default_ty),
                     ];
                     Signature::new(
-                        Parameters::new(db, program, parameters),
+                        Parameters::new(db, parameters),
                         typed_dict.value_type(db, program),
                     )
                 }),
@@ -768,7 +737,6 @@ fn synthesize_typed_dict_setdefault<'db>(
 
 fn synthesize_typed_dict_no_argument_method<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     typed_dict: TypedDictType<'db>,
     return_ty: Type<'db>,
 ) -> Type<'db> {
@@ -777,7 +745,6 @@ fn synthesize_typed_dict_no_argument_method<'db>(
         Signature::new(
             Parameters::new(
                 db,
-                program,
                 [Parameter::positional_only(Some(Name::new_static("self")))
                     .with_annotated_type(Type::TypedDict(typed_dict))],
             ),
@@ -812,7 +779,7 @@ fn synthesize_typed_dict_view_method<'db>(
             .and_then(|class| Type::from(class).to_instance(db, program))
             .unwrap_or_else(Type::unknown);
 
-    synthesize_typed_dict_no_argument_method(db, program, typed_dict, return_ty)
+    synthesize_typed_dict_no_argument_method(db, typed_dict, return_ty)
 }
 
 /// Synthesize a merge operator (`__or__`, `__ror__`, or `__ior__`) for a `TypedDict`.
@@ -839,7 +806,7 @@ fn synthesize_typed_dict_merge<'db>(
     ];
 
     overloads = smallvec::smallvec![Signature::new(
-        Parameters::new(db, program, first_overload_parameters),
+        Parameters::new(db, first_overload_parameters),
         instance_ty,
     )];
 
@@ -872,7 +839,7 @@ fn synthesize_typed_dict_merge<'db>(
                 .with_annotated_type(partial_ty),
         ];
         overloads.push(Signature::new(
-            Parameters::new(db, program, overload_two_parameters),
+            Parameters::new(db, overload_two_parameters),
             instance_ty,
         ));
 
@@ -883,7 +850,7 @@ fn synthesize_typed_dict_merge<'db>(
                 .with_annotated_type(dict_param_ty),
         ];
         overloads.push(Signature::new(
-            Parameters::new(db, program, overload_three_parameters),
+            Parameters::new(db, overload_three_parameters),
             dict_return_ty,
         ));
     }
@@ -930,7 +897,6 @@ impl<'db> DynamicTypedDictAnchor<'db> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -941,12 +907,15 @@ impl<'db> DynamicTypedDictAnchor<'db> {
                 offset,
                 schema,
                 openness,
-            } => Some(Self::ScopeOffset {
-                scope: *scope,
-                offset: *offset,
-                schema: schema.recursive_type_normalized_impl(db, program, div, nested)?,
-                openness: openness.recursive_type_normalized_impl(db, program, div, nested)?,
-            }),
+            } => {
+                let program = scope.program(db);
+                Some(Self::ScopeOffset {
+                    scope: *scope,
+                    offset: *offset,
+                    schema: schema.recursive_type_normalized_impl(db, program, div, nested)?,
+                    openness: openness.recursive_type_normalized_impl(db, program, div, nested)?,
+                })
+            }
         }
     }
 }
@@ -976,7 +945,6 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -984,7 +952,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
             db,
             self.name(db),
             self.anchor(db)
-                .recursive_type_normalized_impl(db, program, div, nested)?,
+                .recursive_type_normalized_impl(db, div, nested)?,
             self.typed_dict_module(db),
         ))
     }
@@ -1049,27 +1017,19 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         Span::from(self.scope(db).file(db)).with_range(self.header_range(db))
     }
 
-    pub(crate) fn items(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> &'db TypedDictSchema<'db> {
+    pub(crate) fn items(self, db: &'db dyn Db) -> &'db TypedDictSchema<'db> {
         match self.anchor(db) {
             DynamicTypedDictAnchor::Definition(definition) => {
-                deferred_functional_typed_dict_schema(db, program, *definition)
+                deferred_functional_typed_dict_schema(db, *definition)
             }
             DynamicTypedDictAnchor::ScopeOffset { schema, .. } => schema,
         }
     }
 
-    pub(crate) fn openness(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> TypedDictOpenness<'db> {
+    pub(crate) fn openness(self, db: &'db dyn Db) -> TypedDictOpenness<'db> {
         match self.anchor(db) {
             DynamicTypedDictAnchor::Definition(definition) => {
-                deferred_functional_typed_dict_openness(db, program, *definition)
+                deferred_functional_typed_dict_openness(db, *definition)
             }
             DynamicTypedDictAnchor::ScopeOffset { openness, .. } => *openness,
         }
@@ -1080,7 +1040,8 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     /// Functional `TypedDict` classes have the same MRO as class-based ones:
     /// [self, `TypedDict`, object]
     #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
-    pub(crate) fn mro(self, db: &'db dyn Db, program: crate::Program<'db>) -> Mro<'db> {
+    pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
+        let program = self.scope(db).program(db);
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
         let object_class = ClassType::object(db, program);
         Mro::from([
@@ -1098,12 +1059,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     }
 
     /// Look up a class-level member defined directly on this `TypedDict` (not inherited).
-    pub(super) fn own_class_member(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-        name: &str,
-    ) -> Member<'db> {
+    pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
         let typed_dict =
             TypedDictType::new(ClassType::NonGeneric(ClassLiteral::DynamicTypedDict(self)));
         synthesize_typed_dict_method(
@@ -1111,7 +1067,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
             self.scope(db).analysis_file(db).program(db),
             typed_dict,
             name,
-            || TypedDictFields::Dynamic(self.items(db, program)),
+            || TypedDictFields::Dynamic(self.items(db)),
         )
         .map(Member::definitely_declared)
         .unwrap_or_default()
@@ -1121,12 +1077,11 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     pub(crate) fn class_member(
         self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         // First check synthesized members (like __getitem__, __init__, get, etc.).
-        let member = self.own_class_member(db, program, name);
+        let member = self.own_class_member(db, name);
         if !member.is_undefined() {
             return member.inner;
         }
@@ -1135,7 +1090,6 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         // This mirrors the behavior of StaticClassLiteral::typed_dict_member.
         typed_dict_class_member(
             db,
-            program,
             ClassType::NonGeneric(ClassLiteral::DynamicTypedDict(self)),
             self.typed_dict_module(db),
             policy,
@@ -1179,12 +1133,12 @@ pub(super) fn typed_dict_fallback_class_member<'db>(
 
 pub(super) fn typed_dict_class_member<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     class: ClassType<'db>,
     module: TypedDictModule,
     lookup_policy: MemberLookupPolicy,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
+    let program = class.program(db);
     let self_class = class.class_literal(db);
     let fallback_member = typed_dict_fallback_class_member(
         db,
@@ -1194,8 +1148,7 @@ pub(super) fn typed_dict_class_member<'db>(
         name,
     )
     .map_type(|ty| {
-        let new_upper_bound =
-            determine_upper_bound(db, program, self_class, ClassBase::is_typed_dict);
+        let new_upper_bound = determine_upper_bound(db, self_class, ClassBase::is_typed_dict);
         let mapping = TypeMapping::ReplaceSelf { new_upper_bound };
         ty.apply_type_mapping(db, program, &mapping, TypeContext::default())
     });
@@ -1210,7 +1163,7 @@ pub(super) fn typed_dict_class_member<'db>(
             &[KnownClass::Str.to_instance(db, program), value_ty],
         )
     {
-        let member = dict_class.class_member(db, program, name, lookup_policy);
+        let member = dict_class.class_member(db, name, lookup_policy);
         if !member.is_undefined() {
             return member;
         }

@@ -12,8 +12,7 @@ pub fn document_highlights(
     analysis_file: AnalysisFile<'_>,
     offset: TextSize,
 ) -> Option<Vec<ReferenceTarget>> {
-    let file = analysis_file.file(db);
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let parsed = analysis_file.parsed(db);
     let module = parsed.load(db);
     let model = SemanticModel::new(db, analysis_file);
 

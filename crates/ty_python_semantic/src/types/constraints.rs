@@ -3768,10 +3768,7 @@ impl<'db> PathBounds<'db> {
     ) -> Result<Option<Type<'db>>, ()> {
         let bound_typevar = path_bound.bound_typevar;
         let lower = path_bound.lower_or_never();
-        match bound_typevar
-            .typevar(db)
-            .require_bound_or_constraints(db, program)
-        {
+        match bound_typevar.typevar(db).require_bound_or_constraints(db) {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
                 let declared_upper = bound.top_materialization(db, program);
 
@@ -7053,7 +7050,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         // _equality_ comparisons, not _subtyping_ comparisons — since we are only going to check
         // that _some_ valid specialization satisfies the constraint set, it's correct for us to
         // return the range of valid materializations that we can choose from.
-        match self.typevar(db).bound_or_constraints(db, program) {
+        match self.typevar(db).bound_or_constraints(db) {
             None => ALWAYS_TRUE,
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 let bound = bound.top_materialization(db, program);
@@ -7105,7 +7102,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         // materialization that is as restrictive as possible, since that minimizes the number of
         // valid specializations that must satisfy the check. We therefore take the bottom
         // materialization of the bound or constraints.
-        match self.typevar(db).bound_or_constraints(db, program) {
+        match self.typevar(db).bound_or_constraints(db) {
             None => (ALWAYS_TRUE, Vec::new()),
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 let bound = bound.bottom_materialization(db, program);

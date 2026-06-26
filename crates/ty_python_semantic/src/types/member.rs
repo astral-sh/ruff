@@ -53,12 +53,8 @@ impl<'db> Member<'db> {
 
 /// Infer the public type of a class member/symbol (its type as seen from outside its scope) in the given
 /// `scope`.
-pub(super) fn class_member<'db>(
-    db: &'db dyn Db,
-    program: crate::Program<'db>,
-    scope: ScopeId<'db>,
-    name: &str,
-) -> Member<'db> {
+pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Member<'db> {
+    let program = scope.program(db);
     place_table(db, scope)
         .symbol_id(name)
         .map(|symbol_id| {

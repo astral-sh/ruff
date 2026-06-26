@@ -102,11 +102,9 @@ impl<'db> SemanticModel<'db> {
             .into_iter()
             .rev()
         {
-            for memberdef in all_reachable_members(
-                self.db,
-                self.program(),
-                file_scope.to_scope_id(self.db, self.analysis_file),
-            ) {
+            for memberdef in
+                all_reachable_members(self.db, file_scope.to_scope_id(self.db, self.analysis_file))
+            {
                 members.insert(
                     memberdef.member.name,
                     MemberDefinition {
@@ -284,16 +282,12 @@ impl<'db> SemanticModel<'db> {
         let mut completions = vec![];
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
             completions.extend(
-                all_reachable_members(
-                    self.db,
-                    self.program(),
-                    file_scope.to_scope_id(self.db, self.analysis_file),
-                )
-                .map(|memberdef| Completion {
-                    name: memberdef.member.name,
-                    ty: Some(memberdef.member.ty),
-                    builtin: false,
-                }),
+                all_reachable_members(self.db, file_scope.to_scope_id(self.db, self.analysis_file))
+                    .map(|memberdef| Completion {
+                        name: memberdef.member.name,
+                        ty: Some(memberdef.member.ty),
+                        builtin: false,
+                    }),
             );
         }
 
@@ -593,7 +587,6 @@ impl<'db> SemanticModel<'db> {
 
         fn collect<'db>(
             db: &'db dyn Db,
-            program: crate::Program<'db>,
             ty: Type<'db>,
             visitor: &StringLiteralCandidatesVisitor<'db>,
         ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
@@ -611,16 +604,16 @@ impl<'db> SemanticModel<'db> {
                 Type::Union(union) => union
                     .elements(db)
                     .iter()
-                    .flat_map(|element| collect(db, program, *element, visitor))
+                    .flat_map(|element| collect(db, *element, visitor))
                     .collect(),
                 Type::Intersection(intersection) => intersection
                     .positive(db)
                     .iter()
-                    .flat_map(|element| collect(db, program, *element, visitor))
+                    .flat_map(|element| collect(db, *element, visitor))
                     .collect(),
-                Type::TypeAlias(alias) => visitor.visit(ty, || {
-                    collect(db, program, alias.value_type(db, program), visitor)
-                }),
+                Type::TypeAlias(alias) => {
+                    visitor.visit(ty, || collect(db, alias.value_type(db), visitor))
+                }
                 _ => Vec::new(),
             }
         }
@@ -631,7 +624,6 @@ impl<'db> SemanticModel<'db> {
 
         let mut candidates = collect(
             self.db,
-            self.program(),
             expected_ty,
             &StringLiteralCandidatesVisitor::default(),
         );

@@ -35,10 +35,10 @@ impl get_size2::GetSize for BoundMethodType<'_> {}
 
 pub(super) fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     method: BoundMethodType<'db>,
     visitor: &V,
 ) {
+    let program = method.function(db).program(db);
     visitor.visit_function_type(db, program, method.function(db));
     visitor.visit_type(db, program, method.self_instance(db));
 }
@@ -48,11 +48,8 @@ impl<'db> BoundMethodType<'db> {
     /// Returns the type that replaces any `typing.Self` annotations in the bound method signature.
     /// This is normally the bound-instance type (the type of `self` or `cls`), but if the bound method is
     /// a `@classmethod`, then it should be an instance of that bound-instance type.
-    pub(crate) fn typing_self_type(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> Type<'db> {
+    pub(crate) fn typing_self_type(self, db: &'db dyn Db) -> Type<'db> {
+        let program = self.function(db).program(db);
         let mut self_instance = self.self_instance(db);
         if self.function(db).is_classmethod(db) {
             self_instance = self_instance
@@ -71,19 +68,15 @@ impl<'db> BoundMethodType<'db> {
     }
 
     #[salsa::tracked(
-        cycle_initial=|db, _, _, _| CallableType::bottom(db),
+        cycle_initial=|db, _, _| CallableType::bottom(db),
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(crate) fn into_callable_type(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> CallableType<'db> {
+    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
         let function = self.function(db);
 
         CallableType::new(
             db,
-            self.bound_signatures(db, program),
+            self.bound_signatures(db),
             CallableTypeKind::FunctionLike,
             CallableFunctionProvenance::from_function_return_annotation(
                 function.has_explicit_return_annotation(db),
@@ -91,14 +84,11 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    #[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _| CallableSignature::bottom(), heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn bound_signatures(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> CallableSignature<'db> {
+    #[salsa::tracked(returns(ref), cycle_initial=|_, _, _| CallableSignature::bottom(), heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> CallableSignature<'db> {
+        let program = self.function(db).program(db);
         let function_signature = self.function(db).signature(db);
-        let typing_self_type = self.typing_self_type(db, program);
+        let typing_self_type = self.typing_self_type(db);
 
         let [signature] = function_signature.overloads.as_slice() else {
             if !function_signature
@@ -130,14 +120,14 @@ impl<'db> BoundMethodType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        let program = self.function(db).program(db);
         Some(Self::new(
             db,
             self.function(db)
-                .recursive_type_normalized_impl(db, program, div, nested)?,
+                .recursive_type_normalized_impl(db, div, nested)?,
             self.self_instance(db)
                 .recursive_type_normalized_impl(db, program, div, true)?,
         ))
@@ -148,22 +138,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     pub(super) fn check_bound_method_pair(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         source: BoundMethodType<'db>,
         target: BoundMethodType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let program = self.program;
         // A bound method is a typically a subtype of itself. However, we must explicitly verify
         // the subtyping of the underlying function signatures (since they might be specialized
         // differently), and of the bound self parameter (taking care that parameters, including a
         // bound self parameter, are contravariant.)
-        self.check_function_pair(db, program, source.function(db), target.function(db))
+        self.check_function_pair(db, source.function(db), target.function(db))
             .and(db, program, self.constraints, || {
-                self.check_type_pair(
-                    db,
-                    program,
-                    target.self_instance(db),
-                    source.self_instance(db),
-                )
+                self.check_type_pair(db, target.self_instance(db), source.self_instance(db))
             })
     }
 }
@@ -251,12 +236,12 @@ impl<'db> KnownBoundMethodType<'db> {
         match self {
             KnownBoundMethodType::FunctionTypeDunderGet(function) => {
                 Some(KnownBoundMethodType::FunctionTypeDunderGet(
-                    function.recursive_type_normalized_impl(db, program, div, nested)?,
+                    function.recursive_type_normalized_impl(db, div, nested)?,
                 ))
             }
             KnownBoundMethodType::FunctionTypeDunderCall(function) => {
                 Some(KnownBoundMethodType::FunctionTypeDunderCall(
-                    function.recursive_type_normalized_impl(db, program, div, nested)?,
+                    function.recursive_type_normalized_impl(db, div, nested)?,
                 ))
             }
             KnownBoundMethodType::PropertyDunderGet(property) => {
@@ -342,7 +327,6 @@ impl<'db> KnownBoundMethodType<'db> {
                     Signature::new(
                         Parameters::new(
                             db,
-                            program,
                             [
                                 Parameter::positional_only(Some(Name::new_static("instance")))
                                     .with_annotated_type(Type::none(db, program)),
@@ -355,7 +339,6 @@ impl<'db> KnownBoundMethodType<'db> {
                     Signature::new(
                         Parameters::new(
                             db,
-                            program,
                             [
                                 Parameter::positional_only(Some(Name::new_static("instance")))
                                     .with_annotated_type(Type::object()),
@@ -381,7 +364,6 @@ impl<'db> KnownBoundMethodType<'db> {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::new(
                         db,
-                        program,
                         [
                             Parameter::positional_only(Some(Name::new_static("instance")))
                                 .with_annotated_type(Type::object()),
@@ -396,7 +378,6 @@ impl<'db> KnownBoundMethodType<'db> {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::new(
                         db,
-                        program,
                         [
                             Parameter::positional_only(Some(Name::new_static("instance")))
                                 .with_annotated_type(Type::object()),
@@ -409,7 +390,6 @@ impl<'db> KnownBoundMethodType<'db> {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::new(
                         db,
-                        program,
                         [
                             Parameter::positional_only(Some(Name::new_static("prefix")))
                                 .with_annotated_type(UnionType::from_two_elements(
@@ -447,7 +427,6 @@ impl<'db> KnownBoundMethodType<'db> {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::new(
                         db,
-                        program,
                         [
                             Parameter::positional_only(Some(Name::new_static("lower_bound")))
                                 .with_annotated_type(object_type_form()),
@@ -473,7 +452,6 @@ impl<'db> KnownBoundMethodType<'db> {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::new(
                         db,
-                        program,
                         [
                             Parameter::positional_only(Some(Name::new_static("ty")))
                                 .with_annotated_type(object_type_form()),
@@ -489,7 +467,6 @@ impl<'db> KnownBoundMethodType<'db> {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::new(
                         db,
-                        program,
                         [Parameter::positional_only(Some(Name::new_static("other")))
                             .with_annotated_type(
                                 KnownClass::ConstraintSet.to_instance(db, program),
@@ -503,7 +480,6 @@ impl<'db> KnownBoundMethodType<'db> {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::new(
                         db,
-                        program,
                         [Parameter::keyword_only(Name::new_static("inferable"))
                             .with_annotated_type(UnionType::from_two_elements(
                                 db,
@@ -534,7 +510,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     pub(super) fn check_known_bound_method_pair(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         source: KnownBoundMethodType<'db>,
         target: KnownBoundMethodType<'db>,
     ) -> ConstraintSet<'db, 'c> {
@@ -542,12 +517,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (
                 KnownBoundMethodType::FunctionTypeDunderGet(source_function),
                 KnownBoundMethodType::FunctionTypeDunderGet(target_function),
-            ) => self.check_function_pair(db, program, source_function, target_function),
+            ) => self.check_function_pair(db, source_function, target_function),
 
             (
                 KnownBoundMethodType::FunctionTypeDunderCall(source_function),
                 KnownBoundMethodType::FunctionTypeDunderCall(target_function),
-            ) => self.check_function_pair(db, program, source_function, target_function),
+            ) => self.check_function_pair(db, source_function, target_function),
 
             (
                 KnownBoundMethodType::PropertyDunderGet(source_property),
@@ -560,7 +535,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             | (
                 KnownBoundMethodType::PropertyDunderDelete(source_property),
                 KnownBoundMethodType::PropertyDunderDelete(target_property),
-            ) => self.check_property_instance_pair(db, program, source_property, target_property),
+            ) => self.check_property_instance_pair(db, source_property, target_property),
 
             (KnownBoundMethodType::StrStartswith(_), KnownBoundMethodType::StrStartswith(_)) => {
                 ConstraintSet::from_bool(self.constraints, source == target)
@@ -666,7 +641,6 @@ impl WrapperDescriptorKind {
                 Signature::new(
                     Parameters::new(
                         db,
-                        program,
                         [
                             Parameter::positional_only(Some(Name::new_static("self")))
                                 .with_annotated_type(descriptor),
@@ -681,7 +655,6 @@ impl WrapperDescriptorKind {
                 Signature::new(
                     Parameters::new(
                         db,
-                        program,
                         [
                             Parameter::positional_only(Some(Name::new_static("self")))
                                 .with_annotated_type(descriptor),
@@ -714,7 +687,6 @@ impl WrapperDescriptorKind {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::new(
                         db,
-                        program,
                         [
                             Parameter::positional_only(Some(Name::new_static("self")))
                                 .with_annotated_type(KnownClass::Property.to_instance(db, program)),
@@ -731,7 +703,6 @@ impl WrapperDescriptorKind {
                 Either::Right(std::iter::once(Signature::new(
                     Parameters::new(
                         db,
-                        program,
                         [
                             Parameter::positional_only(Some(Name::new_static("self")))
                                 .with_annotated_type(KnownClass::Property.to_instance(db, program)),

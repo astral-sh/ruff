@@ -1803,7 +1803,6 @@ pub(super) struct PlaceWithDefinition<'db> {
 /// union type. The last one will include the other overloads already.
 struct PublicTypeBuilder<'db> {
     db: &'db dyn Db,
-    program: Program<'db>,
     queue: Option<Type<'db>>,
     builder: UnionBuilder<'db>,
 }
@@ -1812,7 +1811,6 @@ impl<'db> PublicTypeBuilder<'db> {
     fn new(db: &'db dyn Db, program: Program<'db>) -> Self {
         PublicTypeBuilder {
             db,
-            program,
             queue: None,
             builder: UnionBuilder::new(db, program),
         }
@@ -1906,7 +1904,11 @@ impl<'db> DeclaredTypeBuilder<'db> {
 
         if self.inner.add(element_ty, reachability) {
             if let Some(first_ty) = self.first_type {
-                if !first_ty.is_equivalent_to(self.inner.db, self.inner.program, element_ty) {
+                if !first_ty.is_equivalent_to(
+                    self.inner.db,
+                    self.inner.builder.program(),
+                    element_ty,
+                ) {
                     self.conflicting_types.insert(element_ty);
                 }
             } else {
@@ -2175,7 +2177,6 @@ pub(crate) mod implicit_globals {
                 let signature = Signature::new(
                     Parameters::new(
                         db,
-                        program,
                         [Parameter::positional_only(Some(Name::new_static("format")))
                             .with_annotated_type(KnownClass::Int.to_instance(db, program))],
                     ),

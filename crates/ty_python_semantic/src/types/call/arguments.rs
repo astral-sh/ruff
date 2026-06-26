@@ -578,7 +578,7 @@ pub(crate) fn is_expandable_type<'db>(
                 || enum_metadata(db, class.class_literal(db)).is_some()
         }
         Type::Union(_) => true,
-        Type::TypeAlias(alias) => is_expandable_type(db, program, alias.value_type(db, program)),
+        Type::TypeAlias(alias) => is_expandable_type(db, program, alias.value_type(db)),
         _ => false,
     }
 }

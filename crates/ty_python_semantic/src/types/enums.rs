@@ -172,11 +172,10 @@ impl get_size2::GetSize for EnumMetadata<'_> {}
 
 pub(super) fn class_defines_property<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     class: ClassLiteral<'db>,
     name: &str,
 ) -> bool {
-    let Some(class) = Type::ClassLiteral(class).to_class_type(db, program) else {
+    let Some(class) = Type::ClassLiteral(class).to_class_type(db) else {
         return false;
     };
 
@@ -333,13 +332,13 @@ impl<'db> EnumClassLiteral<'db> {
 /// expand through the remaining literal union so descriptor lookup sees ordinary enum literals.
 pub(super) fn instance_member_for_enum_complement<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     complement: EnumComplement<'db>,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
-    if let Some(member) = special_member_for_enum_complement(db, program, complement, name) {
+    if let Some(member) = special_member_for_enum_complement(db, complement, name) {
         member
     } else {
+        let program = complement.enum_class(db).program(db);
         complement
             .remaining_literal_union(db)
             .instance_member(db, program, name)
@@ -352,14 +351,14 @@ pub(super) fn instance_member_for_enum_complement<'db>(
 /// general member lookup so descriptor and class-variable policy is still applied.
 pub(super) fn member_lookup_for_enum_complement<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     complement: EnumComplement<'db>,
     name: &str,
     policy: MemberLookupPolicy,
 ) -> PlaceAndQualifiers<'db> {
-    if let Some(member) = special_member_for_enum_complement(db, program, complement, name) {
+    if let Some(member) = special_member_for_enum_complement(db, complement, name) {
         member
     } else {
+        let program = complement.enum_class(db).program(db);
         complement
             .remaining_literal_union(db)
             .member_lookup_with_policy(db, program, name.into(), policy)
@@ -373,12 +372,11 @@ pub(super) fn member_lookup_for_enum_complement<'db>(
 /// directly from the remaining canonical members.
 fn special_member_for_enum_complement<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     complement: EnumComplement<'db>,
     name: &str,
 ) -> Option<PlaceAndQualifiers<'db>> {
     if matches!(name, "name" | "_name_" | "value" | "_value_")
-        && !class_defines_property(db, program, complement.enum_class(db), name)
+        && !class_defines_property(db, complement.enum_class(db), name)
         && complement.rest(db).iter().all(Type::is_dynamic)
         && let Some(member_ty) = complement.member_type(db, name)
     {
@@ -399,8 +397,8 @@ fn known_constructor_preserves_value_type<'db>(
     value: Type<'db>,
     annotation: Type<'db>,
 ) -> bool {
-    let annotation = annotation.resolve_type_alias(db, program);
-    match value.resolve_type_alias(db, program) {
+    let annotation = annotation.resolve_type_alias(db);
+    match value.resolve_type_alias(db) {
         Type::Union(union) => union.elements(db).iter().all(|element| {
             known_constructor_preserves_value_type(db, program, *element, annotation)
         }),
@@ -647,11 +645,12 @@ impl<'db> EnumComplementType<'db> {
     ///
     /// Enums that override equality are excluded because one remaining enum literal can still
     /// compare equal to non-identical values.
-    pub(crate) fn is_single_valued(self, db: &'db dyn Db, program: crate::Program<'db>) -> bool {
+    pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
+        let program = self.enum_class(db).program(db);
         self.is_singleton(db)
             && !self
                 .enum_class(db)
-                .to_non_generic_instance(db, program)
+                .to_non_generic_instance(db)
                 .overrides_equality(db, program)
     }
 
@@ -757,13 +756,9 @@ impl<'db> EnumComplementType<'db> {
     }
 
     /// Reconstruct the equivalent set-theoretic intersection.
-    pub(crate) fn to_intersection(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> Type<'db> {
+    pub(crate) fn to_intersection(self, db: &'db dyn Db) -> Type<'db> {
         let enum_class = self.enum_class(db);
-        let mut positive = FxOrderSet::from_iter([enum_class.to_non_generic_instance(db, program)]);
+        let mut positive = FxOrderSet::from_iter([enum_class.to_non_generic_instance(db)]);
         positive.extend(self.rest(db).iter().copied());
 
         let mut negative = NegativeIntersectionElements::default();
@@ -781,11 +776,8 @@ impl<'db> EnumComplementType<'db> {
 
 /// Returns the set of names listed in an enum's `_ignore_` attribute.
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn enum_ignored_names<'db>(
-    db: &'db dyn Db,
-    program: crate::Program<'db>,
-    scope_id: ScopeId<'db>,
-) -> FxHashSet<Name> {
+pub(crate) fn enum_ignored_names<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -> FxHashSet<Name> {
+    let program = scope_id.program(db);
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
@@ -912,7 +904,7 @@ pub(crate) fn enum_metadata<'db>(
     let mut auto_members = FxHashSet::default();
     let mut prev_value_was_non_literal_int = false;
     let mut prev_bool_literal = None;
-    let ignored_names = enum_ignored_names(db, program, scope_id);
+    let ignored_names = enum_ignored_names(db, scope_id);
 
     // Look up custom construction methods, falling back to parent enum classes. An opaque binding
     // still shadows methods from classes later in the MRO.
@@ -927,7 +919,7 @@ pub(crate) fn enum_metadata<'db>(
     let new = resolve_enum_method(user_defined_new, || {
         inherited_known_enum_method(db, class, "__new__")
     });
-    let metaclass_may_transform_values = enum_metaclass_may_transform_values(db, program, class);
+    let metaclass_may_transform_values = enum_metaclass_may_transform_values(db, class);
     let user_defined_generate_next_value =
         custom_enum_method(db, scope_id, "_generate_next_value_")
             .or_else(|| inherited_user_defined_enum_method(db, class, "_generate_next_value_"));
@@ -1142,12 +1134,12 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
-    let value_annotation = custom_value_annotation(db, program, scope_id)
-        .or_else(|| inherited_user_defined_value_annotation(db, program, class))
+    let value_annotation = custom_value_annotation(db, scope_id)
+        .or_else(|| inherited_user_defined_value_annotation(db, class))
         .map(EnumValueAnnotation::UserDefined)
         .or_else(|| {
             (!metaclass_may_transform_values)
-                .then(|| inherited_value_annotation(db, program, class))
+                .then(|| inherited_value_annotation(db, class))
                 .flatten()
                 .map(EnumValueAnnotation::StandardLibrary)
         });
@@ -1171,10 +1163,9 @@ pub(crate) fn enum_metadata<'db>(
 /// enum constructor validates and forwards them to `__new__`/`__init__`.
 fn enum_metaclass_may_transform_values<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     class: StaticClassLiteral<'db>,
 ) -> bool {
-    let Some(metaclass) = class.metaclass(db).to_class_type(db, program) else {
+    let Some(metaclass) = class.metaclass(db).to_class_type(db) else {
         return false;
     };
 
@@ -1215,11 +1206,8 @@ fn iter_parent_enum_classes<'db>(
 }
 
 /// Returns the `_value_` annotation type if one is declared in the given scope.
-fn custom_value_annotation<'db>(
-    db: &'db dyn Db,
-    program: crate::Program<'db>,
-    scope: ScopeId<'db>,
-) -> Option<Type<'db>> {
+fn custom_value_annotation<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<Type<'db>> {
+    let program = scope.program(db);
     let symbol_id = place_table(db, scope).symbol_id("_value_")?;
     let declarations = use_def_map(db, scope).end_of_scope_symbol_declarations(symbol_id);
     place_from_declarations(db, program, declarations)
@@ -1230,22 +1218,20 @@ fn custom_value_annotation<'db>(
 /// Looks up an inherited `_value_` annotation from parent enum classes in the MRO.
 fn inherited_value_annotation<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     class: StaticClassLiteral<'db>,
 ) -> Option<Type<'db>> {
     iter_parent_enum_classes(db, class)
-        .find_map(|base| custom_value_annotation(db, program, base.body_scope(db)))
+        .find_map(|base| custom_value_annotation(db, base.body_scope(db)))
 }
 
 /// Looks up an inherited `_value_` annotation from user-defined parent enum classes in the MRO.
 fn inherited_user_defined_value_annotation<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     class: StaticClassLiteral<'db>,
 ) -> Option<Type<'db>> {
     iter_parent_enum_classes(db, class)
         .filter(|base| base.known(db).is_none())
-        .find_map(|base| custom_value_annotation(db, program, base.body_scope(db)))
+        .find_map(|base| custom_value_annotation(db, base.body_scope(db)))
 }
 
 #[derive(Clone, Copy)]
@@ -1381,7 +1367,7 @@ pub(crate) fn is_enum_class_by_inheritance<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
 ) -> bool {
-    let program = class.definition(db).analysis_file(db).program(db);
+    let program = class.program(db);
     Type::ClassLiteral(ClassLiteral::Static(class)).is_subtype_of(
         db,
         program,

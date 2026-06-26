@@ -168,9 +168,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 class_type.name(db)
                             ));
                         }
-                        if let Some(disjoint_base) =
-                            class_type.nearest_disjoint_base(db, self.program)
-                        {
+                        if let Some(disjoint_base) = class_type.nearest_disjoint_base(db) {
                             disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
                         }
                         continue;
@@ -194,16 +192,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 "Consider using `Enum(\"{name}\", [])` instead"
                             ));
                         }
-                        if let Some(disjoint_base) =
-                            class_type.nearest_disjoint_base(db, self.program)
-                        {
+                        if let Some(disjoint_base) = class_type.nearest_disjoint_base(db) {
                             disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
                         }
                         continue;
                     }
 
-                    if let Some(disjoint_base) = class_type.nearest_disjoint_base(db, self.program)
-                    {
+                    if let Some(disjoint_base) = class_type.nearest_disjoint_base(db) {
                         disjoint_bases.insert(disjoint_base, idx, class_type.class_literal(db));
                     }
                 }
@@ -226,7 +221,7 @@ pub(super) fn report_dynamic_mro_errors<'db>(
 ) -> bool {
     let db = context.db();
     let program = context.program();
-    let Err(error) = dynamic_class.try_mro(db, program) else {
+    let Err(error) = dynamic_class.try_mro(db) else {
         return true;
     };
 

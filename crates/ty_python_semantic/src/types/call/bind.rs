@@ -128,7 +128,7 @@ fn generic_contexts_mentioned_in_type<'db>(
             for signature in &function.signature(db).overloads {
                 self.visit_signature(db, program, signature);
             }
-            self.visit_signature(db, program, function.last_definition_signature(db, program));
+            self.visit_signature(db, program, function.last_definition_signature(db));
         }
 
         fn visit_type(&self, db: &'db dyn Db, program: crate::Program<'db>, ty: Type<'db>) {
@@ -338,7 +338,6 @@ impl<'db> CallableItem<'db> {
                 program,
                 binding.partial_signature_applications(
                     db,
-                    program,
                     partial_overload,
                     bound_call_arguments,
                 )?,
@@ -558,7 +557,6 @@ impl<'db> Bindings<'db> {
     fn set_constructor_instance_type_in_place(
         &mut self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         constructor_instance_type: Type<'db>,
     ) {
         for element in &mut self.elements {
@@ -569,7 +567,7 @@ impl<'db> Bindings<'db> {
                         binding.set_constructed_instance_type(constructor_instance_type);
                         let constructor_context = binding.context();
                         for overload in &mut binding.entry.overloads {
-                            overload.set_constructor_context(db, program, constructor_context);
+                            overload.set_constructor_context(db, constructor_context);
                         }
 
                         // Deferred downstream constructor bindings still need constructor instance
@@ -578,7 +576,6 @@ impl<'db> Bindings<'db> {
                         if let Some(downstream) = binding.downstream_constructor_mut() {
                             downstream.set_constructor_instance_type_in_place(
                                 db,
-                                program,
                                 constructor_instance_type,
                             );
                         }
@@ -702,10 +699,9 @@ impl<'db> Bindings<'db> {
     pub(crate) fn with_constructed_instance_type(
         mut self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         constructor_instance_type: Type<'db>,
     ) -> Self {
-        self.set_constructor_instance_type_in_place(db, program, constructor_instance_type);
+        self.set_constructor_instance_type_in_place(db, constructor_instance_type);
         self
     }
 
@@ -1463,26 +1459,21 @@ impl<'db> Bindings<'db> {
                                     Some("__bound__") => {
                                         overload.set_return_type(
                                             typevar
-                                                .upper_bound(db, program)
+                                                .upper_bound(db)
                                                 .unwrap_or_else(|| Type::none(db, program)),
                                         );
                                     }
                                     Some("__constraints__") => {
                                         overload.set_return_type(Type::heterogeneous_tuple(
                                             db,
-                                            typevar.constraints(db, program).into_iter().flatten(),
+                                            typevar.constraints(db).into_iter().flatten(),
                                         ));
                                     }
                                     Some("__default__") => {
                                         if let Some(program) = property
                                             .getter(db)
                                             .and_then(Type::as_function_literal)
-                                            .map(|function| {
-                                                function
-                                                    .definition(db)
-                                                    .analysis_file(db)
-                                                    .program(db)
-                                            })
+                                            .map(|function| function.program(db))
                                         {
                                             overload.set_return_type(
                                                 typevar.default_type(db).unwrap_or_else(|| {
@@ -1804,11 +1795,7 @@ impl<'db> Bindings<'db> {
                     function @ Type::FunctionLiteral(function_type)
                         if dataclass_field_specifiers.contains(&function) =>
                     {
-                        let python_version = function_type
-                            .definition(db)
-                            .analysis_file(db)
-                            .program(db)
-                            .python_version(db);
+                        let python_version = function_type.program(db).python_version(db);
                         // Helper to get the type of a keyword argument by name. We first try to get it from
                         // the parameter binding (for explicit parameters), and then fall back to checking the
                         // call site arguments (for field-specifier functions that use a `**kwargs` parameter,
@@ -2292,7 +2279,7 @@ impl<'db> Bindings<'db> {
                                 {
                                     if let Some(protocol_class) = class.into_protocol_class(db) {
                                         let member_names = protocol_class
-                                            .interface(db, program)
+                                            .interface(db)
                                             .members(db)
                                             .map(|member| Type::string_literal(db, member.name()));
                                         let specialization =
@@ -2562,11 +2549,7 @@ impl<'db> Bindings<'db> {
                                     continue;
                                 };
 
-                                let python_version = function_type
-                                    .definition(db)
-                                    .analysis_file(db)
-                                    .program(db)
-                                    .python_version(db);
+                                let python_version = function_type.program(db).python_version(db);
                                 let return_type = parse_struct_format(
                                     db,
                                     program,
@@ -3271,7 +3254,6 @@ impl<'db> CallableBinding<'db> {
     fn partial_signature_applications<'a>(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         partial_overload: &mut Binding<'db>,
         bound_call_arguments: &CallArguments<'a, 'db>,
     ) -> Option<SmallVec<[PartialSignatureApplication<'db>; 1]>> {
@@ -3311,11 +3293,7 @@ impl<'db> CallableBinding<'db> {
             .into_iter()
             .filter_map(|index| {
                 self.overloads().get(index).map(|overload| {
-                    overload.partial_signature_application(
-                        signature_arguments.as_ref(),
-                        db,
-                        program,
-                    )
+                    overload.partial_signature_application(signature_arguments.as_ref(), db)
                 })
             })
             .collect();
@@ -3619,7 +3597,7 @@ impl<'db> CallableBinding<'db> {
                 // https://github.com/astral-sh/ty/issues/735 for more details.
                 for overload in &mut self.overloads {
                     // Clear the state of all overloads before re-evaluating from step 1
-                    overload.reset(db, program);
+                    overload.reset(db);
                     overload.match_parameters(db, program, expanded_arguments);
                 }
 
@@ -4284,7 +4262,7 @@ impl<'db> CallableBinding<'db> {
                         diag.info(format_args!(
                             "  {}",
                             overload
-                                .signature(context.db(), program)
+                                .signature(context.db())
                                 .display(context.db(), program)
                         ));
                     }
@@ -5146,7 +5124,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let preferred_type_mappings = return_with_tcx
             .and_then(|(return_ty, tcx)| {
                 if !tcx
-                    .filter_union(self.db, self.program, |ty| {
+                    .filter_union(self.db, |ty| {
                         ty.may_prefer_declared_type(self.db, self.program)
                     })
                     .may_prefer_declared_type(self.db, self.program)
@@ -5215,7 +5193,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                                 binding.bound_typevar,
                                 binding.solution,
                             )
-                            .filter_union(self.db, self.program, |ty| {
+                            .filter_union(self.db, |ty| {
                                 if ty.has_unspecialized_type_var(self.db, program) {
                                     partially_specialized_declared_type.insert(identity);
                                     return false;
@@ -5230,10 +5208,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         // deeply contains non-inferable typevars. Such types (e.g.,
                         // `T@h | list[T@h]` from an outer generic scope) don't provide
                         // useful concrete information and would cause over-expansion.
-                        let concrete_content =
-                            inferred_ty.filter_union(self.db, self.program, |ty| {
-                                !ty.has_typevar(self.db, self.program)
-                            });
+                        let concrete_content = inferred_ty
+                            .filter_union(self.db, |ty| !ty.has_typevar(self.db, self.program));
                         if concrete_content.is_never() && inferred_ty.has_typevar(self.db, program)
                         {
                             continue;
@@ -5308,9 +5284,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // The hook receives (typevar, bounds) and returns Some(ty) to override the default
         // solution, or None to keep it.
         let maybe_promote = |typevar: BoundTypeVarInstance<'db>, bounds: &PathBound<'db>| {
-            let bound_or_constraints = typevar
-                .typevar(self.db)
-                .bound_or_constraints(self.db, program);
+            let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
 
             // For constrained TypeVars, the inferred type is already one of the
             // constraints. Promoting literals would produce a type that doesn't
@@ -6338,7 +6312,7 @@ impl<'db> Binding<'db> {
         if let Type::TypeVar(typevar) = parameter_type
             && !typevar.is_paramspec(db)
             && let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
-                typevar.typevar(db).bound_or_constraints(db, program)
+                typevar.typevar(db).bound_or_constraints(db)
         {
             return Some(ArgumentTypeContext::standard(
                 original_parameter_type,
@@ -6362,7 +6336,7 @@ impl<'db> Binding<'db> {
                 FxHashMap::default();
             if let Some(declared_return_ty) = call_expression_tcx.annotation {
                 let return_ty = self
-                    .normalized_constructor_return(db, program)
+                    .normalized_constructor_return(db)
                     .unwrap_or(self.signature.return_ty);
                 let path_bounds = return_ty.assignable_solutions_with_inferable(
                     db,
@@ -6482,7 +6456,7 @@ impl<'db> Binding<'db> {
         }
 
         self.signature = self.signature.freshen_bound_typevars(db, program, delta);
-        self.return_ty = self.initial_return_type(db, program);
+        self.return_ty = self.initial_return_type(db);
     }
 
     fn match_parameters(
@@ -6760,13 +6734,12 @@ impl<'db> Binding<'db> {
         &self,
         arguments: &CallArguments<'_, 'db>,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
     ) -> PartialSignatureApplication<'db> {
         PartialSignatureApplication::new(
             self.signature.clone(),
             self.partial_application(arguments),
             self.specialization,
-            self.unspecialized_return_type(db, program),
+            self.unspecialized_return_type(db),
         )
     }
 
@@ -6896,8 +6869,8 @@ impl<'db> Binding<'db> {
     }
 
     /// Resets the state of this binding to its initial state.
-    fn reset(&mut self, db: &'db dyn Db, program: crate::Program<'db>) {
-        self.return_ty = self.initial_return_type(db, program);
+    fn reset(&mut self, db: &'db dyn Db) {
+        self.return_ty = self.initial_return_type(db);
         self.inferable_typevars = InferableTypeVars::None;
         self.specialization = None;
         self.argument_matches = Box::from([]);
@@ -7030,7 +7003,7 @@ impl<'db> CallableDescription<'db> {
         ) -> Cow<'db, str> {
             let definition = function.definition(db);
             let semantic_index = semantic_index(db, definition.analysis_file(db));
-            let enclosing_scope = semantic_index.scope(function.definition(db).file_scope(db));
+            let enclosing_scope = semantic_index.scope(definition.file_scope(db));
             if let Some(class_node) = enclosing_scope.node().as_class()
                 && let Some(class) =
                     original_class_type(db, semantic_index.expect_single_definition(class_node))
@@ -7536,7 +7509,7 @@ impl<'db> BindingError<'db> {
                             diag.info(format_args!(
                                 "  {}",
                                 overload
-                                    .signature(context.db(), program)
+                                    .signature(context.db())
                                     .display(context.db(), program)
                             ));
                         }
@@ -7798,7 +7771,7 @@ impl<'db> BindingError<'db> {
                             "Argument type `{argument_ty_display}` does not \
                                 satisfy upper bound `{}` of type variable `{typevar_name}`",
                             typevar
-                                .upper_bound(context.db(), program)
+                                .upper_bound(context.db())
                                 .expect(
                                     "type variable should have an upper bound if this error occurs"
                                 )
@@ -7812,7 +7785,7 @@ impl<'db> BindingError<'db> {
                             "Argument type `{argument_ty_display}` does not \
                                 satisfy constraints ({}) of type variable `{typevar_name}`",
                             typevar
-                                .constraints(context.db(), program)
+                                .constraints(context.db())
                                 .expect(
                                     "type variable should have constraints if this error occurs"
                                 )

@@ -1411,12 +1411,11 @@ pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeR
 // they can only occur if we already failed to validate the dict (and emitted some diagnostic).
 pub(crate) fn is_invalid_typed_dict_literal(
     db: &dyn Db,
-    program: crate::Program<'_>,
     target_ty: Type,
     source: AnyNodeRef<'_>,
 ) -> bool {
     target_ty
-        .filter_union(db, program, Type::is_typed_dict)
+        .filter_union(db, Type::is_typed_dict)
         .as_typed_dict()
         .is_some()
         && matches!(source, AnyNodeRef::ExprDict(_))
@@ -1445,7 +1444,7 @@ pub(super) fn note_numbers_module_not_supported<'db>(
         let class = target_instance.class(db, program).class_literal(db);
         let program = class.program(db);
         if let Some(module) = class.as_static().and_then(|class| {
-            file_to_module(db, class.definition(db).analysis_file(db).program_file(db))
+            file_to_module(db, class.body_scope(db).analysis_file(db).program_file(db))
         }) && module.is_known(db, KnownModule::Numbers)
         {
             let is_numeric = value_ty.is_subtype_of(
@@ -1587,12 +1586,7 @@ pub(super) fn report_invalid_assignment<'db>(
     };
 
     if let Some(value_node) = value_node
-        && is_invalid_typed_dict_literal(
-            context.db(),
-            context.program(),
-            target_ty,
-            value_node.into(),
-        )
+        && is_invalid_typed_dict_literal(context.db(), target_ty, value_node.into())
     {
         return;
     }
@@ -2087,11 +2081,11 @@ pub(super) fn report_possibly_missing_attribute(
         )),
         Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
             "Attribute `{attribute}` may be missing on class `{}`",
-            alias.display(db, program),
+            alias.display(db),
         )),
         _ => builder.into_diagnostic(format_args!(
             "Attribute `{attribute}` may be missing on object of type `{}`",
-            object_ty.display(db, context.program()),
+            object_ty.display(db, program),
         )),
     };
 }
@@ -2363,11 +2357,7 @@ impl<'db> IncompatibleBases<'db> {
     /// Two disjoint bases are allowed to coexist in an MRO if one is a subclass of the other.
     /// This method therefore removes any entry in `self` that is a subclass of one or more
     /// other entries also contained in `self`.
-    pub(super) fn remove_redundant_entries(
-        &mut self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) {
+    pub(super) fn remove_redundant_entries(&mut self, db: &'db dyn Db) {
         self.0 = self
             .0
             .iter()
@@ -2381,7 +2371,7 @@ impl<'db> IncompatibleBases<'db> {
                         // base share the same layout.
                         !disjoint_base
                             .class
-                            .default_specialization(db, program)
+                            .default_specialization(db)
                             .is_subtype_of_class_literal(db, other_base.class)
                     })
             })
@@ -2496,7 +2486,7 @@ pub(crate) fn report_bad_argument_to_protocol_interface(
     diagnostic
         .set_primary_message("Only protocol classes can be passed to `reveal_protocol_interface`");
 
-    if let Some(class) = param_type.to_class_type(context.db(), context.program()) {
+    if let Some(class) = param_type.to_class_type(context.db()) {
         let mut class_def_diagnostic = SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
             format_args!(
@@ -2571,8 +2561,9 @@ pub(crate) fn report_invalid_match_args_type<T: Ranged>(
         return;
     };
     let db = context.db();
-    let class_display = cls_ty.display(db);
-    let match_args_display = match_args_ty.display(db);
+    let program = context.program();
+    let class_display = cls_ty.display(db, program);
+    let match_args_display = match_args_ty.display(db, program);
     builder.into_diagnostic(format_args!(
         "`__match_args__` for `{class_display}` must be an exact tuple, not `{match_args_display}`"
     ));
@@ -2813,10 +2804,9 @@ pub(super) fn abstract_method_span<'db>(
         return function.spans(db).name;
     };
 
-    let definition = function.definition(db);
     let file = function.file(db);
     let module =
-        parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db);
+        parsed_module_versioned(db, function.analysis_file(db).versioned_file(db)).load(db);
     let node = implementation.node(db, file, &module);
     let source_text = source_text(db, file);
 
@@ -3624,7 +3614,6 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
     base_nodes: Option<&[ast::Expr]>,
 ) {
     let db = context.db();
-    let program = context.program();
     // Maps each generic ancestor's class literal to the first
     // specialization seen and the index of the explicit base it
     // came from.
@@ -3674,41 +3663,41 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
                     ) {
                         diagnostic.annotate(context.secondary(earlier_base).message(format_args!(
                             "Earlier class base inherits from `{}`",
-                            earlier_alias.display(db, program)
+                            earlier_alias.display(db)
                         )));
                         let later_annotation = context.secondary(later_base);
                         diagnostic.annotate(if later_is_direct {
                             later_annotation.message(format_args!(
                                 "Later class base is `{}`",
-                                supercls_alias.display(db, program)
+                                supercls_alias.display(db)
                             ))
                         } else {
                             later_annotation.message(format_args!(
                                 "Later class base inherits from `{}`",
-                                supercls_alias.display(db, program)
+                                supercls_alias.display(db)
                             ))
                         });
                     } else {
                         diagnostic.info(format_args!(
                             "Earlier class base inherits from `{}`",
-                            earlier_alias.display(db, program)
+                            earlier_alias.display(db)
                         ));
                         if later_is_direct {
                             diagnostic.info(format_args!(
                                 "Later class base is `{}`",
-                                supercls_alias.display(db, program)
+                                supercls_alias.display(db)
                             ));
                         } else {
                             diagnostic.info(format_args!(
                                 "Later class base inherits from `{}`",
-                                supercls_alias.display(db, program)
+                                supercls_alias.display(db)
                             ));
                         }
                     }
                     diagnostic.set_concise_message(format_args!(
                         "Inconsistent type arguments: class cannot inherit from both `{}` and `{}`",
-                        supercls_alias.display(db, program),
-                        earlier_alias.display(db, program)
+                        supercls_alias.display(db),
+                        earlier_alias.display(db)
                     ));
                     break 'outer;
                 }
@@ -3830,7 +3819,7 @@ pub(super) fn report_invalid_method_override<'db>(
     ));
 
     let class_member = |cls: ClassType<'db>| {
-        cls.class_member(db, context.program(), member, MemberLookupPolicy::default())
+        cls.class_member(db, member, MemberLookupPolicy::default())
             .place
     };
 
@@ -4050,7 +4039,6 @@ pub(super) fn report_overridden_final_method<'db>(
                 &parsed_module_versioned(
                     db,
                     first_final_superclass_definition
-                        .definition(db)
                         .analysis_file(db)
                         .versioned_file(db),
                 )
@@ -4515,7 +4503,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
         let module = parsed_module_versioned(
             db,
             base_class
-                .definition(db)
+                .body_scope(db)
                 .analysis_file(db)
                 .versioned_file(db),
         )

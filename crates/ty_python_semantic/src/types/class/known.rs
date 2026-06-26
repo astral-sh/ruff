@@ -986,8 +986,8 @@ impl KnownClass {
             "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
         );
         self.to_class_literal(db, program)
-            .to_class_type(db, program)
-            .map(|class| Type::instance(db, program, class))
+            .to_class_type(db)
+            .map(|class| Type::instance(db, class))
             .unwrap_or_else(Type::unknown)
     }
 
@@ -1005,7 +1005,7 @@ impl KnownClass {
             "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
         );
         self.try_to_class_literal(db, program)
-            .map(|literal| Type::instance(db, program, literal.unknown_specialization(db)))
+            .map(|literal| Type::instance(db, literal.unknown_specialization(db)))
             .unwrap_or_else(Type::unknown)
     }
 
@@ -1026,7 +1026,6 @@ impl KnownClass {
     {
         fn to_specialized_class_type_impl<'db>(
             db: &'db dyn Db,
-            program: Program<'db>,
             class: KnownClass,
             class_literal: StaticClassLiteral<'db>,
             specialization: Cow<[Type<'db>]>,
@@ -1038,13 +1037,14 @@ impl KnownClass {
                 static MESSAGES: LazyLock<Mutex<FxHashSet<KnownClass>>> =
                     LazyLock::new(Mutex::default);
                 if MESSAGES.lock().unwrap().insert(class) {
+                    let program = class_literal.program(db);
                     tracing::info!(
                         "Wrong number of types when specializing {}. \
                  Falling back to default specialization for the symbol instead.",
                         class.display(db, program)
                     );
                 }
-                return class_literal.default_specialization(db, program);
+                return class_literal.default_specialization(db);
             }
 
             class_literal
@@ -1060,7 +1060,6 @@ impl KnownClass {
 
         Some(to_specialized_class_type_impl(
             db,
-            program,
             self,
             class_literal,
             specialization,
@@ -1198,7 +1197,7 @@ impl KnownClass {
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
     pub fn to_subclass_of<'db>(self, db: &'db dyn Db, program: Program<'db>) -> Type<'db> {
         self.to_class_literal(db, program)
-            .to_class_type(db, program)
+            .to_class_type(db)
             .map(|class| SubclassOfType::from(db, program, class))
             .unwrap_or_else(SubclassOfType::subclass_of_unknown)
     }

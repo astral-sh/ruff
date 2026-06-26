@@ -101,9 +101,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .collect_vec();
                     (!keys.is_empty()).then(|| UnionType::from_elements(db, program, keys))
                 }
-                Type::TypeAlias(alias) => visitor.visit(ty, || {
-                    imp(db, program, alias.value_type(db, program), visitor)
-                }),
+                Type::TypeAlias(alias) => {
+                    visitor.visit(ty, || imp(db, program, alias.value_type(db), visitor))
+                }
                 _ => None,
             }
         }
@@ -763,7 +763,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // against bounds/constraints, but recording the expression for deferred
                     // checking at end of scope. This would avoid a lot of cycles caused by eagerly
                     // doing assignment checks here.
-                    match typevar.typevar(db).bound_or_constraints(db, self.program) {
+                    match typevar.typevar(db).bound_or_constraints(db) {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                             if provided_type
                                 .when_assignable_to(
@@ -1021,7 +1021,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else {
                     Parameters::new(
                         db,
-                        self.program,
                         parameter_types.iter().map(|param_type| {
                             Parameter::positional_only(None).with_annotated_type(*param_type)
                         }),
@@ -1095,7 +1094,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             db,
                             Parameters::new(
                                 db,
-                                self.program,
                                 [
                                     Parameter::positional_only(None)
                                         .with_annotated_type(param_type),
@@ -1125,7 +1123,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             } else {
                                 Parameters::new(
                                     db,
-                                    self.program,
                                     [Parameter::positional_only(None)
                                         .with_annotated_type(param_type)],
                                 )
@@ -1291,8 +1288,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Some(collection_def) = self.index.unannotated_collection_initializer(object)
             && let Some((class_literal, _)) = object_ty.class_specialization(db, self.program)
         {
-            let identity_instance =
-                Type::instance(db, self.program, class_literal.identity_specialization(db));
+            let identity_instance = Type::instance(db, class_literal.identity_specialization(db));
             let collection_generic_context = class_literal.generic_context(db);
 
             let ast_arguments = [
@@ -1775,7 +1771,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     file_to_module(
                                         db,
                                         class_literal
-                                            .definition(db)
+                                            .body_scope(db)
                                             .analysis_file(db)
                                             .program_file(db),
                                     )
@@ -2188,15 +2184,8 @@ fn legacy_generic_class_context<'db>(
     for ty in typevars {
         let argument_ty = *ty;
         if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = argument_ty {
-            let bound = bind_typevar(
-                db,
-                program,
-                index,
-                file_scope_id,
-                typevar_binding_context,
-                typevar,
-            )
-            .ok_or(LegacyGenericContextError::InvalidArgument(argument_ty))?;
+            let bound = bind_typevar(db, index, file_scope_id, typevar_binding_context, typevar)
+                .ok_or(LegacyGenericContextError::InvalidArgument(argument_ty))?;
             if !validated_typevars.insert(bound) {
                 return Err(LegacyGenericContextError::DuplicateTypevar(
                     typevar.name(db),

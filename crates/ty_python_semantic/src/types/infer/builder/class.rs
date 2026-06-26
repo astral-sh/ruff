@@ -152,7 +152,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 _ => Type::from(StaticClassLiteral::new(
                     db,
-                    self.program,
                     &name.id,
                     body_scope,
                     maybe_known_class,
@@ -286,7 +285,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Ok(return_ty) => *return_ty,
                 Err(error) => error.return_type(db, self.program),
             };
-            if is_unknown_decorator_result(db, self.program, decorated_ty) {
+            if is_unknown_decorator_result(db, decorated_ty) {
                 if !preserve_binding_for_unknown_result(
                     db,
                     self.program,
@@ -350,15 +349,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
             // If a class decorator application loses all precision, preserve the original class
             // binding for decorators known to preserve unknown results.
-            let should_preserve_binding =
-                is_unknown_decorator_result(db, self.program, decorated_ty)
-                    && preserve_binding_for_unknown_result(
-                        db,
-                        self.program,
-                        decorator_ty,
-                        decorator_call_ty(decorator_node),
-                        decorated_ty,
-                    );
+            let should_preserve_binding = is_unknown_decorator_result(db, decorated_ty)
+                && preserve_binding_for_unknown_result(
+                    db,
+                    self.program,
+                    decorator_ty,
+                    decorator_call_ty(decorator_node),
+                    decorated_ty,
+                );
             inferred_ty = if should_preserve_binding {
                 inferred_ty
             } else if class_decorator_preserves_class_binding(
@@ -514,7 +512,7 @@ fn class_decorator_preserves_class_binding<'db>(
         Type::SubclassOf(subclass_of) => subclass_of
             .subclass_of()
             .into_class(db, program)
-            .is_some_and(|class| class == original_literal.default_specialization(db, program)),
+            .is_some_and(|class| class == original_literal.default_specialization(db)),
         Type::Divergent(_) => true,
         Type::Union(union) => union.elements(db).iter().all(|element| {
             class_decorator_preserves_class_binding(db, program, original_class, *element)
@@ -523,7 +521,7 @@ fn class_decorator_preserves_class_binding<'db>(
             db,
             program,
             original_class,
-            alias.value_type(db, program),
+            alias.value_type(db),
         ),
         _ => SubclassOfType::try_from_type(db, program, original_class).is_some_and(
             |original_meta_type| decorated_class.is_equivalent_to(db, program, original_meta_type),
@@ -549,7 +547,7 @@ fn type_retains_original_class<'db>(
             .iter()
             .all(|element| type_retains_original_class(db, program, original_class, *element)),
         Type::TypeAlias(alias) => {
-            type_retains_original_class(db, program, original_class, alias.value_type(db, program))
+            type_retains_original_class(db, program, original_class, alias.value_type(db))
         }
         _ => class_decorator_preserves_class_binding(db, program, original_class, decorated_class),
     }
@@ -593,12 +591,8 @@ fn preserve_binding_for_unknown_result<'db>(
 }
 
 /// Return true if applying a class decorator produced no useful replacement type.
-fn is_unknown_decorator_result<'db>(
-    db: &'db dyn crate::Db,
-    program: crate::Program<'db>,
-    ty: Type<'db>,
-) -> bool {
-    ty.is_unknown() || is_unknown_class_object_decorator_result(db, program, ty)
+fn is_unknown_decorator_result<'db>(db: &'db dyn crate::Db, ty: Type<'db>) -> bool {
+    ty.is_unknown() || is_unknown_class_object_decorator_result(db, ty)
 }
 
 /// Return true if applying a class decorator produced an unknown class-object type.
@@ -614,12 +608,8 @@ fn is_unknown_decorator_result<'db>(
 /// @decorator
 /// class C: ...
 /// ```
-fn is_unknown_class_object_decorator_result<'db>(
-    db: &'db dyn crate::Db,
-    program: crate::Program<'db>,
-    ty: Type<'db>,
-) -> bool {
-    let Type::SubclassOf(subclass_of) = ty.resolve_type_alias(db, program) else {
+fn is_unknown_class_object_decorator_result<'db>(db: &'db dyn crate::Db, ty: Type<'db>) -> bool {
+    let Type::SubclassOf(subclass_of) = ty.resolve_type_alias(db) else {
         return false;
     };
 
@@ -733,13 +723,8 @@ impl ClassDecoratorUnknownResultPolicy {
                 },
             ),
             Type::TypeAlias(alias) => Some(
-                Self::known_from_decorator(
-                    db,
-                    program,
-                    alias.value_type(db, program),
-                    decorator_result_ty,
-                )
-                .unwrap_or(Self::ReplaceBinding),
+                Self::known_from_decorator(db, program, alias.value_type(db), decorator_result_ty)
+                    .unwrap_or(Self::ReplaceBinding),
             ),
             Type::Callable(callable) => Some(match callable.provenance(db) {
                 // An unannotated function preserves the class binding when applying it loses the
@@ -768,11 +753,7 @@ impl ClassDecoratorUnknownResultPolicy {
                 // class C: ...
                 // ```
                 CallableFunctionProvenance::None
-                    if is_unknown_class_object_decorator_result(
-                        db,
-                        program,
-                        decorator_result_ty,
-                    ) =>
+                    if is_unknown_class_object_decorator_result(db, decorator_result_ty) =>
                 {
                     Self::PreserveBinding
                 }

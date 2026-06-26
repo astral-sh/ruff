@@ -45,7 +45,6 @@ impl<'db> ClassBase<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -53,7 +52,7 @@ impl<'db> ClassBase<'db> {
             Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
             Self::Divergent(_) => Some(self),
             Self::Class(class) => Some(Self::Class(
-                class.recursive_type_normalized_impl(db, program, div, nested)?,
+                class.recursive_type_normalized_impl(db, div, nested)?,
             )),
             Self::Any | Self::Protocol | Self::Generic | Self::TypedDict(_) => Some(self),
         }
@@ -142,9 +141,7 @@ impl<'db> ClassBase<'db> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
             Type::Divergent(divergent) => Some(Self::Divergent(divergent)),
-            Type::ClassLiteral(literal) => {
-                Some(Self::Class(literal.default_specialization(db, program)))
-            }
+            Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)
                 if instance.has_known_class(db, KnownClass::GenericAlias) =>
@@ -204,15 +201,12 @@ impl<'db> ClassBase<'db> {
             Type::Never => Some(ClassBase::unknown()),
 
             Type::TypeAlias(alias) => {
-                Self::try_from_type(db, program, alias.value_type(db, program), subclass)
+                Self::try_from_type(db, program, alias.value_type(db), subclass)
             }
 
-            Type::NewTypeInstance(newtype) => ClassBase::try_from_type(
-                db,
-                program,
-                newtype.concrete_base_type(db, program),
-                subclass,
-            ),
+            Type::NewTypeInstance(newtype) => {
+                ClassBase::try_from_type(db, program, newtype.concrete_base_type(db), subclass)
+            }
 
             Type::PropertyInstance(_)
             | Type::EnumComplement(_)
@@ -313,7 +307,7 @@ impl<'db> ClassBase<'db> {
 
                 SpecialFormType::NamedTuple => {
                     let class = subclass?.as_static()?;
-                    let fields = class.own_fields(db, program, None, CodeGeneratorKind::NamedTuple);
+                    let fields = class.own_fields(db, None, CodeGeneratorKind::NamedTuple);
                     Self::try_from_type(
                         db,
                         program,
@@ -376,7 +370,7 @@ impl<'db> ClassBase<'db> {
     /// Return the metaclass of this class base.
     pub(crate) fn metaclass(self, db: &'db dyn Db, program: Program<'db>) -> Type<'db> {
         match self {
-            Self::Class(class) => class.metaclass(db, program),
+            Self::Class(class) => class.metaclass(db),
             Self::Any => Type::Dynamic(DynamicType::Any),
             Self::Dynamic(dynamic) => Type::Dynamic(dynamic),
             Self::Divergent(divergent) => Type::Divergent(divergent),
@@ -390,14 +384,13 @@ impl<'db> ClassBase<'db> {
     fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
             Self::Class(class) => {
-                Self::Class(class.apply_type_mapping_impl(db, program, type_mapping, tcx, visitor))
+                Self::Class(class.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
             Self::Any
             | Self::Dynamic(_)
@@ -411,13 +404,11 @@ impl<'db> ClassBase<'db> {
     pub(crate) fn apply_optional_specialization(
         self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Self {
         if let Some(specialization) = specialization {
             let new_self = self.apply_type_mapping_impl(
                 db,
-                program,
                 &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
                     specialization,
                 )),
@@ -426,24 +417,16 @@ impl<'db> ClassBase<'db> {
             );
             match specialization.materialization_kind(db) {
                 None => new_self,
-                Some(materialization_kind) => {
-                    new_self.materialize(db, program, materialization_kind)
-                }
+                Some(materialization_kind) => new_self.materialize(db, materialization_kind),
             }
         } else {
             self
         }
     }
 
-    fn materialize(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-        kind: MaterializationKind,
-    ) -> Self {
+    fn materialize(self, db: &'db dyn Db, kind: MaterializationKind) -> Self {
         self.apply_type_mapping_impl(
             db,
-            program,
             &TypeMapping::Materialize(kind),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
@@ -490,7 +473,7 @@ impl<'db> ClassBase<'db> {
             | ClassBase::Generic
             | ClassBase::TypedDict(_) => ClassBaseMroIterator::length_2(db, program, self),
             ClassBase::Class(class) => {
-                ClassBaseMroIterator::from_class(db, program, class, additional_specialization)
+                ClassBaseMroIterator::from_class(db, class, additional_specialization)
             }
         }
     }
@@ -600,15 +583,10 @@ impl<'db> ClassBaseMroIterator<'db> {
     /// Iterate over the MRO of an arbitrary class. The MRO may be of any length.
     fn from_class(
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         class: ClassType<'db>,
         additional_specialization: Option<Specialization<'db>>,
     ) -> Self {
-        ClassBaseMroIterator::FromClass(class.iter_mro_specialized(
-            db,
-            program,
-            additional_specialization,
-        ))
+        ClassBaseMroIterator::FromClass(class.iter_mro_specialized(db, additional_specialization))
     }
 }
 

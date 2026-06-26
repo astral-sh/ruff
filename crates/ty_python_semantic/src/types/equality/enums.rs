@@ -178,7 +178,7 @@ impl<'db> EnumValueSet<'db> {
             ty: Type<'db>,
             active_types: &mut FxHashSet<Type<'db>>,
         ) -> Option<EnumValueSet<'db>> {
-            let value_set = match ty.resolve_type_alias(db, program) {
+            let value_set = match ty.resolve_type_alias(db) {
                 Type::LiteralValue(literal) => {
                     let LiteralValueTypeKind::Enum(enum_literal) = literal.kind() else {
                         return None;
@@ -401,7 +401,7 @@ impl<'db> EnumValueSet<'db> {
             EnumValueSetMembers::All => self
                 .enum_class
                 .class_literal(db)
-                .to_non_generic_instance(db, program),
+                .to_non_generic_instance(db),
             EnumValueSetMembers::One { name, promotable } => {
                 self.member_type(db, name, *promotable)
             }
@@ -497,7 +497,7 @@ impl<'db> EnumDomainSet<'db> {
             domains: &mut Vec<EnumValueSet<'db>>,
             active_types: &mut FxHashSet<Type<'db>>,
         ) -> Option<()> {
-            let Type::Union(union) = ty.resolve_type_alias(db, program) else {
+            let Type::Union(union) = ty.resolve_type_alias(db) else {
                 return None;
             };
             for element in union.elements(db) {
@@ -818,9 +818,7 @@ fn enum_class_key_profile<'db>(
     let semantics = KnownComparisonSemantics::of_instance(
         db,
         program,
-        enum_class
-            .class_literal(db)
-            .to_non_generic_instance(db, program),
+        enum_class.class_literal(db).to_non_generic_instance(db),
         operator,
     );
     let members: Box<[(Name, Option<LiteralValueTypeKind<'db>>)]> = enum_class

@@ -44,14 +44,13 @@ use ty_python_core::{SemanticIndex, semantic_index};
 /// scope.
 pub(crate) fn enclosing_generic_contexts<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     index: &SemanticIndex<'db>,
     scope: FileScopeId,
 ) -> impl Iterator<Item = GenericContext<'db>> {
     index
         .ancestor_scopes(scope)
         .filter_map(move |(_, ancestor_scope)| {
-            GenericContext::of_node(db, program, ancestor_scope.node(), index)
+            GenericContext::of_node(db, ancestor_scope.node(), index)
         })
 }
 
@@ -86,7 +85,6 @@ pub(crate) fn enclosing_binding_contexts<'a, 'db>(
 /// bind the typevar with that new binding context.
 pub(crate) fn bind_typevar<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     index: &SemanticIndex<'db>,
     containing_scope: FileScopeId,
     typevar_binding_context: Option<Definition<'db>>,
@@ -139,7 +137,7 @@ pub(crate) fn bind_typevar<'db>(
             }
             continue;
         }
-        let generic_context = GenericContext::of_node(db, program, ancestor_scope.node(), index);
+        let generic_context = GenericContext::of_node(db, ancestor_scope.node(), index);
         // If we've already crossed a class boundary, skip class-scoped generic contexts.
         // This prevents inner classes from accessing type parameters of outer classes.
         if (!is_class_scope || !crossed_class_scope)
@@ -159,7 +157,6 @@ pub(crate) fn bind_typevar<'db>(
 /// Create a `typing.Self` type variable for a given class.
 pub(crate) fn typing_self<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     scope_id: ScopeId<'db>,
     typevar_binding_context: Option<Definition<'db>>,
     class: ClassLiteral<'db>,
@@ -181,7 +178,6 @@ pub(crate) fn typing_self<'db>(
     );
     let bounds = TypeVarBoundOrConstraints::UpperBound(Type::instance(
         db,
-        program,
         class.identity_specialization(db),
     ));
     let typevar = TypeVarInstance::new(
@@ -237,7 +233,6 @@ pub(crate) fn typing_self<'db>(
 
     bind_typevar(
         db,
-        program,
         index,
         containing_scope,
         typevar_binding_context,
@@ -373,7 +368,6 @@ impl<'db> GenericContext<'db> {
 
     pub(crate) fn of_node(
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         node: &NodeWithScopeKind,
         index: &SemanticIndex<'db>,
     ) -> Option<Self> {
@@ -386,7 +380,7 @@ impl<'db> GenericContext<'db> {
                 let definition = index.expect_single_definition(function);
                 infer_definition_types(db, definition)
                     .function_type(definition)?
-                    .last_definition_signature(db, program)
+                    .last_definition_signature(db)
                     .generic_context
             }
             NodeWithScopeKind::TypeAlias(type_alias) => {
@@ -492,7 +486,7 @@ impl<'db> GenericContext<'db> {
                     .borrow_mut()
                     .insert(bound_typevar.identity(db));
                 let typevar = bound_typevar.typevar(db);
-                if let Some(bound_or_constraints) = typevar.bound_or_constraints(db, program) {
+                if let Some(bound_or_constraints) = typevar.bound_or_constraints(db) {
                     walk_type_var_bounds(db, program, bound_or_constraints, self);
                 }
             }
@@ -591,11 +585,11 @@ impl<'db> GenericContext<'db> {
     /// list.
     pub(crate) fn from_function_params(
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         definition: Definition<'db>,
         parameters: &Parameters<'db>,
         return_type: Type<'db>,
     ) -> Option<Self> {
+        let program = definition.analysis_file(db).program(db);
         // Find all of the legacy typevars mentioned in the function signature.
         let mut variables = FxOrderSet::default();
         for param in parameters {
@@ -644,10 +638,10 @@ impl<'db> GenericContext<'db> {
     /// list.
     pub(crate) fn from_base_classes(
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         definition: Definition<'db>,
         bases: impl Iterator<Item = Type<'db>>,
     ) -> Option<Self> {
+        let program = definition.analysis_file(db).program(db);
         let mut variables = FxOrderSet::default();
         for base in bases {
             base.find_legacy_typevars(db, program, Some(definition), &mut variables);
@@ -660,7 +654,6 @@ impl<'db> GenericContext<'db> {
 
     pub(crate) fn remove_callable_only_typevars(
         db: &'db dyn Db,
-        program: Program<'db>,
         generic_context: Option<Self>,
         parameters: &Parameters<'db>,
         return_type: Type<'db>,
@@ -687,12 +680,12 @@ impl<'db> GenericContext<'db> {
             fn finalize(
                 self,
                 db: &'db dyn Db,
-                program: crate::Program<'db>,
                 function_definition: Definition<'db>,
             ) -> (
                 FxHashSet<BoundTypeVarInstance<'db>>,
                 FxHashMap<CallableType<'db>, CallableType<'db>>,
             ) {
+                let program = function_definition.analysis_file(db).program(db);
                 let mut found_only_inside_callable_return = FxHashSet::default();
                 let replacements = self
                     .found_inside_callable_return
@@ -837,6 +830,8 @@ impl<'db> GenericContext<'db> {
             }
         }
 
+        let program = function_definition.analysis_file(db).program(db);
+
         // If the function in question is not generic, then there are no typevars, and we don't
         // have to worry about which ones appear in return type Callables.
         let Some(generic_context) = generic_context else {
@@ -856,7 +851,7 @@ impl<'db> GenericContext<'db> {
         let (found_only_inside_callable_return, replacements) = find_typevar_locations
             .locations
             .into_inner()
-            .finalize(db, program, function_definition);
+            .finalize(db, function_definition);
         let type_mapping = TypeMapping::RescopeReturnCallables(&replacements);
         let return_type =
             return_type.apply_type_mapping(db, program, &type_mapping, TypeContext::default());
@@ -1566,7 +1561,7 @@ impl<'db> Specialization<'db> {
             &signature_relation_visitor,
             &materialization_visitor,
         );
-        checker.check_specialization_pair(db, program, self, other)
+        checker.check_specialization_pair(db, self, other)
     }
 
     pub(crate) fn find_legacy_typevars_impl(
@@ -1591,10 +1586,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     pub(super) fn check_specialization_pair(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         source: Specialization<'db>,
         target: Specialization<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let program = self.program;
         let generic_context = source.generic_context(db);
         if generic_context != target.generic_context(db) {
             return self.never();
@@ -1603,7 +1598,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if let (Some(source_tuple), Some(target_tuple)) =
             (source.tuple_inner(db), target.tuple_inner(db))
         {
-            return self.check_tuple_type_pair(db, program, source_tuple, target_tuple);
+            return self.check_tuple_type_pair(db, source_tuple, target_tuple);
         }
 
         let source_materialization_kind = source.materialization_kind(db);
@@ -1629,17 +1624,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 match specialization_variance(db, program, bound_typevar) {
                     TypeVarVariance::Invariant => self.check_relation_in_invariant_position(
                         db,
-                        program,
                         *source_type,
                         source_materialization_kind,
                         *target_type,
                         target_materialization_kind,
                     ),
                     TypeVarVariance::Covariant => {
-                        self.check_type_pair(db, program, *source_type, *target_type)
+                        self.check_type_pair(db, *source_type, *target_type)
                     }
                     TypeVarVariance::Contravariant => {
-                        self.check_type_pair(db, program, *target_type, *source_type)
+                        self.check_type_pair(db, *target_type, *source_type)
                     }
                     TypeVarVariance::Bivariant => self.always(),
                 }
@@ -1653,12 +1647,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     fn check_relation_in_invariant_position(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         source_type: Type<'db>,
         source_materialization: Option<MaterializationKind>,
         target_type: Type<'db>,
         target_materialization: Option<MaterializationKind>,
     ) -> ConstraintSet<'db, 'c> {
+        let program = self.program;
         match (
             source_materialization,
             target_materialization,
@@ -1668,7 +1662,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // is the same as assignability.
             (Some(source_mat), Some(target_mat), _) => self.check_subtyping_in_invariant_position(
                 db,
-                program,
                 source_type,
                 source_mat,
                 target_type,
@@ -1686,11 +1679,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // `Foo[list[Any]]` even if `Foo` is invariant, and even though `Any` is not equivalent to
             // `list[Any]`, because `Any` is assignable to `list[Any]` and `list[Any]` is assignable to
             // `Any`.
-            (None, None, _) => self
-                .check_type_pair(db, program, target_type, source_type)
-                .and(db, program, self.constraints, || {
-                    self.check_type_pair(db, program, source_type, target_type)
-                }),
+            (None, None, _) => self.check_type_pair(db, target_type, source_type).and(
+                db,
+                program,
+                self.constraints,
+                || self.check_type_pair(db, source_type, target_type),
+            ),
             // For gradual types, A <: B (subtyping) is defined as Top[A] <: Bottom[B]
             (
                 None,
@@ -1700,7 +1694,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 | TypeRelation::SubtypingAssuming,
             ) => self.check_subtyping_in_invariant_position(
                 db,
-                program,
                 source_type,
                 MaterializationKind::Top,
                 target_type,
@@ -1714,7 +1707,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 | TypeRelation::SubtypingAssuming,
             ) => self.check_subtyping_in_invariant_position(
                 db,
-                program,
                 source_type,
                 source_mat,
                 target_type,
@@ -1724,7 +1716,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (None, Some(target_mat), TypeRelation::Assignability) => self
                 .check_subtyping_in_invariant_position(
                     db,
-                    program,
                     source_type,
                     MaterializationKind::Bottom,
                     target_type,
@@ -1733,7 +1724,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (Some(source_mat), None, TypeRelation::Assignability) => self
                 .check_subtyping_in_invariant_position(
                     db,
-                    program,
                     source_type,
                     source_mat,
                     target_type,
@@ -1745,12 +1735,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     fn check_subtyping_in_invariant_position(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         source_type: Type<'db>,
         source_materialization: MaterializationKind,
         target_type: Type<'db>,
         target_materialization: MaterializationKind,
     ) -> ConstraintSet<'db, 'c> {
+        let program = self.program;
         let source_top = source_type.materialize(
             db,
             program,
@@ -1788,7 +1778,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 return self.always();
             }
 
-            self.check_type_pair(db, program, source, target)
+            self.check_type_pair(db, source, target)
         };
         match (source_materialization, target_materialization) {
             // `source` is a subtype of `target` if the range of materializations covered by `source`
@@ -1865,10 +1855,10 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     pub(super) fn check_specialization_pair(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         left: Specialization<'db>,
         right: Specialization<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let program = self.program;
         let generic_context = left.generic_context(db);
         if generic_context != right.generic_context(db) {
             return self.always();
@@ -1876,7 +1866,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 
         if let (Some(left_tuple), Some(right_tuple)) = (left.tuple_inner(db), right.tuple_inner(db))
         {
-            return self.check_tuple_type_pair(db, program, left_tuple, right_tuple);
+            return self.check_tuple_type_pair(db, left_tuple, right_tuple);
         }
 
         let types = itertools::izip!(
@@ -1891,8 +1881,8 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             self.constraints,
             |(bound_typevar, left_type, right_type)| match bound_typevar.variance(db, program) {
                 TypeVarVariance::Invariant => {
-                    let left_type = left_type.resolve_type_alias(db, program);
-                    let right_type = right_type.resolve_type_alias(db, program);
+                    let left_type = left_type.resolve_type_alias(db);
+                    let right_type = right_type.resolve_type_alias(db);
 
                     // `Bottom[L] <: Top[R]` asks whether the materialization ranges for `L`
                     // and `R` have any common materialization, so this is symmetric despite
@@ -1900,7 +1890,6 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     self.as_relation_checker(TypeRelation::Subtyping)
                         .check_subtyping_in_invariant_position(
                             db,
-                            program,
                             left_type,
                             MaterializationKind::Bottom,
                             right_type,
@@ -2475,13 +2464,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> Option<ConstraintSet<'db, 'c>> {
         fn collect_typed_dicts<'db>(
             db: &'db dyn Db,
-            program: crate::Program<'db>,
             ty: Type<'db>,
             resolving: &mut FxHashSet<Type<'db>>,
             completed: &mut FxHashMap<Type<'db>, bool>,
             typed_dicts: &mut FxHashSet<Type<'db>>,
         ) -> bool {
-            let ty = ty.resolve_type_alias(db, program);
+            let ty = ty.resolve_type_alias(db);
             if let Some(result) = completed.get(&ty) {
                 return *result;
             }
@@ -2496,14 +2484,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         return false;
                     }
                     let result = union.elements(db).iter().all(|element| {
-                        collect_typed_dicts(
-                            db,
-                            program,
-                            *element,
-                            resolving,
-                            completed,
-                            typed_dicts,
-                        )
+                        collect_typed_dicts(db, *element, resolving, completed, typed_dicts)
                     });
                     resolving.remove(&ty);
                     result
@@ -2521,7 +2502,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         if !actual.elements(self.db).iter().all(|element| {
             collect_typed_dicts(
                 self.db,
-                self.program,
                 *element,
                 &mut resolving,
                 &mut completed,
@@ -2660,12 +2640,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // Expand PEP 695 type aliases in the formal type.
             // This is necessary for solving generics like `def head[T](my_list: MyList[T]) -> T`.
             (Type::TypeAlias(alias), _) => {
-                return self.infer_map_impl(
-                    alias.value_type(self.db, self.program),
-                    actual,
-                    polarity,
-                    seen,
-                );
+                return self.infer_map_impl(alias.value_type(self.db), actual, polarity, seen);
             }
 
             (Type::TypeForm(formal_typeform), Type::TypeForm(actual_typeform)) => {
@@ -2865,10 +2840,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             (Type::TypeVar(bound_typevar), ty) | (ty, Type::TypeVar(bound_typevar))
                 if bound_typevar.is_inferable(self.db, self.inferable) =>
             {
-                match bound_typevar
-                    .typevar(self.db)
-                    .bound_or_constraints(self.db, program)
-                {
+                match bound_typevar.typevar(self.db).bound_or_constraints(self.db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         if polarity.is_contravariant() {
                             // In a contravariant position, the formal type variable is a subtype of
@@ -2928,9 +2900,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // the callee to return a widened type that violates the caller's
                         // constraint.
                         if let Type::TypeVar(actual_typevar) = ty
-                            && let Some(actual_constraints) = actual_typevar
-                                .typevar(self.db)
-                                .constraints(self.db, program)
+                            && let Some(actual_constraints) =
+                                actual_typevar.typevar(self.db).constraints(self.db)
                         {
                             let all_satisfied =
                                 actual_constraints.iter().all(|actual_constraint| {
@@ -3232,9 +3203,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // from matching the actual type's callable signature against the protocol's `__call__`
             // method signature.
             (Type::ProtocolInstance(formal_protocol), _) => {
-                let Some(call_method) = formal_protocol
-                    .interface(self.db, program)
-                    .call_method(self.db)
+                let Some(call_method) = formal_protocol.interface(self.db).call_method(self.db)
                 else {
                     return Ok(());
                 };
@@ -3276,12 +3245,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // when it can be matched directly against a type variable in the formal type,
             // e.g., `reveal_type(alias)` should reveal the type alias, not its value type.
             (formal, Type::TypeAlias(alias)) => {
-                return self.infer_map_impl(
-                    formal,
-                    alias.value_type(self.db, self.program),
-                    polarity,
-                    seen,
-                );
+                return self.infer_map_impl(formal, alias.value_type(self.db), polarity, seen);
             }
 
             // TODO: Add more forms that we can structurally induct into: type[C], callables

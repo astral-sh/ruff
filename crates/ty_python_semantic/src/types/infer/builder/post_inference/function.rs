@@ -98,7 +98,6 @@ fn check_pep695_function_legacy_typevars<'db>(
     };
     let Some(legacy_context) = GenericContext::from_function_params(
         db,
-        context.program(),
         definition,
         signature.parameters(),
         signature.return_ty,

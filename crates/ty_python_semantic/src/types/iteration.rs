@@ -125,7 +125,7 @@ impl<'db> Type<'db> {
 
             match ty {
                 Type::NominalInstance(nominal) => nominal.tuple_spec(db, program),
-                Type::NewTypeInstance(newtype) => non_async_special_case(db, program, newtype.concrete_base_type(db, program)),
+                Type::NewTypeInstance(newtype) => non_async_special_case(db, program, newtype.concrete_base_type(db)),
                 Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
                     Some(Cow::Owned(TupleSpec::homogeneous(todo_type!(
                         "*tuple[] annotations"
@@ -173,9 +173,9 @@ impl<'db> Type<'db> {
                     Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
                 }
                 Type::TypeAlias(alias) => {
-                    non_async_special_case(db, program, alias.value_type(db, program))
+                    non_async_special_case(db, program, alias.value_type(db))
                 }
-                Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db, program)? {
+                Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
                         non_async_special_case(db, program, bound)
                     }

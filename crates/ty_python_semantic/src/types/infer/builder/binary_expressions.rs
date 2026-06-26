@@ -352,7 +352,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_binary_expression_type_impl(
                     node,
                     emitted_division_by_zero_diagnostic,
-                    alias.value_type(db, self.program),
+                    alias.value_type(db),
                     rhs,
                     op,
                     visitor,
@@ -364,7 +364,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     node,
                     emitted_division_by_zero_diagnostic,
                     lhs,
-                    alias.value_type(db, self.program),
+                    alias.value_type(db),
                     op,
                     visitor,
                 )
@@ -421,7 +421,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             (Type::TypeVar(left_tvar), Type::TypeVar(right_tvar), _)
                 if left_tvar.identity(db) == right_tvar.identity(db) =>
             {
-                match left_tvar.typevar(db).bound_or_constraints(db, self.program) {
+                match left_tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         Self::map_constrained_typevar_constraints(
                             db,
@@ -452,7 +452,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // TODO: We expect to replace this with more general support once we migrate to the new
             // solver.
             (Type::TypeVar(left_tvar), rhs, _) if !rhs.is_type_var() => {
-                match left_tvar.typevar(db).bound_or_constraints(db, self.program) {
+                match left_tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         Self::map_constrained_typevar_constraints(
                             db,
@@ -479,10 +479,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // When the right operand is a constrained TypeVar and the left operand is not a TypeVar,
             // we check if each constraint supports the operation with the left operand.
             (lhs, Type::TypeVar(right_tvar), _) if !lhs.is_type_var() => {
-                match right_tvar
-                    .typevar(db)
-                    .bound_or_constraints(db, self.program)
-                {
+                match right_tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         Self::map_constrained_typevar_constraints(
                             db,
@@ -518,7 +515,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         self.infer_binary_expression_type_impl(
                             node,
                             emitted_division_by_zero_diagnostic,
-                            newtype.concrete_base_type(db, self.program),
+                            newtype.concrete_base_type(db),
                             rhs,
                             op,
                             visitor,
@@ -533,7 +530,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             node,
                             emitted_division_by_zero_diagnostic,
                             lhs,
-                            newtype.concrete_base_type(db, self.program),
+                            newtype.concrete_base_type(db),
                             op,
                             visitor,
                         )

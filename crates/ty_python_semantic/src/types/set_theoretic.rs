@@ -1139,7 +1139,7 @@ fn expand_intersection_typevars_and_newtypes<'db>(
     for &element in positive {
         match element {
             Type::TypeVar(tvar) => {
-                match tvar.typevar(db).bound_or_constraints(db, program) {
+                match tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         builder = builder.add_positive(bound);
                     }
@@ -1152,7 +1152,7 @@ fn expand_intersection_typevars_and_newtypes<'db>(
                 }
             }
             Type::NewTypeInstance(newtype) => {
-                builder = builder.add_positive(newtype.concrete_base_type(db, program));
+                builder = builder.add_positive(newtype.concrete_base_type(db));
             }
             _ => builder = builder.add_positive(element),
         }

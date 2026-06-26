@@ -259,7 +259,7 @@ impl<'db> KnownInstanceType<'db> {
                 .recursive_type_normalized_impl(db, program, div, nested)
                 .map(Self::Callable),
             Self::NewType(newtype) => newtype
-                .recursive_type_normalized_impl(db, program, div, true)
+                .recursive_type_normalized_impl(db, div, true)
                 .map(Self::NewType),
             Self::Sentinel(sentinel) => Some(Self::Sentinel(sentinel)),
             Self::GenericContext(generic) => Some(Self::GenericContext(generic)),
@@ -360,12 +360,8 @@ impl<'db> KnownInstanceType<'db> {
     }
 
     /// Return `true` if this symbol is an instance of `class`.
-    pub(super) fn is_instance_of(
-        self,
-        db: &'db dyn Db,
-        program: Program<'db>,
-        class: ClassType<'db>,
-    ) -> bool {
+    pub(super) fn is_instance_of(self, db: &'db dyn Db, class: ClassType<'db>) -> bool {
+        let program = class.program(db);
         self.class(db).is_subclass_of(db, program, class)
     }
 

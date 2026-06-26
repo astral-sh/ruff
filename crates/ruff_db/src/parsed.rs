@@ -41,8 +41,8 @@ pub struct VersionedFile<'db> {
 /// New multi-environment callers should prefer [`parsed_module_versioned`] so that the target
 /// version is part of the Salsa key. This compatibility wrapper remains for callers that only
 /// have one Python environment.
-pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
-    parsed_module_versioned(db, VersionedFile::new(db, file, db.python_version())).clone()
+pub fn parsed_module(db: &dyn Db, file: File) -> &ParsedModule {
+    parsed_module_versioned(db, VersionedFile::new(db, file, db.python_version()))
 }
 
 pub fn parsed_module_versioned<'db>(

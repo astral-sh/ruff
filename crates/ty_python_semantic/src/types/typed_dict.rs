@@ -74,13 +74,8 @@ impl<'db> TypedDictOpenness<'db> {
     /// class ByExtraItems(TypedDict, extra_items=Never): ...
     /// class ByClosed(TypedDict, closed=True): ...
     /// ```
-    pub(crate) fn extra(
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-        declared_ty: Type<'db>,
-        is_read_only: bool,
-    ) -> Self {
-        if declared_ty.resolve_type_alias(db, program).is_never() {
+    pub(crate) fn extra(db: &'db dyn Db, declared_ty: Type<'db>, is_read_only: bool) -> Self {
+        if declared_ty.resolve_type_alias(db).is_never() {
             Self::Closed
         } else {
             Self::Extra(TypedDictExtraItems {
@@ -137,7 +132,6 @@ impl<'db> TypedDictOpenness<'db> {
             Self::ImplicitlyOpen | Self::Closed => self,
             Self::Extra(extra_items) => Self::extra(
                 db,
-                program,
                 extra_items.declared_ty.apply_type_mapping_impl(
                     db,
                     program,
@@ -168,12 +162,7 @@ impl<'db> TypedDictOpenness<'db> {
                 } else {
                     declared_ty.unwrap_or(div)
                 };
-                Some(Self::extra(
-                    db,
-                    program,
-                    declared_ty,
-                    extra_items.is_read_only,
-                ))
+                Some(Self::extra(db, declared_ty, extra_items.is_read_only))
             }
         }
     }
@@ -251,18 +240,18 @@ impl<'db> TypedDictType<'db> {
     /// declares its own `closed` or `extra_items` argument.
     pub(crate) fn openness(self, db: &'db dyn Db) -> TypedDictOpenness<'db> {
         #[salsa::tracked(
-            cycle_initial=|_, _, _, _| TypedDictOpenness::ImplicitlyOpen,
+            cycle_initial=|_, _, _| TypedDictOpenness::ImplicitlyOpen,
             heap_size=ruff_memory_usage::heap_size
         )]
         fn class_based_openness<'db>(
             db: &'db dyn Db,
-            program: crate::Program<'db>,
             class: ClassType<'db>,
         ) -> TypedDictOpenness<'db> {
+            let program = class.class_literal(db).program(db);
             let (class_literal, specialization) = class.class_literal_and_specialization(db);
             let static_class = match class_literal {
                 ClassLiteral::Static(static_class) => static_class,
-                ClassLiteral::DynamicTypedDict(dynamic) => return dynamic.openness(db, program),
+                ClassLiteral::DynamicTypedDict(dynamic) => return dynamic.openness(db),
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicNamedTuple(_)
                 | ClassLiteral::DynamicEnum(_) => {
@@ -290,7 +279,6 @@ impl<'db> TypedDictType<'db> {
                             });
                     return TypedDictOpenness::extra(
                         db,
-                        program,
                         annotation.inner_type(),
                         annotation.qualifiers().contains(TypeQualifiers::READ_ONLY),
                     );
@@ -326,11 +314,7 @@ impl<'db> TypedDictType<'db> {
         }
 
         match self {
-            Self::Class(defining_class) => class_based_openness(
-                db,
-                defining_class.class_literal(db).program(db),
-                defining_class,
-            ),
+            Self::Class(defining_class) => class_based_openness(db, defining_class),
             Self::Synthesized(synthesized) => synthesized.openness(db),
         }
     }
@@ -371,7 +355,7 @@ impl<'db> TypedDictType<'db> {
 
         self.items(db)
             .iter()
-            .filter(|(_, field)| field.may_be_present(db, program))
+            .filter(|(_, field)| field.may_be_present(db))
             .fold(UnionBuilder::new(db, program), |builder, (name, _)| {
                 builder.add(Type::string_literal(db, name))
             })
@@ -526,19 +510,15 @@ impl<'db> TypedDictType<'db> {
         // being collected, e.g. through `typing.Self` in a `TypedDict` field.
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, _, _, _| TypedDictSchema::default(),
+            cycle_initial=|_, _, _| TypedDictSchema::default(),
             heap_size=ruff_memory_usage::heap_size
         )]
-        fn class_based_items<'db>(
-            db: &'db dyn Db,
-            program: crate::Program<'db>,
-            class: ClassType<'db>,
-        ) -> TypedDictSchema<'db> {
+        fn class_based_items<'db>(db: &'db dyn Db, class: ClassType<'db>) -> TypedDictSchema<'db> {
             let Some((class_literal, specialization)) = class.static_class_literal(db) else {
                 return TypedDictSchema::default();
             };
             class_literal
-                .fields(db, program, specialization, CodeGeneratorKind::TypedDict)
+                .fields(db, specialization, CodeGeneratorKind::TypedDict)
                 .into_iter()
                 .map(|(name, field)| {
                     let field = match field {
@@ -566,13 +546,9 @@ impl<'db> TypedDictType<'db> {
             Self::Class(defining_class) => {
                 // Check if this is a dynamic TypedDict
                 if let ClassLiteral::DynamicTypedDict(class) = defining_class.class_literal(db) {
-                    return class.items(db, defining_class.class_literal(db).program(db));
+                    return class.items(db);
                 }
-                class_based_items(
-                    db,
-                    defining_class.class_literal(db).program(db),
-                    defining_class,
-                )
+                class_based_items(db, defining_class)
             }
             Self::Synthesized(synthesized) => synthesized.items(db),
         }
@@ -588,13 +564,9 @@ impl<'db> TypedDictType<'db> {
     ) -> Self {
         // TODO: Materialization of gradual TypedDicts needs more logic
         match self {
-            Self::Class(defining_class) => Self::Class(defining_class.apply_type_mapping_impl(
-                db,
-                program,
-                type_mapping,
-                tcx,
-                visitor,
-            )),
+            Self::Class(defining_class) => {
+                Self::Class(defining_class.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+            }
             Self::Synthesized(synthesized) => Self::Synthesized(
                 synthesized.apply_type_mapping_impl(db, program, type_mapping, tcx, visitor),
             ),
@@ -687,10 +659,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     pub(super) fn check_typeddict_pair(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         source: TypedDictType<'db>,
         target: TypedDictType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let program = self.program;
         if let TypedDictType::Synthesized(synthesized_target) = target
             && synthesized_target.is_patch(db)
         {
@@ -714,7 +686,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 result.intersect(
                     db,
                     self.constraints,
-                    self.check_type_pair(db, program, source_item_field.declared_ty, target_ty),
+                    self.check_type_pair(db, source_item_field.declared_ty, target_ty),
                 );
 
                 if result.is_never_satisfied(db, program) {
@@ -737,7 +709,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         self.constraints,
                         self.check_type_pair(
                             db,
-                            program,
                             source_extra_items.declared_ty,
                             target_item_field.declared_ty,
                         ),
@@ -756,7 +727,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             self.constraints,
                             self.check_type_pair(
                                 db,
-                                program,
                                 source_extra_items.declared_ty,
                                 target_extra_items.declared_ty,
                             ),
@@ -812,7 +782,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     // `TypedDict`s.
                     self.check_type_pair(
                         db,
-                        program,
                         source_item_field.declared_ty,
                         target_item_field.declared_ty,
                     )
@@ -833,14 +802,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     // assignability is "consistency".
                     self.check_type_pair(
                         db,
-                        program,
                         source_item_field.declared_ty,
                         target_item_field.declared_ty,
                     )
                     .and(db, program, self.constraints, || {
                         self.check_type_pair(
                             db,
-                            program,
                             target_item_field.declared_ty,
                             source_item_field.declared_ty,
                         )
@@ -855,7 +822,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     if let Some(source_item_field) = source_items.get(target_item_name) {
                         self.check_type_pair(
                             db,
-                            program,
                             source_item_field.declared_ty,
                             target_item_field.declared_ty,
                         )
@@ -865,7 +831,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             None => self.always(),
                             Some(source_extra_items) => self.check_type_pair(
                                 db,
-                                program,
                                 source_extra_items.declared_ty,
                                 target_item_field.declared_ty,
                             ),
@@ -899,14 +864,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         // to apply both ways.
                         self.check_type_pair(
                             db,
-                            program,
                             source_item_field.declared_ty,
                             target_item_field.declared_ty,
                         )
                         .and(db, program, self.constraints, || {
                             self.check_type_pair(
                                 db,
-                                program,
                                 target_item_field.declared_ty,
                                 source_item_field.declared_ty,
                             )
@@ -921,14 +884,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         }
                         self.check_type_pair(
                             db,
-                            program,
                             source_extra_items.declared_ty,
                             target_item_field.declared_ty,
                         )
                         .and(db, program, self.constraints, || {
                             self.check_type_pair(
                                 db,
-                                program,
                                 target_item_field.declared_ty,
                                 source_extra_items.declared_ty,
                             )
@@ -973,14 +934,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.constraints,
                     self.check_type_pair(
                         db,
-                        program,
                         source_extra_items.declared_ty,
                         target_extra_items.declared_ty,
                     )
                     .and(db, program, self.constraints, || {
                         self.check_type_pair(
                             db,
-                            program,
                             target_extra_items.declared_ty,
                             source_extra_items.declared_ty,
                         )
@@ -996,14 +955,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             self.constraints,
                             self.check_type_pair(
                                 db,
-                                program,
                                 source_item_field.declared_ty,
                                 target_extra_items.declared_ty,
                             )
                             .and(db, program, self.constraints, || {
                                 self.check_type_pair(
                                     db,
-                                    program,
                                     target_extra_items.declared_ty,
                                     source_item_field.declared_ty,
                                 )
@@ -1024,7 +981,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         self.constraints,
                         self.check_type_pair(
                             db,
-                            program,
                             source_extra_items.declared_ty,
                             target_extra_items.declared_ty,
                         ),
@@ -1037,7 +993,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             self.constraints,
                             self.check_type_pair(
                                 db,
-                                program,
                                 source_item_field.declared_ty,
                                 target_extra_items.declared_ty,
                             ),
@@ -1114,10 +1069,10 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     pub(super) fn check_typeddict_pair(
         &self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         left: TypedDictType<'db>,
         right: TypedDictType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let program = self.program;
         let left_items = left.items(db);
         let right_items = right.items(db);
         let fields_in_common = btreemap_values_with_same_key(left_items, right_items);
@@ -1141,16 +1096,10 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     // be compatible, i.e. mutually assignable.
                     let relation_checker = self.as_relation_checker(TypeRelation::Assignability);
                     relation_checker
-                        .check_type_pair(
-                            db,
-                            program,
-                            left_field.declared_ty,
-                            right_field.declared_ty,
-                        )
+                        .check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
                         .and(db, program, self.constraints, || {
                             relation_checker.check_type_pair(
                                 db,
-                                program,
                                 right_field.declared_ty,
                                 left_field.declared_ty,
                             )
@@ -1159,31 +1108,16 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                 } else if !left_field.is_read_only() {
                     // Half of condition 3 above.
                     self.as_relation_checker(TypeRelation::Assignability)
-                        .check_type_pair(
-                            db,
-                            program,
-                            left_field.declared_ty,
-                            right_field.declared_ty,
-                        )
+                        .check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
                         .negate(db, self.constraints)
                 } else if !right_field.is_read_only() {
                     // The other half of condition 3 above.
                     self.as_relation_checker(TypeRelation::Assignability)
-                        .check_type_pair(
-                            db,
-                            program,
-                            right_field.declared_ty,
-                            left_field.declared_ty,
-                        )
+                        .check_type_pair(db, right_field.declared_ty, left_field.declared_ty)
                         .negate(db, self.constraints)
                 } else {
                     // Condition 4 above.
-                    self.check_type_pair(
-                        db,
-                        program,
-                        left_field.declared_ty,
-                        right_field.declared_ty,
-                    )
+                    self.check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
                 }
             },
         );
@@ -1211,7 +1145,6 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                                 if required_field.is_read_only() {
                                     self.check_type_pair(
                                         db,
-                                        program,
                                         required_field.declared_ty,
                                         extra_items_ty,
                                     )
@@ -1219,7 +1152,6 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                                     self.as_relation_checker(TypeRelation::Assignability)
                                         .check_type_pair(
                                             db,
-                                            program,
                                             required_field.declared_ty,
                                             extra_items_ty,
                                         )
@@ -1281,34 +1213,18 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                             self.as_relation_checker(TypeRelation::Assignability);
                         if field.is_read_only() {
                             relation_checker
-                                .check_type_pair(
-                                    db,
-                                    program,
-                                    extra_items.declared_ty,
-                                    field.declared_ty,
-                                )
+                                .check_type_pair(db, extra_items.declared_ty, field.declared_ty)
                                 .negate(db, self.constraints)
                         } else if extra_items.is_read_only() {
                             relation_checker
-                                .check_type_pair(
-                                    db,
-                                    program,
-                                    field.declared_ty,
-                                    extra_items.declared_ty,
-                                )
+                                .check_type_pair(db, field.declared_ty, extra_items.declared_ty)
                                 .negate(db, self.constraints)
                         } else {
                             relation_checker
-                                .check_type_pair(
-                                    db,
-                                    program,
-                                    field.declared_ty,
-                                    extra_items.declared_ty,
-                                )
+                                .check_type_pair(db, field.declared_ty, extra_items.declared_ty)
                                 .and(db, program, self.constraints, || {
                                     relation_checker.check_type_pair(
                                         db,
-                                        program,
                                         extra_items.declared_ty,
                                         field.declared_ty,
                                     )
@@ -1334,16 +1250,10 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     if !left_extra.is_read_only() && !right_extra.is_read_only() =>
                 {
                     relation_checker
-                        .check_type_pair(
-                            db,
-                            program,
-                            left_extra.declared_ty,
-                            right_extra.declared_ty,
-                        )
+                        .check_type_pair(db, left_extra.declared_ty, right_extra.declared_ty)
                         .and(db, program, self.constraints, || {
                             relation_checker.check_type_pair(
                                 db,
-                                program,
                                 right_extra.declared_ty,
                                 left_extra.declared_ty,
                             )
@@ -1360,7 +1270,6 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                             relation_checker
                                 .check_type_pair(
                                     db,
-                                    program,
                                     mutable_extra.declared_ty,
                                     other_extra.declared_ty,
                                 )
@@ -1397,14 +1306,14 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial = |_, _, _, _|TypedDictSchema::default(),
+    cycle_initial = |_, _, _|TypedDictSchema::default(),
     heap_size = ruff_memory_usage::heap_size
 )]
 pub(super) fn deferred_functional_typed_dict_schema<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     definition: Definition<'db>,
 ) -> TypedDictSchema<'db> {
+    let program = definition.analysis_file(db).program(db);
     let module =
         parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db);
     let node = definition
@@ -1460,14 +1369,14 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
 /// Movie = TypedDict("Movie", {"name": str}, extra_items=ReadOnly[int])
 /// ```
 #[salsa::tracked(
-    cycle_initial = |_, _, _, _| TypedDictOpenness::ImplicitlyOpen,
+    cycle_initial = |_, _, _| TypedDictOpenness::ImplicitlyOpen,
     heap_size = ruff_memory_usage::heap_size
 )]
 pub(super) fn deferred_functional_typed_dict_openness<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     definition: Definition<'db>,
 ) -> TypedDictOpenness<'db> {
+    let program = definition.analysis_file(db).program(db);
     let module =
         parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db);
     let node = definition
@@ -1481,7 +1390,6 @@ pub(super) fn deferred_functional_typed_dict_openness<'db>(
         let deferred_inference = infer_deferred_types(db, definition);
         return TypedDictOpenness::extra(
             db,
-            program,
             deferred_inference.expression_type(&extra_items.value),
             deferred_inference
                 .qualifiers(&extra_items.value)
@@ -1621,12 +1529,7 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
             return true;
         }
 
-        if diagnostic::is_invalid_typed_dict_literal(
-            db,
-            self.context.program(),
-            item.declared_ty,
-            self.value_node,
-        ) {
+        if diagnostic::is_invalid_typed_dict_literal(db, item.declared_ty, self.value_node) {
             return false;
         }
 
@@ -1806,7 +1709,6 @@ fn intersect_unpacked_typed_dict_openness<'db>(
     } else {
         TypedDictOpenness::extra(
             db,
-            program,
             IntersectionType::from_elements(db, program, explicit_value_types),
             true,
         )
@@ -1845,11 +1747,11 @@ fn union_unpacked_typed_dict_openness<'db>(
     }
 
     if has_implicitly_open && has_explicit_extra_items {
-        TypedDictOpenness::extra(db, program, Type::object(), true)
+        TypedDictOpenness::extra(db, Type::object(), true)
     } else if has_implicitly_open {
         TypedDictOpenness::ImplicitlyOpen
     } else if has_explicit_extra_items {
-        TypedDictOpenness::extra(db, program, value_types.build(), true)
+        TypedDictOpenness::extra(db, value_types.build(), true)
     } else {
         TypedDictOpenness::Closed
     }
@@ -2029,7 +1931,7 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
             })
         }
         Type::TypeAlias(alias) => {
-            extract_unpacked_typed_dict_from_value_type(db, program, alias.value_type(db, program))
+            extract_unpacked_typed_dict_from_value_type(db, program, alias.value_type(db))
         }
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)
@@ -2078,17 +1980,12 @@ fn merge_unpacked_key_definitions<'db>(
 /// `TypedDict` target, or a type alias resolving to one.
 pub(crate) fn extract_unpacked_typed_dict_keys_from_kwargs_annotation<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     annotated_type: Type<'db>,
     annotation_flags: TypeExpressionFlags,
 ) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
     let typed_dict = annotation_flags
         .contains(TypeExpressionFlags::UNPACK)
-        .then(|| {
-            annotated_type
-                .resolve_type_alias(db, program)
-                .as_typed_dict()
-        })??;
+        .then(|| annotated_type.resolve_type_alias(db).as_typed_dict())??;
 
     Some(
         typed_dict
@@ -2128,17 +2025,13 @@ pub(super) fn infer_unpacked_keyword_types<'db>(
         .collect()
 }
 
-pub(super) fn unpacked_keyword_is_gradual<'db>(
-    db: &'db dyn Db,
-    program: crate::Program<'db>,
-    ty: Type<'db>,
-) -> bool {
-    match ty.resolve_type_alias(db, program) {
+pub(super) fn unpacked_keyword_is_gradual<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty.resolve_type_alias(db) {
         ty if ty.is_never() || ty.is_dynamic() => true,
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .any(|element| element.resolve_type_alias(db, program).is_dynamic()),
+            .any(|element| element.resolve_type_alias(db).is_dynamic()),
         _ => false,
     }
 }
@@ -2228,7 +2121,7 @@ fn collect_guaranteed_keys_from_merged_unpacked_keyword<'db>(
         return;
     }
 
-    if unpacked_keyword_is_gradual(db, program, unpacked_type) {
+    if unpacked_keyword_is_gradual(db, unpacked_type) {
         provided_keys.extend(typed_dict.items(db).keys().cloned());
     } else if let Some(unpacked_keys) =
         extract_unpacked_typed_dict_keys_from_value_type(db, program, unpacked_type)
@@ -2966,7 +2859,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
 
     // Never and Dynamic types are special: they can have any keys, so we skip validation and mark
     // all target keys as provided.
-    if unpacked_keyword_is_gradual(db, context.program(), unpacked_type) {
+    if unpacked_keyword_is_gradual(db, unpacked_type) {
         shadowed_keys.extend(items.keys().cloned());
         for key_name in items.keys() {
             guaranteed_keys.entry(key_name.clone()).or_insert(None);
@@ -3030,7 +2923,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
                 context,
                 typed_dict,
                 &BTreeMap::new(),
-                TypedDictOpenness::extra(db, context.program(), value_ty, true),
+                TypedDictOpenness::extra(db, value_ty, true),
                 nodes,
                 shadowed_keys,
             );
@@ -3218,8 +3111,8 @@ impl<'db> TypedDictField<'db> {
     }
 
     /// Returns `false` for optional fields whose declared type is uninhabited.
-    pub(crate) fn may_be_present(&self, db: &'db dyn Db, program: crate::Program<'db>) -> bool {
-        self.is_required() || !self.declared_ty.resolve_type_alias(db, program).is_never()
+    pub(crate) fn may_be_present(&self, db: &'db dyn Db) -> bool {
+        self.is_required() || !self.declared_ty.resolve_type_alias(db).is_never()
     }
 
     pub(crate) const fn first_declaration(&self) -> Option<Definition<'db>> {

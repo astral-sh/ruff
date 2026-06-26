@@ -73,6 +73,10 @@ fn setup_case(n: usize) -> Case {
     let db = ProjectDatabase::fallible(metadata, system).unwrap();
     let importing_file = system_path_to_file(&db, &importing_path).unwrap();
 
+    // Construct the environment-dependent resolver input outside the timed closure. This keeps
+    // the benchmark focused on module resolution, matching the pre-multi-environment setup cost.
+    let _ = db.project().program(&db).file(&db, importing_file);
+
     let resolves = SEEDED_TARGETS
         .iter()
         .chain(NONEXISTENT_NAMES.iter())

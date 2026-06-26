@@ -17,7 +17,7 @@ pub(crate) fn check_type_guard_definition<'db>(
     let db = context.db();
 
     for overload in function.iter_overloads_and_implementation(db) {
-        let signature = overload.signature(db, context.program());
+        let signature = overload.signature(db);
         let return_ty = signature.return_ty;
 
         // Check if this is a `TypeIs` or `TypeGuard` return type.

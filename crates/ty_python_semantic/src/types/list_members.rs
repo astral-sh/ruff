@@ -30,9 +30,9 @@ use ty_python_core::{
 /// of the given scope.
 pub(crate) fn all_end_of_scope_members<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     scope_id: ScopeId<'db>,
 ) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
+    let program = scope_id.program(db);
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
@@ -82,9 +82,9 @@ pub(crate) fn all_end_of_scope_members<'db>(
 /// in the given scope.
 pub(crate) fn all_reachable_members<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     scope_id: ScopeId<'db>,
 ) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
+    let program = scope_id.program(db);
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
@@ -206,28 +206,23 @@ impl<'db> AllMembers<'db> {
             ),
 
             Type::EnumComplement(complement) => {
-                self.extend_with_type(db, complement.to_intersection(db, program));
+                self.extend_with_type(db, complement.to_intersection(db));
             }
 
             Type::NominalInstance(instance) => {
                 let class = instance.class(db, program);
                 if let Some((class_literal, _)) = class.static_class_literal(db) {
-                    self.extend_with_instance_members(db, program, ty, class_literal);
-                    self.extend_with_synthetic_members(
-                        db,
-                        program,
-                        ty,
-                        ClassLiteral::Static(class_literal),
-                    );
+                    self.extend_with_instance_members(db, ty, class_literal);
+                    self.extend_with_synthetic_members(db, ty, ClassLiteral::Static(class_literal));
                 } else {
                     // For dynamic classes, we can't enumerate instance members (requires body scope),
                     // but we can still add synthetic members for dataclass-like classes.
-                    self.extend_with_synthetic_members(db, program, ty, class.class_literal(db));
+                    self.extend_with_synthetic_members(db, ty, class.class_literal(db));
                 }
             }
 
             Type::NewTypeInstance(newtype) => {
-                self.extend_with_type(db, newtype.concrete_base_type(db, program));
+                self.extend_with_type(db, newtype.concrete_base_type(db));
             }
 
             Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
@@ -252,31 +247,16 @@ impl<'db> AllMembers<'db> {
             }
 
             Type::ClassLiteral(class_literal) => {
-                self.extend_with_class_members(db, program, ty, class_literal);
-                self.extend_with_synthetic_members(db, program, ty, class_literal);
-                self.extend_with_metaclass_members(
-                    db,
-                    program,
-                    ty,
-                    class_literal.metaclass(db, program),
-                );
+                self.extend_with_class_members(db, ty, class_literal);
+                self.extend_with_synthetic_members(db, ty, class_literal);
+                self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
             }
 
             Type::GenericAlias(generic_alias) => {
                 let class_literal = generic_alias.origin(db);
-                self.extend_with_class_members(
-                    db,
-                    program,
-                    ty,
-                    ClassLiteral::Static(class_literal),
-                );
-                self.extend_with_synthetic_members(
-                    db,
-                    program,
-                    ty,
-                    ClassLiteral::Static(class_literal),
-                );
-                self.extend_with_metaclass_members(db, program, ty, class_literal.metaclass(db));
+                self.extend_with_class_members(db, ty, ClassLiteral::Static(class_literal));
+                self.extend_with_synthetic_members(db, ty, ClassLiteral::Static(class_literal));
+                self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
             }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
@@ -289,22 +269,15 @@ impl<'db> AllMembers<'db> {
                         if let Some((class_literal, _)) = class_type.static_class_literal(db) {
                             self.extend_with_class_members(
                                 db,
-                                program,
                                 ty,
                                 ClassLiteral::Static(class_literal),
                             );
                             self.extend_with_synthetic_members(
                                 db,
-                                program,
                                 ty,
                                 ClassLiteral::Static(class_literal),
                             );
-                            self.extend_with_metaclass_members(
-                                db,
-                                program,
-                                ty,
-                                class_literal.metaclass(db),
-                            );
+                            self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
                         }
                     }
                 }
@@ -319,10 +292,10 @@ impl<'db> AllMembers<'db> {
                 self.extend_with_type(db, Type::object());
             }
 
-            Type::TypeAlias(alias) => self.extend_with_type(db, alias.value_type(db, program)),
+            Type::TypeAlias(alias) => self.extend_with_type(db, alias.value_type(db)),
 
             Type::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db, program) {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => {
                         self.extend_with_type(db, Type::object());
                     }
@@ -360,41 +333,31 @@ impl<'db> AllMembers<'db> {
             | Type::TypeIs(_)
             | Type::TypeGuard(_) => match ty.to_meta_type(db, program) {
                 Type::ClassLiteral(class_literal) => {
-                    self.extend_with_class_members(db, program, ty, class_literal);
+                    self.extend_with_class_members(db, ty, class_literal);
                 }
                 Type::SubclassOf(subclass_of) => {
                     if let Some(class) = subclass_of.subclass_of().into_class(db, program)
                         && let Some((class_literal, _)) = class.static_class_literal(db)
                     {
-                        self.extend_with_class_members(
-                            db,
-                            program,
-                            ty,
-                            ClassLiteral::Static(class_literal),
-                        );
+                        self.extend_with_class_members(db, ty, ClassLiteral::Static(class_literal));
                     }
                 }
                 Type::GenericAlias(generic_alias) => {
                     let class_literal = generic_alias.origin(db);
-                    self.extend_with_class_members(
-                        db,
-                        program,
-                        ty,
-                        ClassLiteral::Static(class_literal),
-                    );
+                    self.extend_with_class_members(db, ty, ClassLiteral::Static(class_literal));
                 }
                 _ => {}
             },
 
             Type::TypedDict(_) => {
                 if let Type::ClassLiteral(class_literal) = ty.to_meta_type(db, program) {
-                    self.extend_with_class_members(db, program, ty, class_literal);
+                    self.extend_with_class_members(db, ty, class_literal);
                 }
 
                 if let Type::ClassLiteral(ClassLiteral::Static(class)) =
                     KnownClass::TypedDictFallback.to_class_literal(db, program)
                 {
-                    self.extend_with_instance_members(db, program, ty, class);
+                    self.extend_with_instance_members(db, ty, class);
                 }
             }
 
@@ -514,17 +477,17 @@ impl<'db> AllMembers<'db> {
     fn extend_with_class_members(
         &mut self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         ty: Type<'db>,
         class_literal: ClassLiteral<'db>,
     ) {
+        let program = self.program;
         for parent in class_literal
             .iter_mro(db)
             .filter_map(ClassBase::into_class)
             .filter_map(|class| class.static_class_literal(db).map(|(lit, _)| lit))
         {
             let parent_scope = parent.body_scope(db);
-            for memberdef in all_end_of_scope_members(db, program, parent_scope) {
+            for memberdef in all_end_of_scope_members(db, parent_scope) {
                 let result = ty.member(db, program, memberdef.member.name.as_str());
                 let Some(ty) = result.place.ignore_possibly_undefined() else {
                     continue;
@@ -544,17 +507,16 @@ impl<'db> AllMembers<'db> {
     fn extend_with_metaclass_members(
         &mut self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         ty: Type<'db>,
         metaclass: Type<'db>,
     ) {
-        let Some(metaclass) = metaclass.to_class_type(db, program) else {
+        let Some(metaclass) = metaclass.to_class_type(db) else {
             return;
         };
 
-        self.extend_with_class_members(db, program, ty, metaclass.class_literal(db));
+        self.extend_with_class_members(db, ty, metaclass.class_literal(db));
         if let Some((metaclass, _)) = metaclass.static_class_literal(db) {
-            self.extend_with_instance_members(db, program, ty, metaclass);
+            self.extend_with_instance_members(db, ty, metaclass);
         }
     }
 
@@ -562,10 +524,10 @@ impl<'db> AllMembers<'db> {
     fn extend_with_instance_members_for_class(
         &mut self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         ty: Type<'db>,
         class_literal: StaticClassLiteral<'db>,
     ) {
+        let program = self.program;
         let class_body_scope = class_literal.body_scope(db);
         let index = semantic_index(db, class_body_scope.analysis_file(db));
         for function_scope_id in attribute_scopes(db, class_body_scope) {
@@ -589,7 +551,7 @@ impl<'db> AllMembers<'db> {
         // class member. This gets us the right type for each
         // member, e.g., `SomeClass.__delattr__` is not a bound
         // method, but `instance_of_SomeClass.__delattr__` is.
-        for memberdef in all_end_of_scope_members(db, program, class_body_scope) {
+        for memberdef in all_end_of_scope_members(db, class_body_scope) {
             let result = ty.member(db, program, memberdef.member.name.as_str());
             let Some(ty) = result.place.ignore_possibly_undefined() else {
                 continue;
@@ -605,7 +567,6 @@ impl<'db> AllMembers<'db> {
     fn extend_with_instance_members(
         &mut self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         ty: Type<'db>,
         class_literal: StaticClassLiteral<'db>,
     ) {
@@ -614,7 +575,7 @@ impl<'db> AllMembers<'db> {
             .filter_map(ClassBase::into_class)
         {
             if let Some((class_literal, _)) = class.static_class_literal(db) {
-                self.extend_with_instance_members_for_class(db, program, ty, class_literal);
+                self.extend_with_instance_members_for_class(db, ty, class_literal);
             }
         }
     }
@@ -622,10 +583,10 @@ impl<'db> AllMembers<'db> {
     fn extend_with_synthetic_members(
         &mut self,
         db: &'db dyn Db,
-        program: crate::Program<'db>,
         ty: Type<'db>,
         class_literal: ClassLiteral<'db>,
     ) {
+        let program = self.program;
         match CodeGeneratorKind::from_class(db, class_literal) {
             Some(CodeGeneratorKind::NamedTuple) => {
                 if ty.is_nominal_instance() {

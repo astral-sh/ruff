@@ -49,7 +49,7 @@ impl BackgroundDocumentRequestHandler for SelectionRangeRequestHandler {
                 continue;
             };
 
-            let ranges = selection_range(db, file, offset);
+            let ranges = selection_range(db, crate::server::api::analysis_file(db, file), offset);
             if !ranges.is_empty() {
                 // Convert ranges to nested LSP SelectionRange structure
                 let mut lsp_range = None;

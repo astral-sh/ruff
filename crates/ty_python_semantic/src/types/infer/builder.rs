@@ -1710,7 +1710,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let class_definition = self.index.class_definition_of_method(current_scope_id)?;
         original_class_type(self.db(), class_definition)
-            .map(|class_literal| class_literal.default_specialization(self.db(), self.program))
+            .map(|class_literal| class_literal.default_specialization(self.db()))
     }
 
     /// Report an undeclared protocol attribute written through a method receiver.
@@ -1729,14 +1729,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .index
             .class_definition_of_method(method_scope_id)
             .and_then(|definition| original_class_type(db, definition))
-            .map(|class| class.default_specialization(db, self.program))
+            .map(|class| class.default_specialization(db))
             .and_then(|class| class.into_protocol_class(db))
         else {
             return;
         };
-        if protocol
-            .interface(db, self.program)
-            .includes_member(db, target.attr.id())
+        if protocol.interface(db).includes_member(db, target.attr.id())
             || protocol.has_member_declaration(db, self.program, target.attr.id())
         {
             return;
@@ -2479,8 +2477,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         predicate: PatternPredicate<'db>,
         definition: Definition<'db>,
     ) {
-        let ty = pattern_success_types(self.db(), self.program, predicate)
-            .binding_type(definition.place(self.db()));
+        let ty =
+            pattern_success_types(self.db(), predicate).binding_type(definition.place(self.db()));
         self.add_binding(pattern.into(), definition)
             .insert(self, ty);
     }
@@ -2527,7 +2525,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 first_excess_pattern,
                                 limit,
                                 positional_patterns.len(),
-                                cls_ty.display(self.db()),
+                                cls_ty.display(self.db(), self.program),
                             );
                         }
                     }
@@ -2812,7 +2810,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let Type::NominalInstance(instance) = object_ty {
                 if let Some(converter_ty) = instance
                     .class(db, program)
-                    .converter_input_type_for_field(db, program, attribute)
+                    .converter_input_type_for_field(db, attribute)
                 {
                     return converter_ty;
                 }
@@ -2929,7 +2927,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             Type::TypeAlias(alias) => self.validate_attribute_assignment(
                 target,
-                alias.value_type(self.db(), self.program),
+                alias.value_type(self.db()),
                 attribute,
                 infer_value_ty,
                 emit_diagnostics,
@@ -3513,7 +3511,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 {
                     builtins_symbol(db, self.program, attribute)
                 } else {
-                    module.static_member(db, self.program, attribute)
+                    module.static_member(db, attribute)
                 };
                 if let Place::Defined(DefinedPlace { ty: attr_ty, .. }) = sym.place {
                     let value_ty = infer_value_ty(self, TypeContext::new(Some(attr_ty)));
@@ -3603,7 +3601,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // fallback already delegate through the concrete base type when needed.
             Type::TypeAlias(alias) => self.validate_attribute_deletion(
                 target,
-                alias.value_type(db, self.program),
+                alias.value_type(db),
                 attribute,
                 emit_diagnostics,
             ),
@@ -5080,8 +5078,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         && let Some(class) =
                             nearest_enclosing_class(self.db(), self.index, self.scope())
                         && is_enum_class_by_inheritance(self.db(), class)
-                        && !enum_ignored_names(self.db(), self.program, self.scope())
-                            .contains(&name_expr.id)
+                        && !enum_ignored_names(self.db(), self.scope()).contains(&name_expr.id)
                         && let Some(builder) = self
                             .context
                             .report_lint(&INVALID_ENUM_MEMBER_ANNOTATION, annotation)
@@ -5646,13 +5643,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::Union(union) => union.try_map(db, program, |element| {
                     propagate_callable_kind(db, program, *element, kind, provenance)
                 }),
-                Type::TypeAlias(alias) => propagate_callable_kind(
-                    db,
-                    program,
-                    alias.value_type(db, program),
-                    kind,
-                    provenance,
-                ),
+                Type::TypeAlias(alias) => {
+                    propagate_callable_kind(db, program, alias.value_type(db), kind, provenance)
+                }
                 // Intersections are currently not handled here because that would require
                 // the decorator to be explicitly annotated as returning an intersection.
                 Type::Intersection(_) | Type::EnumComplement(_) => None,
@@ -5690,10 +5683,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         fn callable_paramspec_and_return_typevar<'db>(
             db: &'db dyn Db,
-            program: crate::Program<'db>,
             ty: Type<'db>,
         ) -> Option<(BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>)> {
-            let callable = ty.resolve_type_alias(db, program).as_callable()?;
+            let callable = ty.resolve_type_alias(db).as_callable()?;
             if callable.kind(db) != CallableTypeKind::Regular {
                 return None;
             }
@@ -5728,12 +5720,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
 
             let Some((parameter_callable_paramspec, parameter_callable_return_typevar)) =
-                callable_paramspec_and_return_typevar(db, program, parameter.annotated_type())
+                callable_paramspec_and_return_typevar(db, parameter.annotated_type())
             else {
                 return false;
             };
             let Some((return_callable_paramspec, return_callable_typevar)) =
-                callable_paramspec_and_return_typevar(db, program, decorator_signature.return_ty)
+                callable_paramspec_and_return_typevar(db, decorator_signature.return_ty)
             else {
                 return false;
             };
@@ -6473,10 +6465,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Type::LiteralValue(literal) = ty
             && let Some(tcx) = tcx.annotation
             && let literal_tcx @ (Type::Union(_) | Type::LiteralValue(_)) = tcx
-                .resolve_type_alias(self.db(), self.program)
-                .filter_union(self.db(), self.program, |ty| {
-                    ty.as_literal_value().is_some()
-                })
+                .resolve_type_alias(self.db())
+                .filter_union(self.db(), |ty| ty.as_literal_value().is_some())
             && ty.is_assignable_to(self.db(), self.program, literal_tcx)
         {
             ty = Type::LiteralValue(literal.to_unpromotable());
@@ -6517,14 +6507,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             union
                 .elements(db)
                 .iter()
-                .filter_map(|element| element.resolve_type_alias(db, self.program).as_callable())
+                .filter_map(|element| element.resolve_type_alias(db).as_callable())
                 .exactly_one()
                 .ok()
         };
         let Some(target_callable) = (match target {
             Type::Callable(callable) => Some(callable),
             Type::Union(union) => exactly_one_callable(union),
-            Type::TypeAlias(_) => match target.resolve_type_alias(db, self.program) {
+            Type::TypeAlias(_) => match target.resolve_type_alias(db) {
                 Type::Callable(callable) => Some(callable),
                 Type::Union(union) => exactly_one_callable(union),
                 _ => None,
@@ -6603,9 +6593,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             FxHashMap::default();
         for solution in solutions {
             for binding in solution {
-                let inferred_ty = binding.solution.filter_union(db, self.program, |ty| {
-                    !ty.has_unspecialized_type_var(db, self.program)
-                });
+                let inferred_ty = binding
+                    .solution
+                    .filter_union(db, |ty| !ty.has_unspecialized_type_var(db, self.program));
                 if inferred_ty.has_unspecialized_type_var(db, self.program) {
                     continue;
                 }
@@ -7111,7 +7101,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Validate `TypedDict` dictionary literal assignments.
         if let Some(annotation) = tcx
             .annotation
-            .map(|annotation| annotation.resolve_type_alias(self.db(), self.program))
+            .map(|annotation| annotation.resolve_type_alias(self.db()))
         {
             if let Some(typed_dict) = annotation.as_typed_dict() {
                 // If there is a single typed dict annotation, infer against it directly.
@@ -7126,7 +7116,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let mut has_dict_compatible_fallback = false;
 
                 for element in union_elements {
-                    let element = element.resolve_type_alias(self.db(), self.program);
+                    let element = element.resolve_type_alias(self.db());
 
                     if let Some(typed_dict) = element.as_typed_dict() {
                         typed_dicts.push(typed_dict);
@@ -7318,11 +7308,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let constraints = ConstraintSetBuilder::new();
         let inferable = generic_context.inferable_typevars(self.db(), self.program);
-        let identity_instance = Type::instance(
-            self.db(),
-            self.program,
-            ClassType::Generic(collection_alias),
-        );
+        let identity_instance = Type::instance(self.db(), ClassType::Generic(collection_alias));
 
         // Remove any union elements of that are unrelated to the collection type.
         //
@@ -7346,9 +7332,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut elt_tcx_variance: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
                 FxHashMap::default();
 
-            if let Some(tcx) = tcx
-                .annotation
-                .map(|tcx| tcx.resolve_type_alias(self.db(), self.program))
+            if let Some(tcx) = tcx.annotation.map(|tcx| tcx.resolve_type_alias(self.db()))
                 && matches!(tcx, Type::NominalInstance(_))
                 && let Some(specialization) =
                     tcx.known_specialization(self.db(), self.program, collection_class)
@@ -7357,7 +7341,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     !typevar.is_paramspec(self.db())
                         && typevar
                             .typevar(self.db())
-                            .bound_or_constraints(self.db(), self.program)
+                            .bound_or_constraints(self.db())
                             .is_none()
                 })
             {
@@ -7369,11 +7353,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .zip(specialization.types(self.db()))
                 {
                     let inferred_ty = inferred_ty
-                        .filter_union(self.db(), self.program, |ty| {
+                        .filter_union(self.db(), |ty| {
                             !ty.as_typevar()
                                 .is_some_and(|tv| tv.is_inferable(self.db(), inferable))
                         })
-                        .filter_union(self.db(), self.program, |ty| {
+                        .filter_union(self.db(), |ty| {
                             !ty.has_unspecialized_type_var(self.db(), self.program)
                         });
                     if inferred_ty.has_unspecialized_type_var(self.db(), self.program) {
@@ -7420,19 +7404,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 // which adds `_KT` to `_VT`'s lower bound. Filter out any
                                 // inferable typevars from the solution, since they represent
                                 // cross-typevar relationships that are resolved independently.
-                                let inferred_ty =
-                                    binding.solution.filter_union(db, self.program, |ty| {
-                                        !ty.as_typevar()
-                                            .is_some_and(|tv| tv.is_inferable(db, inferable))
-                                    });
+                                let inferred_ty = binding.solution.filter_union(db, |ty| {
+                                    !ty.as_typevar()
+                                        .is_some_and(|tv| tv.is_inferable(db, inferable))
+                                });
 
                                 // Avoid inferring a preferred type based on partially specialized
                                 // type context from an outer generic call. If the type context is
                                 // a union, we try to keep any concrete elements.
-                                let inferred_ty =
-                                    inferred_ty.filter_union(db, self.program, |ty| {
-                                        !ty.has_unspecialized_type_var(db, self.program)
-                                    });
+                                let inferred_ty = inferred_ty.filter_union(db, |ty| {
+                                    !ty.has_unspecialized_type_var(db, self.program)
+                                });
                                 if inferred_ty.has_unspecialized_type_var(db, self.program) {
                                     continue;
                                 }
@@ -7619,7 +7601,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     builder
                         .infer(
                             identity_instance,
-                            Type::instance(self.db(), self.program, divergent_instance),
+                            Type::instance(self.db(), divergent_instance),
                         )
                         .ok()?;
                 } else if let Some(constraints) =
@@ -8400,7 +8382,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // TODO: We could perform multi-inference here if there are multiple `Callable` annotations
             // in the union/intersection.
             && let Some(callable) = tcx
-                .filter_union(self.db(), self.program, Type::is_callable_type)
+                .filter_union(self.db(), Type::is_callable_type)
                 .as_callable()
         {
             match callable.signatures(self.db()).overloads.as_slice() {
@@ -8484,7 +8466,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .chain(keyword_only)
                 .chain(keyword_variadic);
 
-            Parameters::new(self.db(), self.program, parameters)
+            Parameters::new(self.db(), parameters)
         } else {
             Parameters::empty()
         };
@@ -8599,7 +8581,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Signature::new(
                 Parameters::new(
                     db,
-                    self.program,
                     [
                         Parameter::positional_only(Some(Name::new_static("self"))),
                         Parameter::positional_or_keyword(Name::new_static("key"))
@@ -9159,7 +9140,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let function = bound_method.function(self.db());
                 if let Some(class) = bound_method
                     .self_instance(self.db())
-                    .to_class_type(self.db(), self.program)
+                    .to_class_type(self.db())
                 {
                     if function.is_classmethod(self.db())
                         && function.as_abstract_method(self.db(), class).is_some()
@@ -9177,7 +9158,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::FunctionLiteral(function) if function.is_staticmethod(self.db()) => {
                 if let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() {
                     let value_type = self.expression_type(value);
-                    if let Some(class) = value_type.to_class_type(self.db(), self.program) {
+                    if let Some(class) = value_type.to_class_type(self.db()) {
                         if function.as_abstract_method(self.db(), class).is_some()
                             && function.has_trivial_body(self.db())
                         {
@@ -9353,7 +9334,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 let identity_instance = Type::instance(
                     self.db(),
-                    self.program,
                     collection_literal.identity_specialization(self.db()),
                 );
                 let collection_generic_context = collection_literal.generic_context(self.db());
@@ -9411,8 +9391,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(instance_ty) =
             self.infer_builtin_range_instance_type(callable_type, arguments, &call_arguments)
         {
-            bindings =
-                bindings.with_constructed_instance_type(self.db(), self.program, instance_ty);
+            bindings = bindings.with_constructed_instance_type(self.db(), instance_ty);
         }
 
         let db = self.db();
@@ -10403,11 +10382,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let attribute_exists = match MethodDecorator::try_from_fn_type(self.db(), function_type) {
-            Some(MethodDecorator::ClassMethod) => !Type::instance(self.db(), self.program, class)
+            Some(MethodDecorator::ClassMethod) => !Type::instance(self.db(), class)
                 .class_member(self.db(), self.program, id.clone())
                 .place
                 .is_undefined(),
-            Some(MethodDecorator::None) => !Type::instance(self.db(), self.program, class)
+            Some(MethodDecorator::None) => !Type::instance(self.db(), class)
                 .member(self.db(), self.program, id)
                 .place
                 .is_undefined(),
@@ -10472,7 +10451,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             attr_name: &str,
             missing_types: &mut FxIndexSet<Type<'db>>,
         ) {
-            if let Some(union) = ty.as_union_like(db, program) {
+            if let Some(union) = ty.as_union_like(db) {
                 for element in union.elements(db) {
                     union_elements_missing_attribute(
                         db,
@@ -10496,7 +10475,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && typevar.is_paramspec(db)
             && let Some(bound_typevar) = bind_typevar(
                 db,
-                self.program,
                 self.index,
                 self.scope().file_scope_id(db),
                 self.typevar_binding_context,
@@ -10545,12 +10523,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     let bound_on_instance = match value_type {
                         Type::ClassLiteral(class) => {
-                            !class.instance_member(db, self.program, None, attr).is_undefined()
+                            !class.instance_member(db, None, attr).is_undefined()
                         }
                         Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
                             match subclass_of.subclass_of() {
                                 SubclassOfInner::Class(class) => {
-                                    !class.instance_member(db, self.program, attr).is_undefined()
+                                    !class.instance_member(db, attr).is_undefined()
                                 }
                                 SubclassOfInner::Dynamic(_) => unreachable!(
                                     "Attribute lookup on a dynamic `SubclassOf` type \
@@ -10657,7 +10635,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         )),
                         Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
                             "Class `{}` has no attribute `{attr_name}`",
-                            alias.display(db, self.program),
+                            alias.display(db),
                         )),
                         Type::FunctionLiteral(function) => builder.into_diagnostic(format_args!(
                             "Function `{}` has no attribute `{attr_name}`",
@@ -10729,14 +10707,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Attribute lookup on a bounded type variable delegates to its upper bound, so
                     // use that bound here too when determining whether the lookup was on a union.
                     let union_like_type = if let Type::TypeVar(typevar) = value_type
-                        && let Some(bound) = typevar.typevar(db).upper_bound(db, self.program)
+                        && let Some(bound) = typevar.typevar(db).upper_bound(db)
                     {
                         bound
                     } else {
                         value_type
                     };
 
-                    if let Some(union) = union_like_type.as_union_like(db, self.program) {
+                    if let Some(union) = union_like_type.as_union_like(db) {
                         let mut elements_missing_the_attribute = FxIndexSet::default();
                         for element in union.elements(db) {
                             union_elements_missing_attribute(
@@ -10907,11 +10885,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | (_, Type::Divergent(_)) => operand_type,
             (_, Type::Never) => Type::Never,
 
-            (_, Type::TypeAlias(alias)) => self.infer_unary_expression_type(
-                op,
-                alias.value_type(self.db(), self.program),
-                unary,
-            ),
+            (_, Type::TypeAlias(alias)) => {
+                self.infer_unary_expression_type(op, alias.value_type(self.db()), unary)
+            }
 
             (ast::UnaryOp::UAdd, Type::LiteralValue(literal)) => match literal.kind() {
                 LiteralValueTypeKind::Int(value) => Type::int_literal(value.as_i64()),
@@ -10971,10 +10947,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ast::UnaryOp::Not => unreachable!(),
                 };
 
-                match tvar
-                    .typevar(self.db())
-                    .bound_or_constraints(self.db(), self.program)
-                {
+                match tvar.typevar(self.db()).bound_or_constraints(self.db()) {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         let db = self.db();
                         match Self::map_constrained_typevar_constraints(
