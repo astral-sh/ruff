@@ -376,7 +376,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let scope = region.scope(db);
         Self {
             context: InferContext::new(db, scope, module),
-            program: scope.analysis_file(db).program(db),
+            program: scope.program(db),
             index,
             region,
             scope,
@@ -5885,7 +5885,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let inferable = overload
                     .signature
                     .generic_context
-                    .map(|generic_context| generic_context.inferable_typevars(db, program))
+                    .map(|generic_context| generic_context.inferable_typevars(db))
                     .unwrap_or(InferableTypeVars::None);
 
                 !overload
@@ -6559,10 +6559,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 !class_generic_context.contains(db, typevar.identity(db))
                             })
                             .peekable();
-                        variables
-                            .peek()
-                            .is_some()
-                            .then(|| GenericContext::from_typevar_instances(db, variables))
+                        variables.peek().is_some().then(|| {
+                            GenericContext::from_typevar_instances(db, self.program, variables)
+                        })
                     });
                     Signature::new_generic(
                         signature_generic_context,
@@ -6574,7 +6573,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
             CallableType::new(db, signatures, callable.kind(db), callable.provenance(db))
         });
-        let inferable = class_generic_context.inferable_typevars(db, self.program);
+        let inferable = class_generic_context.inferable_typevars(db);
         let constraints = ConstraintSetBuilder::new();
         let path_bounds = source_callable
             .into_type(db, self.program)
@@ -6873,7 +6872,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let inferable = KnownClass::Tuple
                 .try_to_class_literal(self.db(), self.program)
                 .and_then(|class| class.generic_context(self.db()))
-                .map(|generic_context| generic_context.inferable_typevars(self.db(), self.program))
+                .map(|generic_context| generic_context.inferable_typevars(self.db()))
                 .unwrap_or(InferableTypeVars::None);
             annotation.filter_disjoint_elements(
                 self.db(),
@@ -7307,7 +7306,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let constraints = ConstraintSetBuilder::new();
-        let inferable = generic_context.inferable_typevars(self.db(), self.program);
+        let inferable = generic_context.inferable_typevars(self.db());
         let identity_instance = Type::instance(self.db(), ClassType::Generic(collection_alias));
 
         // Remove any union elements of that are unrelated to the collection type.
@@ -7808,6 +7807,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let yield_typevar = BoundTypeVarInstance::synthetic(
             db,
+            self.program,
             Name::new_static("_GeneratorYieldT"),
             TypeVarVariance::Covariant,
         );
@@ -7827,12 +7827,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
         };
 
-        let generic_context = GenericContext::from_typevar_instances(db, [yield_typevar]);
+        let generic_context =
+            GenericContext::from_typevar_instances(db, self.program, [yield_typevar]);
         let path_bounds = generator_ty.assignable_solutions_with_inferable(
             db,
             self.program,
             annotation,
-            generic_context.inferable_typevars(db, self.program),
+            generic_context.inferable_typevars(db),
         );
         let constraints = ConstraintSetBuilder::new();
         let Solutions::Constrained(solutions) = path_bounds.solve(db, self.program, &constraints)
@@ -8684,8 +8685,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         receiver_generic_context: Option<GenericContext<'db>>,
         call_specialization: Specialization<'db>,
     ) -> Option<Type<'db>> {
-        let constraint =
-            identity_instance.apply_specialization(self.db(), self.program, call_specialization);
+        let constraint = identity_instance.apply_specialization(self.db(), call_specialization);
         let Some(receiver_generic_context) = receiver_generic_context else {
             return Some(constraint);
         };

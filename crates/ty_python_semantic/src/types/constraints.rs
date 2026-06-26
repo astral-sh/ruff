@@ -4192,7 +4192,11 @@ impl InteriorNode {
                         );
                         path.assignments[new_range]
                             .iter()
-                            .filter(|(assignment, _)| !should_remove(assignment.constraint()))
+                            .filter(|(assignment, _)| {
+                                // Don't add back any derived facts if they are ones that we would have
+                                // removed!
+                                !should_remove(assignment.constraint())
+                            })
                             .fold(branch, |branch, (assignment, source_order)| {
                                 branch.and(
                                     builder,
@@ -4223,7 +4227,11 @@ impl InteriorNode {
                         );
                         path.assignments[new_range]
                             .iter()
-                            .filter(|(assignment, _)| !should_remove(assignment.constraint()))
+                            .filter(|(assignment, _)| {
+                                // Don't add back any derived facts if they are ones that we would have
+                                // removed!
+                                !should_remove(assignment.constraint())
+                            })
                             .fold(branch, |branch, (assignment, source_order)| {
                                 branch.and(
                                     builder,
@@ -7149,8 +7157,13 @@ mod tests {
     use crate::types::{BoundTypeVarInstance, KnownClass, TypeVarVariance};
     use ruff_python_ast::name::Name;
 
-    fn create_typevar<'db>(db: &'db dyn Db, name: &'static str) -> BoundTypeVarInstance<'db> {
-        BoundTypeVarInstance::synthetic(db, Name::new_static(name), TypeVarVariance::Invariant)
+    fn create_typevar<'db>(db: &'db TestDb, name: &'static str) -> BoundTypeVarInstance<'db> {
+        BoundTypeVarInstance::synthetic(
+            db,
+            db.program(),
+            Name::new_static(name),
+            TypeVarVariance::Invariant,
+        )
     }
 
     fn create_constraint<'db, 'c>(

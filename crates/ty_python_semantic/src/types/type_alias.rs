@@ -17,7 +17,7 @@ use ty_python_core::{
     semantic_index,
 };
 
-use ruff_db::parsed::parsed_module_versioned;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 
@@ -61,15 +61,14 @@ impl<'db> PEP695TypeAliasType<'db> {
     #[salsa::tracked(
         cycle_initial=|_, id, _| Type::divergent(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: PEP695TypeAliasType<'db>| {
-            let program = alias.rhs_scope(db).analysis_file(db).program(db);
+            let program = alias.rhs_scope(db).program(db);
             value.cycle_normalized(db, program, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(super) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
-        let module =
-            parsed_module_versioned(db, scope.analysis_file(db).versioned_file(db)).load(db);
+        let module = parsed_module(db, scope.analysis_file(db).versioned_file(db)).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
 
@@ -77,7 +76,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     }
 
     fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        let program = self.rhs_scope(db).analysis_file(db).program(db);
+        let program = self.rhs_scope(db).program(db);
         if let Some(generic_context) = self.generic_context(db) {
             let specialization = self
                 .specialization(db)
@@ -136,8 +135,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.rhs_scope(db);
-        let parsed =
-            parsed_module_versioned(db, scope.analysis_file(db).versioned_file(db)).load(db);
+        let parsed = parsed_module(db, scope.analysis_file(db).versioned_file(db)).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
 
         type_alias_stmt_node
@@ -192,8 +190,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     )]
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let definition = self.definition(db);
-        let module =
-            parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db);
+        let module = parsed_module(db, definition.analysis_file(db).versioned_file(db)).load(db);
         let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
             return Type::unknown();
         };

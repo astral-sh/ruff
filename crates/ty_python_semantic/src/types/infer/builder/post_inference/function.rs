@@ -18,7 +18,7 @@ use crate::{
 use itertools::Itertools;
 use ruff_db::{
     diagnostic::{Annotation, Span},
-    parsed::parsed_module_versioned,
+    parsed::parsed_module,
 };
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
@@ -282,7 +282,7 @@ fn check_legacy_typevar_defaults<'db>(
             diagnostic.annotate(
                 Annotation::secondary(Span::from(typevar_definition.full_range(
                     db,
-                    &parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db),
+                    &parsed_module(db, analysis_file.versioned_file(db)).load(db),
                 )))
                 .message(format_args!("`{typevar_name}` defined here")),
             );
@@ -424,7 +424,7 @@ fn check_legacy_typevar_ordering<'db>(
         diagnostic.annotate(
             Annotation::secondary(Span::from(definition.full_range(
                 db,
-                &parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db),
+                &parsed_module(db, analysis_file.versioned_file(db)).load(db),
             )))
             .message(format_args!("`{}` defined here", tvar.name(db))),
         );

@@ -1,5 +1,5 @@
 use ruff_db::files::{File, FilePath};
-use ruff_db::parsed::{parsed_module_versioned, parsed_string_annotation};
+use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::find_node::CoveringNode;
 use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
@@ -400,8 +400,8 @@ impl<'db> SemanticModel<'db> {
         covering_node: &CoveringNode<'_>,
     ) -> Option<Definition<'db>> {
         let index = semantic_index(self.db, self.analysis_file);
-        let parsed = parsed_module_versioned(self.db, self.analysis_file.versioned_file(self.db))
-            .load(self.db);
+        let parsed =
+            parsed_module(self.db, self.analysis_file.versioned_file(self.db)).load(self.db);
         let target_range = covering_node.node().range();
 
         for node in covering_node.ancestors() {
@@ -516,7 +516,7 @@ impl<'db> SemanticModel<'db> {
         match definition.kind(self.db) {
             DefinitionKind::TypeAlias(_) => true,
             DefinitionKind::AnnotatedAssignment(assignment) => {
-                let parsed = parsed_module_versioned(
+                let parsed = parsed_module(
                     self.db,
                     definition.analysis_file(self.db).versioned_file(self.db),
                 );
@@ -538,7 +538,7 @@ impl<'db> SemanticModel<'db> {
                     return TypeQualifiers::empty();
                 };
                 let definition_file = definition.file(self.db);
-                let module = parsed_module_versioned(
+                let module = parsed_module(
                     self.db,
                     definition.analysis_file(self.db).versioned_file(self.db),
                 )
@@ -896,7 +896,6 @@ mod tests {
     use crate::db::tests::TestDbBuilder;
     use crate::{AnalysisFile, HasType, SemanticModel};
     use ruff_db::files::system_path_to_file;
-    use ruff_db::parsed::parsed_module;
 
     #[test]
     fn function_type() -> anyhow::Result<()> {
@@ -906,10 +905,11 @@ mod tests {
 
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
-        let ast = parsed_module(&db, foo).load(&db);
+        let analysis_file = AnalysisFile::new(&db, db.program(), foo);
+        let ast = analysis_file.parsed(&db).load(&db);
 
         let function = ast.suite()[0].as_function_def_stmt().unwrap();
-        let model = SemanticModel::new(&db, AnalysisFile::new(&db, db.program(), foo));
+        let model = SemanticModel::new(&db, analysis_file);
         let ty = function.inferred_type(&model).unwrap();
 
         assert!(ty.is_function_literal());
@@ -925,10 +925,11 @@ mod tests {
 
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
-        let ast = parsed_module(&db, foo).load(&db);
+        let analysis_file = AnalysisFile::new(&db, db.program(), foo);
+        let ast = analysis_file.parsed(&db).load(&db);
 
         let class = ast.suite()[0].as_class_def_stmt().unwrap();
-        let model = SemanticModel::new(&db, AnalysisFile::new(&db, db.program(), foo));
+        let model = SemanticModel::new(&db, analysis_file);
         let ty = class.inferred_type(&model).unwrap();
 
         assert!(ty.is_class_literal());
@@ -945,11 +946,12 @@ mod tests {
 
         let bar = system_path_to_file(&db, "/src/bar.py").unwrap();
 
-        let ast = parsed_module(&db, bar).load(&db);
+        let analysis_file = AnalysisFile::new(&db, db.program(), bar);
+        let ast = analysis_file.parsed(&db).load(&db);
 
         let import = ast.suite()[0].as_import_from_stmt().unwrap();
         let alias = &import.names[0];
-        let model = SemanticModel::new(&db, AnalysisFile::new(&db, db.program(), bar));
+        let model = SemanticModel::new(&db, analysis_file);
         let ty = alias.inferred_type(&model).unwrap();
 
         assert!(ty.is_class_literal());

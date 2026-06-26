@@ -812,7 +812,7 @@ impl SpecialFormType {
         typevar_binding_context: Option<Definition<'db>>,
         inference_flags: InferenceFlags,
     ) -> Result<Type<'db>, InvalidTypeExpression<'db>> {
-        let program = scope_id.analysis_file(db).program(db);
+        let program = scope_id.program(db);
         match self {
             Self::Never | Self::NoReturn => Ok(Type::Never),
             Self::LiteralString => Ok(Type::literal_string()),

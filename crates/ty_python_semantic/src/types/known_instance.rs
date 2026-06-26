@@ -594,7 +594,7 @@ impl<'db> UnionTypeInstance<'db> {
         typevar_binding_context: Option<Definition<'db>>,
         inference_flags: InferenceFlags,
     ) -> Type<'db> {
-        let program = scope_id.analysis_file(db).program(db);
+        let program = scope_id.program(db);
         let mut builder = UnionBuilder::new(db, program);
         for ty in &value_expr_types {
             match ty.in_type_expression(db, scope_id, typevar_binding_context, inference_flags) {

@@ -1,6 +1,6 @@
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
-    parsed::parsed_module_versioned,
+    parsed::parsed_module,
 };
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
@@ -532,8 +532,7 @@ fn add_definition_subdiagnostic<'db>(
     };
 
     let file = definition.file(db);
-    let module =
-        parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db);
+    let module = parsed_module(db, definition.analysis_file(db).versioned_file(db)).load(db);
     let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Field declaration");
     sub.annotate(
         Annotation::secondary(

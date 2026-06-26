@@ -1,4 +1,4 @@
-use ruff_db::parsed::parsed_module_versioned;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -1099,7 +1099,7 @@ pub(crate) fn enum_metadata<'db>(
                             DefinitionKind::AnnotatedAssignment(assignment)
                                 if assignment
                                     .value(
-                                        &parsed_module_versioned(
+                                        &parsed_module(
                                             db,
                                             declaration.analysis_file(db).versioned_file(db),
                                         )

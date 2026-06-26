@@ -1408,7 +1408,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let mut variables = FxOrderSet::default();
         value_ty.find_legacy_typevars(db, program, None, &mut variables);
-        let generic_context = GenericContext::from_typevar_instances(db, variables);
+        let generic_context = GenericContext::from_typevar_instances(db, program, variables);
 
         let scope_id = self.scope();
         let current_typevar_binding_context = self.typevar_binding_context;
@@ -1427,7 +1427,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }) {
             let value_ty = value_ty.apply_specialization(
                 db,
-                self.program,
                 generic_context.specialize(
                     db,
                     std::iter::repeat_n(
@@ -1454,7 +1453,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let specialize = &|types: &[Option<Type<'db>>]| {
             let specialized = value_ty.apply_specialization(
                 db,
-                program,
                 generic_context.specialize_partial(db, program, types.iter().copied()),
             );
 
@@ -1667,7 +1665,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         &mut variables,
                     );
                     let generic_context =
-                        GenericContext::from_typevar_instances(self.db(), variables);
+                        GenericContext::from_typevar_instances(self.db(), self.program, variables);
                     Type::Dynamic(DynamicType::UnknownGeneric(generic_context))
                 }
                 KnownInstanceType::LiteralStringAlias(_) => {

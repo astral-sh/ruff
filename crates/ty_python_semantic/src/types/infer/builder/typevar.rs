@@ -23,7 +23,7 @@ use crate::{
 };
 use ruff_db::{
     diagnostic::{Annotation, Span},
-    parsed::parsed_module_versioned,
+    parsed::parsed_module,
 };
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
@@ -244,7 +244,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     diagnostic.annotate(
                         Annotation::secondary(Span::from(definition.full_range(
                             db,
-                            &parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db),
+                            &parsed_module(db, analysis_file.versioned_file(db)).load(db),
                         )))
                         .message(format_args!("`{default_name}` defined here")),
                     );
@@ -527,7 +527,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             diagnostic.annotate(
                 Annotation::secondary(Span::from(definition.full_range(
                     db,
-                    &parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db),
+                    &parsed_module(db, analysis_file.versioned_file(db)).load(db),
                 )))
                 .message(format_args!("`{outer_name}` defined here")),
             );

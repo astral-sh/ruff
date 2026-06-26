@@ -245,7 +245,7 @@ impl TestCase {
     fn module<'c>(&'c self, name: &str) -> Module<'c> {
         resolve_module_confident(
             self.db(),
-            self.db().project().program(self.db()).resolver(self.db()),
+            self.resolver_program(),
             &ModuleName::new(name).unwrap(),
         )
         .expect("module to be present")

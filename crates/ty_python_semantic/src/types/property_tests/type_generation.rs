@@ -136,13 +136,14 @@ enum ParamKind {
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
 fn create_bound_method<'db>(
     db: &'db dyn Db,
-    program: Program<'db>,
     function: Type<'db>,
     builtins_class: Type<'db>,
 ) -> Type<'db> {
+    let function = function.expect_function_literal();
+    let program = function.program(db);
     Type::BoundMethod(BoundMethodType::new(
         db,
-        function.expect_function_literal(),
+        function,
         builtins_class.to_instance(db, program).unwrap(),
     ))
 }
@@ -258,7 +259,7 @@ impl Ty {
                     .place
                     .expect_type();
 
-                create_bound_method(db, program, function, builtins_class)
+                create_bound_method(db, function, builtins_class)
             }
             Ty::Callable { params, returns } => Type::single_callable(
                 db,

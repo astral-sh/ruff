@@ -1,6 +1,6 @@
 use ruff_db::{
     diagnostic::{Annotation, Span},
-    parsed::parsed_module_versioned,
+    parsed::parsed_module,
 };
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
@@ -258,8 +258,7 @@ pub(crate) fn check_overloaded_function<'db>(
                 }
                 let file = function.file(db);
                 let module =
-                    parsed_module_versioned(db, function.analysis_file(db).versioned_file(db))
-                        .load(db);
+                    parsed_module(db, function.analysis_file(db).versioned_file(db)).load(db);
                 let node = first_overload.node(db, file, &module);
                 let span = if node.body.len() == 1 {
                     Span::from(file).with_range(node.range())

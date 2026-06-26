@@ -612,13 +612,7 @@ impl<'db> CallSignatureDetails<'db> {
         let signature = binding.signature.clone();
         let display_details = signature.display(db, program).to_string_parts();
         let (parameters, parameter_to_displayed_parameter_mapping) =
-            displayed_parameters_for_signature(
-                db,
-                program,
-                &signature,
-                &display_details,
-                specialization,
-            );
+            displayed_parameters_for_signature(db, &signature, &display_details, specialization);
         let argument_to_displayed_parameter_mapping = argument_to_parameter_mapping
             .iter()
             .map(|mapping| {
@@ -651,7 +645,6 @@ impl<'db> CallSignatureDetails<'db> {
 /// displayed parameter types.
 fn displayed_parameters_for_signature<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     signature: &Signature<'db>,
     display_details: &crate::types::display::SignatureDisplayDetails,
     specialization: Option<crate::types::generics::Specialization<'db>>,
@@ -659,9 +652,8 @@ fn displayed_parameters_for_signature<'db>(
     // Apply any inferred specialization to displayed parameter types so
     // call-site substitutions are reflected in the rendered signature. For
     // example, if `_KT` was inferred as `str`, display `str` instead of `_KT`.
-    let apply_specialization = |ty: Type<'db>| {
-        specialization.map_or(ty, |spec| ty.apply_specialization(db, program, spec))
-    };
+    let apply_specialization =
+        |ty: Type<'db>| specialization.map_or(ty, |spec| ty.apply_specialization(db, spec));
     let parameters = signature.parameters();
 
     match parameters.kind() {
@@ -2313,7 +2305,6 @@ mod tests {
     use crate::db::tests::{TestDb, TestDbBuilder};
     use crate::{AnalysisFile, SemanticModel};
     use ruff_db::files::{File, system_path_to_file};
-    use ruff_db::parsed::parsed_module;
 
     fn semantic_model(db: &TestDb, file: File) -> SemanticModel<'_> {
         SemanticModel::new(db, AnalysisFile::new(db, db.program(), file))
@@ -2333,7 +2324,9 @@ cast(val="", typ=int)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
+        let parsed = AnalysisFile::new(&db, db.program(), file)
+            .parsed(&db)
+            .load(&db);
         let call = parsed
             .suite()
             .last()
@@ -2373,7 +2366,9 @@ f(y="", x=1)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
+        let parsed = AnalysisFile::new(&db, db.program(), file)
+            .parsed(&db)
+            .load(&db);
         let call = parsed
             .suite()
             .last()
@@ -2409,7 +2404,9 @@ f(val="", typ=int)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
+        let parsed = AnalysisFile::new(&db, db.program(), file)
+            .parsed(&db)
+            .load(&db);
         let call = parsed
             .suite()
             .last()
@@ -2446,7 +2443,9 @@ f("", int)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
+        let parsed = AnalysisFile::new(&db, db.program(), file)
+            .parsed(&db)
+            .load(&db);
         let call = parsed
             .suite()
             .last()
@@ -2486,7 +2485,9 @@ f(int, x)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
+        let parsed = AnalysisFile::new(&db, db.program(), file)
+            .parsed(&db)
+            .load(&db);
         let call = parsed
             .suite()
             .last()
@@ -2530,7 +2531,9 @@ TypeAliasType("Alias", int)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
+        let parsed = AnalysisFile::new(&db, db.program(), file)
+            .parsed(&db)
+            .load(&db);
         let calls: Vec<_> = parsed
             .suite()
             .iter()
@@ -2575,7 +2578,9 @@ cast(*args)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
+        let parsed = AnalysisFile::new(&db, db.program(), file)
+            .parsed(&db)
+            .load(&db);
         let call = parsed
             .suite()
             .last()

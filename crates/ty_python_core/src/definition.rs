@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use ruff_db::files::{File, FileRange};
-use ruff_db::parsed::{ParsedModuleRef, parsed_module_versioned};
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal::suite;
@@ -107,8 +107,7 @@ impl<'db> Definition<'db> {
 
     /// Returns the name of the item being defined, if applicable.
     pub fn name(self, db: &'db dyn Db) -> Option<String> {
-        let module =
-            parsed_module_versioned(db, self.analysis_file(db).versioned_file(db)).load(db);
+        let module = parsed_module(db, self.analysis_file(db).versioned_file(db)).load(db);
         let kind = self.kind(db);
         match kind {
             DefinitionKind::Function(def) => {
@@ -144,8 +143,7 @@ impl<'db> Definition<'db> {
     /// This method returns a docstring for function, class, and attribute definitions.
     /// The docstring is extracted from the first statement in the body if it's a string literal.
     pub fn docstring(self, db: &'db dyn Db) -> Option<String> {
-        let module =
-            parsed_module_versioned(db, self.analysis_file(db).versioned_file(db)).load(db);
+        let module = parsed_module(db, self.analysis_file(db).versioned_file(db)).load(db);
         let kind = self.kind(db);
 
         match kind {

@@ -1,7 +1,7 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use ruff_db::parsed::parsed_module_versioned;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
@@ -502,8 +502,7 @@ impl<'db> TypeVarInstance<'db> {
     )]
     fn lazy_bound_unchecked(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let definition = self.definition(db)?;
-        let module =
-            parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db);
+        let module = parsed_module(db, definition.analysis_file(db).versioned_file(db)).load(db);
         let ty = match definition.kind(db) {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
@@ -543,8 +542,7 @@ impl<'db> TypeVarInstance<'db> {
     fn lazy_constraints_unchecked(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
         let definition = self.definition(db)?;
         let program = definition.analysis_file(db).program(db);
-        let module =
-            parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db);
+        let module = parsed_module(db, definition.analysis_file(db).versioned_file(db)).load(db);
         let constraints = match definition.kind(db) {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
@@ -643,8 +641,7 @@ impl<'db> TypeVarInstance<'db> {
         }
 
         let definition = self.definition(db)?;
-        let module =
-            parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db);
+        let module = parsed_module(db, definition.analysis_file(db).versioned_file(db)).load(db);
         let ty = match definition.kind(db) {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
@@ -899,6 +896,10 @@ pub struct BoundTypeVarInstance<'db> {
 impl get_size2::GetSize for BoundTypeVarInstance<'_> {}
 
 impl<'db> BoundTypeVarInstance<'db> {
+    pub(crate) fn program(self, db: &'db dyn Db) -> crate::Program<'db> {
+        self.binding_context(db).program(db)
+    }
+
     pub(crate) fn with_name_suffix(self, db: &'db dyn Db, suffix: &str) -> Self {
         Self::new(
             db,
@@ -1021,7 +1022,12 @@ impl<'db> BoundTypeVarInstance<'db> {
 
     /// Create a new PEP 695 type variable that can be used in signatures
     /// of synthetic generic functions.
-    pub(crate) fn synthetic(db: &'db dyn Db, name: Name, variance: TypeVarVariance) -> Self {
+    pub(crate) fn synthetic(
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+        name: Name,
+        variance: TypeVarVariance,
+    ) -> Self {
         let identity = TypeVarIdentity::new(
             db,
             name,
@@ -1038,7 +1044,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         Self::new(
             db,
             typevar,
-            BindingContext::Synthetic,
+            BindingContext::Synthetic(program),
             None,
             TypeVarNonce::NONE,
         )
@@ -1104,7 +1110,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 BindingContext::Definition(definition) => binding_type(db, definition)
                     .with_polarity(polarity)
                     .variance_of(db, program, self),
-                BindingContext::Synthetic => TypeVarVariance::Invariant,
+                BindingContext::Synthetic(_) => TypeVarVariance::Invariant,
             },
         }
     }
@@ -1243,12 +1249,8 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// By using `U` in the generic class, it becomes bound, and so we have a
     /// `BoundTypeVarInstance`. As part of binding `U` we must also bind its default value
     /// (resulting in `T@C`).
-    pub(crate) fn default_type(
-        self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> Option<Type<'db>> {
-        bound_typevar_default_type(db, program, self)
+    pub(crate) fn default_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        bound_typevar_default_type(db, self)
     }
 
     fn materialize_impl(
@@ -1278,7 +1280,7 @@ impl<'db> BoundTypeVarInstance<'db> {
     ) -> Self {
         let typevar = self.typevar(db);
         let bound_or_constraints = typevar.bound_or_constraints(db);
-        let default = self.default_type(db, program);
+        let default = self.default_type(db);
 
         if bound_or_constraints.is_none() && default.is_none() {
             return Self::new(
@@ -1443,7 +1445,7 @@ pub enum BindingContext<'db> {
     Definition(Definition<'db>),
     /// The typevar is synthesized internally, and is not associated with a particular definition
     /// in the source, but is still bound and eligible for specialization inference.
-    Synthetic,
+    Synthetic(crate::Program<'db>),
 }
 
 impl<'db> From<Definition<'db>> for BindingContext<'db> {
@@ -1456,7 +1458,14 @@ impl<'db> BindingContext<'db> {
     pub(crate) fn definition(self) -> Option<Definition<'db>> {
         match self {
             BindingContext::Definition(definition) => Some(definition),
-            BindingContext::Synthetic => None,
+            BindingContext::Synthetic(_) => None,
+        }
+    }
+
+    pub(crate) fn program(self, db: &'db dyn Db) -> crate::Program<'db> {
+        match self {
+            BindingContext::Definition(definition) => definition.scope(db).program(db),
+            BindingContext::Synthetic(program) => program,
         }
     }
 
@@ -1520,15 +1529,15 @@ impl<'db> BoundTypeVarIdentity<'db> {
 }
 
 #[salsa::tracked(
-    cycle_initial=|_, id, _, _| Some(Type::divergent(id)),
+    cycle_initial=|_, id, _| Some(Type::divergent(id)),
     cycle_fn=bound_typevar_default_type_cycle_recover,
     heap_size=ruff_memory_usage::heap_size
 )]
 fn bound_typevar_default_type<'db>(
     db: &'db dyn Db,
-    program: crate::Program<'db>,
     bound_typevar: BoundTypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
+    let program = bound_typevar.program(db);
     let binding_context = bound_typevar.binding_context(db);
     bound_typevar.typevar(db).default_type(db).map(|ty| {
         ty.apply_type_mapping(
@@ -1546,9 +1555,9 @@ fn bound_typevar_default_type_cycle_recover<'db>(
     cycle: &salsa::Cycle,
     previous_default: &Option<Type<'db>>,
     default: Option<Type<'db>>,
-    program: crate::Program<'db>,
-    _bound_typevar: BoundTypeVarInstance<'db>,
+    bound_typevar: BoundTypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
+    let program = bound_typevar.program(db);
     match (previous_default, default) {
         (Some(previous), Some(default)) => {
             Some(default.cycle_normalized(db, program, *previous, cycle))

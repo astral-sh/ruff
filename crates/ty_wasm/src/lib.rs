@@ -303,18 +303,28 @@ impl Workspace {
 
     /// Returns the parsed AST for `path`
     pub fn parsed(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file).load(&self.db);
+        let parsed = self
+            .analysis_file(file_id.file)
+            .parsed(&self.db)
+            .load(&self.db);
 
         Ok(format!("{:#?}", parsed.syntax()))
     }
 
     pub fn format(&self, file_id: &FileHandle) -> Result<Option<String>, Error> {
-        formatted_file(&self.db, file_id.file).map_err(into_error)
+        formatted_file(
+            &self.db,
+            self.analysis_file(file_id.file).versioned_file(&self.db),
+        )
+        .map_err(into_error)
     }
 
     /// Returns the token stream for `path` serialized as a string.
     pub fn tokens(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file).load(&self.db);
+        let parsed = self
+            .analysis_file(file_id.file)
+            .parsed(&self.db)
+            .load(&self.db);
 
         Ok(format!("{:#?}", parsed.tokens()))
     }

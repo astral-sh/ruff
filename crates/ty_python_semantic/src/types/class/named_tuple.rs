@@ -1,4 +1,4 @@
-use ruff_db::{diagnostic::Span, parsed::parsed_module_versioned};
+use ruff_db::{diagnostic::Span, parsed::parsed_module};
 use ruff_python_ast as ast;
 use ruff_python_ast::{NodeIndex, PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange};
@@ -34,8 +34,11 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
     match name {
         "__new__" => {
             // __new__(cls, field1, field2, ...) -> Self
-            let self_typevar =
-                BoundTypeVarInstance::synthetic_self(db, instance_ty, BindingContext::Synthetic);
+            let self_typevar = BoundTypeVarInstance::synthetic_self(
+                db,
+                instance_ty,
+                BindingContext::Synthetic(program),
+            );
             let self_ty = Type::TypeVar(self_typevar);
 
             let variables = inherited_generic_context
@@ -43,7 +46,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
                 .flat_map(|ctx| ctx.variables(db))
                 .chain(std::iter::once(self_typevar));
 
-            let generic_context = GenericContext::from_typevar_instances(db, variables);
+            let generic_context = GenericContext::from_typevar_instances(db, program, variables);
 
             // CPython generates namedtuple `__new__` as `(_cls, field1, ...)` so field names like
             // `cls` remain usable as keyword arguments at call sites.
@@ -91,7 +94,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
             let self_ty = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
                 db,
                 instance_ty,
-                BindingContext::Synthetic,
+                BindingContext::Synthetic(program),
             ));
 
             let first_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
@@ -211,8 +214,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     /// Returns the range of the namedtuple call expression.
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let scope = self.scope(db);
-        let module =
-            parsed_module_versioned(db, scope.analysis_file(db).versioned_file(db)).load(db);
+        let module = parsed_module(db, scope.analysis_file(db).versioned_file(db)).load(db);
 
         match self.anchor(db) {
             DynamicNamedTupleAnchor::CollectionsDefinition { definition, .. }
@@ -458,8 +460,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         )]
         fn deferred_spec<'db>(db: &'db dyn Db, definition: Definition<'db>) -> NamedTupleSpec<'db> {
             let module =
-                parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db))
-                    .load(db);
+                parsed_module(db, definition.analysis_file(db).versioned_file(db)).load(db);
             let node = definition
                 .kind(db)
                 .value(&module)

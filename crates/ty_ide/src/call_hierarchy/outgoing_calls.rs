@@ -4,7 +4,6 @@ use crate::call_hierarchy::CalleeLeaf;
 use crate::goto::find_goto_target;
 use crate::{CallHierarchyItem, Db};
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::visitor::source_order::{
     walk_arguments, walk_decorator, walk_expr, walk_parameters, walk_type_params,
@@ -156,7 +155,7 @@ impl<'a> OutgoingCallsFinder<'a, '_> {
                 _ => continue,
             }
             let def_file = def.file(self.db);
-            let module_ref = parsed_module(self.db, def_file).load(self.db);
+            let module_ref = def.analysis_file(self.db).parsed(self.db).load(self.db);
             let selection_range = def.focus_range(self.db, &module_ref).range();
 
             let key = CalleeKey {

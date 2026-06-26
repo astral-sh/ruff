@@ -36,27 +36,15 @@ pub struct VersionedFile<'db> {
     pub python_version: PythonVersion,
 }
 
-/// Returns the parsed AST for a physical file at the database's default Python version.
-///
-/// New multi-environment callers should prefer [`parsed_module_versioned`] so that the target
-/// version is part of the Salsa key. This compatibility wrapper remains for callers that only
-/// have one Python environment.
-pub fn parsed_module(db: &dyn Db, file: File) -> &ParsedModule {
-    parsed_module_versioned(db, VersionedFile::new(db, file, db.python_version()))
-}
-
-pub fn parsed_module_versioned<'db>(
-    db: &'db dyn Db,
-    file: VersionedFile<'db>,
-) -> &'db ParsedModule {
-    contextual::parsed_module(db, file)
+pub fn parsed_module<'db>(db: &'db dyn Db, file: VersionedFile<'db>) -> &'db ParsedModule {
+    contextual::parse_module(db, file)
 }
 
 mod contextual {
     use super::*;
 
     #[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size, lru=200)]
-    pub(crate) fn parsed_module(db: &dyn Db, file: VersionedFile<'_>) -> ParsedModule {
+    pub(crate) fn parse_module(db: &dyn Db, file: VersionedFile<'_>) -> ParsedModule {
         let source_file = file.file(db);
         let _span = tracing::trace_span!(
             "parsed_module",
@@ -71,7 +59,7 @@ mod contextual {
     }
 
     pub(super) fn disable_lru(db: &mut dyn Db) {
-        parsed_module::set_lru_capacity(db, 0);
+        parse_module::set_lru_capacity(db, 0);
     }
 }
 
@@ -896,13 +884,13 @@ class C[T](Base, metaclass=Meta):
 mod tests {
     use crate::Db;
     use crate::files::{system_path_to_file, vendored_path_to_file};
-    use crate::parsed::parsed_module;
-    use crate::parsed::{VersionedFile, parsed_module_versioned};
+    use crate::parsed::{VersionedFile, parsed_module};
     use crate::system::{
         DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemVirtualPath,
     };
     use crate::tests::TestDb;
     use crate::vendored::{VendoredFileSystemBuilder, VendoredPath};
+    use ruff_python_ast::PythonVersion;
     use zip::CompressionMethod;
 
     #[test]
@@ -914,7 +902,8 @@ mod tests {
 
         let file = system_path_to_file(&db, path).unwrap();
 
-        let parsed = parsed_module(&db, file).load(&db);
+        let versioned_file = VersionedFile::new(&db, file, PythonVersion::latest_ty());
+        let parsed = parsed_module(&db, versioned_file).load(&db);
 
         assert!(parsed.has_valid_syntax());
 
@@ -930,7 +919,8 @@ mod tests {
 
         let file = system_path_to_file(&db, path).unwrap();
 
-        let parsed = parsed_module(&db, file).load(&db);
+        let versioned_file = VersionedFile::new(&db, file, PythonVersion::latest_ty());
+        let parsed = parsed_module(&db, versioned_file).load(&db);
 
         assert!(parsed.has_valid_syntax());
 
@@ -946,7 +936,9 @@ mod tests {
 
         let virtual_file = db.files().virtual_file(&db, path);
 
-        let parsed = parsed_module(&db, virtual_file.file()).load(&db);
+        let versioned_file =
+            VersionedFile::new(&db, virtual_file.file(), PythonVersion::latest_ty());
+        let parsed = parsed_module(&db, versioned_file).load(&db);
 
         assert!(parsed.has_valid_syntax());
 
@@ -962,7 +954,9 @@ mod tests {
 
         let virtual_file = db.files().virtual_file(&db, path);
 
-        let parsed = parsed_module(&db, virtual_file.file()).load(&db);
+        let versioned_file =
+            VersionedFile::new(&db, virtual_file.file(), PythonVersion::latest_ty());
+        let parsed = parsed_module(&db, versioned_file).load(&db);
 
         assert!(parsed.has_valid_syntax());
 
@@ -993,15 +987,14 @@ else:
 
         let file = vendored_path_to_file(&db, VendoredPath::new("path.pyi")).unwrap();
 
-        let parsed = parsed_module(&db, file).load(&db);
+        let versioned_file = VersionedFile::new(&db, file, PythonVersion::latest_ty());
+        let parsed = parsed_module(&db, versioned_file).load(&db);
 
         assert!(parsed.has_valid_syntax());
     }
 
     #[test]
     fn same_file_at_different_python_versions() -> crate::system::Result<()> {
-        use ruff_python_ast::PythonVersion;
-
         let mut db = TestDb::new();
         db.write_file("test.py", "type Alias = int")?;
         let file = system_path_to_file(&db, "test.py").unwrap();
@@ -1010,13 +1003,13 @@ else:
         let py312 = VersionedFile::new(&db, file, PythonVersion::PY312);
 
         assert!(
-            !parsed_module_versioned(&db, py311)
+            !parsed_module(&db, py311)
                 .load(&db)
                 .unsupported_syntax_errors()
                 .is_empty()
         );
         assert!(
-            parsed_module_versioned(&db, py312)
+            parsed_module(&db, py312)
                 .load(&db)
                 .unsupported_syntax_errors()
                 .is_empty()

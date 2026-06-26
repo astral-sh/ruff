@@ -451,10 +451,10 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn program(self, db: &'db dyn Db) -> Program<'db> {
         match self {
             Self::Static(class) => class.program(db),
-            Self::Dynamic(class) => class.scope(db).analysis_file(db).program(db),
-            Self::DynamicNamedTuple(class) => class.scope(db).analysis_file(db).program(db),
-            Self::DynamicTypedDict(class) => class.scope(db).analysis_file(db).program(db),
-            Self::DynamicEnum(class) => class.scope(db).analysis_file(db).program(db),
+            Self::Dynamic(class) => class.scope(db).program(db),
+            Self::DynamicNamedTuple(class) => class.scope(db).program(db),
+            Self::DynamicTypedDict(class) => class.scope(db).program(db),
+            Self::DynamicEnum(class) => class.scope(db).program(db),
         }
     }
 
@@ -1346,13 +1346,12 @@ impl<'db> ClassType<'db> {
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
     pub(super) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        let program = self.program(db);
         match self {
             Self::NonGeneric(class) => class.metaclass(db),
             Self::Generic(generic) => generic
                 .origin(db)
                 .metaclass(db)
-                .apply_optional_specialization(db, program, Some(generic.specialization(db))),
+                .apply_optional_specialization(db, Some(generic.specialization(db))),
         }
     }
 
@@ -1650,7 +1649,7 @@ impl<'db> ClassType<'db> {
         let fallback_member_lookup = || {
             class_literal
                 .own_class_member(db, inherited_generic_context, specialization, name)
-                .map_type(|ty| ty.apply_optional_specialization(db, program, specialization))
+                .map_type(|ty| ty.apply_optional_specialization(db, specialization))
         };
 
         match name {
@@ -1940,7 +1939,6 @@ impl<'db> ClassType<'db> {
     ///
     /// See [`Type::instance_member`] for more details.
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
-        let program = self.program(db);
         match self {
             Self::NonGeneric(ClassLiteral::Dynamic(class)) => class.instance_member(db, name),
             Self::NonGeneric(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
@@ -1966,7 +1964,7 @@ impl<'db> ClassType<'db> {
 
                 class_literal
                     .instance_member(db, specialization, name)
-                    .map_type(|ty| ty.apply_optional_specialization(db, program, specialization))
+                    .map_type(|ty| ty.apply_optional_specialization(db, specialization))
             }
         }
     }
@@ -1977,7 +1975,6 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         name: &str,
     ) -> Option<Type<'db>> {
-        let program = self.program(db);
         match self {
             Self::NonGeneric(ClassLiteral::Static(class)) => {
                 class.converter_input_type_for_field(db, name)
@@ -1985,9 +1982,7 @@ impl<'db> ClassType<'db> {
             Self::Generic(generic) => generic
                 .origin(db)
                 .converter_input_type_for_field(db, name)
-                .map(|ty| {
-                    ty.apply_optional_specialization(db, program, Some(generic.specialization(db)))
-                }),
+                .map(|ty| ty.apply_optional_specialization(db, Some(generic.specialization(db)))),
             Self::NonGeneric(
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicNamedTuple(_)
@@ -2000,7 +1995,6 @@ impl<'db> ClassType<'db> {
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
     pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
-        let program = self.program(db);
         match self {
             Self::NonGeneric(ClassLiteral::Dynamic(dynamic)) => {
                 dynamic.own_instance_member(db, name)
@@ -2020,9 +2014,7 @@ impl<'db> ClassType<'db> {
                 generic
                     .origin(db)
                     .own_instance_member(db, name)
-                    .map_type(|ty| {
-                        ty.apply_optional_specialization(db, program, Some(specialization))
-                    })
+                    .map_type(|ty| ty.apply_optional_specialization(db, Some(specialization)))
             }
         }
     }

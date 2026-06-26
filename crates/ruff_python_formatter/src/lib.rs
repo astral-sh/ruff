@@ -1,6 +1,5 @@
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
-use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{VersionedFile, parsed_module};
 use ruff_db::source::source_text;
 use thiserror::Error;
 use tracing::Level;
@@ -177,10 +176,14 @@ where
     Ok(formatted)
 }
 
-pub fn formatted_file(db: &dyn Db, file: File) -> Result<Option<String>, FormatModuleError> {
+pub fn formatted_file(
+    db: &dyn Db,
+    versioned_file: VersionedFile<'_>,
+) -> Result<Option<String>, FormatModuleError> {
+    let file = versioned_file.file(db);
     let options = db.format_options(file);
 
-    let parsed = parsed_module(db, file).load(db);
+    let parsed = parsed_module(db, versioned_file).load(db);
 
     if let Some(first) = parsed.errors().first() {
         return Err(FormatModuleError::ParseError(first.clone()));

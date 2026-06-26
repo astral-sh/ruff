@@ -23,7 +23,6 @@ pub fn code_actions(
     diagnostic_range: TextRange,
     diagnostic_id: &str,
 ) -> Vec<QuickFix> {
-    let file = analysis_file.file(db);
     let registry = db.lint_registry();
     let Ok(lint_id) = registry.get(diagnostic_id) else {
         return Vec::new();
@@ -43,7 +42,7 @@ pub fn code_actions(
     // Suggest just suppressing the lint (always a valid option, but never ideal)
     actions.push(QuickFix {
         title: format!("Ignore '{}' for this line", lint_id.name()),
-        edits: suppress_single(db, file, lint_id, diagnostic_range).into_edits(),
+        edits: suppress_single(db, analysis_file, lint_id, diagnostic_range).into_edits(),
         preferred: false,
     });
 

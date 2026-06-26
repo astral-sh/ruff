@@ -44,7 +44,7 @@
 //! be considered a bug.)
 
 use itertools::Either;
-use ruff_db::parsed::parsed_module_versioned;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
@@ -142,7 +142,7 @@ pub(crate) fn infer_definition_types<'db>(
 ) -> DefinitionInference<'db> {
     let file = definition.file(db);
     let analysis_file = definition.analysis_file(db);
-    let module = parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db);
+    let module = parsed_module(db, analysis_file.versioned_file(db)).load(db);
     let _span = tracing::trace_span!(
         "infer_definition_types",
         range = ?definition.kind(db).target_range(&module),
@@ -192,7 +192,7 @@ pub(crate) fn function_known_decorators<'db>(
     definition: Definition<'db>,
 ) -> FunctionDecoratorInference<'db> {
     let analysis_file = definition.analysis_file(db);
-    let module = parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db);
+    let module = parsed_module(db, analysis_file.versioned_file(db)).load(db);
     let index = ty_python_core::semantic_index(db, analysis_file);
 
     TypeInferenceBuilder::new(
@@ -287,7 +287,7 @@ pub(crate) fn infer_deferred_types<'db>(
 ) -> DefinitionInference<'db> {
     let file = definition.file(db);
     let analysis_file = definition.analysis_file(db);
-    let module = parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db);
+    let module = parsed_module(db, analysis_file.versioned_file(db)).load(db);
     let _span = tracing::trace_span!(
         "infer_deferred_types",
         definition = ?definition.as_id(),
@@ -361,7 +361,7 @@ pub(crate) fn infer_scope_types_impl<'db>(
     let analysis_file = scope.analysis_file(db);
     let _span = tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), ?file).entered();
 
-    let module = parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db);
+    let module = parsed_module(db, analysis_file.versioned_file(db)).load(db);
 
     // Using the index here is fine because the code below depends on the AST anyway.
     // The isolation of the query is by the return inferred types.
@@ -398,7 +398,7 @@ pub(super) fn infer_expression_types_impl<'db>(
 
     let file = expression.file(db);
     let analysis_file = expression.analysis_file(db);
-    let module = parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db);
+    let module = parsed_module(db, analysis_file.versioned_file(db)).load(db);
     let _span = tracing::trace_span!(
         "infer_expression_types",
         expression = ?expression.as_id(),
@@ -515,7 +515,7 @@ fn infer_statement_types_impl<'db>(
 ) -> StatementInferenceInner<'db> {
     let file = statement.file(db);
     let analysis_file = statement.analysis_file(db);
-    let module = parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db);
+    let module = parsed_module(db, analysis_file.versioned_file(db)).load(db);
     let _span = tracing::trace_span!(
         "infer_statement_types",
         statement = ?statement.as_id(),
@@ -595,10 +595,8 @@ pub(super) struct ScopeWithContext<'db> {
 impl<'db> InferScope<'db> {
     fn program(self, db: &'db dyn Db) -> crate::Program<'db> {
         match self {
-            InferScope::Bare(scope) => scope.analysis_file(db).program(db),
-            InferScope::WithContext(with_context) => {
-                with_context.scope(db).analysis_file(db).program(db)
-            }
+            InferScope::Bare(scope) => scope.program(db),
+            InferScope::WithContext(with_context) => with_context.scope(db).program(db),
         }
     }
 
@@ -715,7 +713,7 @@ impl<'db> From<Type<'db>> for TypeContext<'db> {
 )]
 pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
     let file = unpack.file(db);
-    let module = parsed_module_versioned(db, unpack.analysis_file(db).versioned_file(db)).load(db);
+    let module = parsed_module(db, unpack.analysis_file(db).versioned_file(db)).load(db);
     let _span = tracing::trace_span!("infer_unpack_types", range=?unpack.range(db, &module), ?file)
         .entered();
 
@@ -1359,8 +1357,7 @@ impl<'db> DefinitionInference<'db> {
         // cycle iteration, i.e., by inferring `list[Divergent]` instead of `Divergent`.
         if let DefinitionKind::Assignment(assignment) = definition.kind(db) {
             let module =
-                parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db))
-                    .load(db);
+                parsed_module(db, definition.analysis_file(db).versioned_file(db)).load(db);
             let known_collection = match assignment.value(&module) {
                 ast::Expr::Set(_) => Some(KnownClass::Set),
                 ast::Expr::List(_) => Some(KnownClass::List),

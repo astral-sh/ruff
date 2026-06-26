@@ -354,16 +354,23 @@ fn run_test(
                 }
             };
 
-            let failure = match matcher::match_file(db, test_file.file, &diagnostics, options)
-                .and_then(|inline_diagnostics| {
-                    mdtest::validate_inline_snapshot(
-                        db,
-                        "ty",
-                        test_file,
-                        &inline_diagnostics,
-                        &mut markdown_edits,
-                    )
-                }) {
+            let analysis_file =
+                ty_python_core::environment::AnalysisFile::new(db, program, test_file.file);
+            let failure = match matcher::match_file(
+                db,
+                analysis_file.versioned_file(db),
+                &diagnostics,
+                options,
+            )
+            .and_then(|inline_diagnostics| {
+                mdtest::validate_inline_snapshot(
+                    db,
+                    "ty",
+                    test_file,
+                    &inline_diagnostics,
+                    &mut markdown_edits,
+                )
+            }) {
                 Ok(()) => None,
                 Err(line_failures) => Some(FileFailures {
                     backtick_offsets: test_file.to_code_block_backtick_offsets(),

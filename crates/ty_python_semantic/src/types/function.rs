@@ -54,7 +54,7 @@ use std::str::FromStr;
 use bitflags::bitflags;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, FileRange};
-use ruff_db::parsed::{ParsedModuleRef, parsed_module_versioned};
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::find_node::covering_node;
@@ -378,7 +378,7 @@ impl<'db> OverloadLiteral<'db> {
         self.node(
             db,
             file,
-            &parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db),
+            &parsed_module(db, definition.analysis_file(db).versioned_file(db)).load(db),
         )
         .decorator_list
         .iter()
@@ -441,7 +441,7 @@ impl<'db> OverloadLiteral<'db> {
         let definition = self.definition(db);
         let analysis_file = definition.analysis_file(db);
         let scope = definition.scope(db);
-        let module = parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db);
+        let module = parsed_module(db, analysis_file.versioned_file(db)).load(db);
         let use_def = semantic_index(db, analysis_file).use_def_map(scope.file_scope_id(db));
         let use_id = self
             .body_scope(db)
@@ -495,7 +495,7 @@ impl<'db> OverloadLiteral<'db> {
 
         let scope = self.body_scope(db);
         let analysis_file = scope.analysis_file(db);
-        let module = parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db);
+        let module = parsed_module(db, analysis_file.versioned_file(db)).load(db);
         let function_node = scope.node(db).expect_function().node(&module);
         let index = semantic_index(db, analysis_file);
         let file_scope_id = scope.file_scope_id(db);
@@ -582,7 +582,7 @@ impl<'db> OverloadLiteral<'db> {
         let program = self.body_scope(db).program(db);
         let scope = self.body_scope(db);
         let analysis_file = scope.analysis_file(db);
-        let module = parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db);
+        let module = parsed_module(db, analysis_file.versioned_file(db)).load(db);
         let function_stmt_node = scope.node(db).expect_function().node(&module);
         let definition = self.definition(db);
         let index = semantic_index(db, analysis_file);
@@ -693,8 +693,7 @@ impl<'db> OverloadLiteral<'db> {
         let file = self.file(db);
         let span = Span::from(file);
         let module =
-            parsed_module_versioned(db, self.body_scope(db).analysis_file(db).versioned_file(db))
-                .load(db);
+            parsed_module(db, self.body_scope(db).analysis_file(db).versioned_file(db)).load(db);
         let func_def = self.node(db, file, &module);
         let range = parameter_index
             .and_then(|parameter_index| {
@@ -714,8 +713,7 @@ impl<'db> OverloadLiteral<'db> {
         let file = self.file(db);
         let span = Span::from(file);
         let module =
-            parsed_module_versioned(db, self.body_scope(db).analysis_file(db).versioned_file(db))
-                .load(db);
+            parsed_module(db, self.body_scope(db).analysis_file(db).versioned_file(db)).load(db);
         let func_def = self.node(db, file, &module);
         let return_type_range = func_def.returns.as_ref().map(|returns| returns.range());
         let mut signature = func_def.name.range.cover(func_def.parameters.range);
@@ -947,8 +945,7 @@ impl<'db> FunctionLiteral<'db> {
             let definition = implementation.definition(db);
             let file = definition.file(db);
             let module =
-                parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db))
-                    .load(db);
+                parsed_module(db, definition.analysis_file(db).versioned_file(db)).load(db);
             let node = implementation.node(db, file, &module);
             function_body_kind(db, program, node, |expr| {
                 definition_expression_type(db, definition, expr)

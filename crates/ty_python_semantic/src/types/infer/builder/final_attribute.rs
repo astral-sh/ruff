@@ -1,5 +1,5 @@
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
-use ruff_db::parsed::parsed_module_versioned;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
@@ -23,8 +23,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) {
         let db = self.db();
         let file = declaration.file(db);
-        let module =
-            parsed_module_versioned(db, declaration.analysis_file(db).versioned_file(db)).load(db);
+        let module = parsed_module(db, declaration.analysis_file(db).versioned_file(db)).load(db);
         let range = match declaration.kind(db) {
             DefinitionKind::AnnotatedAssignment(assignment) => {
                 assignment.annotation(&module).range()

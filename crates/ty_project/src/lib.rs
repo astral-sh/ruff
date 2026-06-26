@@ -16,7 +16,7 @@ use ruff_db::diagnostic::{
     Diagnostic, DiagnosticId, Severity, SubDiagnostic, SubDiagnosticSeverity,
 };
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module_versioned;
+use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
 use salsa::{Database, Durability, Setter};
@@ -215,10 +215,6 @@ impl Project {
                     .clone(),
             },
         )
-    }
-
-    pub fn analysis_file(self, db: &dyn Db, file: File) -> AnalysisFile<'_> {
-        AnalysisFile::new(db, self.program(db), file)
     }
 
     /// Permanently freezes the most heavily read immutable project inputs.
@@ -458,10 +454,8 @@ impl Project {
                                 if !open_files.contains(&file) {
                                     // The module has already been parsed by `check_file_impl`.
                                     // We only retrieve it here so that we can call `clear` on it.
-                                    let parsed = parsed_module_versioned(
-                                        &db,
-                                        analysis_file.versioned_file(&db),
-                                    );
+                                    let parsed =
+                                        parsed_module(&db, analysis_file.versioned_file(&db));
 
                                     // Drop the AST now that we are done checking this file. It is not currently open,
                                     // so it is unlikely to be accessed again soon. If any queries need to access the AST

@@ -1013,6 +1013,7 @@ impl<'db> Signature<'db> {
             };
 
             if let Some(self_typevar) = self_typevar {
+                let program = self_typevar.program(db);
                 match self.generic_context.as_mut() {
                     Some(generic_context)
                         if generic_context
@@ -1021,12 +1022,14 @@ impl<'db> Signature<'db> {
                     Some(generic_context) => {
                         *generic_context = GenericContext::from_typevar_instances(
                             db,
+                            program,
                             std::iter::once(self_typevar).chain(generic_context.variables(db)),
                         );
                     }
                     None => {
                         self.generic_context = Some(GenericContext::from_typevar_instances(
                             db,
+                            program,
                             std::iter::once(self_typevar),
                         ));
                     }
@@ -1135,11 +1138,8 @@ impl<'db> Signature<'db> {
 
         // A specialized receiver can make generic receiver annotations concrete enough to compare.
         if let Some((_, self_specialization)) = self_type.class_specialization(db, program) {
-            expected_self_ty = expected_self_ty.apply_optional_specialization(
-                db,
-                program,
-                Some(self_specialization),
-            );
+            expected_self_ty =
+                expected_self_ty.apply_optional_specialization(db, Some(self_specialization));
 
             // Specialization can also make the receiver annotation trivially compatible.
             if accepts_any_or_exact_self(expected_self_ty) {
@@ -1154,7 +1154,7 @@ impl<'db> Signature<'db> {
                 program,
                 expected_self_ty,
                 &constraints,
-                self.inferable_typevars(db, program),
+                self.inferable_typevars(db),
             )
             .is_always_satisfied(db, program)
     }
@@ -1241,11 +1241,8 @@ impl<'db> Signature<'db> {
         let return_ty = specialization.map_or_else(
             || unspecialized_return_ty,
             |specialization| {
-                unspecialized_return_ty.apply_specialization(
-                    db,
-                    program,
-                    signature_specialization.unwrap_or(specialization),
-                )
+                unspecialized_return_ty
+                    .apply_specialization(db, signature_specialization.unwrap_or(specialization))
             },
         );
 
@@ -1376,13 +1373,9 @@ impl<'db> Signature<'db> {
                 .any(|(_, parameter)| parameter.annotated_type().contains_self(db, program))
     }
 
-    fn inferable_typevars(
-        &self,
-        db: &'db dyn Db,
-        program: crate::Program<'db>,
-    ) -> InferableTypeVars<'db> {
+    fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {
         match self.generic_context {
-            Some(generic_context) => generic_context.inferable_typevars(db, program),
+            Some(generic_context) => generic_context.inferable_typevars(db),
             None => InferableTypeVars::None,
         }
     }
@@ -1945,8 +1938,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target
         };
 
-        let source_inferable = source.inferable_typevars(db, program);
-        let target_inferable = target.inferable_typevars(db, program);
+        let source_inferable = source.inferable_typevars(db);
+        let target_inferable = target.inferable_typevars(db);
         let inferable = source_inferable.merge(db, target_inferable);
         let inferable = self.inferable.merge(db, inferable);
 

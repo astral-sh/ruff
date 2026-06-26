@@ -14,8 +14,6 @@ use ruff_source_file::LineColumn;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_db::parsed::parsed_module;
-
 use crate::Db;
 use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
@@ -867,7 +865,13 @@ impl<'db> FmtDetailed<'db> for TypeAliasDisplay<'db> {
             let definition = self.type_alias.definition(self.db);
             let file = definition.file(self.db);
             let offset = definition
-                .focus_range(self.db, &parsed_module(self.db, file).load(self.db))
+                .focus_range(
+                    self.db,
+                    &definition
+                        .analysis_file(self.db)
+                        .parsed(self.db)
+                        .load(self.db),
+                )
                 .range()
                 .start();
             fmt_file_location(self.db, file, offset, f)?;

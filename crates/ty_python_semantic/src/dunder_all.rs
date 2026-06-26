@@ -1,5 +1,5 @@
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module_versioned;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast};
@@ -20,7 +20,7 @@ pub(crate) fn dunder_all_names(
     let file = analysis_file.file(db);
     let _span = tracing::trace_span!("dunder_all_names", file=?file.path(db)).entered();
 
-    let module = parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db);
+    let module = parsed_module(db, analysis_file.versioned_file(db)).load(db);
     let index = semantic_index(db, analysis_file);
     let mut collector = DunderAllNamesCollector::new(db, analysis_file, index);
     collector.visit_body(module.suite());

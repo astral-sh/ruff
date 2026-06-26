@@ -1631,7 +1631,9 @@ fn is_legacy_namespace_package(
     //
     // The downside is if you write slightly different syntax we will fail to detect the idiom,
     // but hey, this is better than nothing!
-    let parsed = ruff_db::parsed::parsed_module(context.db, init);
+    let versioned_file =
+        ruff_db::parsed::VersionedFile::new(context.db, init, context.python_version);
+    let parsed = ruff_db::parsed::parsed_module(context.db, versioned_file);
     let mut visitor = LegacyNamespacePackageVisitor::default();
     visitor.visit_body(parsed.load(context.db).suite());
 

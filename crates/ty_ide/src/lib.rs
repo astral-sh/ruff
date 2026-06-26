@@ -403,7 +403,7 @@ mod tests {
         Annotation, Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, UnifiedFile,
     };
     use ruff_db::files::{File, FileRootKind, system_path_to_file};
-    use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+    use ruff_db::parsed::ParsedModuleRef;
     use ruff_db::source::{SourceText, source_text};
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_python_ast::PythonVersion;
@@ -569,7 +569,9 @@ mod tests {
                         "found more than one source that contains `<CURSOR>`"
                     );
                     let source = source_text(&db, file);
-                    let parsed = parsed_module(&db, file).load(&db);
+                    let parsed = AnalysisFile::new(&db, db.project().program(&db), file)
+                        .parsed(&db)
+                        .load(&db);
                     let stylist =
                         Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
                     cursor = Some(Cursor {
@@ -713,7 +715,9 @@ mod tests {
                         "found more than one source that contains `<CURSOR>`"
                     );
                     let source = source_text(&db, file);
-                    let parsed = parsed_module(&db, file).load(&db);
+                    let parsed = AnalysisFile::new(&db, db.project().program(&db), file)
+                        .parsed(&db)
+                        .load(&db);
                     let stylist =
                         Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
                     cursor = Some(Cursor {

@@ -1162,7 +1162,7 @@ fn cached_protocol_interface<'db>(
                 continue;
             }
 
-            let ty = ty.apply_optional_specialization(db, program, specialization);
+            let ty = ty.apply_optional_specialization(db, specialization);
 
             let member = match ty {
                 Type::PropertyInstance(property) => ProtocolMemberKind::Property(property),

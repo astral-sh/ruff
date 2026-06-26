@@ -3,7 +3,7 @@ use itertools::{Either, Itertools};
 use ruff_db::{
     diagnostic::Span,
     files::File,
-    parsed::{ParsedModuleRef, parsed_module_versioned},
+    parsed::{ParsedModuleRef, parsed_module},
 };
 use ruff_python_ast as ast;
 use ruff_python_ast::{PythonVersion, name::Name};
@@ -223,7 +223,6 @@ impl<'db> StaticClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> Option<Type<'db>> {
         const ORDERING_METHODS: [&str; 4] = ["__lt__", "__le__", "__gt__", "__ge__"];
-        let program = self.program(db);
 
         for name in ORDERING_METHODS {
             for base in self.iter_mro(db, specialization) {
@@ -240,11 +239,7 @@ impl<'db> StaticClassLiteral<'db> {
                             let base_specialization = base_class
                                 .static_class_literal(db)
                                 .and_then(|(_, spec)| spec);
-                            return Some(ty.apply_optional_specialization(
-                                db,
-                                program,
-                                base_specialization,
-                            ));
+                            return Some(ty.apply_optional_specialization(db, base_specialization));
                         }
                     }
                     ClassLiteral::Dynamic(dynamic) => {
@@ -301,7 +296,7 @@ impl<'db> StaticClassLiteral<'db> {
     fn pep695_generic_context_inner(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
         let analysis_file = scope.analysis_file(db);
-        let parsed = parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db);
+        let parsed = parsed_module(db, analysis_file.versioned_file(db)).load(db);
         let class_def_node = scope.node(db).expect_class().node(&parsed);
         class_def_node.type_params.as_ref().map(|type_params| {
             let index = semantic_index(db, analysis_file);
@@ -519,7 +514,7 @@ impl<'db> StaticClassLiteral<'db> {
             );
 
             let analysis_file = class.body_scope(db).analysis_file(db);
-            let module = parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db);
+            let module = parsed_module(db, analysis_file.versioned_file(db)).load(db);
             let class_stmt = class.node(db, &module);
 
             let class_definition =
@@ -612,7 +607,7 @@ impl<'db> StaticClassLiteral<'db> {
         tracing::trace!("StaticClassLiteral::decorators: {}", self.name(db));
 
         let analysis_file = self.body_scope(db).analysis_file(db);
-        let module = parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db);
+        let module = parsed_module(db, analysis_file.versioned_file(db)).load(db);
 
         let class_stmt = self.node(db, &module);
         if class_stmt.decorator_list.is_empty() {
@@ -645,7 +640,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// that is either `@dataclass` or `@dataclass(...)`.
     pub(crate) fn find_dataclass_decorator_position(self, db: &'db dyn Db) -> Option<usize> {
         let analysis_file = self.body_scope(db).analysis_file(db);
-        let module = parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db);
+        let module = parsed_module(db, analysis_file.versioned_file(db)).load(db);
         let class_stmt = self.node(db, &module);
         let class_definition =
             semantic_index(db, analysis_file).expect_single_definition(class_stmt);
@@ -800,8 +795,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let module =
-            parsed_module_versioned(db, self.body_scope(db).analysis_file(db).versioned_file(db))
-                .load(db);
+            parsed_module(db, self.body_scope(db).analysis_file(db).versioned_file(db)).load(db);
         let class_stmt = self.node(db, &module);
         Some(typed_dict_params_from_class_def(class_stmt))
     }
@@ -828,11 +822,9 @@ impl<'db> StaticClassLiteral<'db> {
         // Dataclass transformer flags can be overwritten using class arguments.
         if let Some(transformer_params) = transformer_params.as_mut() {
             if let Some(class_def) = self.definition(db).kind(db).as_class() {
-                let module = parsed_module_versioned(
-                    db,
-                    self.body_scope(db).analysis_file(db).versioned_file(db),
-                )
-                .load(db);
+                let module =
+                    parsed_module(db, self.body_scope(db).analysis_file(db).versioned_file(db))
+                        .load(db);
 
                 if let Some(arguments) = &class_def.node(&module).arguments {
                     let mut flags = transformer_params.flags(db);
@@ -986,7 +978,7 @@ impl<'db> StaticClassLiteral<'db> {
                 return Ok((SubclassOfType::subclass_of_unknown(), None));
             }
 
-            let module = parsed_module_versioned(
+            let module = parsed_module(
                 db,
                 class.body_scope(db).analysis_file(db).versioned_file(db),
             )
@@ -2146,8 +2138,8 @@ impl<'db> StaticClassLiteral<'db> {
                     .place
                     .ignore_possibly_undefined();
 
-                default_ty = default_ty
-                    .map(|ty| ty.apply_optional_specialization(db, program, specialization));
+                default_ty =
+                    default_ty.map(|ty| ty.apply_optional_specialization(db, specialization));
 
                 let mut init = true;
                 let mut kw_only = None;
@@ -2193,7 +2185,7 @@ impl<'db> StaticClassLiteral<'db> {
                 };
 
                 let mut field = Field {
-                    declared_ty: attr_ty.apply_optional_specialization(db, program, specialization),
+                    declared_ty: attr_ty.apply_optional_specialization(db, specialization),
                     kind,
                     first_declaration,
                 };
@@ -2316,7 +2308,7 @@ impl<'db> StaticClassLiteral<'db> {
         let mut is_attribute_bound = false;
         let mut provenance = Provenance::Unknown;
 
-        let module = parsed_module_versioned(db, analysis_file.versioned_file(db)).load(db);
+        let module = parsed_module(db, analysis_file.versioned_file(db)).load(db);
         let index = semantic_index(db, analysis_file);
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
@@ -2966,8 +2958,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// ```
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let class_scope = self.body_scope(db);
-        let module =
-            parsed_module_versioned(db, class_scope.analysis_file(db).versioned_file(db)).load(db);
+        let module = parsed_module(db, class_scope.analysis_file(db).versioned_file(db)).load(db);
         let class_node = self.node(db, &module);
         let class_name = &class_node.name;
         TextRange::new(
@@ -2983,8 +2974,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// Returns the range of the class's name
     pub(crate) fn focus_range(self, db: &'db dyn Db) -> TextRange {
         let class_scope = self.body_scope(db);
-        let module =
-            parsed_module_versioned(db, class_scope.analysis_file(db).versioned_file(db)).load(db);
+        let module = parsed_module(db, class_scope.analysis_file(db).versioned_file(db)).load(db);
         let class_node = self.node(db, &module);
         class_node.name.range()
     }
@@ -3269,7 +3259,7 @@ fn explicit_bases_cycle_initial<'db>(
     id: salsa::Id,
     literal: StaticClassLiteral<'db>,
 ) -> Box<[Type<'db>]> {
-    let module = parsed_module_versioned(
+    let module = parsed_module(
         db,
         literal.body_scope(db).analysis_file(db).versioned_file(db),
     )
@@ -3343,7 +3333,7 @@ fn implicit_attribute_cycle_recover<'db>(
     member: Member<'db>,
     attribute: ImplicitAttributeName<'db>,
 ) -> Member<'db> {
-    let program = attribute.class_body_scope(db).analysis_file(db).program(db);
+    let program = attribute.class_body_scope(db).program(db);
     let inner = member
         .inner
         .cycle_normalized(db, program, previous_member.inner, cycle);

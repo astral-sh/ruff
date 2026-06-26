@@ -13,7 +13,7 @@ pub use diagnostic::{
 pub use fixes::{fix_all_diagnostics, suppress_all_diagnostics};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module_versioned;
+use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
 use rustc_hash::FxHasher;
 pub use semantic_model::{
@@ -186,7 +186,7 @@ pub fn check_file(
         .to_diagnostic());
     }
 
-    let parsed = parsed_module_versioned(db, analysis_file.versioned_file(db));
+    let parsed = parsed_module(db, analysis_file.versioned_file(db));
 
     let parsed_ref = parsed.load(db);
     diagnostics.extend(

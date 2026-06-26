@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use itertools::Either;
 use ruff_db::diagnostic::Span;
-use ruff_db::parsed::parsed_module_versioned;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::NodeIndex;
 use ruff_python_ast::name::Name;
@@ -439,6 +439,7 @@ fn synthesize_typed_dict_get<'db>(
 
             let t_default = BoundTypeVarInstance::synthetic(
                 db,
+                program,
                 Name::new_static("T"),
                 TypeVarVariance::Covariant,
             );
@@ -452,7 +453,11 @@ fn synthesize_typed_dict_get<'db>(
                     .with_annotated_type(Type::TypeVar(t_default)),
             ];
             let get_with_default_sig = Signature::new_generic(
-                Some(GenericContext::from_typevar_instances(db, [t_default])),
+                Some(GenericContext::from_typevar_instances(
+                    db,
+                    program,
+                    [t_default],
+                )),
                 Parameters::new(db, get_with_default_sig_params),
                 if field.is_required() {
                     field.declared_ty
@@ -508,6 +513,7 @@ fn synthesize_typed_dict_get<'db>(
         .chain(std::iter::once({
             let t_default = BoundTypeVarInstance::synthetic(
                 db,
+                program,
                 Name::new_static("T"),
                 TypeVarVariance::Covariant,
             );
@@ -522,7 +528,11 @@ fn synthesize_typed_dict_get<'db>(
             ];
 
             Signature::new_generic(
-                Some(GenericContext::from_typevar_instances(db, [t_default])),
+                Some(GenericContext::from_typevar_instances(
+                    db,
+                    program,
+                    [t_default],
+                )),
                 Parameters::new(db, parameterss),
                 UnionType::from_two_elements(
                     db,
@@ -639,8 +649,12 @@ fn synthesize_typed_dict_pop<'db>(
             value_ty,
         );
 
-        let t_default =
-            BoundTypeVarInstance::synthetic(db, Name::new_static("T"), TypeVarVariance::Covariant);
+        let t_default = BoundTypeVarInstance::synthetic(
+            db,
+            program,
+            Name::new_static("T"),
+            TypeVarVariance::Covariant,
+        );
         let pop_with_default_parameters = [
             Parameter::positional_only(Some(Name::new_static("self")))
                 .with_annotated_type(instance_ty),
@@ -649,7 +663,11 @@ fn synthesize_typed_dict_pop<'db>(
                 .with_annotated_type(Type::TypeVar(t_default)),
         ];
         let pop_with_default_sig = Signature::new_generic(
-            Some(GenericContext::from_typevar_instances(db, [t_default])),
+            Some(GenericContext::from_typevar_instances(
+                db,
+                program,
+                [t_default],
+            )),
             Parameters::new(db, pop_with_default_parameters),
             UnionType::from_two_elements(db, program, value_ty, Type::TypeVar(t_default)),
         );
@@ -979,8 +997,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     /// Returns the range of the `TypedDict` call expression.
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let scope = self.scope(db);
-        let module =
-            parsed_module_versioned(db, scope.analysis_file(db).versioned_file(db)).load(db);
+        let module = parsed_module(db, scope.analysis_file(db).versioned_file(db)).load(db);
 
         match self.anchor(db) {
             DynamicTypedDictAnchor::Definition(definition) => {
@@ -1055,20 +1072,16 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     ///
     /// `TypedDict`s use `type` as their metaclass.
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        KnownClass::Type.to_class_literal(db, self.scope(db).analysis_file(db).program(db))
+        KnownClass::Type.to_class_literal(db, self.scope(db).program(db))
     }
 
     /// Look up a class-level member defined directly on this `TypedDict` (not inherited).
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
         let typed_dict =
             TypedDictType::new(ClassType::NonGeneric(ClassLiteral::DynamicTypedDict(self)));
-        synthesize_typed_dict_method(
-            db,
-            self.scope(db).analysis_file(db).program(db),
-            typed_dict,
-            name,
-            || TypedDictFields::Dynamic(self.items(db)),
-        )
+        synthesize_typed_dict_method(db, self.scope(db).program(db), typed_dict, name, || {
+            TypedDictFields::Dynamic(self.items(db))
+        })
         .map(Member::definitely_declared)
         .unwrap_or_default()
     }

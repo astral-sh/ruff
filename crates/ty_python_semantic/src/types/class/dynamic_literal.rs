@@ -1,4 +1,4 @@
-use ruff_db::{diagnostic::Span, parsed::parsed_module_versioned};
+use ruff_db::{diagnostic::Span, parsed::parsed_module};
 use ruff_python_ast::{self as ast, NodeIndex, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -204,8 +204,7 @@ impl<'db> DynamicClassLiteral<'db> {
         ) -> Box<[Type<'db>]> {
             let program = definition.analysis_file(db).program(db);
             let module =
-                parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db))
-                    .load(db);
+                parsed_module(db, definition.analysis_file(db).versioned_file(db)).load(db);
 
             let value = definition
                 .kind(db)
@@ -244,8 +243,7 @@ impl<'db> DynamicClassLiteral<'db> {
     /// Returns the range of the `type()` call expression that created this class.
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let scope = self.scope(db);
-        let module =
-            parsed_module_versioned(db, scope.analysis_file(db).versioned_file(db)).load(db);
+        let module = parsed_module(db, scope.analysis_file(db).versioned_file(db)).load(db);
 
         match self.anchor(db) {
             DynamicClassAnchor::Definition(definition) => {
@@ -381,7 +379,7 @@ impl<'db> DynamicClassLiteral<'db> {
 
     /// Look up an instance member by iterating through the MRO.
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
-        let program = self.scope(db).analysis_file(db).program(db);
+        let program = self.scope(db).program(db);
         match MroLookup::new(db, program, self.iter_mro(db)).instance_member(name) {
             InstanceMemberResult::Done(result) => result,
             InstanceMemberResult::TypedDict => {
@@ -404,7 +402,7 @@ impl<'db> DynamicClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        let program = self.scope(db).analysis_file(db).program(db);
+        let program = self.scope(db).program(db);
         // Check if this dynamic class is dataclass-like (via dataclass_transform inheritance).
         if matches!(
             CodeGeneratorKind::from_class(db, self.into()),

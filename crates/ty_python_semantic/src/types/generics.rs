@@ -333,6 +333,8 @@ impl<'db> InferableTypeVars<'db> {
 /// generic context can coexist without collapsing into each other.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct GenericContext<'db> {
+    pub(crate) program: Program<'db>,
+
     #[returns(ref)]
     variables_inner: FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>,
 }
@@ -359,11 +361,12 @@ impl<'db> GenericContext<'db> {
         binding_context: Definition<'db>,
         type_params_node: &ast::TypeParams,
     ) -> Self {
+        let program = binding_context.scope(db).program(db);
         let variables = type_params_node.iter().filter_map(|type_param| {
             Self::variable_from_type_param(db, index, binding_context, type_param)
         });
 
-        Self::from_typevar_instances(db, variables)
+        Self::from_typevar_instances(db, program, variables)
     }
 
     pub(crate) fn of_node(
@@ -397,12 +400,15 @@ impl<'db> GenericContext<'db> {
     /// Creates a generic context from a list of `BoundTypeVarInstance`s.
     pub(crate) fn from_typevar_instances(
         db: &'db dyn Db,
+        program: Program<'db>,
         type_params: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
     ) -> Self {
         Self::new_internal(
             db,
+            program,
             type_params
                 .into_iter()
+                .inspect(|variable| debug_assert_eq!(variable.program(db), program))
                 .map(|variable| (variable.identity(db), variable))
                 .collect::<FxOrderMap<_, _>>(),
         )
@@ -411,8 +417,11 @@ impl<'db> GenericContext<'db> {
     /// Merge this generic context with another, returning a new generic context that
     /// contains type variables from both contexts.
     pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
+        let program = self.program(db);
+        debug_assert_eq!(program, other.program(db));
         Self::from_typevar_instances(
             db,
+            program,
             self.variables_inner(db)
                 .values()
                 .chain(other.variables_inner(db).values())
@@ -439,6 +448,7 @@ impl<'db> GenericContext<'db> {
     ) -> Self {
         Self::from_typevar_instances(
             db,
+            self.program(db),
             self.variables(db).filter(|bound_typevar| {
                 !(bound_typevar.typevar(db).is_self(db)
                     && binding_context.is_none_or(|binding_context| {
@@ -460,11 +470,7 @@ impl<'db> GenericContext<'db> {
     /// In this example, `method`'s generic context binds `Self` and `T`, but its inferable set
     /// also includes `A@C`. This is needed because at each call site, we need to infer the
     /// specialized class instance type whose method is being invoked.
-    pub(crate) fn inferable_typevars(
-        self,
-        db: &'db dyn Db,
-        program: Program<'db>,
-    ) -> InferableTypeVars<'db> {
+    pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> InferableTypeVars<'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
             typevars: RefCell<FxOrderSet<BoundTypeVarIdentity<'db>>>,
@@ -497,14 +503,14 @@ impl<'db> GenericContext<'db> {
         }
 
         #[salsa::tracked(
-            cycle_initial=|_, _, _, _| InferableTypeVars::None,
+            cycle_initial=|_, _, _| InferableTypeVars::None,
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn inferable_typevars_inner<'db>(
             db: &'db dyn Db,
-            program: Program<'db>,
             generic_context: GenericContext<'db>,
         ) -> InferableTypeVars<'db> {
+            let program = generic_context.program(db);
             let visitor = CollectTypeVars::default();
             for bound_typevar in generic_context.variables(db) {
                 visitor.visit_bound_type_var_type(db, program, bound_typevar);
@@ -512,7 +518,7 @@ impl<'db> GenericContext<'db> {
             InferableTypeVars::from_typevars(db, visitor.typevars.into_inner())
         }
 
-        inferable_typevars_inner(db, program, self)
+        inferable_typevars_inner(db, self)
     }
 
     pub(crate) fn variables(
@@ -608,7 +614,7 @@ impl<'db> GenericContext<'db> {
         if variables.is_empty() {
             return None;
         }
-        Some(Self::from_typevar_instances(db, variables))
+        Some(Self::from_typevar_instances(db, program, variables))
     }
 
     pub(crate) fn merge_pep695_and_legacy(
@@ -649,7 +655,7 @@ impl<'db> GenericContext<'db> {
         if variables.is_empty() {
             return None;
         }
-        Some(Self::from_typevar_instances(db, variables))
+        Some(Self::from_typevar_instances(db, program, variables))
     }
 
     pub(crate) fn remove_callable_only_typevars(
@@ -728,6 +734,7 @@ impl<'db> GenericContext<'db> {
                         );
                         let generic_context = GenericContext::from_typevar_instances(
                             db,
+                            program,
                             typevar_replacements.values().copied(),
                         );
                         let signatures =
@@ -864,7 +871,11 @@ impl<'db> GenericContext<'db> {
         let generic_context = if kept_typevars.peek().is_none() {
             None
         } else {
-            Some(GenericContext::from_typevar_instances(db, kept_typevars))
+            Some(GenericContext::from_typevar_instances(
+                db,
+                program,
+                kept_typevars,
+            ))
         };
 
         (generic_context, return_type)
@@ -1079,7 +1090,7 @@ impl<'db> GenericContext<'db> {
                 continue;
             }
 
-            let Some(default) = typevar.default_type(db, program) else {
+            let Some(default) = typevar.default_type(db) else {
                 continue;
             };
 
@@ -2237,6 +2248,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             any_over_type(self.db, self.program, *ty, false, |nested| {
                 nested.as_typevar().is_some_and(|dependency| {
                     let dependency = dependency.identity(self.db);
+                    // Recursive specialization skips a typevar's own slot. Only references
+                    // through other mappings can recursively expand.
                     dependency != identity
                         && generic_context.contains(self.db, dependency)
                         && self.reaches_pending_typevar(
@@ -2261,7 +2274,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // Relationships across binding contexts can intentionally remap one generic context
             // onto another, as with constructor `self` annotations. Synthetic contexts do not
             // identify a single source-level binding, so they are not safe to project either.
-            target_context != BindingContext::Synthetic
+            !matches!(target_context, BindingContext::Synthetic(_))
                 && typevar.is_inferable(self.db, self.inferable)
                 && typevar.binding_context(self.db) == target_context
         })

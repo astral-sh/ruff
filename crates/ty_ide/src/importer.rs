@@ -926,7 +926,6 @@ mod tests {
     use crate::tests::{CursorTest, CursorTestBuilder, cursor_test};
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
     use ruff_db::files::{File, FileRootKind, system_path_to_file};
-    use ruff_db::parsed::parsed_module;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_db::{Db, system};

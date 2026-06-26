@@ -1,7 +1,7 @@
 use crate::environment::InferenceSettings;
 use crate::{Db, platform::PythonPlatform};
 
-use ruff_db::{files::File, parsed::VersionedFile, system::SystemPath};
+use ruff_db::{files::File, system::SystemPath};
 use ruff_python_ast::PythonVersion;
 use ty_module_resolver::{ProgramFile, ResolverProgram, SearchPaths};
 use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
@@ -79,10 +79,6 @@ impl<'db> Program<'db> {
 
     pub fn file(self, db: &'db dyn Db, file: File) -> ProgramFile<'db> {
         ProgramFile::new(db, self.resolver(db), file)
-    }
-
-    pub fn versioned_file(self, db: &'db dyn Db, file: File) -> VersionedFile<'db> {
-        VersionedFile::new(db, file, self.python_version(db))
     }
 
     /// Captures the settings needed to recreate this program against another database view.

@@ -5,7 +5,7 @@ use std::ops::{Deref, DerefMut};
 use bitflags::bitflags;
 use ordermap::OrderSet;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
-use ruff_db::parsed::parsed_module_versioned;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::Arguments;
 use ruff_python_ast::{self as ast, AnyNodeRef, StmtClassDef, name::Name};
 use ruff_text_size::Ranged;
@@ -262,8 +262,7 @@ impl<'db> TypedDictType<'db> {
 
             let class_definition = static_class.definition(db);
             let module =
-                parsed_module_versioned(db, class_definition.analysis_file(db).versioned_file(db))
-                    .load(db);
+                parsed_module(db, class_definition.analysis_file(db).versioned_file(db)).load(db);
             let class_stmt = class_definition
                 .kind(db)
                 .as_class()
@@ -274,9 +273,7 @@ impl<'db> TypedDictType<'db> {
                 if let Some(extra_items) = arguments.find_keyword("extra_items") {
                     let annotation =
                         definition_expression_annotation(db, class_definition, &extra_items.value)
-                            .map_type(|ty| {
-                                ty.apply_optional_specialization(db, program, specialization)
-                            });
+                            .map_type(|ty| ty.apply_optional_specialization(db, specialization));
                     return TypedDictOpenness::extra(
                         db,
                         annotation.inner_type(),
@@ -295,7 +292,7 @@ impl<'db> TypedDictType<'db> {
             }
 
             for base in static_class.explicit_bases(db) {
-                let base = base.apply_optional_specialization(db, program, specialization);
+                let base = base.apply_optional_specialization(db, specialization);
                 let base_class = match base {
                     Type::ClassLiteral(base) => ClassType::NonGeneric(base),
                     Type::GenericAlias(base) => ClassType::Generic(base),
@@ -1314,8 +1311,7 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
     definition: Definition<'db>,
 ) -> TypedDictSchema<'db> {
     let program = definition.analysis_file(db).program(db);
-    let module =
-        parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db);
+    let module = parsed_module(db, definition.analysis_file(db).versioned_file(db)).load(db);
     let node = definition
         .kind(db)
         .value(&module)
@@ -1377,8 +1373,7 @@ pub(super) fn deferred_functional_typed_dict_openness<'db>(
     definition: Definition<'db>,
 ) -> TypedDictOpenness<'db> {
     let program = definition.analysis_file(db).program(db);
-    let module =
-        parsed_module_versioned(db, definition.analysis_file(db).versioned_file(db)).load(db);
+    let module = parsed_module(db, definition.analysis_file(db).versioned_file(db)).load(db);
     let node = definition
         .kind(db)
         .value(&module)
@@ -1609,8 +1604,7 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
         if let Some(declaration) = item.first_declaration() {
             let file = declaration.file(db);
             let module =
-                parsed_module_versioned(db, declaration.analysis_file(db).versioned_file(db))
-                    .load(db);
+                parsed_module(db, declaration.analysis_file(db).versioned_file(db)).load(db);
 
             let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Item declaration");
             sub.annotate(
