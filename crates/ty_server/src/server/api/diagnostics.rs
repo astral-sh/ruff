@@ -12,7 +12,9 @@ use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
 use ty_ide::{Hint, hints};
 
-use ruff_db::diagnostic::{Annotation, DisplayDiagnosticConfig, Severity, SubDiagnostic};
+use ruff_db::diagnostic::{
+    Annotation, DisplayDiagnosticConfig, HyperlinkMode, Severity, SubDiagnostic,
+};
 use ruff_db::files::{File, FileRange};
 use ruff_db::source::source_text;
 use ruff_db::system::SystemPathBuf;
@@ -668,7 +670,14 @@ impl DiagnosticData {
                 rendered: diagnostic
                     .display(
                         &(db as &dyn ruff_db::Db),
-                        &DisplayDiagnosticConfig::new("ty").color(false),
+                        &DisplayDiagnosticConfig::new("ty")
+                            .color(true)
+                            // The styled renderer can enable OSC-8 hyperlinks based on the process
+                            // environment, even though this output is sent over LSP rather than to a
+                            // terminal. The ANSI parser used by ty-vscode does not strip OSC-8
+                            // sequences, so their escape codes would appear in the virtual diagnostic
+                            // document.
+                            .hyperlinks(HyperlinkMode::Never),
                     )
                     .to_string(),
                 diagnostic_id: diagnostic.id().to_string(),

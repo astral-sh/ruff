@@ -258,7 +258,7 @@ impl ResolvedClientCapabilities {
         if client_capabilities
             .experimental
             .as_ref()
-            // Protocol: crates/ty_server/README.md#full-diagnostic-output
+            // Protocol: https://docs.astral.sh/ty/features/language-server/#full-diagnostic-output
             .and_then(|experimental| experimental.get("fullDiagnosticOutput"))
             .and_then(serde_json::Value::as_bool)
             .unwrap_or_default()
