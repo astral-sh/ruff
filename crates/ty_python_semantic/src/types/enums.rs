@@ -1159,7 +1159,7 @@ pub(crate) fn enum_metadata<'db>(
             let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
 
             if !explicit_member_wrapper
-                && declarations.clone().any_reachable(db, |declaration| {
+                && declarations.any_reachable(db, |declaration| {
                     declaration.is_defined_and(|declaration| {
                         !matches!(
                             declaration.kind(db),
