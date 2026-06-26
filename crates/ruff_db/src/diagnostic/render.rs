@@ -2,11 +2,11 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use full::FullRenderer;
-use ruff_annotate_snippets::{
+use annotate_snippets::{
     Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
     Snippet as AnnotateSnippet,
 };
+use full::FullRenderer;
 use ruff_notebook::{Notebook, NotebookIndex};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextLen, TextRange, TextSize};

@@ -4,7 +4,7 @@ use std::{borrow::Cow, path::Path, sync::Arc};
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_source_file::{LineColumn, SourceCode, SourceFile};
 
-use ruff_annotate_snippets::Level as AnnotateLevel;
+use annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 #[cfg(feature = "serde")]
 use serde::Serialize;

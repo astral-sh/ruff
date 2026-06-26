@@ -2,9 +2,9 @@ use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::{Formatter, Write};
 
+use annotate_snippets::{Level, Renderer, Snippet};
 use datatest_stable::Utf8Path;
 use itertools::Itertools;
-use ruff_annotate_snippets::{Level, Renderer, Snippet};
 use ruff_python_ast::token::{Token, Tokens};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_module};
