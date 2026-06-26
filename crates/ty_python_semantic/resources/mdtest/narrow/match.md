@@ -1167,14 +1167,29 @@ class GenericOverlapB(Generic[OverlapT]):
 class GenericOverlapC(GenericOverlapB[str], GenericOverlapA):
     member: str
 
+class GenericListOverlapA: ...
+
+class GenericListOverlapB(Generic[OverlapT]):
+    values: list[OverlapT]
+
+class GenericListOverlapC(GenericListOverlapA, GenericListOverlapB[int]): ...
+
 def test_match_generic_class_capture_preserves_possible_multiple_inheritance(
     value: GenericOverlapA,
 ) -> None:
     match value:
         case GenericOverlapB(member=str() as item):
-            reveal_type(item)  # revealed: str
+            reveal_type(item)  # revealed: Unknown & str
             reveal_type(value)  # revealed: GenericOverlapA & Top[GenericOverlapB[Unknown]]
             1 + "x"  # error: [unsupported-operator]
+
+def test_match_generic_container_member_preserves_unknown_specialization(
+    value: GenericListOverlapA,
+) -> None:
+    match value:
+        case GenericListOverlapB(values=items):
+            for item in items:
+                reveal_type(item)  # revealed: Unknown
 ```
 
 ## Class pattern captures from `Any` and `Unknown`

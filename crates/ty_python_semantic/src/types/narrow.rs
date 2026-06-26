@@ -1547,12 +1547,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                             .or(default_pattern_member_ty)
                             .unwrap_or_else(Type::unknown),
                     );
-                } else if let Some(pattern_member_ty) = context
-                    .class_ty
-                    .member(self.db, name.as_str())
-                    .place
-                    .ignore_possibly_undefined()
-                {
+                } else if let Some(pattern_member_ty) = default_pattern_member_ty {
                     // Unrelated classes can overlap through multiple inheritance, so retain the
                     // generic pattern class's member as a possible runtime value.
                     member_ty = Some(UnionType::from_elements(
