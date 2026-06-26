@@ -266,6 +266,10 @@ pub(crate) fn check_noqa(
         );
     }
 
+    if context.is_rule_enabled(Rule::NoqaComment) && !exemption.enumerates(Rule::NoqaComment) {
+        ruff::rules::noqa_comment(context, &file_noqa_directives, &noqa_directives);
+    }
+
     ignored_diagnostics.sort_unstable();
     ignored_diagnostics
 }
