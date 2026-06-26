@@ -118,11 +118,10 @@ Testing focus:
 
 Completed details:
 
-- Added unit tests in `constraints.rs` that render `Solutions` and compare solved-type results, avoiding graph-shape assertions.
-- Added lower-bound union coverage with `int` then `str` source order and reversed BDD variable order from pre-interning.
-- Added upper-bound intersection coverage with `Iterable` then `Awaitable` source order and reversed BDD variable order from pre-interning.
-- Added a redundant uncertain-wrapper test (`n ? never : U-lower-str : never`) to verify that solved types are unaffected when a future local reduction drops the wrapper node.
-- Added mutually constrained typevar coverage for `T = U` and `U ≤ int`, with reversed pre-interning to exercise typevar/constraint ordering and sequent-derived relationships.
+- Initially added implementation-level unit tests that compared rendered `Solutions` across different BDD pre-interning orders. PR review established that user-visible mdtests are preferable to tests coupled to constraint-set construction details, so those unit tests and their scaffolding were removed.
+- Existing generic-function mdtests cover stable lower-bound union ordering and constrained-TypeVar relationships.
+- Added a generic-function mdtest showing that upper-bound-only inference constructs intersections in call-site order.
+- Deliberately dropped direct coverage of redundant uncertain wrappers and reversed BDD pre-interning; those are internal graph-shape details rather than user-visible behavior.
 
 Validation:
 
@@ -158,9 +157,9 @@ Implementation completed:
 
 Tests/docs:
 
-- Added unit tests covering each local reduction rule.
+- Rule-by-rule `NodeId::with_uncertain` unit tests were initially added, then removed during PR review because they only checked basic helper behavior and internal graph shapes.
 - Existing graph-shape tests did not need expectation updates.
-- Re-ran the Phase 1 solved-type stability tests as part of the targeted `constraints` run.
+- User-visible solver effects are covered by generic-function and TypedDict mdtests.
 
 Validation:
 
@@ -176,7 +175,7 @@ Completed details:
 - Fixed this in `PathBounds::default_solve` instead of sandboxing callers. When a concrete path satisfies multiple declared constraints for a constrained TypeVar, the solver now scans all compatible declared constraints and picks a stable best match rather than depending on semantically redundant BDD paths to provide one exact constraint.
 - Ecosystem analysis showed that first-compatible declaration order was not enough: broad constraints can appear before narrow ones (`str | bytes` before `str`, `CryptoAsset` before `EvmToken`, `Index[Any]` before `IndexHierarchy`). The current best-match rule prefers the most specific compatible constraint when there is explicit lower-bound evidence, prefers the most general compatible constraint for upper-bound-only evidence, and preserves declaration order for equivalent or incomparable candidates.
 - Preserved TypeVar-to-TypeVar relationships: if either explicit bound for a constrained-TypeVar path is itself a TypeVar, the solver first verifies that at least one declared constraint is compatible and then solves to that TypeVar instead of replacing the relationship with an arbitrary concrete constraint.
-- Added focused unit tests for ambiguous constrained-TypeVar solving, including stability across TypeVar constraint order, broad-before-narrow union constraints, and upper-bound-only solving.
+- Covered ambiguous constrained-TypeVar solving through user-visible mdtests instead of direct `PathBounds::default_solve` unit tests. Existing mdtests cover exact-match selection and TypeVar-to-TypeVar relationships; new sections cover broad-before-narrow union constraints and upper-bound-only solving, both in either declaration order.
 - Removed the temporary `GenericContextSpecializationBuilder::common_typed_dict_protocol_constraints` throwaway-builder workaround; `generics.rs` has no remaining change for this feature.
 - Updated the `typed_dict.md` expectation for `get_value(ValueA | ValueB)` to reveal `int` while still rejecting `str`, matching the best-compatible constrained-TypeVar choice.
 

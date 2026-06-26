@@ -391,6 +391,31 @@ reveal_type(two_params("a", "b"))  # revealed: Literal["a", "b"]
 reveal_type(two_params("a", 1))  # revealed: Literal["a", 1]
 ```
 
+## Upper-bound inference preserves intersection order
+
+When a typevar occurs contravariantly, argument matching can provide only upper bounds for its
+solution. Multiple upper bounds are intersected in the order in which they occur at the call site.
+
+```py
+from typing import Callable, Protocol, TypeVar
+
+class P(Protocol):
+    def p(self) -> None: ...
+
+class Q(Protocol):
+    def q(self) -> None: ...
+
+T = TypeVar("T")
+
+def accepts_p(value: P) -> None: ...
+def accepts_q(value: Q) -> None: ...
+def infer_from_callbacks(first: Callable[[T], None], second: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+reveal_type(infer_from_callbacks(accepts_p, accepts_q))  # revealed: P & Q
+reveal_type(infer_from_callbacks(accepts_q, accepts_p))  # revealed: Q & P
+```
+
 ## Recursive generic calls
 
 Recursive occurrences of a generic function should be treated as fresh generic callable occurrences.
@@ -906,6 +931,51 @@ reveal_type(x)  # revealed: list[Sub]
 
 y: list[Sub] = f2(Sub())
 reveal_type(y)  # revealed: list[Sub]
+```
+
+## Prefer specific compatible constraints over union constraints
+
+When multiple declared constraints are compatible with a lower bound, we prefer the most specific
+one. This does not depend on the order in which the constraints were declared.
+
+```py
+from typing import TypeVar
+
+BroadFirst = TypeVar("BroadFirst", str | bytes, str, bytes)
+NarrowFirst = TypeVar("NarrowFirst", str, bytes, str | bytes)
+
+def broad_first(value: BroadFirst) -> BroadFirst:
+    return value
+
+def narrow_first(value: NarrowFirst) -> NarrowFirst:
+    return value
+
+def check(value: str) -> None:
+    reveal_type(broad_first(value))  # revealed: str
+    reveal_type(narrow_first(value))  # revealed: str
+```
+
+## Prefer general constraints for upper-bound-only inference
+
+When inference provides only an upper bound, we prefer the most general compatible declared
+constraint. This also does not depend on declaration order.
+
+```py
+from typing import Callable, TypeVar
+
+NarrowFirst = TypeVar("NarrowFirst", int, object)
+BroadFirst = TypeVar("BroadFirst", object, int)
+
+def narrow_first(callback: Callable[[NarrowFirst], None]) -> NarrowFirst:
+    raise NotImplementedError
+
+def broad_first(callback: Callable[[BroadFirst], None]) -> BroadFirst:
+    raise NotImplementedError
+
+def accepts_object(value: object) -> None: ...
+
+reveal_type(narrow_first(accepts_object))  # revealed: object
+reveal_type(broad_first(accepts_object))  # revealed: object
 ```
 
 ## Bounded TypeVar with callable parameter
