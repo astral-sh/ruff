@@ -40,14 +40,16 @@ MedCare (C#) ──Roslyn harvester (.NET)──► triples.ndjson ──ruff_cs
 dotnet run --project crates/ruff_csharp_spo/harvester/CSharpSpoHarvester.csproj \
   -- /path/to/MedCare triples.ndjson
 
-# 2. Load + validate from Rust:
-#    ruff_csharp_spo::load(&fs::read_to_string("triples.ndjson")?)?
-#    ruff_csharp_spo::unknown_predicates(&triples)  // must be empty
+# 2. Load + validate from Rust (the load IS the validation):
+#    let triples = ruff_csharp_spo::load(&fs::read_to_string("triples.ndjson")?)?;
 ```
 
-`load` rejects malformed lines; `unknown_predicates` names any predicate
-outside the closed `ruff_spo_triplet::Predicate` vocabulary — a harvester bug
-must surface there, never as silent drift into the store.
+`load` (a thin wrapper over `ruff_spo_triplet::from_ndjson`) rejects malformed
+lines **and** any predicate outside the closed `ruff_spo_triplet::Predicate`
+vocabulary, returning a `ParseError` that names the line and offending
+predicate. A harvester bug therefore surfaces as a hard error at load time,
+never as silent drift into the store — so a clean `Ok(_)` is itself the schema
+guarantee, with no separate post-load check to run.
 
 ## Predicate mapping (scaffold)
 
@@ -83,8 +85,9 @@ toward data shape (`db_*.cs` class → collection, field → column) and
 form→route, rather than the deep virtual-override graph `ruff_cpp_spo` harvests
 from Tesseract. Any predicate not yet in `ruff_spo_triplet::Predicate` is a
 deliberate ontology addition there first (a new enum variant + `as_str` /
-`from_str` arm), then emitted here — `unknown_predicates` is the gate that
-forces that order.
+`from_str` arm), then emitted here — `load` is the gate that forces that
+order: emit a predicate before adding it to the vocabulary and the next load
+fails with a `ParseError` naming it.
 
 ## Provenance / non-vendoring
 
