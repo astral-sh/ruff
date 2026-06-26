@@ -694,6 +694,26 @@ class Child(Base):
     GITHUB = "github"  # error: [invalid-assignment]
 ```
 
+### Inherited `__new_member__`
+
+An inherited `__new_member__` takes precedence over the default enum constructor and can replace the
+member value:
+
+```py
+from enum import Enum
+
+class Base(Enum):
+    def __new_member__(cls: type["Base"], value: int) -> "Base":
+        obj = object.__new__(cls)
+        obj._value_ = str(value)
+        return obj
+
+class Child(Base):
+    VALUE = 1
+
+reveal_type(Child.VALUE.value)  # revealed: Any
+```
+
 ### Data-type mixin `__new__`
 
 A user-defined `__new__` on a data-type mixin constructs the scalar payload and can transform the

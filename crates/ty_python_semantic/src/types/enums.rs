@@ -872,7 +872,10 @@ pub(crate) fn enum_metadata<'db>(
     let init = resolve_enum_method(user_defined_init, || {
         inherited_known_enum_method(db, class, "__init__")
     });
+    // CPython checks an inherited `__new_member__` before falling back to `__new__` or the
+    // data-type constructor.
     let user_defined_new = custom_enum_method(db, scope_id, "__new__")
+        .or_else(|| inherited_user_defined_enum_method(db, class, "__new_member__"))
         .or_else(|| inherited_user_defined_enum_method(db, class, "__new__"))
         .or_else(|| inherited_user_defined_mixin_new(db, class));
     let new = resolve_enum_method(user_defined_new, || {
