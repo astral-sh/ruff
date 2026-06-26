@@ -982,8 +982,7 @@ reveal_type(broad_first(accepts_object))  # revealed: object
 
 A gradual argument alone provides no evidence for choosing between multiple compatible constraints.
 We currently fall back to `Unknown` rather than choosing an arbitrary concrete constraint. Ideally,
-we would preserve `Any` instead. Other static arguments can still provide enough evidence to choose
-a constraint.
+we would preserve `Any` instead.
 
 ```py
 from typing import Any, TypeVar
@@ -999,7 +998,13 @@ def choose(left: T, right: T) -> T:
 def caller(value: Any) -> None:
     # TODO: revealed: Any
     reveal_type(identity(value))  # revealed: Unknown
+    # TODO: revealed: Any
     reveal_type(choose(value, 1))  # revealed: int
+
+def list_caller(value: list[Any]) -> None:
+    reveal_type(identity(value))  # revealed: int | list[int]
+    reveal_type(choose(value, 1))  # revealed: int | list[int]
+    reveal_type(choose(value, [1]))  # revealed: int | list[int]
 ```
 
 ## Ambiguous constrained TypeVar inference from a gradual callable return
