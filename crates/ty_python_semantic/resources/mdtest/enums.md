@@ -825,6 +825,20 @@ reveal_type(InheritedValues.FALSE.value)  # revealed: Literal[0]
 reveal_type(enum_members(InheritedValues))
 ```
 
+When a built-in conversion cannot be modeled precisely, its aliases remain unknown:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+class ParsedIntegerValues(int, Enum):
+    FIRST = "1"
+    SECOND = "1"
+
+reveal_type(ParsedIntegerValues.FIRST is ParsedIntegerValues.SECOND)  # revealed: bool
+reveal_type(enum_members(ParsedIntegerValues))  # revealed: Unknown
+```
+
 Other built-in data types retain exact assigned values when no coercion is needed:
 
 ```py

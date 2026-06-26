@@ -1156,8 +1156,10 @@ pub(crate) fn enum_metadata<'db>(
                         _ => None,
                     });
 
-            let data_type_aliases_may_be_unknown = value_construction.data_type_is_opaque
-                || value_construction.exact_data_type.is_some();
+            let data_type_aliases_may_be_unknown =
+                value_construction.known_data_type_mixin.is_some()
+                    || value_construction.data_type_is_opaque
+                    || value_construction.exact_data_type.is_some();
             match value_construction
                 .alias_detection_value(db, value_ty, auto_members.contains(name))
                 .and_then(|alias_value_ty| {
