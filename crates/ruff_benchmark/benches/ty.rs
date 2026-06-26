@@ -1569,6 +1569,7 @@ struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
     max_diagnostics: usize,
+    freeze_inputs: bool,
 }
 
 impl<'a> ProjectBenchmark<'a> {
@@ -1582,7 +1583,13 @@ impl<'a> ProjectBenchmark<'a> {
             project: setup_project,
             fs,
             max_diagnostics,
+            freeze_inputs: false,
         }
+    }
+
+    fn freeze_inputs(mut self) -> Self {
+        self.freeze_inputs = true;
+        self
     }
 
     fn setup_iteration(&self) -> ProjectDatabase {
@@ -1611,12 +1618,25 @@ impl<'a> ProjectBenchmark<'a> {
                 .collect(),
         );
 
+        if self.freeze_inputs {
+            db.freeze();
+        }
+
         db
     }
 }
 
 #[track_caller]
 fn bench_project(benchmark: &ProjectBenchmark, criterion: &mut Criterion) {
+    bench_project_named(benchmark, criterion, benchmark.project.config.name);
+}
+
+#[track_caller]
+fn bench_project_named(
+    benchmark: &ProjectBenchmark,
+    criterion: &mut Criterion,
+    benchmark_name: &str,
+) {
     fn check_project(db: &mut ProjectDatabase, project_name: &str, max_diagnostics: usize) {
         let result = db.check();
         let diagnostics = result.len();
@@ -1638,10 +1658,10 @@ fn bench_project(benchmark: &ProjectBenchmark, criterion: &mut Criterion) {
 
     let mut group = criterion.benchmark_group("project");
     group.sampling_mode(criterion::SamplingMode::Flat);
-    group.bench_function(benchmark.project.config.name, |b| {
+    group.bench_function(benchmark_name, |b| {
         b.iter_batched_ref(
             || benchmark.setup_iteration(),
-            |db| check_project(db, benchmark.project.config.name, benchmark.max_diagnostics),
+            |db| check_project(db, benchmark_name, benchmark.max_diagnostics),
             BatchSize::SmallInput,
         );
     });
@@ -1713,6 +1733,10 @@ fn datetype(criterion: &mut Criterion) {
     );
 
     bench_project(&benchmark, criterion);
+
+    // Keep one cheap real-world benchmark frozen to catch regressions from newly added inputs.
+    let frozen_benchmark = benchmark.freeze_inputs();
+    bench_project_named(&frozen_benchmark, criterion, "DateType (frozen inputs)");
 }
 
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);
