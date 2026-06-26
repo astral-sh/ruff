@@ -84,18 +84,9 @@ impl Token {
 
     /// Returns true if the current token is a string and it is raw.
     pub fn string_flags(self) -> Option<AnyStringFlags> {
-        if self.is_any_string() {
-            Some(self.kind_and_flags().1.as_any_string_flags())
-        } else {
-            None
-        }
-    }
-
-    /// Returns `true` if this is any kind of string token - including
-    /// tokens in t-strings (which do not have type `str`).
-    const fn is_any_string(self) -> bool {
-        matches!(
-            self.kind(),
+        let (kind, flags) = self.kind_and_flags();
+        if matches!(
+            kind,
             TokenKind::String
                 | TokenKind::FStringStart
                 | TokenKind::FStringMiddle
@@ -103,17 +94,13 @@ impl Token {
                 | TokenKind::TStringStart
                 | TokenKind::TStringMiddle
                 | TokenKind::TStringEnd
-        )
+        ) {
+            Some(flags.as_any_string_flags())
+        } else {
+            None
+        }
     }
-}
 
-impl Ranged for Token {
-    fn range(&self) -> TextRange {
-        self.range()
-    }
-}
-
-impl Token {
     const fn range(&self) -> TextRange {
         TextRange::new(
             TextSize::new(u32::from_ne_bytes(self.start)),
@@ -127,10 +114,14 @@ impl Token {
     const INTERPOLATED_STRING_START: u8 = Self::STRING_START + 7 * 8;
     const UNCLOSED_NEWLINE: u8 = Self::INTERPOLATED_STRING_START + 6 * 12;
     const UNCLOSED_NON_LOGICAL_NEWLINE: u8 = Self::UNCLOSED_NEWLINE + 1;
-    const UNPREFIXED_INTERPOLATED_STRING_START: u8 = Self::UNCLOSED_NON_LOGICAL_NEWLINE + 1;
+    const UNCLOSED_UNKNOWN: u8 = Self::UNCLOSED_NON_LOGICAL_NEWLINE + 1;
+    const UNCLOSED_INTERPOLATED_STRING_START: u8 = Self::UNCLOSED_UNKNOWN + 1;
 
     /// Encodes flag-free kinds directly, followed by compact ranges for each valid flagged kind.
     fn encode_kind_and_flags(kind: TokenKind, flags: TokenFlags) -> u8 {
+        if flags.is_empty() {
+            return kind as u8;
+        }
         if kind == TokenKind::Name && flags == TokenFlags::NON_ASCII_NAME {
             return Self::NON_ASCII_NAME;
         }
@@ -139,6 +130,9 @@ impl Token {
         }
         if kind == TokenKind::NonLogicalNewline && flags == TokenFlags::UNCLOSED_STRING {
             return Self::UNCLOSED_NON_LOGICAL_NEWLINE;
+        }
+        if kind == TokenKind::Unknown && flags == TokenFlags::UNCLOSED_STRING {
+            return Self::UNCLOSED_UNKNOWN;
         }
 
         if kind == TokenKind::String {
@@ -166,10 +160,8 @@ impl Token {
             _ => None,
         };
         if let Some(phase) = phase {
-            if flags.is_empty() || flags == TokenFlags::UNCLOSED_STRING {
-                return Self::UNPREFIXED_INTERPOLATED_STRING_START
-                    + phase * 2
-                    + u8::from(flags == TokenFlags::UNCLOSED_STRING);
+            if flags == TokenFlags::UNCLOSED_STRING {
+                return Self::UNCLOSED_INTERPOLATED_STRING_START + phase;
             }
             let prefix = match flags.prefix() {
                 AnyStringPrefix::Format(FStringPrefix::Regular)
@@ -192,6 +184,18 @@ impl Token {
 
         debug_assert!(flags.is_empty(), "{kind:?} {flags:?}");
         kind as u8
+    }
+
+    const fn interpolated_string_kind(phase: u8) -> TokenKind {
+        match phase {
+            0 => TokenKind::FStringStart,
+            1 => TokenKind::FStringMiddle,
+            2 => TokenKind::FStringEnd,
+            3 => TokenKind::TStringStart,
+            4 => TokenKind::TStringMiddle,
+            5 => TokenKind::TStringEnd,
+            _ => unreachable!(),
+        }
     }
 
     #[expect(
@@ -217,23 +221,14 @@ impl Token {
         if encoded == Self::UNCLOSED_NON_LOGICAL_NEWLINE {
             return (TokenKind::NonLogicalNewline, TokenFlags::UNCLOSED_STRING);
         }
-        if encoded >= Self::UNPREFIXED_INTERPOLATED_STRING_START {
-            let encoded = encoded - Self::UNPREFIXED_INTERPOLATED_STRING_START;
-            let kind = match encoded / 2 {
-                0 => TokenKind::FStringStart,
-                1 => TokenKind::FStringMiddle,
-                2 => TokenKind::FStringEnd,
-                3 => TokenKind::TStringStart,
-                4 => TokenKind::TStringMiddle,
-                5 => TokenKind::TStringEnd,
-                _ => unreachable!(),
-            };
-            let flags = if encoded.is_multiple_of(2) {
-                TokenFlags::empty()
-            } else {
-                TokenFlags::UNCLOSED_STRING
-            };
-            return (kind, flags);
+        if encoded == Self::UNCLOSED_UNKNOWN {
+            return (TokenKind::Unknown, TokenFlags::UNCLOSED_STRING);
+        }
+        if encoded >= Self::UNCLOSED_INTERPOLATED_STRING_START {
+            return (
+                Self::interpolated_string_kind(encoded - Self::UNCLOSED_INTERPOLATED_STRING_START),
+                TokenFlags::UNCLOSED_STRING,
+            );
         }
         if encoded < Self::INTERPOLATED_STRING_START {
             let encoded = encoded - Self::STRING_START;
@@ -257,15 +252,7 @@ impl Token {
         let phase = encoded / 12;
         let prefix = (encoded % 12) / 4;
         let status = encoded % 4;
-        let kind = match phase {
-            0 => TokenKind::FStringStart,
-            1 => TokenKind::FStringMiddle,
-            2 => TokenKind::FStringEnd,
-            3 => TokenKind::TStringStart,
-            4 => TokenKind::TStringMiddle,
-            5 => TokenKind::TStringEnd,
-            _ => unreachable!(),
-        };
+        let kind = Self::interpolated_string_kind(phase);
         let prefix = match (phase < 3, prefix) {
             (true, 0) => TokenFlags::F_STRING,
             (true, 1) => TokenFlags::F_STRING.union(TokenFlags::RAW_STRING_LOWERCASE),
@@ -276,6 +263,12 @@ impl Token {
             _ => unreachable!(),
         };
         (kind, TokenFlags::with_string_status(prefix, status))
+    }
+}
+
+impl Ranged for Token {
+    fn range(&self) -> TextRange {
+        self.range()
     }
 }
 
@@ -1093,6 +1086,7 @@ mod tests {
         assert_round_trip(TokenKind::Name, TokenFlags::NON_ASCII_NAME);
         assert_round_trip(TokenKind::Newline, TokenFlags::UNCLOSED_STRING);
         assert_round_trip(TokenKind::NonLogicalNewline, TokenFlags::UNCLOSED_STRING);
+        assert_round_trip(TokenKind::Unknown, TokenFlags::UNCLOSED_STRING);
 
         let string_prefixes = [
             TokenFlags::empty(),
@@ -1119,11 +1113,7 @@ mod tests {
                     TokenKind::FStringMiddle,
                     TokenKind::FStringEnd,
                 ],
-                [
-                    TokenFlags::F_STRING,
-                    TokenFlags::F_STRING.union(TokenFlags::RAW_STRING_LOWERCASE),
-                    TokenFlags::F_STRING.union(TokenFlags::RAW_STRING_UPPERCASE),
-                ],
+                TokenFlags::F_STRING,
             ),
             (
                 [
@@ -1131,20 +1121,20 @@ mod tests {
                     TokenKind::TStringMiddle,
                     TokenKind::TStringEnd,
                 ],
-                [
-                    TokenFlags::T_STRING,
-                    TokenFlags::T_STRING.union(TokenFlags::RAW_STRING_LOWERCASE),
-                    TokenFlags::T_STRING.union(TokenFlags::RAW_STRING_UPPERCASE),
-                ],
+                TokenFlags::T_STRING,
             ),
         ];
-        for (kinds, prefixes) in interpolated {
+        for (kinds, prefix) in interpolated {
             for kind in kinds {
-                for prefix in prefixes {
+                for raw in [
+                    TokenFlags::empty(),
+                    TokenFlags::RAW_STRING_LOWERCASE,
+                    TokenFlags::RAW_STRING_UPPERCASE,
+                ] {
                     for quote_status in 0..4 {
                         assert_round_trip(
                             kind,
-                            TokenFlags::with_string_status(prefix, quote_status),
+                            TokenFlags::with_string_status(prefix.union(raw), quote_status),
                         );
                     }
                 }
