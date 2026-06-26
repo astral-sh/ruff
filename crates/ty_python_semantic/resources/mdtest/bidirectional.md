@@ -798,7 +798,7 @@ type context of other arguments on a later iteration, making inference independe
 order.
 
 ```py
-from typing import Callable, Sequence, TypedDict, TypeVar
+from typing import Any, Callable, Literal, Sequence, TypedDict, TypeVar, overload
 
 def lst[T](x: T) -> list[T]:
     return [x]
@@ -848,6 +848,32 @@ def _(a: A):
     reveal_type(bare_first)  # revealed: A
     bare_second = bare_pair(a, {"a": 1, "b": 2})
     reveal_type(bare_second)  # revealed: A
+
+# A downstream generic `__init__` participates in the same fixpoint as the upstream `__new__`.
+# Its checked specialization must be retained so that it contributes to the constructed class's
+# inferred specialization.
+class GenericInitializer[T]:
+    def __new__(cls, *args: object) -> "GenericInitializer[T]":
+        return super().__new__(cls)
+
+    def __init__(self, value: T, values: list[T]) -> None:
+        pass
+
+initialized = GenericInitializer(1, [True])
+reveal_type(initialized)  # revealed: GenericInitializer[int]
+
+# An inactive downstream must also remain structurally present during speculative rounds because
+# the fixed argument-inference candidate table still contains it. It is pruned only after the
+# fixpoint has been committed.
+class InactiveInitializer:
+    def __new__[T](cls, value: T, values: list[T]) -> T:
+        return value
+
+    def __init__(self) -> None:
+        pass
+
+inactive = InactiveInitializer(1, [True])
+reveal_type(inactive)  # revealed: int
 
 # Covariance only guarantees assignability; it does not mean that contextual inference is stable.
 # Both callable parameter positions reverse variance, so `T` occurs covariantly in `callbacks`.
@@ -925,6 +951,24 @@ def non_generic(value: int) -> int:
 # error: [unresolved-reference]
 diagnostic_pair(non_generic(missing_argument), [1])
 diagnostic_pair(non_generic(suppressed_argument), [1])  # ty: ignore[unresolved-reference]
+
+# Every fixpoint round must infer against the complete set of overloads that matched before type
+# inference. Narrowing that set between rounds can leave no entry for an earlier overload's
+# declared type, causing its check to fall back to an unrelated contextual inference.
+FloatDtype = type[float] | Literal["float"]
+
+@overload
+def overloaded_call(data: Sequence[str], dtype: object) -> str: ...
+@overload
+def overloaded_call(data: list[Any], dtype: FloatDtype) -> float: ...
+@overload
+def overloaded_call[T](data: Sequence[T], dtype: Literal["generic"]) -> T: ...
+def overloaded_call(data: object, dtype: object) -> object:
+    return data
+
+def _(dtype: FloatDtype):
+    result = overloaded_call([1.0], dtype)
+    reveal_type(result)  # revealed: int | float
 ```
 
 Long reverse dependency chains can require more than two speculative iterations:

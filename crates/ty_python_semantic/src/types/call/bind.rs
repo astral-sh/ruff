@@ -218,6 +218,28 @@ impl<'db> CallableItem<'db> {
         }
     }
 
+    /// Checks this callable while preserving every callable that can contribute argument context
+    /// during generic-call fixpoint inference.
+    fn check_types_for_argument_inference(
+        &mut self,
+        db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
+        argument_types: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) {
+        match self {
+            CallableItem::Regular(binding) => {
+                binding.check_types(db, constraints, argument_types, call_expression_tcx);
+            }
+            CallableItem::Constructor(binding) => binding.check_types_for_argument_inference(
+                db,
+                constraints,
+                argument_types,
+                call_expression_tcx,
+            ),
+        }
+    }
+
     fn match_parameters(&mut self, db: &'db dyn Db, arguments: &CallArguments<'_, 'db>) {
         match self {
             CallableItem::Regular(binding) => binding.match_parameters(db, arguments),
@@ -475,6 +497,16 @@ pub(crate) struct Bindings<'db> {
     /// `None` means the caller did not provide lexical collision information. `Some([])` means the
     /// caller knows there are no enclosing binding contexts.
     enclosing_binding_contexts: Option<Box<[BindingContext<'db>]>>,
+}
+
+/// The overload indexes that matched parameter shape before argument type inference.
+///
+/// Generic-call fixpoint inference keeps this candidate set stable while each candidate's
+/// specialization evolves between rounds. This ensures that every fresh type check can retrieve
+/// an argument type inferred for its own declared parameter type.
+#[derive(Debug)]
+pub(crate) struct CallArgumentInferenceCandidates {
+    overload_indices: SmallVec<[SmallVec<[usize; 1]>; 1]>,
 }
 
 impl<'db> Bindings<'db> {
@@ -790,25 +822,69 @@ impl<'db> Bindings<'db> {
         }
     }
 
+    /// Visits the overloads that matched parameter shape before argument type inference.
+    ///
+    /// `self` may contain specializations inferred by a later fixpoint round, but it must retain
+    /// the same callable structure as the bindings from which `candidates` was created.
+    pub(crate) fn visit_call_argument_inference_candidates<'a>(
+        &'a self,
+        candidates: &'a CallArgumentInferenceCandidates,
+        visit: &mut impl FnMut(&'a Binding<'db>, &'a CallableBinding<'db>),
+    ) {
+        let mut candidate_indices = candidates.overload_indices.iter();
+        self.visit_type_context_callables(&mut |binding| {
+            let Some(indices) = candidate_indices.next() else {
+                debug_assert!(false, "checked bindings added an inference candidate");
+                return;
+            };
+
+            if indices.is_empty() {
+                // Preserve the existing single-signature fallback used to infer arguments for
+                // better diagnostics when parameter matching itself failed.
+                if let [overload] = binding.overloads() {
+                    visit(overload, binding);
+                }
+            } else {
+                for &index in indices {
+                    visit(&binding.overloads()[index], binding);
+                }
+            }
+        });
+        let remaining_candidates = candidate_indices.next();
+        debug_assert!(remaining_candidates.is_none());
+    }
+
     /// Returns whether any overload is generic, the source arguments whose type context can change
-    /// when that generic call is specialized, and the maximum number of inferable type-variable
-    /// occurrences in any one matching overload's parameter contexts.
+    /// when that generic call is specialized, the maximum number of inferable type-variable
+    /// occurrences in any one matching overload's parameter contexts, and the fixed overload
+    /// candidates for argument inference.
     pub(crate) fn generic_context_arguments(
         &self,
         db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
-    ) -> (bool, SmallVec<[usize; 4]>, usize) {
+    ) -> (
+        bool,
+        SmallVec<[usize; 4]>,
+        usize,
+        CallArgumentInferenceCandidates,
+    ) {
         let mut generic_arguments = SmallVec::<[bool; 8]>::with_capacity(arguments.len());
         generic_arguments.resize(arguments.len(), false);
         let mut has_generic_context = false;
         let mut max_typevar_occurrences = 0;
+        let mut candidate_overload_indices = SmallVec::new();
 
         self.visit_type_context_callables(&mut |binding| {
             has_generic_context |= binding
                 .overloads()
                 .iter()
                 .any(|overload| overload.signature.generic_context.is_some());
-            for (_, overload) in binding.matching_overloads() {
+            let matching_overload_indices: SmallVec<[usize; 1]> = binding
+                .matching_overloads()
+                .map(|(index, _)| index)
+                .collect();
+            for &overload_index in &matching_overload_indices {
+                let overload = &binding.overloads()[overload_index];
                 if overload.signature.generic_context.is_none() {
                     continue;
                 }
@@ -826,6 +902,7 @@ impl<'db> Bindings<'db> {
                 // compose, so the fixpoint bound only needs the deepest matching overload.
                 max_typevar_occurrences = max_typevar_occurrences.max(overload_typevar_occurrences);
             }
+            candidate_overload_indices.push(matching_overload_indices);
         });
 
         (
@@ -836,6 +913,9 @@ impl<'db> Bindings<'db> {
                 .filter_map(|(index, is_generic)| is_generic.then_some(index))
                 .collect(),
             max_typevar_occurrences,
+            CallArgumentInferenceCandidates {
+                overload_indices: candidate_overload_indices,
+            },
         )
     }
 
@@ -1100,6 +1180,59 @@ impl<'db> Bindings<'db> {
 
         // For intersection elements with at least one successful binding,
         // filter out the failing bindings after deferred constructor checks.
+        for element in &mut self.elements {
+            element.retain_successful(db);
+        }
+
+        self.as_result(db)
+    }
+
+    /// Checks every callable that can contribute argument context without pruning the callable
+    /// structure or conditionally discarding downstream constructors.
+    ///
+    /// Generic-call fixpoint inference uses this for speculative rounds so the overload candidate
+    /// set remains identical to the set captured before type inference.
+    pub(crate) fn check_types_for_argument_inference(
+        &mut self,
+        db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
+        call_arguments: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) {
+        for element in &mut self.elements {
+            for item in &mut element.items {
+                item.check_types_for_argument_inference(
+                    db,
+                    constraints,
+                    call_arguments,
+                    call_expression_tcx,
+                );
+            }
+        }
+    }
+
+    /// Applies the non-inference effects of [`Self::check_types_impl`] after a candidate-preserving
+    /// fixpoint check is committed.
+    pub(crate) fn finalize_argument_inference_check(
+        &mut self,
+        db: &'db dyn Db,
+        call_arguments: &CallArguments<'_, 'db>,
+        dataclass_field_specifiers: &[Type<'db>],
+    ) -> Result<(), CallErrorKind> {
+        self.evaluate_known_cases(db, call_arguments, dataclass_field_specifiers);
+
+        for constructor in self.iter_constructor_items_mut() {
+            if constructor.finalize_argument_inference_check(db)
+                && let Some(downstream) = constructor.downstream_constructor_mut()
+            {
+                let _ = downstream.finalize_argument_inference_check(
+                    db,
+                    call_arguments,
+                    dataclass_field_specifiers,
+                );
+            }
+        }
+
         for element in &mut self.elements {
             element.retain_successful(db);
         }
