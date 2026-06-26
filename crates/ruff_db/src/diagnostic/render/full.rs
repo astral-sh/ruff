@@ -3,7 +3,7 @@ use std::num::NonZeroUsize;
 
 use similar::{ChangeTag, DiffOp, TextDiff};
 
-use ruff_annotate_snippets::Renderer as AnnotateRenderer;
+use annotate_snippets::Renderer as AnnotateRenderer;
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;

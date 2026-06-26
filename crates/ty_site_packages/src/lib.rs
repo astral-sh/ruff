@@ -17,9 +17,9 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::{fmt, sync::Arc};
 
+use annotate_snippets::{Level, Renderer, Snippet};
 use camino::Utf8Component;
 use indexmap::IndexSet;
-use ruff_annotate_snippets::{Level, Renderer, Snippet};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
 use ruff_python_trivia::Cursor;
