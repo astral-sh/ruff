@@ -981,7 +981,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     return f.with_type(marker).write_str("Divergent");
                 }
                 let body = recursive
-                    .unfold(self.db)
+                    .body_with_origin_marker(self.db)
                     .recursive_type_normalized_impl(self.db, marker, false)
                     .unwrap_or(marker);
                 body.display_with(self.db, self.settings.with_recursive_type_binder(binder_id))

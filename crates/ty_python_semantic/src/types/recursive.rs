@@ -164,7 +164,23 @@ impl<'db> RecursiveType<'db> {
         self.binder(db).into_id()
     }
 
-    pub fn unfold(self, db: &'db dyn Db) -> Type<'db> {
+    /// Returns the body with recursive-position markers replaced by the source type when known.
+    ///
+    /// This is for finite views such as display. Structural type operations should use
+    /// [`map`](Self::map), which preserves recursive positions as this recursive type.
+    pub fn body_with_origin_marker(self, db: &'db dyn Db) -> Type<'db> {
+        let body = self.body(db);
+        let Some(replacement) = self.origin(db).source_type() else {
+            return body;
+        };
+        let mapping = TypeMapping::ReplaceDivergent {
+            binder_id: self.binder(db),
+            replacement,
+        };
+        body.apply_type_mapping(db, &mapping, TypeContext::default())
+    }
+
+    pub(crate) fn unfold(self, db: &'db dyn Db) -> Type<'db> {
         let body = self.body(db);
         let replacement = self.unfold_replacement(db);
         let mapping = TypeMapping::ReplaceDivergent {
