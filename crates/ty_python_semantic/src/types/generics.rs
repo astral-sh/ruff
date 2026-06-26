@@ -1916,6 +1916,8 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     inferable: InferableTypeVars<'db>,
     pending: ConstraintSet<'db, 'c>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
+    /// Whether all non-placeholder evidence seen for each constrained TypeVar is gradual.
+    typevar_evidence_is_gradual: FxHashMap<BoundTypeVarIdentity<'db>, bool>,
     paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
 }
 
@@ -1931,6 +1933,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             inferable,
             pending: ConstraintSet::from_bool(constraints, true),
             types: FxHashMap::default(),
+            typevar_evidence_is_gradual: FxHashMap::default(),
             paramspec_seen: FxHashSet::default(),
         }
     }
@@ -2000,7 +2003,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     return Ok(Some(ty));
                 }
 
-                PathBounds::default_solve(self.db, self.constraints, path_bound)
+                PathBounds::default_solve_with_ambiguity_fallback(
+                    self.db,
+                    self.constraints,
+                    path_bound,
+                    self.typevar_evidence_is_gradual
+                        .get(&typevar.identity(self.db))
+                        .copied()
+                        .unwrap_or(false),
+                )
             }) {
                 Solutions::Unsatisfiable | Solutions::Unconstrained => {
                     return self.solve_hash_map_with(generic_context, choose);
@@ -2278,6 +2289,21 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     .get_or_build(self.db)
                     .is_assignable_to(self.db, ty)
             })
+    }
+
+    fn record_constrained_typevar_evidence(
+        &mut self,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+    ) {
+        if ty.has_unspecialized_type_var(self.db) {
+            return;
+        }
+        let is_gradual = ty.bottom_materialization(self.db) != ty.top_materialization(self.db);
+        self.typevar_evidence_is_gradual
+            .entry(bound_typevar.identity(self.db))
+            .and_modify(|all_gradual| *all_gradual &= is_gradual)
+            .or_insert(is_gradual);
     }
 
     /// Add a type mapping for a bound typevar using the given variance to determine how the
@@ -2718,6 +2744,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // Prefer an exact match first.
                         for constraint in typevar_constraints.elements(self.db) {
                             if ty == *constraint {
+                                self.record_constrained_typevar_evidence(bound_typevar, ty);
                                 self.add_type_mapping(bound_typevar, ty, polarity);
                                 return Ok(());
                             }
@@ -2749,6 +2776,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                     )
                                 });
                             if all_satisfied {
+                                self.record_constrained_typevar_evidence(bound_typevar, ty);
                                 self.add_type_mapping(bound_typevar, ty, polarity);
                                 return Ok(());
                             }
@@ -2775,6 +2803,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             };
 
                             if is_satisfied {
+                                // Constraint-set solving can split gradual evidence into fully
+                                // static paths. Remember its origin so that an ambiguous path does
+                                // not choose an arbitrary concrete constraint later.
+                                self.record_constrained_typevar_evidence(bound_typevar, ty);
                                 self.add_type_mapping(bound_typevar, *constraint, polarity);
                                 return Ok(());
                             }

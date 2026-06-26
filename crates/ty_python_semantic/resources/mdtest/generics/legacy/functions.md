@@ -978,6 +978,30 @@ reveal_type(narrow_first(accepts_object))  # revealed: object
 reveal_type(broad_first(accepts_object))  # revealed: object
 ```
 
+## Ambiguous constrained TypeVar inference from `Any`
+
+A gradual argument alone provides no evidence for choosing between multiple compatible constraints.
+We currently fall back to `Unknown` rather than choosing an arbitrary concrete constraint. Ideally,
+we would preserve `Any` instead. Other static arguments can still provide enough evidence to choose
+a constraint.
+
+```py
+from typing import Any, TypeVar
+
+T = TypeVar("T", int, int | list[int])
+
+def identity(value: T) -> T:
+    return value
+
+def choose(left: T, right: T) -> T:
+    return left
+
+def caller(value: Any) -> None:
+    # TODO: revealed: Any
+    reveal_type(identity(value))  # revealed: Unknown
+    reveal_type(choose(value, 1))  # revealed: int
+```
+
 ## Bounded TypeVar with callable parameter
 
 When a bounded TypeVar appears in a `Callable` parameter's return type, the inferred type should be

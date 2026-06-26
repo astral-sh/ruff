@@ -3620,6 +3620,17 @@ impl<'db> PathBounds<'db> {
         builder: &ConstraintSetBuilder<'db>,
         path_bound: &PathBound<'db>,
     ) -> Result<Option<Type<'db>>, ()> {
+        Self::default_solve_with_ambiguity_fallback(db, builder, path_bound, false)
+    }
+
+    /// Applies the default solver, optionally leaving multiply-compatible constrained TypeVars
+    /// unsolved instead of selecting a best match.
+    pub(crate) fn default_solve_with_ambiguity_fallback(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        path_bound: &PathBound<'db>,
+        fallback_on_ambiguous_constraints: bool,
+    ) -> Result<Option<Type<'db>>, ()> {
         let bound_typevar = path_bound.bound_typevar;
         let lower = path_bound.lower_or_never();
         match bound_typevar.typevar(db).require_bound_or_constraints(db) {
@@ -3681,6 +3692,7 @@ impl<'db> PathBounds<'db> {
 
                 // Filter out the typevar constraints that aren't satisfied by this path.
                 let mut compatible_constraint = None;
+                let mut multiple_compatible_constraints = false;
                 for constraint in constraints.elements(db).iter().copied() {
                     let constraint_lower = constraint.bottom_materialization(db);
                     let constraint_upper = constraint.top_materialization(db);
@@ -3697,6 +3709,9 @@ impl<'db> PathBounds<'db> {
                         continue;
                     }
 
+                    if compatible_constraint.is_some() {
+                        multiple_compatible_constraints = true;
+                    }
                     if compatible_constraint.is_none_or(|best| is_better_solution(constraint, best))
                     {
                         compatible_constraint = Some(constraint);
@@ -3718,6 +3733,10 @@ impl<'db> PathBounds<'db> {
                     // concrete constraint here would break the relationship between `T` and `S`.
                     // Keep that relationship as the solution instead.
                     return Ok(Some(ty));
+                }
+
+                if fallback_on_ambiguous_constraints && multiple_compatible_constraints {
+                    return Ok(None);
                 }
 
                 // TODO: This is a stable half-punt. A constrained TypeVar must solve to exactly

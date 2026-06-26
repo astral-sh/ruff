@@ -171,13 +171,14 @@ Revision purpose: handle behavioral fallout exposed by Phase 3.
 
 Completed details:
 
-- A full `ty_python_semantic` test run exposed one solver fallout through TypedDict protocol inference: reduced TDDs no longer retained a redundant path that had let constrained-TypeVar solving pick a compatible concrete constraint for `get_value(ValueA | ValueB)`.
-- Fixed this in `PathBounds::default_solve` instead of sandboxing callers. When a concrete path satisfies multiple declared constraints for a constrained TypeVar, the solver now scans all compatible declared constraints and picks a stable best match rather than depending on semantically redundant BDD paths to provide one exact constraint.
-- Ecosystem analysis showed that first-compatible declaration order was not enough: broad constraints can appear before narrow ones (`str | bytes` before `str`, `CryptoAsset` before `EvmToken`, `Index[Any]` before `IndexHierarchy`). The current best-match rule prefers the most specific compatible constraint when there is explicit lower-bound evidence, prefers the most general compatible constraint for upper-bound-only evidence, and preserves declaration order for equivalent or incomparable candidates.
-- Preserved TypeVar-to-TypeVar relationships: if either explicit bound for a constrained-TypeVar path is itself a TypeVar, the solver first verifies that at least one declared constraint is compatible and then solves to that TypeVar instead of replacing the relationship with an arbitrary concrete constraint.
-- Covered ambiguous constrained-TypeVar solving through user-visible mdtests instead of direct `PathBounds::default_solve` unit tests. Existing mdtests cover exact-match selection and TypeVar-to-TypeVar relationships; new sections cover broad-before-narrow union constraints and upper-bound-only solving, both in either declaration order.
+- A full `ty_python_semantic` test run exposed changed constrained-TypeVar inference through TypedDict protocol inference after redundant TDD paths were removed.
+- An initial response made `PathBounds::default_solve` choose a stable best match whenever multiple declared constraints were compatible. Although that improved several static ecosystem cases, PR review found that it arbitrarily narrowed gradual inputs and caused false positives in Hydpy.
+- Kept best-match selection for fully static evidence, but taught `SpecializationBuilder` to remember when all evidence for a constrained TypeVar was gradual. In that case, multiple compatible constraints leave the TypeVar unsolved instead of choosing an arbitrary concrete constraint. Static evidence for the same TypeVar still permits best-match selection.
+- The review reproduction with an `Any` argument therefore continues to reveal `Unknown` instead of arbitrarily choosing `int`. Preserving `Any` would be preferable, but the original gradual type has already been lost by the decisive solver call; returning a gradual bound locally does not work. Carrying that provenance far enough to return `Any` is deferred to a separate change.
+- Existing mdtests continue to cover exact constrained-TypeVar matches and TypeVar-to-TypeVar relationships. New sections cover static best-match selection, upper-bound-only selection, and the gradual ambiguity fallback; the latter includes a TODO for the eventual `Any` result.
 - Removed the temporary `GenericContextSpecializationBuilder::common_typed_dict_protocol_constraints` throwaway-builder workaround; `generics.rs` has no remaining change for this feature.
-- Updated the `typed_dict.md` expectation for `get_value(ValueA | ValueB)` to reveal `int` while still rejecting `str`, matching the best-compatible constrained-TypeVar choice.
+- The reduced TDD still makes `get_value(ValueA | ValueB)` reveal `int` while rejecting `str`, without changing the general multiple-compatible-constraint fallback.
+- A local Hydpy ecosystem comparison against `main` produced identical diagnostics (1,160 on each), confirming that the gradual-evidence fallback removes the review's false positives.
 
 Validation:
 
