@@ -3,7 +3,7 @@
 ```toml
 [lint]
 preview = true
-select = ["noqa-comment"]
+select = ["noqa-comment", "F401", "F402", "F403"]
 ```
 
 ## File-level comments
@@ -13,6 +13,7 @@ select = ["noqa-comment"]
 ```py
 # snapshot: noqa-comment
 # ruff: noqa: F401
+import math
 ```
 
 ```snapshot
@@ -27,6 +28,7 @@ help: Use `ruff:file-ignore` instead
 1 | # snapshot: noqa-comment
   - # ruff: noqa: F401
 2 + # ruff:file-ignore[F401]
+3 | import math
   |
 ```
 
@@ -35,6 +37,11 @@ help: Use `ruff:file-ignore` instead
 ```py
 # snapshot: noqa-comment
 # ruff: noqa: F401, F402, F403
+import math
+import os
+from module import *
+for os in []:
+    pass
 ```
 
 ```snapshot
@@ -49,6 +56,7 @@ help: Use `ruff:file-ignore` instead
 1 | # snapshot: noqa-comment
   - # ruff: noqa: F401, F402, F403
 2 + # ruff:file-ignore[F401, F402, F403]
+3 | import math
   |
 ```
 
@@ -57,6 +65,11 @@ help: Use `ruff:file-ignore` instead
 ```py
 # snapshot: noqa-comment
 # ruff: noqa: F401, F402, F403 for some reason
+import math
+import os
+from module import *
+for os in []:
+    pass
 ```
 
 ```snapshot
@@ -71,6 +84,7 @@ help: Use `ruff:file-ignore` instead
 1 | # snapshot: noqa-comment
   - # ruff: noqa: F401, F402, F403 for some reason
 2 + # ruff:file-ignore[F401, F402, F403] for some reason
+3 | import math
   |
 ```
 
@@ -79,6 +93,11 @@ help: Use `ruff:file-ignore` instead
 ```py
 # snapshot: noqa-comment
 # ruff: noqa: F401, F402, F403 # fmt:skip
+import math
+import os
+from module import *
+for os in []:
+    pass
 ```
 
 ```snapshot
@@ -93,6 +112,7 @@ help: Use `ruff:file-ignore` instead
 1 | # snapshot: noqa-comment
   - # ruff: noqa: F401, F402, F403 # fmt:skip
 2 + # ruff:file-ignore[F401, F402, F403] # fmt:skip
+3 | import math
   |
 ```
 
@@ -102,11 +122,31 @@ help: Use `ruff:file-ignore` instead
 # ruff: noqa: UNK001
 ```
 
+### Any unmatched code disables the rule
+
+This leaves an unused `noqa` comment to be cleaned up by `RUF100` instead, which can be especially
+important in the case of a standalone `noqa` comment, which has no effect (in almost all cases), but
+could become an effectful own-line `ruff:ignore` comment if `RUF105` applied.
+
+```py
+# ruff: noqa: F401, F402
+import math
+```
+
+### Flake8 comments are ignored
+
+```py
+# flake8: noqa: F401
+import math
+```
+
 ## Inline comments
 
 ```py
 # snapshot: noqa-comment
 import math  # noqa: F401
+
+import os  # noqa: F401, F402
 ```
 
 ```snapshot
@@ -121,5 +161,18 @@ help: Use `ruff:ignore` instead
 1 | # snapshot: noqa-comment
   - import math  # noqa: F401
 2 + import math  # ruff:ignore[F401]
+3 |
   |
+```
+
+## Inline self-suppression
+
+```toml
+[lint]
+preview = true
+select = ["noqa-comment", "unused-noqa"]
+```
+
+```py
+value = 1  # noqa: RUF105
 ```

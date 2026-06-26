@@ -5,10 +5,10 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::{
-    AlwaysFixableViolation,
+    AlwaysFixableViolation, Locator,
     checkers::ast::LintContext,
     codes::Rule,
-    noqa::{Code, Directive, FileNoqaDirectives, NoqaDirectives},
+    noqa::{Code, Codes},
     rule_redirects::get_redirect_target,
 };
 
@@ -67,43 +67,30 @@ impl AlwaysFixableViolation for NoqaComment {
 /// RUF105
 pub(crate) fn noqa_comment(
     context: &LintContext,
-    file_noqa_directives: &FileNoqaDirectives,
-    noqa_directives: &NoqaDirectives,
+    locator: &Locator,
+    file_level: bool,
+    codes: &Codes,
 ) {
-    let directives = file_noqa_directives
-        .lines()
-        .iter()
-        .map(|line| (true, &line.parsed_file_exemption))
-        .chain(
-            noqa_directives
-                .lines()
-                .iter()
-                .map(|line| (false, &line.directive)),
-        );
-
-    for (file_level, directive) in directives {
-        let Directive::Codes(codes) = directive else {
-            continue;
-        };
-
-        // Skip cases with unknown codes, external or otherwise.
-        if !codes.iter().all(is_valid_code) {
-            continue;
-        }
-
-        let mut diagnostic =
-            context.report_diagnostic(NoqaComment { file_level }, directive.range());
-
-        let edit = Edit::range_replacement(
-            format!(
-                "# ruff:{action}[{codes}]",
-                action = if file_level { "file-ignore" } else { "ignore" },
-                codes = codes.iter().join(", ")
-            ),
-            directive.range(),
-        );
-        diagnostic.set_fix(Fix::safe_edit(edit));
+    if file_level && locator.slice(codes.range()).contains("flake8") {
+        return;
     }
+
+    // Skip cases with unknown codes, external or otherwise.
+    if !codes.iter().all(is_valid_code) {
+        return;
+    }
+
+    let mut diagnostic = context.report_diagnostic(NoqaComment { file_level }, codes.range());
+
+    let edit = Edit::range_replacement(
+        format!(
+            "# ruff:{action}[{codes}]",
+            action = if file_level { "file-ignore" } else { "ignore" },
+            codes = codes.iter().join(", ")
+        ),
+        codes.range(),
+    );
+    diagnostic.set_fix(Fix::safe_edit(edit));
 }
 
 fn is_valid_code(code: &Code) -> bool {
