@@ -224,11 +224,11 @@ reveal_type(foo)  # revealed: Unknown
 
 ## Import submodule from self
 
-We don't currently consider `from...import` statements when building up the `imported_modules` set
-in the semantic index. When accessing an attribute of a module, we only consider it a potential
-submodule when that submodule name appears in the `imported_modules` set. That means that submodules
-that are imported via `from...import` are not visible to our type inference if you also access that
-submodule via the attribute on its parent package.
+We don't currently consider `from...import` statements in the `imported_modules` query. When
+accessing an attribute of a module, we only consider it a potential submodule when that submodule
+name appears in the `imported_modules` set. That means that submodules that are imported via
+`from...import` are not visible to our type inference if you also access that submodule via the
+attribute on its parent package.
 
 `package/__init__.py`:
 

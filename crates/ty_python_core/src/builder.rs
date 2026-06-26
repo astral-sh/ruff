@@ -273,7 +273,6 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     unpacks_by_target: FxHashMap<ExpressionNodeKey, Unpack<'db>>,
     condition_flow_snapshots_by_node: FxHashMap<ExpressionNodeKey, ConditionFlowSnapshots>,
     statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
-    imported_modules: FxHashSet<ModuleName>,
     seen_submodule_imports: FxHashSet<String>,
     // A map from a lambda expression to its enclosing statement.
     enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
@@ -333,7 +332,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             uses_by_collection: FxHashMap::default(),
 
             seen_submodule_imports: FxHashSet::default(),
-            imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
 
             enclosing_snapshots: FxHashMap::default(),
@@ -2648,7 +2646,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             enclosing_lambda_statements: FrozenMap::from(self.enclosing_lambda_statements),
             collections_by_use: FrozenMap::from(self.collections_by_use),
             uses_by_collection,
-            imported_modules: FrozenSet::from(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: FrozenMap::from(self.enclosing_snapshots),
             semantic_syntax_errors,
@@ -2846,12 +2843,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             ast::Stmt::Import(node) => {
                 for (alias_index, alias) in node.names.iter().enumerate() {
-                    // Mark the imported module, and all of its parents, as being imported in this
-                    // file.
-                    if let Some(module_name) = ModuleName::new(&alias.name) {
-                        self.imported_modules.extend(module_name.ancestors());
-                    }
-
                     let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
                         self.scopes_by_expression
                             .record_expression(asname, self.current_scope());

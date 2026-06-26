@@ -16,7 +16,6 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Update;
 use salsa::plumbing::AsId;
 use smallvec::SmallVec;
-use ty_module_resolver::ModuleName;
 
 use crate::frozen::{FrozenMap, FrozenSet};
 use crate::place::ScopedPlaceId;
@@ -47,6 +46,7 @@ pub mod definition;
 pub mod expression;
 pub mod frozen;
 pub(crate) mod member;
+mod module_imports;
 pub mod narrowing_constraints;
 pub mod node_key;
 pub mod place;
@@ -61,6 +61,7 @@ pub mod symbol;
 pub mod unpack;
 mod use_def;
 pub use db::Db;
+pub use module_imports::imported_modules;
 pub mod program;
 
 /// Returns the semantic index for `file`.
@@ -324,9 +325,6 @@ pub struct SemanticIndex<'db> {
     /// changing a file invalidates all dependents.
     ast_ids: AstIds,
 
-    /// The set of modules that are imported anywhere within this file.
-    imported_modules: FrozenSet<ModuleName>,
-
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
 
@@ -376,15 +374,6 @@ impl<'db> SemanticIndex<'db> {
     #[track_caller]
     pub fn use_def_map(&self, scope_id: FileScopeId) -> &UseDefMap<'db> {
         &self.use_def_maps[scope_id]
-    }
-
-    /// Returns the set of modules that are imported anywhere in this file.
-    ///
-    /// This set only considers `import` statements, not `from...import` statements.
-    /// See `ModuleLiteralType::available_submodule_attributes` for discussion
-    /// of why this analysis is intentionally limited.
-    pub fn imported_modules(&self) -> impl Iterator<Item = &ModuleName> {
-        self.imported_modules.iter()
     }
 
     #[track_caller]

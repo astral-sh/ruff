@@ -421,10 +421,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         // If the module doesn't bind the symbol, check if it's a submodule.  This won't get
-        // handled by the `Type::member` call because it relies on the semantic index's
-        // `imported_modules` set.  The semantic index does not include information about
-        // `from...import` statements because there are two things it cannot determine while only
-        // inspecting the content of the current file:
+        // handled by the `Type::member` call because it relies on the `imported_modules` query.
+        // The query does not include information about `from...import` statements because there
+        // are two things it cannot determine while only inspecting the content of the current
+        // file:
         //
         //   - whether the imported symbol is an attribute or submodule
         //   - whether the containing file is in a module or a package (needed to correctly resolve
