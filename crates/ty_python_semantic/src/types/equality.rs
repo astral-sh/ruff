@@ -1485,6 +1485,10 @@ fn known_literal_equality<'db>(
             if same_enum_member(db, left, right) {
                 return Some(true);
             }
+            let enum_class = left.enum_class_literal(db);
+            if enum_class == right.enum_class_literal(db) && !enum_class.aliases_are_known(db) {
+                return None;
+            }
             if left_semantics == KnownComparisonSemantics::Object {
                 return Some(false);
             }

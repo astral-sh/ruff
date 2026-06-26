@@ -206,6 +206,20 @@ reveal_type(CoercingAlias.FIRST == CoercingAlias.SECOND)  # revealed: Literal[Tr
 reveal_type(CoercingAlias.SECOND == "1")  # revealed: Literal[True]
 ```
 
+When alias detection is inconclusive, equality between different declarations is also unknown. The
+two declarations below are aliases at runtime:
+
+```py
+class Behavior:
+    pass
+
+class OpaqueAliases(Behavior, Enum):
+    FIRST = 1
+    SECOND = 1
+
+reveal_type(OpaqueAliases.FIRST == OpaqueAliases.SECOND)  # revealed: bool
+```
+
 Equality can transfer restrictions on enum members, but other intersection elements must stay on the
 operand where they originated:
 
