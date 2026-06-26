@@ -360,26 +360,19 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 /// An expression cache shared across builders during multi-inference.
 #[derive(Default)]
 struct ExpressionCache<'db> {
-    entries: FxHashMap<ExpressionNodeKey, ExpressionCacheEntry<'db>>,
+    entries: FxHashMap<ExpressionNodeKey, ExpressionCacheValues<'db>>,
 }
 
-enum ExpressionCacheEntry<'db> {
-    /// The core inference of this expression is independent of type context. Contextual finishing
-    /// is still applied to the cached result on every lookup.
-    Independent(ReplayableExpression<'db>),
-    Contextual(ContextualExpressionCache<'db>),
-}
-
-/// A compact type-context mapping for a context-dependent expression.
+/// A compact type-context mapping for one expression's cached inference results.
 ///
 /// Most expressions are only inferred under one context. Avoid allocating a hash table for that
 /// case, but promote to one when multi-inference actually observes another context.
-enum ContextualExpressionCache<'db> {
+enum ExpressionCacheValues<'db> {
     One(TypeContext<'db>, ReplayableExpression<'db>),
     Multiple(FxHashMap<TypeContext<'db>, ReplayableExpression<'db>>),
 }
 
-impl<'db> ContextualExpressionCache<'db> {
+impl<'db> ExpressionCacheValues<'db> {
     fn get(&self, tcx: TypeContext<'db>) -> Option<&ReplayableExpression<'db>> {
         match self {
             Self::One(cached_tcx, value) if *cached_tcx == tcx => Some(value),
@@ -417,48 +410,22 @@ impl<'db> ExpressionCache<'db> {
         &self,
         expression: ExpressionNodeKey,
         tcx: TypeContext<'db>,
-        independent: bool,
     ) -> Option<&ReplayableExpression<'db>> {
-        match self.entries.get(&expression)? {
-            ExpressionCacheEntry::Independent(value) if independent => Some(value),
-            ExpressionCacheEntry::Contextual(values) if !independent => values.get(tcx),
-            ExpressionCacheEntry::Independent(_) | ExpressionCacheEntry::Contextual(_) => None,
-        }
-    }
-
-    fn context_independence(&self, expression: ExpressionNodeKey) -> Option<bool> {
-        self.entries
-            .get(&expression)
-            .map(|entry| matches!(entry, ExpressionCacheEntry::Independent(_)))
+        self.entries.get(&expression)?.get(tcx)
     }
 
     fn insert(
         &mut self,
         expression: ExpressionNodeKey,
         tcx: TypeContext<'db>,
-        independent: bool,
         value: ReplayableExpression<'db>,
     ) {
-        if independent {
-            self.entries
-                .insert(expression, ExpressionCacheEntry::Independent(value));
-        } else {
-            match self.entries.entry(expression) {
-                std::collections::hash_map::Entry::Occupied(mut entry) => match entry.get_mut() {
-                    ExpressionCacheEntry::Contextual(values) => {
-                        values.insert(tcx, value);
-                    }
-                    ExpressionCacheEntry::Independent(_) => {
-                        entry.insert(ExpressionCacheEntry::Contextual(
-                            ContextualExpressionCache::One(tcx, value),
-                        ));
-                    }
-                },
-                std::collections::hash_map::Entry::Vacant(entry) => {
-                    entry.insert(ExpressionCacheEntry::Contextual(
-                        ContextualExpressionCache::One(tcx, value),
-                    ));
-                }
+        match self.entries.entry(expression) {
+            std::collections::hash_map::Entry::Occupied(mut entry) => {
+                entry.get_mut().insert(tcx, value);
+            }
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(ExpressionCacheValues::One(tcx, value));
             }
         }
     }
@@ -6842,77 +6809,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         standalone_expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        // `infer_expression_types` cache inference results for a given expression and type
-        // context. For expressions that are not directly affected by type context, we defer
-        // applying the type context until after the Salsa query runs, allowing us to reuse
-        // the memoized query result during multi-inference.
-        let defer_type_context = self.can_defer_type_context(expression, tcx);
-        let inference_tcx = if defer_type_context {
-            TypeContext::default()
-        } else {
-            tcx
-        };
-
-        let types = infer_expression_types(self.db(), standalone_expression, inference_tcx);
+        let types = infer_expression_types(self.db(), standalone_expression, tcx);
         self.extend_expression(types);
 
         // Instead of calling `self.expression_type(expr)` after extending here, we get
         // the result from `types` directly because we might be in cycle recovery where
         // `types.cycle_fallback_type` is `Some(fallback_ty)`, which we can retrieve by
         // using `expression_type` on `types`:
-        let ty = types.expression_type(expression);
-        if inference_tcx == tcx {
-            ty
-        } else {
-            let ty = self.apply_type_context(expression, ty, tcx);
-            self.expressions.insert(expression.into(), ty);
-            ty
-        }
-    }
-
-    /// Returns `true` if applying type context to the given expression may be deferred until after
-    /// inference.
-    ///
-    /// This includes semantic call classification while an expression cache is active. Once a call
-    /// has been cached, its entry variant memoizes whether it was context-independent.
-    fn can_defer_type_context(&mut self, expression: &ast::Expr, tcx: TypeContext<'db>) -> bool {
-        if matches!(
-            expression,
-            ast::Expr::Tuple(_)
-                | ast::Expr::List(_)
-                | ast::Expr::Set(_)
-                | ast::Expr::Dict(_)
-                | ast::Expr::Generator(_)
-                | ast::Expr::ListComp(_)
-                | ast::Expr::DictComp(_)
-                | ast::Expr::SetComp(_)
-                | ast::Expr::BinOp(_)
-                | ast::Expr::BoolOp(_)
-                | ast::Expr::If(_)
-                | ast::Expr::Lambda(_)
-                | ast::Expr::Starred(_)
-                | ast::Expr::Await(_)
-        ) {
-            return false;
-        }
-
-        let context_can_defer = !(is_type_form_context(self.db(), tcx)
-            || tcx.is_typealias() && matches!(expression, ast::Expr::StringLiteral(_)));
-
-        match expression {
-            ast::Expr::Call(call) if context_can_defer => {
-                let cached_independence = self
-                    .expression_cache
-                    .as_ref()
-                    .and_then(|cache| cache.borrow().context_independence(expression.into()));
-                cached_independence.unwrap_or_else(|| {
-                    self.expression_cache.is_some()
-                        && self.call_expression_is_context_independent(call)
-                })
-            }
-            ast::Expr::Call(_) => false,
-            _ => context_can_defer,
-        }
+        types.expression_type(expression)
     }
 
     /// Infer the type of an expression.
@@ -6926,12 +6830,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let expression_key = expression.into();
-        let independent = self.can_defer_type_context(expression, tcx);
         let cached = self.expression_cache.as_ref().and_then(|expression_cache| {
-            expression_cache
-                .borrow()
-                .get(expression_key, tcx, independent)
-                .cloned()
+            expression_cache.borrow().get(expression_key, tcx).cloned()
         });
 
         if let Some(cached) = cached {
@@ -6945,25 +6845,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ty
                 }
             };
-            let ty = if independent {
-                let ty = self.apply_type_context(expression, cached_ty, tcx);
-                self.store_expression_type(expression, ty);
-                ty
-            } else {
-                self.store_expression_type(expression, cached_ty);
-                cached_ty
-            };
-            return ty;
+            self.store_expression_type(expression, cached_ty);
+            return cached_ty;
         }
 
-        let inference_tcx = if independent {
-            TypeContext::default()
-        } else {
-            tcx
-        };
-
         let mut speculative_builder = self.speculate();
-        let ty = speculative_builder.infer_expression_uncached(expression, inference_tcx);
+        let ty = speculative_builder.infer_expression_uncached(expression, tcx);
         let inference = speculative_builder.into_replayable_expression_inference();
         let cached = if inference.contains_only_expression(expression_key, ty) {
             self.store_expression_type(expression, ty);
@@ -6977,17 +6864,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(expression_cache) = &self.expression_cache {
             expression_cache
                 .borrow_mut()
-                .insert(expression_key, tcx, independent, cached);
+                .insert(expression_key, tcx, cached);
         }
 
-        if independent {
-            self.expressions.remove(&expression_key);
-            let ty = self.apply_type_context(expression, ty, tcx);
-            self.store_expression_type(expression, ty);
-            ty
-        } else {
-            ty
-        }
+        ty
     }
 
     fn infer_expression_uncached(
@@ -9325,19 +9205,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Some(Type::KnownInstance(KnownInstanceType::Range {
             is_non_empty,
         }))
-    }
-
-    /// Returns `true` if the callable has no generic signature whose inference can be affected by
-    /// the call expression's type context.
-    fn call_expression_is_context_independent(&mut self, call_expression: &ast::ExprCall) -> bool {
-        let mut speculative_builder = self.speculate();
-        let callable_type = speculative_builder
-            .infer_maybe_standalone_expression(&call_expression.func, TypeContext::default());
-        !speculative_builder
-            .bindings_for_call(callable_type)
-            .iter_flat()
-            .flat_map(CallableBinding::overloads)
-            .any(|overload| overload.signature.generic_context.is_some())
     }
 
     fn infer_call_expression_impl(
@@ -12455,18 +12322,6 @@ fn is_collection_literal(expression: &ast::Expr) -> bool {
         expression,
         ast::Expr::List(_) | ast::Expr::Set(_) | ast::Expr::Dict(_)
     )
-}
-
-fn is_type_form_context<'db>(db: &'db dyn Db, tcx: TypeContext<'db>) -> bool {
-    tcx.annotation
-        .is_some_and(|target| match target.resolve_type_alias(db) {
-            Type::TypeForm(_) => true,
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .any(|element| matches!(element.resolve_type_alias(db), Type::TypeForm(_))),
-            _ => false,
-        })
 }
 
 /// Returns `true` if `tcx` cannot provide useful type context for a collection literal.
