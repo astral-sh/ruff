@@ -98,6 +98,13 @@
             "boolean",
             "null"
           ]
+        },
+        "unsafe-literal-narrowing": {
+          "description": "Whether equality-based checks may narrow `str`, `int`, and `bytes` to literal types.\n\nFor example, when this option is enabled, ty narrows `value` from `str` to\n`Literal[\"a\"]` in the positive branch of `value == \"a\"`.\nThis also applies to membership tests and literal patterns, which use equality.\n\n```python\nfrom typing import Literal\n\ndef parse(value: str) -> Literal[\"a\"] | None:\n    if value == \"a\":\n        return value  # Accepted by default; `value` remains `str` when disabled.\n    return None\n```\n\nThis narrowing is unsafe because subclasses of these builtin types may override\n`__eq__` to compare equal to a literal without inhabiting the corresponding literal type.\nDisable this option to preserve the broader builtin type instead.\n\nDefaults to `true`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false

@@ -1465,6 +1465,36 @@ pub struct TerminalOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AnalysisOptions {
+    /// Whether equality-based checks may narrow `str`, `int`, and `bytes` to literal types.
+    ///
+    /// For example, when this option is enabled, ty narrows `value` from `str` to
+    /// `Literal["a"]` in the positive branch of `value == "a"`.
+    /// This also applies to membership tests and literal patterns, which use equality.
+    ///
+    /// ```python
+    /// from typing import Literal
+    ///
+    /// def parse(value: str) -> Literal["a"] | None:
+    ///     if value == "a":
+    ///         return value  # Accepted by default; `value` remains `str` when disabled.
+    ///     return None
+    /// ```
+    ///
+    /// This narrowing is unsafe because subclasses of these builtin types may override
+    /// `__eq__` to compare equal to a literal without inhabiting the corresponding literal type.
+    /// Disable this option to preserve the broader builtin type instead.
+    ///
+    /// Defaults to `true`.
+    #[option(
+        default = r#"true"#,
+        value_type = "bool",
+        example = r#"
+        # Preserve broad builtin types after equality-based checks
+        unsafe-literal-narrowing = false
+        "#
+    )]
+    pub unsafe_literal_narrowing: Option<bool>,
+
     /// Whether ty should respect `type: ignore` comments.
     ///
     /// When set to `false`, `type: ignore` comments are treated like any other normal
@@ -1541,12 +1571,14 @@ impl AnalysisOptions {
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
         let Self {
+            unsafe_literal_narrowing,
             respect_type_ignore_comments,
             allowed_unresolved_imports,
             replace_imports_with_any,
         } = self;
 
         let AnalysisSettings {
+            unsafe_literal_narrowing: unsafe_literal_narrowing_default,
             respect_type_ignore_comments: respect_type_ignore_default,
             allowed_unresolved_imports: allowed_unresolved_imports_default,
             replace_imports_with_any: replace_imports_with_any_default,
@@ -1575,6 +1607,8 @@ impl AnalysisOptions {
             };
 
         AnalysisSettings {
+            unsafe_literal_narrowing: unsafe_literal_narrowing
+                .unwrap_or(unsafe_literal_narrowing_default),
             respect_type_ignore_comments: respect_type_ignore_comments
                 .unwrap_or(respect_type_ignore_default),
             allowed_unresolved_imports,

@@ -160,6 +160,53 @@ Defaults to `true`.
 
 ---
 
+### `unsafe-literal-narrowing`
+
+Whether equality-based checks may narrow `str`, `int`, and `bytes` to literal types.
+
+For example, when this option is enabled, ty narrows `value` from `str` to
+`Literal["a"]` in the positive branch of `value == "a"`.
+This also applies to membership tests and literal patterns, which use equality.
+
+```python
+from typing import Literal
+
+def parse(value: str) -> Literal["a"] | None:
+    if value == "a":
+        return value  # Accepted by default; `value` remains `str` when disabled.
+    return None
+```
+
+This narrowing is unsafe because subclasses of these builtin types may override
+`__eq__` to compare equal to a literal without inhabiting the corresponding literal type.
+Disable this option to preserve the broader builtin type instead.
+
+Defaults to `true`.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Preserve broad builtin types after equality-based checks
+    unsafe-literal-narrowing = false
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Preserve broad builtin types after equality-based checks
+    unsafe-literal-narrowing = false
+    ```
+
+---
+
 ## `environment`
 
 ### `extra-paths`
@@ -650,6 +697,53 @@ Defaults to `true`.
     [overrides.analysis]
     # Disable support for `type: ignore` comments
     respect-type-ignore-comments = false
+    ```
+
+---
+
+#### `unsafe-literal-narrowing`
+
+Whether equality-based checks may narrow `str`, `int`, and `bytes` to literal types.
+
+For example, when this option is enabled, ty narrows `value` from `str` to
+`Literal["a"]` in the positive branch of `value == "a"`.
+This also applies to membership tests and literal patterns, which use equality.
+
+```python
+from typing import Literal
+
+def parse(value: str) -> Literal["a"] | None:
+    if value == "a":
+        return value  # Accepted by default; `value` remains `str` when disabled.
+    return None
+```
+
+This narrowing is unsafe because subclasses of these builtin types may override
+`__eq__` to compare equal to a literal without inhabiting the corresponding literal type.
+Disable this option to preserve the broader builtin type instead.
+
+Defaults to `true`.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Preserve broad builtin types after equality-based checks
+    unsafe-literal-narrowing = false
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Preserve broad builtin types after equality-based checks
+    unsafe-literal-narrowing = false
     ```
 
 ---
