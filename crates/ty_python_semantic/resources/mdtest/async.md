@@ -241,9 +241,9 @@ async def f(fn: Callable[[int], int | Awaitable[int]]) -> None:
     if is_async_callable(fn):
         reveal_type(fn)  # revealed: ((int, /) -> int | Awaitable[int]) & Top[(...) -> Awaitable[object]]
         result = fn(1)
-        # This includes `int & Awaitable[object]`: an `int` subtype could define `__await__`.
-        reveal_type(result)  # revealed: (int & Awaitable[object]) | Awaitable[int]
-        reveal_type(await result)  # revealed: object
+        # The builtin-protocol heuristic drops `int & Awaitable[object]`.
+        reveal_type(result)  # revealed: Awaitable[int]
+        reveal_type(await result)  # revealed: int
 ```
 
 ## Awaiting intersection types (Python 3.12 or lower)

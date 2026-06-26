@@ -2846,6 +2846,22 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // (<https://github.com/rust-lang/rust/issues/129967>)
             (Type::ProtocolInstance(protocol), Type::NominalInstance(nominal))
             | (Type::NominalInstance(nominal), Type::ProtocolInstance(protocol))
+                if nominal.is_builtin_instance(db)
+                    && protocol.is_typing_protocol(db)
+                    && !Type::ProtocolInstance(protocol).has_dynamic(db)
+                    && !Type::ProtocolInstance(protocol).has_typevar_or_typevar_instance(db) =>
+            {
+                self.as_relation_checker(TypeRelation::Subtyping)
+                    .check_type_pair(
+                        db,
+                        Type::NominalInstance(nominal),
+                        Type::ProtocolInstance(protocol),
+                    )
+                    .negate(db, self.constraints)
+            }
+
+            (Type::ProtocolInstance(protocol), Type::NominalInstance(nominal))
+            | (Type::NominalInstance(nominal), Type::ProtocolInstance(protocol))
                 if nominal.class(db).is_final(db) =>
             {
                 self.with_recursion_guard(left, right, || {
