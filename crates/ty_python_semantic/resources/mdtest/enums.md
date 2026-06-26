@@ -845,6 +845,21 @@ reveal_type(CustomValues.FALSE.value)  # revealed: Any
 reveal_type(enum_members(CustomValues))
 ```
 
+A separate behavior base does not become the enum's data type:
+
+```py
+class Behavior:
+    pass
+
+class ValuesWithBehavior(Behavior, int, Enum):
+    FALSE = False
+    ZERO = 0
+
+reveal_type(ValuesWithBehavior.FALSE.value)  # revealed: Literal[0]
+# revealed: tuple[Literal["FALSE"]]
+reveal_type(enum_members(ValuesWithBehavior))
+```
+
 ### Assigned `__new__`
 
 Assigning to `__new__` can prevent us from validating members against its signature or inferring

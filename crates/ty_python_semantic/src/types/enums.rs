@@ -1247,6 +1247,81 @@ fn inherited_user_defined_value_annotation<'db>(
         .find_map(|base| custom_value_annotation(db, base.body_scope(db)))
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum InheritedEnumDataType {
+    #[default]
+    None,
+    Known(KnownEnumDataTypeMixin),
+    Opaque,
+}
+
+/// Find the `int` or `str` data type selected for this enum.
+///
+/// CPython searches each direct base independently. A user-defined class in the same base chain as
+/// `int` or `str` makes that data type opaque, while an unrelated behavior base does not.
+fn inherited_enum_data_type<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> InheritedEnumDataType {
+    let mut selected = InheritedEnumDataType::None;
+    let mut has_unsupported_data_type = false;
+
+    for explicit_base in class.explicit_bases(db) {
+        let Some(explicit_base) = explicit_base.to_class_type(db) else {
+            return InheritedEnumDataType::Opaque;
+        };
+        let mut has_preceding_class = false;
+        let mut candidate = None;
+
+        for base in explicit_base.iter_mro(db) {
+            let Some(base) = base
+                .into_class()
+                .and_then(|base| base.class_literal(db).as_static())
+            else {
+                return InheritedEnumDataType::Opaque;
+            };
+
+            if base.known(db) == Some(KnownClass::Object) || is_enum_class_by_inheritance(db, base)
+            {
+                continue;
+            }
+
+            let known = match base.known(db) {
+                Some(KnownClass::Int) => Some(KnownEnumDataTypeMixin::Int),
+                Some(KnownClass::Str) => Some(KnownEnumDataTypeMixin::Str),
+                _ => {
+                    has_preceding_class = true;
+                    None
+                }
+            };
+            if let Some(known) = known {
+                candidate = Some(if has_preceding_class {
+                    InheritedEnumDataType::Opaque
+                } else {
+                    InheritedEnumDataType::Known(known)
+                });
+                break;
+            }
+            has_unsupported_data_type = true;
+        }
+
+        let Some(candidate) = candidate else {
+            continue;
+        };
+        selected = match (selected, candidate) {
+            (InheritedEnumDataType::None, candidate) => candidate,
+            (selected, candidate) if selected == candidate => selected,
+            _ => InheritedEnumDataType::Opaque,
+        };
+    }
+
+    if matches!(selected, InheritedEnumDataType::None) && has_unsupported_data_type {
+        InheritedEnumDataType::Opaque
+    } else {
+        selected
+    }
+}
+
 #[derive(Clone, Copy)]
 enum EnumMethodBinding<'db> {
     Function(FunctionType<'db>),
@@ -1317,40 +1392,27 @@ fn inherited_data_type_mixin<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
 ) -> InheritedDataTypeMixin<'db> {
-    let mut result = InheritedDataTypeMixin::default();
+    let mut result = match inherited_enum_data_type(db, class) {
+        InheritedEnumDataType::None => InheritedDataTypeMixin::default(),
+        InheritedEnumDataType::Known(known) => InheritedDataTypeMixin {
+            known: Some(known),
+            ..InheritedDataTypeMixin::default()
+        },
+        InheritedEnumDataType::Opaque => InheritedDataTypeMixin {
+            opaque: true,
+            ..InheritedDataTypeMixin::default()
+        },
+    };
 
-    for base in class.iter_mro(db, None).skip(1) {
-        let Some(base) = base
-            .into_class()
-            .and_then(|class| class.class_literal(db).as_static())
-        else {
-            if result.known.is_none() {
-                result.opaque = true;
-            }
-            continue;
-        };
-
-        if base.known(db) == Some(KnownClass::Object) || is_enum_class_by_inheritance(db, base) {
-            continue;
-        }
-
-        match base.known(db) {
-            Some(KnownClass::Int) if result.known.is_none() && !result.opaque => {
-                result.known = Some(KnownEnumDataTypeMixin::Int);
-            }
-            Some(KnownClass::Str) if result.known.is_none() && !result.opaque => {
-                result.known = Some(KnownEnumDataTypeMixin::Str);
-            }
-            None => {
-                if result.new.is_none() {
-                    result.new = custom_enum_method(db, base.body_scope(db), "__new__");
-                }
-                if result.known.is_none() {
-                    result.opaque = true;
-                }
-            }
-            Some(_) if result.known.is_none() => result.opaque = true,
-            Some(_) => {}
+    for base in class
+        .iter_mro(db, None)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+        .filter_map(|class| class.class_literal(db).as_static())
+        .filter(|base| base.known(db).is_none())
+    {
+        if result.new.is_none() {
+            result.new = custom_enum_method(db, base.body_scope(db), "__new__");
         }
     }
 
