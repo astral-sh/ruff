@@ -1526,7 +1526,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 // For example, `Child[int]` and `Base[T]` share a generic hierarchy, so a `Base`
                 // pattern can reuse `int` from the subject. This does not infer `Child[int]` from
                 // a `Base[int]` subject.
-                let shares_generic_hierarchy = original_subject_ty
+                if original_subject_ty
                     .nominal_class(self.db)
                     .is_some_and(|original_class| {
                         unknown_pattern_class.is_subtype_of_class_literal(
@@ -1536,8 +1536,8 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                             self.db,
                             unknown_pattern_class.class_literal(self.db),
                         )
-                    });
-                if shares_generic_hierarchy {
+                    })
+                {
                     // The pattern class's unknown specialization loses type arguments known
                     // through the related subject type. Prefer the subject's member type when it
                     // exists, but retain a member declared only by the pattern class.
