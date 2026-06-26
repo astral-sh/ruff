@@ -2685,14 +2685,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             }
 
             (Type::LiteralValue(left), Type::LiteralValue(right))
-                if let (Some(left), Some(right)) = (left.as_enum(), right.as_enum())
-                    && left.enum_class_literal(db) == right.enum_class_literal(db)
-                    && !left.enum_class_literal(db).aliases_are_known(db) =>
-            {
-                self.never()
-            }
-
-            (Type::LiteralValue(left), Type::LiteralValue(right))
                 if left.is_literal_string() && right.is_literal_string()
                     || (left.is_string() && right.is_literal_string())
                     || (left.is_literal_string() && right.is_string()) =>
@@ -2701,7 +2693,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             }
 
             (Type::LiteralValue(left), Type::LiteralValue(right)) => {
-                ConstraintSet::from_bool(self.constraints, left.kind() != right.kind())
+                if let (Some(left), Some(right)) = (left.as_enum(), right.as_enum())
+                    && left.enum_class_literal(db) == right.enum_class_literal(db)
+                    && !left.enum_class_literal(db).aliases_are_known(db)
+                {
+                    self.never()
+                } else {
+                    ConstraintSet::from_bool(self.constraints, left.kind() != right.kind())
+                }
             }
 
             (Type::PropertyInstance(left), Type::PropertyInstance(right)) => {
