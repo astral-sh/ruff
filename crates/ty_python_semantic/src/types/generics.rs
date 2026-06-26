@@ -2288,27 +2288,22 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         ty: Type<'db>,
         variance: TypeVarVariance,
     ) {
-        self.add_type_mapping_with_evidence(bound_typevar, ty, ty, variance);
+        self.insert_hash_map_type_mapping(bound_typevar, ty);
+        self.insert_pending_type_mapping(bound_typevar, ty, variance);
     }
 
-    /// Add `mapped_ty` to the legacy type mapping while preserving `evidence_ty` in the pending
-    /// constraint set.
-    fn add_type_mapping_with_evidence(
+    fn insert_pending_type_mapping(
         &mut self,
         bound_typevar: BoundTypeVarInstance<'db>,
-        mapped_ty: Type<'db>,
-        evidence_ty: Type<'db>,
+        ty: Type<'db>,
         variance: TypeVarVariance,
     ) {
-        self.insert_hash_map_type_mapping(bound_typevar, mapped_ty);
-
         let bounds = match variance {
-            TypeVarVariance::Covariant => ConstraintBounds::new(Some(evidence_ty), None),
-            TypeVarVariance::Contravariant => ConstraintBounds::new(None, Some(evidence_ty)),
-            TypeVarVariance::Invariant => ConstraintBounds::exact(evidence_ty),
+            TypeVarVariance::Covariant => ConstraintBounds::new(Some(ty), None),
+            TypeVarVariance::Contravariant => ConstraintBounds::new(None, Some(ty)),
+            TypeVarVariance::Invariant => ConstraintBounds::exact(ty),
             TypeVarVariance::Bivariant => return,
         };
-
         self.intersect_pending_typevar_constraint(bound_typevar, bounds);
     }
 
@@ -2787,12 +2782,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             };
 
                             if is_satisfied {
-                                self.add_type_mapping_with_evidence(
-                                    bound_typevar,
-                                    *constraint,
-                                    ty,
-                                    polarity,
-                                );
+                                // For the old solver, we use the constraint itself as the mapped
+                                // type, since the old solver's hash map stores solutions. For the
+                                // new solver's pending constraint set, we store the type that
+                                // matched against the constraint. This is especially important
+                                // when the matched type is gradual, since it might match multiple
+                                // constraints, and we need the constraint set to be able to reason
+                                // about all of them.
+                                self.insert_hash_map_type_mapping(bound_typevar, *constraint);
+                                self.insert_pending_type_mapping(bound_typevar, ty, polarity);
                                 return Ok(());
                             }
                         }
