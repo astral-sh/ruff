@@ -405,6 +405,12 @@ pub(crate) fn class_pattern_positional_result<'db>(
         return (!has_local_binding()).then_some(ClassPatternPositionalResult::Limit(0));
     }
     let match_args = binding_type(db, definition);
+    if match_args
+        .try_call_dunder_get(db, None, Type::ClassLiteral(class))
+        .is_some()
+    {
+        return None;
+    }
 
     if let Some(tuple) = match_args.exact_tuple_instance_spec(db) {
         tuple

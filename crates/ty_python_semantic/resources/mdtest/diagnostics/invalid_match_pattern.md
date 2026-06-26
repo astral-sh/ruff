@@ -170,6 +170,27 @@ def describe(value: NoMatchArgs) -> None:
             pass
 ```
 
+## Descriptor-provided `__match_args__`
+
+Descriptor lookup can produce a valid tuple even when the raw binding is not a tuple.
+
+```py
+from typing import Literal, final
+
+@final
+class MatchArgsDescriptor:
+    def __get__(self, instance: object | None, owner: type[object]) -> tuple[Literal["x"]]:
+        return ("x",)
+
+class Model:
+    __match_args__ = MatchArgsDescriptor()
+
+def describe(value: Model) -> None:
+    match value:
+        case Model(_):
+            pass
+```
+
 ## Missing `__match_args__` in a stub
 
 An omitted stub member does not prove that the runtime class lacks `__match_args__`.
