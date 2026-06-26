@@ -638,6 +638,9 @@ fn direct_match_args_binding<'db>(
         | ast::Expr::BooleanLiteral(_)
         | ast::Expr::NoneLiteral(_)
         | ast::Expr::EllipsisLiteral(_) => DirectMatchArgsBinding::InvalidLiteral,
+        ast::Expr::UnaryOp(_) if is_signed_number_literal(value) => {
+            DirectMatchArgsBinding::InvalidLiteral
+        }
         _ => return None,
     };
 
@@ -645,6 +648,18 @@ fn direct_match_args_binding<'db>(
         return None;
     }
     Some(binding)
+}
+
+fn is_signed_number_literal(expression: &ast::Expr) -> bool {
+    match expression {
+        ast::Expr::NumberLiteral(_) => true,
+        ast::Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::UAdd | ast::UnaryOp::USub,
+            operand,
+            ..
+        }) => is_signed_number_literal(operand),
+        _ => false,
+    }
 }
 
 /// Resolve the value supplied to each positional subpattern, preserving source order and length.

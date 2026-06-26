@@ -106,6 +106,12 @@ class BytesMatchArgs:
 class NumberMatchArgs:
     __match_args__ = 1
 
+class SignedNumberMatchArgs:
+    __match_args__ = -1
+
+class NestedSignedNumberMatchArgs:
+    __match_args__ = --1
+
 class BooleanMatchArgs:
     __match_args__ = True
 
@@ -130,6 +136,8 @@ def describe(
     plain_string_value: PlainStringMatchArgs,
     bytes_value: BytesMatchArgs,
     number_value: NumberMatchArgs,
+    signed_number_value: SignedNumberMatchArgs,
+    nested_signed_number_value: NestedSignedNumberMatchArgs,
     boolean_value: BooleanMatchArgs,
     none_value: NoneMatchArgs,
     ellipsis_value: EllipsisMatchArgs,
@@ -160,6 +168,16 @@ def describe(
     match number_value:
         # error: [invalid-match-pattern] "must be an exact tuple"
         case NumberMatchArgs(_):
+            pass
+
+    match signed_number_value:
+        # error: [invalid-match-pattern] "must be an exact tuple"
+        case SignedNumberMatchArgs(_):
+            pass
+
+    match nested_signed_number_value:
+        # error: [invalid-match-pattern] "must be an exact tuple"
+        case NestedSignedNumberMatchArgs(_):
             pass
 
     match boolean_value:
