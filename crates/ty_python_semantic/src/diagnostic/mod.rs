@@ -1,6 +1,5 @@
 use crate::{
-    Db, Program, PythonVersionSource, PythonVersionWithSource, lint::lint_documentation_url,
-    types::TypeCheckDiagnostics,
+    Db, Program, PythonVersionSource, lint::lint_documentation_url, types::TypeCheckDiagnostics,
 };
 use levenshtein::{HideUnderscoredSuggestions, find_best_suggestion};
 use ruff_db::{
@@ -45,11 +44,12 @@ pub fn inferred_python_version_source_annotation(
 /// configuration files, or defaults.
 pub fn add_inferred_python_version_hint_to_diagnostic(
     db: &dyn Db,
+    program: Program<'_>,
     diagnostic: &mut Diagnostic,
     action: &str,
 ) {
-    let program = Program::get(db);
-    let PythonVersionWithSource { version, source } = program.python_version_with_source(db);
+    let version = program.python_version(db);
+    let source = db.python_version_source(program);
 
     match source {
         crate::PythonVersionSource::Cli => {
@@ -58,7 +58,7 @@ pub fn add_inferred_python_version_hint_to_diagnostic(
             ));
         }
         source @ crate::PythonVersionSource::ConfigFile(_) => {
-            if let Some(annotation) = inferred_python_version_source_annotation(db, source) {
+            if let Some(annotation) = inferred_python_version_source_annotation(db, &source) {
                 let mut sub_diagnostic = SubDiagnostic::new(
                     SubDiagnosticSeverity::Info,
                     format_args!("Python {version} was assumed when {action}"),
@@ -72,7 +72,7 @@ pub fn add_inferred_python_version_hint_to_diagnostic(
             }
         }
         source @ crate::PythonVersionSource::PyvenvCfgFile(_) => {
-            if let Some(annotation) = inferred_python_version_source_annotation(db, source) {
+            if let Some(annotation) = inferred_python_version_source_annotation(db, &source) {
                 let mut sub_diagnostic = SubDiagnostic::new(
                     SubDiagnosticSeverity::Info,
                     format_args!(

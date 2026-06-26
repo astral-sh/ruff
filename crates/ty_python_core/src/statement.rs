@@ -1,10 +1,10 @@
 use crate::ast_node_ref::AstNodeRef;
 use crate::db::Db;
 use crate::definition::Definition;
+use crate::environment::AnalysisFile;
 use crate::expression::Expression;
 use crate::node_key::NodeKey;
 use crate::scope::{FileScopeId, ScopeId};
-use ruff_db::files::File;
 use ruff_python_ast as ast;
 use salsa;
 
@@ -37,7 +37,7 @@ pub enum Statement<'db> {
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct StatementInner<'db> {
     /// The file in which the statement occurs.
-    pub file: File,
+    pub analysis_file: AnalysisFile<'db>,
 
     /// The scope in which the statement occurs.
     pub file_scope: FileScopeId,
@@ -53,8 +53,12 @@ pub struct StatementInner<'db> {
 impl get_size2::GetSize for StatementInner<'_> {}
 
 impl<'db> StatementInner<'db> {
+    pub fn file(self, db: &'db dyn Db) -> ruff_db::files::File {
+        self.analysis_file(db).file(db)
+    }
+
     pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        self.file_scope(db).to_scope_id(db, self.file(db))
+        self.file_scope(db).to_scope_id(db, self.analysis_file(db))
     }
 }
 

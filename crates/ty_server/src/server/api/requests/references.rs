@@ -51,7 +51,12 @@ impl BackgroundDocumentRequestHandler for ReferencesRequestHandler {
 
         let include_declaration = params.context.include_declaration;
 
-        let Some(references_result) = find_references(db, file, offset, include_declaration) else {
+        let Some(references_result) = find_references(
+            db,
+            crate::server::api::analysis_file(db, file),
+            offset,
+            include_declaration,
+        ) else {
             return Ok(None);
         };
 

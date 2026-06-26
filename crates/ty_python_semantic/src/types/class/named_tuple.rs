@@ -4,7 +4,7 @@ use ruff_python_ast::{NodeIndex, PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::{
-    Db, Program,
+    Db,
     place::{Place, PlaceAndQualifiers},
     types::{
         BindingContext, BoundTypeVarInstance, ClassBase, ClassLiteral, ClassType, GenericContext,
@@ -24,16 +24,21 @@ use ty_python_core::{definition::Definition, scope::ScopeId};
 /// generic context in the synthesized `__new__` signature.
 pub(super) fn synthesize_namedtuple_class_member<'db>(
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     name: &str,
     instance_ty: Type<'db>,
     fields: impl Iterator<Item = NamedTupleField<'db>>,
     inherited_generic_context: Option<GenericContext<'db>>,
+    python_version: PythonVersion,
 ) -> Option<Type<'db>> {
     match name {
         "__new__" => {
             // __new__(cls, field1, field2, ...) -> Self
-            let self_typevar =
-                BoundTypeVarInstance::synthetic_self(db, instance_ty, BindingContext::Synthetic);
+            let self_typevar = BoundTypeVarInstance::synthetic_self(
+                db,
+                instance_ty,
+                BindingContext::Synthetic(program),
+            );
             let self_ty = Type::TypeVar(self_typevar);
 
             let variables = inherited_generic_context
@@ -41,12 +46,12 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
                 .flat_map(|ctx| ctx.variables(db))
                 .chain(std::iter::once(self_typevar));
 
-            let generic_context = GenericContext::from_typevar_instances(db, variables);
+            let generic_context = GenericContext::from_typevar_instances(db, program, variables);
 
             // CPython generates namedtuple `__new__` as `(_cls, field1, ...)` so field names like
             // `cls` remain usable as keyword arguments at call sites.
             let first_parameter = Parameter::positional_or_keyword(Name::new_static("_cls"))
-                .with_annotated_type(SubclassOfType::from(db, self_typevar));
+                .with_annotated_type(SubclassOfType::from(db, program, self_typevar));
 
             let parameters = std::iter::once(first_parameter).chain(fields.map(|field| {
                 Parameter::positional_or_keyword(field.name)
@@ -63,7 +68,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
             Some(Type::function_like_callable(db, signature))
         }
         "__match_args__" => {
-            if Program::get(db).python_version(db) < PythonVersion::PY310 {
+            if python_version < PythonVersion::PY310 {
                 return None;
             }
 
@@ -81,7 +86,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
             Some(Type::empty_tuple(db))
         }
         "_replace" | "__replace__" => {
-            if name == "__replace__" && Program::get(db).python_version(db) < PythonVersion::PY313 {
+            if name == "__replace__" && python_version < PythonVersion::PY313 {
                 return None;
             }
 
@@ -89,7 +94,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
             let self_ty = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
                 db,
                 instance_ty,
-                BindingContext::Synthetic,
+                BindingContext::Synthetic(program),
             ));
 
             let first_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
@@ -112,10 +117,10 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
         _ => {
             // Fall back to NamedTupleFallback for other synthesized methods.
             KnownClass::NamedTupleFallback
-                .to_class_literal(db)
+                .to_class_literal(db, program)
                 .as_class_literal()?
                 .as_static()?
-                .own_class_member(db, inherited_generic_context, None, name)
+                .own_class_member(db, None, None, name)
                 .ignore_possibly_undefined()
         }
     }
@@ -197,6 +202,10 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         }
     }
 
+    fn program(self, db: &'db dyn Db) -> crate::Program<'db> {
+        self.scope(db).program(db)
+    }
+
     /// Returns an instance type for this dynamic namedtuple.
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
         Type::instance(db, ClassType::NonGeneric(self.into()))
@@ -205,8 +214,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     /// Returns the range of the namedtuple call expression.
     pub(crate) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let scope = self.scope(db);
-        let file = scope.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, scope.analysis_file(db).versioned_file(db)).load(db);
 
         match self.anchor(db) {
             DynamicNamedTupleAnchor::CollectionsDefinition { definition, .. }
@@ -260,9 +268,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     #[salsa::tracked(
         returns(ref),
         heap_size=ruff_memory_usage::heap_size,
-        cycle_initial=|db, _, self_| Mro::from_error(
-            db, ClassType::NonGeneric(ClassLiteral::DynamicNamedTuple(self_)),
-        ),
+        cycle_initial=|db, _, self_: DynamicNamedTupleLiteral<'db>| Mro::from_error(db, ClassType::NonGeneric(ClassLiteral::DynamicNamedTuple(self_))),
     )]
     pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
@@ -276,26 +282,28 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     ///
     /// Namedtuples always have `type` as their metaclass.
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
+        let program = self.program(db);
         let _ = self;
-        KnownClass::Type.to_class_literal(db)
+        KnownClass::Type.to_class_literal(db, program)
     }
 
     /// Compute the specialized tuple class that this namedtuple inherits from.
     ///
     /// For example, `namedtuple("Point", [("x", int), ("y", int)])` inherits from `tuple[int, int]`.
     pub(crate) fn tuple_base_class(self, db: &'db dyn Db) -> ClassType<'db> {
+        let program = self.program(db);
         // If fields are unknown, return `tuple[Unknown, ...]` to avoid false positives
         // like index-out-of-bounds errors.
         if !self.has_known_fields(db) {
-            return TupleType::homogeneous(db, Type::unknown()).to_class_type(db);
+            return TupleType::homogeneous(db, Type::unknown()).to_class_type(db, program);
         }
 
         let field_types = self.fields(db).iter().map(|field| field.ty);
         TupleType::heterogeneous(db, field_types)
-            .map(|t| t.to_class_type(db))
+            .map(|t| t.to_class_type(db, program))
             .unwrap_or_else(|| {
                 KnownClass::Tuple
-                    .to_class_literal(db)
+                    .to_class_literal(db, program)
                     .as_class_literal()
                     .expect("tuple should be a class literal")
                     .default_specialization(db)
@@ -316,6 +324,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
 
     /// Look up an instance member by name (including superclasses).
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+        let program = self.program(db);
         // First check own instance members.
         let result = self.own_instance_member(db, name);
         if !result.is_undefined() {
@@ -323,7 +332,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         }
 
         // Fall back to the tuple base type for other attributes.
-        Type::instance(db, self.tuple_base_class(db)).instance_member(db, name)
+        Type::instance(db, self.tuple_base_class(db)).instance_member(db, program, name)
     }
 
     /// Look up a class-level member by name.
@@ -376,6 +385,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
 
     /// Generate synthesized class members for namedtuples.
     fn synthesized_class_member(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
+        let program = self.program(db);
         let instance_ty = self.to_instance(db);
 
         // When fields are unknown, handle constructor and field-specific methods specially.
@@ -389,7 +399,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                 // For other field-specific methods, fall through to NamedTupleFallback.
                 "__match_args__" | "_fields" | "_replace" | "__replace__" => {
                     return KnownClass::NamedTupleFallback
-                        .to_class_literal(db)
+                        .to_class_literal(db, program)
                         .as_class_literal()?
                         .as_static()?
                         .own_class_member(db, None, None, name)
@@ -397,6 +407,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                         .map(|ty| {
                             ty.apply_type_mapping(
                                 db,
+                                program,
                                 &TypeMapping::ReplaceSelf {
                                     new_upper_bound: instance_ty,
                                 },
@@ -410,10 +421,15 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
 
         let result = synthesize_namedtuple_class_member(
             db,
+            program,
             name,
             instance_ty,
             self.fields(db).iter().cloned(),
             None,
+            self.scope(db)
+                .analysis_file(db)
+                .program(db)
+                .python_version(db),
         );
         // For fallback members from NamedTupleFallback, apply type mapping to handle
         // `Self` types. The explicitly synthesized members (__new__, _fields, _replace,
@@ -427,6 +443,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
             result.map(|ty| {
                 ty.apply_type_mapping(
                     db,
+                    program,
                     &TypeMapping::ReplaceSelf {
                         new_upper_bound: instance_ty,
                     },
@@ -442,7 +459,8 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
             heap_size=ruff_memory_usage::heap_size
         )]
         fn deferred_spec<'db>(db: &'db dyn Db, definition: Definition<'db>) -> NamedTupleSpec<'db> {
-            let module = parsed_module(db, definition.file(db)).load(db);
+            let module =
+                parsed_module(db, definition.analysis_file(db).versioned_file(db)).load(db);
             let node = definition
                 .kind(db)
                 .value(&module)
@@ -541,20 +559,26 @@ impl<'db> DynamicNamedTupleAnchor<'db> {
         nested: bool,
     ) -> Option<Self> {
         match self {
-            Self::CollectionsDefinition { definition, spec } => Some(Self::CollectionsDefinition {
-                definition: *definition,
-                spec: spec.recursive_type_normalized_impl(db, div, nested)?,
-            }),
+            Self::CollectionsDefinition { definition, spec } => {
+                let program = definition.analysis_file(db).program(db);
+                Some(Self::CollectionsDefinition {
+                    definition: *definition,
+                    spec: spec.recursive_type_normalized_impl(db, program, div, nested)?,
+                })
+            }
             Self::TypingDefinition(definition) => Some(Self::TypingDefinition(*definition)),
             Self::ScopeOffset {
                 scope,
                 offset,
                 spec,
-            } => Some(Self::ScopeOffset {
-                scope: *scope,
-                offset: *offset,
-                spec: spec.recursive_type_normalized_impl(db, div, nested)?,
-            }),
+            } => {
+                let program = scope.program(db);
+                Some(Self::ScopeOffset {
+                    scope: *scope,
+                    offset: *offset,
+                    spec: spec.recursive_type_normalized_impl(db, program, div, nested)?,
+                })
+            }
         }
     }
 }
@@ -583,6 +607,7 @@ impl<'db> NamedTupleSpec<'db> {
     pub(crate) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -590,11 +615,12 @@ impl<'db> NamedTupleSpec<'db> {
             .fields(db)
             .iter()
             .map(|f| {
-                let ty = f.ty.recursive_type_normalized_impl(db, div, true);
+                let ty = f.ty.recursive_type_normalized_impl(db, program, div, true);
                 let ty = if nested { ty? } else { ty.unwrap_or(div) };
                 let default = match f.default {
                     Some(default) => {
-                        let default = default.recursive_type_normalized_impl(db, div, true);
+                        let default =
+                            default.recursive_type_normalized_impl(db, program, div, true);
                         Some(if nested {
                             default?
                         } else {

@@ -1,5 +1,6 @@
 use itertools::Either;
 use ruff_db::system::SystemPathBuf;
+use ty_python_core::program::Program;
 use ty_python_semantic::{ResolvedDefinition, map_stub_definition};
 
 use crate::cached_vendored_root;
@@ -12,14 +13,16 @@ use crate::cached_vendored_root;
 /// docstrings for functions that resolve to stubs.
 pub(crate) struct StubMapper<'db> {
     db: &'db dyn ty_python_semantic::Db,
+    program: Program<'db>,
     cached_vendored_root: Option<SystemPathBuf>,
 }
 
 impl<'db> StubMapper<'db> {
-    pub(crate) fn new(db: &'db dyn ty_python_semantic::Db) -> Self {
+    pub(crate) fn new(db: &'db dyn ty_python_semantic::Db, program: Program<'db>) -> Self {
         let cached_vendored_root = cached_vendored_root(db);
         Self {
             db,
+            program,
             cached_vendored_root,
         }
     }
@@ -32,9 +35,12 @@ impl<'db> StubMapper<'db> {
         &self,
         def: ResolvedDefinition<'db>,
     ) -> impl Iterator<Item = ResolvedDefinition<'db>> {
-        if let Some(definitions) =
-            map_stub_definition(self.db, &def, self.cached_vendored_root.as_deref())
-        {
+        if let Some(definitions) = map_stub_definition(
+            self.db,
+            self.program,
+            &def,
+            self.cached_vendored_root.as_deref(),
+        ) {
             return Either::Left(definitions.into_iter());
         }
         Either::Right(std::iter::once(def))

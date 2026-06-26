@@ -1,6 +1,6 @@
-use ruff_db::files::File;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
+use ty_python_core::environment::AnalysisFile;
 use ty_python_semantic::types::ide_support::{
     UnreachableKind, unreachable_ranges, unused_bindings,
 };
@@ -40,14 +40,15 @@ impl HintKind {
     }
 }
 
-pub fn hints(db: &dyn Db, file: File) -> Vec<Hint> {
+pub fn hints(db: &dyn Db, analysis_file: AnalysisFile<'_>) -> Vec<Hint> {
+    let file = analysis_file.file(db);
     if !db.project().should_check_file(db, file) {
         return Vec::new();
     }
 
-    let unreachable = unreachable_ranges(db, file);
+    let unreachable = unreachable_ranges(db, analysis_file);
 
-    let mut hints = unused_bindings(db, file)
+    let mut hints = unused_bindings(db, analysis_file)
         .iter()
         // Avoid a narrower unused-binding hint inside code that is already reported as unreachable.
         .filter(|binding| {

@@ -18,7 +18,8 @@ pub(crate) fn generate_semantic_tokens(
 ) -> Vec<SemanticToken> {
     let source = source_text(db, file);
     let line_index = line_index(db, file);
-    let semantic_token_data = semantic_tokens(db, file, range);
+    let semantic_token_data =
+        semantic_tokens(db, crate::server::api::analysis_file(db, file), range);
 
     let mut encoder = Encoder {
         tokens: Vec::with_capacity(semantic_token_data.len()),

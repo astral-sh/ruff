@@ -49,7 +49,8 @@ impl BackgroundDocumentRequestHandler for GotoDefinitionRequestHandler {
             return Ok(None);
         };
 
-        let Some(ranged) = goto_definition(db, file, offset) else {
+        let Some(ranged) = goto_definition(db, crate::server::api::analysis_file(db, file), offset)
+        else {
             return Ok(None);
         };
 

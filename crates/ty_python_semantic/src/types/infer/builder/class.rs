@@ -1,3 +1,4 @@
+use crate::Program;
 use crate::place::Place;
 use crate::types::{
     CallArguments, DataclassParams, KnownClass, KnownInstanceType, MemberLookupPolicy,
@@ -14,7 +15,7 @@ use crate::types::{
 };
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, helpers::any_over_expr};
-use ty_module_resolver::{KnownModule, file_to_module};
+use ty_module_resolver::KnownModule;
 use ty_python_core::{definition::Definition, scope::NodeWithScopeRef};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -105,11 +106,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let body_scope = self
             .index
             .node_scope(NodeWithScopeRef::Class(class_node))
-            .to_scope_id(db, self.file());
+            .to_scope_id(db, self.analysis_file());
 
-        let maybe_known_class = KnownClass::try_from_file_and_name(db, self.file(), name);
+        let maybe_known_class =
+            KnownClass::try_from_analysis_file_and_name(db, self.analysis_file(), name);
 
-        let known_module = || file_to_module(db, self.file()).and_then(|module| module.known(db));
+        let known_module = || {
+            ty_module_resolver::file_to_module(db, self.analysis_file().program_file(db))
+                .and_then(|module| module.known(db))
+        };
         let in_typing_module = || {
             matches!(
                 known_module(),
@@ -182,7 +187,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .as_function_literal()
                 .is_some_and(|function| function.is_known(db, KnownFunction::Dataclass))
             {
-                dataclass_params = Some(DataclassParams::default_params(db));
+                dataclass_params = Some(DataclassParams::default_params(db, self.program));
                 continue;
             }
 
@@ -274,21 +279,28 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 dataclass_transformer_params,
                 total_ordering,
             );
-            let decorator_result = apply_class_decorator(db, decorator_ty, original_class_ty);
+            let decorator_result =
+                apply_class_decorator(db, self.program, decorator_ty, original_class_ty);
             let decorated_ty = match &decorator_result {
                 Ok(return_ty) => *return_ty,
-                Err(error) => error.return_type(db),
+                Err(error) => error.return_type(db, self.program),
             };
             if is_unknown_decorator_result(db, decorated_ty) {
                 if !preserve_binding_for_unknown_result(
                     db,
+                    self.program,
                     decorator_ty,
                     decorator_call_ty(decorator),
                     decorated_ty,
                 ) {
                     metadata_applies_to_original_class = false;
                 }
-            } else if !type_retains_original_class(db, original_class_ty, decorated_ty) {
+            } else if !type_retains_original_class(
+                db,
+                self.program,
+                original_class_ty,
+                decorated_ty,
+            ) {
                 metadata_applies_to_original_class = false;
             }
 
@@ -322,13 +334,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     decorator_result
                 }
-                _ => apply_class_decorator(db, decorator_ty, inferred_ty),
+                _ => apply_class_decorator(db, self.program, decorator_ty, inferred_ty),
             };
             let decorated_ty = match decorator_result {
                 Ok(return_ty) => return_ty,
                 Err(CallError(_, bindings)) => {
                     bindings.report_diagnostics(&self.context, decorator_node.into());
-                    bindings.return_type(db)
+                    bindings.return_type(db, self.program)
                 }
             };
             let decorated_ty = match decorated_ty {
@@ -340,15 +352,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let should_preserve_binding = is_unknown_decorator_result(db, decorated_ty)
                 && preserve_binding_for_unknown_result(
                     db,
+                    self.program,
                     decorator_ty,
                     decorator_call_ty(decorator_node),
                     decorated_ty,
                 );
             inferred_ty = if should_preserve_binding {
                 inferred_ty
-            } else if class_decorator_preserves_class_binding(db, original_class_ty, decorated_ty) {
+            } else if class_decorator_preserves_class_binding(
+                db,
+                self.program,
+                original_class_ty,
+                decorated_ty,
+            ) {
                 merge_class_preserving_decorator_result(
                     db,
+                    self.program,
                     original_class_ty,
                     inferred_ty,
                     decorated_ty,
@@ -450,13 +469,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
 fn apply_class_decorator<'db>(
     db: &'db dyn crate::Db,
+    program: Program<'db>,
     decorator_ty: Type<'db>,
     decorated_ty: Type<'db>,
 ) -> Result<Type<'db>, CallError<'db>> {
     let call_arguments = CallArguments::positional([decorated_ty]);
     decorator_ty
-        .try_call(db, &call_arguments)
-        .map(|bindings| bindings.return_type(db))
+        .try_call(db, program, &call_arguments)
+        .map(|bindings| bindings.return_type(db, program))
 }
 
 /// Return true if a decorator result still binds the name to the original class.
@@ -474,6 +494,7 @@ fn apply_class_decorator<'db>(
 /// original class object even if the decorator call produced a `SubclassOf` type internally.
 fn class_decorator_preserves_class_binding<'db>(
     db: &'db dyn crate::Db,
+    program: Program<'db>,
     original_class: Type<'db>,
     decorated_class: Type<'db>,
 ) -> bool {
@@ -490,19 +511,21 @@ fn class_decorator_preserves_class_binding<'db>(
         }
         Type::SubclassOf(subclass_of) => subclass_of
             .subclass_of()
-            .into_class(db)
+            .into_class(db, program)
             .is_some_and(|class| class == original_literal.default_specialization(db)),
         Type::Divergent(_) => true,
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .all(|element| class_decorator_preserves_class_binding(db, original_class, *element)),
-        Type::TypeAlias(alias) => {
-            class_decorator_preserves_class_binding(db, original_class, alias.value_type(db))
-        }
-        _ => SubclassOfType::try_from_type(db, original_class).is_some_and(|original_meta_type| {
-            decorated_class.is_equivalent_to(db, original_meta_type)
+        Type::Union(union) => union.elements(db).iter().all(|element| {
+            class_decorator_preserves_class_binding(db, program, original_class, *element)
         }),
+        Type::TypeAlias(alias) => class_decorator_preserves_class_binding(
+            db,
+            program,
+            original_class,
+            alias.value_type(db),
+        ),
+        _ => SubclassOfType::try_from_type(db, program, original_class).is_some_and(
+            |original_meta_type| decorated_class.is_equivalent_to(db, program, original_meta_type),
+        ),
     }
 }
 
@@ -510,6 +533,7 @@ fn class_decorator_preserves_class_binding<'db>(
 /// intersection members.
 fn type_retains_original_class<'db>(
     db: &'db dyn crate::Db,
+    program: Program<'db>,
     original_class: Type<'db>,
     decorated_class: Type<'db>,
 ) -> bool {
@@ -517,15 +541,15 @@ fn type_retains_original_class<'db>(
         Type::Intersection(intersection) => intersection
             .positive(db)
             .iter()
-            .any(|element| type_retains_original_class(db, original_class, *element)),
+            .any(|element| type_retains_original_class(db, program, original_class, *element)),
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .all(|element| type_retains_original_class(db, original_class, *element)),
+            .all(|element| type_retains_original_class(db, program, original_class, *element)),
         Type::TypeAlias(alias) => {
-            type_retains_original_class(db, original_class, alias.value_type(db))
+            type_retains_original_class(db, program, original_class, alias.value_type(db))
         }
-        _ => class_decorator_preserves_class_binding(db, original_class, decorated_class),
+        _ => class_decorator_preserves_class_binding(db, program, original_class, decorated_class),
     }
 }
 
@@ -549,14 +573,19 @@ fn type_retains_original_class<'db>(
 /// be preserved.
 fn preserve_binding_for_unknown_result<'db>(
     db: &'db dyn crate::Db,
+    program: crate::Program<'db>,
     decorator_ty: Type<'db>,
     decorator_call_ty: Option<Type<'db>>,
     decorator_result_ty: Type<'db>,
 ) -> bool {
-    ClassDecoratorUnknownResultPolicy::from_decorator(db, decorator_ty, decorator_result_ty)
-        == ClassDecoratorUnknownResultPolicy::PreserveBinding
+    ClassDecoratorUnknownResultPolicy::from_decorator(
+        db,
+        program,
+        decorator_ty,
+        decorator_result_ty,
+    ) == ClassDecoratorUnknownResultPolicy::PreserveBinding
         || decorator_call_ty.is_some_and(|ty| {
-            ClassDecoratorUnknownResultPolicy::from_decorator(db, ty, decorator_result_ty)
+            ClassDecoratorUnknownResultPolicy::from_decorator(db, program, ty, decorator_result_ty)
                 == ClassDecoratorUnknownResultPolicy::PreserveBinding
         })
 }
@@ -612,6 +641,7 @@ impl ClassDecoratorUnknownResultPolicy {
     /// intent.
     fn from_decorator<'db>(
         db: &'db dyn crate::Db,
+        program: crate::Program<'db>,
         decorator_ty: Type<'db>,
         decorator_result_ty: Type<'db>,
     ) -> Self {
@@ -619,7 +649,7 @@ impl ClassDecoratorUnknownResultPolicy {
             return Self::ReplaceBinding;
         }
 
-        Self::known_from_decorator(db, decorator_ty, decorator_result_ty)
+        Self::known_from_decorator(db, program, decorator_ty, decorator_result_ty)
             .unwrap_or(Self::ReplaceBinding)
     }
 
@@ -642,6 +672,7 @@ impl ClassDecoratorUnknownResultPolicy {
     /// the decorator value itself is not the function that receives the class.
     fn known_from_decorator<'db>(
         db: &'db dyn crate::Db,
+        program: crate::Program<'db>,
         decorator_ty: Type<'db>,
         decorator_result_ty: Type<'db>,
     ) -> Option<Self> {
@@ -664,6 +695,7 @@ impl ClassDecoratorUnknownResultPolicy {
                 let call_symbol = decorator_ty
                     .member_lookup_with_policy(
                         db,
+                        program,
                         Name::new_static("__call__"),
                         MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                     )
@@ -673,7 +705,7 @@ impl ClassDecoratorUnknownResultPolicy {
                     && place.is_definitely_defined()
                 {
                     Some(
-                        Self::known_from_decorator(db, place.ty, decorator_result_ty)
+                        Self::known_from_decorator(db, program, place.ty, decorator_result_ty)
                             .unwrap_or(Self::ReplaceBinding),
                     )
                 } else {
@@ -682,7 +714,7 @@ impl ClassDecoratorUnknownResultPolicy {
             }
             Type::Union(union) => Some(
                 if union.elements(db).iter().all(|element| {
-                    Self::known_from_decorator(db, *element, decorator_result_ty)
+                    Self::known_from_decorator(db, program, *element, decorator_result_ty)
                         == Some(Self::PreserveBinding)
                 }) {
                     Self::PreserveBinding
@@ -691,7 +723,7 @@ impl ClassDecoratorUnknownResultPolicy {
                 },
             ),
             Type::TypeAlias(alias) => Some(
-                Self::known_from_decorator(db, alias.value_type(db), decorator_result_ty)
+                Self::known_from_decorator(db, program, alias.value_type(db), decorator_result_ty)
                     .unwrap_or(Self::ReplaceBinding),
             ),
             Type::Callable(callable) => Some(match callable.provenance(db) {
@@ -747,12 +779,13 @@ impl ClassDecoratorUnknownResultPolicy {
 /// returns the original class object again.
 fn merge_class_preserving_decorator_result<'db>(
     db: &'db dyn crate::Db,
+    program: Program<'db>,
     original_class: Type<'db>,
     current_binding: Type<'db>,
     decorated_binding: Type<'db>,
 ) -> Type<'db> {
     if current_binding == original_class
-        || type_retains_original_class(db, original_class, current_binding)
+        || type_retains_original_class(db, program, original_class, current_binding)
     {
         current_binding
     } else {

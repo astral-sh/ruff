@@ -51,16 +51,20 @@ impl<'db> NewType<'db> {
     }
 
     #[salsa::tracked(
-        cycle_initial=|db, _, _| NewTypeBase::ClassType(ClassType::object(db)),
+        cycle_initial=|db: &'db dyn Db, _, newtype: NewType<'db>| {
+            let program = newtype.definition(db).analysis_file(db).program(db);
+            NewTypeBase::ClassType(ClassType::object(db, program))
+        },
         heap_size=ruff_memory_usage::heap_size
     )]
     fn lazy_base(self, db: &'db dyn Db) -> NewTypeBase<'db> {
         // `TypeInferenceBuilder` emits diagnostics for invalid `NewType` definitions that show up
         // in assignments, but invalid definitions still get here, and also `NewType` might show up
         // in places that aren't definitions at all. Fall back to `object` in all error cases.
-        let object_fallback = NewTypeBase::ClassType(ClassType::object(db));
         let definition = self.definition(db);
-        let module = parsed_module(db, definition.file(db)).load(db);
+        let program = definition.analysis_file(db).program(db);
+        let object_fallback = NewTypeBase::ClassType(ClassType::object(db, program));
+        let module = parsed_module(db, definition.analysis_file(db).versioned_file(db)).load(db);
         let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
             return object_fallback;
         };
@@ -72,7 +76,7 @@ impl<'db> NewType<'db> {
         };
         match definition_expression_type(db, definition, second_arg) {
             Type::NominalInstance(nominal_instance_type) => {
-                NewTypeBase::ClassType(nominal_instance_type.class(db))
+                NewTypeBase::ClassType(nominal_instance_type.class(db, program))
             }
             Type::NewTypeInstance(newtype) => NewTypeBase::NewType(newtype),
             // There are exactly two union types allowed as bases for NewType: `int | float` and
@@ -96,13 +100,19 @@ impl<'db> NewType<'db> {
         }
     }
 
+    pub(crate) fn base_instance_type(self, db: &'db dyn Db) -> Type<'db> {
+        let program = self.definition(db).analysis_file(db).program(db);
+        self.base(db).instance_type(db, program)
+    }
+
     // Walk the `NewTypeBase` chain to find the underlying non-newtype `Type`. There might not be
     // one if this `NewType` is cyclical, and we fall back to `object` in that case.
     pub fn concrete_base_type(self, db: &'db dyn Db) -> Type<'db> {
+        let program = self.definition(db).analysis_file(db).program(db);
         for base in self.iter_bases(db) {
             match base {
                 NewTypeBase::NewType(_) => continue,
-                concrete => return concrete.instance_type(db),
+                concrete => return concrete.instance_type(db, program),
             }
         }
         Type::object()
@@ -227,13 +237,14 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         left: NewType<'db>,
         right: NewType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let program = self.program;
         // Two NewTypes are disjoint if they're not equal and neither inherits from the other.
         // NewTypes have single inheritance, and a regular class can't inherit from a NewType, so
         // it's not possible for some third type to multiply-inherit from both.
         let relation_checker = self.as_relation_checker(TypeRelation::Subtyping);
         relation_checker
             .check_newtype_pair(db, left, right)
-            .or(db, self.constraints, || {
+            .or(db, program, self.constraints, || {
                 relation_checker.check_newtype_pair(db, right, left)
             })
             .negate(db, self.constraints)
@@ -242,6 +253,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 
 pub(crate) fn walk_newtype_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     newtype: NewType<'db>,
     visitor: &V,
 ) {
@@ -251,7 +263,7 @@ pub(crate) fn walk_newtype_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Si
         newtype.eager_base(db)
     };
     if let Some(base) = base {
-        visitor.visit_type(db, base.instance_type(db));
+        visitor.visit_type(db, program, base.instance_type(db, program));
     }
 }
 
@@ -269,12 +281,12 @@ pub enum NewTypeBase<'db> {
 }
 
 impl<'db> NewTypeBase<'db> {
-    pub fn instance_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub fn instance_type(self, db: &'db dyn Db, program: crate::Program<'db>) -> Type<'db> {
         match self {
             NewTypeBase::ClassType(class_type) => Type::instance(db, class_type),
             NewTypeBase::NewType(newtype) => Type::NewTypeInstance(newtype),
-            NewTypeBase::Float => KnownUnion::Float.to_type(db),
-            NewTypeBase::Complex => KnownUnion::Complex.to_type(db),
+            NewTypeBase::Float => KnownUnion::Float.to_type(db, program),
+            NewTypeBase::Complex => KnownUnion::Complex.to_type(db, program),
         }
     }
 

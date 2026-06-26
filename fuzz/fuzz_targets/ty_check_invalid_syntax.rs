@@ -18,13 +18,14 @@ use ruff_python_ast::PythonVersion;
 use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
 use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings};
 use ty_python_core::Db as _;
+use ty_python_core::environment::InferenceSettings;
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 use ty_python_semantic::lint::LintRegistry;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
-    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, default_lint_registry,
-    lint::RuleSelection,
+    AnalysisFile, AnalysisSettings, Db as SemanticDb, PythonVersionWithSource,
+    default_lint_registry, lint::RuleSelection,
 };
 
 /// Database that can be used for testing.
@@ -39,10 +40,13 @@ struct TestDb {
     vendored: VendoredFileSystem,
     rule_selection: Arc<RuleSelection>,
     analysis_settings: Arc<AnalysisSettings>,
+    program_settings: ProgramSettings,
+    inference_settings: InferenceSettings,
 }
 
 impl TestDb {
     fn new() -> Self {
+        let vendored = ty_vendored::file_system().clone();
         Self {
             storage: salsa::Storage::new(Some(Box::new({
                 move |event| {
@@ -50,11 +54,21 @@ impl TestDb {
                 }
             }))),
             system: TestSystem::default(),
-            vendored: ty_vendored::file_system().clone(),
+            program_settings: ProgramSettings {
+                python_version: PythonVersionWithSource::default(),
+                python_platform: PythonPlatform::default(),
+                search_paths: ty_module_resolver::SearchPaths::empty(&vendored),
+            },
+            inference_settings: InferenceSettings::default(),
+            vendored,
             files: Files::default(),
             rule_selection: RuleSelection::from_registry(default_lint_registry()).into(),
             analysis_settings: AnalysisSettings::default().into(),
         }
+    }
+
+    fn program(&self) -> Program<'_> {
+        Program::from_settings(self, &self.program_settings, &self.inference_settings)
     }
 }
 
@@ -73,7 +87,7 @@ impl SourceDb for TestDb {
     }
 
     fn python_version(&self) -> PythonVersion {
-        Program::get(self).python_version(self)
+        self.program().python_version(self)
     }
 }
 
@@ -88,11 +102,7 @@ impl DbWithTestSystem for TestDb {
 }
 
 #[salsa::db]
-impl ModuleResolverDb for TestDb {
-    fn search_paths(&self) -> &ty_module_resolver::SearchPaths {
-        Program::get(self).search_paths(self)
-    }
-}
+impl ModuleResolverDb for TestDb {}
 
 #[salsa::db]
 impl ty_python_core::Db for TestDb {
@@ -103,9 +113,10 @@ impl ty_python_core::Db for TestDb {
 
 #[salsa::db]
 impl SemanticDb for TestDb {
-    fn check_file(&self, file: File) -> Vec<Diagnostic> {
+    fn check_file(&self, analysis_file: AnalysisFile<'_>) -> Vec<Diagnostic> {
+        let file = analysis_file.file(self);
         if self.should_check_file(file) {
-            ty_python_semantic::check_file_unwrap(self, file)
+            ty_python_semantic::check_file_unwrap(self, analysis_file)
         } else {
             Vec::new()
         }
@@ -136,23 +147,20 @@ impl SemanticDb for TestDb {
 impl salsa::Database for TestDb {}
 
 fn setup_db() -> TestDb {
-    let db = TestDb::new();
+    let mut db = TestDb::new();
 
     let src_root = SystemPathBuf::from("/src");
     db.memory_file_system()
         .create_directory_all(&src_root)
         .unwrap();
 
-    Program::from_settings(
-        &db,
-        ProgramSettings {
-            python_version: PythonVersionWithSource::default(),
-            python_platform: PythonPlatform::default(),
-            search_paths: SearchPathSettings::new(vec![src_root])
-                .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-                .expect("Valid search path settings"),
-        },
-    );
+    db.program_settings = ProgramSettings {
+        python_version: PythonVersionWithSource::default(),
+        python_platform: PythonPlatform::default(),
+        search_paths: SearchPathSettings::new(vec![src_root])
+            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+            .expect("Valid search path settings"),
+    };
 
     db
 }
@@ -177,7 +185,7 @@ fn do_fuzz(case: &[u8]) -> Corpus {
     for path in &["/src/a.py", "/src/a.pyi"] {
         db.write_file(path, code).unwrap();
         let file = system_path_to_file(&*db, path).unwrap();
-        check_types(&*db, file);
+        check_types(&*db, AnalysisFile::new(&*db, db.program(), file));
         db.memory_file_system().remove_file(path).unwrap();
         file.sync(&mut *db);
     }

@@ -13,6 +13,7 @@ use ruff_python_ast::{Singleton, name::Name};
 
 use crate::ast_ids::ExpressionNodeKey;
 use crate::db::Db;
+use crate::environment::AnalysisFile;
 use crate::expression::Expression;
 use crate::global_scope;
 use crate::scope::{FileScopeId, ScopeId};
@@ -230,7 +231,7 @@ pub enum PatternPredicateKind<'db> {
 
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PatternPredicate<'db> {
-    pub file: File,
+    pub analysis_file: AnalysisFile<'db>,
 
     pub file_scope: FileScopeId,
 
@@ -249,8 +250,12 @@ pub struct PatternPredicate<'db> {
 impl get_size2::GetSize for PatternPredicate<'_> {}
 
 impl<'db> PatternPredicate<'db> {
+    pub fn file(self, db: &'db dyn Db) -> File {
+        self.analysis_file(db).file(db)
+    }
+
     pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        self.file_scope(db).to_scope_id(db, self.file(db))
+        self.file_scope(db).to_scope_id(db, self.analysis_file(db))
     }
 }
 
@@ -296,7 +301,7 @@ impl<'db> PatternPredicate<'db> {
 /// [Truthiness]: [crate::types::Truthiness]
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct StarImportPlaceholderPredicate<'db> {
-    pub importing_file: File,
+    pub importing_file: AnalysisFile<'db>,
 
     /// Each symbol imported by a `*` import has a separate predicate associated with it:
     /// this field identifies which symbol that is.
@@ -309,7 +314,7 @@ pub struct StarImportPlaceholderPredicate<'db> {
     /// to the global scope of the importing file.
     pub symbol_id: ScopedSymbolId,
 
-    pub referenced_file: File,
+    pub referenced_file: AnalysisFile<'db>,
 }
 
 // The Salsa heap is tracked separately.

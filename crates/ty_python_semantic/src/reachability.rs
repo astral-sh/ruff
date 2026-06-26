@@ -196,7 +196,7 @@
 use std::cell::RefCell;
 
 use crate::{
-    Db,
+    Db, Program,
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
@@ -237,8 +237,14 @@ use ty_python_core::{
 /// same intersections.
 #[salsa::tracked(
     cycle_initial = |_, id, _, _| Type::divergent(id),
-    cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-        result.cycle_normalized(db, *previous, cycle)
+    cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
+        let program = predicate.analysis_file(db).program(db);
+        result.cycle_normalized(
+            db,
+            program,
+            *previous,
+            cycle,
+        )
     },
     heap_size = ruff_memory_usage::heap_size
 )]
@@ -266,8 +272,14 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
 /// This result is also the preceding-pattern prefix for the next unguarded case.
 #[salsa::tracked(
     cycle_initial = |_, id, _, _| Type::divergent(id),
-    cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-        result.cycle_normalized(db, *previous, cycle)
+    cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
+        let program = predicate.analysis_file(db).program(db);
+        result.cycle_normalized(
+            db,
+            program,
+            *previous,
+            cycle,
+        )
     },
     heap_size = ruff_memory_usage::heap_size
 )]
@@ -276,7 +288,8 @@ fn type_narrowed_by_pattern<'db>(
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
-    pattern_binding_fallthrough_type(db, predicate.kind(db), subject_ty)
+    let program = predicate.analysis_file(db).program(db);
+    pattern_binding_fallthrough_type(db, program, predicate.kind(db), subject_ty)
 }
 
 /// Return the enum class and canonical member names represented by an enum-literal subject type.
@@ -323,7 +336,9 @@ fn enum_literal_subject_names<'db>(
                 add_enum_literal(db, &mut enum_class, &mut names, *element)?;
             }
         }
-        Type::TypeAlias(alias) => return enum_literal_subject_names(db, alias.value_type(db)),
+        Type::TypeAlias(alias) => {
+            return enum_literal_subject_names(db, alias.value_type(db));
+        }
         _ => return None,
     }
 
@@ -340,7 +355,8 @@ fn enum_member_pattern_name<'db>(
     enum_class: EnumClassLiteral<'db>,
     kind: &PatternPredicateKind<'db>,
 ) -> Option<Name> {
-    let value_ty = definite_match_pattern_type(db, kind);
+    let program = enum_class.class_literal(db).program(db);
+    let value_ty = definite_match_pattern_type(db, program, kind);
     let enum_literal = value_ty.as_enum_literal()?;
     if enum_literal.enum_class_literal(db) != enum_class {
         return None;
@@ -465,6 +481,7 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
     heap_size = get_size2::GetSize::get_heap_size
 )]
 fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'db>) -> Truthiness {
+    let program = predicate.subject(db).analysis_file(db).program(db);
     let subject_ty =
         infer_same_file_expression_type(db, predicate.subject(db), TypeContext::default());
 
@@ -474,8 +491,8 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
         return truthiness;
     }
 
-    let coverage_subject_ty = expand_type(db, subject_ty)
-        .map(|types| UnionType::from_elements(db, types))
+    let coverage_subject_ty = expand_type(db, program, subject_ty)
+        .map(|types| UnionType::from_elements(db, program, types))
         .unwrap_or(subject_ty);
     let narrowed_subject_ty =
         type_narrowed_by_previous_patterns(db, predicate, coverage_subject_ty);
@@ -494,8 +511,13 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
         return Truthiness::AlwaysTrue;
     }
 
-    let truthiness =
-        analyze_single_pattern_predicate_kind(db, predicate.kind(db), narrowed_subject_ty, None);
+    let truthiness = analyze_single_pattern_predicate_kind(
+        db,
+        program,
+        predicate.kind(db),
+        narrowed_subject_ty,
+        None,
+    );
 
     if truthiness == Truthiness::AlwaysTrue && predicate.guard(db).is_some() {
         // Fall back to ambiguous, the guard might change the result.
@@ -652,6 +674,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
 
 pub(crate) fn narrow_type_by_constraint<'db>(
     db: &'db dyn Db,
+    program: Program<'db>,
     constraints: &NarrowingConstraints,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     id: ScopedNarrowingConstraint,
@@ -668,6 +691,7 @@ pub(crate) fn narrow_type_by_constraint<'db>(
     let projected_root = projector.project(id);
     let mut context = ProjectedNarrowingContext {
         db,
+        program,
         base_ty,
         graph: &projector.graph,
         joins: projector.graph.joins(projected_root),
@@ -678,13 +702,14 @@ pub(crate) fn narrow_type_by_constraint<'db>(
 
 fn apply_accumulated_narrowing<'db>(
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     base_ty: Type<'db>,
     accumulated: Option<NarrowingConstraint<'db>>,
 ) -> Type<'db> {
     match accumulated {
         Some(constraint) => NarrowingConstraint::intersection(base_ty)
             .merge_constraint_and(constraint)
-            .evaluate_constraint_type(db),
+            .evaluate_constraint_type(db, program),
         None => base_ty,
     }
 }
@@ -1023,6 +1048,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
 /// Evaluates narrowed types over a projected narrowing graph.
 struct ProjectedNarrowingContext<'a, 'db> {
     db: &'db dyn Db,
+    program: Program<'db>,
     base_ty: Type<'db>,
     graph: &'a ProjectedNarrowingGraph<'db>,
     /// Marks join boundaries in the projected DAG.
@@ -1057,7 +1083,7 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
             // Preserve replacement narrowing order at a join: evaluate the shared suffix once,
             // then apply the incoming prefix constraint to its narrowed type.
             let suffix_ty = self.narrow_join(id);
-            return apply_accumulated_narrowing(self.db, suffix_ty, accumulated);
+            return apply_accumulated_narrowing(self.db, self.program, suffix_ty, accumulated);
         }
 
         self.narrow_uncached(id, accumulated)
@@ -1074,7 +1100,7 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
         }
 
         if id == ProjectedNarrowingNodeId::ALWAYS_TRUE {
-            apply_accumulated_narrowing(self.db, self.base_ty, accumulated)
+            apply_accumulated_narrowing(self.db, self.program, self.base_ty, accumulated)
         } else {
             let node = self.graph.node(id);
             let (pos_constraint, neg_constraint) =
@@ -1100,8 +1126,8 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
                 let false_ty = self.narrow(node.if_false, false_accumulated);
 
                 let true_or_uncertain =
-                    UnionType::from_two_elements(self.db, true_ty, uncertain_ty);
-                UnionType::from_two_elements(self.db, true_or_uncertain, false_ty)
+                    UnionType::from_two_elements(self.db, self.program, true_ty, uncertain_ty);
+                UnionType::from_two_elements(self.db, self.program, true_or_uncertain, false_ty)
             }
         }
     }
@@ -1109,6 +1135,7 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
 
 fn analyze_single_pattern_predicate_kind<'db>(
     db: &'db dyn Db,
+    program: Program<'db>,
     predicate_kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
     precomputed_definite_match_ty: Option<Type<'db>>,
@@ -1117,18 +1144,18 @@ fn analyze_single_pattern_predicate_kind<'db>(
         PatternPredicateKind::Value(value) => {
             let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
 
-            if subject_ty.is_single_valued(db) {
-                equality_truthiness(db, subject_ty, value_ty)
+            if subject_ty.is_single_valued(db, program) {
+                equality_truthiness(db, program, subject_ty, value_ty)
             } else {
                 Truthiness::Ambiguous
             }
         }
         PatternPredicateKind::Singleton(singleton) => {
-            let singleton_ty = singleton_pattern_type(db, *singleton);
+            let singleton_ty = singleton_pattern_type(db, program, *singleton);
 
-            if subject_ty.is_equivalent_to(db, singleton_ty) {
+            if subject_ty.is_equivalent_to(db, program, singleton_ty) {
                 Truthiness::AlwaysTrue
-            } else if subject_ty.is_disjoint_from(db, singleton_ty) {
+            } else if subject_ty.is_disjoint_from(db, program, singleton_ty) {
                 Truthiness::AlwaysFalse
             } else {
                 Truthiness::Ambiguous
@@ -1141,20 +1168,25 @@ fn analyze_single_pattern_predicate_kind<'db>(
             let (ControlFlow::Break(truthiness) | ControlFlow::Continue(truthiness)) = predicates
                 .iter()
                 .map(|p| {
-                    let narrowed_subject_ty = IntersectionBuilder::new(db)
+                    let narrowed_subject_ty = IntersectionBuilder::new(db, program)
                         .add_positive(subject_ty)
-                        .add_negative(UnionType::from_elements(db, excluded_types.iter()))
+                        .add_negative(UnionType::from_elements(db, program, excluded_types.iter()))
                         .build();
 
-                    let definitely_matched =
-                        definite_match_pattern_type_for_subject(db, p, narrowed_subject_ty);
+                    let definitely_matched = definite_match_pattern_type_for_subject(
+                        db,
+                        program,
+                        p,
+                        narrowed_subject_ty,
+                    );
                     excluded_types.push(definitely_matched);
 
-                    if narrowed_subject_ty.is_subtype_of(db, definitely_matched) {
+                    if narrowed_subject_ty.is_subtype_of(db, program, definitely_matched) {
                         Truthiness::AlwaysTrue
                     } else {
                         analyze_single_pattern_predicate_kind(
                             db,
+                            program,
                             p,
                             narrowed_subject_ty,
                             Some(definitely_matched),
@@ -1181,47 +1213,47 @@ fn analyze_single_pattern_predicate_kind<'db>(
                 match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
                     Type::ClassLiteral(class) => Type::instance(db, class.top_materialization(db)),
                     Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
-                        callable_pattern_type(db)
+                        callable_pattern_type(db, program)
                     }
                     _ => return Truthiness::Ambiguous,
                 };
             let definitely_matched = precomputed_definite_match_ty.unwrap_or_else(|| {
-                definite_match_pattern_type_for_subject(db, predicate_kind, subject_ty)
+                definite_match_pattern_type_for_subject(db, program, predicate_kind, subject_ty)
             });
 
-            if subject_ty.is_equivalent_to(db, definitely_matched)
-                || subject_ty.is_subtype_of(db, definitely_matched)
+            if subject_ty.is_equivalent_to(db, program, definitely_matched)
+                || subject_ty.is_subtype_of(db, program, definitely_matched)
             {
                 Truthiness::AlwaysTrue
-            } else if subject_ty.is_disjoint_from(db, class_ty) {
+            } else if subject_ty.is_disjoint_from(db, program, class_ty) {
                 Truthiness::AlwaysFalse
             } else {
                 Truthiness::Ambiguous
             }
         }
         PatternPredicateKind::Mapping(kind) => {
-            let mapping_ty = mapping_pattern_type(db);
-            if subject_ty.is_subtype_of(db, mapping_ty) {
+            let mapping_ty = mapping_pattern_type(db, program);
+            if subject_ty.is_subtype_of(db, program, mapping_ty) {
                 if kind.is_irrefutable() {
                     Truthiness::AlwaysTrue
                 } else {
                     Truthiness::Ambiguous
                 }
-            } else if subject_ty.is_disjoint_from(db, mapping_ty) {
+            } else if subject_ty.is_disjoint_from(db, program, mapping_ty) {
                 Truthiness::AlwaysFalse
             } else {
                 Truthiness::Ambiguous
             }
         }
         PatternPredicateKind::Sequence(kind) => {
-            let sequence_ty = sequence_pattern_type_builder(db).build();
-            if subject_ty.is_subtype_of(db, sequence_ty) {
+            let sequence_ty = sequence_pattern_type_builder(db, program).build();
+            if subject_ty.is_subtype_of(db, program, sequence_ty) {
                 if kind.is_irrefutable() {
                     Truthiness::AlwaysTrue
                 } else {
                     Truthiness::Ambiguous
                 }
-            } else if subject_ty.is_disjoint_from(db, sequence_ty) {
+            } else if subject_ty.is_disjoint_from(db, program, sequence_ty) {
                 Truthiness::AlwaysFalse
             } else {
                 Truthiness::Ambiguous
@@ -1232,6 +1264,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
             .map(|p| {
                 analyze_single_pattern_predicate_kind(
                     db,
+                    program,
                     p,
                     subject_ty,
                     precomputed_definite_match_ty,
@@ -1259,6 +1292,7 @@ fn analyze_non_terminal_call<'db>(
     call_expr: Expression<'db>,
     is_await: bool,
 ) -> Truthiness {
+    let program = callable.analysis_file(db).program(db);
     // We first infer just the type of the callable. In the most likely case that the function is
     // not marked with `NoReturn`, or that it always returns `NoReturn`, doing so allows us to avoid
     // the more expensive work of inferring the entire call expression (which could involve
@@ -1277,7 +1311,7 @@ fn analyze_non_terminal_call<'db>(
     }
 
     let overloads_iterator = if let Some(callable) = ty
-        .try_upcast_to_callable(db)
+        .try_upcast_to_callable(db, program)
         .and_then(CallableTypes::exactly_one)
     {
         callable.signatures(db).overloads.iter()
@@ -1290,10 +1324,12 @@ fn analyze_non_terminal_call<'db>(
     let mut any_overload_is_generic = false;
 
     for overload in overloads_iterator {
-        let returns_never = overload.return_ty.is_equivalent_to(db, Type::Never);
+        let returns_never = overload
+            .return_ty
+            .is_equivalent_to(db, program, Type::Never);
         no_overloads_return_never &= !returns_never;
         all_overloads_return_never &= returns_never;
-        any_overload_is_generic |= overload.return_ty.has_typevar(db);
+        any_overload_is_generic |= overload.return_ty.has_typevar(db, program);
     }
 
     if no_overloads_return_never && !any_overload_is_generic && !is_await {
@@ -1302,7 +1338,7 @@ fn analyze_non_terminal_call<'db>(
         Truthiness::AlwaysFalse
     } else {
         let call_expr_ty = infer_same_file_expression_type(db, call_expr, TypeContext::default());
-        if call_expr_ty.is_equivalent_to(db, Type::Never) {
+        if call_expr_ty.is_equivalent_to(db, program, Type::Never) {
             Truthiness::AlwaysFalse
         } else {
             Truthiness::AlwaysTrue
@@ -1325,7 +1361,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
     match predicate.node {
         PredicateNode::Expression(test_expr) => {
             infer_same_file_expression_type(db, test_expr, TypeContext::default())
-                .bool(db)
+                .bool(db, test_expr.analysis_file(db).program(db))
                 .negate_if(!predicate.is_positive)
         }
         PredicateNode::IsNonTerminalCall(CallableAndCallExpr {
@@ -1354,7 +1390,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
                         tracing::trace!(
                             "Symbol `{}` (via star import) not found in `__all__` of `{}`",
                             symbol.name(),
-                            referenced_file.path(db)
+                            referenced_file.file(db).path(db)
                         );
                         return Truthiness::AlwaysFalse;
                     }
@@ -1364,6 +1400,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
 
             match imported_symbol(
                 db,
+                referenced_file.program(db),
                 Some(referenced_file),
                 symbol.name(),
                 requires_explicit_reexport,
@@ -1619,9 +1656,10 @@ mod tests {
                             y = x
                     "#,
                 )?;
+                let program = db.program();
 
                 let file = system_path_to_file(&db, "/src/test.py").unwrap();
-                let index = semantic_index(&db, file);
+                let index = semantic_index(&db, crate::AnalysisFile::new(&db, program, file));
                 let function_scope = index.child_scopes(FileScopeId::global()).next().unwrap().0;
                 let use_def = index.use_def_map(function_scope);
                 let predicate = use_def

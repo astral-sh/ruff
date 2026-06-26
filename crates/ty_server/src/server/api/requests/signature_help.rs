@@ -54,7 +54,9 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
         // Extract signature help capabilities from the client
         let resolved_capabilities = snapshot.resolved_client_capabilities();
 
-        let Some(signature_help_info) = signature_help(db, file, offset) else {
+        let Some(signature_help_info) =
+            signature_help(db, crate::server::api::analysis_file(db, file), offset)
+        else {
             return Ok(None);
         };
 

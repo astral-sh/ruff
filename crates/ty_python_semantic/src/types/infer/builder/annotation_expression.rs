@@ -293,7 +293,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 if qualifier == TypeQualifier::ClassVar
                                     && type_and_qualifiers
                                         .inner_type()
-                                        .has_non_self_typevar(self.db())
+                                        .has_non_self_typevar(self.db(), self.program)
                                     && let Some(builder) =
                                         self.context.report_lint(&INVALID_TYPE_FORM, subscript)
                                 {

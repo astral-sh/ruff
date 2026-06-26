@@ -99,7 +99,12 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
             if let Some(diagnostic_id) = diagnostic_id
                 && let Some(range) = diagnostic.range.to_text_range(db, file, uri, encoding)
             {
-                for action in code_actions(db, file, range, &diagnostic_id) {
+                for action in code_actions(
+                    db,
+                    crate::server::api::analysis_file(db, file),
+                    range,
+                    &diagnostic_id,
+                ) {
                     actions.push(CodeActionResponse::CodeAction(lsp_types::CodeAction {
                         title: action.title,
                         kind: Some(CodeActionKind::QuickFix),

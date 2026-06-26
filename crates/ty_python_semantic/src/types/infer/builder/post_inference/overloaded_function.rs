@@ -67,6 +67,7 @@ pub(crate) fn check_overloaded_function<'db>(
         ..
     }) = place_from_bindings(
         db,
+        context.program(),
         use_def.end_of_scope_symbol_bindings(place.as_symbol().unwrap()),
     )
     .place
@@ -142,11 +143,13 @@ pub(crate) fn check_overloaded_function<'db>(
             )
         {
             if class.is_protocol(db)
-                || (Type::ClassLiteral(class)
-                    .is_subtype_of(db, KnownClass::ABCMeta.to_instance(db))
-                    && overloads.iter().all(|overload| {
-                        overload.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD)
-                    }))
+                || (Type::ClassLiteral(class).is_subtype_of(
+                    db,
+                    context.program(),
+                    KnownClass::ABCMeta.to_instance(db, context.program()),
+                ) && overloads.iter().all(|overload| {
+                    overload.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD)
+                }))
             {
                 implementation_required = false;
             }
@@ -254,7 +257,8 @@ pub(crate) fn check_overloaded_function<'db>(
                     diagnostic.annotate(Annotation::secondary(decorator));
                 }
                 let file = function.file(db);
-                let module = parsed_module(db, file).load(db);
+                let module =
+                    parsed_module(db, function.analysis_file(db).versioned_file(db)).load(db);
                 let node = first_overload.node(db, file, &module);
                 let span = if node.body.len() == 1 {
                     Span::from(file).with_range(node.range())
@@ -307,9 +311,17 @@ fn check_non_generic_overload_implementation_consistency<'db>(
     for (overload, overload_signature) in overload_signatures {
         let function_node = overload.node(db, context.file(), context.module());
         let parameter_consistency = implementation_signature
-            .non_generic_implementation_parameters_consistency_with(db, &overload_signature);
+            .non_generic_implementation_parameters_consistency_with(
+                db,
+                context.program(),
+                &overload_signature,
+            );
         let return_type_consistency = implementation_signature
-            .non_generic_implementation_return_type_consistency_with(db, &overload_signature);
+            .non_generic_implementation_return_type_consistency_with(
+                db,
+                context.program(),
+                &overload_signature,
+            );
 
         let (parameter_error_context, return_type_error_context, message) =
             match (parameter_consistency, return_type_consistency) {
@@ -347,18 +359,20 @@ fn check_non_generic_overload_implementation_consistency<'db>(
         if let Some(error_context) = parameter_error_context {
             diagnostic.info(format_args!(
                 "Implementation signature `{}` is not assignable to overload signature `{}`",
-                implementation_signature.display(db),
-                overload_signature.display(db),
+                implementation_signature.display(db, context.program()),
+                overload_signature.display(db, context.program()),
             ));
-            error_context.attach_to(db, &mut diagnostic);
+            error_context.attach_to(db, context.program(), &mut diagnostic);
         }
         if let Some(error_context) = return_type_error_context {
             diagnostic.info(format_args!(
                 "Overload returns `{}`, which is not assignable to implementation return type `{}`",
-                overload_signature.return_ty.display(db),
-                implementation_signature.return_ty.display(db),
+                overload_signature.return_ty.display(db, context.program()),
+                implementation_signature
+                    .return_ty
+                    .display(db, context.program()),
             ));
-            error_context.attach_to(db, &mut diagnostic);
+            error_context.attach_to(db, context.program(), &mut diagnostic);
         }
         diagnostic.annotate(
             context

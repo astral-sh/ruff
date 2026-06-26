@@ -5,7 +5,7 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_python_ast::{AnyNodeRef, name::Name};
 
 use crate::{
-    Db, DisplaySettings,
+    Db, DisplaySettings, Program,
     place::{Place, PlaceAndQualifiers},
     types::{
         BoundTypeVarInstance, ClassBase, ClassType, DivergentType, DynamicType,
@@ -42,18 +42,19 @@ impl<'db> TypeVarOwnerContext<'db> {
     /// The bound or constraints of this typevar, as a type (i.e. constraints are unioned), wrapped
     /// in `SubclassOf` if this is a `SubclassOf` context. `object` if no bound/constraints.
     /// Used for error messages.
-    fn bound_or_constraints_type(self, db: &'db dyn Db) -> Type<'db> {
+    fn bound_or_constraints_type(self, db: &'db dyn Db, program: crate::Program<'db>) -> Type<'db> {
         match self {
             TypeVarOwnerContext::Bare(typevar) => typevar
                 .typevar(db)
                 .require_bound_or_constraints(db)
-                .as_type(db),
+                .as_type(db, program),
             TypeVarOwnerContext::SubclassOf(typevar) => SubclassOfType::try_from_instance(
                 db,
+                program,
                 typevar
                     .typevar(db)
                     .require_bound_or_constraints(db)
-                    .as_type(db),
+                    .as_type(db, program),
             )
             .unwrap_or_else(SubclassOfType::subclass_of_unknown),
         }
@@ -102,16 +103,21 @@ impl<'db> BoundSuperError<'db> {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "`{owner}` is a type variable with an abstract/structural type as \
                             its bounds or constraints, in `super({pivot_class}, {owner})` call",
-                            pivot_class = pivot_class.display(context.db()),
-                            owner = owner_type.display(context.db()),
+                            pivot_class = pivot_class.display(context.db(), context.program()),
+                            owner = owner_type.display(context.db(), context.program()),
                         ));
-                        Self::describe_typevar(context.db(), &mut diagnostic, *typevar_context);
+                        Self::describe_typevar(
+                            context.db(),
+                            context.program(),
+                            &mut diagnostic,
+                            *typevar_context,
+                        );
                     } else {
                         builder.into_diagnostic(format_args!(
                             "`{owner}` is an abstract/structural type in \
                             `super({pivot_class}, {owner})` call",
-                            pivot_class = pivot_class.display(context.db()),
-                            owner = owner_type.display(context.db()),
+                            pivot_class = pivot_class.display(context.db(), context.program()),
+                            owner = owner_type.display(context.db(), context.program()),
                         ));
                     }
                 }
@@ -130,11 +136,11 @@ impl<'db> BoundSuperError<'db> {
                                 builder.into_diagnostic("Argument is not a valid class");
                             diagnostic.set_primary_message(format_args!(
                                 "Argument has type `{}`",
-                                pivot_class.display(context.db())
+                                pivot_class.display(context.db(), context.program())
                             ));
                             diagnostic.set_concise_message(format_args!(
                                 "`{}` is not a valid class",
-                                pivot_class.display(context.db()),
+                                pivot_class.display(context.db(), context.program()),
                             ));
                         }
                     }
@@ -149,16 +155,21 @@ impl<'db> BoundSuperError<'db> {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "`{owner}` is not an instance or subclass of \
                         `{pivot_class}` in `super({pivot_class}, {owner})` call",
-                        pivot_class = pivot_class.display(context.db()),
-                        owner = owner.display(context.db()),
+                        pivot_class = pivot_class.display(context.db(), context.program()),
+                        owner = owner.display(context.db(), context.program()),
                     ));
                     if let Some(typevar_context) = typevar_context {
-                        Self::describe_typevar(context.db(), &mut diagnostic, *typevar_context);
+                        Self::describe_typevar(
+                            context.db(),
+                            context.program(),
+                            &mut diagnostic,
+                            *typevar_context,
+                        );
                         diagnostic.info(format_args!(
                             "`{bounds_or_constraints}` is not an instance or subclass of `{pivot_class}`",
                             bounds_or_constraints =
-                                typevar_context.bound_or_constraints_type(context.db()).display(context.db()),
-                            pivot_class = pivot_class.display(context.db()),
+                                typevar_context.bound_or_constraints_type(context.db(), context.program()).display(context.db(), context.program()),
+                            pivot_class = pivot_class.display(context.db(), context.program()),
                         ));
                         let typevar = typevar_context.typevar(context.db());
                         if typevar_context.has_implicit_upper_bound(context.db()) {
@@ -186,6 +197,7 @@ impl<'db> BoundSuperError<'db> {
     /// and return the type variable's upper bound or the union of its constraints.
     fn describe_typevar(
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         diagnostic: &mut Diagnostic,
         type_var_context: TypeVarOwnerContext<'db>,
     ) -> Type<'db> {
@@ -202,7 +214,7 @@ impl<'db> BoundSuperError<'db> {
                 diagnostic.info(format_args!(
                     "Type variable `{}` has upper bound `{}`",
                     type_var.name(db),
-                    bound.display(db)
+                    bound.display(db, program)
                 ));
                 bound
             }
@@ -213,10 +225,10 @@ impl<'db> BoundSuperError<'db> {
                     constraints
                         .elements(db)
                         .iter()
-                        .map(|c| c.display(db))
+                        .map(|c| c.display(db, program))
                         .join(", ")
                 ));
-                constraints.as_type(db)
+                constraints.as_type(db, program)
             }
         }
     }
@@ -265,10 +277,11 @@ impl<'db> ResolvedSuperOwner<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        let program = self.lookup_anchor.program(db);
         Some(Self {
             owner_type: self
                 .owner_type
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, program, div, nested)?,
             lookup_anchor: self
                 .lookup_anchor
                 .recursive_type_normalized_impl(db, div, nested)?,
@@ -277,11 +290,13 @@ impl<'db> ResolvedSuperOwner<'db> {
     }
 
     fn descriptor_binding(&self, db: &'db dyn Db) -> (Option<Type<'db>>, Type<'db>) {
+        let program = self.lookup_anchor.program(db);
         match self.receiver {
             DescriptorReceiverKind::Class => (None, self.owner_type),
-            DescriptorReceiverKind::Instance => {
-                (Some(self.owner_type), self.owner_type.to_meta_type(db))
-            }
+            DescriptorReceiverKind::Instance => (
+                Some(self.owner_type),
+                self.owner_type.to_meta_type(db, program),
+            ),
         }
     }
 }
@@ -311,13 +326,17 @@ impl<'db> SuperOwnerKind<'db> {
         }
     }
 
-    fn iter_mro(&self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> + Clone {
+    fn iter_mro(
+        &self,
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+    ) -> impl Iterator<Item = ClassBase<'db>> + Clone {
         match self {
             SuperOwnerKind::Dynamic(dynamic) => {
-                Either::Left(ClassBase::Dynamic(*dynamic).mro(db, None))
+                Either::Left(ClassBase::Dynamic(*dynamic).mro(db, program, None))
             }
             SuperOwnerKind::Divergent(divergent) => {
-                Either::Left(ClassBase::Divergent(*divergent).mro(db, None))
+                Either::Left(ClassBase::Divergent(*divergent).mro(db, program, None))
             }
             SuperOwnerKind::Resolved(resolved_owner) => {
                 Either::Right(resolved_owner.lookup_anchor.iter_mro(db))
@@ -354,16 +373,19 @@ impl get_size2::GetSize for BoundSuperType<'_> {}
 
 pub(super) fn walk_bound_super_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
+    program: crate::Program<'db>,
     bound_super: BoundSuperType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, Type::from(bound_super.pivot_class(db)));
+    visitor.visit_type(db, program, Type::from(bound_super.pivot_class(db)));
     match bound_super.owner(db) {
-        SuperOwnerKind::Dynamic(dynamic) => visitor.visit_type(db, Type::Dynamic(dynamic)),
-        SuperOwnerKind::Divergent(divergent) => visitor.visit_type(db, Type::Divergent(divergent)),
+        SuperOwnerKind::Dynamic(dynamic) => visitor.visit_type(db, program, Type::Dynamic(dynamic)),
+        SuperOwnerKind::Divergent(divergent) => {
+            visitor.visit_type(db, program, Type::Divergent(divergent));
+        }
         SuperOwnerKind::Resolved(resolved_owner) => {
-            visitor.visit_type(db, resolved_owner.owner_type);
-            visitor.visit_type(db, Type::from(resolved_owner.lookup_anchor));
+            visitor.visit_type(db, program, resolved_owner.owner_type);
+            visitor.visit_type(db, program, Type::from(resolved_owner.lookup_anchor));
         }
     }
 }
@@ -484,11 +506,13 @@ impl<'db> BoundSuperType<'db> {
     /// However, the checking is skipped when any of the arguments is a dynamic type.
     pub(super) fn build(
         db: &'db dyn Db,
+        program: Program<'db>,
         pivot_class_type: Type<'db>,
         owner_type: Type<'db>,
     ) -> Result<Type<'db>, BoundSuperError<'db>> {
-        let delegate_to =
-            |type_to_delegate_to| BoundSuperType::build(db, pivot_class_type, type_to_delegate_to);
+        let delegate_to = |type_to_delegate_to| {
+            BoundSuperType::build(db, program, pivot_class_type, type_to_delegate_to)
+        };
 
         // Delegate but rewrite errors to preserve TypeVar context.
         let delegate_with_error_mapped =
@@ -530,7 +554,7 @@ impl<'db> BoundSuperType<'db> {
             Type::ClassLiteral(class) => ClassBase::Class(ClassType::NonGeneric(class)),
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
-                _ => match subclass_of.subclass_of().into_class(db) {
+                _ => match subclass_of.subclass_of().into_class(db, program) {
                     Some(class) => ClassBase::Class(class),
                     None => {
                         return Err(BoundSuperError::InvalidPivotClassType {
@@ -556,10 +580,10 @@ impl<'db> BoundSuperType<'db> {
         let build_constrained_union = |constraints: TypeVarConstraints<'db>,
                                        typevar: TypeVarOwnerContext<'db>|
          -> Result<Type<'db>, BoundSuperError<'db>> {
-            let mut builder = UnionBuilder::new(db);
+            let mut builder = UnionBuilder::new(db, program);
             for constraint in constraints.elements(db) {
                 let class = match constraint {
-                    Type::NominalInstance(instance) => Some(instance.class(db)),
+                    Type::NominalInstance(instance) => Some(instance.class(db, program)),
                     _ => constraint.to_class_type(db),
                 };
                 match class {
@@ -630,10 +654,12 @@ impl<'db> BoundSuperType<'db> {
                     match typevar.bound_or_constraints(db) {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                             let class = match bound {
-                                Type::NominalInstance(instance) => Some(instance.class(db)),
+                                Type::NominalInstance(instance) => {
+                                    Some(instance.class(db, program))
+                                }
                                 Type::ProtocolInstance(protocol) => protocol
                                     .to_nominal_instance()
-                                    .map(|instance| instance.class(db)),
+                                    .map(|instance| instance.class(db, program)),
                                 _ => None,
                             };
                             if let Some(class) = class {
@@ -647,8 +673,9 @@ impl<'db> BoundSuperType<'db> {
                                     Some(TypeVarOwnerContext::SubclassOf(bound_typevar)),
                                 )?)
                             } else {
-                                let subclass_of = SubclassOfType::try_from_instance(db, bound)
-                                    .unwrap_or_else(SubclassOfType::subclass_of_unknown);
+                                let subclass_of =
+                                    SubclassOfType::try_from_instance(db, program, bound)
+                                        .unwrap_or_else(SubclassOfType::subclass_of_unknown);
                                 return delegate_with_error_mapped(
                                     subclass_of,
                                     Some(TypeVarOwnerContext::SubclassOf(bound_typevar)),
@@ -669,7 +696,7 @@ impl<'db> BoundSuperType<'db> {
                                 pivot_class_type,
                                 owner_type,
                                 owner_type,
-                                ClassType::object(db),
+                                ClassType::object(db, program),
                                 Some(TypeVarOwnerContext::SubclassOf(bound_typevar)),
                             )?)
                         }
@@ -682,7 +709,7 @@ impl<'db> BoundSuperType<'db> {
                     pivot_class,
                     pivot_class_type,
                     owner_type,
-                    instance.class(db),
+                    instance.class(db, program),
                     None,
                 )?)
             }
@@ -694,7 +721,7 @@ impl<'db> BoundSuperType<'db> {
                         pivot_class,
                         pivot_class_type,
                         owner_type,
-                        nominal_instance.class(db),
+                        nominal_instance.class(db, program),
                         None,
                     )?)
                 } else {
@@ -710,13 +737,13 @@ impl<'db> BoundSuperType<'db> {
                 return Ok(union
                     .elements(db)
                     .iter()
-                    .try_fold(UnionBuilder::new(db), |builder, element| {
+                    .try_fold(UnionBuilder::new(db, program), |builder, element| {
                         delegate_to(*element).map(|ty| builder.add(ty))
                     })?
                     .build());
             }
             Type::Intersection(intersection) => {
-                let mut builder = IntersectionBuilder::new(db);
+                let mut builder = IntersectionBuilder::new(db, program);
                 let mut one_good_element_found = false;
                 for positive in intersection.positive(db) {
                     if let Ok(good_element) = delegate_to(*positive) {
@@ -749,10 +776,10 @@ impl<'db> BoundSuperType<'db> {
                 match typevar.bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         let class = match bound {
-                            Type::NominalInstance(instance) => Some(instance.class(db)),
+                            Type::NominalInstance(instance) => Some(instance.class(db, program)),
                             Type::ProtocolInstance(protocol) => protocol
                                 .to_nominal_instance()
-                                .map(|instance| instance.class(db)),
+                                .map(|instance| instance.class(db, program)),
                             _ => None,
                         };
                         if let Some(class) = class {
@@ -784,59 +811,68 @@ impl<'db> BoundSuperType<'db> {
                             pivot_class,
                             pivot_class_type,
                             owner_type,
-                            ClassType::object(db),
+                            ClassType::object(db, program),
                             Some(TypeVarOwnerContext::Bare(bound_typevar)),
                         )?)
                     }
                 }
             }
             Type::TypeIs(_) | Type::TypeGuard(_) => {
-                return delegate_to(KnownClass::Bool.to_instance(db));
+                return delegate_to(KnownClass::Bool.to_instance(db, program));
             }
-            Type::LiteralValue(literal) => return delegate_to(literal.fallback_instance(db)),
+            Type::LiteralValue(literal) => {
+                return delegate_to(literal.fallback_instance(db, program));
+            }
             Type::SpecialForm(special_form) => {
-                return delegate_to(special_form.instance_fallback(db));
+                return delegate_to(special_form.instance_fallback(db, program));
             }
             Type::KnownInstance(instance) => {
-                return delegate_to(instance.instance_fallback(db));
+                return delegate_to(instance.instance_fallback(db, program));
             }
             Type::FunctionLiteral(_) | Type::DataclassDecorator(_) => {
-                return delegate_to(KnownClass::FunctionType.to_instance(db));
+                return delegate_to(KnownClass::FunctionType.to_instance(db, program));
             }
             Type::WrapperDescriptor(_) => {
-                return delegate_to(KnownClass::WrapperDescriptorType.to_instance(db));
+                return delegate_to(KnownClass::WrapperDescriptorType.to_instance(db, program));
             }
             Type::KnownBoundMethod(method) => {
-                return delegate_to(method.class().to_instance(db));
+                return delegate_to(method.class().to_instance(db, program));
             }
-            Type::BoundMethod(_) => return delegate_to(KnownClass::MethodType.to_instance(db)),
+            Type::BoundMethod(_) => {
+                return delegate_to(KnownClass::MethodType.to_instance(db, program));
+            }
             Type::ModuleLiteral(_) => {
-                return delegate_to(KnownClass::ModuleType.to_instance(db));
+                return delegate_to(KnownClass::ModuleType.to_instance(db, program));
             }
-            Type::GenericAlias(_) => return delegate_to(KnownClass::GenericAlias.to_instance(db)),
+            Type::GenericAlias(_) => {
+                return delegate_to(KnownClass::GenericAlias.to_instance(db, program));
+            }
             Type::PropertyInstance(property) => {
-                return delegate_to(property.instance_fallback(db));
+                return delegate_to(property.instance_fallback(db, program));
             }
-            Type::BoundSuper(_) => return delegate_to(KnownClass::Super.to_instance(db)),
+            Type::BoundSuper(_) => {
+                return delegate_to(KnownClass::Super.to_instance(db, program));
+            }
             Type::TypedDict(td) => {
                 // In general it isn't sound to upcast a `TypedDict` to a `dict`,
                 // but here it seems like it's probably sound?
-                let mut key_builder = UnionBuilder::new(db);
-                let mut value_builder = UnionBuilder::new(db);
+                let mut key_builder = UnionBuilder::new(db, program);
+                let mut value_builder = UnionBuilder::new(db, program);
                 for (name, field) in td.items(db) {
                     key_builder = key_builder.add(Type::string_literal(db, name));
                     value_builder = value_builder.add(field.declared_ty);
                 }
-                return delegate_to(
-                    KnownClass::Dict
-                        .to_specialized_instance(db, &[key_builder.build(), value_builder.build()]),
-                );
+                return delegate_to(KnownClass::Dict.to_specialized_instance(
+                    db,
+                    program,
+                    &[key_builder.build(), value_builder.build()],
+                ));
             }
             Type::NewTypeInstance(newtype) => {
                 return delegate_to(newtype.concrete_base_type(db));
             }
             Type::Callable(callable) if callable.is_function_like(db) => {
-                return delegate_to(KnownClass::FunctionType.to_instance(db));
+                return delegate_to(KnownClass::FunctionType.to_instance(db, program));
             }
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -861,10 +897,11 @@ impl<'db> BoundSuperType<'db> {
     fn skip_until_after_pivot(
         self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         mro_iter: impl Iterator<Item = ClassBase<'db>> + Clone,
     ) -> impl Iterator<Item = ClassBase<'db>> + Clone {
         let Some(pivot_class) = self.pivot_class(db).into_class() else {
-            return Either::Left(ClassBase::Dynamic(DynamicType::Unknown).mro(db, None));
+            return Either::Left(ClassBase::Dynamic(DynamicType::Unknown).mro(db, program, None));
         };
 
         let mut pivot_found = false;
@@ -890,10 +927,11 @@ impl<'db> BoundSuperType<'db> {
     pub(super) fn try_call_dunder_get_on_attribute(
         self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         attribute: PlaceAndQualifiers<'db>,
     ) -> Option<PlaceAndQualifiers<'db>> {
         let (instance, owner) = self.owner(db).descriptor_binding(db)?;
-        Some(Type::try_call_dunder_get_on_attribute(db, attribute, instance, owner).0)
+        Some(Type::try_call_dunder_get_on_attribute(db, program, attribute, instance, owner).0)
     }
 
     /// Similar to `Type::find_name_in_mro_with_policy`, but performs lookup starting *after* the
@@ -901,6 +939,7 @@ impl<'db> BoundSuperType<'db> {
     pub(super) fn find_name_in_mro_after_pivot(
         self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
@@ -908,18 +947,19 @@ impl<'db> BoundSuperType<'db> {
         let class = match &owner {
             SuperOwnerKind::Dynamic(dynamic) => {
                 return Type::Dynamic(*dynamic)
-                    .find_name_in_mro_with_policy(db, name, policy)
+                    .find_name_in_mro_with_policy(db, program, name, policy)
                     .expect("Calling `find_name_in_mro` on dynamic type should return `Some`");
             }
             SuperOwnerKind::Divergent(_) => {
                 return Type::unknown()
-                    .find_name_in_mro_with_policy(db, name, policy)
+                    .find_name_in_mro_with_policy(db, program, name, policy)
                     .expect("Calling `find_name_in_mro` on Unknown should return `Some`");
             }
             SuperOwnerKind::Resolved(resolved_owner) => resolved_owner.lookup_anchor,
         };
 
-        let mut mro_after_pivot = self.skip_until_after_pivot(db, owner.iter_mro(db));
+        let mut mro_after_pivot =
+            self.skip_until_after_pivot(db, program, owner.iter_mro(db, program));
         let class_literal = class.class_literal(db);
         let result = class_literal.class_member_from_mro(db, name, policy, mro_after_pivot.clone());
 
@@ -976,6 +1016,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         left: BoundSuperType<'db>,
         right: BoundSuperType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let program = self.program;
         let mut class_equivalence = match (left.pivot_class(db), right.pivot_class(db)) {
             (ClassBase::Class(left), ClassBase::Class(right)) => {
                 self.check_type_pair(db, Type::from(left), Type::from(right))
@@ -1004,20 +1045,20 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             }
             (ClassBase::TypedDict(_), _) => self.never(),
         };
-        if class_equivalence.is_never_satisfied(db) {
+        if class_equivalence.is_never_satisfied(db, program) {
             return self.never();
         }
         let owner_equivalence = match (left.owner(db), right.owner(db)) {
             (SuperOwnerKind::Resolved(left), SuperOwnerKind::Resolved(right)) => self
                 .check_type_pair(db, left.owner_type, right.owner_type)
-                .and(db, self.constraints, || {
+                .and(db, program, self.constraints, || {
                     self.check_type_pair(
                         db,
                         Type::from(left.lookup_anchor),
                         Type::from(right.lookup_anchor),
                     )
                 })
-                .and(db, self.constraints, || {
+                .and(db, program, self.constraints, || {
                     ConstraintSet::from_bool(self.constraints, left.receiver == right.receiver)
                 }),
             (SuperOwnerKind::Resolved(_), _) => self.never(),

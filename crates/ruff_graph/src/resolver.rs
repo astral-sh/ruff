@@ -1,8 +1,9 @@
-use ruff_db::files::{File, FilePath, system_path_to_file};
+use ruff_db::Db as _;
+use ruff_db::files::{FilePath, system_path_to_file};
 use ruff_db::system::SystemPath;
 use ty_module_resolver::{
-    ModuleName, resolve_module, resolve_module_confident, resolve_real_module,
-    resolve_real_module_confident,
+    ModuleName, ProgramFile, ResolverProgram, resolve_module, resolve_module_confident,
+    resolve_real_module, resolve_real_module_confident,
 };
 
 use crate::ModuleDb;
@@ -11,15 +12,19 @@ use crate::collector::CollectedImport;
 /// Collect all imports for a given Python file.
 pub(crate) struct Resolver<'a> {
     db: &'a ModuleDb,
-    file: Option<File>,
+    program: ResolverProgram<'a>,
+    file: Option<ProgramFile<'a>>,
 }
 
 impl<'a> Resolver<'a> {
     /// Initialize a [`Resolver`] with a given [`ModuleDb`].
     pub(crate) fn new(db: &'a ModuleDb, path: &SystemPath) -> Self {
+        let program = ResolverProgram::create(db, db.python_version(), db.search_paths());
         // If we know the importing file we can potentially resolve more imports
-        let file = system_path_to_file(db, path).ok();
-        Self { db, file }
+        let file = system_path_to_file(db, path)
+            .ok()
+            .map(|file| ProgramFile::new(db, program, file));
+        Self { db, program, file }
     }
 
     /// Resolve the [`CollectedImport`] into a [`FilePath`].
@@ -103,7 +108,7 @@ impl<'a> Resolver<'a> {
         let module = if let Some(file) = self.file {
             resolve_module(self.db, file, module_name)?
         } else {
-            resolve_module_confident(self.db, module_name)?
+            resolve_module_confident(self.db, self.program, module_name)?
         };
         Some(module.file(self.db)?.path(self.db))
     }
@@ -113,7 +118,7 @@ impl<'a> Resolver<'a> {
         let module = if let Some(file) = self.file {
             resolve_real_module(self.db, file, module_name)?
         } else {
-            resolve_real_module_confident(self.db, module_name)?
+            resolve_real_module_confident(self.db, self.program, module_name)?
         };
         Some(module.file(self.db)?.path(self.db))
     }

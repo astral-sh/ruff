@@ -3,11 +3,11 @@ use crate::reachability::is_reachable;
 use crate::types::function::FunctionDecorators;
 use crate::types::infer::function_known_decorator_flags;
 use get_size2::GetSize;
-use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 use ty_python_core::definition::{DefinitionCategory, DefinitionKind, DefinitionState};
+use ty_python_core::environment::AnalysisFile;
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
 use ty_python_core::{SemanticIndex, semantic_index};
@@ -72,10 +72,11 @@ pub struct UnusedBinding {
 /// without broader reference analysis. Bare local annotations (`x: int`) are also
 /// reported, but only if the symbol is neither bound nor used elsewhere in the scope.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBinding]> {
-    let parsed = parsed_module(db, file).load(db);
+pub fn unused_bindings(db: &dyn Db, analysis_file: AnalysisFile<'_>) -> Box<[UnusedBinding]> {
+    let file = analysis_file.file(db);
+    let parsed = analysis_file.parsed(db).load(db);
     let is_stub_file = file.is_stub(db);
-    let index = semantic_index(db, file);
+    let index = semantic_index(db, analysis_file);
     let mut unused = Vec::new();
 
     for scope_id in index.scope_ids() {
@@ -199,7 +200,8 @@ mod tests {
     ) -> anyhow::Result<Vec<UnusedBinding>> {
         let db = TestDbBuilder::new().with_file(path, source).build()?;
         let file = system_path_to_file(&db, path).unwrap();
-        let mut bindings = unused_bindings(&db, file).to_vec();
+        let mut bindings =
+            unused_bindings(&db, crate::AnalysisFile::new(&db, db.program(), file)).to_vec();
         bindings.sort_unstable_by_key(|binding| (binding.range.start(), binding.range.end()));
         Ok(bindings)
     }

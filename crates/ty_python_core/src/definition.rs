@@ -12,6 +12,7 @@ use smallvec::SmallVec;
 use crate::Db;
 use crate::LoopHeaderId;
 use crate::ast_node_ref::AstNodeRef;
+use crate::environment::AnalysisFile;
 use crate::member::ScopedMemberId;
 use crate::node_key::NodeKey;
 use crate::place::ScopedPlaceId;
@@ -80,6 +81,10 @@ impl<'db> Definition<'db> {
         self.scope_id(db).file(db)
     }
 
+    pub fn analysis_file(self, db: &'db dyn Db) -> AnalysisFile<'db> {
+        self.scope_id(db).analysis_file(db)
+    }
+
     pub fn file_scope(self, db: &'db dyn Db) -> FileScopeId {
         self.scope_id(db).file_scope_id(db)
     }
@@ -102,8 +107,7 @@ impl<'db> Definition<'db> {
 
     /// Returns the name of the item being defined, if applicable.
     pub fn name(self, db: &'db dyn Db) -> Option<String> {
-        let file = self.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, self.analysis_file(db).versioned_file(db)).load(db);
         let kind = self.kind(db);
         match kind {
             DefinitionKind::Function(def) => {
@@ -139,8 +143,7 @@ impl<'db> Definition<'db> {
     /// This method returns a docstring for function, class, and attribute definitions.
     /// The docstring is extracted from the first statement in the body if it's a string literal.
     pub fn docstring(self, db: &'db dyn Db) -> Option<String> {
-        let file = self.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, self.analysis_file(db).versioned_file(db)).load(db);
         let kind = self.kind(db);
 
         match kind {

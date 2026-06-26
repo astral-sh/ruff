@@ -1,9 +1,9 @@
 use super::context::InferContext;
 use super::{Signature, Type, TypeContext};
-use crate::Db;
 use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
 use crate::types::{MemberLookupPolicy, PropertyInstanceType};
+use crate::{Db, Program};
 use ruff_python_ast as ast;
 
 mod arguments;
@@ -16,36 +16,47 @@ impl<'db> Type<'db> {
     /// expressions don't re-run overload selection at every call site.
     pub(crate) fn try_call_bin_op_return_type(
         db: &'db dyn Db,
+        program: Program<'db>,
         left_ty: Type<'db>,
         op: ast::Operator,
         right_ty: Type<'db>,
     ) -> Option<Type<'db>> {
-        #[salsa::tracked(cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn try_call_bin_op_return_type_impl<'db>(
             db: &'db dyn Db,
+            program: Program<'db>,
             left_ty: Type<'db>,
             op: ast::Operator,
             right_ty: Type<'db>,
         ) -> Option<Type<'db>> {
-            Type::try_call_bin_op(db, left_ty, op, right_ty)
+            Type::try_call_bin_op(db, program, left_ty, op, right_ty)
                 .ok()
-                .map(|bindings| bindings.return_type(db))
+                .map(|bindings| bindings.return_type(db, program))
         }
 
-        try_call_bin_op_return_type_impl(db, left_ty, op, right_ty)
+        try_call_bin_op_return_type_impl(db, program, left_ty, op, right_ty)
     }
 
     pub(crate) fn try_call_bin_op(
         db: &'db dyn Db,
+        program: Program<'db>,
         left_ty: Type<'db>,
         op: ast::Operator,
         right_ty: Type<'db>,
     ) -> Result<Bindings<'db>, CallBinOpError> {
-        Self::try_call_bin_op_with_policy(db, left_ty, op, right_ty, MemberLookupPolicy::default())
+        Self::try_call_bin_op_with_policy(
+            db,
+            program,
+            left_ty,
+            op,
+            right_ty,
+            MemberLookupPolicy::default(),
+        )
     }
 
     pub(crate) fn try_call_bin_op_with_policy(
         db: &'db dyn Db,
+        program: Program<'db>,
         left_ty: Type<'db>,
         op: ast::Operator,
         right_ty: Type<'db>,
@@ -66,20 +77,22 @@ impl<'db> Type<'db> {
         // are the same, they will trivially have the same implementation of the reflected
         // dunder, and so we'll fail the inner check. But the type equality check will be
         // faster for the common case, and allow us to skip the (two) class member lookups.
-        let left_class = left_ty.to_meta_type(db);
-        let right_class = right_ty.to_meta_type(db);
-        if left_ty != right_ty && right_ty.is_subtype_of(db, left_ty) {
+        let left_class = left_ty.to_meta_type(db, program);
+        let right_class = right_ty.to_meta_type(db, program);
+        if left_ty != right_ty && right_ty.is_subtype_of(db, program, left_ty) {
             let reflected_dunder = op.reflected_dunder();
-            let rhs_reflected = right_class.member(db, reflected_dunder).place;
+            let rhs_reflected = right_class.member(db, program, reflected_dunder).place;
             // TODO: if `rhs_reflected` is possibly unbound, we should union the two possible
             // Bindings together
             if !rhs_reflected.is_undefined()
-                && !rhs_reflected
-                    .is_equal_ignoring_provenance(left_class.member(db, reflected_dunder).place)
+                && !rhs_reflected.is_equal_ignoring_provenance(
+                    left_class.member(db, program, reflected_dunder).place,
+                )
             {
                 return Ok(right_ty
                     .try_call_dunder_with_policy(
                         db,
+                        program,
                         reflected_dunder,
                         &mut CallArguments::positional([left_ty]),
                         TypeContext::default(),
@@ -88,6 +101,7 @@ impl<'db> Type<'db> {
                     .or_else(|_| {
                         left_ty.try_call_dunder_with_policy(
                             db,
+                            program,
                             op.dunder(),
                             &mut CallArguments::positional([right_ty]),
                             TypeContext::default(),
@@ -99,6 +113,7 @@ impl<'db> Type<'db> {
 
         let call_on_left_instance = left_ty.try_call_dunder_with_policy(
             db,
+            program,
             op.dunder(),
             &mut CallArguments::positional([right_ty]),
             TypeContext::default(),
@@ -111,6 +126,7 @@ impl<'db> Type<'db> {
             } else {
                 Ok(right_ty.try_call_dunder_with_policy(
                     db,
+                    program,
                     op.reflected_dunder(),
                     &mut CallArguments::positional([left_ty]),
                     TypeContext::default(),
@@ -129,8 +145,8 @@ impl<'db> Type<'db> {
 pub(crate) struct CallError<'db>(pub(crate) CallErrorKind, pub(crate) Box<Bindings<'db>>);
 
 impl<'db> CallError<'db> {
-    pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
-        self.1.return_type(db)
+    pub(crate) fn return_type(&self, db: &'db dyn Db, program: crate::Program<'db>) -> Type<'db> {
+        self.1.return_type(db, program)
     }
 
     /// Returns `Some(property)` if the call error was caused by an attempt to set a property
@@ -227,16 +243,24 @@ impl<'db> CallDunderError<'db> {
         }
     }
 
-    pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(super) fn return_type(
+        &self,
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+    ) -> Option<Type<'db>> {
         match self {
             Self::MethodNotAvailable | Self::CallError(CallErrorKind::NotCallable, _, _) => None,
-            Self::CallError(_, bindings, _) => Some(bindings.return_type(db)),
-            Self::PossiblyUnbound { bindings, .. } => Some(bindings.return_type(db)),
+            Self::CallError(_, bindings, _) => Some(bindings.return_type(db, program)),
+            Self::PossiblyUnbound { bindings, .. } => Some(bindings.return_type(db, program)),
         }
     }
 
-    pub(super) fn fallback_return_type(&self, db: &'db dyn Db) -> Type<'db> {
-        self.return_type(db).unwrap_or(Type::unknown())
+    pub(super) fn fallback_return_type(
+        &self,
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+    ) -> Type<'db> {
+        self.return_type(db, program).unwrap_or(Type::unknown())
     }
 }
 

@@ -401,7 +401,7 @@ pub(super) fn compute_diagnostics(
     };
 
     let diagnostics = db.check_file(file);
-    let unnecessary_hints = hints(db, file);
+    let unnecessary_hints = hints(db, crate::server::api::analysis_file(db, file));
 
     Some(Diagnostics {
         items: diagnostics,

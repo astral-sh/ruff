@@ -141,7 +141,12 @@ pub(crate) trait VarianceInferable<'db>: Sized {
     ///
     /// Sometimes the recursive calls will be in positions where you need to
     /// specify a non-covariant polarity. See `with_polarity` for more details.
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance;
+    fn variance_of(
+        self,
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> TypeVarVariance;
 
     /// Creates a `VarianceInferable` that applies `polarity` (see
     /// `TypeVarVariance::compose`) to the result of variance inference on the
@@ -173,12 +178,17 @@ impl<'db, T> VarianceInferable<'db> for WithPolarity<T>
 where
     T: VarianceInferable<'db>,
 {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(
+        self,
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> TypeVarVariance {
         let WithPolarity {
             variance_inferable,
             polarity,
         } = self;
 
-        polarity.compose_thunk(|| variance_inferable.variance_of(db, typevar))
+        polarity.compose_thunk(|| variance_inferable.variance_of(db, program, typevar))
     }
 }

@@ -39,8 +39,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .infer_maybe_standalone_expression(expression, TypeContext::default());
         if matches!(value_ty.resolve_type_alias(self.db()), Type::Never)
             || self.contains_type_form_value(expression, value_ty)
-            || non_type_form_fallback
-                .is_some_and(|alternative| value_ty.is_assignable_to(self.db(), alternative))
+            || non_type_form_fallback.is_some_and(|alternative| {
+                value_ty.is_assignable_to(self.db(), self.program, alternative)
+            })
         {
             return None;
         }
@@ -58,7 +59,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .infer_value_expression_impl(expression, TypeContext::new(Some(target)));
             // TODO: Remove this exception once `Unpack` produces a precise type instead of a
             // dynamic placeholder in ordinary expression inference.
-            if contextual_ty.is_assignable_to(self.db(), target)
+            if contextual_ty.is_assignable_to(self.db(), self.program, target)
                 && contextual_ty != Type::Dynamic(DynamicType::TodoUnpack)
             {
                 return None;
@@ -114,7 +115,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             imp(
                                 builder,
                                 expression,
-                                bound_or_constraints.as_type(builder.db()),
+                                bound_or_constraints.as_type(builder.db(), builder.program),
                                 visitor,
                             )
                         })

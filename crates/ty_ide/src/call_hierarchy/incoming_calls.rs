@@ -3,7 +3,7 @@ use crate::goto::{Definitions, GotoTarget, find_goto_target};
 use crate::references::{contains_identifier, has_any_external_visible_definitions};
 use crate::{CallHierarchyItem, Db, SymbolKind};
 use ruff_db::files::File;
-use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::Tokens;
@@ -11,6 +11,7 @@ use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::FxHashMap;
+use ty_python_core::environment::AnalysisFile;
 use ty_python_core::scope::{NodeWithScopeKind, ScopeKind};
 use ty_python_semantic::types::ide_support::static_member_type_for_attribute;
 use ty_python_semantic::types::{PropertyAccessorRole, Type};
@@ -18,9 +19,15 @@ use ty_python_semantic::{HasDefinition as _, HasType as _, ImportAliasResolution
 
 /// Find every place in the project that calls the symbol at `offset`, grouped
 /// by enclosing function/method/class/module.
-pub fn incoming_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<IncomingCall> {
-    let module = parsed_module(db, file).load(db);
-    let model = SemanticModel::new(db, file);
+pub fn incoming_calls(
+    db: &dyn Db,
+    analysis_file: AnalysisFile<'_>,
+    offset: TextSize,
+) -> Vec<IncomingCall> {
+    let file = analysis_file.file(db);
+    let program = analysis_file.program(db);
+    let module = analysis_file.parsed(db).load(db);
+    let model = SemanticModel::new(db, analysis_file);
     let Some(goto_target) = find_goto_target(&model, &module, offset) else {
         return Vec::new();
     };
@@ -60,7 +67,7 @@ pub fn incoming_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Incoming
     let needle = (!is_dunder(needle)).then_some(needle);
 
     // Collect raw `(caller_file, call_site_range, enclosing_scope)` triples.
-    let mut raw = call_sites_for_file(db, file, &target_definitions, target_role, needle);
+    let mut raw = call_sites_for_file(db, analysis_file, &target_definitions, target_role, needle);
 
     if is_externally_visible {
         let result = std::sync::Mutex::new(Vec::<RawCallSite>::new());
@@ -93,7 +100,7 @@ pub fn incoming_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Incoming
                         }
                         let sites = call_sites_for_file(
                             db,
-                            other_file,
+                            AnalysisFile::new(db, program, other_file),
                             target_definitions,
                             target_role,
                             needle,
@@ -161,14 +168,14 @@ struct EnclosingKey {
 /// `target_definitions`.
 fn call_sites_for_file(
     db: &dyn Db,
-    file: File,
+    analysis_file: AnalysisFile<'_>,
     target_definitions: &Definitions<'_>,
     target_role: Option<PropertyAccessorRole>,
     needle: Option<&str>,
 ) -> Vec<RawCallSite> {
-    let parsed = parsed_module(db, file);
+    let parsed = analysis_file.parsed(db);
     let module = parsed.load(db);
-    let model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, analysis_file);
     let mut sites = Vec::new();
 
     let mut finder = CallSitesFinder {
@@ -388,11 +395,11 @@ impl<'a> CallSitesFinder<'a, '_> {
                 ScopeKind::Module | ScopeKind::Function | ScopeKind::Class | ScopeKind::Lambda
             )
         }) else {
-            return module_item(self.db, file);
+            return module_item(self.db, self.model.analysis_file());
         };
 
         match enclosing.node() {
-            NodeWithScopeKind::Module => module_item(self.db, file),
+            NodeWithScopeKind::Module => module_item(self.db, self.model.analysis_file()),
             NodeWithScopeKind::Function(func) => {
                 let func = func.node(self.module);
                 let is_method = ancestors
@@ -411,7 +418,7 @@ impl<'a> CallSitesFinder<'a, '_> {
                     } else {
                         SymbolKind::Function
                     },
-                    detail: module_detail(self.db, file),
+                    detail: module_detail(self.db, self.model.analysis_file()),
                     file,
                     full_range: func.range(),
                     selection_range: func.name.range(),
@@ -422,7 +429,7 @@ impl<'a> CallSitesFinder<'a, '_> {
                 CallHierarchyItem {
                     name: Name::new(class.name.as_str()),
                     kind: SymbolKind::Class,
-                    detail: module_detail(self.db, file),
+                    detail: module_detail(self.db, self.model.analysis_file()),
                     file,
                     full_range: class.range(),
                     selection_range: class.name.range(),
@@ -439,13 +446,13 @@ impl<'a> CallSitesFinder<'a, '_> {
                 CallHierarchyItem {
                     name: Name::new_static("(lambda)"),
                     kind: SymbolKind::Function,
-                    detail: module_detail(self.db, file),
+                    detail: module_detail(self.db, self.model.analysis_file()),
                     file,
                     full_range: lambda.range(),
                     selection_range: TextRange::new(lambda.start(), end),
                 }
             }
-            _ => module_item(self.db, file),
+            _ => module_item(self.db, self.model.analysis_file()),
         }
     }
 }
@@ -456,8 +463,9 @@ struct RawCallSite {
 }
 
 /// Build an item for the module-level enclosing scope (no enclosing function).
-fn module_item(db: &dyn Db, file: File) -> CallHierarchyItem {
-    let name = ty_module_resolver::file_to_module(db, file)
+fn module_item(db: &dyn Db, analysis_file: AnalysisFile<'_>) -> CallHierarchyItem {
+    let file = analysis_file.file(db);
+    let name = ty_module_resolver::file_to_module(db, analysis_file.program_file(db))
         .map(|module| Name::new(module.name(db).last_component()))
         .unwrap_or_else(|| Name::new_static("<module>"));
     CallHierarchyItem {
@@ -514,7 +522,11 @@ mod tests {
             else {
                 return "No incoming calls found".to_string();
             };
-            let calls = incoming_calls(&self.db, target.file, target.selection_range.start());
+            let calls = incoming_calls(
+                &self.db,
+                self.analysis_file(target.file),
+                target.selection_range.start(),
+            );
             if calls.is_empty() {
                 return "No incoming calls found".to_string();
             }
@@ -1162,7 +1174,11 @@ def make() -> C:
         else {
             panic!("expected a call hierarchy target");
         };
-        let incoming = incoming_calls(&test.db, target.file, target.selection_range.start());
+        let incoming = incoming_calls(
+            &test.db,
+            test.analysis_file(target.file),
+            target.selection_range.start(),
+        );
         // The selection identifies the anonymous callable header.
         let sel = incoming[0].from.selection_range;
         let source = test.cursor.source.as_str();
@@ -1299,14 +1315,18 @@ def make() -> C:
         else {
             panic!("expected a call hierarchy target");
         };
-        let incoming = incoming_calls(&test.db, target.file, target.selection_range.start());
+        let incoming = incoming_calls(
+            &test.db,
+            test.analysis_file(target.file),
+            target.selection_range.start(),
+        );
         assert_eq!(incoming.len(), 1, "got {incoming:?}");
         let lambda_item = &incoming[0].from;
         assert_eq!(lambda_item.name.as_str(), "(lambda)");
 
         let follow_up_incoming = incoming_calls(
             &test.db,
-            lambda_item.file,
+            test.analysis_file(lambda_item.file),
             lambda_item.selection_range.start(),
         );
         assert!(
@@ -1316,7 +1336,7 @@ def make() -> C:
 
         let follow_up_outgoing = outgoing_calls(
             &test.db,
-            lambda_item.file,
+            test.analysis_file(lambda_item.file),
             lambda_item.selection_range.start(),
         );
         assert!(

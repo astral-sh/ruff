@@ -1,5 +1,6 @@
 use crate::ast_node_ref::AstNodeRef;
 use crate::db::Db;
+use crate::environment::AnalysisFile;
 use crate::scope::ScopeId;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
@@ -69,5 +70,9 @@ impl<'db> Expression<'db> {
 
     pub fn file(self, db: &'db dyn Db) -> File {
         self.scope_id(db).file(db)
+    }
+
+    pub fn analysis_file(self, db: &'db dyn Db) -> AnalysisFile<'db> {
+        self.scope_id(db).analysis_file(db)
     }
 }

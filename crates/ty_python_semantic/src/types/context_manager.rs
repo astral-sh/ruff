@@ -13,18 +13,18 @@ impl<'db> Type<'db> {
     ///
     /// This method should only be used outside of type checking because it omits any errors.
     /// For type checking, use [`try_enter_with_mode`](Self::try_enter_with_mode) instead.
-    pub(super) fn enter(self, db: &'db dyn Db) -> Type<'db> {
-        self.try_enter_with_mode(db, EvaluationMode::Sync)
-            .unwrap_or_else(|err| err.fallback_enter_type(db))
+    pub(super) fn enter(self, db: &'db dyn Db, program: crate::Program<'db>) -> Type<'db> {
+        self.try_enter_with_mode(db, program, EvaluationMode::Sync)
+            .unwrap_or_else(|err| err.fallback_enter_type(db, program))
     }
 
     /// Returns the type bound from a context manager with type `self`.
     ///
     /// This method should only be used outside of type checking because it omits any errors.
     /// For type checking, use [`try_enter_with_mode`](Self::try_enter_with_mode) instead.
-    pub(super) fn aenter(self, db: &'db dyn Db) -> Type<'db> {
-        self.try_enter_with_mode(db, EvaluationMode::Async)
-            .unwrap_or_else(|err| err.fallback_enter_type(db))
+    pub(super) fn aenter(self, db: &'db dyn Db, program: crate::Program<'db>) -> Type<'db> {
+        self.try_enter_with_mode(db, program, EvaluationMode::Async)
+            .unwrap_or_else(|err| err.fallback_enter_type(db, program))
     }
 
     /// Given the type of an object that is used as a context manager (i.e. in a `with` statement),
@@ -38,6 +38,7 @@ impl<'db> Type<'db> {
     pub(super) fn try_enter_with_mode(
         self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         mode: EvaluationMode,
     ) -> Result<Type<'db>, ContextManagerError<'db>> {
         let (enter_method, exit_method) = match mode {
@@ -47,32 +48,38 @@ impl<'db> Type<'db> {
 
         let enter = self.try_call_dunder(
             db,
+            program,
             enter_method,
             CallArguments::none(),
             TypeContext::default(),
         );
         let exit = self.try_call_dunder(
             db,
+            program,
             exit_method,
-            CallArguments::positional([Type::none(db), Type::none(db), Type::none(db)]),
+            CallArguments::positional([
+                Type::none(db, program),
+                Type::none(db, program),
+                Type::none(db, program),
+            ]),
             TypeContext::default(),
         );
 
         // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
         match (enter, exit) {
             (Ok(enter), Ok(_)) => {
-                let ty = enter.return_type(db);
+                let ty = enter.return_type(db, program);
                 Ok(if mode.is_async() {
-                    ty.try_await(db).unwrap_or(Type::unknown())
+                    ty.try_await(db, program).unwrap_or(Type::unknown())
                 } else {
                     ty
                 })
             }
             (Ok(enter), Err(exit_error)) => {
-                let ty = enter.return_type(db);
+                let ty = enter.return_type(db, program);
                 Err(ContextManagerError::Exit {
                     enter_return_type: if mode.is_async() {
-                        ty.try_await(db).unwrap_or(Type::unknown())
+                        ty.try_await(db, program).unwrap_or(Type::unknown())
                     } else {
                         ty
                     },
@@ -108,13 +115,17 @@ pub(super) enum ContextManagerError<'db> {
 }
 
 impl<'db> ContextManagerError<'db> {
-    pub(super) fn fallback_enter_type(&self, db: &'db dyn Db) -> Type<'db> {
-        self.enter_type(db).unwrap_or(Type::unknown())
+    pub(super) fn fallback_enter_type(
+        &self,
+        db: &'db dyn Db,
+        program: crate::Program<'db>,
+    ) -> Type<'db> {
+        self.enter_type(db, program).unwrap_or(Type::unknown())
     }
 
     /// Returns the `__enter__` or `__aenter__` return type if it is known,
     /// or `None` if the type never has a callable `__enter__` or `__aenter__` attribute
-    fn enter_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn enter_type(&self, db: &'db dyn Db, program: crate::Program<'db>) -> Option<Type<'db>> {
         match self {
             Self::Exit {
                 enter_return_type,
@@ -127,9 +138,13 @@ impl<'db> ContextManagerError<'db> {
                 exit_error: _,
                 mode: _,
             } => match enter_error {
-                CallDunderError::PossiblyUnbound { bindings, .. } => Some(bindings.return_type(db)),
+                CallDunderError::PossiblyUnbound { bindings, .. } => {
+                    Some(bindings.return_type(db, program))
+                }
                 CallDunderError::CallError(CallErrorKind::NotCallable, _, _) => None,
-                CallDunderError::CallError(_, bindings, _) => Some(bindings.return_type(db)),
+                CallDunderError::CallError(_, bindings, _) => {
+                    Some(bindings.return_type(db, program))
+                }
                 CallDunderError::MethodNotAvailable => None,
             },
         }
@@ -205,6 +220,7 @@ impl<'db> ContextManagerError<'db> {
         };
 
         let db = context.db();
+        let program = context.program();
 
         let formatted_errors = match self {
             Self::Exit {
@@ -229,7 +245,7 @@ impl<'db> ContextManagerError<'db> {
 
         let mut diag = builder.into_diagnostic(format_args!(
             "Object of type `{}` cannot be used with `{}` because {}",
-            context_expression_type.display(db),
+            context_expression_type.display(db, program),
             with_kw,
             formatted_errors,
         ));
@@ -240,7 +256,7 @@ impl<'db> ContextManagerError<'db> {
                 for ty in &exit_unbound_on {
                     diag.info(format_args!(
                         "`{}` does not implement `{exit_method}`",
-                        ty.display(db)
+                        ty.display(db, program)
                     ));
                 }
             }
@@ -249,7 +265,7 @@ impl<'db> ContextManagerError<'db> {
                 for ty in &enter_unbound_on {
                     diag.info(format_args!(
                         "`{}` does not implement `{enter_method}`",
-                        ty.display(db)
+                        ty.display(db, program)
                     ));
                 }
             }
@@ -265,12 +281,12 @@ impl<'db> ContextManagerError<'db> {
                     if exit_unbound_on.contains(ty) {
                         diag.info(format_args!(
                             "`{}` does not implement `{enter_method}` or `{exit_method}`",
-                            ty.display(db)
+                            ty.display(db, program)
                         ));
                     } else {
                         diag.info(format_args!(
                             "`{}` does not implement `{enter_method}`",
-                            ty.display(db)
+                            ty.display(db, program)
                         ));
                     }
                 }
@@ -279,7 +295,7 @@ impl<'db> ContextManagerError<'db> {
                     if !enter_unbound_on.contains(ty) {
                         diag.info(format_args!(
                             "`{}` does not implement `{exit_method}`",
-                            ty.display(db)
+                            ty.display(db, program)
                         ));
                     }
                 }
@@ -293,12 +309,14 @@ impl<'db> ContextManagerError<'db> {
 
         let alt_enter = context_expression_type.try_call_dunder(
             db,
+            program,
             alt_enter_method,
             CallArguments::none(),
             TypeContext::default(),
         );
         let alt_exit = context_expression_type.try_call_dunder(
             db,
+            program,
             alt_exit_method,
             CallArguments::positional([Type::unknown(), Type::unknown(), Type::unknown()]),
             TypeContext::default(),
@@ -309,7 +327,7 @@ impl<'db> ContextManagerError<'db> {
         {
             diag.info(format_args!(
                 "Objects of type `{}` can be used as {} context managers",
-                context_expression_type.display(db),
+                context_expression_type.display(db, program),
                 alt_mode
             ));
             diag.info(format!("Consider using `{alt_with_kw}` here"));

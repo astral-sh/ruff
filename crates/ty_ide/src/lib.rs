@@ -72,6 +72,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::ops::{Deref, DerefMut};
 use ty_project::Db;
+use ty_python_core::program::Program;
 use ty_python_semantic::types::{Type, TypeDefinition};
 
 /// Information associated with a text range.
@@ -276,23 +277,23 @@ impl FromIterator<NavigationTarget> for NavigationTargets {
 }
 
 pub trait HasNavigationTargets {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets;
+    fn navigation_targets(&self, db: &dyn Db, program: Program<'_>) -> NavigationTargets;
 }
 
 impl HasNavigationTargets for Type<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
+    fn navigation_targets(&self, db: &dyn Db, program: Program<'_>) -> NavigationTargets {
         match self {
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .flat_map(|target| target.navigation_targets(db))
+                .flat_map(|target| target.navigation_targets(db, program))
                 .collect(),
 
             Type::Intersection(intersection) => {
-                if let Some(alternatives) = intersection.finite_alternatives(db) {
+                if let Some(alternatives) = intersection.finite_alternatives(db, program) {
                     return alternatives
                         .iter()
-                        .flat_map(|alternative| alternative.navigation_targets(db))
+                        .flat_map(|alternative| alternative.navigation_targets(db, program))
                         .collect();
                 }
 
@@ -309,26 +310,26 @@ impl HasNavigationTargets for Type<'_> {
                         // because the type is the intersection of all those types.
                         NavigationTargets::empty()
                     }
-                    None => first.navigation_targets(db),
+                    None => first.navigation_targets(db, program),
                 }
             }
 
             Type::EnumComplement(complement) => complement
                 .remaining_literal_types(db)
                 .iter()
-                .flat_map(|alternative| alternative.navigation_targets(db))
+                .flat_map(|alternative| alternative.navigation_targets(db, program))
                 .collect(),
 
             ty => ty
-                .definition(db)
-                .map(|definition| definition.navigation_targets(db))
+                .definition(db, program)
+                .map(|definition| definition.navigation_targets(db, program))
                 .unwrap_or_else(NavigationTargets::empty),
         }
     }
 }
 
 impl HasNavigationTargets for TypeDefinition<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
+    fn navigation_targets(&self, db: &dyn Db, _program: Program<'_>) -> NavigationTargets {
         let Some(full_range) = self.full_range(db) else {
             return NavigationTargets::empty();
         };
@@ -402,7 +403,7 @@ mod tests {
         Annotation, Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, UnifiedFile,
     };
     use ruff_db::files::{File, FileRootKind, system_path_to_file};
-    use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+    use ruff_db::parsed::ParsedModuleRef;
     use ruff_db::source::{SourceText, source_text};
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_python_ast::PythonVersion;
@@ -410,7 +411,8 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
     use ty_module_resolver::SearchPathSettings;
-    use ty_project::ProjectMetadata;
+    use ty_project::{Db as _, ProjectMetadata};
+    use ty_python_core::environment::AnalysisFile;
     use ty_python_core::platform::PythonPlatform;
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
     use ty_python_semantic::PythonVersionWithSource;
@@ -432,6 +434,18 @@ mod tests {
     impl CursorTest {
         pub(super) fn builder() -> CursorTestBuilder {
             CursorTestBuilder::default()
+        }
+
+        pub(super) fn program(&self) -> Program<'_> {
+            self.db.project().program(&self.db)
+        }
+
+        pub(super) fn analysis_file(&self, file: File) -> AnalysisFile<'_> {
+            AnalysisFile::new(&self.db, self.program(), file)
+        }
+
+        pub(super) fn cursor_analysis_file(&self) -> AnalysisFile<'_> {
+            self.analysis_file(self.cursor.file)
         }
 
         pub(super) fn write_file(
@@ -555,7 +569,9 @@ mod tests {
                         "found more than one source that contains `<CURSOR>`"
                     );
                     let source = source_text(&db, file);
-                    let parsed = parsed_module(&db, file).load(&db);
+                    let parsed = AnalysisFile::new(&db, db.project().program(&db), file)
+                        .parsed(&db)
+                        .load(&db);
                     let stylist =
                         Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
                     cursor = Some(Cursor {
@@ -668,14 +684,11 @@ mod tests {
             .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
             .expect("valid search paths");
 
-            Program::from_settings(
-                &db,
-                ProgramSettings {
-                    python_version: PythonVersionWithSource::default(),
-                    python_platform: PythonPlatform::default(),
-                    search_paths,
-                },
-            );
+            db.update_program_settings(ProgramSettings {
+                python_version: PythonVersionWithSource::default(),
+                python_platform: PythonPlatform::default(),
+                search_paths,
+            });
 
             db.files()
                 .try_add_root(&db, &project_root, FileRootKind::Project);
@@ -702,7 +715,9 @@ mod tests {
                         "found more than one source that contains `<CURSOR>`"
                     );
                     let source = source_text(&db, file);
-                    let parsed = parsed_module(&db, file).load(&db);
+                    let parsed = AnalysisFile::new(&db, db.project().program(&db), file)
+                        .parsed(&db)
+                        .load(&db);
                     let stylist =
                         Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
                     cursor = Some(Cursor {

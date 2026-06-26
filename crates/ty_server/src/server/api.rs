@@ -19,7 +19,14 @@ use self::traits::{NotificationHandler, RequestHandler};
 use super::{Result, schedule::BackgroundSchedule};
 use crate::session::client::Client;
 pub(crate) use diagnostics::publish_settings_diagnostics;
+use ruff_db::files::File;
 use ruff_db::panic::PanicError;
+use ty_project::Db as _;
+use ty_python_core::environment::AnalysisFile;
+
+pub(crate) fn analysis_file(db: &ty_project::ProjectDatabase, file: File) -> AnalysisFile<'_> {
+    AnalysisFile::new(db, db.project().program(db), file)
+}
 
 /// Processes a request from the client to the server.
 ///

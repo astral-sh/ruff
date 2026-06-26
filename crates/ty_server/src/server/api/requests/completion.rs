@@ -9,7 +9,7 @@ use lsp_types::{
 use ruff_source_file::OneIndexed;
 use ruff_text_size::Ranged;
 use ty_ide::{CompletionCapabilities, CompletionInsertTextFormat, CompletionKind, completion};
-use ty_project::ProjectDatabase;
+use ty_project::{Db as _, ProjectDatabase};
 
 use crate::document::{PositionExt, ToRangeExt};
 use crate::server::api::traits::{
@@ -62,7 +62,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             snapshot.workspace_settings().completions(),
             CompletionCapabilities::default()
                 .snippets(client_capabilities.supports_completion_item_snippets()),
-            file,
+            crate::server::api::analysis_file(db, file),
             offset,
         );
         if completions.is_empty() {
@@ -76,7 +76,8 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             .enumerate()
             .map(|(i, comp)| {
                 let kind = comp.kind.map(ty_kind_to_lsp_kind);
-                let type_display = comp.ty.map(|ty| ty.display(db).to_string());
+                let program = db.project().program(db);
+                let type_display = comp.ty.map(|ty| ty.display(db, program).to_string());
                 let import_edit = comp.import.as_ref().and_then(|edit| {
                     let range = edit
                         .range()

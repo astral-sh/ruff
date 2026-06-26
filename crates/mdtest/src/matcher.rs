@@ -11,7 +11,7 @@ use path_slash::PathExt;
 use ruff_db::Db;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{VersionedFile, parsed_module};
 use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_source_file::{LineIndex, OneIndexed};
 use smallvec::SmallVec;
@@ -88,16 +88,17 @@ struct LineFailures {
     range: Range<usize>,
 }
 
-pub fn match_file(
-    db: &dyn Db,
-    file: File,
+pub fn match_file<'db>(
+    db: &'db dyn Db,
+    versioned_file: VersionedFile<'db>,
     diagnostics: &[Diagnostic],
     options: RunOptions,
 ) -> Result<Vec<Diagnostic>, FailuresByLine> {
+    let file = versioned_file.file(db);
     // Parse assertions from comments in the file, and get diagnostics from the file; both
     // ordered by line number.
     let source = source_text(db, file);
-    let parsed = parsed_module(db, file).load(db);
+    let parsed = parsed_module(db, versioned_file).load(db);
     let line_index = line_index(db, file);
     let assertions = InlineFileAssertions::from_file(&source, &parsed, &line_index);
 
@@ -534,6 +535,7 @@ mod tests {
     use super::FailuresByLine;
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
     use ruff_db::files::{File, system_path_to_file};
+    use ruff_db::parsed::VersionedFile;
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
@@ -595,7 +597,9 @@ mod tests {
             .into_iter()
             .map(|diagnostic| diagnostic.into_diagnostic(file))
             .collect();
-        super::match_file(&db, file, &diagnostics, options)
+        let versioned_file =
+            VersionedFile::new(&db, file, ruff_python_ast::PythonVersion::latest_ty());
+        super::match_file(&db, versioned_file, &diagnostics, options)
     }
 
     fn assert_fail(result: Result<Vec<Diagnostic>, FailuresByLine>, messages: &[(usize, &[&str])]) {

@@ -20,7 +20,7 @@ use ty_module_resolver::{
     Module, SearchPath, SearchPathSettings, list_modules, resolve_module_confident,
 };
 use ty_python_core::platform::PythonPlatform;
-use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+use ty_python_core::program::{FallibleStrategy, ProgramSettings};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::UNDEFINED_REVEAL;
 use ty_python_semantic::{
@@ -316,10 +316,11 @@ fn run_test(
         .expect("Failed to resolve search path settings"),
     };
 
-    Program::init_or_update(db, settings);
+    db.set_program_settings(settings);
     db.update_analysis_options(configuration.analysis.as_ref());
     db.update_mdtest_rule_selection(configuration.rules.as_ref(), options.default_error_rule);
     db.set_verbosity(test.configuration().verbose());
+    let program = db.program();
 
     let mut all_diagnostics = vec![];
 
@@ -333,7 +334,12 @@ fn run_test(
         .iter()
         .filter_map(|test_file| {
             let mdtest_result = attempt_test(
-                |file| ty_python_semantic::Db::check_file(db, file),
+                |file| {
+                    ty_python_semantic::Db::check_file(
+                        db,
+                        ty_python_core::environment::AnalysisFile::new(db, program, file),
+                    )
+                },
                 test_file,
             );
             let diagnostics = match mdtest_result {
@@ -348,16 +354,23 @@ fn run_test(
                 }
             };
 
-            let failure = match matcher::match_file(db, test_file.file, &diagnostics, options)
-                .and_then(|inline_diagnostics| {
-                    mdtest::validate_inline_snapshot(
-                        db,
-                        "ty",
-                        test_file,
-                        &inline_diagnostics,
-                        &mut markdown_edits,
-                    )
-                }) {
+            let analysis_file =
+                ty_python_core::environment::AnalysisFile::new(db, program, test_file.file);
+            let failure = match matcher::match_file(
+                db,
+                analysis_file.versioned_file(db),
+                &diagnostics,
+                options,
+            )
+            .and_then(|inline_diagnostics| {
+                mdtest::validate_inline_snapshot(
+                    db,
+                    "ty",
+                    test_file,
+                    &inline_diagnostics,
+                    &mut markdown_edits,
+                )
+            }) {
                 Ok(()) => None,
                 Err(line_failures) => Some(FileFailures {
                     backtick_offsets: test_file.to_code_block_backtick_offsets(),
@@ -367,7 +380,15 @@ fn run_test(
 
             all_diagnostics.extend(diagnostics);
 
-            let pull_types_result = attempt_test(|file| pull_types(db, file), test_file);
+            let pull_types_result = attempt_test(
+                |file| {
+                    pull_types(
+                        db,
+                        ty_python_core::environment::AnalysisFile::new(db, program, file),
+                    );
+                },
+                test_file,
+            );
             match pull_types_result {
                 Ok(()) => {}
                 Err(failures) => {
@@ -425,9 +446,11 @@ fn run_test(
     // Test to fix all fixable diagnostics and verify that they don't introduce any syntax errors.
     // But don't try to run fixes for tests that are expected to panic.
     if test.should_expect_panic().is_err() {
+        let program = db.program().snapshot(db);
         let token_source = CancellationTokenSource::new();
         let result = fix_all_diagnostics(
             db,
+            &program,
             all_diagnostics,
             Applicability::Unsafe,
             &token_source.token(),
@@ -498,22 +521,25 @@ struct ModuleInconsistency<'db> {
 /// `list_module`.
 fn run_module_resolution_consistency_test(db: &db::Db) -> Result<(), Vec<ModuleInconsistency<'_>>> {
     let mut errs = vec![];
-    for from_list in list_modules(db).iter().copied() {
+    let program = db.program().resolver(db);
+    for from_list in list_modules(db, program).iter().copied() {
         // TODO: For now list_modules does not partake in desperate module resolution so
         // only compare against confident module resolution.
-        errs.push(match resolve_module_confident(db, from_list.name(db)) {
-            None => ModuleInconsistency {
-                db,
-                from_list,
-                from_resolve: None,
+        errs.push(
+            match resolve_module_confident(db, program, from_list.name(db)) {
+                None => ModuleInconsistency {
+                    db,
+                    from_list,
+                    from_resolve: None,
+                },
+                Some(from_resolve) if from_list != from_resolve => ModuleInconsistency {
+                    db,
+                    from_list,
+                    from_resolve: Some(from_resolve),
+                },
+                _ => continue,
             },
-            Some(from_resolve) if from_list != from_resolve => ModuleInconsistency {
-                db,
-                from_list,
-                from_resolve: Some(from_resolve),
-            },
-            _ => continue,
-        });
+        );
     }
     if errs.is_empty() { Ok(()) } else { Err(errs) }
 }

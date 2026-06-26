@@ -2,10 +2,10 @@ use bitflags::bitflags;
 use compact_str::CompactString;
 use ruff_python_ast::name::Name;
 
-use crate::Db;
 use crate::types::enums::EnumClassLiteral;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{ClassLiteral, KnownClass, Type};
+use crate::{Db, Program};
 use ty_python_core::definition::Definition;
 use ty_python_core::{place_table, use_def_map};
 
@@ -247,14 +247,14 @@ impl<'db> LiteralValueType<'db> {
         matches!(self.kind(), LiteralValueTypeKind::Bytes(..))
     }
 
-    pub(crate) fn fallback_instance(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn fallback_instance(self, db: &'db dyn Db, program: Program<'db>) -> Type<'db> {
         match self.kind() {
             LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => {
-                KnownClass::Str.to_instance(db)
+                KnownClass::Str.to_instance(db, program)
             }
-            LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_instance(db),
-            LiteralValueTypeKind::Int(_) => KnownClass::Int.to_instance(db),
-            LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_instance(db),
+            LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_instance(db, program),
+            LiteralValueTypeKind::Int(_) => KnownClass::Int.to_instance(db, program),
+            LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_instance(db, program),
             LiteralValueTypeKind::Enum(literal) => literal.enum_class_instance(db),
         }
     }

@@ -6,7 +6,6 @@ use crate::lint::{LintRegistry, LintRegistryBuilder};
 use crate::suppression::{
     IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT, UNUSED_TYPE_IGNORE_COMMENT,
 };
-use crate::types::check_types;
 pub use db::Db;
 pub use diagnostic::{
     add_inferred_python_version_hint_to_diagnostic, inferred_python_version_source_annotation,
@@ -28,12 +27,12 @@ pub use suppression::{
 };
 use ty_module_resolver::ModuleGlobSet;
 use ty_python_core::definition::docstring_from_body;
+pub use ty_python_core::environment::{AnalysisFile, InferenceSettings};
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::Program;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
     BindingWithConstraintsIterator, DeclarationsIterator, FileScopeId, attribute_scopes,
-    semantic_index,
 };
 pub use ty_site_packages::{
     PythonEnvironment, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
@@ -123,8 +122,7 @@ pub(crate) fn attribute_assignments<'db, 's>(
     class_body_scope: ScopeId<'db>,
     name: &'s str,
 ) -> impl Iterator<Item = (BindingWithConstraintsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
-    let file = class_body_scope.file(db);
-    let index = semantic_index(db, file);
+    let index = ty_python_core::semantic_index(db, class_body_scope.analysis_file(db));
 
     attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
         let place_table = index.place_table(function_scope_id);
@@ -144,8 +142,7 @@ pub(crate) fn attribute_declarations<'db, 's>(
     class_body_scope: ScopeId<'db>,
     name: &'s str,
 ) -> impl Iterator<Item = (DeclarationsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
-    let file = class_body_scope.file(db);
-    let index = semantic_index(db, file);
+    let index = ty_python_core::semantic_index(db, class_body_scope.analysis_file(db));
 
     attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
         let place_table = index.place_table(function_scope_id);
@@ -159,19 +156,23 @@ pub(crate) fn attribute_declarations<'db, 's>(
 }
 
 /// Get the module-level docstring for the given file.
-pub(crate) fn module_docstring(db: &dyn Db, file: File) -> Option<String> {
-    let module = parsed_module(db, file).load(db);
+pub(crate) fn module_docstring(db: &dyn Db, file: AnalysisFile<'_>) -> Option<String> {
+    let module = file.parsed(db).load(db);
     docstring_from_body(module.suite())
         .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
 }
 
-pub fn check_file_unwrap(db: &dyn Db, file: File) -> Vec<Diagnostic> {
-    check_file(db, file)
+pub fn check_file_unwrap(db: &dyn Db, analysis_file: AnalysisFile<'_>) -> Vec<Diagnostic> {
+    check_file(db, analysis_file)
         .map(<[ruff_db::diagnostic::Diagnostic]>::into_vec)
         .unwrap_or_else(|error| vec![error])
 }
 
-pub fn check_file(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnostic> {
+pub fn check_file(
+    db: &dyn Db,
+    analysis_file: AnalysisFile<'_>,
+) -> Result<Box<[Diagnostic]>, Diagnostic> {
+    let file = analysis_file.file(db);
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
     // Abort checking if there are IO errors.
@@ -185,7 +186,7 @@ pub fn check_file(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnost
         .to_diagnostic());
     }
 
-    let parsed = parsed_module(db, file);
+    let parsed = parsed_module(db, analysis_file.versioned_file(db));
 
     let parsed_ref = parsed.load(db);
     diagnostics.extend(
@@ -197,11 +198,16 @@ pub fn check_file(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnost
 
     diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
         let mut error = Diagnostic::invalid_syntax(file, error, error);
-        add_inferred_python_version_hint_to_diagnostic(db, &mut error, "parsing syntax");
+        add_inferred_python_version_hint_to_diagnostic(
+            db,
+            analysis_file.program(db),
+            &mut error,
+            "parsing syntax",
+        );
         error
     }));
 
-    diagnostics.extend(check_types(db, file));
+    diagnostics.extend(types::check_types(db, analysis_file));
 
     diagnostics.sort_unstable_by(|a, b| a.rendering_sort_key(db).cmp(&b.rendering_sort_key(db)));
 

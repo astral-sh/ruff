@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::num::{NonZeroU16, NonZeroUsize};
 use std::ops::{RangeFrom, RangeInclusive};
 use std::str::FromStr;
@@ -8,7 +9,6 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::{PythonVersion, PythonVersionDeserializationError};
 use rustc_hash::FxHashMap;
 
-use crate::db::Db;
 use crate::module_name::ModuleName;
 
 pub fn vendored_typeshed_versions(vendored: &VendoredFileSystem) -> TypeshedVersions {
@@ -18,10 +18,6 @@ pub fn vendored_typeshed_versions(vendored: &VendoredFileSystem) -> TypeshedVers
             .expect("The vendored typeshed stubs should contain a VERSIONS file"),
     )
     .expect("The VERSIONS file in the vendored typeshed stubs should be well-formed")
-}
-
-pub(crate) fn typeshed_versions(db: &dyn Db) -> &TypeshedVersions {
-    db.search_paths().typeshed_versions()
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -73,6 +69,14 @@ pub enum TypeshedVersionsParseErrorKind {
 
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub struct TypeshedVersions(FxHashMap<ModuleName, PyVersionRange>);
+
+impl Hash for TypeshedVersions {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let mut entries = self.0.iter().collect::<Vec<_>>();
+        entries.sort_unstable_by_key(|(name, _)| *name);
+        entries.hash(state);
+    }
+}
 
 impl TypeshedVersions {
     #[must_use]

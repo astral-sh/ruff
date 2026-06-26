@@ -1,6 +1,7 @@
 use lsp_types::WorkspaceSymbolRequest;
 use lsp_types::{WorkspaceSymbolParams, WorkspaceSymbolResponse};
 use ty_ide::{WorkspaceSymbolInfo, workspace_symbols};
+use ty_project::Db as _;
 
 use crate::server::api::symbols::convert_to_lsp_symbol_information;
 use crate::server::api::traits::{
@@ -28,7 +29,7 @@ impl BackgroundRequestHandler for WorkspaceSymbolRequestHandler {
         for db in snapshot.projects() {
             // Get workspace symbols matching the query
             let start = std::time::Instant::now();
-            let workspace_symbol_infos = workspace_symbols(db, query);
+            let workspace_symbol_infos = workspace_symbols(db, db.project().program(db), query);
             tracing::debug!(
                 "Found {len} workspace symbols in {elapsed:?}",
                 len = workspace_symbol_infos.len(),

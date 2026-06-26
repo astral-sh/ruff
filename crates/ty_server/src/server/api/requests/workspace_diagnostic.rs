@@ -240,7 +240,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
     }
 
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
-        let unnecessary_hints = hints(db, file);
+        let unnecessary_hints = hints(db, crate::server::api::analysis_file(db, file));
 
         // Another thread might have panicked at this point because of a salsa cancellation which
         // poisoned the result. If the response is poisoned, just don't report and wait for our thread
@@ -288,7 +288,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         let response = &mut self.state.get_mut().unwrap().response;
 
         for (file, diagnostics) in by_file {
-            let unnecessary_hints = hints(db, file);
+            let unnecessary_hints = hints(db, crate::server::api::analysis_file(db, file));
             response.write_diagnostics_for_file(db, file, &diagnostics, &unnecessary_hints);
         }
         response.maybe_flush();

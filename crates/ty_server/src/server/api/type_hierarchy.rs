@@ -1,7 +1,7 @@
 use lsp_types::{SymbolKind, TypeHierarchyItem};
-use ruff_db::files::File;
 use ruff_text_size::TextSize;
 use ty_project::ProjectDatabase;
+use ty_python_core::environment::AnalysisFile;
 
 use crate::PositionEncoding;
 use crate::document::{ToRangeExt, resolve_file_uri_range};
@@ -15,7 +15,11 @@ use crate::system::file_to_uri;
 pub(crate) fn hierarchy_handler(
     snapshot: &SessionSnapshot,
     requested_item: &TypeHierarchyItem,
-    hierarchy_types: fn(&dyn ty_project::Db, File, TextSize) -> Vec<ty_ide::TypeHierarchyItem>,
+    hierarchy_types: for<'db> fn(
+        &'db dyn ty_project::Db,
+        AnalysisFile<'db>,
+        TextSize,
+    ) -> Vec<ty_ide::TypeHierarchyItem>,
 ) -> Option<Vec<TypeHierarchyItem>> {
     let encoding = snapshot.position_encoding();
 
@@ -33,7 +37,7 @@ pub(crate) fn hierarchy_handler(
             continue;
         };
         items.extend(
-            hierarchy_types(db, file, offset)
+            hierarchy_types(db, crate::server::api::analysis_file(db, file), offset)
                 .into_iter()
                 .filter_map(|item| convert_to_lsp_item(db, item, encoding)),
         );

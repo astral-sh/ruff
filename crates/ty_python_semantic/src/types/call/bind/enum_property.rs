@@ -11,15 +11,16 @@ impl<'db> Bindings<'db> {
     pub(super) fn evaluate_enum_property_calls(
         &mut self,
         db: &'db dyn Db,
+        program: crate::Program<'db>,
         call_arguments: &CallArguments<'_, 'db>,
     ) {
         let property_instance =
             |getter: Option<Type<'db>>, setter: Option<Type<'db>>, deleter: Option<Type<'db>>| {
                 Type::PropertyInstance(PropertyInstanceType::new_enum_property(
                     db,
-                    getter.filter(|ty| !ty.is_none(db)),
-                    setter.filter(|ty| !ty.is_none(db)),
-                    deleter.filter(|ty| !ty.is_none(db)),
+                    getter.filter(|ty| !ty.is_none(db, program)),
+                    setter.filter(|ty| !ty.is_none(db, program)),
+                    deleter.filter(|ty| !ty.is_none(db, program)),
                 ))
             };
 
@@ -27,10 +28,11 @@ impl<'db> Bindings<'db> {
         // only a known property class, so this rewrite collapses subclass instances to
         // `enum.property`.
         for constructor in self.iter_constructor_items_mut() {
-            if !constructor
-                .constructed_instance_type()
-                .is_instance_of(db, KnownClass::EnumProperty)
-            {
+            if !constructor.constructed_instance_type().is_instance_of(
+                db,
+                program,
+                KnownClass::EnumProperty,
+            ) {
                 continue;
             }
 

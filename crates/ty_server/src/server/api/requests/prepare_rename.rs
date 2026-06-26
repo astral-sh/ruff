@@ -48,7 +48,8 @@ impl BackgroundDocumentRequestHandler for PrepareRenameRequestHandler {
             return Ok(None);
         };
 
-        let Some(range) = can_rename(db, file, offset) else {
+        let Some(range) = can_rename(db, crate::server::api::analysis_file(db, file), offset)
+        else {
             return Ok(None);
         };
 

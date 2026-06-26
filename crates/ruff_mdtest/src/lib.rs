@@ -8,6 +8,7 @@ use mdtest::{
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::files::{File, system_path_to_file};
+use ruff_db::parsed::VersionedFile;
 use ruff_db::source::source_text;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
 use ruff_linter::source_kind::SourceKind;
@@ -135,7 +136,7 @@ fn run_test(
 
             let failure = match matcher::match_file(
                 db,
-                test_file.file,
+                VersionedFile::new(db, test_file.file, ruff_python_ast::PythonVersion::latest()),
                 &diagnostics,
                 mdtest::RunOptions::default(),
             )

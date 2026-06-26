@@ -10,7 +10,7 @@ use ruff_db::Db as _;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
-use ty_python_core::program::{FallibleStrategy, Program};
+use ty_python_core::program::FallibleStrategy;
 
 /// Represents the result of applying changes to the project database.
 pub struct ChangeResult {
@@ -42,9 +42,10 @@ impl ProjectDatabase {
         let config_file_override =
             project_options_overrides.and_then(|options| options.config_file_override.clone());
         let extra_configuration_paths = project.metadata(self).extra_configuration_paths().to_vec();
-        let program = Program::get(self);
-        let custom_stdlib_versions_path = program
-            .custom_stdlib_search_path(self)
+        let custom_stdlib_versions_path = project
+            .program_settings(self)
+            .search_paths
+            .custom_stdlib()
             .map(|path| path.join("VERSIONS"));
 
         let mut result = ChangeResult {
@@ -276,21 +277,17 @@ impl ProjectDatabase {
 
                     metadata.try_add_project_root(self);
 
-                    let program_settings_diagnostics = match metadata.to_program_settings(
-                        self.system(),
-                        self.vendored(),
-                        &FallibleStrategy,
-                    ) {
+                    let (program_settings, program_settings_diagnostics) = match metadata
+                        .to_program_settings(self.system(), self.vendored(), &FallibleStrategy)
+                    {
                         Ok((program_settings, diagnostics)) => {
-                            let program = Program::get(self);
-                            program.update_from_settings(self, program_settings);
-                            diagnostics
+                            (Some(program_settings), diagnostics)
                         }
                         Err(error) => {
                             tracing::error!(
                                 "Failed to convert metadata to program settings, continuing without applying them: {error}"
                             );
-                            Vec::new()
+                            (None, Vec::new())
                         }
                     };
 
@@ -313,6 +310,7 @@ impl ProjectDatabase {
                         self,
                         metadata,
                         settings,
+                        program_settings,
                         settings_diagnostics,
                         program_settings_diagnostics,
                     ) {
@@ -354,7 +352,7 @@ impl ProjectDatabase {
                 &FallibleStrategy,
             ) {
                 Ok((program_settings, program_settings_diagnostics)) => {
-                    program.update_from_settings(self, program_settings);
+                    project.update_program_settings(self, program_settings);
                     let settings_diagnostics = match project.metadata(self).options().to_settings(
                         self,
                         project.metadata(self).root(),

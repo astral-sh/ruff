@@ -49,7 +49,9 @@ impl BackgroundDocumentRequestHandler for DocumentHighlightRequestHandler {
             return Ok(None);
         };
 
-        let Some(highlights_result) = document_highlights(db, file, offset) else {
+        let Some(highlights_result) =
+            document_highlights(db, crate::server::api::analysis_file(db, file), offset)
+        else {
             return Ok(None);
         };
 

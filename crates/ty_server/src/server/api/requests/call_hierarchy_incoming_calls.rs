@@ -40,7 +40,9 @@ impl BackgroundRequestHandler for CallHierarchyIncomingCallsRequestHandler {
                 continue;
             };
 
-            for call in ty_ide::incoming_calls(db, file, offset) {
+            for call in
+                ty_ide::incoming_calls(db, crate::server::api::analysis_file(db, file), offset)
+            {
                 // `from_ranges` are byte offsets into `call.from.file` (the caller),
                 // NOT into `file` (the prepared/queried symbol). Capture the caller
                 // file before moving `call.from` into `convert_to_lsp_item`.

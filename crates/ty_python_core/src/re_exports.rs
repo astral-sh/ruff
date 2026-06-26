@@ -20,7 +20,7 @@
 //! to handle cycles. We do this using fixpoint iteration; adding fixpoint iteration to the
 //! whole [`super::semantic_index()`] query would probably be prohibitively expensive.
 
-use ruff_db::{files::File, parsed::parsed_module};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{
     self as ast,
     name::Name,
@@ -29,16 +29,16 @@ use ruff_python_ast::{
 use rustc_hash::FxHashMap;
 use ty_module_resolver::{ModuleName, resolve_module};
 
-use crate::Db;
+use crate::{Db, environment::AnalysisFile};
 
 #[salsa::tracked(
     returns(deref),
     cycle_initial=|_, _, _| Box::default(),
     heap_size=ruff_memory_usage::heap_size)
 ]
-pub(super) fn exported_names(db: &dyn Db, file: File) -> Box<[Name]> {
-    let module = parsed_module(db, file).load(db);
-    let mut finder = ExportFinder::new(db, file);
+pub(super) fn exported_names(db: &dyn Db, analysis_file: AnalysisFile<'_>) -> Box<[Name]> {
+    let module = parsed_module(db, analysis_file.versioned_file(db)).load(db);
+    let mut finder = ExportFinder::new(db, analysis_file);
     finder.visit_body(module.suite());
 
     let mut exports = finder.resolve_exports();
@@ -51,17 +51,18 @@ pub(super) fn exported_names(db: &dyn Db, file: File) -> Box<[Name]> {
 
 struct ExportFinder<'db> {
     db: &'db dyn Db,
-    file: File,
+    analysis_file: AnalysisFile<'db>,
     visiting_stub_file: bool,
     exports: FxHashMap<&'db Name, PossibleExportKind>,
     dunder_all: DunderAll,
 }
 
 impl<'db> ExportFinder<'db> {
-    fn new(db: &'db dyn Db, file: File) -> Self {
+    fn new(db: &'db dyn Db, analysis_file: AnalysisFile<'db>) -> Self {
+        let file = analysis_file.file(db);
         Self {
             db,
-            file,
+            analysis_file,
             visiting_stub_file: file.is_stub(db),
             exports: FxHashMap::default(),
             dunder_all: DunderAll::NotPresent,
@@ -248,21 +249,24 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     if &name.name.id == "*" {
                         if !found_star {
                             found_star = true;
-                            for export in
-                                ModuleName::from_import_statement(self.db, self.file, node)
-                                    .ok()
-                                    .and_then(|module_name| {
-                                        resolve_module(self.db, self.file, &module_name)
-                                    })
-                                    .iter()
-                                    .flat_map(|module| {
-                                        module
-                                            .file(self.db)
-                                            .map(|file| exported_names(self.db, file))
-                                            .unwrap_or_default()
-                                    })
+                            if let Ok(module_name) = ModuleName::from_import_statement(
+                                self.db,
+                                self.analysis_file.program_file(self.db),
+                                node,
+                            ) && let Some(module) = resolve_module(
+                                self.db,
+                                self.analysis_file.program_file(self.db),
+                                &module_name,
+                            ) && let Some(file) = module.file(self.db)
                             {
-                                self.possibly_add_export(export, PossibleExportKind::Normal);
+                                let analysis_file = AnalysisFile::new(
+                                    self.db,
+                                    self.analysis_file.program(self.db),
+                                    file,
+                                );
+                                for export in exported_names(self.db, analysis_file) {
+                                    self.possibly_add_export(export, PossibleExportKind::Normal);
+                                }
                             }
                         }
                     } else {
