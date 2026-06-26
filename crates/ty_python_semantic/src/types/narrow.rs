@@ -1518,6 +1518,11 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                     })
                     .is_some_and(|ty| ty.has_typevar(self.db))
             {
+                let default_pattern_member_ty =
+                    Type::instance(self.db, pattern_class.default_specialization(self.db))
+                        .member(self.db, name.as_str())
+                        .place
+                        .ignore_possibly_undefined();
                 // For example, `Child[int]` and `Base[T]` share a generic hierarchy, so a `Base`
                 // pattern can reuse `int` from the subject. This does not infer `Child[int]` from
                 // a `Base[int]` subject.
@@ -1535,9 +1540,13 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                     });
                 if shares_generic_hierarchy {
                     // The pattern class's default specialization loses type arguments known
-                    // through the related subject type. Prefer the subject's member type;
-                    // otherwise, do not treat the generic fallback as a declared type.
-                    member_ty = Some(original_member_ty.unwrap_or_else(Type::unknown));
+                    // through the related subject type. Prefer the subject's member type when it
+                    // exists, but retain a member declared only by the pattern class.
+                    member_ty = Some(
+                        original_member_ty
+                            .or(default_pattern_member_ty)
+                            .unwrap_or_else(Type::unknown),
+                    );
                 } else if let Some(pattern_member_ty) = context
                     .class_ty
                     .member(self.db, name.as_str())
