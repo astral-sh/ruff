@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Roslyn C#->SPO harvester. Emits one `ruff_spo_triplet::Triple` per line of
+    ndjson (s/p/o/f/c) to stdout (or a file), which `ruff_csharp_spo::load`
+    consumes and validates against the closed Predicate vocabulary.
+
+    This scaffold uses the syntax layer only (Microsoft.CodeAnalysis.CSharp):
+    it parses each .cs file with CSharpSyntaxTree and walks declarations. That
+    is enough for the structural facts (classes, base types as written, fields,
+    field types as written, methods, static-ness) without needing the project
+    to restore/build.
+
+    To resolve symbols fully (fully-qualified base types, override targets,
+    EF/Mongo attribute binding) add the SemanticModel: reference
+    Microsoft.CodeAnalysis.CSharp.Workspaces + Microsoft.Build.Locator and load
+    the .sln via MSBuildWorkspace instead of raw ParseText. See README.md.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>csharp-spo-harvest</AssemblyName>
+    <RootNamespace>RuffCSharpSpo</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
+  </ItemGroup>
+
+</Project>
