@@ -41,6 +41,91 @@ fn respect_type_ignore_comments_is_turned_off() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// ty can preserve broad builtin types when `unsafe-literal-narrowing=false`
+#[test]
+fn unsafe_literal_narrowing_is_turned_off() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+            from typing import Literal
+
+            Text = Literal["a", "b"]
+
+            def safe_literal(value: Text) -> Literal["a"] | None:
+                if value == "a":
+                    return value
+                return None
+
+            def equality(value: str) -> Text | None:
+                if value == "a":
+                    return value
+                return None
+
+            def membership(value: str, values: list[Text]) -> Text | None:
+                if value in values:
+                    return value
+                return None
+
+            def pattern(value: str) -> Text | None:
+                match value:
+                    case "a":
+                        return value
+                return None
+            "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    assert_cmd_snapshot!(case.command().arg("--config").arg("analysis.unsafe-literal-narrowing=false"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[invalid-return-type]: Return type does not match returned value
+      --> test.py:11:29
+       |
+    11 | def equality(value: str) -> Text | None:
+       |                             ----------- Expected `Literal["a", "b"] | None` because of return type
+    12 |     if value == "a":
+    13 |         return value
+       |                ^^^^^ expected `Literal["a", "b"] | None`, found `str`
+       |
+
+    error[invalid-return-type]: Return type does not match returned value
+      --> test.py:16:51
+       |
+    16 | def membership(value: str, values: list[Text]) -> Text | None:
+       |                                                   ----------- Expected `Literal["a", "b"] | None` because of return type
+    17 |     if value in values:
+    18 |         return value
+       |                ^^^^^ expected `Literal["a", "b"] | None`, found `str`
+       |
+
+    error[invalid-return-type]: Return type does not match returned value
+      --> test.py:21:28
+       |
+    21 | def pattern(value: str) -> Text | None:
+       |                            ----------- Expected `Literal["a", "b"] | None` because of return type
+    22 |     match value:
+    23 |         case "a":
+    24 |             return value
+       |                    ^^^^^ expected `Literal["a", "b"] | None`, found `str`
+       |
+
+    Found 3 diagnostics
+
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
 /// Basic override functionality: override analysis options for a specific file
 #[test]
 fn overrides_basic() -> anyhow::Result<()> {

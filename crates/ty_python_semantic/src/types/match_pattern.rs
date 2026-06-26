@@ -643,7 +643,14 @@ pub(crate) fn pattern_fallthrough_type<'db>(
                 .add_negative(value_ty)
                 .build();
         }
-        if let Some(constraint) = evaluate_type_equality(db, subject_ty, value_ty, false) {
+        if let Some(constraint) = evaluate_type_equality(
+            db,
+            subject_ty,
+            value_ty,
+            false,
+            db.analysis_settings(value.file(db))
+                .unsafe_literal_narrowing,
+        ) {
             return IntersectionBuilder::new(db)
                 .add_positive(subject_ty)
                 .add_positive(constraint)
