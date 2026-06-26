@@ -415,7 +415,11 @@ pub(crate) fn class_pattern_positional_result<'db>(
     if binding == DirectMatchArgsBinding::AnnotationOnly {
         return (!has_local_binding()).then_some(ClassPatternPositionalResult::Limit(0));
     }
-    let match_args = binding_type(db, definition);
+    let match_args = if place.origin.is_declared() {
+        place.ty
+    } else {
+        binding_type(db, definition)
+    };
 
     match binding {
         DirectMatchArgsBinding::TupleLiteral => match_args

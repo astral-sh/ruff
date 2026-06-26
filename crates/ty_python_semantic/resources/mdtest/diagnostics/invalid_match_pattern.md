@@ -8,6 +8,8 @@ statically missing `__match_args__` has a limit of zero; match-self builtins suc
 limit of one.
 
 ```py
+from typing import Literal
+
 class Point:
     __match_args__ = ("x", "y")
 
@@ -24,7 +26,7 @@ class AnnotationOnly:
     __match_args__: tuple[str]
 
 class AnnotatedBinding:
-    __match_args__: tuple[str] = ("x",)
+    __match_args__: tuple[Literal["x"]] = ("x",)
 
 def describe(
     point: Point,
@@ -266,6 +268,23 @@ class Model: ...
 ```py
 class Model:
     __match_args__ = ("value", "other")
+```
+
+## Mutable `__match_args__` declaration
+
+A wider class-variable declaration permits legal writes after the class body, so its initializer
+does not establish an exact runtime limit.
+
+```py
+class Model:
+    __match_args__: tuple[str, ...] = ()
+
+Model.__match_args__ = ("value",)
+
+def describe(model: Model) -> None:
+    match model:
+        case Model(_):
+            pass
 ```
 
 ## Deliberately conservative cases
