@@ -3129,6 +3129,25 @@ impl<'db> Type<'db> {
             return Some((descriptor_result, AttributeKind::NormalOrNonDataDescriptor));
         }
 
+        // Avoid retaining a context-specific query when the existing class-member query already
+        // proves that this common concrete type has no descriptor method.
+        if matches!(self, Type::NominalInstance(_) | Type::ClassLiteral(_)) {
+            let Place::Defined(DefinedPlace { ty, .. }) = self
+                .class_member_with_policy(
+                    db,
+                    "__get__".into(),
+                    MemberLookupPolicy::REQUIRE_CONCRETE,
+                )
+                .place
+            else {
+                return None;
+            };
+
+            if ty.is_divergent() {
+                return None;
+            }
+        }
+
         try_call_dunder_get_inner(db, self, instance, owner)
     }
 
