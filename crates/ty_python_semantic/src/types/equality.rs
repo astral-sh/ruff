@@ -129,7 +129,7 @@ pub(super) fn evaluate_type_equality<'db>(
     left: Type<'db>,
     right: Type<'db>,
     is_positive: bool,
-    narrowing_mode: ComparisonNarrowingMode,
+    soundness_policy: ComparisonSoundnessPolicy,
 ) -> Option<Type<'db>> {
     let branch = ComparisonBranch::from(is_positive);
     let condition_expects_equality =
@@ -158,7 +158,7 @@ pub(super) fn evaluate_type_equality<'db>(
         if comparison_domain(db, left, right, ComparisonOperator::Equality)
             == ComparisonDomain::Known
         {
-            ComparisonEvaluator::new(db, narrowing_mode)
+            ComparisonEvaluator::new(db, soundness_policy)
                 .evaluate(left, right, branch, ComparisonOperator::Equality)
                 .constraint(branch)
         } else {
@@ -211,7 +211,7 @@ pub(super) fn evaluate_type_inequality<'db>(
     left: Type<'db>,
     right: Type<'db>,
     is_positive: bool,
-    narrowing_mode: ComparisonNarrowingMode,
+    soundness_policy: ComparisonSoundnessPolicy,
 ) -> Option<Type<'db>> {
     let branch = ComparisonBranch::from(is_positive);
     let condition_expects_equality =
@@ -233,7 +233,7 @@ pub(super) fn evaluate_type_inequality<'db>(
         )
     })
     .or_else(|| {
-        ComparisonEvaluator::new(db, narrowing_mode)
+        ComparisonEvaluator::new(db, soundness_policy)
             .evaluate(left, right, branch, ComparisonOperator::Inequality)
             .constraint(branch)
     })
@@ -310,15 +310,15 @@ enum ComparisonGoal {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(super) enum ComparisonNarrowingMode {
+pub(super) enum ComparisonSoundnessPolicy {
     Conservative,
-    AssumeBuiltinEquality,
+    UnsafeLiteralNarrowing,
 }
 
-impl ComparisonNarrowingMode {
+impl ComparisonSoundnessPolicy {
     pub(super) fn from_unsafe_literal_narrowing(enabled: bool) -> Self {
         if enabled {
-            Self::AssumeBuiltinEquality
+            Self::UnsafeLiteralNarrowing
         } else {
             Self::Conservative
         }
@@ -341,21 +341,21 @@ struct ComparisonEvaluator<'db> {
     db: &'db dyn Db,
     active: FxHashSet<ComparisonKey<'db>>,
     goal: ComparisonGoal,
-    narrowing_mode: ComparisonNarrowingMode,
+    soundness_policy: ComparisonSoundnessPolicy,
 }
 
 impl<'db> ComparisonEvaluator<'db> {
-    fn new(db: &'db dyn Db, narrowing_mode: ComparisonNarrowingMode) -> Self {
+    fn new(db: &'db dyn Db, soundness_policy: ComparisonSoundnessPolicy) -> Self {
         Self {
             db,
             active: FxHashSet::default(),
             goal: ComparisonGoal::Constraint,
-            narrowing_mode,
+            soundness_policy,
         }
     }
 
     fn conservative(db: &'db dyn Db) -> Self {
-        Self::new(db, ComparisonNarrowingMode::Conservative)
+        Self::new(db, ComparisonSoundnessPolicy::Conservative)
     }
 
     fn for_truthiness(db: &'db dyn Db) -> Self {
@@ -363,7 +363,7 @@ impl<'db> ComparisonEvaluator<'db> {
             db,
             active: FxHashSet::default(),
             goal: ComparisonGoal::Truthiness,
-            narrowing_mode: ComparisonNarrowingMode::Conservative,
+            soundness_policy: ComparisonSoundnessPolicy::Conservative,
         }
     }
 
@@ -1220,7 +1220,7 @@ fn compare_literal_to_other<'db>(
     // Treat broad builtin types as if they exclude subclasses with custom equality. This is
     // intentionally unsafe: an instance of such a subclass can compare equal to the literal
     // without inhabiting its literal type. Explicitly typed subclasses do not take this path.
-    if evaluator.narrowing_mode == ComparisonNarrowingMode::AssumeBuiltinEquality
+    if evaluator.soundness_policy == ComparisonSoundnessPolicy::UnsafeLiteralNarrowing
         && condition_expects_equality
         && literal_operand == LiteralOperand::Other
         && let Some(equal_to_literal) = builtin_literals_equal_to(db, literal_type, literal)

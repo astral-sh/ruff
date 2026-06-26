@@ -10,7 +10,7 @@ use crate::Db;
 use crate::place::{DefinedPlace, Place};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::equality::{
-    ComparisonNarrowingMode, evaluate_type_equality, is_same_enum_domain,
+    ComparisonSoundnessPolicy, evaluate_type_equality, is_same_enum_domain,
 };
 use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
@@ -650,7 +650,7 @@ pub(crate) fn pattern_fallthrough_type<'db>(
             subject_ty,
             value_ty,
             false,
-            ComparisonNarrowingMode::from_unsafe_literal_narrowing(
+            ComparisonSoundnessPolicy::from_unsafe_literal_narrowing(
                 db.analysis_settings(value.file(db))
                     .unsafe_literal_narrowing,
             ),
