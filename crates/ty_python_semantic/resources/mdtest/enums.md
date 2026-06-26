@@ -775,8 +775,7 @@ class InheritedWeirdEnum(EmptyWeirdEnum):
 
 reveal_type(InheritedWeirdEnum.FROM_BOOL.value)  # revealed: Any
 reveal_type(InheritedWeirdEnum.FROM_INT)  # revealed: Literal[InheritedWeirdEnum.FROM_INT]
-# revealed: tuple[Literal["FROM_BOOL"], Literal["FROM_INT"], Literal["OTHER"]]
-reveal_type(enum_members(InheritedWeirdEnum))
+reveal_type(enum_members(InheritedWeirdEnum))  # revealed: Unknown
 ```
 
 ### Built-in data types
@@ -800,9 +799,12 @@ reveal_type(enum_members(IntegerValues))
 class StringValues(str, Enum):
     INTEGER = 1
     STRING = "1"
+    BOOLEAN = False
+    BOOLEAN_STRING = "False"
 
 reveal_type(StringValues.INTEGER.value)  # revealed: Literal["1"]
-# revealed: tuple[Literal["INTEGER"]]
+reveal_type(StringValues.BOOLEAN.value)  # revealed: Literal["False"]
+# revealed: tuple[Literal["INTEGER"], Literal["BOOLEAN"]]
 reveal_type(enum_members(StringValues))
 
 def union_member_value(value: Literal[False, 2]):
@@ -838,6 +840,21 @@ reveal_type(ByteValues.VALUE.value)  # revealed: Literal[b"value"]
 reveal_type(enum_members(ByteValues))
 ```
 
+If the data type would coerce the assigned value, its value and aliases remain unknown:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+class CoercingByteValues(bytes, Enum):
+    FROM_INT = 1
+    FROM_BYTES = b"\0"
+
+reveal_type(CoercingByteValues.FROM_INT.value)  # revealed: Any
+reveal_type(CoercingByteValues.FROM_INT is CoercingByteValues.FROM_BYTES)  # revealed: bool
+reveal_type(enum_members(CoercingByteValues))  # revealed: Unknown
+```
+
 ### User-defined data types
 
 User-defined data types remain opaque even when they inherit from `int` or `str` without overriding
@@ -856,11 +873,13 @@ class CustomValues(CustomInt, Enum):
     ZERO = 0
 
 reveal_type(CustomValues.FALSE.value)  # revealed: Any
-# revealed: tuple[Literal["FALSE"], Literal["ZERO"]]
-reveal_type(enum_members(CustomValues))
+reveal_type(CustomValues.FALSE is CustomValues.ZERO)  # revealed: bool
+reveal_type(CustomValues.ZERO.name)  # revealed: str
+reveal_type(enum_members(CustomValues))  # revealed: Unknown
 ```
 
-A separate behavior base does not become the enum's data type:
+A user-defined behavior base can still affect member construction and attribute access, so it keeps
+the enum's values opaque even when a separate base selects a built-in data type:
 
 ```py
 class Behavior:
@@ -870,9 +889,7 @@ class ValuesWithBehavior(Behavior, int, Enum):
     FALSE = False
     ZERO = 0
 
-reveal_type(ValuesWithBehavior.FALSE.value)  # revealed: Literal[0]
-# revealed: tuple[Literal["FALSE"]]
-reveal_type(enum_members(ValuesWithBehavior))
+reveal_type(ValuesWithBehavior.FALSE.value)  # revealed: Any
 ```
 
 ### Assigned `__new__`

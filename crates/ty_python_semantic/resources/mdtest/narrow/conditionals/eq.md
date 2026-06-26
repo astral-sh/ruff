@@ -533,6 +533,12 @@ class IntegerKey(IntEnum):
     ZERO = 0
 
 reveal_type(BooleanKey.FALSE == IntegerKey.ZERO)  # revealed: Literal[True]
+
+class IntegerAliases(IntEnum):
+    ZERO = 0
+    FALSE = False
+
+reveal_type(IntegerAliases.ZERO == IntegerAliases.FALSE)  # revealed: Literal[True]
 ```
 
 Plain enum members from different classes use identity comparison, even when their declared values
