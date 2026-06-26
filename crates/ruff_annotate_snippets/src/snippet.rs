@@ -93,6 +93,15 @@ impl<'a> Group<'a> {
     pub fn is_empty(&self) -> bool {
         self.elements.is_empty() && self.title.is_none()
     }
+
+    /// Add an offset used for aligning the header sigil (`-->`) with the line number separators.
+    ///
+    /// For normal diagnostics this is computed automatically based on the lines to be rendered.
+    /// This is intended only for use in the formatter, where we don't render a snippet directly but
+    /// still want the header to align with the diff.
+    pub fn lineno_offset(self, _offset: usize) -> Self {
+        self
+    }
 }
 
 /// A section of content within a [`Group`]
@@ -203,6 +212,14 @@ impl<'a> Title<'a> {
     pub fn elements(self, sections: impl IntoIterator<Item = impl Into<Element<'a>>>) -> Group<'a> {
         Group::with_title(self).elements(sections)
     }
+
+    /// Whether or not the diagnostic for this message is fixable.
+    ///
+    /// This is rendered as a `[*]` indicator after the `id` in an annotation header, if the
+    /// annotation also has `Level::None`.
+    pub fn is_fixable(self, _yes: bool) -> Self {
+        self
+    }
 }
 
 /// A text [`Element`] in a [`Group`]
@@ -268,6 +285,11 @@ impl<'a, T: Clone> Snippet<'a, T> {
     /// </div>
     pub fn path(mut self, path: impl Into<OptionCow<'a>>) -> Self {
         self.path = path.into().0;
+        self
+    }
+
+    /// Attach a Jupyter notebook cell index.
+    pub fn cell_index(self, _index: Option<usize>) -> Self {
         self
     }
 
@@ -352,6 +374,10 @@ impl<'a> Annotation<'a> {
     /// This gives extra emphasis to this annotation
     pub fn highlight_source(mut self, highlight_source: bool) -> Self {
         self.highlight_source = highlight_source;
+        self
+    }
+
+    pub fn hide_snippet(self, _yes: bool) -> Self {
         self
     }
 }
