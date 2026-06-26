@@ -194,8 +194,8 @@ class RuntimeIntAlias(IntEnum):
 reveal_type(RuntimeIntAlias.FIRST == RuntimeIntAlias.SECOND)  # revealed: Literal[True]
 ```
 
-A scalar mixin can normalize member values before `Enum` checks for aliases. Here, `str` converts
-`1` to `"1"`, so the two members are aliases:
+An enum with a `str` data type constructs its values before checking for aliases. Here, `str`
+converts `1` to `"1"`, so the two members are aliases:
 
 ```py
 class CoercingAlias(str, Enum):
