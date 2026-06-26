@@ -261,12 +261,12 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// Only populated for expressions that have non-empty flags.
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
 
-    /// The constraints on any collection literals that are accessed in this region.
+    /// The constraints on any collection initializers that are accessed in this region.
     //
     // TODO: Store projected constraint sets directly here instead of specialized receiver types.
-    // Bound-method calls on unconstrained collection literals can introduce method-local typevars
+    // Bound-method calls on unconstrained collection initializers can introduce method-local typevars
     // (for example, `list.sort` constrains `T@list` using `SupportsRichComparisonT@sort`). A
-    // principled representation would store an owned constraint set over the collection literal's
+    // principled representation would store an owned constraint set over the collection initializer's
     // generic context and existentially quantify away the method-local typevars, so combining
     // `xs.append("x")` with `xs.sort()` yields `str ≤ T ≤ SupportsRichComparison` instead of
     // leaking `SupportsRichComparisonT@sort` into the inferred list element type.
@@ -6303,7 +6303,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if let Some(tcx) = tcx.annotation
-            && let Some(collection_def) = self.index.unannotated_collection_literal(expression)
+            && let Some(collection_def) = self.index.unannotated_collection_initializer(expression)
         {
             self.collection_use_constraints
                 .entry(collection_def)
@@ -8456,6 +8456,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_call_expression_impl(call_expression, callable_type, tcx)
     }
 
+    fn infer_empty_list_or_set_constructor(
+        &mut self,
+        collection_class: KnownClass,
+        call_expression: &ast::ExprCall,
+        tcx: TypeContext<'db>,
+    ) -> Option<Type<'db>> {
+        let elements: [[Option<&ast::Expr>; 1]; 0] = [];
+        let mut infer_element_ty = |_: &mut Self, _| Type::unknown();
+
+        self.infer_collection_literal(
+            collection_class,
+            Some(call_expression.into()),
+            &elements,
+            &mut infer_element_ty,
+            tcx,
+        )
+    }
+
     /// Infers a truthiness-refined `range` instance for literal built-in `range(...)` calls.
     ///
     /// The refinement only records whether the constructed range is statically non-empty. Dynamic
@@ -8558,11 +8576,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             arguments,
         } = call_expression;
 
+        // Semantic indexing recognizes only bare empty constructor calls. Confirm that the name
+        // still resolves to the corresponding builtin before using later collection constraints.
+        let collection_initializer_class = if arguments.is_empty()
+            && self
+                .index
+                .try_expression(call_expression)
+                .and_then(|expression| expression.assigned_to(self.db()))
+                .is_some()
+            && let Some(name) = func.as_name_expr()
+            && let Some(known_class) = callable_type
+                .as_class_literal()
+                .and_then(|class| class.known(self.db()))
+            && matches!(
+                (name.id.as_str(), known_class),
+                ("list", KnownClass::List) | ("set", KnownClass::Set) | ("dict", KnownClass::Dict)
+            ) {
+            Some(known_class)
+        } else {
+            None
+        };
+
         if callable_type
             .as_class_literal()
             .is_some_and(|class_literal| class_literal.is_known(self.db(), KnownClass::Dict))
-            && let Some(ty) =
-                self.infer_keyword_only_dict_call(func, arguments, call_expression_tcx)
+            && let Some(ty) = self.infer_keyword_only_dict_call(
+                func,
+                arguments,
+                (collection_initializer_class == Some(KnownClass::Dict))
+                    .then_some(call_expression.into()),
+                call_expression_tcx,
+            )
         {
             return ty;
         }
@@ -9012,11 +9056,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Record the constraints for the receiver of a bound method call, if the receiver is an
-        // unannotated collection literal.
+        // unannotated collection initializer.
         if let ast::Expr::Attribute(attribute @ ast::ExprAttribute { value, .. }) = func.as_ref() {
             let value_type = self.expression_type(value);
 
-            if let Some(collection_def) = self.index.unannotated_collection_literal(value)
+            if let Some(collection_def) = self.index.unannotated_collection_initializer(value)
                 && let Some((collection_literal, _)) = value_type.class_specialization(self.db())
             {
                 let identity_instance = Type::instance(
@@ -9084,6 +9128,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let scope = self.scope();
         let return_ty = bindings.return_type(db);
+        let return_ty = match collection_initializer_class {
+            Some(collection_class @ (KnownClass::List | KnownClass::Set))
+                if return_ty
+                    .class_specialization(db)
+                    .is_some_and(|(class, _)| class.is_known(db, collection_class)) =>
+            {
+                self.infer_empty_list_or_set_constructor(
+                    collection_class,
+                    call_expression,
+                    call_expression_tcx,
+                )
+                .unwrap_or(return_ty)
+            }
+            _ => return_ty,
+        };
 
         let find_narrowed_place = |argument_index: usize| match arguments.args.get(argument_index) {
             None => {
