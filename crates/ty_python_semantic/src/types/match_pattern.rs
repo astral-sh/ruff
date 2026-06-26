@@ -375,6 +375,7 @@ pub(crate) fn class_pattern_positional_result<'db>(
     let is_plain_class = !static_class.has_decorators(db)
         && !static_class.has_explicit_bases(db)
         && !static_class.has_explicit_metaclass(db);
+    let is_stub = static_class.body_scope(db).file(db).is_stub(db);
     let has_local_binding = || {
         let places = place_table(db, static_class.body_scope(db));
         places
@@ -388,13 +389,15 @@ pub(crate) fn class_pattern_positional_result<'db>(
         }
         return if class.known(db).is_some() && class_has_match_self_flag(db, class) {
             Some(ClassPatternPositionalResult::Limit(1))
+        } else if is_stub {
+            None
         } else if is_plain_class || class_is_plain_dataclass_without_match_args(db, static_class) {
             Some(ClassPatternPositionalResult::Limit(0))
         } else {
             None
         };
     };
-    if !is_plain_class || !place.is_definitely_defined() {
+    if is_stub || !is_plain_class || !place.is_definitely_defined() {
         return None;
     }
     let definition = place.provenance.definition()?;

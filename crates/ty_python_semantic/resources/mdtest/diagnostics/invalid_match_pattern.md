@@ -170,6 +170,47 @@ def describe(value: NoMatchArgs) -> None:
             pass
 ```
 
+## Missing `__match_args__` in a stub
+
+An omitted stub member does not prove that the runtime class lacks `__match_args__`.
+
+```py
+from lib import Declared, Point
+
+def describe(point: Point, declared: Declared) -> None:
+    match point:
+        case Point(_):
+            pass
+    match declared:
+        case Declared(_):
+            pass
+```
+
+`lib.pyi`:
+
+```pyi
+from typing import Literal
+
+class Point:
+    x: int
+
+class Declared:
+    __match_args__: tuple[Literal["x"]]
+    x: int
+```
+
+`lib.py`:
+
+```py
+class Point:
+    __match_args__ = ("x",)
+    x = 1
+
+class Declared:
+    __match_args__ = ("x",)
+    x = 1
+```
+
 ## Deliberately conservative cases
 
 The diagnostic does not attempt to model alternate runtime states or infer exact runtime values from
