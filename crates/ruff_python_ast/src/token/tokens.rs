@@ -3,7 +3,6 @@ use std::{iter::FusedIterator, ops::Deref};
 use super::{Token, TokenKind};
 use ruff_python_trivia::{CommentRanges, ParenthesizedExpressions, TriviaRanges};
 use ruff_text_size::{Ranged as _, TextRange, TextSize};
-use rustc_hash::FxHashSet;
 
 /// Tokens represents a vector of lexed [`Token`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -294,7 +293,7 @@ impl From<&Tokens> for CommentRanges {
 impl From<&Tokens> for TriviaRanges {
     fn from(tokens: &Tokens) -> Self {
         let mut comments = vec![];
-        let mut parenthesized = FxHashSet::default();
+        let mut parenthesized = vec![];
         let mut stack = Vec::<Option<TextSize>>::new();
         let mut previous_end = None;
 
@@ -316,7 +315,7 @@ impl From<&Tokens> for TriviaRanges {
                 }
                 TokenKind::Rpar => {
                     if let (Some(Some(start)), Some(end)) = (stack.pop(), previous_end) {
-                        parenthesized.insert(TextRange::new(start, end));
+                        parenthesized.push(TextRange::new(start, end));
                     }
                 }
                 _ => {
