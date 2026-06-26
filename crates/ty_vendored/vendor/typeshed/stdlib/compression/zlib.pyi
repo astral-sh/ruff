@@ -14,4 +14,5 @@ decompressobj([wbits[, zdict]]) -- Return a decompressor object.
 Compressor objects support compress() and flush() methods; decompressor
 objects support decompress() and flush().
 """
+
 from zlib import *
