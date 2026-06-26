@@ -81,7 +81,7 @@ def describe(value: InvalidElement) -> None:
 
 ## Invalid `__match_args__` type
 
-A direct, unconditional list or string literal is invalid whenever a positional subpattern is used.
+A direct, unconditional non-tuple literal is invalid whenever a positional subpattern is used.
 
 ```py
 from typing_extensions import LiteralString
@@ -95,10 +95,42 @@ class StringMatchArgs:
 class PlainStringMatchArgs:
     __match_args__ = "x"
 
+class BytesMatchArgs:
+    __match_args__ = b"x"
+
+class NumberMatchArgs:
+    __match_args__ = 1
+
+class BooleanMatchArgs:
+    __match_args__ = True
+
+class NoneMatchArgs:
+    __match_args__ = None
+
+class EllipsisMatchArgs:
+    __match_args__ = ...
+
+class DictMatchArgs:
+    __match_args__ = {}
+
+class SetMatchArgs:
+    __match_args__ = {1}
+
+class FStringMatchArgs:
+    __match_args__ = f"x"
+
 def describe(
     list_value: ListMatchArgs,
     string_value: StringMatchArgs,
     plain_string_value: PlainStringMatchArgs,
+    bytes_value: BytesMatchArgs,
+    number_value: NumberMatchArgs,
+    boolean_value: BooleanMatchArgs,
+    none_value: NoneMatchArgs,
+    ellipsis_value: EllipsisMatchArgs,
+    dict_value: DictMatchArgs,
+    set_value: SetMatchArgs,
+    f_string_value: FStringMatchArgs,
 ) -> None:
     match list_value:
         # error: [invalid-match-pattern] "must be an exact tuple, not `list[str]`"
@@ -113,6 +145,46 @@ def describe(
     match plain_string_value:
         # error: [invalid-match-pattern] "must be an exact tuple"
         case PlainStringMatchArgs(_):
+            pass
+
+    match bytes_value:
+        # error: [invalid-match-pattern] "must be an exact tuple"
+        case BytesMatchArgs(_):
+            pass
+
+    match number_value:
+        # error: [invalid-match-pattern] "must be an exact tuple"
+        case NumberMatchArgs(_):
+            pass
+
+    match boolean_value:
+        # error: [invalid-match-pattern] "must be an exact tuple"
+        case BooleanMatchArgs(_):
+            pass
+
+    match none_value:
+        # error: [invalid-match-pattern] "must be an exact tuple"
+        case NoneMatchArgs(_):
+            pass
+
+    match ellipsis_value:
+        # error: [invalid-match-pattern] "must be an exact tuple"
+        case EllipsisMatchArgs(_):
+            pass
+
+    match dict_value:
+        # error: [invalid-match-pattern] "must be an exact tuple"
+        case DictMatchArgs(_):
+            pass
+
+    match set_value:
+        # error: [invalid-match-pattern] "must be an exact tuple"
+        case SetMatchArgs(_):
+            pass
+
+    match f_string_value:
+        # error: [invalid-match-pattern] "must be an exact tuple"
+        case FStringMatchArgs(_):
             pass
 ```
 

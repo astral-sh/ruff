@@ -595,7 +595,16 @@ fn direct_match_args_binding<'db>(
         {
             DirectMatchArgsBinding::TupleLiteral
         }
-        ast::Expr::List(_) | ast::Expr::StringLiteral(_) => DirectMatchArgsBinding::InvalidLiteral,
+        ast::Expr::Dict(_)
+        | ast::Expr::Set(_)
+        | ast::Expr::List(_)
+        | ast::Expr::FString(_)
+        | ast::Expr::StringLiteral(_)
+        | ast::Expr::BytesLiteral(_)
+        | ast::Expr::NumberLiteral(_)
+        | ast::Expr::BooleanLiteral(_)
+        | ast::Expr::NoneLiteral(_)
+        | ast::Expr::EllipsisLiteral(_) => DirectMatchArgsBinding::InvalidLiteral,
         _ => return None,
     };
 
