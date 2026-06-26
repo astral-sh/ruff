@@ -6161,9 +6161,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// covariant context must be re-applied because it can change the inferred type of a
     /// context-sensitive expression.
     ///
-    /// After convergence, one non-speculative pass uses the selected overloads to commit expression
-    /// inference and diagnostics without rechecking rejected overloads against incomplete argument
-    /// type entries.
+    /// After convergence, the final speculative pass is committed directly. Overload selection
+    /// does not re-infer arguments under only the selected overloads; this matches ordinary
+    /// overload evaluation and avoids another complete argument-inference pass.
     fn infer_argument_types_to_fixpoint(
         &mut self,
         ast_arguments: &ArgumentsIter<'_>,
@@ -6191,13 +6191,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut has_previous_checked_bindings = false;
 
         // The active expression cache remains shared across every round. A cache hit restores the
-        // complete expression inference into the final non-speculative pass, including any
+        // complete expression inference into whichever round is committed, including any
         // diagnostics captured by the original inference.
         //
         // The inclusive range allows the initial inference round followed by at most one
         // propagation round per inferable type-variable occurrence.
         let mut round = 0;
-        let checked_argument_types = 'fixpoint: loop {
+        let (checked_argument_types, final_round_builder) = 'fixpoint: loop {
             // Reuse both round buffers; cloning these graphs from scratch is significant for
             // overloaded and constructor calls.
             next_argument_types.clone_from(&baseline_argument_types);
@@ -6215,7 +6215,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
             if converged {
                 if has_previous_checked_bindings {
-                    break 'fixpoint CheckedArgumentTypes::Context;
+                    break 'fixpoint (CheckedArgumentTypes::Context, round_builder);
                 }
                 next_bindings.clone_from(bindings);
                 next_bindings.check_types_for_argument_inference(
@@ -6224,7 +6224,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &next_argument_types,
                     inference_params.call_expression_tcx,
                 );
-                break 'fixpoint CheckedArgumentTypes::Next;
+                break 'fixpoint (CheckedArgumentTypes::Next, round_builder);
             }
 
             next_bindings.clone_from(bindings);
@@ -6236,7 +6236,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
 
             if round == generic_fixpoint.typevar_occurrences {
-                break 'fixpoint CheckedArgumentTypes::Next;
+                break 'fixpoint (CheckedArgumentTypes::Next, round_builder);
             }
 
             let next_inference_contexts = self.collect_call_argument_inference_contexts(
@@ -6248,7 +6248,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if round_inference_contexts
                 .equal_at(&next_inference_contexts, &generic_fixpoint.argument_indices)
             {
-                break 'fixpoint CheckedArgumentTypes::Next;
+                break 'fixpoint (CheckedArgumentTypes::Next, round_builder);
             }
 
             has_previous_checked_bindings = true;
@@ -6267,19 +6267,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &self.dataclass_field_specifiers,
         );
 
-        // Emit diagnostics and commit expression inference once, using only the overloads selected
-        // by the stable candidate check. The binding result remains based on the separate argument
-        // type inferred for every original candidate, so this final narrowed pass cannot cause a
-        // rejected overload to re-enter through an unrelated contextual type.
-        argument_types.clone_from(&baseline_argument_types);
-        self.infer_all_argument_types(
-            (*ast_arguments).clone(),
-            argument_types,
-            checked_argument_types,
-            infer_argument_ty,
-            &next_bindings,
-            inference_params,
-        );
+        argument_types.clone_from(&next_argument_types);
+        self.extend(final_round_builder);
         bindings.clone_from(&next_bindings);
 
         checked_result

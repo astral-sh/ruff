@@ -554,7 +554,10 @@ def f7[T](y: list[T]) -> list[T]: ...
 def f7(y: object) -> object:
     raise NotImplementedError
 
-x9 = f7(reveal_type(["Sheet1"]))  # revealed: list[int | str]
+# TODO: Re-infer arguments using the selected overload's context. Generic-call fixpoint inference
+# deliberately makes the same performance tradeoff as ordinary overload evaluation and commits the
+# context-free expression inference performed while considering multiple overloads.
+x9 = f7(reveal_type(["Sheet1"]))  # revealed: list[str]
 reveal_type(x9)  # revealed: list[int | str]
 
 def f8(xs: tuple[str, ...]) -> tuple[str, ...]:
