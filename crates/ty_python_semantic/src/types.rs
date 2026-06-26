@@ -35,12 +35,11 @@ pub(crate) use self::infer::{
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
 pub(crate) use self::match_pattern::{
-    ClassPatternPositionalResult, ClassPatternPositionalSource, callable_pattern_type,
-    class_pattern_positional_result, class_pattern_positional_sources,
-    definite_match_pattern_type, definite_match_pattern_type_for_subject,
-    exact_sequence_pattern_type, mapping_pattern_type, pattern_binding_fallthrough_type,
-    pattern_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
-    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
+    ClassPatternPositionalSource, callable_pattern_type, class_pattern_positional_limit,
+    class_pattern_positional_sources, definite_match_pattern_type,
+    definite_match_pattern_type_for_subject, exact_sequence_pattern_type, mapping_pattern_type,
+    pattern_binding_fallthrough_type, pattern_fallthrough_type, sequence_pattern_type_builder,
+    singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
@@ -482,9 +481,6 @@ bitflags! {
         /// This is used when detecting descriptors. An `Any` or `Unknown` base can provide any
         /// member, but that does not mean that every subclass should be treated as a descriptor.
         const REQUIRE_CONCRETE = 1 << 5;
-
-        /// Ignore source declarations that do not create a runtime binding.
-        const REQUIRE_RUNTIME_BOUND = 1 << 6;
     }
 }
 
@@ -521,11 +517,6 @@ impl MemberLookupPolicy {
     /// Ignore members that are only available through a dynamic type.
     pub(crate) const fn require_concrete(self) -> bool {
         self.contains(Self::REQUIRE_CONCRETE)
-    }
-
-    /// Ignore source declarations that do not create a runtime binding.
-    pub(crate) const fn require_runtime_bound(self) -> bool {
-        self.contains(Self::REQUIRE_RUNTIME_BOUND)
     }
 }
 
@@ -2816,13 +2807,7 @@ impl<'db> Type<'db> {
             Type::SubclassOf(subclass_of) => subclass_of.subclass_of().into_class(db),
             _ => self.to_class_type(db),
         };
-        let own_class_attr = own_class.map(|class| {
-            if policy.require_runtime_bound() {
-                class.own_runtime_class_member(db, None, name).inner
-            } else {
-                class.own_class_member(db, None, name).inner
-            }
-        });
+        let own_class_attr = own_class.map(|class| class.own_class_member(db, None, name).inner);
 
         // A definitely-declared attribute in this class's own namespace is the contract for
         // values populated by metaclass initialization, analogous to a declared instance

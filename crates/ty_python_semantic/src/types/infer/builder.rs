@@ -61,8 +61,7 @@ use crate::types::diagnostic::{
     report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_invalid_exception_tuple_caught,
     report_invalid_generator_yield_type, report_invalid_key_on_typed_dict,
-    report_invalid_match_args_element, report_invalid_match_args_type,
-    report_invalid_match_args_union, report_invalid_type_checking_constant,
+    report_invalid_type_checking_constant,
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_mismatched_type_name,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
@@ -101,16 +100,15 @@ use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
 use crate::types::unpacker::UnpackResult;
 use crate::types::{
-    BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes,
-    ClassPatternPositionalResult, ClassType, DynamicType, InferenceFlags, InternedConstraintSet,
-    InternedType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
-    LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters,
-    SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
-    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
-    TypeVarVariance, TypedDictModule, TypedDictType, UnionAccumulator, UnionBuilder, UnionType,
-    any_over_type, binding_type, class_pattern_positional_result,
-    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
-    is_discarded_dict_key_assignment, todo_type,
+    BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType,
+    DynamicType, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind,
+    MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters, SentinelInstance, Signature,
+    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictModule,
+    TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
+    class_pattern_positional_limit, extract_fixed_length_iterable_element_types,
+    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -2474,54 +2472,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let positional_patterns = &pattern.arguments.patterns;
             if !positional_patterns.is_empty()
-                && let Some(result) =
-                    class_pattern_positional_result(self.db(), class, positional_patterns.len())
+                && let Some(limit) = class_pattern_positional_limit(self.db(), class)
+                && let Some(first_excess_pattern) = positional_patterns.get(limit)
             {
-                match result {
-                    ClassPatternPositionalResult::Limit(positional_limit) => {
-                        if let Some(first_excess_pattern) =
-                            positional_patterns.get(positional_limit)
-                        {
-                            report_too_many_positional_patterns_for_match_args(
-                                &self.context,
-                                first_excess_pattern,
-                                positional_limit,
-                                positional_patterns.len(),
-                                cls_ty,
-                            );
-                        }
-                    }
-                    ClassPatternPositionalResult::InvalidElement(element_index) => {
-                        if let Some(pattern) = positional_patterns.get(element_index) {
-                            report_invalid_match_args_element(
-                                &self.context,
-                                pattern,
-                                element_index,
-                                cls_ty,
-                            );
-                        }
-                    }
-                    ClassPatternPositionalResult::InvalidType(match_args_ty) => {
-                        if let Some(pattern) = positional_patterns.first() {
-                            report_invalid_match_args_type(
-                                &self.context,
-                                pattern,
-                                match_args_ty,
-                                cls_ty,
-                            );
-                        }
-                    }
-                    ClassPatternPositionalResult::AlwaysInvalid => {
-                        if let Some(pattern) = positional_patterns.first() {
-                            report_invalid_match_args_union(
-                                &self.context,
-                                pattern,
-                                positional_patterns.len(),
-                                cls_ty,
-                            );
-                        }
-                    }
-                }
+                report_too_many_positional_patterns_for_match_args(
+                    &self.context,
+                    first_excess_pattern,
+                    limit,
+                    positional_patterns.len(),
+                    cls_ty,
+                );
             }
         } else if !cls_ty.is_assignable_to(self.db(), KnownClass::Type.to_instance(self.db())) {
             report_invalid_class_match_pattern(&self.context, &*pattern.cls, cls_ty);

@@ -1,102 +1,51 @@
-# Invalid Match Pattern
+# Invalid match pattern
 
-Tests for `[invalid-match-pattern]` diagnostic (issue #3738).
+## Too many positional subpatterns
 
-## Basic positional overflow
+The diagnostic is emitted when the positional limit comes from a direct, unconditional,
+unannotated tuple-literal assignment in the matched class body.
 
 ```py
 class Point:
     __match_args__ = ("x", "y")
 
-def describe(p: Point) -> None:
-    match p:
-        case Point(x, y, z):  # error: [invalid-match-pattern]
+class Empty:
+    __match_args__ = ()
+
+def describe(point: Point, empty: Empty) -> None:
+    match point:
+        case Point(_, _):
+            pass
+
+    match point:
+        # error: [invalid-match-pattern] "Too many positional subpatterns for `<class 'Point'>`: expected 2, got 3"
+        case Point(_, _, _):
+            pass
+
+    match empty:
+        case Empty(_):  # error: [invalid-match-pattern] "expected 0, got 1"
             pass
 ```
 
-```python
-from typing_extensions import LiteralString
-
-class Position:
-    __match_args__: LiteralString = "field"
-
-def check(x: Position) -> None:
-    match x:
-        case Position(a, b):  # error: [invalid-match-pattern]
-            pass
-```
-
-## Invalid `__match_args__`
+Overflow is checked before the contents of the tuple because this is also the order used at runtime.
 
 ```py
-class Point:
-    __match_args__ = ["x", "y"]
-
-def describe(p: Point) -> None:
-    match p:
-        case Point(x):  # error: [invalid-match-pattern] "must be an exact tuple"
-            pass
-```
-
-```py
-class Vec:
-    __match_args__ = "coords"
-
-def describe(v: Vec) -> None:
-    match v:
-        case Vec(a):  # error: [invalid-match-pattern] "must be an exact tuple"
-            pass
-```
-
-## Tuple subclass
-
-```py
-class MatchArgs(tuple[str, ...]): ...
-
-class Point:
-    __match_args__ = MatchArgs(("x",))
-
-def describe(p: Point) -> None:
-    match p:
-        case Point(x):  # error: [invalid-match-pattern] "must be an exact tuple"
-            pass
-```
-
-## Non-string `__match_args__` elements
-
-```py
-class FirstInvalid:
+class InvalidElement:
     __match_args__ = (1,)
 
-class LaterInvalid:
-    __match_args__ = ("value", 1)
-    value: int = 0
-
-class MissingBeforeInvalid:
-    __match_args__ = ("missing", 1)
-
-def describe_first(value: FirstInvalid) -> None:
+def describe(value: InvalidElement) -> None:
     match value:
-        case FirstInvalid(_):  # error: [invalid-match-pattern]
-            pass
-
-def describe_one(value: LaterInvalid) -> None:
-    match value:
-        case LaterInvalid(_):
-            pass
-
-def describe_two(value: LaterInvalid) -> None:
-    match value:
-        case LaterInvalid(_, _):  # error: [invalid-match-pattern]
-            pass
-
-def describe_missing(value: MissingBeforeInvalid) -> None:
-    match value:
-        case MissingBeforeInvalid(_, _):
+        # error: [invalid-match-pattern] "expected 1, got 2"
+        case InvalidElement(_, _):
             pass
 ```
 
-## Non-exact-string `__match_args__` elements
+## Deliberately conservative cases
+
+The diagnostic does not attempt to model alternate runtime states or infer exact runtime values from
+declarations. Inherited, metaclass, or synthesized values, declarations, conditional bindings,
+unions, variadic tuples, tuple subclasses, malformed or absent `__match_args__` values, and
+assignments whose value is not a tuple literal are deliberately left undiagnosed.
 
 ```toml
 [environment]
@@ -104,391 +53,169 @@ python-version = "3.11"
 ```
 
 ```py
-from enum import StrEnum
-
-class StringSubclass(str): ...
-
-class Field(StrEnum):
-    VALUE = "value"
-
-class SubclassArgs:
-    __match_args__ = (StringSubclass("value"),)
-
-class EnumArgs:
-    __match_args__ = (Field.VALUE,)
-
-def describe_subclass(value: SubclassArgs) -> None:
-    match value:
-        case SubclassArgs(_):  # error: [invalid-match-pattern] "not an exact string"
-            pass
-
-def describe_enum(value: EnumArgs) -> None:
-    match value:
-        case EnumArgs(_):  # error: [invalid-match-pattern] "not an exact string"
-            pass
-```
-
-## Positional overflow before invalid elements
-
-```py
-class OverflowFirst:
-    __match_args__ = (1,)
-
-def describe(value: OverflowFirst) -> None:
-    match value:
-        # error: [invalid-match-pattern] "Too many positional subpatterns for `<class 'OverflowFirst'>`: expected 1, got 2"
-        case OverflowFirst(_, _):
-            pass
-```
-
-## Alternate finite `__match_args__` limits
-
-```py
-from typing import Literal
-
-flag: bool = bool()
-
-class UnionArgs:
-    __match_args__: tuple[Literal["x"]] | tuple[Literal["x"], Literal["y"]] = ("x",) if flag else ("x", "y")
-
-def describe_union(value: UnionArgs) -> None:
-    match value:
-        # error: [invalid-match-pattern] "Too many positional subpatterns for `<class 'UnionArgs'>`: expected 2, got 3"
-        case UnionArgs(_, _, _):
-            pass
-
-def describe_conditional(flag: bool) -> None:
-    class ConditionalArgs:
-        if flag:
-            __match_args__ = ("x",)
-
-    match ConditionalArgs():
-        # error: [invalid-match-pattern] "Too many positional subpatterns for `<class 'ConditionalArgs'>`: expected 1, got 2"
-        case ConditionalArgs(_, _):
-            pass
-```
-
-## Common invalid `__match_args__` union element
-
-```py
-from typing import Literal
-
-flag: bool = bool()
-
-class InvalidUnion:
-    __match_args__: tuple[Literal[1]] | tuple[Literal[2]] = (1,) if flag else (2,)
-
-def describe(value: InvalidUnion) -> None:
-    match value:
-        case InvalidUnion(_):  # error: [invalid-match-pattern] "not an exact string"
-            pass
-```
-
-## Heterogeneous invalid `__match_args__` union
-
-```py
-from typing import Literal
-
-flag: bool = bool()
-
-class HeterogeneousInvalid:
-    __match_args__: tuple[Literal["x"]] | list[str] = ("x",) if flag else ["x"]
-
-class HeterogeneousPossiblyValid:
-    __match_args__: tuple[Literal["x"], Literal["y"]] | list[str] = ("x", "y") if flag else ["x", "y"]
-
-def describe(value: HeterogeneousInvalid) -> None:
-    match value:
-        # error: [invalid-match-pattern] "Every possible `__match_args__` value"
-        case HeterogeneousInvalid(_, _):
-            pass
-
-def describe_possible(value: HeterogeneousPossiblyValid) -> None:
-    match value:
-        case HeterogeneousPossiblyValid(_, _):
-            pass
-```
-
-## Unknown `__match_args__` tuple length (no error)
-
-```py
-class Point:
-    __match_args__: tuple[str, ...] = ("x", "y")
-
-def describe(p: Point) -> None:
-    match p:
-        case Point(x, y, z):
-            pass
-```
-
-## Homogeneous `__match_args__` element types
-
-```py
-class InvalidElements:
-    __match_args__: tuple[int, ...] = ()
-
-class StringElements:
-    __match_args__: tuple[str, ...] = ()
-
-def describe_invalid(value: InvalidElements) -> None:
-    match value:
-        case InvalidElements(_):  # error: [invalid-match-pattern]
-            pass
-
-def describe_strings(value: StringElements) -> None:
-    match value:
-        case StringElements(_):
-            pass
-```
-
-## PEP 695 type alias
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing import Literal
-
-type MatchArgs = tuple[Literal["x"], Literal["y"]]
-
-class Point:
-    __match_args__: MatchArgs = ("x", "y")
-
-def describe(p: Point) -> None:
-    match p:
-        case Point(x, y, z):  # error: [invalid-match-pattern]
-            pass
-```
-
-## Exact match (no error)
-
-```py
-class Point:
-    __match_args__ = ("x", "y")
-
-def describe(p: Point) -> None:
-    match p:
-        case Point(x, y):
-            pass
-```
-
-## Fewer positionals than __match_args__ (no error)
-
-```py
-class Point:
-    __match_args__ = ("x", "y", "z")
-
-def describe(p: Point) -> None:
-    match p:
-        case Point(x, y):
-            pass
-```
-
-## Empty __match_args__
-
-```py
-class Foo:
-    __match_args__ = ()
-
-def bar(x: Foo) -> None:
-    match x:
-        case Foo(a):  # error: [invalid-match-pattern]
-            pass
-```
-
-## Dataclass with default __match_args__
-
-```python
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Literal
 
-@dataclass
-class Point:
-    x: int
-    y: int
+flag: bool = bool()
 
-def describe(p: Point) -> None:
-    match p:
-        case Point(x, y, z):  # error: [invalid-match-pattern]
-            pass
-```
-
-## Missing `__match_args__`
-
-```python
-class Plain: ...
-
-def describe(p: Plain) -> None:
-    match p:
-        case Plain(value):  # error: [invalid-match-pattern]
-            pass
-```
-
-## Annotation-only `__match_args__`
-
-`model.pyi`:
-
-```pyi
-from typing import Literal
-
-class StubModel:
-    __match_args__: tuple[Literal["value"]]
-```
-
-`main.py`:
-
-```python
-from typing import Literal
-
-from model import StubModel
-
-class SourceModel:
-    __match_args__: tuple[Literal["value"]]
-
-class SplitModel:
-    __match_args__: tuple[Literal["value"]]
-    __match_args__ = ("value",)
-
-def describe(source: SourceModel, split: SplitModel, stub: StubModel) -> None:
-    match source:
-        case SourceModel(_):  # error: [invalid-match-pattern]
-            pass
-
-    match split:
-        case SplitModel(_):
-            pass
-
-    match stub:
-        case StubModel(_):
-            pass
-```
-
-## Annotation-only `__match_args__` falls back
-
-```py
-from typing import Literal
+class Missing: ...
 
 class Base:
-    __match_args__ = ("value",)
+    __match_args__ = ("x",)
 
-class Derived(Base):
-    __match_args__: tuple[Literal["value"]]
+class Inherited(Base): ...
 
 class Meta(type):
-    __match_args__ = ("value",)
+    __match_args__ = ("x",)
 
-class FromMeta(metaclass=Meta):
-    __match_args__: tuple[Literal["value"]]
+class FromMeta(metaclass=Meta): ...
 
-def describe(derived: Derived, from_meta: FromMeta) -> None:
-    match derived:
-        case Derived(_):
-            pass
+@dataclass
+class Synthesized:
+    x: int
 
-    match from_meta:
-        case FromMeta(_):
-            pass
-```
+class AnnotationOnly:
+    __match_args__: tuple[Literal["x"]]
 
-## Runtime `TYPE_CHECKING` reachability
+class AnnotatedBinding:
+    __match_args__: tuple[Literal["x"]] = ("x",)
 
-```py
-from typing import TYPE_CHECKING, Literal
+class AssignedName:
+    args: tuple[Literal["x"]] = ("x",)
+    __match_args__ = args
+
+class Conditional:
+    if flag:
+        __match_args__ = ("x",)
+
+class TypeCheckingOnly:
+    if TYPE_CHECKING is True:
+        __match_args__ = ("x",)
+
+class DirectTypeCheckingOnly:
+    if TYPE_CHECKING:
+        __match_args__ = ("x",)
 
 class RuntimeOnly:
     if not TYPE_CHECKING:
-        __match_args__ = ("value",)
+        __match_args__ = ("x",)
 
-class CheckingOnly:
-    if TYPE_CHECKING:
-        __match_args__ = ("value",)
+class InvalidType:
+    __match_args__ = ["x"]
 
-class RuntimeTuple:
-    if TYPE_CHECKING:
-        __match_args__: list[str]
-    else:
-        __match_args__ = ("value",)
+class TupleSubclass(tuple[str, ...]): ...
 
-class RuntimeList:
-    if TYPE_CHECKING:
-        __match_args__: tuple[Literal["value"]]
-    else:
-        __match_args__ = ["value"]
+class SubclassValue:
+    __match_args__ = TupleSubclass(("x",))
 
-def describe(
-    runtime: RuntimeOnly,
-    checking: CheckingOnly,
-    runtime_tuple: RuntimeTuple,
-    runtime_list: RuntimeList,
-) -> None:
-    match runtime:
-        case RuntimeOnly(_):
-            pass
+class VariadicPrefix:
+    __match_args__: tuple[Literal[1], *tuple[str, ...]]
 
-    match checking:
-        case CheckingOnly(_):  # error: [invalid-match-pattern]
-            pass
+class UnionValue:
+    __match_args__: tuple[Literal["x"]] | tuple[Literal["x"], Literal["y"]]
 
-    match runtime_tuple:
-        case RuntimeTuple(_):
-            pass
-
-    match runtime_list:
-        case RuntimeList(_):  # error: [invalid-match-pattern] "must be an exact tuple"
-            pass
-```
-
-## Dataclass with `match_args=False`
-
-```python
-from dataclasses import dataclass
-
-@dataclass(match_args=False)
-class NoMatch:
-    x: int
-    y: int
-
-def describe(n: NoMatch) -> None:
-    match n:
-        case NoMatch(x, y):  # error: [invalid-match-pattern]
-            pass
-```
-
-## Dataclass synthesis after an annotation-only `__match_args__`
-
-```py
-from dataclasses import dataclass
-from typing import ClassVar, Literal
+class UnionNames:
+    __match_args__: tuple[Literal["x", "y"], Literal[1]]
 
 @dataclass
-class Point:
-    __match_args__: ClassVar[tuple[Literal["x"]]]
+class ConditionalDataclass:
     x: int
+    if flag:
+        __match_args__ = ()
 
-def describe(point: Point) -> None:
-    match point:
-        case Point(_):
+def describe(
+    missing: Missing,
+    inherited: Inherited,
+    from_meta: FromMeta,
+    synthesized: Synthesized,
+    annotation_only: AnnotationOnly,
+    annotated_binding: AnnotatedBinding,
+    assigned_name: AssignedName,
+    conditional: Conditional,
+    type_checking_only: TypeCheckingOnly,
+    direct_type_checking_only: DirectTypeCheckingOnly,
+    runtime_only: RuntimeOnly,
+    invalid_type: InvalidType,
+    subclass_value: SubclassValue,
+    variadic_prefix: VariadicPrefix,
+    union_value: UnionValue,
+    union_names: UnionNames,
+    conditional_dataclass: ConditionalDataclass,
+) -> None:
+    match missing:
+        case Missing(_):
+            pass
+    match inherited:
+        case Inherited(_, _):
+            pass
+    match from_meta:
+        case FromMeta(_, _):
+            pass
+    match synthesized:
+        case Synthesized(_, _):
+            pass
+    match annotation_only:
+        case AnnotationOnly(_, _):
+            pass
+    match annotated_binding:
+        case AnnotatedBinding(_, _):
+            pass
+    match assigned_name:
+        case AssignedName(_, _):
+            pass
+    match conditional:
+        case Conditional(_, _):
+            pass
+    match type_checking_only:
+        case TypeCheckingOnly(_, _):
+            pass
+    match direct_type_checking_only:
+        case DirectTypeCheckingOnly(_, _):
+            pass
+    match runtime_only:
+        case RuntimeOnly(_, _):
+            pass
+    match invalid_type:
+        case InvalidType(_):
+            pass
+    match subclass_value:
+        case SubclassValue(_, _):
+            pass
+    match variadic_prefix:
+        case VariadicPrefix(_):
+            pass
+    match union_value:
+        case UnionValue(_, _, _):
+            pass
+    match union_names:
+        case UnionNames(_, _):
+            pass
+    match conditional_dataclass:
+        case ConditionalDataclass(_):
             pass
 ```
 
-## Built-in match-self classes
+Patterns without positional subpatterns do not inspect `__match_args__`.
 
-```python
-def one_positional(value: int) -> None:
+```py
+class Model:
+    __match_args__ = ("value",)
+    value: int = 0
+
+def describe(value: Model) -> None:
     match value:
-        case int(_):
+        case Model():
             pass
-
-def two_positionals(value: int) -> None:
     match value:
-        case int(_, _):  # error: [invalid-match-pattern]
+        case Model(value=_):
             pass
 ```
 
 ## Invalid pattern classes do not cascade
 
-```python
+The existing invalid-class diagnostic takes precedence over positional validation.
+
+```py
 from typing import Protocol, TypedDict
 
 class Payload(TypedDict):
@@ -506,65 +233,5 @@ def describe(value: object) -> None:
     match value:
         # error: [isinstance-against-protocol]
         case HasValue(_):
-            pass
-```
-
-## Dataclass with kw_only=True
-
-```python
-from dataclasses import dataclass
-
-@dataclass(kw_only=True)
-class NoMatch:
-    x: int
-    y: int
-
-def describe(n: NoMatch) -> None:
-    match n:
-        case NoMatch(x, y):  # error: [invalid-match-pattern]
-            pass
-```
-
-```python
-from dataclasses import dataclass, field
-
-@dataclass
-class Point:
-    x: int
-    y: int = field(kw_only=True)
-
-def describe(n: Point) -> None:
-    match n:
-        case Point(x, y):  # error: [invalid-match-pattern]
-            pass
-```
-
-## NamedTuple __match_args__
-
-```python
-from typing import NamedTuple
-
-class Point(NamedTuple):
-    x: int
-    y: int
-
-def describe(p: Point) -> None:
-    match p:
-        case Point(x, y, z):  # error: [invalid-match-pattern]
-            pass
-```
-
-## Inherited __match_args__
-
-```py
-class Base:
-    __match_args__ = ("a", "b")
-
-class Derived(Base):
-    pass
-
-def check(d: Derived) -> None:
-    match d:
-        case Derived(a, b, c):  # error: [invalid-match-pattern]
             pass
 ```

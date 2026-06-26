@@ -4,13 +4,7 @@ Checks for invalid match patterns.
 
 ## Why is this bad?
 
-Invalid match patterns will cause a `TypeError` at runtime. Specifically:
-
-- Using a non-type object in a class pattern.
-- Providing more positional sub-patterns than `__match_args__` allows.
-- Matching against `collections.abc.Callable` with positional sub-patterns.
-- Matching against a non-runtime-checkable protocol.
-- Matching against a `TypedDict`.
+Matching on invalid patterns will lead to a runtime error.
 
 ## Examples
 
@@ -30,7 +24,7 @@ def describe(p: Point) -> None:
 NotAClass = 42
 
 match object():
-    # TypeError at runtime: called match pattern must be a class
-    case NotAClass():  # error: [invalid-match-pattern]
+    # TypeError at runtime: must be a class
+    case NotAClass():  # error
         ...
 ```

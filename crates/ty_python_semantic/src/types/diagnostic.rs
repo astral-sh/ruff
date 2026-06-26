@@ -2521,56 +2521,6 @@ pub(crate) fn report_too_many_positional_patterns_for_match_args<T: Ranged>(
     diagnostic.set_primary_message("This will raise `TypeError` at runtime");
 }
 
-pub(crate) fn report_invalid_match_args_element<T: Ranged>(
-    context: &InferContext,
-    pattern: T,
-    element_index: usize,
-    cls_ty: Type,
-) {
-    let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, pattern) else {
-        return;
-    };
-    let class_display = cls_ty.display(context.db());
-    let mut diagnostic = builder.into_diagnostic(format_args!(
-        "`__match_args__` element {element_index} for `{class_display}` is not an exact string"
-    ));
-    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
-}
-
-pub(crate) fn report_invalid_match_args_type<T: Ranged>(
-    context: &InferContext,
-    pattern: T,
-    match_args_ty: Type,
-    cls_ty: Type,
-) {
-    let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, pattern) else {
-        return;
-    };
-    let db = context.db();
-    let class_display = cls_ty.display(db);
-    let match_args_display = match_args_ty.display(db);
-    let mut diagnostic = builder.into_diagnostic(format_args!(
-        "`__match_args__` for `{class_display}` must be an exact tuple, not `{match_args_display}`"
-    ));
-    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
-}
-
-pub(crate) fn report_invalid_match_args_union<T: Ranged>(
-    context: &InferContext,
-    pattern: T,
-    positional_count: usize,
-    cls_ty: Type,
-) {
-    let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, pattern) else {
-        return;
-    };
-    let class_display = cls_ty.display(context.db());
-    let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Every possible `__match_args__` value for `{class_display}` is invalid with {positional_count} positional subpatterns"
-    ));
-    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
-}
-
 pub(crate) fn add_type_expression_reference_link<'db, 'ctx>(
     mut diag: LintDiagnosticGuard<'db, 'ctx>,
 ) -> LintDiagnosticGuard<'db, 'ctx> {

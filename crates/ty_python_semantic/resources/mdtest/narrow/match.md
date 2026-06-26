@@ -1764,9 +1764,7 @@ Only the class named in the pattern determines what a positional subpattern rece
 `IntPlainChild` also inherits from `int`, `PlainBase(_)` does not receive the whole value:
 
 ```py
-class PlainBase:
-    __match_args__ = ("missing",)
-
+class PlainBase: ...
 class IntPlainChild(int, PlainBase): ...
 
 def builtin_positional_behavior_comes_from_pattern_class(

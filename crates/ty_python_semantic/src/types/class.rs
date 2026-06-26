@@ -29,7 +29,7 @@ use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, walk_specialization,
 };
 use crate::types::known_instance::DeprecatedInstance;
-use crate::types::member::{Member, runtime_class_member};
+use crate::types::member::Member;
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
@@ -1858,46 +1858,6 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    /// Returns the class member named `name` as it exists at runtime.
-    ///
-    /// Unlike [`Self::own_class_member`], this lookup evaluates `TYPE_CHECKING` branches using
-    /// their runtime reachability and ignores annotation-only members in source files.
-    pub(super) fn own_runtime_class_member(
-        self,
-        db: &'db dyn Db,
-        inherited_generic_context: Option<GenericContext<'db>>,
-        name: &str,
-    ) -> Member<'db> {
-        let (class_literal, specialization) = match self {
-            Self::NonGeneric(ClassLiteral::Static(class)) => (class, None),
-            Self::Generic(generic) => (generic.origin(db), Some(generic.specialization(db))),
-            Self::NonGeneric(_) => {
-                return self.own_class_member(db, inherited_generic_context, name);
-            }
-        };
-
-        let body_scope = class_literal.body_scope(db);
-        let runtime_member = runtime_class_member(db, body_scope, Name::new(name))
-            .map_type(|ty| ty.apply_optional_specialization(db, specialization));
-        if !runtime_member.is_undefined() {
-            return runtime_member;
-        }
-
-        if place_table(db, body_scope).symbol_id(name).is_some() {
-            if let Some(synthesized_member) = class_literal.own_synthesized_member(
-                db,
-                specialization,
-                inherited_generic_context,
-                name,
-            ) {
-                return Member::definitely_declared(synthesized_member);
-            }
-            Member::unbound()
-        } else {
-            self.own_class_member(db, inherited_generic_context, name)
-        }
-    }
-
     /// Look up an instance attribute (available in `__dict__`) of the given name.
     ///
     /// See [`Type::instance_member`] for more details.
@@ -2531,12 +2491,12 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     }
 
                     lookup_result = lookup_result.or_else(|lookup_error| {
-                        let member = if policy.require_runtime_bound() {
-                            class.own_runtime_class_member(db, inherited_generic_context, name)
-                        } else {
-                            class.own_class_member(db, inherited_generic_context, name)
-                        };
-                        lookup_error.or_fall_back_to(db, member.inner)
+                        lookup_error.or_fall_back_to(
+                            db,
+                            class
+                                .own_class_member(db, inherited_generic_context, name)
+                                .inner,
+                        )
                     });
                 }
                 ClassBase::TypedDict(module) => {

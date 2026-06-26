@@ -1,20 +1,25 @@
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use ruff_text_size::Ranged;
 use ty_python_core::Truthiness;
+use ty_python_core::definition::Definition;
 use ty_python_core::predicate::{
     ClassPatternPredicateKind, MappingPatternPredicateKind, PatternPredicateKind,
     SequencePatternPredicateKind,
 };
+use ty_python_core::reachability_constraints::ScopedReachabilityConstraintId;
+use ty_python_core::{semantic_index, use_def_map};
 
 use crate::Db;
-use crate::place::{DefinedPlace, Place};
+use crate::place::{DefinedPlace, Place, TypeOrigin};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::equality::{evaluate_type_equality, is_same_enum_domain};
 use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass,
-    MemberLookupPolicy, Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext,
+    Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext,
     TypeVarBoundOrConstraints, TypedDictType, UnionType, binding_type, equality_truthiness,
     infer_same_file_expression_type,
 };
@@ -279,8 +284,8 @@ enum ClassMatchArgs<'db> {
     Undefined,
     /// `__match_args__` is definitely bound with this type.
     Defined(Type<'db>),
-    /// `__match_args__` has this type along some control-flow paths and is undefined along others.
-    PossiblyUndefined(Type<'db>),
+    /// `__match_args__` is defined along some control-flow paths but not others.
+    PossiblyUndefined,
 }
 
 /// The value supplied to one positional subpattern in a class pattern.
@@ -300,14 +305,7 @@ pub(crate) enum ClassPatternPositionalSource {
 /// authoritative. `PossiblyUndefined` is distinct from `Undefined` because only a truly absent
 /// `__match_args__` enables match-self behavior.
 fn class_match_args_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> ClassMatchArgs<'db> {
-    match Type::ClassLiteral(class)
-        .member_lookup_with_policy(
-            db,
-            "__match_args__".into(),
-            MemberLookupPolicy::REQUIRE_RUNTIME_BOUND,
-        )
-        .place
-    {
+    match Type::ClassLiteral(class).member(db, "__match_args__").place {
         Place::Defined(
             place @ DefinedPlace {
                 ty,
@@ -315,29 +313,23 @@ fn class_match_args_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Clas
                 provenance,
                 ..
             },
-        ) => {
-            let ty = if origin.is_declared() {
-                ty
-            } else {
-                provenance
-                    .definition()
-                    .map_or(ty, |definition| binding_type(db, definition))
-            };
-            if place.is_definitely_defined() {
-                ClassMatchArgs::Defined(ty)
-            } else {
-                ClassMatchArgs::PossiblyUndefined(ty)
-            }
-        }
+        ) if place.is_definitely_defined() => ClassMatchArgs::Defined(if origin.is_declared() {
+            ty
+        } else {
+            provenance
+                .definition()
+                .map_or(ty, |definition| binding_type(db, definition))
+        }),
+        Place::Defined(_) => ClassMatchArgs::PossiblyUndefined,
         Place::Undefined => ClassMatchArgs::Undefined,
     }
 }
 
 /// Return whether `class` inherits Python's special match-self class-pattern behavior.
 ///
-/// Callers use this only for runtime states in which `__match_args__` is absent. A definite
-/// definition overrides match-self behavior, while a conditional definition only enables it on
-/// paths where the member is not bound.
+/// Callers must first establish that `__match_args__` is statically absent. A definite definition
+/// overrides match-self behavior, while a conditional definition makes it runtime-dependent;
+/// neither case should consult this flag.
 fn class_has_match_self_flag(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
     class
         .iter_mro(db)
@@ -362,191 +354,70 @@ fn class_has_match_self_flag(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
         })
 }
 
-/// The statically known result of validating positional subpatterns for a class pattern.
-pub(crate) enum ClassPatternPositionalResult<'db> {
-    /// The maximum number of positional subpatterns accepted by the class.
-    Limit(usize),
-    /// The zero-based index of a consumed `__match_args__` element that is not a string.
-    InvalidElement(usize),
-    /// A statically known non-exact-tuple type used for `__match_args__`.
-    InvalidType(Type<'db>),
-    /// Every possible state fails, but not for one common statically known reason.
-    AlwaysInvalid,
-}
-
-impl ClassPatternPositionalResult<'_> {
-    fn always_fails(&self, positional_count: usize) -> bool {
-        match self {
-            Self::Limit(limit) => positional_count > *limit,
-            Self::InvalidElement(_) | Self::InvalidType(_) | Self::AlwaysInvalid => true,
-        }
-    }
-}
-
-/// Validate the positional subpatterns accepted by `class`.
+/// Return the positional limit only when it is independent of runtime control flow.
 ///
-/// `None` means that the result cannot be determined statically, as for a valid variable-length
-/// `__match_args__` tuple or alternate states without one finite positional limit.
-pub(crate) fn class_pattern_positional_result<'db>(
-    db: &'db dyn Db,
-    class: ClassLiteral<'db>,
-    positional_count: usize,
-) -> Option<ClassPatternPositionalResult<'db>> {
-    match class_match_args_type(db, class) {
-        ClassMatchArgs::Undefined if class_has_match_self_flag(db, class) => {
-            Some(ClassPatternPositionalResult::Limit(1))
-        }
-        ClassMatchArgs::Undefined => Some(ClassPatternPositionalResult::Limit(0)),
-        ClassMatchArgs::Defined(match_args) => {
-            match_args_positional_result(db, class, match_args, positional_count)
-        }
-        ClassMatchArgs::PossiblyUndefined(match_args) => {
-            let defined_result =
-                match_args_positional_result(db, class, match_args, positional_count)?;
-            let undefined_limit = usize::from(class_has_match_self_flag(db, class));
-            if let ClassPatternPositionalResult::Limit(defined_limit) = defined_result {
-                Some(ClassPatternPositionalResult::Limit(
-                    defined_limit.max(undefined_limit),
-                ))
-            } else if positional_count > undefined_limit
-                && defined_result.always_fails(positional_count)
-            {
-                Some(ClassPatternPositionalResult::AlwaysInvalid)
-            } else {
-                None
-            }
-        }
-    }
-}
-
-fn match_args_positional_result<'db>(
-    db: &'db dyn Db,
-    class: ClassLiteral<'db>,
-    match_args: Type<'db>,
-    positional_count: usize,
-) -> Option<ClassPatternPositionalResult<'db>> {
-    let match_args = match_args.resolve_type_alias(db);
-    if let Type::Union(union) = match_args {
-        let mut results = union
-            .elements(db)
-            .iter()
-            .map(|element| match_args_positional_result(db, class, *element, positional_count));
-        let first = results.next()??;
-        return results.try_fold(first, |combined, result| match (combined, result?) {
-            (
-                ClassPatternPositionalResult::Limit(left),
-                ClassPatternPositionalResult::Limit(right),
-            ) => Some(ClassPatternPositionalResult::Limit(left.max(right))),
-            (
-                ClassPatternPositionalResult::InvalidElement(left),
-                ClassPatternPositionalResult::InvalidElement(right),
-            ) if left == right => Some(ClassPatternPositionalResult::InvalidElement(left)),
-            (
-                ClassPatternPositionalResult::InvalidType(left),
-                ClassPatternPositionalResult::InvalidType(right),
-            ) => Some(ClassPatternPositionalResult::InvalidType(
-                UnionType::from_two_elements(db, left, right),
-            )),
-            (left, right)
-                if left.always_fails(positional_count) && right.always_fails(positional_count) =>
-            {
-                Some(ClassPatternPositionalResult::AlwaysInvalid)
-            }
-            _ => None,
-        });
-    }
-
-    if let Some(tuple) = match_args.exact_tuple_instance_spec(db) {
-        if let Some(tuple) = tuple.as_fixed_length() {
-            if positional_count > tuple.len() {
-                return Some(ClassPatternPositionalResult::Limit(tuple.len()));
-            }
-            let elements = tuple.elements_slice();
-            if let Some(index) = elements
-                .iter()
-                .take(positional_count)
-                .position(|element| match_args_element_is_not_exact_string(db, *element))
-                && preceding_match_args_lookups_are_reachable(db, class, elements, index)
-            {
-                Some(ClassPatternPositionalResult::InvalidElement(index))
-            } else {
-                Some(ClassPatternPositionalResult::Limit(tuple.len()))
-            }
-        } else if positional_count > 0
-            && tuple.fixed_elements().next().is_none()
-            && tuple
-                .variable_element()
-                .is_some_and(|element| match_args_element_is_not_exact_string(db, *element))
-        {
-            Some(ClassPatternPositionalResult::InvalidElement(0))
-        } else {
-            None
-        }
-    } else if match_args.tuple_instance_spec(db).is_some()
-        || match_args.is_disjoint_from(db, Type::homogeneous_tuple(db, Type::unknown()))
-    {
-        Some(ClassPatternPositionalResult::InvalidType(match_args))
-    } else {
-        None
-    }
-}
-
-/// Return whether runtime matching is guaranteed to inspect the element at `index`.
-///
-/// Before inspecting each `__match_args__` element, Python looks up the attribute named by every
-/// preceding element. A missing attribute silently fails the match, and a duplicate name raises a
-/// different error, so neither path reaches a later invalid element.
-fn preceding_match_args_lookups_are_reachable(
+/// This intentionally supports only direct, unconditional, unannotated tuple-literal assignments.
+/// Diagnosing broader cases requires correlating runtime boundness, declarations, inheritance,
+/// synthesis, and alternate tuple values; an uncertain result is preferable to a false positive.
+pub(crate) fn class_pattern_positional_limit(
     db: &dyn Db,
     class: ClassLiteral<'_>,
-    elements: &[Type<'_>],
-    index: usize,
-) -> bool {
-    let instance = class.to_non_generic_instance(db);
-    let mut names = Vec::with_capacity(index);
-    elements.iter().take(index).all(|element| {
-        let Some(literal) = element.resolve_type_alias(db).as_string_literal() else {
-            return false;
-        };
-        let name = Name::new(literal.value(db));
-        if names.contains(&name)
-            || !instance
-                .member(db, name.as_str())
-                .place
-                .is_definitely_bound()
+) -> Option<usize> {
+    let match_args = match Type::ClassLiteral(class).member(db, "__match_args__").place {
+        Place::Undefined => return None,
+        Place::Defined(place)
+            if place.is_definitely_defined() && place.origin == TypeOrigin::Inferred =>
         {
-            return false;
+            let definition = place.provenance.definition()?;
+            if definition.scope(db) != class.as_static()?.body_scope(db)
+                || !definition_is_unconditional_tuple_literal_binding(db, definition)
+            {
+                return None;
+            }
+            binding_type(db, definition)
         }
-        names.push(name);
-        true
-    })
+        Place::Defined(_) => return None,
+    };
+
+    match_args
+        .exact_tuple_instance_spec(db)?
+        .as_fixed_length()
+        .map(super::tuple::FixedLengthTuple::len)
 }
 
-fn match_args_element_is_not_exact_string(db: &dyn Db, element: Type<'_>) -> bool {
-    let element = element.resolve_type_alias(db);
-    if let Type::Union(union) = element {
-        return union
-            .elements(db)
-            .iter()
-            .all(|element| match_args_element_is_not_exact_string(db, *element));
+#[salsa::tracked]
+fn definition_is_unconditional_tuple_literal_binding<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> bool {
+    let file = definition.file(db);
+    let module = parsed_module(db, file).load(db);
+    let scope = definition.scope(db);
+    let Some(assignment) = definition.kind(db).as_unannotated_assignment() else {
+        return false;
+    };
+
+    if file.is_stub(db)
+        || !matches!(assignment.value(&module), ast::Expr::Tuple(_))
+        || semantic_index(db, file).is_in_type_checking_block(
+            scope.file_scope_id(db),
+            definition.full_range(db, &module).range(),
+        )
+    {
+        return false;
     }
 
-    let str_instance = KnownClass::Str.to_instance(db);
-    match element {
-        Type::NominalInstance(_) => {
-            (element.is_subtype_of(db, str_instance)
-                && !element.is_instance_of(db, KnownClass::Str))
-                || element.is_disjoint_from(db, str_instance)
-        }
-        Type::LiteralValue(literal) => {
-            literal.as_enum().is_some_and(|enum_literal| {
-                enum_literal
-                    .enum_class_instance(db)
-                    .is_subtype_of(db, str_instance)
-            }) || element.is_disjoint_from(db, str_instance)
-        }
-        _ => element.is_disjoint_from(db, str_instance),
-    }
+    let Some(symbol_id) = definition.place(db).as_symbol() else {
+        return false;
+    };
+    use_def_map(db, scope)
+        .end_of_scope_symbol_bindings(symbol_id)
+        .any(|binding| {
+            binding
+                .binding
+                .is_defined_and(|candidate| candidate == definition)
+                && binding.reachability_constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE
+        })
 }
 
 /// Resolve the value supplied to each positional subpattern, preserving source order and length.
@@ -589,7 +460,7 @@ pub(crate) fn class_pattern_positional_sources(
         ClassMatchArgs::Defined(match_args) => match_args
             .exact_tuple_instance_spec(db)
             .and_then(|tuple| tuple.as_fixed_length().cloned()),
-        ClassMatchArgs::Undefined | ClassMatchArgs::PossiblyUndefined(_) => None,
+        ClassMatchArgs::Undefined | ClassMatchArgs::PossiblyUndefined => None,
     };
 
     (0..positional_count)

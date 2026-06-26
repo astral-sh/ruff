@@ -1865,25 +1865,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    /// Preserve `TYPE_CHECKING` conditions in the reachability graph so runtime-sensitive lookups
-    /// can evaluate them as false, while ordinary narrowing continues to treat them as true.
-    fn reachability_predicate(
-        &mut self,
-        predicate_node: &'ast ast::Expr,
-        typing_predicate: PredicateOrLiteral<'db>,
-    ) -> PredicateOrLiteral<'db> {
-        if self.scopes[self.current_scope()].kind().is_class()
-            && (is_if_type_checking(predicate_node) || is_if_not_type_checking(predicate_node))
-        {
-            PredicateOrLiteral::Predicate(Predicate {
-                node: PredicateNode::Expression(self.add_standalone_expression(predicate_node)),
-                is_positive: true,
-            })
-        } else {
-            typing_predicate
-        }
-    }
-
     /// Adds a new predicate to the list of all predicates, but does not record it. Returns the
     /// predicate ID for later recording using
     /// [`SemanticIndexBuilder::record_narrowing_constraint_id_for_places`].
@@ -3289,10 +3270,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 };
                 let (mut last_predicate, mut last_narrowing_id) =
                     self.record_expression_narrowing_constraint(&node.test);
-                let reachability_predicate =
-                    self.reachability_predicate(&node.test, last_predicate);
                 let mut last_reachability_constraint =
-                    self.record_reachability_constraint(reachability_predicate);
+                    self.record_reachability_constraint(last_predicate);
 
                 let is_outer_block_in_type_checking = self.in_type_checking_block;
 
@@ -3349,10 +3328,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         (last_predicate, last_narrowing_id) =
                             self.record_expression_narrowing_constraint(elif_test);
 
-                        let reachability_predicate =
-                            self.reachability_predicate(elif_test, last_predicate);
                         last_reachability_constraint =
-                            self.record_reachability_constraint(reachability_predicate);
+                            self.record_reachability_constraint(last_predicate);
 
                         Some(next_falsy)
                     } else {
