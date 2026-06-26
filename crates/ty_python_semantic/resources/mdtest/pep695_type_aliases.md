@@ -572,18 +572,18 @@ type B = tuple[A] | None
 
 def f(x: A):
     if x is not None:
-        reveal_type(x)  # revealed: tuple[B]
+        reveal_type(x)  # revealed: tuple[tuple[A] | None]
         y = x[0]
         if y is not None:
             reveal_type(y)  # revealed: tuple[A]
 
 def g(x: A | B):
-    reveal_type(x)  # revealed: tuple[B] | None
+    reveal_type(x)  # revealed: tuple[tuple[A] | None] | None
 
 from ty_extensions import Intersection
 
 def h(x: Intersection[A, B]):
-    reveal_type(x)  # revealed: tuple[B] | None
+    reveal_type(x)  # revealed: tuple[tuple[A] | None] | None
 ```
 
 ### Self-recursive callable type

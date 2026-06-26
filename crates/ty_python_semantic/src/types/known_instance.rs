@@ -383,6 +383,7 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::BindSelf(..)
                 | TypeMapping::ReplaceSelf { .. }
                 | TypeMapping::ReplaceRecursiveOrigin { .. }
+                | TypeMapping::ReplaceRecursiveAliasComponent { .. }
                 | TypeMapping::ReplaceDivergent { .. }
                 | TypeMapping::FoldRecursive { .. }
                 | TypeMapping::Materialize(_)

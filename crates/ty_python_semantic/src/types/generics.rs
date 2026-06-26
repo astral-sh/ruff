@@ -29,10 +29,10 @@ use crate::types::visitor::{
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
-    MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, binding_type,
-    infer_definition_types, inferred_declaration,
+    ClassLiteral, FindLegacyTypeVarsVisitor, Foldable, IntersectionType, KnownClass,
+    KnownInstanceType, MaterializationKind, RecursiveType, StaticClassLiteral, Type, TypeAliasType,
+    TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
+    UnionAccumulator, UnionType, binding_type, infer_definition_types, inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -1796,6 +1796,39 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     }
 }
 
+impl<'db> Foldable<'db> for Specialization<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        let types = self.map_types(db, |_, _, ty| ty.fold(db, rec));
+
+        let original_tuple_inner = self.tuple_inner(db);
+        let tuple_inner = original_tuple_inner.and_then(|tuple| {
+            let folded_tuple = Cow::Borrowed(tuple.tuple(db)).fold(db, rec);
+            TupleType::new(db, folded_tuple.as_ref())
+        });
+
+        let specialization_unchanged =
+            matches!(&types, Cow::Borrowed(_)) && tuple_inner == original_tuple_inner;
+        if specialization_unchanged {
+            self
+        } else {
+            Self::new(
+                db,
+                self.generic_context(db),
+                types,
+                self.materialization_kind(db),
+                tuple_inner,
+            )
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for (StaticClassLiteral<'db>, Specialization<'db>) {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        let (class, specialization) = self;
+        (class, specialization.fold(db, rec))
+    }
+}
+
 /// A mapping between type variables and types.
 ///
 /// You will usually use [`Specialization`] instead of this type. This type is used when we need to
@@ -2788,6 +2821,25 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
+            (Type::Recursive(recursive), _) if recursive.is_non_contractive(self.db) => {
+                return Ok(());
+            }
+            (Type::Recursive(recursive), actual) => {
+                let db = self.db;
+                return recursive.map(db, |formal| {
+                    self.infer_map_impl(formal, actual, polarity, seen)
+                });
+            }
+            (_, Type::Recursive(recursive)) if recursive.is_non_contractive(self.db) => {
+                return Ok(());
+            }
+            (formal, Type::Recursive(recursive)) => {
+                let db = self.db;
+                return recursive.map(db, |actual| {
+                    self.infer_map_impl(formal, actual, polarity, seen)
+                });
+            }
+
             (Type::Intersection(formal_intersection), _) => {
                 // The actual type must be assignable to every (positive) element of the
                 // formal intersection, so we must infer type mappings for each of them. (The
@@ -3010,16 +3062,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 return self.infer_map_impl(formal, alias.value_type(self.db), polarity, seen);
             }
 
-            (Type::ProtocolInstance(_), Type::Recursive(recursive))
-                if recursive.is_non_contractive(self.db) =>
-            {
-                return Ok(());
-            }
-
-            (formal @ Type::ProtocolInstance(_), Type::Recursive(recursive)) => {
-                return self.infer_map_impl(formal, recursive.body(self.db), polarity, seen);
-            }
-
             // When the formal type is a protocol with a `__call__` method, infer the specialization
             // from matching the actual type's callable signature against the protocol's `__call__`
             // method signature.
@@ -3083,6 +3125,27 @@ pub(crate) enum SpecializationError<'db> {
         bound_typevar: BoundTypeVarInstance<'db>,
         argument: Type<'db>,
     },
+}
+
+impl<'db> Foldable<'db> for SpecializationError<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        match self {
+            Self::MismatchedBound {
+                bound_typevar,
+                argument,
+            } => Self::MismatchedBound {
+                bound_typevar,
+                argument: argument.fold(db, rec),
+            },
+            Self::MismatchedConstraint {
+                bound_typevar,
+                argument,
+            } => Self::MismatchedConstraint {
+                bound_typevar,
+                argument: argument.fold(db, rec),
+            },
+        }
+    }
 }
 
 impl<'db> SpecializationError<'db> {

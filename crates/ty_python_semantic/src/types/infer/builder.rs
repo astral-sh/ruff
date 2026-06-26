@@ -7196,7 +7196,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 FxHashMap::default();
 
             if let Some(tcx) = tcx.annotation.map(|tcx| tcx.resolve_type_alias(self.db()))
-                && matches!(tcx, Type::NominalInstance(_))
                 && let Some(specialization) = tcx.known_specialization(self.db(), collection_class)
                 && specialization.generic_context(self.db()) == generic_context
                 && generic_context.variables(self.db()).all(|typevar| {

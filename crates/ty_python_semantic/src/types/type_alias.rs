@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::fmt::Write;
 
 use crate::{
@@ -33,6 +34,52 @@ pub struct PEP695TypeAliasType<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for PEP695TypeAliasType<'_> {}
+
+struct AliasDependencyCollector<'db> {
+    dependencies: RefCell<Vec<TypeAliasType<'db>>>,
+    recursion_guard: visitor::TypeCollector<'db>,
+}
+
+impl<'db> AliasDependencyCollector<'db> {
+    fn collect(db: &'db dyn Db, ty: Type<'db>) -> Vec<TypeAliasType<'db>> {
+        let collector = Self {
+            dependencies: RefCell::new(Vec::new()),
+            recursion_guard: visitor::TypeCollector::default(),
+        };
+        visitor::TypeVisitor::visit_type(&collector, db, ty);
+        collector.dependencies.into_inner()
+    }
+
+    fn add(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+        let mut dependencies = self.dependencies.borrow_mut();
+        if !dependencies
+            .iter()
+            .any(|dependency| dependency.has_same_definition(db, alias))
+        {
+            dependencies.push(alias);
+        }
+    }
+}
+
+impl<'db> visitor::TypeVisitor<'db> for AliasDependencyCollector<'db> {
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        if let Type::TypeAlias(alias) = ty {
+            self.add(db, alias);
+            if let Some(specialization) = alias.specialization(db) {
+                for ty in specialization.types(db) {
+                    self.visit_type(db, *ty);
+                }
+            }
+            return;
+        }
+
+        visitor::walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+    }
+}
 
 fn type_alias_cycle_initial<'db>(
     db: &'db dyn Db,
@@ -83,24 +130,22 @@ impl<'db> PEP695TypeAliasType<'db> {
     /// The RHS type of a PEP-695 style type alias with specialization applied.
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let raw = self.raw_value_type(db);
-        let origin = RecursiveOrigin::TypeAlias(TypeAliasType::PEP695(self));
+        let alias = TypeAliasType::PEP695(self);
+        let origin = RecursiveOrigin::TypeAlias(alias);
+        let Some(component) = alias.recursive_component(db) else {
+            return self.apply_function_specialization(db, raw);
+        };
+
         let Some(binder_id) = origin.binder_id(db) else {
             return self.apply_function_specialization(db, raw);
         };
 
-        if !origin.contains_in_type(db, raw) {
-            return with_type_alias_origin(
-                db,
-                self.apply_function_specialization(db, raw),
-                TypeAliasType::PEP695(self),
-            );
-        }
-
         let marker = Type::divergent(binder_id);
         let folded_raw = raw.apply_type_mapping_impl(
             db,
-            &TypeMapping::ReplaceRecursiveOrigin {
-                origin,
+            &TypeMapping::ReplaceRecursiveAliasComponent {
+                root: alias,
+                component: &component,
                 binder_id: BinderId::new(binder_id),
             },
             TypeContext::default(),
@@ -277,6 +322,72 @@ pub enum TypeAliasType<'db> {
     PEP695(PEP695TypeAliasType<'db>),
     /// A type alias defined by manually instantiating the PEP 695 `types.TypeAliasType`.
     ManualPEP695(ManualPEP695TypeAliasType<'db>),
+}
+
+impl<'db> TypeAliasType<'db> {
+    pub(crate) fn has_same_definition(self, db: &'db dyn Db, other: Self) -> bool {
+        self.definition(db) == other.definition(db)
+    }
+
+    pub(crate) fn is_in_component(self, db: &'db dyn Db, component: &[Self]) -> bool {
+        component
+            .iter()
+            .any(|alias| alias.has_same_definition(db, self))
+    }
+
+    fn recursive_component(self, db: &'db dyn Db) -> Option<Vec<Self>> {
+        // Fold a recursive alias against the strongly connected component that contains it.
+        // Other components reachable from this alias remain ordinary aliases.
+        let mut reachable = Vec::new();
+        self.collect_reachable_aliases(db, &mut reachable);
+
+        let component = reachable
+            .into_iter()
+            .filter(|alias| alias.can_reach_alias(db, self, &mut Vec::new()))
+            .collect::<Vec<_>>();
+        if component.len() > 1
+            || self
+                .raw_dependencies(db)
+                .iter()
+                .any(|alias| alias.has_same_definition(db, self))
+        {
+            Some(component)
+        } else {
+            None
+        }
+    }
+
+    fn collect_reachable_aliases(self, db: &'db dyn Db, reachable: &mut Vec<Self>) {
+        if reachable
+            .iter()
+            .any(|alias| alias.has_same_definition(db, self))
+        {
+            return;
+        }
+        reachable.push(self);
+
+        for dependency in self.raw_dependencies(db) {
+            dependency.collect_reachable_aliases(db, reachable);
+        }
+    }
+
+    fn can_reach_alias(self, db: &'db dyn Db, target: Self, seen: &mut Vec<Self>) -> bool {
+        if self.has_same_definition(db, target) {
+            return true;
+        }
+        if seen.iter().any(|alias| alias.has_same_definition(db, self)) {
+            return false;
+        }
+        seen.push(self);
+
+        self.raw_dependencies(db)
+            .into_iter()
+            .any(|dependency| dependency.can_reach_alias(db, target, seen))
+    }
+
+    fn raw_dependencies(self, db: &'db dyn Db) -> Vec<Self> {
+        AliasDependencyCollector::collect(db, self.raw_value_type(db))
+    }
 }
 
 pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(

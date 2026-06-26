@@ -1599,6 +1599,16 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         expected_class: StaticClassLiteral<'_>,
     ) -> Option<Specialization<'db>> {
+        if let Type::Recursive(recursive) = self {
+            return if recursive.is_non_contractive(db) {
+                None
+            } else {
+                recursive.map(db, |unfolded| {
+                    unfolded.specialization_of(db, expected_class)
+                })
+            };
+        }
+
         self.nominal_class(db)?
             .static_class_literal(db)
             .filter(|(class_literal, _)| *class_literal == expected_class)
@@ -1610,6 +1620,14 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
     ) -> Option<(StaticClassLiteral<'db>, Specialization<'db>)> {
+        if let Type::Recursive(recursive) = self {
+            return if recursive.is_non_contractive(db) {
+                None
+            } else {
+                recursive.map(db, |unfolded| unfolded.class_specialization(db))
+            };
+        }
+
         self.nominal_class(db)?
             .static_class_literal(db)
             .and_then(|(class_literal, specialization)| Some((class_literal, specialization?)))
@@ -2240,6 +2258,16 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> Type<'db> {
+        if let Type::Recursive(recursive) = self.resolve_type_alias(db) {
+            return if recursive.is_non_contractive(db) {
+                self
+            } else {
+                recursive.map(db, |unfolded| {
+                    unfolded.filter_disjoint_elements(db, target, inferable)
+                })
+            };
+        }
+
         let constraints = ConstraintSetBuilder::new();
         self.filter_union(db, |elem| {
             !elem
@@ -2753,14 +2781,7 @@ impl<'db> Type<'db> {
             Type::TypeGuard(type_guard) => type_guard.is_bound(db),
             Type::TypeForm(_) => false,
 
-            Type::TypeAlias(alias) => {
-                if !seen.insert(self) {
-                    return false;
-                }
-                let is_single_valued = alias.value_type(db).is_single_valued_impl(db, seen);
-                seen.remove(&self);
-                is_single_valued
-            }
+            Type::TypeAlias(alias) => alias.value_type(db).is_single_valued_impl(db, seen),
 
             Type::Dynamic(_)
             | Type::Divergent(_)
@@ -6490,6 +6511,14 @@ impl<'db> Type<'db> {
         {
             return Type::divergent(binder_id.into_id());
         }
+        if let TypeMapping::ReplaceRecursiveAliasComponent {
+            root, binder_id, ..
+        } = type_mapping
+            && let Type::TypeAlias(alias) = self
+            && root.has_same_definition(db, alias)
+        {
+            return Type::divergent(binder_id.into_id());
+        }
         if let TypeMapping::FoldRecursive {
             recursive,
             replacement,
@@ -6691,8 +6720,35 @@ impl<'db> Type<'db> {
 
             Type::TypeAlias(alias) => {
                 match type_mapping {
+                    TypeMapping::ReplaceRecursiveAliasComponent {
+                        component,
+                        binder_id,
+                        ..
+                    }
+                        if alias.is_in_component(db, component) =>
+                    {
+                        let mapped = visitor.visit(db, self, type_mapping, || {
+                            let value_type = alias.raw_value_type(db).apply_type_mapping_impl(
+                                db,
+                                type_mapping,
+                                tcx,
+                                visitor,
+                            );
+                            alias
+                                .apply_function_specialization(db, value_type)
+                                .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                        });
+                        if let Type::TypeAlias(mapped_alias) = mapped
+                            && mapped_alias.is_in_component(db, component)
+                        {
+                            Type::divergent(binder_id.into_id())
+                        } else {
+                            mapped
+                        }
+                    }
                     TypeMapping::ReplaceDivergent { .. }
-                    | TypeMapping::ReplaceRecursiveOrigin { .. } => {
+                    | TypeMapping::ReplaceRecursiveOrigin { .. }
+                    | TypeMapping::ReplaceRecursiveAliasComponent { .. } => {
                         if let Some(specialization) = alias.specialization(db) {
                             let mapped_specialization =
                                 specialization.apply_type_mapping_impl(db, type_mapping, &[], visitor);
@@ -6775,6 +6831,7 @@ impl<'db> Type<'db> {
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::ReplaceRecursiveOrigin { .. } |
+                TypeMapping::ReplaceRecursiveAliasComponent { .. } |
                 TypeMapping::ReplaceDivergent { .. } |
                 TypeMapping::FoldRecursive { .. } |
                 TypeMapping::Materialize(_) |
@@ -6797,6 +6854,7 @@ impl<'db> Type<'db> {
                 TypeMapping::BindSelf(..) |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::ReplaceRecursiveOrigin { .. } |
+                TypeMapping::ReplaceRecursiveAliasComponent { .. } |
                 TypeMapping::ReplaceDivergent { .. } |
                 TypeMapping::FoldRecursive { .. } |
                 TypeMapping::Promote(..) |
@@ -7897,6 +7955,13 @@ pub enum TypeMapping<'a, 'db> {
         origin: RecursiveOrigin<'db>,
         binder_id: BinderId,
     },
+    /// Replaces the root alias of a recursive alias component with the binder marker and expands
+    /// the other aliases in that component.
+    ReplaceRecursiveAliasComponent {
+        root: TypeAliasType<'db>,
+        component: &'a [TypeAliasType<'db>],
+        binder_id: BinderId,
+    },
     /// Replaces a recursive-type binder marker with another type.
     ///
     /// Recursive binders block this mapping for their own marker, so this behaves like a
@@ -7964,6 +8029,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceRecursiveOrigin { .. }
+            | TypeMapping::ReplaceRecursiveAliasComponent { .. }
             | TypeMapping::ReplaceDivergent { .. }
             | TypeMapping::FoldRecursive { .. }
             | TypeMapping::ReplaceParameterDefaults
@@ -8013,6 +8079,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::BindSelf(..)
             | TypeMapping::ReplaceSelf { .. }
             | TypeMapping::ReplaceRecursiveOrigin { .. }
+            | TypeMapping::ReplaceRecursiveAliasComponent { .. }
             | TypeMapping::ReplaceDivergent { .. }
             | TypeMapping::FoldRecursive { .. }
             | TypeMapping::ReplaceParameterDefaults

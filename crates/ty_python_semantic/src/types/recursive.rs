@@ -59,10 +59,6 @@ impl<'db> RecursiveOrigin<'db> {
         }
     }
 
-    pub(crate) fn contains_in_type(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
-        crate::types::visitor::any_over_type(db, ty, false, |inner| self.matches_type(db, inner))
-    }
-
     pub(crate) fn binder_id(self, db: &'db dyn Db) -> Option<salsa::Id> {
         match self {
             Self::Implicit => None,

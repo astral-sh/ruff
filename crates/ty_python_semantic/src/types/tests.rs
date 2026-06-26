@@ -371,6 +371,10 @@ type B = tuple[A]
     let recursive = get_type_alias(&db, "RecursiveSingleValuedTuple").value_type(&db);
     assert!(!recursive.is_single_valued(&db));
     let recursive = get_type_alias(&db, "A").value_type(&db);
+    assert_eq!(recursive.display(&db).to_string(), "tuple[tuple[A]]");
+    assert!(!recursive.is_single_valued(&db));
+    let recursive = get_type_alias(&db, "B").value_type(&db);
+    assert_eq!(recursive.display(&db).to_string(), "tuple[tuple[B]]");
     assert!(!recursive.is_single_valued(&db));
 }
 
