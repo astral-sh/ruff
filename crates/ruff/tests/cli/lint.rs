@@ -2875,6 +2875,61 @@ fn add_ignore_continuation_mapping() -> Result<()> {
 }
 
 #[test]
+fn add_ignore_escaped_newline_string() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "test.py",
+        r#"first = "one"
+second = "two"
+value = "first %s \
+second %s" % (first, second)
+"#,
+    )?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .args(["--select=UP031,RUF100", "--preview", "--add-ignore"])
+            .arg("test.py"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 suppression comment.
+    "
+    );
+
+    assert_eq!(
+        fixture.read_file("test.py")?,
+        r#"first = "one"
+second = "two"
+# ruff:ignore[printf-string-formatting]
+value = "first %s \
+second %s" % (first, second)
+"#
+    );
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .args(["--select=UP031,RUF100", "--preview"])
+            .arg("test.py"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
 fn add_ignore_multiline_diagnostic() -> Result<()> {
     let fixture = CliTest::new()?;
     fixture.write_file(

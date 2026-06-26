@@ -110,18 +110,12 @@ fn extract_noqa_line_for(tokens: &Tokens, locator: &Locator, indexer: &Indexer) 
     let mut string_mappings = Vec::new();
 
     for token in tokens {
-        match token.kind() {
-            // For multi-line strings, we expect `noqa` directives on the last line of the string.
-            TokenKind::String if token.is_triple_quoted_string() => {
-                if locator.contains_line_break(token.range()) {
-                    string_mappings.push(TextRange::new(
-                        locator.line_start(token.start()),
-                        token.end(),
-                    ));
-                }
-            }
-
-            _ => {}
+        // For multi-line strings, we expect `noqa` directives on the last line of the string.
+        if token.kind() == TokenKind::String && locator.contains_line_break(token.range()) {
+            string_mappings.push(TextRange::new(
+                locator.line_start(token.start()),
+                token.end(),
+            ));
         }
     }
 
@@ -637,6 +631,19 @@ assert foo, \
         assert_eq!(
             noqa_mappings(contents),
             NoqaMapping::from_iter([TextRange::new(TextSize::default(), continuation_end)])
+        );
+    }
+
+    #[test]
+    fn noqa_mapping_escaped_newline_string() {
+        let contents = r#"value = "first %s \
+second %s" % (first, second)"#;
+        let string = r#"value = "first %s \
+second %s""#;
+
+        assert_eq!(
+            noqa_mappings(contents),
+            NoqaMapping::from_iter([TextRange::new(TextSize::default(), string.text_len())])
         );
     }
 
