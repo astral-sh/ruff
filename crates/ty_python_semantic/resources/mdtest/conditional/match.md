@@ -575,6 +575,25 @@ def _(target: int | str):
     reveal_type(y)  # revealed: Literal[2, 3, 4]
 ```
 
+### Disabling unsafe literal narrowing
+
+With unsafe literal narrowing disabled, broad builtin types are preserved both in the capture and
+when narrowing the subject for later cases:
+
+```toml
+[analysis]
+unsafe-literal-narrowing = false
+```
+
+```py
+def _(target: int | str):
+    match target:
+        case 1 as x:
+            reveal_type(x)  # revealed: int | str
+        case "foo" as x:
+            reveal_type(x)  # revealed: (int & ~Literal[1] & ~Literal[True]) | str
+```
+
 ### Narrowing a value alias
 
 When every possible value has known equality behavior, the value pattern can narrow the bound name.

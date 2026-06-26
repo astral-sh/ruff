@@ -1633,6 +1633,14 @@ from typing import Literal
 def broad(value: str):
     if value == "a":
         reveal_type(value)  # revealed: str
+    else:
+        reveal_type(value)  # revealed: str & ~Literal["a"]
+
+def inequality(value: str):
+    if value != "a":
+        reveal_type(value)  # revealed: str & ~Literal["a"]
+    else:
+        reveal_type(value)  # revealed: str
 
 def literal(value: Literal["a", "b"]):
     if value == "a":

@@ -123,6 +123,29 @@ def _(x: Foo):
         reveal_type(x)  # revealed: Literal["a", "c"]
 ```
 
+## Disabling unsafe literal narrowing for membership
+
+With unsafe literal narrowing disabled, a broad union arm is preserved when a membership test
+succeeds, while literal arms are still narrowed safely:
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+unsafe-literal-narrowing = false
+```
+
+```py
+from typing import Literal
+
+type Foo = Literal["a", "b", "c"] | int
+
+def _(x: Foo):
+    if x in ("a", "b"):
+        reveal_type(x)  # revealed: Literal["a", "b"] | int
+```
+
 ## `in` for `str` and literal strings
 
 ```py

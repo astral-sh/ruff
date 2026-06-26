@@ -1471,6 +1471,15 @@ pub struct AnalysisOptions {
     /// `Literal["a"]` in the positive branch of `value == "a"`.
     /// This also applies to membership tests and literal patterns, which use equality.
     ///
+    /// ```python
+    /// from typing import Literal
+    ///
+    /// def parse(value: str) -> Literal["a"] | None:
+    ///     if value == "a":
+    ///         return value  # Accepted by default; `value` remains `str` when disabled.
+    ///     return None
+    /// ```
+    ///
     /// This narrowing is unsafe because subclasses of these builtin types may override
     /// `__eq__` to compare equal to a literal without inhabiting the corresponding literal type.
     /// Disable this option to preserve the broader builtin type instead.
