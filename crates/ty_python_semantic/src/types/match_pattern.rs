@@ -424,8 +424,7 @@ pub(crate) fn class_pattern_positional_result<'db>(
     let definition = place.provenance.definition()?;
     let binding = direct_match_args_binding(db, definition)?;
     if binding == DirectMatchArgsBinding::AnnotationOnly {
-        return (!has_local_binding("__match_args__"))
-            .then_some(ClassPatternPositionalResult::Limit(0));
+        return None;
     }
     let match_args = if place.origin.is_declared() {
         place.ty

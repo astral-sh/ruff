@@ -8,7 +8,7 @@ statically missing `__match_args__` has a limit of zero; match-self builtins suc
 limit of one.
 
 ```py
-from typing import Literal
+from typing import ClassVar, Literal
 
 class Point:
     __match_args__ = ("x", "y")
@@ -19,7 +19,9 @@ class Empty:
     __match_args__ = ()
 
 class AnnotationOnly:
-    __match_args__: tuple[str]
+    __match_args__: ClassVar[tuple[Literal["x"]]]
+
+AnnotationOnly.__match_args__ = ("x",)
 
 class AnnotatedBinding:
     __match_args__: tuple[Literal["x"]] = ("x",)
@@ -51,7 +53,7 @@ def describe(
             pass
 
     match annotation_only:
-        case AnnotationOnly(_):  # error: [invalid-match-pattern] "expected 0, got 1"
+        case AnnotationOnly(_):
             pass
 
     match annotated_binding:
