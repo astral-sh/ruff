@@ -232,6 +232,42 @@ def describe(model: Model, data_model: DataModel) -> None:
             pass
 ```
 
+## Type-checking-only pattern imports
+
+An imported pattern class may resolve to a different class at runtime.
+
+```py
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from static_model import Model
+    from builtins import int as BuiltinModel
+else:
+    from runtime_model import Model
+    from runtime_model import Model as BuiltinModel
+
+def describe(model: Model, builtin_model: BuiltinModel) -> None:
+    match model:
+        case Model(_):
+            pass
+    match builtin_model:
+        case BuiltinModel(_, _):
+            pass
+```
+
+`static_model.py`:
+
+```py
+class Model: ...
+```
+
+`runtime_model.py`:
+
+```py
+class Model:
+    __match_args__ = ("value", "other")
+```
+
 ## Deliberately conservative cases
 
 The diagnostic does not attempt to model alternate runtime states or infer exact runtime values from

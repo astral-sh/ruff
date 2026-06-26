@@ -2454,6 +2454,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ast::Expr::Name(name) = pattern_cls else {
             return false;
         };
+        if static_class.definition(self.db()).file(self.db()) != self.file()
+            && (class.known(self.db()).is_none()
+                || self
+                    .index
+                    .visible_ancestor_scopes(self.scope().file_scope_id(self.db()))
+                    .any(|(scope, _)| {
+                        let places = self.index.place_table(scope);
+                        places
+                            .symbol_id(&name.id)
+                            .is_some_and(|symbol_id| places.symbol(symbol_id).is_bound())
+                    }))
+        {
+            return false;
+        }
+
         let model = SemanticModel::new(self.db(), self.file());
         definition_for_name(&model, name, ImportAliasResolution::ResolveAliases)
             .is_some_and(|definition| definition == static_class.definition(self.db()))
