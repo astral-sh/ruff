@@ -1082,7 +1082,7 @@ def narrowed_via_isinstance(x: Sequence[str] | int):
     if isinstance(x, int):
         reveal_type(x)  # revealed: int
     else:
-        reveal_type(x)  # revealed: Sequence[str] & ~int
+        reveal_type(x)  # revealed: Sequence[str]
         reveal_type(first(x))  # revealed: str
 
 def narrowed_via_truthiness(y: list[str]):

@@ -146,28 +146,28 @@ from typing import Any
 
 def test_isinstance(x: dict[Any, Any] | int) -> None:
     if isinstance(x, Mapping):
-        reveal_type(x)  # revealed: dict[Any, Any] | (int & Top[Mapping[Unknown, object]])
+        reveal_type(x)  # revealed: dict[Any, Any]
     else:
-        reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
+        reveal_type(x)  # revealed: int
 
 def test_match(x: dict[Any, Any] | int) -> None:
     match x:
         case {}:
-            reveal_type(x)  # revealed: dict[Any, Any] | (int & Top[Mapping[Unknown, object]])
+            reveal_type(x)  # revealed: dict[Any, Any]
         case _:
-            reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
+            reveal_type(x)  # revealed: int
 
 def test_match_double_star(x: dict[Any, Any] | int) -> None:
     match x:
         case {**rest}:
-            reveal_type(x)  # revealed: dict[Any, Any] | (int & Top[Mapping[Unknown, object]])
+            reveal_type(x)  # revealed: dict[Any, Any]
         case _:
-            reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
+            reveal_type(x)  # revealed: int
 
 def test_match_refutable(x: dict[Any, Any] | int) -> None:
     match x:
         case {"k": _}:
-            reveal_type(x)  # revealed: dict[Any, Any] | (int & Top[Mapping[Unknown, object]])
+            reveal_type(x)  # revealed: dict[Any, Any]
         case _:
             reveal_type(x)  # revealed: dict[Any, Any] | int
 ```
@@ -180,7 +180,7 @@ from collections.abc import Sequence
 def test_match_star(x: Sequence[int] | int) -> None:
     match x:
         case [*rest]:
-            reveal_type(x)  # revealed: (Sequence[int] & ~str & ~bytes & ~bytearray) | (int & Sequence[object])
+            reveal_type(x)  # revealed: Sequence[int] & ~str & ~bytes & ~bytearray
         case _:
             # `str`, `bytes`, and `bytearray` are subtypes of `Sequence`, but
             # sequence patterns explicitly do not match them. `bytes` and
@@ -188,7 +188,7 @@ def test_match_star(x: Sequence[int] | int) -> None:
             # TODO: After https://github.com/astral-sh/ty/issues/3314 is
             # fixed, the `Sequence[int] & str` intersection should simplify to
             # `Never`.
-            reveal_type(x)  # revealed: (Sequence[int] & str) | bytes | bytearray | (int & ~Sequence[object])
+            reveal_type(x)  # revealed: (Sequence[int] & str) | bytes | bytearray | int
 
 def test_match_star_excludes_text_and_bytes(x: str | bytes | bytearray | list[int]) -> None:
     match x:
@@ -1211,6 +1211,13 @@ def test_match_mapping_instance_get(value: InstanceGetMapping) -> None:
         case {"item": item}:
             reveal_type(item)  # revealed: object
 
+def test_mapping_pattern_drops_builtin_mapping_intersection(
+    value: dict[str, int] | str,
+) -> None:
+    match value:
+        case {"item": item}:
+            reveal_type(item)  # revealed: int
+
 def test_incompatible_declared_mapping_captures(value: Mapping[str, int]) -> None:
     item: str
     rest: dict[str, str]
@@ -2200,7 +2207,7 @@ def match_loop_carried_mapping_capture(flag: bool) -> None:
     while flag:
         match x:
             case {"value": x}:
-                reveal_type(x)  # revealed: int | Unknown
+                reveal_type(x)  # revealed: int
 
 def match_loop_carried_match_self_capture(flag: bool, x: int) -> None:
     while flag:
