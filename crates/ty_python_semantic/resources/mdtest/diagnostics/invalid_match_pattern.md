@@ -346,6 +346,23 @@ def describe(model: Model, runtime_match_args: RuntimeMatchArgs) -> None:
             pass
 ```
 
+## Keyword-unpacked metaclass
+
+An unpacked class keyword may select a metaclass that supplies `__match_args__`, so the class is not
+treated as plain.
+
+```py
+class Meta(type):
+    __match_args__ = ("value",)
+
+class Model(**{"metaclass": Meta}): ...
+
+def describe(model: Model) -> None:
+    match model:
+        case Model(_):
+            pass
+```
+
 ## Synthesized slot descriptors
 
 A local `__slots__` declaration may synthesize a `__match_args__` descriptor. The diagnostic does

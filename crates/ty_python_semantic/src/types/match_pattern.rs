@@ -385,7 +385,8 @@ pub(crate) fn class_pattern_positional_result<'db>(
     }
     let is_plain_class = !static_class.has_decorators(db)
         && !static_class.has_explicit_bases(db)
-        && !static_class.has_explicit_metaclass(db);
+        && !static_class.has_explicit_metaclass(db)
+        && !class_has_keyword_unpack(db, static_class);
     let is_stub = static_class.body_scope(db).file(db).is_stub(db);
     let has_local_binding = |name| {
         let places = place_table(db, static_class.body_scope(db));
@@ -448,9 +449,28 @@ fn class_is_in_type_checking_block(db: &dyn Db, class: StaticClassLiteral<'_>) -
 }
 
 #[salsa::tracked]
+fn class_has_keyword_unpack(db: &dyn Db, class: StaticClassLiteral<'_>) -> bool {
+    let scope = class.body_scope(db);
+    let module = parsed_module(db, scope.file(db)).load(db);
+    scope
+        .node(db)
+        .expect_class()
+        .node(&module)
+        .arguments
+        .as_deref()
+        .is_some_and(|arguments| {
+            arguments
+                .keywords
+                .iter()
+                .any(|keyword| keyword.arg.is_none())
+        })
+}
+
+#[salsa::tracked]
 fn class_is_plain_dataclass_without_match_args(db: &dyn Db, class: StaticClassLiteral<'_>) -> bool {
     if class.has_explicit_bases(db)
         || class.has_explicit_metaclass(db)
+        || class_has_keyword_unpack(db, class)
         || class
             .dataclass_params(db)
             .is_none_or(|params| params.flags(db).contains(DataclassFlags::MATCH_ARGS))
