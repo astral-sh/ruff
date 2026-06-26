@@ -78,8 +78,9 @@ impl Program {
         }
     }
 
-    /// Sets the durability of all program inputs.
-    pub fn set_input_durability(self, db: &mut dyn Db, durability: Durability) {
+    /// Permanently freezes all program inputs.
+    pub fn freeze(self, db: &mut dyn Db) {
+        let durability = Durability::NEVER_CHANGE;
         let python_version = self.python_version_with_source(db).clone();
         let python_platform = self.python_platform(db).clone();
         let search_paths = self.search_paths(db).clone();

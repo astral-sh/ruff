@@ -23,7 +23,7 @@ use ruff_db::files::File;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ruff_db::{STACK_SIZE, max_parallelism};
 use ruff_diagnostics::Applicability;
-use salsa::{Database, Durability};
+use salsa::Database;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
@@ -178,7 +178,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     }
 
     if !watch && matches!(mode, MainLoopMode::Check) {
-        db.set_input_durability(Durability::NEVER_CHANGE);
+        db.freeze();
     }
 
     let (main_loop, main_loop_cancellation_token) =

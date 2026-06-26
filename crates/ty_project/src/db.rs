@@ -13,7 +13,7 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
-use salsa::{Database, Durability, Event, Setter};
+use salsa::{Database, Event, Setter};
 use ty_module_resolver::SearchPaths;
 use ty_python_core::program::{
     FallibleStrategy, MisconfigurationStrategy, Program, UseDefaultStrategy,
@@ -75,20 +75,19 @@ impl ProjectDatabase {
         db
     }
 
-    /// Sets the durability of inputs that are immutable during a one-shot check.
+    /// Permanently freezes inputs that are immutable during a one-shot check.
     ///
     /// This includes every [`Program`] input, the frequently-read immutable [`Project`] inputs,
     /// and every field on files created after this call. Existing files retain their durability.
-    /// Setting the durability to [`Durability::NEVER_CHANGE`] permanently freezes these inputs, so
-    /// this must not be used by incremental consumers or checks that apply fixes.
-    pub fn set_input_durability(&mut self, durability: Durability) {
+    /// This must not be used by incremental consumers or checks that apply fixes.
+    pub fn freeze(&mut self) {
         let program = Program::try_get(self).expect("the program should be initialized");
         let project = self.project();
         let files = self.files.clone();
 
-        program.set_input_durability(self, durability);
-        project.set_input_durability(self, durability);
-        files.set_input_durability(durability);
+        program.freeze(self);
+        project.freeze(self);
+        files.freeze();
     }
 
     fn new<S, Strategy: MisconfigurationStrategy>(
@@ -805,8 +804,6 @@ pub(crate) mod testing {
 
 #[cfg(test)]
 mod tests {
-    use salsa::Durability;
-
     use ruff_db::Db as _;
     use ruff_db::files::FileRootKind;
     use ruff_db::system::{SystemPathBuf, TestSystem};
@@ -815,7 +812,7 @@ mod tests {
     use crate::{ProjectDatabase, ProjectMetadata};
 
     #[test]
-    fn never_change_inputs_support_a_one_shot_check() -> anyhow::Result<()> {
+    fn frozen_inputs_support_a_one_shot_check() -> anyhow::Result<()> {
         let system = TestSystem::default();
         let project = SystemPathBuf::from("/project");
         system
@@ -824,7 +821,7 @@ mod tests {
 
         let metadata = ProjectMetadata::discover(&project, &system)?;
         let mut db = ProjectDatabase::fallible(metadata, system)?;
-        db.set_input_durability(Durability::NEVER_CHANGE);
+        db.freeze();
 
         assert_eq!(db.check().len(), 1);
 

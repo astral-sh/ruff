@@ -12,7 +12,6 @@ use std::path::{Path, PathBuf};
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use rayon::ThreadPoolBuilder;
 use rustc_hash::FxHashSet;
-use salsa::Durability;
 
 use ruff_benchmark::TestFile;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
@@ -1451,7 +1450,7 @@ impl<'a> ProjectBenchmark<'a> {
                 .collect(),
         );
 
-        db.set_input_durability(Durability::NEVER_CHANGE);
+        db.freeze();
 
         db
     }

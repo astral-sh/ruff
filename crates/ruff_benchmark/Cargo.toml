@@ -29,7 +29,6 @@ anyhow = { workspace = true }
 codspeed-criterion-compat = { workspace = true, default-features = false, optional = true }
 criterion = { workspace = true, default-features = false, optional = true }
 divan = { workspace = true, optional = true }
-salsa = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
@@ -59,12 +58,12 @@ ruff_instrumented = [
     "tikv-jemallocator",
 ]
 # Enables the ty instrumented benchmarks
-ty_instrumented = ["criterion", "salsa", "ty_project", "ruff_python_trivia"]
+ty_instrumented = ["criterion", "ty_project", "ruff_python_trivia"]
 # Enables the module-resolution benchmark
 module_resolution = ["divan", "ty_module_resolver", "ty_project"]
 codspeed = ["codspeed-criterion-compat"]
 # Enables the ty_walltime benchmarks
-ty_walltime = ["ruff_db/os", "ty_project", "divan", "salsa"]
+ty_walltime = ["ruff_db/os", "ty_project", "divan"]
 
 [[bench]]
 name = "linter"

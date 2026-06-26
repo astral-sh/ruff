@@ -190,8 +190,9 @@ impl Project {
             .new(db)
     }
 
-    /// Sets the durability of the project inputs used throughout a one-shot check.
-    pub(crate) fn set_input_durability(self, db: &mut dyn Db, durability: Durability) {
+    /// Permanently freezes the project inputs used throughout a one-shot check.
+    pub(crate) fn freeze(self, db: &mut dyn Db) {
+        let durability = Durability::NEVER_CHANGE;
         let metadata = Box::new(self.metadata(db).clone());
         let settings = Box::new(self.settings(db).clone());
         let included_paths = self.included_paths_list(db).to_vec();

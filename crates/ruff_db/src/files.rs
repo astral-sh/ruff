@@ -64,7 +64,7 @@ pub struct Files {
 
 #[derive(Default)]
 struct FilesInner {
-    /// Overrides the durability of every field for files created after this is set.
+    /// The durability applied to every field on files created after freezing.
     input_durability: OnceLock<Durability>,
 
     /// Lookup table that maps [`SystemPathBuf`]s to salsa interned [`File`] instances.
@@ -84,18 +84,14 @@ struct FilesInner {
 }
 
 impl Files {
-    /// Overrides the durability of all inputs on files created from now on.
+    /// Freezes all inputs on files created from now on.
     ///
-    /// Existing files retain their current durability. Callers should therefore set this before
-    /// discovering any files if they need the override to apply to the entire project.
-    pub fn set_input_durability(&self, durability: Durability) {
-        if let Err(durability) = self.inner.input_durability.set(durability) {
-            assert_eq!(
-                self.inner.input_durability.get(),
-                Some(&durability),
-                "the input durability can only be set once"
-            );
-        }
+    /// Existing files retain their current durability. Callers should therefore call this before
+    /// discovering any files if they need the freeze to apply to the entire project.
+    pub fn freeze(&self) {
+        self.inner
+            .input_durability
+            .get_or_init(|| Durability::NEVER_CHANGE);
     }
 
     fn input_durability(&self, default: Durability) -> Durability {
@@ -704,7 +700,7 @@ impl TryFrom<Span> for FileRange {
 
 #[cfg(test)]
 mod tests {
-    use salsa::{Durability, Setter};
+    use salsa::Setter;
 
     use crate::Db as _;
     use crate::file_revision::FileRevision;
@@ -756,10 +752,10 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn input_durability_applies_to_new_file_overrides() {
+    fn freeze_applies_to_new_file_overrides() {
         let mut db = TestDb::new();
         db.write_file("test.py", "x = 1").unwrap();
-        db.files().set_input_durability(Durability::NEVER_CHANGE);
+        db.files().freeze();
 
         let file = system_path_to_file(&db, "test.py").unwrap();
         let source = source_text(&db, file);
@@ -767,12 +763,12 @@ mod tests {
     }
 
     #[test]
-    fn input_durability_does_not_change_existing_files() {
+    fn freeze_does_not_change_existing_files() {
         let mut db = TestDb::new();
         db.write_file("test.py", "x = 1").unwrap();
 
         let file = system_path_to_file(&db, "test.py").unwrap();
-        db.files().set_input_durability(Durability::NEVER_CHANGE);
+        db.files().freeze();
 
         let source = source_text(&db, file);
         file.set_source_text_override(&mut db)
