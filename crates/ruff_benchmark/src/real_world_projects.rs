@@ -6,7 +6,7 @@
 //! to add new benchmarks for projects in [mypy primer's project's list](https://github.com/hauntsaninja/mypy_primer/blob/ebaa9fd27b51a278873b63676fd25490cec6823b/mypy_primer/projects.py#L74).
 //!
 //! The basic steps for a project are:
-//! 1. Clone or update the project into a directory inside `./target`. The commits are pinnted to prevent flaky benchmark results due to new commits.
+//! 1. Clone or update the project into a directory inside `./target`. The commits are pinned to prevent flaky benchmark results due to new commits.
 //! 2. For projects with dependencies, run uv to create a virtual environment and install the dependencies.
 //! 3. (optionally) Copy the entire project structure into a memory file system to reduce the IO noise in benchmarks.
 //! 4. (not in this module) Create a `ProjectDatabase` and run the benchmark.
