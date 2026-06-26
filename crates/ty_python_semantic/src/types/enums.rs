@@ -47,8 +47,8 @@ pub(super) enum ResolvedEnumMethod<'db> {
 ///     ZERO = 0  # Alias of `FALSE` after `int(False)` produces `0`.
 /// ```
 ///
-/// Value normalization is only used when user-defined mixins do not replace construction. Alias
-/// detection additionally requires the enum to retain the built-in mixin's equality semantics.
+/// User-defined data-type mixins are excluded because their construction, equality, and hashing
+/// semantics cannot be inferred from the built-in scalar class later in their MRO.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::Update)]
 enum KnownEnumDataTypeMixin {
     Int,
@@ -107,15 +107,15 @@ impl<'db> ResolvedEnumMethod<'db> {
 /// Describes the runtime steps that may transform a declared enum member value.
 ///
 /// Different consumers require different levels of conservatism. Value inference trusts known
-/// standard-library constructors but treats user-defined constructors as possible transformations,
-/// while alias detection follows the value captured before `__init__`.
+/// standard-library data types but treats user-defined data types and constructors as possible
+/// transformations, while alias detection follows the value captured before `__init__`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, salsa::Update)]
 pub(super) struct EnumValueConstruction<'db> {
     pub(super) init: ResolvedEnumMethod<'db>,
     pub(super) new: ResolvedEnumMethod<'db>,
-    eq: ResolvedEnumMethod<'db>,
     generate_next_value: ResolvedEnumMethod<'db>,
     known_data_type_mixin: Option<KnownEnumDataTypeMixin>,
+    data_type_is_opaque: bool,
     pub(super) metaclass_may_transform_values: bool,
 }
 
@@ -123,23 +123,25 @@ impl<'db> EnumValueConstruction<'db> {
     /// Returns whether a member value can be checked directly against an explicit `_value_`
     /// annotation.
     ///
-    /// Constructor methods have their own call signatures and may replace `_value_`; a custom
-    /// metaclass may rewrite the member value before construction.
+    /// User-defined data types and constructor methods may replace `_value_`; a custom metaclass may
+    /// rewrite the member value before construction.
     pub(crate) const fn can_validate_with_value_annotation(self) -> bool {
         matches!(self.init, ResolvedEnumMethod::Absent)
             && matches!(self.new, ResolvedEnumMethod::Absent)
+            && !self.data_type_is_opaque
             && !self.metaclass_may_transform_values
     }
 
     /// Returns whether the declared value cannot be used as the precise type of `.value`.
     ///
-    /// Standard-library constructors are trusted because their value normalization is either
-    /// modeled directly or reflected in the inherited `_value_` annotation. A resolvable
-    /// `_generate_next_value_` is excluded because its return type can be used for an `auto()`
-    /// member instead.
+    /// Standard-library data types are trusted because their value normalization is either modeled
+    /// directly or reflected in the inherited `_value_` annotation. A resolvable
+    /// `_generate_next_value_` is excluded because its return type can be used for an `auto()` member
+    /// instead.
     const fn member_value_may_be_transformed(self, is_auto: bool) -> bool {
         self.init.is_user_defined()
             || self.new.is_user_defined()
+            || self.data_type_is_opaque
             || self.metaclass_may_transform_values
             || (is_auto && self.generate_next_value.is_opaque())
     }
@@ -150,7 +152,10 @@ impl<'db> EnumValueConstruction<'db> {
     /// `_generate_next_value_` is excluded because `value_type` incorporates its return type for
     /// each `auto()` member before the values are combined.
     const fn instance_value_may_be_transformed(self) -> bool {
-        self.init.is_present() || self.new.is_present() || self.metaclass_may_transform_values
+        self.init.is_present()
+            || self.new.is_present()
+            || self.data_type_is_opaque
+            || self.metaclass_may_transform_values
     }
 
     /// Applies the payload normalization performed by a known built-in data-type mixin.
@@ -167,15 +172,16 @@ impl<'db> EnumValueConstruction<'db> {
     /// Returns `None` when construction can rewrite `_value_` before alias registration, because
     /// the inferred value is not reliable alias evidence in those cases. `__init__` does not affect
     /// this result because alias registration uses the value captured before `__init__` runs.
-    /// Built-in normalization is skipped when member equality is customized, because equal scalar
-    /// payloads may then represent distinct members.
     fn alias_detection_value(
         self,
         db: &'db dyn Db,
         value_ty: Type<'db>,
         is_auto: bool,
     ) -> Option<Type<'db>> {
-        if self.new.is_user_defined() || self.metaclass_may_transform_values {
+        if self.new.is_user_defined()
+            || self.data_type_is_opaque
+            || self.metaclass_may_transform_values
+        {
             return None;
         }
 
@@ -188,11 +194,7 @@ impl<'db> EnumValueConstruction<'db> {
         } else {
             value_ty
         };
-        Some(if self.eq.is_user_defined() {
-            value
-        } else {
-            self.normalize_value(db, value)
-        })
+        Some(self.normalize_value(db, value))
     }
 }
 
@@ -469,10 +471,10 @@ impl<'db> EnumMetadata<'db> {
     /// Returns the type of `.value`/`._value_` for a given enum member.
     ///
     /// A user-defined `_value_` annotation takes priority. Otherwise, values transformed by
-    /// user-defined construction methods or metaclasses become `Any`. For standard-library
-    /// constructors, known data-type mixins normalize the value directly. A literal is preserved
-    /// when its runtime class matches an inherited `_value_` annotation; otherwise, the annotation
-    /// describes the normalized value.
+    /// user-defined data types, construction methods, or metaclasses become `Any`. For
+    /// standard-library constructors, known data-type mixins normalize the value directly. A
+    /// literal is preserved when its runtime class matches an inherited `_value_` annotation;
+    /// otherwise, the annotation describes the normalized value.
     pub(crate) fn value_type(&self, db: &'db dyn Db, member_name: &Name) -> Option<Type<'db>> {
         let declared_value = self.members.get(member_name).copied()?;
 
@@ -517,8 +519,8 @@ impl<'db> EnumMetadata<'db> {
     /// narrowed to a specific member (e.g. `x: MyEnum` where `MyEnum` has multiple members).
     ///
     /// If there is an explicit `_value_` annotation, returns that.
-    /// If there is a custom `__init__` or `__new__` or a custom enum
-    /// metaclass may transform member values, returns `Any`.
+    /// If there is a user-defined data type, a custom `__init__` or `__new__`, or a custom enum
+    /// metaclass that may transform member values, returns `Any`.
     /// Otherwise, returns the union of each member's `value_type`, which
     /// applies `_generate_next_value_`'s return type to `auto()` members.
     pub(crate) fn instance_value_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
@@ -947,9 +949,6 @@ pub(crate) fn enum_metadata<'db>(
     let new = resolve_enum_method(user_defined_new, || {
         inherited_known_enum_method(db, class, "__new__")
     });
-    let user_defined_eq =
-        custom_enum_method(db, scope_id, "__eq__").or(inherited_data_type_mixin.eq);
-    let eq = resolve_enum_method(user_defined_eq, || None);
     let metaclass_may_transform_values = enum_metaclass_may_transform_values(db, class);
     let user_defined_generate_next_value =
         custom_enum_method(db, scope_id, "_generate_next_value_")
@@ -960,9 +959,9 @@ pub(crate) fn enum_metadata<'db>(
     let value_construction = EnumValueConstruction {
         init,
         new,
-        eq,
         generate_next_value,
         known_data_type_mixin: inherited_data_type_mixin.known,
+        data_type_is_opaque: inherited_data_type_mixin.opaque,
         metaclass_may_transform_values,
     };
 
@@ -1103,6 +1102,18 @@ pub(crate) fn enum_metadata<'db>(
                 }
             };
 
+            // Track whether this member's value is a non-literal `int`, so a
+            // following `auto()` knows to widen its result to `int`.
+            prev_value_was_non_literal_int = value_ty.as_int_like_literal().is_none()
+                && value_ty.is_assignable_to(db, KnownClass::Int.to_instance(db));
+            prev_bool_literal =
+                value_ty
+                    .as_literal_value_kind()
+                    .and_then(|literal| match literal {
+                        LiteralValueTypeKind::Bool(value) => Some(value),
+                        _ => None,
+                    });
+
             let alias_value_ty =
                 value_construction.alias_detection_value(db, value_ty, auto_members.contains(name));
             if let Some(alias_value_ty) = alias_value_ty
@@ -1128,18 +1139,6 @@ pub(crate) fn enum_metadata<'db>(
             {
                 return None;
             }
-
-            // Track whether this member's value is a non-literal `int`, so a
-            // following `auto()` knows to widen its result to `int`.
-            prev_value_was_non_literal_int = value_ty.as_int_like_literal().is_none()
-                && value_ty.is_assignable_to(db, KnownClass::Int.to_instance(db));
-            prev_bool_literal =
-                value_ty
-                    .as_literal_value_kind()
-                    .and_then(|literal| match literal {
-                        LiteralValueTypeKind::Bool(value) => Some(value),
-                        _ => None,
-                    });
 
             Some((name.clone(), value_ty))
         })
@@ -1257,15 +1256,15 @@ enum EnumMethodBinding<'db> {
 
 /// Constructor behavior collected from data-type mixins in MRO order.
 ///
-/// `init` and `new` record the first user-defined constructor methods, `eq` records the first
-/// user-defined `__eq__` preceding the built-in scalar base, and `known` records the nearest
-/// built-in scalar mixin whose value normalization ty models.
+/// `init` and `new` record the first user-defined constructor methods. `known` records the nearest
+/// built-in scalar mixin whose value normalization ty models, unless an opaque user-defined
+/// data-type mixin precedes it.
 #[derive(Clone, Copy, Default)]
 struct InheritedDataTypeMixin<'db> {
     init: Option<EnumMethodBinding<'db>>,
     new: Option<EnumMethodBinding<'db>>,
-    eq: Option<EnumMethodBinding<'db>>,
     known: Option<KnownEnumDataTypeMixin>,
+    opaque: bool,
 }
 
 /// Returns the enum method defined in `scope`, including opaque bindings.
@@ -1321,24 +1320,30 @@ fn inherited_user_defined_enum_new<'db>(
 ///
 /// The scan continues through enum bases because a memberless parent enum can itself inherit the
 /// data-type mixin. When no enum class provides a member constructor, `EnumType` uses this method to
-/// construct the scalar payload stored by the enum member.
+/// construct the scalar payload stored by the enum member. A user-defined non-enum class before the
+/// built-in scalar makes that data type opaque.
 fn inherited_data_type_mixin<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
 ) -> InheritedDataTypeMixin<'db> {
     let mut result = InheritedDataTypeMixin::default();
 
-    for base in class
-        .iter_mro(db, None)
-        .skip(1)
-        .filter_map(ClassBase::into_class)
-        .filter_map(|class| class.class_literal(db).as_static())
-    {
+    for base in class.iter_mro(db, None).skip(1) {
+        let Some(base) = base
+            .into_class()
+            .and_then(|class| class.class_literal(db).as_static())
+        else {
+            if result.known.is_none() {
+                result.opaque = true;
+            }
+            continue;
+        };
+
         match base.known(db) {
-            Some(KnownClass::Int) if result.known.is_none() => {
+            Some(KnownClass::Int) if result.known.is_none() && !result.opaque => {
                 result.known = Some(KnownEnumDataTypeMixin::Int);
             }
-            Some(KnownClass::Str) if result.known.is_none() => {
+            Some(KnownClass::Str) if result.known.is_none() && !result.opaque => {
                 result.known = Some(KnownEnumDataTypeMixin::Str);
             }
             None => {
@@ -1349,8 +1354,8 @@ fn inherited_data_type_mixin<'db>(
                 if result.new.is_none() {
                     result.new = custom_enum_method(db, scope, "__new__");
                 }
-                if result.known.is_none() && result.eq.is_none() {
-                    result.eq = custom_enum_method(db, scope, "__eq__");
+                if result.known.is_none() && !is_enum_class_by_inheritance(db, base) {
+                    result.opaque = true;
                 }
             }
             _ => {}

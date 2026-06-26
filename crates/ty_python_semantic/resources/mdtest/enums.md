@@ -853,21 +853,6 @@ reveal_type(InheritedInt.FROM_BOOL.value)  # revealed: Literal[0]
 reveal_type(InheritedInt.FROM_INT)  # revealed: Literal[InheritedInt.FROM_BOOL]
 # revealed: tuple[Literal["FROM_BOOL"], Literal["OTHER"]]
 reveal_type(enum_members(InheritedInt))
-
-# Built-in payload normalization must not override user-defined equality during alias detection.
-class NeverEqualInt(int):
-    def __eq__(self, other: object) -> Literal[False]:
-        return False
-
-class CustomEquality(NeverEqualInt, Enum):
-    FROM_BOOL = False
-    FROM_INT = 0
-
-reveal_type(CustomEquality.FROM_BOOL.value)  # revealed: Literal[0]
-reveal_type(CustomEquality.FROM_INT.value)  # revealed: Literal[0]
-reveal_type(CustomEquality.FROM_INT)  # revealed: Literal[CustomEquality.FROM_INT]
-# revealed: tuple[Literal["FROM_BOOL"], Literal["FROM_INT"]]
-reveal_type(enum_members(CustomEquality))
 ```
 
 `StrEnum` uses the same built-in `str` normalization as an explicit data-type mixin:
@@ -890,6 +875,57 @@ reveal_type(StrictStr.FROM_INT.value)  # revealed: Literal["1"]
 reveal_type(StrictStr.FROM_STR)  # revealed: Literal[StrictStr.FROM_INT]
 # revealed: tuple[Literal["FROM_INT"], Literal["OTHER"]]
 reveal_type(enum_members(StrictStr))
+```
+
+### User-defined data-type mixins
+
+User-defined data-type mixins are opaque for value normalization and alias detection, even when they
+inherit from a known scalar without explicitly overriding its methods. Construction, equality, and
+hashing can all differ from the built-in base:
+
+```py
+from dataclasses import dataclass
+from enum import Enum
+from ty_extensions import enum_members
+from typing import Literal
+
+class CustomInt(int):
+    pass
+
+class CustomIntEnum(CustomInt, Enum):
+    FROM_BOOL = False
+    FROM_INT = 0
+
+reveal_type(CustomIntEnum.FROM_BOOL.value)  # revealed: Any
+# revealed: tuple[Literal["FROM_BOOL"], Literal["FROM_INT"]]
+reveal_type(enum_members(CustomIntEnum))
+
+class NeverEqualInt(int):
+    def __eq__(self, other: object) -> Literal[False]:
+        return False
+
+class CustomEquality(NeverEqualInt, Enum):
+    FROM_BOOL = False
+    FROM_INT = 0
+
+reveal_type(CustomEquality.FROM_BOOL.value)  # revealed: Any
+reveal_type(CustomEquality.FROM_INT)  # revealed: Literal[CustomEquality.FROM_INT]
+# revealed: tuple[Literal["FROM_BOOL"], Literal["FROM_INT"]]
+reveal_type(enum_members(CustomEquality))
+
+@dataclass(frozen=True)
+class TypeSensitiveInt(int):
+    value_type: type
+
+    def __init__(self, value: int) -> None:
+        object.__setattr__(self, "value_type", type(value))
+
+class TypeSensitive(TypeSensitiveInt, Enum):
+    FROM_BOOL = False
+    FROM_INT = 0
+
+# revealed: tuple[Literal["FROM_BOOL"], Literal["FROM_INT"]]
+reveal_type(enum_members(TypeSensitive))
 ```
 
 ### Assigned `__new__`
@@ -1774,6 +1810,25 @@ reveal_type(InheritedCustomNextValueChild.C)  # revealed: Literal[InheritedCusto
 
 def _inherited_mixed_instance(x: InheritedCustomNextValueChild):
     reveal_type(x.value)  # revealed: str | Literal[1]
+```
+
+### Alias RHS state before `auto()`
+
+Aliases still contribute their raw right-hand-side values to the history used by a following
+`auto()` member:
+
+```py
+from enum import Enum, auto
+from ty_extensions import enum_members
+
+class Mixed(int, Enum):
+    ONE = 1
+    TRUE = True
+    AFTER = auto()
+
+reveal_type(Mixed.AFTER.value)  # revealed: Literal[2]
+# revealed: tuple[Literal["ONE"], Literal["AFTER"]]
+reveal_type(enum_members(Mixed))
 ```
 
 ### `member` and `nonmember`
