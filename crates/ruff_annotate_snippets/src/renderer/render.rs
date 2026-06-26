@@ -507,6 +507,8 @@ fn render_snippet_annotations(
     is_cont: bool,
     is_first: bool,
 ) {
+    let show_snippet = !snippet.markers.iter().any(|s| s.is_file_level);
+
     if let Some(path) = &snippet.path {
         let mut origin = Origin::path(path.as_ref());
         // print out the span location and spacer before we print the annotated source
@@ -569,12 +571,14 @@ fn render_snippet_annotations(
             buffer_msg_line_offset,
         );
         // Put in the spacer between the location and annotated source
-        draw_col_separator_no_space(
-            renderer,
-            buffer,
-            buffer_msg_line_offset + 1,
-            max_line_num_len + 1,
-        );
+        if show_snippet {
+            draw_col_separator_no_space(
+                renderer,
+                buffer,
+                buffer_msg_line_offset + 1,
+                max_line_num_len + 1,
+            );
+        }
     } else {
         let buffer_msg_line_offset = buffer.num_lines();
         if is_primary {
@@ -618,6 +622,10 @@ fn render_snippet_annotations(
                 ElementStyle::LineNumber,
             );
         }
+    }
+
+    if !show_snippet {
+        return;
     }
 
     // Contains the vertical lines' positions for active multiline annotations
@@ -2641,30 +2649,33 @@ fn pre_process<'a>(
                     let (depth, annotated_lines) =
                         sm.annotated_lines(cause.markers.clone(), cause.fold);
 
-                    if cause.fold {
-                        let end = cause
-                            .markers
-                            .iter()
-                            .map(|a| a.span.end)
-                            .max()
-                            .unwrap_or(cause.source.len())
-                            .min(cause.source.len());
+                    let show_snippet = !cause.markers.iter().any(|s| s.is_file_level);
+                    if show_snippet {
+                        if cause.fold {
+                            let end = cause
+                                .markers
+                                .iter()
+                                .map(|a| a.span.end)
+                                .max()
+                                .unwrap_or(cause.source.len())
+                                .min(cause.source.len());
 
-                        max_line_num = max(
-                            cause.line_start + newline_count(&cause.source[..end]),
-                            max_line_num,
-                        );
-                    } else {
-                        max_line_num = max(
-                            cause.line_start + newline_count(&cause.source),
-                            max_line_num,
-                        );
+                            max_line_num = max(
+                                cause.line_start + newline_count(&cause.source[..end]),
+                                max_line_num,
+                            );
+                        } else {
+                            max_line_num = max(
+                                cause.line_start + newline_count(&cause.source),
+                                max_line_num,
+                            );
+                        }
+                        max_depth = max(depth, max_depth);
                     }
 
                     if primary_path.is_none() {
                         primary_path = Some(cause.path.as_ref());
                     }
-                    max_depth = max(depth, max_depth);
                     elements.push(PreProcessedElement::Cause((cause, sm, annotated_lines)));
                 }
                 Element::Suggestion(suggestion) => {

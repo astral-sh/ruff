@@ -350,6 +350,7 @@ pub struct Annotation<'a> {
     pub(crate) label: Option<Cow<'a, str>>,
     pub(crate) kind: AnnotationKind,
     pub(crate) highlight_source: bool,
+    pub(crate) is_file_level: bool,
 }
 
 impl<'a> Annotation<'a> {
@@ -377,7 +378,8 @@ impl<'a> Annotation<'a> {
         self
     }
 
-    pub fn hide_snippet(self, _yes: bool) -> Self {
+    pub fn hide_snippet(mut self, yes: bool) -> Self {
+        self.is_file_level = yes;
         self
     }
 }
@@ -425,6 +427,7 @@ impl AnnotationKind {
             label: None,
             kind: self,
             highlight_source: false,
+            is_file_level: false,
         }
     }
 

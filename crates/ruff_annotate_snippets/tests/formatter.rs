@@ -5389,9 +5389,6 @@ fn main() {
     let expected_ascii = str![[r#"
 error[E0038]: the trait alias `EqAlias` is not dyn compatible
  --> $DIR/object-fail.rs:7:17
-  |
-7 |     let _: &dyn EqAlias = &123;
-  |                 ^^^^^^^ `EqAlias` is not dyn compatible
 "#]];
 
     let renderer = Renderer::plain();
@@ -5400,9 +5397,6 @@ error[E0038]: the trait alias `EqAlias` is not dyn compatible
     let expected_unicode = str![[r#"
 error[E0038]: the trait alias `EqAlias` is not dyn compatible
   ╭▸ $DIR/object-fail.rs:7:17
-  │
-7 │     let _: &dyn EqAlias = &123;
-  ╰╴                ━━━━━━━ `EqAlias` is not dyn compatible
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
     assert_data_eq!(renderer.render(input), expected_unicode);
