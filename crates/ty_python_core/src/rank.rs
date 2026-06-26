@@ -35,7 +35,7 @@ pub type RankBitBoxStorage = BitBox<Chunk, Msb0>;
 pub type RankBitBoxVec = BitVec<Chunk, Msb0>;
 
 fn bit_box_size(bits: &RankBitBoxStorage) -> usize {
-    bits.as_raw_slice().get_heap_size()
+    std::mem::size_of_val(bits.as_raw_slice())
 }
 
 // bitvec does not support `u64` as a Store type on 32-bit platforms
@@ -102,5 +102,26 @@ impl RankBitBox {
         let chunk_mask = Chunk::MAX << (CHUNK_SIZE - index_within_chunk);
         let rank_within_chunk = (chunk & chunk_mask).count_ones();
         chunk_rank + rank_within_chunk
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::mem::size_of;
+
+    use get_size2::GetSize;
+
+    use super::{CHUNK_SIZE, Chunk, RankBitBox};
+
+    #[test]
+    fn heap_size_includes_bits_and_chunk_ranks() {
+        let bit_count = CHUNK_SIZE + 1;
+        let bits = RankBitBox::from_bits(RankBitBox::bits_with_capacity(bit_count));
+        let chunk_count = bit_count.div_ceil(CHUNK_SIZE);
+
+        assert_eq!(
+            bits.get_heap_size(),
+            chunk_count * (size_of::<Chunk>() + size_of::<u32>())
+        );
     }
 }
