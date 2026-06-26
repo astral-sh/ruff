@@ -215,7 +215,6 @@ fn all_submodule_names_for_package<'db>(
         SystemOrVendoredPathRef::Vendored(parent_directory) => db
             .vendored()
             .read_directory(parent_directory)
-            .into_iter()
             .filter(|entry| {
                 let ty = entry.file_type();
                 let path = entry.path();
