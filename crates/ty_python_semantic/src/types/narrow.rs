@@ -42,8 +42,8 @@ use super::UnionType;
 use super::call::CallArguments;
 use super::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use super::equality::{
-    equality_exclusion_constraint, equality_truthiness, evaluate_type_equality,
-    evaluate_type_inequality,
+    ComparisonNarrowingMode, equality_exclusion_constraint, equality_truthiness,
+    evaluate_type_equality, evaluate_type_inequality,
 };
 use super::variance::TypeVarVariance;
 use itertools::Itertools;
@@ -1349,10 +1349,12 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         Self { db, scope }
     }
 
-    fn unsafe_literal_narrowing(&self) -> bool {
-        self.db
-            .analysis_settings(self.scope.file(self.db))
-            .unsafe_literal_narrowing
+    fn comparison_narrowing_mode(&self) -> ComparisonNarrowingMode {
+        ComparisonNarrowingMode::from_unsafe_literal_narrowing(
+            self.db
+                .analysis_settings(self.scope.file(self.db))
+                .unsafe_literal_narrowing,
+        )
     }
 
     fn merge_binding(
@@ -1553,7 +1555,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             subject_ty,
             value_ty,
             true,
-            self.unsafe_literal_narrowing(),
+            self.comparison_narrowing_mode(),
         )
         .map(|constraint| self.intersect_types(subject_ty, constraint))
         .unwrap_or(subject_ty)
@@ -2641,10 +2643,12 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         }
     }
 
-    fn unsafe_literal_narrowing(&self) -> bool {
-        self.db
-            .analysis_settings(self.scope().file(self.db))
-            .unsafe_literal_narrowing
+    fn comparison_narrowing_mode(&self) -> ComparisonNarrowingMode {
+        ComparisonNarrowingMode::from_unsafe_literal_narrowing(
+            self.db
+                .analysis_settings(self.scope().file(self.db))
+                .unsafe_literal_narrowing,
+        )
     }
 
     #[track_caller]
@@ -2917,7 +2921,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     ) -> Option<Type<'db>> {
         let lhs_ty = lhs_ty.resolve_type_alias(self.db);
         let rhs_ty = rhs_ty.resolve_type_alias(self.db);
-        let unsafe_literal_narrowing = self.unsafe_literal_narrowing();
+        let narrowing_mode = self.comparison_narrowing_mode();
 
         // Preserve the shared specialization of a constrained TypeVar. Expanding the TypeVar
         // before comparing it with `lhs_ty` would lose the correlation between this occurrence
@@ -2926,7 +2930,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             && let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
                 typevar.typevar(self.db).bound_or_constraints(self.db)
             && constraints.elements(self.db).iter().all(|constraint| {
-                evaluate_type_equality(self.db, lhs_ty, *constraint, true, unsafe_literal_narrowing)
+                evaluate_type_equality(self.db, lhs_ty, *constraint, true, narrowing_mode)
                     .is_some_and(|narrowed| narrowed.is_equivalent_to(self.db, *constraint))
             })
         {
@@ -2941,13 +2945,13 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             _ => lhs_ty.is_single_valued(self.db),
         };
         if !has_single_valued_component {
-            return evaluate_type_equality(self.db, lhs_ty, rhs_ty, true, unsafe_literal_narrowing);
+            return evaluate_type_equality(self.db, lhs_ty, rhs_ty, true, narrowing_mode);
         }
 
         let mut builder = UnionBuilder::new(self.db);
         let add_lhs_element = |builder: UnionBuilder<'db>, element: Type<'db>| {
             let element = element.resolve_type_alias(self.db);
-            match evaluate_type_equality(self.db, element, rhs_ty, true, unsafe_literal_narrowing) {
+            match evaluate_type_equality(self.db, element, rhs_ty, true, narrowing_mode) {
                 Some(Type::Never) => builder,
                 Some(constraint) => builder.add(constraint),
                 None if !element.is_single_valued(self.db) => builder.add(element),
@@ -3003,7 +3007,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 lhs_ty,
                 rhs_ty,
                 is_positive,
-                self.unsafe_literal_narrowing(),
+                self.comparison_narrowing_mode(),
             );
         }
         if op == ast::CmpOp::NotEq {
@@ -3012,7 +3016,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 lhs_ty,
                 rhs_ty,
                 is_positive,
-                self.unsafe_literal_narrowing(),
+                self.comparison_narrowing_mode(),
             );
         }
 

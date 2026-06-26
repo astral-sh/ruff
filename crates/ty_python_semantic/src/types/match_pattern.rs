@@ -9,7 +9,9 @@ use ty_python_core::predicate::{
 use crate::Db;
 use crate::place::{DefinedPlace, Place};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
-use crate::types::equality::{evaluate_type_equality, is_same_enum_domain};
+use crate::types::equality::{
+    ComparisonNarrowingMode, evaluate_type_equality, is_same_enum_domain,
+};
 use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
 use crate::types::visitor::any_over_type;
@@ -714,8 +716,10 @@ pub(crate) fn pattern_fallthrough_type<'db>(
             subject_ty,
             value_ty,
             false,
-            db.analysis_settings(value.file(db))
-                .unsafe_literal_narrowing,
+            ComparisonNarrowingMode::from_unsafe_literal_narrowing(
+                db.analysis_settings(value.file(db))
+                    .unsafe_literal_narrowing,
+            ),
         ) {
             return IntersectionBuilder::new(db)
                 .add_positive(subject_ty)
