@@ -33,6 +33,15 @@ use crate::{Db, FxOrderSet};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 use ty_python_core::definition::Definition;
 
+fn class_is_defined_in_known_module(
+    db: &dyn Db,
+    class: ClassType<'_>,
+    module: KnownModule,
+) -> bool {
+    file_to_module(db, class.class_literal(db).file(db))
+        .is_some_and(|resolved| resolved.is_known(db, module))
+}
+
 impl<'db> Type<'db> {
     pub(crate) const fn object() -> Self {
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::Object))
@@ -228,6 +237,10 @@ impl<'db> NominalInstanceType<'db> {
     pub fn class_module_name(&self, db: &'db dyn Db) -> Option<&'db ModuleName> {
         let file = self.class(db).class_literal(db).file(db);
         file_to_module(db, file).map(|module| module.name(db))
+    }
+
+    pub(super) fn is_builtin_instance(self, db: &'db dyn Db) -> bool {
+        class_is_defined_in_known_module(db, self.class(db), KnownModule::Builtins)
     }
 
     pub(super) fn class(&self, db: &'db dyn Db) -> ClassType<'db> {
@@ -621,10 +634,6 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 
         let left_class = left.class(db);
         let right_class = right.class(db);
-        let class_is_defined_in = |class: ClassType<'db>, module| {
-            file_to_module(db, class.class_literal(db).file(db))
-                .is_some_and(|resolved| resolved.is_known(db, module))
-        };
         let class_inherits_from = |class: ClassType<'db>, base: ClassType<'db>| {
             class
                 .iter_mro(db)
@@ -633,8 +642,8 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         };
         let builtin_and_typing_abc_are_disjoint =
             |builtin: ClassType<'db>, typing_abc: ClassType<'db>| {
-                class_is_defined_in(builtin, KnownModule::Builtins)
-                    && class_is_defined_in(typing_abc, KnownModule::Typing)
+                class_is_defined_in_known_module(db, builtin, KnownModule::Builtins)
+                    && class_is_defined_in_known_module(db, typing_abc, KnownModule::Typing)
                     && !typing_abc.is_protocol(db)
                     && !class_inherits_from(builtin, typing_abc)
                     && !class_inherits_from(typing_abc, builtin)
@@ -799,6 +808,15 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn is_hashable(self, db: &'db dyn Db) -> bool {
         self.to_nominal_instance()
             .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::Hashable))
+    }
+
+    pub(super) fn is_typing_protocol(self, db: &'db dyn Db) -> bool {
+        match self.inner {
+            Protocol::FromClass(class) => {
+                class_is_defined_in_known_module(db, *class, KnownModule::Typing)
+            }
+            Protocol::Synthesized(_) => false,
+        }
     }
 
     // Keep this method private, so that the only way of constructing `ProtocolInstanceType`

@@ -325,20 +325,26 @@ static_assert(is_disjoint_from(D, B))
 static_assert(not is_disjoint_from(D, A))
 ```
 
-## Builtin classes and typing ABCs
+## Builtin classes, typing ABCs, and protocols
 
-Builtin classes are treated as disjoint from typing ABCs they do not already inherit from. This
-avoids retaining intersections that would require an unusual multiple-inheritance hierarchy. Typing
-protocols remain potentially compatible with builtin subclasses.
+Builtin classes are treated as disjoint from typing ABCs they do not already inherit from and typing
+protocols they do not already satisfy. This avoids retaining intersections that would require an
+unusual subclass.
 
 ```py
 from collections.abc import Mapping, Sequence
-from typing import Awaitable
+from typing import Awaitable, Iterable, Protocol
 from ty_extensions import static_assert, is_disjoint_from
 
 static_assert(is_disjoint_from(str, Mapping[str, object]))
 static_assert(not is_disjoint_from(str, Sequence[str]))
-static_assert(not is_disjoint_from(int, Awaitable[object]))
+static_assert(is_disjoint_from(int, Awaitable[object]))
+static_assert(not is_disjoint_from(str, Iterable[str]))
+
+class CustomProtocol(Protocol):
+    def custom(self) -> None: ...
+
+static_assert(not is_disjoint_from(int, CustomProtocol))
 ```
 
 ## Dataclasses
