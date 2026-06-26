@@ -1,13 +1,15 @@
 # Generics and set theoretic types
 
+This test suite explores the interplay between generics and set theoretic gradual types.
+
 ```toml
 [environment]
 python-version = "3.14"
 ```
 
-This test suite explores the interplay between generics and set theoretic gradual types.
+## Derivations and general results
 
-## General relationships
+This section concentrates on deriving the main results while the next section covers some more edge cases.
 
 ```pyi
 from typing import Any
@@ -295,7 +297,7 @@ static_assert(is_equivalent_to(Invariant[P] & Invariant[Any], Invariant[P]))
 static_assert(not is_equivalent_to(Invariant[P] | Invariant[Any], Invariant[P]))
 ```
 
-Finally, we consider intersections with the negation of an `Any`-specialized generic class. For any
+We can also consider intersections with the negation of an `Any`-specialized generic class. For all
 of the generic classes `C` above, we can negate the canonical interval representation of `C[Any]`:
 
 ```ignore
@@ -343,7 +345,7 @@ The results above naturally extend to multi-parameter generics and mixed varianc
 
 ```pyi
 from typing import Any, Generic, TypeVar
-from ty_extensions import Bottom, static_assert, is_equivalent_to, is_subtype_of
+from ty_extensions import Bottom, static_assert, is_equivalent_to
 
 class P: ...
 class Q: ...
@@ -365,7 +367,7 @@ Tuple types are covariant in every type parameter, so the results derived for `C
 
 ```pyi
 from typing import Any, Never
-from ty_extensions import static_assert, is_equivalent_to, is_subtype_of
+from ty_extensions import static_assert, is_equivalent_to
 
 class P: ...
 class Q: ...
@@ -391,6 +393,22 @@ Intersections with tuples of different length are not affected:
 ```pyi
 static_assert(is_equivalent_to(tuple[int, str] & ~tuple[Any], tuple[int, str]))
 static_assert(is_equivalent_to(tuple[int, str] & ~tuple[int, str, Any], tuple[int, str]))
+```
+
+### `type[...]`
+
+`type[..]` can also be a covariant type constructor, so these results also hold here:
+
+```pyi
+from typing import Any
+from ty_extensions import static_assert, is_equivalent_to
+
+class P: ...
+class Q: ...
+
+# TODO: these should pass
+static_assert(is_equivalent_to(type[P] & type[Any], type[P & Any]))  # error: [static-assert-error]
+static_assert(is_equivalent_to(type[Any] & type[P], type[P & Any]))  # error: [static-assert-error]
 ```
 
 ### Type var bounds and `NewTypes`
