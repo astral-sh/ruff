@@ -1473,7 +1473,7 @@ impl<'db> Bindings<'db> {
                                             typevar.constraints(db, program).into_iter().flatten(),
                                         ));
                                     }
-                                    Some("__default__")
+                                    Some("__default__") => {
                                         if let Some(program) = property
                                             .getter(db)
                                             .and_then(Type::as_function_literal)
@@ -1482,13 +1482,15 @@ impl<'db> Bindings<'db> {
                                                     .definition(db)
                                                     .analysis_file(db)
                                                     .program(db)
-                                            }) =>
-                                    {
-                                        overload.set_return_type(
-                                            typevar.default_type(db).unwrap_or_else(|| {
-                                                KnownClass::NoDefaultType.to_instance(db, program)
-                                            }),
-                                        );
+                                            })
+                                        {
+                                            overload.set_return_type(
+                                                typevar.default_type(db).unwrap_or_else(|| {
+                                                    KnownClass::NoDefaultType
+                                                        .to_instance(db, program)
+                                                }),
+                                            );
+                                        }
                                     }
                                     _ => {}
                                 }
