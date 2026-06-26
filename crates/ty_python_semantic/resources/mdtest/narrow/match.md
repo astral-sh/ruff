@@ -474,9 +474,9 @@ def test_ordered_or_alias_excludes_cross_type_equal_values(
 
 ## Ordered `or`-pattern bindings
 
-Alternatives are tried from left to right. Under the static member model, the declaration of
-`Values.x` makes the protocol pattern exhaustive, so the later sequence alternative cannot
-contribute to the binding:
+Alternatives are tried from left to right. We assume the declaration of `Values.x` means that every
+`Values` instance has an `x` attribute. This makes the protocol pattern exhaustive, so the later
+sequence alternative cannot contribute to the binding:
 
 ```py
 from typing import Protocol, runtime_checkable
@@ -734,8 +734,8 @@ def test_match_class_alias_rejects_disjoint_final_class(value: FinalA) -> None:
 ## Class patterns for runtime dictionary values
 
 A `TypedDict` type does not inherit from `dict`, but its values are dictionaries at runtime. Those
-values can therefore match `dict`, the mapping abstract base classes, and runtime-checkable
-protocols implemented by dictionaries.
+values can therefore match `dict`, `collections.abc.Mapping`, and runtime-checkable protocols
+implemented by dictionaries.
 
 ```py
 from collections.abc import Mapping
@@ -825,10 +825,10 @@ def test_incompatible_declared_class_capture(value: PatternBox[int]) -> None:
 
 ## Generic subclass captures
 
-When a value is typed as a generic base class and the pattern matches one of its subclasses, the
-base class's type argument is not yet preserved on the subclass. The extracted attribute is
-therefore `Unknown`, rather than the default `object` specialization that would produce false
-positive errors.
+We do not yet infer a generic subclass's specialization from its base class. In the first two
+examples, ty therefore cannot infer `GenericPatternChild[int]` from `GenericPatternBase[int]`, so
+attributes declared only on the subclass are `Unknown`. Attributes inherited from the generic base
+class can still use the subject's specialization, as shown in the final example.
 
 ```py
 from typing import Generic, TypeVar
@@ -874,8 +874,9 @@ def test_match_inherited_generic_subclass_capture(
 ## Positional class patterns
 
 `__match_args__` is read through the pattern class and must identify literal attribute names. This
-includes attributes provided by a metaclass. An explicit widened annotation does not tell us which
-attribute a positional pattern extracts.
+includes attributes provided by a metaclass. An annotation such as `tuple[str, ...]` does not
+preserve the literal attribute names, so we cannot tell which attribute a positional pattern
+extracts.
 
 ```py
 class MatchArgsMeta(type):

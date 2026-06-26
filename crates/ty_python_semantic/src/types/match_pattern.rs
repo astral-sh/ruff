@@ -505,10 +505,10 @@ fn sequence_pattern_is_exhaustive_for_subject(
 /// answer depends on the subject.
 ///
 /// This is an under-approximation used for negative narrowing and ordered alternatives: callers
-/// may subtract the result from `subject_ty` under ty's static member model. A subject-independent
-/// pattern can return a type wider than `subject_ty`; for example, `case Base()` returns `Base`
-/// even for a `Child` subject. Class patterns need the current subject type when member extraction
-/// depends on the subject's statically known members.
+/// may subtract the result from `subject_ty`. A subject-independent pattern can return a type wider
+/// than `subject_ty`; for example, `case Base()` returns `Base` even for a `Child` subject. Class
+/// patterns need the current subject type when member extraction depends on the subject's statically
+/// known members.
 /// A subject-independent pattern can return its context-free definite-match type directly. A
 /// mapping pattern can use required `TypedDict` fields to establish that every subject value
 /// contains its keys.
