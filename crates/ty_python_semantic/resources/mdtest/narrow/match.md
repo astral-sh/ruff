@@ -662,7 +662,12 @@ def test_mutable_sequence_alias_does_not_keep_index_types(
             reveal_type(len(whole))  # revealed: int
             whole.reverse()
             reveal_type(whole[0])  # revealed: int | str
+```
 
+Information from a failed sequence pattern must also be discarded before a mutable sequence is
+changed and matched again:
+
+```py
 def mutable_sequence_alias_does_not_keep_previous_shape_constraints(
     value: list[int],
 ) -> None:
@@ -674,6 +679,18 @@ def mutable_sequence_alias_does_not_keep_previous_shape_constraints(
             match whole:
                 case []:
                     reveal_type(whole)  # revealed: list[int]
+
+def failed_sequence_pattern_does_not_narrow_mutable_subject(
+    value: list[int],
+) -> None:
+    match value:
+        case []:
+            pass
+        case _:
+            value.clear()
+            match value:
+                case []:
+                    reveal_type(value)  # revealed: list[int]
 ```
 
 ## Indirect class patterns
@@ -710,6 +727,7 @@ def test_union_class_pattern_uses_members_from_matching_class(
     match value:
         case PatternClass(tag="int", payload=item):
             reveal_type(item)  # revealed: int
+            reveal_type(value)  # revealed: IndirectIntPattern
 ```
 
 ## Class pattern aliases
@@ -1594,6 +1612,122 @@ def test_required_typed_dict_key_excludes_fallback_binding(
             return item
 ```
 
+## Narrowing the match subject
+
+When a class, mapping, or sequence pattern succeeds, it can narrow the original match subject even
+if the pattern does not bind a name for the whole value. Nested patterns can remove union members,
+and an `or` pattern combines the possibilities from its alternatives. A class or mapping pattern
+also keeps the uncertainty of an `Any` or `Unknown` subject.
+
+```py
+from typing import Any, Generic, Literal, TypeVar, final
+from typing_extensions import TypedDict
+from ty_extensions import Unknown
+
+TagT = TypeVar("TagT")
+PayloadT = TypeVar("PayloadT")
+
+class TaggedPayload(Generic[TagT, PayloadT]):
+    __match_args__ = ("tag", "payload")
+    tag: TagT
+    payload: PayloadT
+
+class GradualSubjectBox: ...
+
+def match_patterns_preserve_any_and_unknown(
+    any_value: Any,
+    unknown_value: Unknown,
+) -> None:
+    match any_value:
+        case GradualSubjectBox():
+            reveal_type(any_value)  # revealed: Any & GradualSubjectBox
+
+    match unknown_value:
+        case {"key": _}:
+            reveal_type(unknown_value)  # revealed: Unknown & Top[Mapping[Unknown, object]]
+
+def match_class_narrows_subject(
+    value: TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str],
+) -> None:
+    match value:
+        case TaggedPayload("int", _):
+            reveal_type(value)  # revealed: TaggedPayload[Literal["int"], int]
+
+def builtin_class_pattern_narrows_subject(value: bool) -> None:
+    match value:
+        case bool(True):
+            reveal_type(value)  # revealed: Literal[True]
+
+def list_class_pattern_does_not_keep_index_types_after_mutation(
+    value: list[int | str],
+) -> None:
+    match value:
+        case list([int(), str()]):
+            value.reverse()
+            reveal_type(value[0])  # revealed: int | str
+
+def nested_list_pattern_does_not_keep_index_types_after_mutation(
+    value: tuple[list[int | str]],
+) -> None:
+    match value:
+        case [[int(), str()]]:
+            value[0].reverse()
+            reveal_type(value[0][0])  # revealed: int | str
+
+def match_class_or_pattern_narrows_subject(
+    value: (TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str] | TaggedPayload[Literal["bool"], bool]),
+) -> None:
+    match value:
+        case TaggedPayload("int", _) | TaggedPayload("str", _):
+            # revealed: TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str]
+            reveal_type(value)
+
+def match_sequence_narrows_tuple_element_subject(
+    value: tuple[Literal[1, 2]],
+) -> None:
+    match value:
+        case [1]:
+            reveal_type(value[0])  # revealed: Literal[1]
+
+@final
+class FinalWithoutRequestedAttribute: ...
+
+def missing_final_class_attribute_rejects_subject_alternative(
+    value: FinalWithoutRequestedAttribute | TaggedPayload[Literal["int"], int],
+) -> None:
+    match value:
+        case FinalWithoutRequestedAttribute(missing=_) | TaggedPayload("int", _):
+            reveal_type(value)  # revealed: TaggedPayload[Literal["int"], int]
+
+class IntPayload(TypedDict):
+    tag: Literal["int"]
+    value: int
+
+class StrPayload(TypedDict):
+    tag: Literal["str"]
+    value: str
+
+def match_mapping_narrows_subject(value: IntPayload | StrPayload) -> None:
+    match value:
+        case {"tag": "int"}:
+            reveal_type(value)  # revealed: IntPayload
+
+class PayloadContainer:
+    payload: IntPayload | StrPayload
+
+def mapping_pattern_narrows_attribute_subject(container: PayloadContainer) -> None:
+    match container.payload:
+        case {"tag": "int"}:
+            reveal_type(container.payload)  # revealed: IntPayload
+
+def nested_mapping_narrows_sequence_subject(
+    value: tuple[IntPayload] | tuple[StrPayload],
+) -> None:
+    match value:
+        case [{"tag": "int"}]:
+            reveal_type(value)  # revealed: tuple[IntPayload]
+```
+
 ## Exhaustive positional patterns for built-in classes
 
 Python defines a fixed set of built-in classes whose single positional subpattern receives the
@@ -2308,6 +2442,16 @@ narrows the corresponding narrowable elements. If a multi-element pattern fails,
 which element failed to match.
 
 ```py
+from typing import Generic, Literal, TypeVar
+
+DisplayTagT = TypeVar("DisplayTagT")
+DisplayPayloadT = TypeVar("DisplayPayloadT")
+
+class DisplayTaggedPayload(Generic[DisplayTagT, DisplayPayloadT]):
+    __match_args__ = ("tag", "payload")
+    tag: DisplayTagT
+    payload: DisplayPayloadT
+
 class TupleSubjectA: ...
 class TupleSubjectA1(TupleSubjectA): ...
 class TupleSubjectB: ...
@@ -2330,6 +2474,13 @@ def match_list_expression_subject(a: TupleSubjectA, b: TupleSubjectB) -> None:
         case [TupleSubjectA1(), TupleSubjectB1()]:
             reveal_type(a)  # revealed: TupleSubjectA1
             reveal_type(b)  # revealed: TupleSubjectB1
+
+def match_tuple_expression_class_pattern(
+    value: (DisplayTaggedPayload[Literal["int"], int] | DisplayTaggedPayload[Literal["str"], str]),
+) -> None:
+    match (value,):
+        case (DisplayTaggedPayload("int", _),):
+            reveal_type(value)  # revealed: DisplayTaggedPayload[Literal["int"], int]
 ```
 
 ## Nested sequence display subjects
@@ -2376,12 +2527,27 @@ Element narrowing respects later cases, OR patterns, impossible alternatives, re
 expressions, and starred sequence patterns.
 
 ```py
+from typing import final
+
 class TupleSubjectA: ...
 class TupleSubjectA1(TupleSubjectA): ...
 class TupleSubjectA2(TupleSubjectA): ...
 class TupleSubjectB: ...
 class TupleSubjectB1(TupleSubjectB): ...
 class TupleSubjectB2(TupleSubjectB): ...
+class OrDisplayA: ...
+
+@final
+class OrDisplayA1(OrDisplayA): ...
+
+@final
+class OrDisplayA2(OrDisplayA): ...
+
+@final
+class OrDisplayB1: ...
+
+@final
+class OrDisplayB2: ...
 
 def match_tuple_expression_later_case(a: TupleSubjectA, b: TupleSubjectB) -> None:
     match a, b:
@@ -2415,6 +2581,14 @@ def match_tuple_expression_or_impossible_alternative(
         case [TupleSubjectA1()] | [TupleSubjectA2(), TupleSubjectB1()]:
             reveal_type(a)  # revealed: TupleSubjectA2
             reveal_type(b)  # revealed: TupleSubjectB1
+
+def match_tuple_expression_or_drops_impossible_class_pattern(
+    a: OrDisplayA,
+    b: OrDisplayB1,
+) -> None:
+    match a, b:
+        case (OrDisplayA1(), OrDisplayB2()) | (OrDisplayA2(), OrDisplayB1()):
+            reveal_type(a)  # revealed: OrDisplayA2
 
 def match_repeated_tuple_expression_subject(a: TupleSubjectA) -> None:
     match a, a:

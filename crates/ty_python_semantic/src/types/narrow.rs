@@ -374,8 +374,9 @@ enum PatternValueSource {
 
 /// Computes the subject and binding types produced by successful match patterns.
 ///
-/// Structural patterns pass the type of each extracted value to their child patterns. Results from
-/// a subject union are combined only after each complete union arm has been checked.
+/// Subject narrowing and binding inference use separate recursive entry points. Structural
+/// patterns share the lower-level operations that filter subject arms, extract child values, and
+/// preserve type variables.
 struct PatternSuccessAnalyzer<'db> {
     db: &'db dyn Db,
     scope: ScopeId<'db>,
@@ -751,6 +752,14 @@ impl<'db> NarrowingConstraint<'db> {
         }
     }
 
+    /// Merge two constraints with OR semantics (union/disjunction).
+    fn merge_constraint_or(&mut self, other: Self) {
+        self.intersection_disjuncts
+            .extend(other.intersection_disjuncts);
+        self.replacement_disjuncts
+            .extend(other.replacement_disjuncts);
+    }
+
     /// Evaluate the type this effectively constrains to
     ///
     /// Forgets whether each constraint originated from a `replacement` disjunct or not
@@ -894,15 +903,7 @@ fn merge_constraints_or<'db>(
         match into.entry(key) {
             Entry::Occupied(mut entry) => {
                 let into_constraint = entry.get_mut();
-                // Union the intersection constraints by concatenating disjunct lists.
-                into_constraint
-                    .intersection_disjuncts
-                    .extend(from_constraint.intersection_disjuncts);
-
-                // Concatenate replacement disjuncts
-                into_constraint
-                    .replacement_disjuncts
-                    .extend(from_constraint.replacement_disjuncts);
+                into_constraint.merge_constraint_or(from_constraint);
             }
             Entry::Vacant(_) => {
                 // Place only appears in `from`, not in `into`. No constraint needed.
@@ -1193,38 +1194,34 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    fn evaluate_pattern_predicate_kind(
+    fn evaluate_negative_pattern_predicate_kind(
         &mut self,
         pattern_predicate_kind: &PatternPredicateKind<'db>,
         subject: Expression<'db>,
-        is_positive: bool,
     ) -> PatternNarrowingResult<'db> {
         match pattern_predicate_kind {
             PatternPredicateKind::Singleton(singleton) => PatternNarrowingResult::Possible(
-                self.evaluate_match_pattern_singleton(subject, *singleton, is_positive),
+                self.evaluate_negative_match_pattern_singleton(subject, *singleton),
             ),
-            PatternPredicateKind::Class(kind) => {
-                PatternNarrowingResult::Possible(self.evaluate_match_pattern_class(
-                    subject,
-                    kind.class,
-                    pattern_predicate_kind,
-                    is_positive,
-                ))
+            PatternPredicateKind::Class(_) | PatternPredicateKind::Mapping(_) => {
+                PatternNarrowingResult::Possible(
+                    self.evaluate_negative_match_pattern(subject, pattern_predicate_kind),
+                )
             }
-            PatternPredicateKind::Mapping(_) => PatternNarrowingResult::Possible(
-                self.evaluate_match_pattern_mapping(subject, pattern_predicate_kind, is_positive),
-            ),
             PatternPredicateKind::Sequence(kind) => {
-                self.evaluate_match_pattern_sequence(subject, kind, is_positive)
+                self.evaluate_negative_match_pattern_sequence(subject, kind, pattern_predicate_kind)
             }
             PatternPredicateKind::Value(expr) => PatternNarrowingResult::Possible(
-                self.evaluate_match_pattern_value(subject, *expr, is_positive),
+                self.evaluate_match_pattern_value(subject, *expr, false),
             ),
-            PatternPredicateKind::Or(predicates) => {
-                self.evaluate_match_pattern_or(subject, predicates, is_positive)
-            }
+            PatternPredicateKind::Or(predicates) => PatternNarrowingResult::merge_alternatives(
+                predicates.iter().map(|predicate| {
+                    self.evaluate_negative_pattern_predicate_kind(predicate, subject)
+                }),
+                Self::merge_optional_constraints_and,
+            ),
             PatternPredicateKind::As(Some(pattern), _) => {
-                self.evaluate_pattern_predicate_kind(pattern, subject, is_positive)
+                self.evaluate_negative_pattern_predicate_kind(pattern, subject)
             }
             PatternPredicateKind::As(None, _) | PatternPredicateKind::Star(_) => {
                 PatternNarrowingResult::Possible(None)
@@ -1239,8 +1236,115 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> Option<NarrowingConstraints<'db>> {
         let kind = pattern.kind(self.db);
         let subject = pattern.subject(self.db);
-        self.evaluate_pattern_predicate_kind(kind, subject, is_positive)
-            .into_constraints()
+        if !is_positive {
+            return self
+                .evaluate_negative_pattern_predicate_kind(kind, subject)
+                .into_constraints();
+        }
+
+        let subject_node = subject.node_ref(self.db).node(self.module);
+        let expression_constraints = self
+            .evaluate_positive_pattern_related_expressions(kind, subject, subject_node)
+            .into_constraints();
+
+        let Some(subject_place) = PlaceExpr::try_from_expr(subject_node) else {
+            return expression_constraints;
+        };
+        let place = self.expect_place(&subject_place);
+        let subject_ty = infer_same_file_expression_type(self.db, subject, TypeContext::default());
+        let mut constraints = expression_constraints.unwrap_or_default();
+        constraints.remove(&place);
+        if let Some(subject_constraint) = self.positive_subject_constraint(kind, subject_ty) {
+            constraints.insert(place, subject_constraint);
+        }
+        (!constraints.is_empty()).then_some(constraints)
+    }
+
+    fn evaluate_positive_pattern_related_expressions(
+        &mut self,
+        pattern: &PatternPredicateKind<'db>,
+        subject: Expression<'db>,
+        subject_node: &ast::Expr,
+    ) -> PatternNarrowingResult<'db> {
+        if Self::sequence_expression_elements(subject_node).is_some() {
+            return self.evaluate_match_pattern_for_subject_element(
+                subject,
+                subject_node,
+                pattern,
+                None,
+            );
+        }
+
+        match pattern {
+            PatternPredicateKind::Value(value)
+                if matches!(
+                    subject_node,
+                    ast::Expr::Attribute(_) | ast::Expr::Subscript(_)
+                ) =>
+            {
+                PatternNarrowingResult::Possible(
+                    self.evaluate_match_pattern_value(subject, *value, true),
+                )
+            }
+            PatternPredicateKind::Or(patterns) => PatternNarrowingResult::merge_alternatives(
+                patterns.iter().map(|pattern| {
+                    self.evaluate_positive_pattern_related_expressions(
+                        pattern,
+                        subject,
+                        subject_node,
+                    )
+                }),
+                Self::merge_optional_constraints_or,
+            ),
+            PatternPredicateKind::As(Some(pattern), _) => {
+                self.evaluate_positive_pattern_related_expressions(pattern, subject, subject_node)
+            }
+            _ => PatternNarrowingResult::Possible(None),
+        }
+    }
+
+    /// Return the positive constraint produced when `pattern` matches `subject_ty`.
+    ///
+    /// Leaf patterns return their direct runtime-test constraint; the caller applies that constraint
+    /// to the current subject type. Structural patterns use the type established by successful
+    /// pattern analysis.
+    fn positive_subject_constraint(
+        &mut self,
+        pattern: &PatternPredicateKind<'db>,
+        subject_ty: Type<'db>,
+    ) -> Option<NarrowingConstraint<'db>> {
+        match pattern {
+            PatternPredicateKind::Value(value) => {
+                let value_ty =
+                    infer_same_file_expression_type(self.db, *value, TypeContext::default());
+                self.evaluate_expr_compare_op(subject_ty, value_ty, ast::CmpOp::Eq, true)
+                    .map(NarrowingConstraint::intersection)
+            }
+            PatternPredicateKind::Singleton(singleton) => Some(NarrowingConstraint::intersection(
+                singleton_pattern_type(self.db, *singleton),
+            )),
+            PatternPredicateKind::As(Some(pattern), _) => {
+                self.positive_subject_constraint(pattern, subject_ty)
+            }
+            PatternPredicateKind::As(None, _) | PatternPredicateKind::Star(_) => None,
+            PatternPredicateKind::Or(patterns) => {
+                let mut patterns = patterns.iter();
+                let mut constraint =
+                    self.positive_subject_constraint(patterns.next()?, subject_ty)?;
+                for pattern in patterns {
+                    constraint.merge_constraint_or(
+                        self.positive_subject_constraint(pattern, subject_ty)?,
+                    );
+                }
+                Some(constraint)
+            }
+            _ => {
+                let matched_subject_ty = PatternSuccessAnalyzer::new(self.db, self.scope())
+                    .matched_subject_type(pattern, subject_ty);
+                (!matched_subject_ty.is_equivalent_to(self.db, subject_ty))
+                    .then(|| NarrowingConstraint::intersection(matched_subject_ty))
+            }
+        }
     }
 }
 
@@ -1368,6 +1472,61 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         }
     }
 
+    /// Return the type established when `pattern` matches `subject_ty`.
+    ///
+    /// This analysis is independent of binding inference. In particular, every `or`-pattern
+    /// alternative is checked against the original subject, and sequence patterns retain the
+    /// structural facts established by their child patterns.
+    fn matched_subject_type(
+        &self,
+        pattern: &PatternPredicateKind<'db>,
+        subject_ty: Type<'db>,
+    ) -> Type<'db> {
+        match pattern {
+            PatternPredicateKind::Class(kind) => {
+                self.matched_class_pattern_subject_type(kind, subject_ty)
+            }
+            PatternPredicateKind::Mapping(kind) => {
+                self.matched_mapping_pattern_subject_type(kind, subject_ty)
+            }
+            PatternPredicateKind::Sequence(kind) => {
+                self.matched_sequence_pattern_subject_type(kind, subject_ty)
+            }
+            PatternPredicateKind::Or(patterns) => {
+                self.matched_or_pattern_subject_type(patterns, subject_ty)
+            }
+            PatternPredicateKind::As(Some(pattern), _) => {
+                self.matched_subject_type(pattern, subject_ty)
+            }
+            PatternPredicateKind::As(None, _) | PatternPredicateKind::Star(_) => subject_ty,
+            PatternPredicateKind::Value(value) => {
+                self.match_value_pattern_subject_type(*value, subject_ty)
+            }
+            PatternPredicateKind::Singleton(_) => {
+                self.intersect_types(subject_ty, necessary_match_pattern_type(self.db, pattern))
+            }
+        }
+    }
+
+    fn matched_or_pattern_subject_type(
+        &self,
+        patterns: &[PatternPredicateKind<'db>],
+        subject_ty: Type<'db>,
+    ) -> Type<'db> {
+        self.analyze_matched_subject_arms(
+            subject_ty,
+            OriginalSubjectPreservation::TypeVariablesOnly,
+            |analyzer, _, subject_ty| {
+                Some(UnionType::from_elements(
+                    analyzer.db,
+                    patterns
+                        .iter()
+                        .map(|pattern| analyzer.matched_subject_type(pattern, subject_ty)),
+                ))
+            },
+        )
+    }
+
     /// Return the type of the subject when a value pattern succeeds.
     ///
     /// A value pattern uses Python equality, so a successful match does not always narrow to the
@@ -1434,9 +1593,10 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             remaining_subject_ty =
                 pattern_binding_fallthrough_type(self.db, previous_pattern, remaining_subject_ty);
             let alternative = self.analyze_successful_pattern(pattern, remaining_subject_ty);
-            matched_subject_types.add_in_place(alternative.matched_subject_ty);
             binding_subject_types.add_in_place(alternative.binding_subject_ty);
             Self::merge_bindings(&mut bindings, alternative.bindings);
+
+            matched_subject_types.add_in_place(self.matched_subject_type(pattern, subject_ty));
             previous_pattern = pattern;
         }
 
@@ -1772,6 +1932,51 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         Some((narrowed_subject_ty, arguments))
     }
 
+    fn matched_class_pattern_subject_type(
+        &self,
+        kind: &ClassPatternPredicateKind<'db>,
+        subject_ty: Type<'db>,
+    ) -> Type<'db> {
+        UnionType::from_elements(
+            self.db,
+            self.class_pattern_contexts(kind).iter().map(|context| {
+                self.matched_class_pattern_subject_type_for_context(kind, context, subject_ty)
+            }),
+        )
+    }
+
+    fn matched_class_pattern_subject_type_for_context(
+        &self,
+        kind: &ClassPatternPredicateKind<'db>,
+        context: &ClassPatternContext<'db>,
+        subject_ty: Type<'db>,
+    ) -> Type<'db> {
+        self.analyze_matched_subject_arms(
+            subject_ty,
+            OriginalSubjectPreservation::EquivalentTypes,
+            |analyzer, original_subject_ty, subject_ty| {
+                let (narrowed_subject_ty, arguments) =
+                    analyzer.class_pattern_arm(kind, context, original_subject_ty, subject_ty)?;
+                let mut matched_subject_ty = narrowed_subject_ty;
+                for (pattern, argument) in kind
+                    .positional
+                    .iter()
+                    .chain(kind.keywords.iter().map(|keyword| &keyword.pattern))
+                    .zip(arguments)
+                {
+                    let child_ty = analyzer.matched_subject_type(pattern, argument.ty);
+                    if child_ty.is_never() {
+                        return None;
+                    }
+                    if argument.source == PatternValueSource::Subject {
+                        matched_subject_ty = child_ty;
+                    }
+                }
+                Some(matched_subject_ty)
+            },
+        )
+    }
+
     fn analyze_successful_class_pattern(
         &self,
         kind: &ClassPatternPredicateKind<'db>,
@@ -1942,6 +2147,31 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         Some((narrowed_subject_ty, value_types))
     }
 
+    fn matched_mapping_pattern_subject_type(
+        &self,
+        kind: &MappingPatternPredicateKind<'db>,
+        subject_ty: Type<'db>,
+    ) -> Type<'db> {
+        let key_types = self.mapping_pattern_key_types(kind);
+        self.analyze_matched_subject_arms(
+            subject_ty,
+            OriginalSubjectPreservation::EquivalentTypes,
+            |analyzer, _, subject_ty| {
+                let (narrowed_subject_ty, value_types) =
+                    analyzer.mapping_pattern_arm(subject_ty, &key_types)?;
+                for (entry, value_ty) in kind.entries.iter().zip(value_types) {
+                    if analyzer
+                        .matched_subject_type(&entry.pattern, value_ty)
+                        .is_never()
+                    {
+                        return None;
+                    }
+                }
+                Some(narrowed_subject_ty)
+            },
+        )
+    }
+
     fn analyze_successful_mapping_pattern(
         &self,
         kind: &MappingPatternPredicateKind<'db>,
@@ -1997,6 +2227,39 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         KnownClass::Dict.to_specialized_instance(self.db, &[key_ty, value_ty])
     }
 
+    fn matched_sequence_pattern_subject_type(
+        &self,
+        kind: &SequencePatternPredicateKind<'db>,
+        subject_ty: Type<'db>,
+    ) -> Type<'db> {
+        let target_len = Self::sequence_pattern_target_len(kind);
+        let sequence_ty = sequence_pattern_type_builder(self.db).build();
+        self.analyze_matched_subject_arms(
+            subject_ty,
+            OriginalSubjectPreservation::TypeVariablesOnly,
+            |analyzer, _, subject_ty| {
+                let (narrowed_subject_ty, element_types) =
+                    analyzer.sequence_pattern_arm(subject_ty, target_len, sequence_ty)?;
+                let mut persistent_element_types = Vec::with_capacity(kind.patterns.len());
+                for (pattern, element_ty) in kind.patterns.iter().zip(element_types) {
+                    let child = analyzer.analyze_successful_pattern(pattern, element_ty);
+                    if child.matched_subject_ty.is_never() {
+                        return None;
+                    }
+                    // Use the mutation-safe type so an exact tuple does not retain stale facts
+                    // about a mutable sequence stored in one of its elements.
+                    persistent_element_types.push(child.binding_subject_ty);
+                }
+                Some(analyzer.successful_sequence_subject_type(
+                    kind,
+                    subject_ty,
+                    narrowed_subject_ty,
+                    &persistent_element_types,
+                ))
+            },
+        )
+    }
+
     /// Return the subject and binding types of a successful sequence pattern.
     ///
     /// Each union member is checked against the complete pattern before element types are combined.
@@ -2016,12 +2279,13 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         subject_ty: Type<'db>,
     ) -> PatternSuccessResult<'db> {
         let target_len = Self::sequence_pattern_target_len(kind);
+        let sequence_ty = sequence_pattern_type_builder(self.db).build();
         self.analyze_pattern_subject_arms(
             subject_ty,
             OriginalSubjectPreservation::TypeVariablesOnly,
             |analyzer, _, subject_ty| {
                 let (narrowed_subject_ty, element_types) =
-                    analyzer.sequence_pattern_arm(subject_ty, target_len)?;
+                    analyzer.sequence_pattern_arm(subject_ty, target_len, sequence_ty)?;
                 let mut bindings = BTreeMap::new();
                 let mut matched_element_types = Vec::with_capacity(kind.patterns.len());
                 let mut binding_element_types = Vec::with_capacity(kind.patterns.len());
@@ -2139,9 +2403,9 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         &self,
         subject_ty: Type<'db>,
         target_len: TupleLength,
+        sequence_ty: Type<'db>,
     ) -> Option<(Type<'db>, Vec<Type<'db>>)> {
-        let narrowed_subject_ty =
-            self.intersect_types(subject_ty, sequence_pattern_type_builder(self.db).build());
+        let narrowed_subject_ty = self.intersect_types(subject_ty, sequence_ty);
         if narrowed_subject_ty.is_never() {
             return None;
         }
@@ -2157,6 +2421,35 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         let mut unpacker = TupleUnpacker::new(self.db, target_len);
         unpacker.unpack_tuple(tuple.as_ref()).ok()?;
         Some((narrowed_subject_ty, unpacker.into_types().collect()))
+    }
+
+    fn analyze_matched_subject_arms(
+        &self,
+        subject_ty: Type<'db>,
+        preservation: OriginalSubjectPreservation,
+        analyze_arm: impl Fn(&Self, Type<'db>, Type<'db>) -> Option<Type<'db>>,
+    ) -> Type<'db> {
+        let subject_arms = self.match_pattern_subject_arms(subject_ty);
+        let grouped_arms = subject_arms
+            .into_iter()
+            .chunk_by(|(original_subject_ty, _)| *original_subject_ty);
+        let mut matched_subject_types = UnionBuilder::new(self.db);
+
+        for (original_subject_ty, arms) in &grouped_arms {
+            let matched_types = UnionType::from_elements(
+                self.db,
+                arms.filter_map(|(_, filtering_subject_ty)| {
+                    analyze_arm(self, original_subject_ty, filtering_subject_ty)
+                }),
+            );
+            matched_subject_types.add_in_place(self.preserve_original_subject_type(
+                original_subject_ty,
+                matched_types,
+                preservation,
+            ));
+        }
+
+        matched_subject_types.build()
     }
 
     fn analyze_pattern_subject_arms(
@@ -2210,8 +2503,9 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             ));
         }
 
+        let matched_subject_ty = matched_subject_types.build();
         PatternSuccessResult {
-            matched_subject_ty: matched_subject_types.build(),
+            matched_subject_ty,
             binding_subject_ty: binding_subject_types.build(),
             bindings,
         }
@@ -2309,8 +2603,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         subject_element: SubjectElementPatternPredicate<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
         let pattern = subject_element.pattern;
-        let subject = pattern.subject(self.db).node_ref(self.db).node(self.module);
+        let subject_expression = pattern.subject(self.db);
+        let subject = subject_expression.node_ref(self.db).node(self.module);
         self.evaluate_match_pattern_for_subject_element(
+            subject_expression,
             subject,
             pattern.kind(self.db),
             Some(subject_element.target),
@@ -2437,83 +2733,6 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 Some(builder.build())
             }
             _ => None,
-        }
-    }
-
-    /// Narrow a successful sequence-pattern subject without retaining observed length or indexed
-    /// element types for mutable or stateful sequences.
-    fn narrow_type_by_sequence_pattern(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        kind: &SequencePatternPredicateKind<'db>,
-    ) -> Type<'db> {
-        let resolved = ty.resolve_type_alias(db);
-        let narrowed = match resolved {
-            Type::Union(union) => union.map(db, |element| {
-                Self::narrow_type_by_sequence_pattern(db, *element, kind)
-            }),
-            Type::Intersection(intersection) if !intersection.positive(db).is_empty() => {
-                intersection.map_positive(db, |element| {
-                    Self::narrow_type_by_sequence_pattern(db, *element, kind)
-                })
-            }
-            _ => {
-                let refined_exact = resolved
-                    .exact_tuple_instance_spec(db)
-                    .filter(|_| kind.split_around_star().is_none())
-                    .and_then(|tuple| {
-                        tuple
-                            .resize(db, TupleLength::Fixed(kind.patterns.len()))
-                            .ok()
-                    })
-                    .and_then(|tuple| {
-                        let element_types = tuple
-                            .iter_all_elements()
-                            .zip(kind.patterns.iter())
-                            .map(|(element, pattern)| {
-                                Self::necessary_match_pattern_type_for_subject(db, pattern, element)
-                            })
-                            .collect::<Vec<_>>();
-                        refine_exact_tuple_for_sequence_pattern(db, resolved, &element_types)
-                    });
-
-                refined_exact.unwrap_or_else(|| {
-                    let sequence_ty = if resolved.exact_tuple_instance_spec(db).is_some() {
-                        necessary_sequence_pattern_type(db, kind)
-                    } else {
-                        sequence_pattern_type_builder(db).build()
-                    };
-                    IntersectionBuilder::new(db)
-                        .add_positive(resolved)
-                        .add_positive(sequence_ty)
-                        .build()
-                })
-            }
-        };
-
-        if narrowed == resolved { ty } else { narrowed }
-    }
-
-    /// Return the type required by `pattern`, preserving nested exact tuples from `subject_ty`.
-    fn necessary_match_pattern_type_for_subject(
-        db: &'db dyn Db,
-        pattern: &PatternPredicateKind<'db>,
-        subject_ty: Type<'db>,
-    ) -> Type<'db> {
-        match pattern {
-            PatternPredicateKind::Sequence(kind) => {
-                Self::narrow_type_by_sequence_pattern(db, subject_ty, kind)
-            }
-            PatternPredicateKind::Or(patterns) => UnionType::from_elements(
-                db,
-                patterns.iter().map(|pattern| {
-                    Self::necessary_match_pattern_type_for_subject(db, pattern, subject_ty)
-                }),
-            ),
-            PatternPredicateKind::As(Some(pattern), _) => {
-                Self::necessary_match_pattern_type_for_subject(db, pattern, subject_ty)
-            }
-            _ => necessary_match_pattern_type(db, pattern),
         }
     }
 
@@ -3390,66 +3609,18 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         Some(NarrowingConstraints::from_iter([place_and_constraint]))
     }
 
-    fn evaluate_match_pattern_singleton(
+    fn evaluate_negative_match_pattern_singleton(
         &mut self,
         subject: Expression<'db>,
         singleton: ast::Singleton,
-        is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
         let place = self.expect_place(&subject);
 
-        let ty = singleton_pattern_type(self.db, singleton);
-        let ty = ty.negate_if(self.db, !is_positive);
+        let ty = singleton_pattern_type(self.db, singleton).negate(self.db);
         Some(NarrowingConstraints::from_iter([(
             place,
             NarrowingConstraint::intersection(ty),
-        )]))
-    }
-
-    fn evaluate_match_pattern_class(
-        &mut self,
-        subject: Expression<'db>,
-        cls: Expression<'db>,
-        pattern: &PatternPredicateKind<'db>,
-        is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
-        if !is_positive {
-            return self.evaluate_negative_match_pattern(subject, pattern);
-        }
-
-        let subject_place = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
-        let place = self.expect_place(&subject_place);
-        let class_type = infer_same_file_expression_type(self.db, cls, TypeContext::default());
-        let narrowed_type = positive_class_pattern_type(self.db, class_type)?;
-
-        Some(NarrowingConstraints::from_iter([(
-            place,
-            NarrowingConstraint::intersection(narrowed_type),
-        )]))
-    }
-
-    fn evaluate_match_pattern_mapping(
-        &mut self,
-        subject: Expression<'db>,
-        pattern: &PatternPredicateKind<'db>,
-        is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
-        if !is_positive {
-            return self.evaluate_negative_match_pattern(subject, pattern);
-        }
-
-        let subject_place = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
-        let place = self.expect_place(&subject_place);
-        let mapping_type = ClassInfoConstraintFunction::IsInstance.generate_constraint(
-            self.db,
-            KnownClass::Mapping.to_class_literal(self.db),
-            true,
-        )?;
-
-        Some(NarrowingConstraints::from_iter([(
-            place,
-            NarrowingConstraint::intersection(mapping_type),
         )]))
     }
 
@@ -3473,11 +3644,11 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         )]))
     }
 
-    fn evaluate_match_pattern_sequence(
+    fn evaluate_negative_match_pattern_sequence(
         &mut self,
         subject: Expression<'db>,
         kind: &SequencePatternPredicateKind<'db>,
-        is_positive: bool,
+        pattern: &PatternPredicateKind<'db>,
     ) -> PatternNarrowingResult<'db> {
         let subject_node = subject.node_ref(self.db).node(self.module);
 
@@ -3489,27 +3660,16 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         // Apply the element constraints to the narrowable elements of the subject expression.
         if let Some(elements) = Self::sequence_expression_elements(subject_node) {
             return self.evaluate_match_pattern_sequence_for_subject_element(
-                elements,
-                kind,
-                is_positive,
-                None,
+                subject, elements, kind, false, None,
             );
         }
 
-        let subject_ty = infer_same_file_expression_type(self.db, subject, TypeContext::default());
         let Some(subject_place) = PlaceExpr::try_from_expr(subject_node) else {
             return PatternNarrowingResult::Possible(None);
         };
 
-        let narrowed_ty = if is_positive {
-            Self::narrow_type_by_sequence_pattern(self.db, subject_ty, kind)
-        } else {
-            pattern_binding_fallthrough_type(
-                self.db,
-                &PatternPredicateKind::Sequence(kind.clone()),
-                subject_ty,
-            )
-        };
+        let subject_ty = infer_same_file_expression_type(self.db, subject, TypeContext::default());
+        let narrowed_ty = pattern_binding_fallthrough_type(self.db, pattern, subject_ty);
         if narrowed_ty == subject_ty {
             return PatternNarrowingResult::Possible(None);
         }
@@ -3532,6 +3692,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
     fn evaluate_match_pattern_sequence_for_subject_element(
         &mut self,
+        subject_expression: Expression<'db>,
         elements: &[ast::Expr],
         kind: &SequencePatternPredicateKind<'db>,
         is_positive: bool,
@@ -3566,7 +3727,12 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             .chain(elements.iter().rev().zip(suffix_patterns.iter().rev()));
         let mut constraints = None;
         for (element, pattern) in element_patterns {
-            match self.evaluate_match_pattern_for_subject_element(element, pattern, target) {
+            match self.evaluate_match_pattern_for_subject_element(
+                subject_expression,
+                element,
+                pattern,
+                target,
+            ) {
                 PatternNarrowingResult::Impossible => return PatternNarrowingResult::Impossible,
                 PatternNarrowingResult::Possible(element_constraints) => {
                     constraints =
@@ -3580,6 +3746,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
     fn evaluate_match_pattern_for_subject_element(
         &mut self,
+        subject_expression: Expression<'db>,
         subject: &ast::Expr,
         pattern: &PatternPredicateKind<'db>,
         target: Option<ExpressionNodeKey>,
@@ -3588,14 +3755,27 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             return match pattern {
                 PatternPredicateKind::Sequence(kind) => self
                     .evaluate_match_pattern_sequence_for_subject_element(
-                        elements, kind, true, target,
+                        subject_expression,
+                        elements,
+                        kind,
+                        true,
+                        target,
                     ),
-                PatternPredicateKind::As(Some(pattern), _) => {
-                    self.evaluate_match_pattern_for_subject_element(subject, pattern, target)
-                }
+                PatternPredicateKind::As(Some(pattern), _) => self
+                    .evaluate_match_pattern_for_subject_element(
+                        subject_expression,
+                        subject,
+                        pattern,
+                        target,
+                    ),
                 PatternPredicateKind::Or(patterns) => PatternNarrowingResult::merge_alternatives(
                     patterns.iter().map(|pattern| {
-                        self.evaluate_match_pattern_for_subject_element(subject, pattern, target)
+                        self.evaluate_match_pattern_for_subject_element(
+                            subject_expression,
+                            subject,
+                            pattern,
+                            target,
+                        )
                     }),
                     Self::merge_optional_constraints_or,
                 ),
@@ -3607,6 +3787,19 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let Some(subject) = PlaceExpr::try_from_expr(subject_expr) else {
             return PatternNarrowingResult::Possible(None);
         };
+        let subject_ty =
+            infer_expression_types(self.db, subject_expression, TypeContext::default())
+                .expression_type(subject_expr);
+        let Some(constraint) = self.positive_subject_constraint(pattern, subject_ty) else {
+            return PatternNarrowingResult::Possible(None);
+        };
+        if NarrowingConstraint::intersection(subject_ty)
+            .merge_constraint_and(constraint.clone())
+            .evaluate_constraint_type(self.db)
+            .is_never()
+        {
+            return PatternNarrowingResult::Impossible;
+        }
         if let Some(target) = target
             && ExpressionNodeKey::from(subject_expr) != target
         {
@@ -3614,7 +3807,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         }
         PatternNarrowingResult::Possible(Some(NarrowingConstraints::from_iter([(
             self.expect_place(&subject),
-            NarrowingConstraint::intersection(necessary_match_pattern_type(self.db, pattern)),
+            constraint,
         )])))
     }
 
@@ -3686,26 +3879,6 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         }
 
         Some(constraints)
-    }
-
-    fn evaluate_match_pattern_or(
-        &mut self,
-        subject: Expression<'db>,
-        predicates: &[PatternPredicateKind<'db>],
-        is_positive: bool,
-    ) -> PatternNarrowingResult<'db> {
-        let merge_constraints = if is_positive {
-            Self::merge_optional_constraints_or
-        } else {
-            Self::merge_optional_constraints_and
-        };
-
-        PatternNarrowingResult::merge_alternatives(
-            predicates.iter().map(|predicate| {
-                self.evaluate_pattern_predicate_kind(predicate, subject, is_positive)
-            }),
-            merge_constraints,
-        )
     }
 
     fn evaluate_bool_op(
