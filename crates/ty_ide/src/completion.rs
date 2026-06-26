@@ -3133,7 +3133,7 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
                 visitor.visit(ty, || imp(db, alias.value_type(db), visitor))?
             }
             Type::Recursive(recursive) => visitor.visit(ty, || {
-                imp(db, recursive.body_with_origin_marker(db), visitor)
+                imp(db, recursive.unfold(db), visitor)
             })?,
         })
     }

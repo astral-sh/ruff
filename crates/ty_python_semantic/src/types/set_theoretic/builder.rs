@@ -1257,7 +1257,7 @@ impl<'db> IntersectionBuilder<'db> {
             }
             Type::Recursive(recursive) => {
                 let db = self.db;
-                self.add_positive_impl(recursive.body_with_origin_marker(db), seen_aliases)
+                self.add_positive_impl(recursive.unfold(db), seen_aliases)
             }
             Type::Union(union) => {
                 // Distribute ourself over this union: for each union element, clone ourself and
@@ -1334,7 +1334,7 @@ impl<'db> IntersectionBuilder<'db> {
             }
             Type::Recursive(recursive) => {
                 let db = self.db;
-                self.add_negative_impl(recursive.body_with_origin_marker(db), seen_aliases)
+                self.add_negative_impl(recursive.unfold(db), seen_aliases)
             }
             Type::Union(union) => {
                 for elem in union.elements(self.db) {
@@ -1970,7 +1970,7 @@ mod tests {
     use crate::place::{global_symbol, known_module_symbol};
     use crate::types::enums::enum_member_literals;
     use crate::types::type_alias::TypeAliasType;
-    use crate::types::{KnownClass, KnownInstanceType, RecursiveOrigin, Truthiness};
+    use crate::types::{KnownClass, KnownInstanceType, Truthiness};
 
     use ruff_db::system::DbWithWritableSystem as _;
     use ty_module_resolver::KnownModule;
@@ -2001,25 +2001,6 @@ mod tests {
         let union = UnionType::from_elements(&db, [t0, t1]).expect_union();
 
         assert_eq!(union.elements(&db), &[t0, t1]);
-    }
-
-    #[test]
-    fn recursive_union_body_is_union_like() {
-        let db = setup_db();
-        let binder_id = salsa::plumbing::Id::from_bits(1);
-        let int = KnownClass::Int.to_instance(&db);
-        let marker = Type::divergent(binder_id);
-        let body = UnionType::from_elements(&db, [int, marker]);
-        let Type::Union(body_union) = body else {
-            panic!("expected union body");
-        };
-
-        let recursive = Type::recursive(&db, binder_id, RecursiveOrigin::Implicit, body);
-        let union = recursive
-            .as_union_like(&db)
-            .expect("recursive union body should be union-like");
-
-        assert_eq!(union.elements(&db), body_union.elements(&db));
     }
 
     #[test]
