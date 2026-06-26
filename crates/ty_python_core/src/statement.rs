@@ -4,8 +4,11 @@ use crate::definition::Definition;
 use crate::expression::Expression;
 use crate::node_key::NodeKey;
 use crate::scope::{FileScopeId, ScopeId};
+use crate::semantic_index;
 use ruff_db::files::File;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
+use ruff_text_size::Ranged;
 use salsa;
 
 /// An independently type-inferable statement.
@@ -58,11 +61,93 @@ impl<'db> StatementInner<'db> {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
+#[derive(
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, salsa::Update, get_size2::GetSize,
+)]
 pub struct StatementNodeKey(NodeKey);
 
 impl From<&ast::Stmt> for StatementNodeKey {
     fn from(node: &ast::Stmt) -> Self {
         Self(NodeKey::from_node(node))
+    }
+}
+
+impl StatementNodeKey {
+    fn node(self, module: &ParsedModuleRef) -> &ast::Stmt {
+        module
+            .get_by_index(self.0.index())
+            .try_into()
+            .expect("statement key should point to a statement")
+    }
+}
+
+/// Returns the statement containing `lambda`.
+///
+/// This is intentionally a pure AST lookup because contextual lambda inference is the only caller.
+pub fn enclosing_lambda_statement(
+    module: &ParsedModuleRef,
+    lambda: &ast::ExprLambda,
+) -> Option<StatementNodeKey> {
+    let lambda_key = NodeKey::from_node(lambda);
+    let mut found_lambda = false;
+
+    for ancestor in
+        ast::find_node::covering_node(module.syntax().into(), lambda.range()).ancestors()
+    {
+        if NodeKey::from_node(ancestor) == lambda_key {
+            found_lambda = true;
+        } else if found_lambda && let Some(statement) = ancestor.as_stmt_ref() {
+            return Some(StatementNodeKey(NodeKey::from_node(statement)));
+        }
+    }
+
+    None
+}
+
+/// Materializes the tracked [`Statement`] ingredient for a standalone statement.
+#[salsa::tracked]
+pub fn standalone_statement(
+    db: &dyn Db,
+    file: File,
+    statement_key: StatementNodeKey,
+) -> Statement<'_> {
+    let index = semantic_index(db, file);
+    let file_scope = index.standalone_statement_scope(statement_key);
+    let module = parsed_module(db, file).load(db);
+    let statement = statement_key.node(&module);
+
+    match statement {
+        ast::Stmt::FunctionDef(function) => {
+            Statement::Definition(index.expect_single_definition(function))
+        }
+        ast::Stmt::ClassDef(class) => Statement::Definition(index.expect_single_definition(class)),
+        ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
+            Statement::Expression(index.expression(value))
+        }
+        ast::Stmt::Assign(assign) => {
+            if let [ast::Expr::Name(name)] = &assign.targets[..] {
+                Statement::Definition(index.expect_single_definition(name))
+            } else {
+                Statement::Other(StatementInner::new(
+                    db,
+                    file,
+                    file_scope,
+                    AstNodeRef::new(&module, statement),
+                ))
+            }
+        }
+        ast::Stmt::AnnAssign(assign) if assign.target.is_name_expr() => {
+            Statement::Definition(index.expect_single_definition(assign))
+        }
+        ast::Stmt::AugAssign(assign) if assign.target.is_name_expr() => {
+            Statement::Definition(index.expect_single_definition(assign))
+        }
+        ast::Stmt::TypeAlias(alias) => Statement::Definition(index.expect_single_definition(alias)),
+        _ => Statement::Other(StatementInner::new(
+            db,
+            file,
+            file_scope,
+            AstNodeRef::new(&module, statement),
+        )),
     }
 }

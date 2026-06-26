@@ -32,6 +32,7 @@ use crate::{
         typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation,
     },
 };
+use ty_python_core::statement::{enclosing_lambda_statement, standalone_statement};
 use ty_python_core::{
     UseDefMap,
     definition::{Definition, DefinitionKind},
@@ -1166,9 +1167,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         index: u32,
         lambda: &'ast ast::ExprLambda,
     ) -> Option<Type<'db>> {
+        let statement_key = enclosing_lambda_statement(self.module(), lambda)?;
         let enclosing_stmt = infer_statement_types(
             self.db(),
-            self.index.enclosing_lambda_statement(lambda.into())?,
+            standalone_statement(self.db(), self.file(), statement_key),
         );
         let callable = enclosing_stmt.expression_type(lambda).as_callable()?;
         let [signature] = callable.signatures(self.db()).overloads.as_slice() else {

@@ -19,7 +19,7 @@ use smallvec::SmallVec;
 use strum::IntoEnumIterator;
 use ty_module_resolver::{KnownModule, ModuleName, resolve_module};
 use ty_python_core::ast_ids::HasScopedUseId;
-use ty_python_core::statement::StatementInner;
+use ty_python_core::statement::{StatementInner, standalone_statement};
 
 use super::{
     DeferredAndUndecorated, DefinitionInference, DefinitionInferenceExtra, DefinitionTypes,
@@ -6025,7 +6025,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_maybe_standalone_statement(&mut self, statement: &ast::Stmt) {
-        if let Some(standalone_statement) = self.index.try_statement(statement) {
+        if let Some(standalone_statement) =
+            self.index.try_statement(self.db(), self.file(), statement)
+        {
             self.infer_standalone_statement_impl(standalone_statement);
         } else {
             self.infer_statement(statement);
@@ -7371,6 +7373,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             for (statement, use_expression) in
                 self.index.constraining_collection_uses(collection_def)
             {
+                let statement = standalone_statement(self.db(), self.file(), statement);
                 let statement_use_types = infer_statement_types(self.db(), statement);
 
                 if let Some(divergent) = statement_use_types

@@ -10,6 +10,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{FrozenIndexVec, IndexSlice};
 use ruff_python_ast::NodeIndex;
+use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -73,6 +74,37 @@ pub fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
     let module = parsed_module(db, file).load(db);
 
     SemanticIndexBuilder::new(db, file, &module).build()
+}
+
+/// Returns the set of modules imported by `import` statements anywhere in `file`.
+///
+/// This intentionally excludes `from...import` statements. See
+/// `ModuleLiteralType::available_submodule_attributes` for why this analysis is limited.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+pub fn imported_modules(db: &dyn Db, file: File) -> FrozenSet<ModuleName> {
+    #[derive(Default)]
+    struct ImportedModulesVisitor {
+        modules: FxHashSet<ModuleName>,
+    }
+
+    impl<'ast> StatementVisitor<'ast> for ImportedModulesVisitor {
+        fn visit_stmt(&mut self, statement: &'ast ast::Stmt) {
+            if let ast::Stmt::Import(import) = statement {
+                for alias in &import.names {
+                    if let Some(module_name) = ModuleName::new(&alias.name) {
+                        self.modules.extend(module_name.ancestors());
+                    }
+                }
+            }
+
+            walk_stmt(self, statement);
+        }
+    }
+
+    let module = parsed_module(db, file).load(db);
+    let mut visitor = ImportedModulesVisitor::default();
+    visitor.visit_body(&module.syntax().body);
+    FrozenSet::from(visitor.modules)
 }
 
 /// Returns the place table for a specific `scope`.
@@ -297,20 +329,17 @@ pub struct SemanticIndex<'db> {
     /// Map from an unpacking target to its [`unpack::Unpack`] ingredient.
     unpacks_by_target: FrozenMap<ExpressionNodeKey, unpack::Unpack<'db>>,
 
-    /// Map from a standalone statement to its [`Statement`] ingredient.
-    statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
+    /// Map from an independently inferable statement to its containing scope.
+    standalone_statement_scopes: FrozenMap<StatementNodeKey, FileScopeId>,
 
     /// Map from nodes that create a scope to the scope they create.
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
-
-    /// Map from a lambda expression to its containing statement.
-    enclosing_lambda_statements: FrozenMap<ExpressionNodeKey, Statement<'db>>,
 
     // Map from a constraining use of a collection literal to its definition.
     collections_by_use: FrozenMap<ExpressionNodeKey, Definition<'db>>,
 
     // Map from a collection literal definition to statements containing a constraining use.
-    uses_by_collection: FrozenMap<Definition<'db>, Box<[(Statement<'db>, ExpressionNodeKey)]>>,
+    uses_by_collection: FrozenMap<Definition<'db>, Box<[(StatementNodeKey, ExpressionNodeKey)]>>,
 
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
     scope_ids_by_scope: FrozenIndexVec<FileScopeId, ScopeId<'db>>,
@@ -323,9 +352,6 @@ pub struct SemanticIndex<'db> {
     /// Note: We should not depend on this map when analysing other files or
     /// changing a file invalidates all dependents.
     ast_ids: AstIds,
-
-    /// The set of modules that are imported anywhere within this file.
-    imported_modules: FrozenSet<ModuleName>,
 
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
@@ -376,15 +402,6 @@ impl<'db> SemanticIndex<'db> {
     #[track_caller]
     pub fn use_def_map(&self, scope_id: FileScopeId) -> &UseDefMap<'db> {
         &self.use_def_maps[scope_id]
-    }
-
-    /// Returns the set of modules that are imported anywhere in this file.
-    ///
-    /// This set only considers `import` statements, not `from...import` statements.
-    /// See `ModuleLiteralType::available_submodule_attributes` for discussion
-    /// of why this analysis is intentionally limited.
-    pub fn imported_modules(&self) -> impl Iterator<Item = &ModuleName> {
-        self.imported_modules.iter()
     }
 
     #[track_caller]
@@ -520,10 +537,6 @@ impl<'db> SemanticIndex<'db> {
             .map(|node_ref| self.expect_single_definition(node_ref))
     }
 
-    pub fn enclosing_lambda_statement(&self, lambda: ExpressionNodeKey) -> Option<Statement<'db>> {
-        self.enclosing_lambda_statements.get(&lambda).copied()
-    }
-
     /// If this is a potentially constraining use of an unannotated collection literal, returns
     /// its definition.
     pub fn unannotated_collection_literal(
@@ -537,7 +550,7 @@ impl<'db> SemanticIndex<'db> {
     pub fn constraining_collection_uses(
         &self,
         collection_def: Definition<'db>,
-    ) -> impl Iterator<Item = (Statement<'db>, ExpressionNodeKey)> {
+    ) -> impl Iterator<Item = (StatementNodeKey, ExpressionNodeKey)> {
         self.uses_by_collection
             .get(&collection_def)
             .into_iter()
@@ -670,9 +683,21 @@ impl<'db> SemanticIndex<'db> {
 
     pub fn try_statement(
         &self,
+        db: &'db dyn Db,
+        file: File,
         statement_key: impl Into<StatementNodeKey>,
     ) -> Option<Statement<'db>> {
-        self.statements_by_node.get(&statement_key.into()).copied()
+        let statement_key = statement_key.into();
+        self.standalone_statement_scopes
+            .get(&statement_key)
+            .map(|_| statement::standalone_statement(db, file, statement_key))
+    }
+
+    pub(crate) fn standalone_statement_scope(
+        &self,
+        statement_key: StatementNodeKey,
+    ) -> FileScopeId {
+        self.standalone_statement_scopes[&statement_key]
     }
 
     /// Returns the id of the scope that `node` creates.

@@ -57,14 +57,13 @@ use crate::scope::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef, Scope, ScopeId, ScopeKind,
     ScopeLaziness,
 };
-use crate::statement::StatementInner;
 use crate::symbol::{ScopedSymbolId, Symbol};
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, LiveBinding, PreviousDefinitions,
     ScopedDefinitionId, ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
-use crate::{Db, Statement, StatementNodeKey};
+use crate::{Db, StatementNodeKey};
 use crate::{
     DefinitionsByNode, EvaluationMode, ExpressionsScopeMap, LoopHeader, LoopHeaderId,
     NarrowingAliasPredicate, PossiblyNarrowedPlaces, SemanticIndex, VisibleAncestorsIter,
@@ -239,7 +238,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     current_assignments: Vec<CurrentAssignment<'ast, 'db>>,
     /// The statements we're currently visiting, with
     /// the most recent visit at the end of the Vec.
-    current_statements: Vec<CurrentStatement<'ast, 'db>>,
+    current_statements: Vec<CurrentStatement<'db>>,
     /// The match case we're currently visiting.
     current_match_case: Option<CurrentMatchCase<'ast, 'db>>,
     /// The name of the first function parameter of the innermost function that we're currently visiting.
@@ -272,15 +271,12 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     unpacks_by_target: FxHashMap<ExpressionNodeKey, Unpack<'db>>,
     condition_flow_snapshots_by_node: FxHashMap<ExpressionNodeKey, ConditionFlowSnapshots>,
-    statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
-    imported_modules: FxHashSet<ModuleName>,
+    standalone_statement_scopes: FxHashMap<StatementNodeKey, FileScopeId>,
     seen_submodule_imports: FxHashSet<String>,
-    // A map from a lambda expression to its enclosing statement.
-    enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
     // A map from a constraining use of a collection literal to its definition.
     collections_by_use: FxHashMap<ExpressionNodeKey, Definition<'db>>,
     // A map from a collection literal definition to statements containing a constraining use.
-    uses_by_collection: FxHashMap<Definition<'db>, Vec<(Statement<'db>, ExpressionNodeKey)>>,
+    uses_by_collection: FxHashMap<Definition<'db>, Vec<(StatementNodeKey, ExpressionNodeKey)>>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
@@ -327,13 +323,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             expressions_by_node: FxHashMap::default(),
             unpacks_by_target: FxHashMap::default(),
             condition_flow_snapshots_by_node: FxHashMap::default(),
-            statements_by_node: FxHashMap::default(),
-            enclosing_lambda_statements: FxHashMap::default(),
+            standalone_statement_scopes: FxHashMap::default(),
             collections_by_use: FxHashMap::default(),
             uses_by_collection: FxHashMap::default(),
 
             seen_submodule_imports: FxHashSet::default(),
-            imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
 
             enclosing_snapshots: FxHashMap::default(),
@@ -369,20 +363,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn current_scope_id(&self) -> ScopeId<'db> {
         self.scope_ids_by_scope[self.current_scope()]
-    }
-
-    pub(crate) fn expect_single_definition(
-        &self,
-        definition_key: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy,
-    ) -> Definition<'db> {
-        let definitions = &self.definitions_by_node[&definition_key.into()];
-        debug_assert_eq!(
-            definitions.len(),
-            1,
-            "Expected exactly one definition to be associated with AST node {definition_key:?} but found {}",
-            definitions.len()
-        );
-        definitions[0]
     }
 
     /// Returns an iterator over ancestors of `scope` that are visible for name resolution,
@@ -2018,15 +1998,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_assignments.last_mut()
     }
 
-    fn push_statement(&mut self, statement: CurrentStatement<'ast, 'db>) {
+    fn push_statement(&mut self, statement: CurrentStatement<'db>) {
         self.current_statements.push(statement);
     }
 
-    fn pop_statement(&mut self) -> CurrentStatement<'ast, 'db> {
+    fn pop_statement(&mut self) -> CurrentStatement<'db> {
         self.current_statements.pop().unwrap()
     }
 
-    fn current_statement_mut(&mut self) -> Option<&mut CurrentStatement<'ast, 'db>> {
+    fn current_statement_mut(&mut self) -> Option<&mut CurrentStatement<'db>> {
         self.current_statements.last_mut()
     }
 
@@ -2234,53 +2214,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         expression
     }
 
-    fn add_standalone_statement(&mut self, statement_node: &ast::Stmt) -> Statement<'db> {
-        // Avoid allocating a salsa ingredient if the statement represents an existing
-        // definition or standalone expression.
-        let statement = match statement_node {
-            ast::Stmt::FunctionDef(function) => Some(Statement::Definition(
-                self.expect_single_definition(function),
-            )),
-            ast::Stmt::ClassDef(class) => {
-                Some(Statement::Definition(self.expect_single_definition(class)))
-            }
-            ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
-                Some(Statement::Expression(self.add_standalone_expression(value)))
-            }
-            ast::Stmt::Assign(assign) => {
-                if let [ast::Expr::Name(name)] = &assign.targets[..] {
-                    Some(Statement::Definition(self.expect_single_definition(name)))
-                } else {
-                    None
-                }
-            }
-            ast::Stmt::AnnAssign(assign) if assign.target.is_name_expr() => {
-                Some(Statement::Definition(self.expect_single_definition(assign)))
-            }
-            ast::Stmt::AugAssign(assign) if assign.target.is_name_expr() => {
-                Some(Statement::Definition(self.expect_single_definition(assign)))
-            }
-            ast::Stmt::TypeAlias(alias) => {
-                Some(Statement::Definition(self.expect_single_definition(alias)))
-            }
-            _ => None,
-        };
+    fn add_standalone_statement(&mut self, statement: &ast::Stmt) -> StatementNodeKey {
+        if let ast::Stmt::Expr(ast::StmtExpr { value, .. }) = statement {
+            self.add_standalone_expression(value);
+        }
 
-        let statement = if let Some(statement) = statement {
-            statement
-        } else {
-            Statement::Other(StatementInner::new(
-                self.db,
-                self.file,
-                self.current_scope(),
-                AstNodeRef::new(self.module, statement_node),
-            ))
-        };
-
-        self.statements_by_node
-            .insert(statement_node.into(), statement);
-
-        statement
+        let key = statement.into();
+        self.standalone_statement_scopes
+            .insert(key, self.current_scope());
+        key
     }
 
     fn with_type_params<T>(
@@ -2639,16 +2581,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             definitions_by_node: DefinitionsByNode::from_map(self.definitions_by_node),
             expressions_by_node: self.expressions_by_node,
             unpacks_by_target: FrozenMap::from(self.unpacks_by_target),
-            statements_by_node: self.statements_by_node,
+            standalone_statement_scopes: FrozenMap::from(self.standalone_statement_scopes),
             scope_ids_by_scope: self.scope_ids_by_scope.into(),
             ast_ids,
             scopes_by_expression: self.scopes_by_expression.build(),
             scopes_by_node: self.scopes_by_node,
             use_def_maps: use_def_maps.into(),
-            enclosing_lambda_statements: FrozenMap::from(self.enclosing_lambda_statements),
             collections_by_use: FrozenMap::from(self.collections_by_use),
             uses_by_collection,
-            imported_modules: FrozenSet::from(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: FrozenMap::from(self.enclosing_snapshots),
             semantic_syntax_errors,
@@ -2846,12 +2786,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             ast::Stmt::Import(node) => {
                 for (alias_index, alias) in node.names.iter().enumerate() {
-                    // Mark the imported module, and all of its parents, as being imported in this
-                    // file.
-                    if let Some(module_name) = ModuleName::new(&alias.name) {
-                        self.imported_modules.extend(module_name.ancestors());
-                    }
-
                     let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
                         self.scopes_by_expression
                             .record_expression(asname, self.current_scope());
@@ -4231,24 +4165,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             });
 
-        if current_statement.lambda_expressions.is_empty()
-            && current_statement.collection_uses.is_empty()
+        if !current_statement.has_lambda_expression && current_statement.collection_uses.is_empty()
         {
             return;
         }
 
         let standalone_statement = self.add_standalone_statement(stmt);
-
-        // The body of a lambda expression needs access to the `Callable` type
-        // context the lambda is being inferred with, and so any statement
-        // containing a lambda must be inferable as a standalone statement
-        // to avoid large scope-level cycles.
-        self.enclosing_lambda_statements.extend(
-            current_statement
-                .lambda_expressions
-                .into_iter()
-                .map(|lambda| (lambda.into(), standalone_statement)),
-        );
 
         // The inferred element type of collection literal depends on uses of
         // the collection in its containing scope, and so each use must be part
@@ -4417,8 +4339,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Expr::Lambda(lambda) => {
                 self.current_statement_mut()
                     .expect("every lambda expression is part of a statement")
-                    .lambda_expressions
-                    .push(lambda);
+                    .has_lambda_expression = true;
 
                 if let Some(parameters) = &lambda.parameters {
                     // The default value of the parameters needs to be evaluated in the
@@ -4896,9 +4817,9 @@ impl<'ast> From<&'ast ast::ExprNamed> for CurrentAssignment<'ast, '_> {
 }
 
 #[derive(Default)]
-struct CurrentStatement<'ast, 'db> {
-    /// A list of lambda expressions contained in this statement.
-    lambda_expressions: Vec<&'ast ast::ExprLambda>,
+struct CurrentStatement<'db> {
+    /// Whether this statement contains a lambda expression.
+    has_lambda_expression: bool,
     /// A list of collection definitions whose uses are contained in this statement.
     collection_uses: Vec<(Definition<'db>, ExpressionNodeKey)>,
 }
