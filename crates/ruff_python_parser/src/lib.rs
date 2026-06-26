@@ -73,7 +73,8 @@ use crate::parser::Parser;
 
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{
-    Expr, Mod, ModExpression, ModModule, PySourceType, StringFlags, StringLiteral, Suite,
+    AtomicNodeIndex, Expr, Mod, ModExpression, ModModule, PySourceType, StringFlags, StringLiteral,
+    Suite,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -296,6 +297,70 @@ pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed
         .parse()
         .try_into_module()
         .unwrap()
+}
+
+/// Parses each `range` of `source` as an independent module and concatenates the results into a
+/// single [`Parsed<ModModule>`] whose nodes keep their offsets into `source`.
+///
+/// This validates sources such as Jupyter notebooks, where each cell must be syntactically valid on
+/// its own while later cells can still reference earlier definitions.
+/// The `ranges` must be ordered and non-overlapping. An empty `ranges` falls back to [`parse_unchecked`].
+pub fn parse_unchecked_module_ranges(
+    source: &str,
+    ranges: impl IntoIterator<Item = TextRange>,
+    options: ParseOptions,
+) -> Parsed<ModModule> {
+    let mut ranges = ranges.into_iter().peekable();
+    if ranges.peek().is_none() {
+        return parse_unchecked(source, options)
+            .try_into_module()
+            .expect("module options should parse into a module");
+    }
+
+    let mut body = Suite::new();
+    let mut tokens = Vec::new();
+    let mut errors = Vec::new();
+    let mut unsupported_syntax_errors = Vec::new();
+    let mut module_range: Option<TextRange> = None;
+
+    for range in ranges {
+        if let Some(previous) = module_range {
+            debug_assert!(previous.end() <= range.start());
+        }
+
+        // The cell is lexed from `range.start()`, so the slice must keep the leading text to
+        // preserve absolute offsets into the concatenated source.
+        let cell_source = &source[..range.end().to_usize()];
+        let Parsed {
+            syntax,
+            tokens: cell_tokens,
+            errors: cell_errors,
+            unsupported_syntax_errors: cell_unsupported_syntax_errors,
+        } = Parser::new_starts_at(cell_source, range.start(), options.clone())
+            .parse()
+            .try_into_module()
+            .expect("module options should parse into a module");
+
+        body.extend(syntax.body);
+        tokens.extend(cell_tokens.iter().copied());
+        errors.extend(cell_errors);
+        unsupported_syntax_errors.extend(cell_unsupported_syntax_errors);
+        module_range = Some(match module_range {
+            Some(previous) => TextRange::new(previous.start(), range.end()),
+            None => range,
+        });
+    }
+
+    Parsed {
+        syntax: ModModule {
+            node_index: AtomicNodeIndex::NONE,
+            range: module_range.expect("at least one range must be present"),
+            body,
+        },
+        tokens: Tokens::new(tokens),
+        errors,
+        unsupported_syntax_errors,
+    }
 }
 
 /// Represents the parsed source code.

@@ -769,7 +769,11 @@ impl ParseSource {
 
 /// Like [`ruff_python_parser::parse_unchecked_source`] but with an additional [`PythonVersion`]
 /// argument.
-fn parse_unchecked_source(
+///
+/// Jupyter notebooks are parsed cell by cell so that a syntax error confined to one cell isn't
+/// masked by the source of a following cell
+/// Definitions still resolve across cells because the per-cell modules are concatenated into a single module
+pub(crate) fn parse_unchecked_source(
     source_kind: &SourceKind,
     source_type: PySourceType,
     target_version: PythonVersion,
@@ -778,9 +782,16 @@ fn parse_unchecked_source(
     // SAFETY: Safe because `PySourceType` always parses to a `ModModule`. See
     // `ruff_python_parser::parse_unchecked_source`. We use `parse_unchecked` (and thus
     // have to unwrap) in order to pass the `PythonVersion` via `ParseOptions`.
-    ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
-        .try_into_module()
-        .expect("PySourceType always parses into a module")
+    match source_kind.as_ipy_notebook() {
+        Some(notebook) => ruff_python_parser::parse_unchecked_module_ranges(
+            source_kind.source_code(),
+            notebook.cell_offsets().ranges(),
+            options,
+        ),
+        None => ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
+            .try_into_module()
+            .expect("PySourceType always parses into a module"),
+    }
 }
 
 #[cfg(test)]
@@ -791,14 +802,13 @@ mod tests {
     use ruff_python_ast::{PySourceType, PythonVersion};
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
-    use ruff_python_parser::ParseOptions;
     use ruff_python_trivia::textwrap::dedent;
     use test_case::test_case;
 
     use ruff_db::diagnostic::Diagnostic;
     use ruff_notebook::{Notebook, NotebookError};
 
-    use crate::linter::check_path;
+    use crate::linter::{check_path, parse_unchecked_source};
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
     use crate::source_kind::SourceKind;
@@ -809,6 +819,45 @@ mod tests {
     /// Construct a path to a Jupyter notebook in the `resources/test/fixtures/jupyter` directory.
     fn notebook_path(path: impl AsRef<Path>) -> std::path::PathBuf {
         Path::new("../ruff_notebook/resources/test/fixtures/jupyter").join(path)
+    }
+
+    #[test]
+    fn test_cell_boundary_syntax_error() -> Result<(), NotebookError> {
+        // A decorator whose definition lives in the next cell parses cleanly once the cells are
+        // concatenated, but is invalid on its own. Per-cell parsing must report it.
+        let path = notebook_path("cell_boundary_syntax_error.ipynb");
+        let source_kind = SourceKind::ipy_notebook(Notebook::from_path(&path)?);
+        let diagnostics =
+            test_contents_syntax_errors(&source_kind, &path, &LinterSettings::default());
+        assert!(
+            diagnostics.iter().any(Diagnostic::is_invalid_syntax),
+            "expected a cell-boundary syntax error, got: {diagnostics:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_notebook_cell_boundary_no_spurious_diagnostics() -> Result<(), NotebookError> {
+        // Per-cell parsing injects synthetic boundary tokens (trailing `Newline`/`Dedent`)
+        // Ensuring they don't trigger spurious blank-line or whitespace diagnostics on a valid notebook.
+        let path = notebook_path("valid_multicell.ipynb");
+        let source_kind = SourceKind::ipy_notebook(Notebook::from_path(&path)?);
+        let settings = LinterSettings::for_rules([
+            Rule::BlankLineBetweenMethods,
+            Rule::BlankLinesTopLevel,
+            Rule::TooManyBlankLines,
+            Rule::BlankLinesAfterFunctionOrClass,
+            Rule::BlankLinesBeforeNestedDefinition,
+            Rule::TrailingWhitespace,
+            Rule::BlankLineWithWhitespace,
+            Rule::TooManyNewlinesAtEndOfFile,
+        ]);
+        let diagnostics = test_contents_syntax_errors(&source_kind, &path, &settings);
+        assert!(
+            diagnostics.is_empty(),
+            "per-cell parsing introduced spurious diagnostics: {diagnostics:?}"
+        );
+        Ok(())
     }
 
     #[test]
@@ -964,11 +1013,9 @@ mod tests {
     ) -> Vec<Diagnostic> {
         let source_type = PySourceType::from(path);
         let target_version = settings.resolve_target_version(path);
-        let options =
-            ParseOptions::from(source_type).with_target_version(target_version.parser_version());
-        let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
-            .try_into_module()
-            .expect("PySourceType always parses into a module");
+        // Mirror the production parse path so notebooks are validated cell by cell.
+        let parsed =
+            parse_unchecked_source(source_kind, source_type, target_version.parser_version());
         let locator = Locator::new(source_kind.source_code());
         let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
         let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
