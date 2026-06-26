@@ -175,6 +175,7 @@ impl<'a> SourceMap<'a> {
             label,
             kind,
             highlight_source,
+            is_file_level: _,
         } in annotations
         {
             let (lo, mut hi) = self.span_to_locations(span.clone());
