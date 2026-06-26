@@ -2,14 +2,12 @@
 
 ## Too many positional subpatterns
 
-The diagnostic is emitted when the positional limit comes from a direct, unconditional assignment
-with a statically known fixed-tuple type in the body of a plain class without decorators, explicit
-bases, or an explicit metaclass. A statically missing `__match_args__` has a limit of zero;
-match-self builtins such as `int` have a limit of one.
+The diagnostic is emitted when the positional limit comes from a direct, unconditional tuple literal
+in the body of a plain class without decorators, explicit bases, or an explicit metaclass. A
+statically missing `__match_args__` has a limit of zero; match-self builtins such as `int` have a
+limit of one.
 
 ```py
-from typing import Literal
-
 class Point:
     __match_args__ = ("x", "y")
 
@@ -28,20 +26,6 @@ class AnnotationOnly:
 class AnnotatedBinding:
     __match_args__: tuple[str] = ("x",)
 
-args = ("x",)
-
-class FromVariable:
-    __match_args__ = args
-
-def make_args() -> tuple[Literal["x"]]:
-    return ("x",)
-
-class FromCall:
-    __match_args__ = make_args()
-
-class FixedTupleAnnotation:
-    __match_args__: tuple[Literal["x"]] = make_args()
-
 def describe(
     point: Point,
     missing: Missing,
@@ -49,9 +33,6 @@ def describe(
     reassigned: Reassigned,
     annotation_only: AnnotationOnly,
     annotated_binding: AnnotatedBinding,
-    from_variable: FromVariable,
-    from_call: FromCall,
-    fixed_tuple_annotation: FixedTupleAnnotation,
     integer: int,
 ) -> None:
     match point:
@@ -83,18 +64,6 @@ def describe(
         case AnnotatedBinding(_, _):  # error: [invalid-match-pattern] "expected 1, got 2"
             pass
 
-    match from_variable:
-        case FromVariable(_, _):  # error: [invalid-match-pattern] "expected 1, got 2"
-            pass
-
-    match from_call:
-        case FromCall(_, _):  # error: [invalid-match-pattern] "expected 1, got 2"
-            pass
-
-    match fixed_tuple_annotation:
-        case FixedTupleAnnotation(_, _):  # error: [invalid-match-pattern] "expected 1, got 2"
-            pass
-
     match integer:
         case int(_):
             pass
@@ -119,8 +88,7 @@ def describe(value: InvalidElement) -> None:
 
 ## Invalid `__match_args__` type
 
-A direct, unconditional assignment of a statically non-tuple value is invalid whenever a positional
-subpattern is used.
+A direct, unconditional list or string literal is invalid whenever a positional subpattern is used.
 
 ```py
 from typing_extensions import LiteralString
@@ -268,8 +236,9 @@ def describe(model: Model, data_model: DataModel) -> None:
 
 The diagnostic does not attempt to model alternate runtime states or infer exact runtime values from
 declarations. Decorated classes, classes with explicit bases or metaclasses, inherited, metaclass,
-or synthesized values, conditional bindings, unions that may contain tuples, variadic tuples, tuple
-subclasses, and invalid tuple elements are deliberately left undiagnosed.
+or synthesized values, indirect or conditional bindings, pattern aliases, unions that may contain
+tuples, variadic tuples, tuple subclasses, and invalid tuple elements are deliberately left
+undiagnosed.
 
 ```toml
 [environment]
@@ -311,6 +280,20 @@ class SeparateAnnotationAndBinding:
     __match_args__: tuple[Literal["x"]]
     __match_args__ = ("x",)
 
+args = ("x",)
+
+class AssignedName:
+    __match_args__ = args
+
+def make_args() -> tuple[Literal["x"]]:
+    return ("x",)
+
+class FromCall:
+    __match_args__ = make_args()
+
+class FixedTupleAnnotation:
+    __match_args__: tuple[Literal["x"]] = make_args()
+
 class Conditional:
     if flag:
         __match_args__ = ("x",)
@@ -330,6 +313,27 @@ class RuntimeOnly:
 class InvalidElementValue:
     __match_args__ = (1,)
 
+if TYPE_CHECKING:
+    runtime_args = ()
+else:
+    runtime_args = ("x",)
+
+class RuntimeValue:
+    __match_args__ = runtime_args
+
+class StaticModel: ...
+
+class RuntimeModel:
+    __match_args__ = ("value",)
+
+if TYPE_CHECKING:
+    PatternModel = StaticModel
+else:
+    PatternModel = RuntimeModel
+
+class Slotted:
+    __slots__ = ("__match_args__",)
+
 def describe(subject: object) -> None:
     match subject:
         case Decorated(_, _):
@@ -346,6 +350,12 @@ def describe(subject: object) -> None:
             pass
         case SeparateAnnotationAndBinding(_, _):
             pass
+        case AssignedName(_, _):
+            pass
+        case FromCall(_, _):
+            pass
+        case FixedTupleAnnotation(_, _):
+            pass
         case Conditional(_, _):
             pass
         case TypeCheckingOnly(_, _):
@@ -355,6 +365,12 @@ def describe(subject: object) -> None:
         case RuntimeOnly(_, _):
             pass
         case InvalidElementValue(_):
+            pass
+        case RuntimeValue(_):
+            pass
+        case PatternModel(_):
+            pass
+        case Slotted(_):
             pass
 ```
 

@@ -362,6 +362,13 @@ pub(crate) enum ClassPatternPositionalResult<'db> {
     InvalidType(Type<'db>),
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, salsa::Update)]
+enum DirectMatchArgsBinding {
+    AnnotationOnly,
+    TupleLiteral,
+    InvalidLiteral,
+}
+
 /// Validate positional subpatterns when the result is independent of runtime control flow.
 ///
 /// This intentionally supports match-self builtins, statically absent `__match_args__` attributes,
@@ -387,7 +394,7 @@ pub(crate) fn class_pattern_positional_result<'db>(
     };
 
     let Place::Defined(place) = Type::ClassLiteral(class).member(db, "__match_args__").place else {
-        if has_local_binding() {
+        if has_local_binding() || class_defines_match_args_slot(db, class) {
             return None;
         }
         return if class.known(db).is_some() && class_has_match_self_flag(db, class) {
@@ -404,27 +411,48 @@ pub(crate) fn class_pattern_positional_result<'db>(
         return None;
     }
     let definition = place.provenance.definition()?;
-    if !definition_is_unconditional_match_args_binding(db, definition) {
+    let binding = direct_match_args_binding(db, definition)?;
+    if binding == DirectMatchArgsBinding::AnnotationOnly {
         return (!has_local_binding()).then_some(ClassPatternPositionalResult::Limit(0));
     }
     let match_args = binding_type(db, definition);
-    if match_args
-        .try_call_dunder_get(db, None, Type::ClassLiteral(class))
-        .is_some()
-    {
-        return None;
-    }
 
-    if let Some(tuple) = match_args.exact_tuple_instance_spec(db) {
-        tuple
+    match binding {
+        DirectMatchArgsBinding::TupleLiteral => match_args
+            .exact_tuple_instance_spec(db)?
             .as_fixed_length()
             .map(super::tuple::FixedLengthTuple::len)
-            .map(ClassPatternPositionalResult::Limit)
-    } else if match_args.is_disjoint_from(db, Type::homogeneous_tuple(db, Type::unknown())) {
-        Some(ClassPatternPositionalResult::InvalidType(match_args))
-    } else {
-        None
+            .map(ClassPatternPositionalResult::Limit),
+        DirectMatchArgsBinding::InvalidLiteral => match_args
+            .is_disjoint_from(db, Type::homogeneous_tuple(db, Type::unknown()))
+            .then_some(ClassPatternPositionalResult::InvalidType(match_args)),
+        DirectMatchArgsBinding::AnnotationOnly => None,
     }
+}
+
+fn class_defines_match_args_slot(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+    let Some(slots) = Type::ClassLiteral(class)
+        .member(db, "__slots__")
+        .place
+        .raw_type()
+    else {
+        return false;
+    };
+    if slots
+        .as_string_literal()
+        .is_some_and(|literal| literal.value(db) == "__match_args__")
+    {
+        return true;
+    }
+    slots.exact_tuple_instance_spec(db).is_some_and(|tuple| {
+        tuple.as_fixed_length().is_some_and(|tuple| {
+            tuple.elements_slice().iter().any(|element| {
+                element
+                    .as_string_literal()
+                    .is_some_and(|literal| literal.value(db) == "__match_args__")
+            })
+        })
+    })
 }
 
 #[salsa::tracked]
@@ -461,34 +489,51 @@ fn class_is_plain_dataclass_without_match_args(db: &dyn Db, class: StaticClassLi
         && class.find_dataclass_decorator_position(db) == Some(0)
 }
 
-/// Keep syntax inspection behind a tracked boundary so consumers depend only on this result.
+/// Classify only direct literals whose runtime tuple-ness is independent of static type flow.
 #[salsa::tracked]
-fn definition_is_unconditional_match_args_binding<'db>(
+fn direct_match_args_binding<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-) -> bool {
+) -> Option<DirectMatchArgsBinding> {
     let file = definition.file(db);
     let module = parsed_module(db, file).load(db);
     let scope = definition.scope(db);
-    let has_runtime_binding = match definition.kind(db) {
-        DefinitionKind::Assignment(_) => true,
-        DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(&module).is_some(),
-        _ => false,
+    let symbol_id = definition.place(db).as_symbol()?;
+    if place_table(db, scope).symbol(symbol_id).name() != "__match_args__" {
+        return None;
+    }
+    let value = match definition.kind(db) {
+        DefinitionKind::Assignment(assignment) => assignment.value(&module),
+        DefinitionKind::AnnotatedAssignment(assignment) => {
+            let Some(value) = assignment.value(&module) else {
+                return Some(DirectMatchArgsBinding::AnnotationOnly);
+            };
+            value
+        }
+        _ => return None,
+    };
+    let binding = match value {
+        ast::Expr::Tuple(tuple)
+            if tuple
+                .elts
+                .iter()
+                .all(|element| !matches!(element, ast::Expr::Starred(_))) =>
+        {
+            DirectMatchArgsBinding::TupleLiteral
+        }
+        ast::Expr::List(_) | ast::Expr::StringLiteral(_) => DirectMatchArgsBinding::InvalidLiteral,
+        _ => return None,
     };
 
-    if !has_runtime_binding
-        || file.is_stub(db)
+    if file.is_stub(db)
         || semantic_index(db, file).is_in_type_checking_block(
             scope.file_scope_id(db),
             definition.full_range(db, &module).range(),
         )
     {
-        return false;
+        return None;
     }
 
-    let Some(symbol_id) = definition.place(db).as_symbol() else {
-        return false;
-    };
     use_def_map(db, scope)
         .end_of_scope_symbol_bindings(symbol_id)
         .any(|binding| {
@@ -497,6 +542,7 @@ fn definition_is_unconditional_match_args_binding<'db>(
                 .is_defined_and(|candidate| candidate == definition)
                 && binding.reachability_constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE
         })
+        .then_some(binding)
 }
 
 /// Resolve the value supplied to each positional subpattern, preserving source order and length.

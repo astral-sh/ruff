@@ -77,6 +77,7 @@ use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, bind_typevar,
     enclosing_binding_contexts,
 };
+use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::builder::typed_dict::TypedDictConstructorForm;
@@ -110,7 +111,7 @@ use crate::types::{
     extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
     is_discarded_dict_key_assignment, todo_type,
 };
-use crate::{AnalysisSettings, Db, FxIndexSet, Program};
+use crate::{AnalysisSettings, Db, FxIndexSet, Program, SemanticModel};
 use ty_python_core::ast_ids::ScopedUseId;
 use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
@@ -2442,6 +2443,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .insert(self, ty);
     }
 
+    fn pattern_class_is_direct_definition(
+        &self,
+        pattern_cls: &ast::Expr,
+        class: ClassLiteral<'db>,
+    ) -> bool {
+        let Some(static_class) = class.as_static() else {
+            return false;
+        };
+        let ast::Expr::Name(name) = pattern_cls else {
+            return false;
+        };
+        let model = SemanticModel::new(self.db(), self.file());
+        definition_for_name(&model, name, ImportAliasResolution::ResolveAliases)
+            .is_some_and(|definition| definition == static_class.definition(self.db()))
+    }
+
     fn validate_class_pattern(&mut self, pattern: &ast::PatternMatchClass, cls_ty: Type<'db>) {
         if let Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) = cls_ty {
             if let Some(first_excess_pattern) = pattern.arguments.patterns.first() {
@@ -2474,6 +2491,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let positional_patterns = &pattern.arguments.patterns;
             if !positional_patterns.is_empty()
+                && self.pattern_class_is_direct_definition(&pattern.cls, class)
                 && let Some(result) = class_pattern_positional_result(self.db(), class)
             {
                 match result {
