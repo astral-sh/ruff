@@ -1779,37 +1779,43 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         false
     }
 
+    fn mapping_pattern_key_types(&self, kind: &MappingPatternPredicateKind<'db>) -> Vec<Type<'db>> {
+        kind.entries
+            .iter()
+            .map(|entry| {
+                infer_same_file_expression_type(self.db, entry.key, TypeContext::default())
+            })
+            .collect()
+    }
+
+    fn mapping_pattern_arm(
+        &self,
+        subject_ty: Type<'db>,
+        key_types: &[Type<'db>],
+    ) -> Option<(Type<'db>, Vec<Type<'db>>)> {
+        let narrowed_subject_ty = self.intersect_types(subject_ty, mapping_pattern_type(self.db));
+        if narrowed_subject_ty.is_never() {
+            return None;
+        }
+        let value_types = key_types
+            .iter()
+            .map(|key_ty| self.mapping_pattern_value_type_for_arm(narrowed_subject_ty, *key_ty))
+            .collect::<Option<Vec<_>>>()?;
+        Some((narrowed_subject_ty, value_types))
+    }
+
     fn analyze_successful_mapping_pattern(
         &self,
         kind: &MappingPatternPredicateKind<'db>,
         subject_ty: Type<'db>,
     ) -> PatternSuccessResult<'db> {
-        let key_types: Vec<_> = kind
-            .entries
-            .iter()
-            .map(|entry| {
-                infer_same_file_expression_type(self.db, entry.key, TypeContext::default())
-            })
-            .collect();
+        let key_types = self.mapping_pattern_key_types(kind);
         self.analyze_pattern_subject_arms(
             subject_ty,
             OriginalSubjectPreservation::EquivalentTypes,
             |analyzer, _, subject_ty| {
-                let narrowed_subject_ty =
-                    analyzer.intersect_types(subject_ty, mapping_pattern_type(analyzer.db));
-                if narrowed_subject_ty.is_never() {
-                    return None;
-                }
-
-                let value_types: Option<Vec<_>> = kind
-                    .entries
-                    .iter()
-                    .zip(&key_types)
-                    .map(|(_, key_ty)| {
-                        analyzer.mapping_pattern_value_type_for_arm(subject_ty, *key_ty)
-                    })
-                    .collect();
-                let value_types = value_types?;
+                let (narrowed_subject_ty, value_types) =
+                    analyzer.mapping_pattern_arm(subject_ty, &key_types)?;
                 let mut bindings = BTreeMap::new();
                 for (entry, value_ty) in kind.entries.iter().zip(value_types) {
                     let mut child = analyzer.analyze_successful_pattern(&entry.pattern, value_ty);

@@ -1206,6 +1206,12 @@ def test_match_dict_alias_preserves_concrete_type(value: dict[str, int]) -> None
         case {"item": item, **rest} as whole:
             reveal_type(whole)  # revealed: dict[str, int]
 
+def test_match_object_mapping_capture(value: object) -> None:
+    match value:
+        case {"item": item}:
+            reveal_type(item)  # revealed: object
+            item.missing  # error: [unresolved-attribute]
+
 class CustomGet(Mapping[str, int | str]):
     def __getitem__(self, key: str) -> int:
         return 1
@@ -2220,7 +2226,8 @@ def match_named_expression_subject_capture(value: tuple[int]) -> None:
 
 Pattern captures can affect the type of a later match subject, including through a loop or a
 function defined before the capture. Direct, sequence, class, and match-self captures resolve to a
-concrete type. A mapping capture conservatively retains `Unknown` from cycle recovery.
+concrete type. A mapping capture from a recursive subject widens to `object` through the guaranteed
+mapping interface.
 
 ```py
 def match_loop_carried_capture(flag: bool, x: int) -> None:
@@ -2251,7 +2258,7 @@ def match_loop_carried_mapping_capture(flag: bool) -> None:
     while flag:
         match x:
             case {"value": x}:
-                reveal_type(x)  # revealed: int | Unknown
+                reveal_type(x)  # revealed: object
 
 def match_loop_carried_match_self_capture(flag: bool, x: int) -> None:
     while flag:
