@@ -31,6 +31,7 @@ def describe(
     annotation_only: AnnotationOnly,
     annotated_binding: AnnotatedBinding,
     integer: int,
+    complex_number: complex,
 ) -> None:
     match point:
         case Point(_, _):
@@ -63,6 +64,10 @@ def describe(
 
     match integer:
         case int(_, _):  # error: [invalid-match-pattern] "expected 1, got 2"
+            pass
+
+    match complex_number:
+        case complex(_):  # error: [invalid-match-pattern] "expected 0, got 1"
             pass
 ```
 

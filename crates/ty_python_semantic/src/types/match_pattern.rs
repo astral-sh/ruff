@@ -2,6 +2,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
+use ty_module_resolver::{KnownModule, file_to_module};
 use ty_python_core::Truthiness;
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -388,6 +389,9 @@ pub(crate) fn class_pattern_positional_result<'db>(
         && !static_class.has_explicit_metaclass(db)
         && !class_has_keyword_unpack(db, static_class);
     let is_stub = static_class.body_scope(db).file(db).is_stub(db);
+    let is_known_builtin = class.known(db).is_some()
+        && file_to_module(db, static_class.body_scope(db).file(db))
+            .is_some_and(|module| module.is_known(db, KnownModule::Builtins));
     let has_local_binding = |name| {
         let places = place_table(db, static_class.body_scope(db));
         places
@@ -399,8 +403,10 @@ pub(crate) fn class_pattern_positional_result<'db>(
         if has_local_binding("__match_args__") || has_local_binding("__slots__") {
             return None;
         }
-        return if class.known(db).is_some() && class_has_match_self_flag(db, class) {
-            Some(ClassPatternPositionalResult::Limit(1))
+        return if is_known_builtin {
+            Some(ClassPatternPositionalResult::Limit(usize::from(
+                class_has_match_self_flag(db, class),
+            )))
         } else if is_stub {
             None
         } else if is_plain_class || class_is_plain_dataclass_without_match_args(db, static_class) {
