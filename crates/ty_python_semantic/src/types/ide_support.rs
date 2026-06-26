@@ -2353,9 +2353,6 @@ mod resolve_definition {
         let component = match definition.kind(db) {
             DefinitionKind::Function(func) => func.node(parsed).name.as_str(),
             DefinitionKind::Class(class) => class.node(parsed).name.as_str(),
-            // Attribute and module-level variable definitions whose target is a simple name. The
-            // down-walk resolves that name in the real file's matching scope, so complex targets
-            // (tuple unpacking, `self.x = ...`, subscripts) can't be mapped and fall through below.
             DefinitionKind::Assignment(assignment) => {
                 let ast::Expr::Name(name) = assignment.target(parsed) else {
                     return Err(());
