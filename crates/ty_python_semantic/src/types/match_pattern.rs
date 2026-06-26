@@ -490,15 +490,17 @@ fn class_is_plain_dataclass_without_match_args(db: &dyn Db, class: StaticClassLi
     {
         return false;
     }
-    binding
-        .binding
-        .definition()
-        .is_some_and(|definition| definition_is_unconditional_runtime_binding(db, definition))
+    binding.binding.definition().is_some_and(|definition| {
+        definition_is_unique_unconditional_runtime_binding(db, definition)
+    })
 }
 
 /// Return whether a definition is the sole unconditional runtime binding for its symbol.
 #[salsa::tracked]
-fn definition_is_unconditional_runtime_binding(db: &dyn Db, definition: Definition<'_>) -> bool {
+pub(crate) fn definition_is_unique_unconditional_runtime_binding(
+    db: &dyn Db,
+    definition: Definition<'_>,
+) -> bool {
     let file = definition.file(db);
     let module = parsed_module(db, file).load(db);
     let scope = definition.scope(db);
@@ -514,7 +516,24 @@ fn definition_is_unconditional_runtime_binding(db: &dyn Db, definition: Definiti
         return false;
     }
 
-    use_def_map(db, scope)
+    let use_def = use_def_map(db, scope);
+    if use_def
+        .all_definitions_with_usage()
+        .filter_map(|(_, state, _)| state.definition())
+        .filter(|candidate| candidate.place(db) == definition.place(db))
+        .filter(|candidate| {
+            candidate
+                .kind(db)
+                .category(file.is_stub(db), &module)
+                .is_binding()
+        })
+        .count()
+        != 1
+    {
+        return false;
+    }
+
+    use_def
         .end_of_scope_symbol_bindings(symbol_id)
         .any(|binding| {
             binding
@@ -560,7 +579,7 @@ fn direct_match_args_binding<'db>(
         _ => return None,
     };
 
-    if !definition_is_unconditional_runtime_binding(db, definition) {
+    if !definition_is_unique_unconditional_runtime_binding(db, definition) {
         return None;
     }
     Some(binding)

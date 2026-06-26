@@ -18,10 +18,6 @@ class Missing: ...
 class Empty:
     __match_args__ = ()
 
-class Reassigned:
-    __match_args__ = ("x",)
-    __match_args__ = ("x", "y")
-
 class AnnotationOnly:
     __match_args__: tuple[str]
 
@@ -32,7 +28,6 @@ def describe(
     point: Point,
     missing: Missing,
     empty: Empty,
-    reassigned: Reassigned,
     annotation_only: AnnotationOnly,
     annotated_binding: AnnotatedBinding,
     integer: int,
@@ -52,10 +47,6 @@ def describe(
 
     match empty:
         case Empty(_):  # error: [invalid-match-pattern] "expected 0, got 1"
-            pass
-
-    match reassigned:
-        case Reassigned(_, _, _):  # error: [invalid-match-pattern] "expected 2, got 3"
             pass
 
     match annotation_only:
@@ -323,6 +314,38 @@ def describe(model: Model) -> None:
             pass
 ```
 
+## Runtime-only rebindings
+
+A runtime-only assignment can replace either the pattern class or its `__match_args__` value. The
+diagnostic does not rely on the type-checking control-flow graph when either symbol has another
+binding.
+
+```py
+from typing import TYPE_CHECKING
+
+class Model: ...
+
+class RuntimeModel:
+    __match_args__ = ("value",)
+
+if not TYPE_CHECKING:
+    Model = RuntimeModel
+
+class RuntimeMatchArgs:
+    __match_args__ = ()
+
+    if not TYPE_CHECKING:
+        __match_args__ = ("value",)
+
+def describe(model: Model, runtime_match_args: RuntimeMatchArgs) -> None:
+    match model:
+        case Model(_):
+            pass
+    match runtime_match_args:
+        case RuntimeMatchArgs(_):
+            pass
+```
+
 ## Synthesized slot descriptors
 
 A local `__slots__` declaration may synthesize a `__match_args__` descriptor. The diagnostic does
@@ -401,6 +424,10 @@ class SeparateAnnotationAndBinding:
     __match_args__: tuple[Literal["x"]]
     __match_args__ = ("x",)
 
+class Reassigned:
+    __match_args__ = ("x",)
+    __match_args__ = ("x", "y")
+
 args = ("x",)
 
 class AssignedName:
@@ -467,6 +494,8 @@ def describe(subject: object) -> None:
         case MatchSelfSubclass(_, _):
             pass
         case SeparateAnnotationAndBinding(_, _):
+            pass
+        case Reassigned(_, _, _):
             pass
         case AssignedName(_, _):
             pass

@@ -86,7 +86,10 @@ use crate::types::infer::{
     TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
     nearest_enclosing_function, original_class_type,
 };
-use crate::types::match_pattern::{ClassPatternPositionalResult, class_pattern_positional_result};
+use crate::types::match_pattern::{
+    ClassPatternPositionalResult, class_pattern_positional_result,
+    definition_is_unique_unconditional_runtime_binding,
+};
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::narrow::pattern_success_types;
 use crate::types::newtype::NewType;
@@ -2470,8 +2473,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let model = SemanticModel::new(self.db(), self.file());
-        definition_for_name(&model, name, ImportAliasResolution::ResolveAliases)
-            .is_some_and(|definition| definition == static_class.definition(self.db()))
+        definition_for_name(&model, name, ImportAliasResolution::ResolveAliases).is_some_and(
+            |definition| {
+                definition == static_class.definition(self.db())
+                    && (definition.file(self.db()) != self.file()
+                        || definition_is_unique_unconditional_runtime_binding(
+                            self.db(),
+                            definition,
+                        ))
+            },
+        )
     }
 
     fn validate_class_pattern(&mut self, pattern: &ast::PatternMatchClass, cls_ty: Type<'db>) {
