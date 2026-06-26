@@ -17,7 +17,7 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::{fmt, sync::Arc};
 
-use annotate_snippets::{Level, Renderer, Snippet};
+use annotate_snippets::{AnnotationKind, Level, Renderer, Snippet};
 use camino::Utf8Component;
 use indexmap::IndexSet;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
@@ -1405,7 +1405,7 @@ fn display_error(
     let start_offset = source.line_start(start_index);
     let end_offset = source.line_end(end_index);
 
-    let mut annotation = Level::Error.span((setting_range - start_offset).into());
+    let mut annotation = AnnotationKind::Primary.span((setting_range - start_offset).into());
 
     if let Some(secondary_message) = secondary_message {
         annotation = annotation.label(secondary_message);
@@ -1416,7 +1416,10 @@ fn display_error(
         .line_start(start_index.get())
         .fold(false);
 
-    let message = Level::None.title(&primary_message).snippet(snippet);
+    let message = Level::ERROR
+        .no_name()
+        .primary_title(&primary_message)
+        .element(snippet);
 
     let renderer = if colored::control::SHOULD_COLORIZE.should_colorize() {
         Renderer::styled()
@@ -1425,7 +1428,7 @@ fn display_error(
     };
     let renderer = renderer.cut_indicator("…");
 
-    writeln!(f, "{}", renderer.render(message))
+    writeln!(f, "{}", renderer.render(&[message]))
 }
 
 /// The various ways in which parsing a `pyvenv.cfg` file could fail

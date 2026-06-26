@@ -48,7 +48,7 @@ impl<'a> FullRenderer<'a> {
             .info(stylesheet.info)
             .note(stylesheet.note)
             .help(stylesheet.help)
-            .line_no(stylesheet.line_no)
+            .line_num(stylesheet.line_no)
             .emphasis(stylesheet.emphasis)
             .none(stylesheet.none)
             .hyperlink(stylesheet.hyperlink);
@@ -61,7 +61,7 @@ impl<'a> FullRenderer<'a> {
             let resolved = Resolved::new(self.resolver, diag, self.config);
             let renderable = resolved.to_renderable(self.config);
             for diag in renderable.diagnostics.iter() {
-                writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
+                writeln!(f, "{}", renderer.render(&[diag.to_annotate()]))?;
             }
 
             if self.config.show_fix_diff
