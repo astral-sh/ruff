@@ -913,6 +913,102 @@ def funcmod(x: int) -> int:
     return x
 ```
 
+## Re-export Nameclash Problems From Star Import After Conditional Raise
+
+A star import should similarly overwrite the submodule attribute if the name is included in the
+submodule's `__all__`.
+
+`star_import/__init__.py`:
+
+```py
+def should_raise() -> bool:
+    return True
+
+if should_raise():
+    raise RuntimeError
+
+from .funcmod import *
+
+reveal_type(funcmod)  # revealed: def funcmod(x: int) -> int
+
+def run():
+    reveal_type(funcmod)  # revealed: def funcmod(x: int) -> int
+    funcmod(1)
+```
+
+`star_import/funcmod.py`:
+
+```py
+__all__ = ["funcmod"]
+
+def funcmod(x: int) -> int:
+    return x
+```
+
+A name that is not included in `__all__` does not shadow the implicit submodule binding.
+
+`not_exported/__init__.py`:
+
+```py
+def should_raise() -> bool:
+    return True
+
+if should_raise():
+    raise RuntimeError
+
+from .funcmod import *
+
+def run():
+    reveal_type(funcmod)  # revealed: <module 'not_exported.funcmod'>
+```
+
+`not_exported/funcmod.py`:
+
+```py
+__all__ = ["funcmod"]
+__all__.remove("funcmod")
+
+def funcmod(x: int) -> int:
+    return x
+```
+
+The semantic `__all__` analysis uses type inference to determine whether conditional mutations are
+executed. The syntax-only analysis must conservatively preserve the implicit submodule binding here,
+while the semantic analysis determines that `should_remove()` is always true and that `funcmod` is
+not exported.
+
+`conditionally_not_exported/__init__.py`:
+
+```py
+def should_raise() -> bool:
+    return True
+
+if should_raise():
+    raise RuntimeError
+
+from .funcmod import *
+
+def run():
+    reveal_type(funcmod)  # revealed: <module 'conditionally_not_exported.funcmod'>
+```
+
+`conditionally_not_exported/funcmod.py`:
+
+```py
+from typing import Literal
+
+__all__ = ["funcmod"]
+
+def should_remove() -> Literal[True]:
+    return True
+
+if should_remove():
+    __all__.remove("funcmod")
+
+def funcmod(x: int) -> int:
+    return x
+```
+
 ## Re-export Nameclash Problems In Try-Blocks
 
 `from` imports in an `__init__.py` at file scope in a `try` block should be visible to functions
