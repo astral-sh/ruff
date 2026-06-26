@@ -93,6 +93,42 @@ def describe(missing: Missing, integer: int, complex_number: complex) -> None:
             pass
 ```
 
+## Reviewed regression cases
+
+These cases directly cover the `LiteralString` and dataclass behavior identified during review.
+
+```py
+from dataclasses import dataclass
+from typing_extensions import LiteralString
+
+class Position:
+    __match_args__: LiteralString = "field"
+
+@dataclass
+class Point:
+    x: int
+    y: int
+
+@dataclass(match_args=False)
+class NoMatch:
+    x: int
+    y: int
+
+def describe(position: Position, point: Point, no_match: NoMatch) -> None:
+    match position:
+        # error: [invalid-match-pattern] "must be an exact tuple, not `LiteralString`"
+        case Position(_, _):
+            pass
+
+    match point:
+        case Point(_, _, _):  # error: [invalid-match-pattern] "expected 2, got 3"
+            pass
+
+    match no_match:
+        case NoMatch(_, _):  # error: [invalid-match-pattern] "expected 0, got 2"
+            pass
+```
+
 ## Invalid `__match_args__` type
 
 A definitely non-tuple `__match_args__` type cannot support positional subpatterns.
