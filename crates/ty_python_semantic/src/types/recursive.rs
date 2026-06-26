@@ -180,7 +180,7 @@ impl<'db> RecursiveType<'db> {
         body.apply_type_mapping(db, &mapping, TypeContext::default())
     }
 
-    fn unfold(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn unfold(self, db: &'db dyn Db) -> Type<'db> {
         let body = self.body(db);
         let replacement = self.unfold_replacement(db);
         let mapping = TypeMapping::ReplaceDivergent {

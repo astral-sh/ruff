@@ -141,6 +141,7 @@ impl<'db> Type<'db> {
     /// Return `true` if `self` is a nominal instance of the given known class.
     pub(crate) fn is_instance_of(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         match self {
+            Type::Recursive(recursive) => recursive.body(db).is_instance_of(db, known_class),
             Type::NominalInstance(instance) => instance.class(db).is_known(db, known_class),
             _ => false,
         }

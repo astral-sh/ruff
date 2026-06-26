@@ -1424,8 +1424,13 @@ impl<'db> Type<'db> {
     }
 
     fn is_enum(&self, db: &'db dyn Db) -> bool {
-        self.as_nominal_instance()
-            .is_some_and(|instance| enum_metadata(db, instance.class_literal(db)).is_some())
+        match self {
+            Type::Recursive(recursive) => recursive.body(db).is_enum(db),
+            Type::NominalInstance(instance) => {
+                enum_metadata(db, instance.class_literal(db)).is_some()
+            }
+            _ => false,
+        }
     }
 
     fn is_typealias_special_form(&self) -> bool {
@@ -1599,16 +1604,6 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         expected_class: StaticClassLiteral<'_>,
     ) -> Option<Specialization<'db>> {
-        if let Type::Recursive(recursive) = self {
-            return if recursive.is_non_contractive(db) {
-                None
-            } else {
-                recursive.map(db, |unfolded| {
-                    unfolded.specialization_of(db, expected_class)
-                })
-            };
-        }
-
         self.nominal_class(db)?
             .static_class_literal(db)
             .filter(|(class_literal, _)| *class_literal == expected_class)
@@ -1620,14 +1615,6 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
     ) -> Option<(StaticClassLiteral<'db>, Specialization<'db>)> {
-        if let Type::Recursive(recursive) = self {
-            return if recursive.is_non_contractive(db) {
-                None
-            } else {
-                recursive.map(db, |unfolded| unfolded.class_specialization(db))
-            };
-        }
-
         self.nominal_class(db)?
             .static_class_literal(db)
             .and_then(|(class_literal, specialization)| Some((class_literal, specialization?)))
@@ -1639,6 +1626,9 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance) => Some(instance.class(db)),
             Type::ProtocolInstance(instance) => instance.to_nominal_instance().map(|i| i.class(db)),
             Type::TypeAlias(alias) => alias.value_type(db).nominal_class(db),
+            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
+                recursive.unfold(db).nominal_class(db)
+            }
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).nominal_class(db),
             Type::TypeVar(typevar) => {
                 let TypeVarBoundOrConstraints::UpperBound(bound) =
@@ -1694,8 +1684,14 @@ impl<'db> Type<'db> {
     /// I.e., for the type `tuple[int, str]`, this will return the tuple spec `[int, str]`.
     /// For a subclass of `tuple[int, str]`, it will return the same tuple spec.
     fn tuple_instance_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
-        self.as_nominal_instance()
-            .and_then(|instance| instance.tuple_spec(db))
+        match self {
+            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
+                recursive.map(db, |unfolded| unfolded.tuple_instance_spec(db))
+            }
+            _ => self
+                .as_nominal_instance()
+                .and_then(|instance| instance.tuple_spec(db)),
+        }
     }
 
     /// If this type is an *exact* tuple type (*not* a subclass of `tuple`), returns the
@@ -1709,8 +1705,14 @@ impl<'db> Type<'db> {
     /// I.e., for the type `tuple[int, str]`, this will return the tuple spec `[int, str]`.
     /// But for a subclass of `tuple[int, str]`, it will return `None`.
     fn exact_tuple_instance_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
-        self.as_nominal_instance()
-            .and_then(|instance| instance.own_tuple_spec(db))
+        match self {
+            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
+                recursive.map(db, |unfolded| unfolded.exact_tuple_instance_spec(db))
+            }
+            _ => self
+                .as_nominal_instance()
+                .and_then(|instance| instance.own_tuple_spec(db)),
+        }
     }
 
     /// Returns the materialization of this type depending on the given `variance`.
@@ -1869,6 +1871,9 @@ impl<'db> Type<'db> {
     /// unspecialized generic class literal.
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         match self {
+            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
+                recursive.unfold(db).to_class_type(db)
+            }
             Type::ClassLiteral(class_literal) => Some(class_literal.default_specialization(db)),
             Type::GenericAlias(alias) => Some(ClassType::Generic(alias)),
             _ => None,
@@ -1917,6 +1922,7 @@ impl<'db> Type<'db> {
     /// "real" intersection.)
     pub(crate) fn is_nontrivial_intersection(self, db: &'db dyn Db) -> bool {
         match self {
+            Type::Recursive(recursive) => recursive.body(db).is_nontrivial_intersection(db),
             Type::Intersection(intersection) => !intersection.is_simple_negation(db),
             _ => false,
         }
@@ -2242,10 +2248,12 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         f: impl FnMut(&Type<'db>) -> bool,
     ) -> Type<'db> {
-        if let Type::Union(union) = self.resolve_type_alias(db) {
-            union.filter(db, f)
-        } else {
-            self
+        match self.resolve_type_alias(db) {
+            Type::Union(union) => union.filter(db, f),
+            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
+                recursive.map(db, |unfolded| unfolded.filter_union(db, f))
+            }
+            _ => self,
         }
     }
 
@@ -2258,16 +2266,6 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> Type<'db> {
-        if let Type::Recursive(recursive) = self.resolve_type_alias(db) {
-            return if recursive.is_non_contractive(db) {
-                self
-            } else {
-                recursive.map(db, |unfolded| {
-                    unfolded.filter_disjoint_elements(db, target, inferable)
-                })
-            };
-        }
-
         let constraints = ConstraintSetBuilder::new();
         self.filter_union(db, |elem| {
             !elem
@@ -2284,6 +2282,8 @@ impl<'db> Type<'db> {
         // into what's included vs not; this is just an empirical choice that makes our ecosystem
         // report look better until we have proper bidirectional type inference.
         match self {
+            // No need to `map` here
+            Type::Recursive(recursive) => recursive.body(db).literal_fallback_instance(db),
             Type::ModuleLiteral(_) => Some(KnownClass::ModuleType.to_instance(db)),
             Type::FunctionLiteral(_) => Some(KnownClass::FunctionType.to_instance(db)),
             Type::LiteralValue(literal) => Some(literal.fallback_instance(db)),
@@ -2339,6 +2339,9 @@ impl<'db> Type<'db> {
         match self {
             Type::LiteralValue(literal) if literal.is_promotable() => literal.fallback_instance(db),
             Type::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(db)),
+            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
+                recursive.map(db, |ty| ty.promote_impl(db))
+            }
             _ => self,
         }
     }
@@ -2348,6 +2351,9 @@ impl<'db> Type<'db> {
         match self {
             Type::NominalInstance(instance) if instance.is_singleton(db) => {
                 UnionType::from_two_elements(db, self, Type::unknown())
+            }
+            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
+                recursive.map(db, |ty| ty.promote_singletons_impl(db))
             }
             _ => self,
         }
@@ -2559,6 +2565,11 @@ impl<'db> Type<'db> {
                         });
                     }
                 }
+                Type::Recursive(recursive) => visitor.visit(self, || {
+                    recursive
+                        .body(db)
+                        .visit_specialization_impl(db, polarity, f, visitor);
+                }),
                 _ => {}
             }
 
@@ -5809,8 +5820,7 @@ impl<'db> Type<'db> {
                 }
                 builder.build()
             }
-            Type::Recursive(recursive) if recursive.is_non_contractive(db) => self,
-            Type::Recursive(recursive) => {
+            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
                 recursive.map(db, |unfolded| unfolded.flatten_typevars(db))
             }
             // Don't descend into other types; only flatten top-level typevars.
@@ -7248,6 +7258,7 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn str(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
+            Type::Recursive(recursive) => recursive.body(db).str(db),
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(_) | LiteralValueTypeKind::Bool(_) => self.repr(db),
                 LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => *self,
@@ -7284,6 +7295,7 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn repr(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
+            Type::Recursive(recursive) => recursive.body(db).repr(db),
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(number) => Type::string_literal(db, &number.to_string()),
                 LiteralValueTypeKind::Bool(true) => Type::string_literal(db, "True"),
@@ -7416,10 +7428,10 @@ impl<'db> Type<'db> {
             ) => Type::SpecialForm(SpecialFormType::Todo).definition(db),
             Self::AlwaysTruthy => Type::SpecialForm(SpecialFormType::AlwaysTruthy).definition(db),
             Self::AlwaysFalsy => Type::SpecialForm(SpecialFormType::AlwaysFalsy).definition(db),
+            Self::Recursive(recursive) => recursive.body(db).definition(db),
 
             // These types have no definition
-            Self::Recursive(_)
-            | Self::Dynamic(
+            Self::Dynamic(
                 DynamicType::InvalidConcatenateUnknown | DynamicType::UnspecializedTypeVar,
             )
             | Self::Callable(_)
@@ -7458,6 +7470,7 @@ impl<'db> Type<'db> {
         parameter_index: Option<usize>,
     ) -> Option<(Span, Span)> {
         match self {
+            Type::Recursive(recursive) => recursive.body(db).parameter_span(db, parameter_index),
             Type::FunctionLiteral(function) => Some(function.parameter_span(db, parameter_index)),
             Type::BoundMethod(bound_method) => Some(
                 bound_method
@@ -7487,6 +7500,7 @@ impl<'db> Type<'db> {
     /// a diagnostic.
     fn function_spans(&self, db: &'db dyn Db) -> Option<FunctionSpans> {
         match self {
+            Type::Recursive(recursive) => recursive.body(db).function_spans(db),
             Type::FunctionLiteral(function) => Some(function.spans(db)),
             Type::BoundMethod(bound_method) => Some(bound_method.function(db).spans(db)),
             _ => None,
@@ -7495,6 +7509,7 @@ impl<'db> Type<'db> {
 
     pub(crate) fn generic_origin(self, db: &'db dyn Db) -> Option<StaticClassLiteral<'db>> {
         match self {
+            Type::Recursive(recursive) => recursive.body(db).generic_origin(db),
             Type::GenericAlias(generic) => Some(generic.origin(db)),
             Type::NominalInstance(instance) => {
                 if let ClassType::Generic(generic) = instance.class(db) {
