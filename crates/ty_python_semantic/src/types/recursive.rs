@@ -241,11 +241,17 @@ impl<'db> RecursiveType<'db> {
 
 #[cfg(test)]
 mod tests {
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::DbWithWritableSystem as _;
     use ruff_python_ast as ast;
 
     use super::*;
     use crate::db::tests::setup_db;
-    use crate::types::{CallableType, KnownClass, Parameters, Signature, UnionType, visitor};
+    use crate::place::global_symbol;
+    use crate::types::{
+        CallableType, KnownClass, KnownInstanceType, Parameters, Signature, TypeAliasType,
+        UnionType, visitor,
+    };
 
     #[test]
     fn map_folds_operation_result_back_to_recursive_type() {
@@ -279,6 +285,38 @@ mod tests {
         let unfolded_body = Type::homogeneous_tuple(&db, recursive_ty);
 
         assert_eq!(recursive.fold(&db, unfolded_body), recursive_ty);
+    }
+
+    #[test]
+    fn body_with_origin_marker_restores_explicit_recursive_alias_positions() {
+        let mut db = setup_db();
+        db.write_dedented("/src/a.py", "type RecursiveList = list[RecursiveList]")
+            .unwrap();
+
+        let module = system_path_to_file(&db, "/src/a.py").unwrap();
+        let alias_ty = global_symbol(&db, module, "RecursiveList")
+            .place
+            .expect_type();
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))) =
+            alias_ty
+        else {
+            panic!("expected RecursiveList to be a PEP 695 type alias");
+        };
+        let Type::Recursive(recursive) = alias.value_type(&db) else {
+            panic!("expected RecursiveList to resolve to a recursive type");
+        };
+
+        assert_eq!(
+            recursive.body(&db).display(&db).to_string(),
+            "list[Divergent]"
+        );
+        assert_eq!(
+            recursive
+                .body_with_origin_marker(&db)
+                .display(&db)
+                .to_string(),
+            "list[RecursiveList]"
+        );
     }
 
     #[test]
