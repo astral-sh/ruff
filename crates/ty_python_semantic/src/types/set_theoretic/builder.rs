@@ -1251,7 +1251,7 @@ impl<'db> IntersectionBuilder<'db> {
             }
             Type::Recursive(recursive) if recursive.is_non_contractive(self.db) => {
                 for inner in &mut self.intersections {
-                    inner.positive.insert(ty);
+                    inner.add_positive(self.db, ty);
                 }
                 self
             }
@@ -1328,7 +1328,7 @@ impl<'db> IntersectionBuilder<'db> {
             }
             Type::Recursive(recursive) if recursive.is_non_contractive(self.db) => {
                 for inner in &mut self.intersections {
-                    inner.negative.insert(ty);
+                    inner.add_negative(self.db, ty);
                 }
                 self
             }
@@ -2020,6 +2020,22 @@ mod tests {
             .expect("recursive union body should be union-like");
 
         assert_eq!(union.elements(&db), body_union.elements(&db));
+    }
+
+    #[test]
+    fn non_contractive_recursive_dominates_intersection() {
+        let db = setup_db();
+        let binder_id = salsa::plumbing::Id::from_bits(1);
+        let marker = Type::divergent(binder_id);
+        let recursive = Type::recursive(&db, binder_id, RecursiveOrigin::Implicit, marker);
+
+        let intersection = IntersectionBuilder::new(&db)
+            .add_positive(KnownClass::Bool.to_instance(&db))
+            .add_positive(recursive)
+            .add_negative(Type::AlwaysTruthy)
+            .build();
+
+        assert_eq!(intersection, recursive);
     }
 
     #[test]
