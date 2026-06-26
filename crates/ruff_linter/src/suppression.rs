@@ -69,7 +69,7 @@ pub(crate) struct SuppressionComment {
     /// Ranges containing the lint codes being suppressed
     codes: SmallVec<[TextRange; 2]>,
 
-    /// Range containing the reason for the suppression
+    /// Range containing the reason for the suppression, including leading whitespace.
     reason: TextRange,
 }
 
@@ -77,6 +77,11 @@ impl SuppressionComment {
     /// Return the suppressed codes as strings
     pub(crate) fn codes_as_str<'src>(&self, source: &'src str) -> impl Iterator<Item = &'src str> {
         self.codes.iter().map(|range| source.slice(range))
+    }
+
+    /// Return the content following the suppression directive.
+    pub(crate) fn trailing_content<'src>(&self, source: &'src str) -> &'src str {
+        source.slice(TextRange::new(self.reason.start(), self.token_range.end()))
     }
 
     /// Return whether the comment is nested within a wider comment token.
@@ -1174,8 +1179,6 @@ impl<'src> SuppressionParser<'src> {
             return Err(ParseErrorKind::MissingCodes);
         }
 
-        self.eat_whitespace();
-
         let reason_start = self.offset();
 
         // Consume the comment until its end or until the next "sub-comment" starts.
@@ -1856,7 +1859,7 @@ print('hello')
                         codes: [
                             "foo",
                         ],
-                        reason: "first",
+                        reason: " first",
                     },
                     enable_comment: SuppressionComment {
                         text: "# ruff: enable[foo]",
@@ -1876,7 +1879,7 @@ print('hello')
                         codes: [
                             "foo",
                         ],
-                        reason: "second",
+                        reason: " second",
                     },
                     enable_comment: None,
                 },
@@ -1990,7 +1993,7 @@ def bar():
                         codes: [
                             "delta",
                         ],
-                        reason: "unmatched",
+                        reason: " unmatched",
                     },
                     enable_comment: None,
                 },
@@ -2003,7 +2006,7 @@ def bar():
                         codes: [
                             "zeta",
                         ],
-                        reason: "unmatched",
+                        reason: " unmatched",
                     },
                     enable_comment: None,
                 },
@@ -2017,7 +2020,7 @@ def bar():
                         codes: [
                             "phi",
                         ],
-                        reason: "trailing",
+                        reason: " trailing",
                     },
                 },
                 InvalidSuppression {
@@ -2028,7 +2031,7 @@ def bar():
                         codes: [
                             "zeta",
                         ],
-                        reason: "underindented",
+                        reason: " underindented",
                     },
                 },
             ],
@@ -2696,7 +2699,7 @@ def foo():
                 codes: [
                     "foo",
                 ],
-                reason: "I like bar better",
+                reason: " I like bar better",
             },
         )
         "##,
@@ -2868,7 +2871,7 @@ x = 1 # trailing";
                 .collect::<Vec<_>>(),
             ["foo", "bar"]
         );
-        assert_eq!(source.slice(comment.reason.into()), "hello world");
+        assert_eq!(source.slice(comment.reason.into()), " hello world");
     }
 
     /// Parse a single suppression comment for testing
