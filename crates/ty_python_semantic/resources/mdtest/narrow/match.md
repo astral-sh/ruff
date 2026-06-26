@@ -855,6 +855,7 @@ def test_match_generic_subclass_capture(value: GenericPatternBase[int]) -> None:
 def test_match_nested_generic_subclass_capture(value: GenericPatternBase[int]) -> list[int]:
     match value:
         case GenericPatternChild(items=items):
+            # TODO: This should be `list[int]` once generic subclass specialization is supported.
             reveal_type(items)  # revealed: Unknown
             return items
     return []
@@ -994,18 +995,39 @@ def test_match_ordered_class_alternatives_remove_later_bindings(
 ```
 
 An argumentless class pattern cannot fail after its class check. If it matches the entire subject
-type, a later alternative cannot contribute to the binding:
+type, a later alternative cannot contribute to the binding. When the argumentless pattern comes
+second, an earlier class pattern can still contribute if the subject class is not final because a
+subclass could match both classes. A final subject class rules out that overlap:
 
 ```py
+from typing import final
+
 class DefiniteFirst: ...
 
 class UnreachableLater:
     payload: str
 
+@final
+class FinalDefiniteFirst: ...
+
 def test_definite_class_alternative_removes_later_bindings(value: DefiniteFirst) -> None:
     match value:
         case (DefiniteFirst() as item) | UnreachableLater(payload=item):
             reveal_type(item)  # revealed: DefiniteFirst
+
+def test_later_non_final_class_alternative_preserves_earlier_bindings(
+    value: DefiniteFirst,
+) -> None:
+    match value:
+        case UnreachableLater(payload=item) | (DefiniteFirst() as item):
+            reveal_type(item)  # revealed: str | DefiniteFirst
+
+def test_later_final_class_alternative_removes_earlier_bindings(
+    value: FinalDefiniteFirst,
+) -> None:
+    match value:
+        case UnreachableLater(payload=item) | (FinalDefiniteFirst() as item):
+            reveal_type(item)  # revealed: FinalDefiniteFirst
 ```
 
 ## Positional patterns for built-in classes
@@ -1059,8 +1081,6 @@ class OverlapCaptureA: ...
 class OverlapCaptureB:
     member: int
 
-class OverlapCaptureC(OverlapCaptureA, OverlapCaptureB): ...
-
 def test_match_class_capture_preserves_possible_multiple_inheritance(
     value: OverlapCaptureA,
 ) -> None:
@@ -1074,8 +1094,6 @@ class OverlapMemberA:
 
 class OverlapMemberB:
     member: str
-
-class OverlapMemberC(OverlapMemberA, OverlapMemberB): ...
 
 def test_match_class_capture_combines_overlapping_member_types(
     value: OverlapMemberA,
