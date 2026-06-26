@@ -6250,8 +6250,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // propagation round per inferable type-variable occurrence.
         let mut round = 0;
         let (checked_argument_types, final_round_builder) = 'fixpoint: loop {
-            // Reuse both round buffers; cloning these graphs from scratch is significant for
-            // overloaded and constructor calls.
+            // Reset the argument buffer to the baseline before inferring this round.
             next_argument_types.clone_from(&baseline_argument_types);
             let mut round_builder = self.speculate();
             round_builder.infer_all_argument_types_with_contexts(
@@ -6392,6 +6391,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             });
         }
 
+        let overloads_with_binding: Vec<_> = overloads_with_binding
+            .into_iter()
+            .map(|(overload, binding)| {
+                let specialization = overload.argument_type_context_specialization(
+                    db,
+                    inference_params.constraints,
+                    inference_params.call_expression_tcx,
+                );
+                (overload, binding, specialization)
+            })
+            .collect();
+
         let arguments = (0..argument_types.len())
             .map(|argument_index| {
                 if argument_types.is_variadic(argument_index) {
@@ -6401,35 +6412,44 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let mut seen_binder_types = FxHashSet::default();
                 let paramspec_binder_types = overloads_with_binding
                     .iter()
-                    .filter_map(|(overload, binding)| {
+                    .filter_map(|(overload, binding, _)| {
                         overload.paramspec_binder_parameter_type(db, binding, argument_index)
                     })
                     .filter(|declared_type| seen_binder_types.insert(*declared_type))
                     .collect();
 
-                let parameter_context =
-                    |overload: &'bindings Binding<'db>, binding: &CallableBinding<'db>| {
-                        overload.argument_type_context(
-                            db,
-                            inference_params.constraints,
-                            binding,
-                            argument_types,
-                            argument_index,
-                            inference_params.call_expression_tcx,
-                        )
-                    };
+                let parameter_context = |overload: &'bindings Binding<'db>,
+                                         binding: &CallableBinding<'db>,
+                                         specialization| {
+                    overload.argument_type_context(
+                        db,
+                        inference_params.constraints,
+                        binding,
+                        argument_types,
+                        argument_index,
+                        inference_params.call_expression_tcx,
+                        specialization,
+                    )
+                };
 
-                let parameter_contexts =
-                    if let Ok((overload, binding)) = overloads_with_binding.iter().exactly_one() {
-                        ParameterInferenceContexts::Unique(parameter_context(overload, binding))
-                    } else {
-                        ParameterInferenceContexts::Multiple(
-                            overloads_with_binding
-                                .iter()
-                                .map(|(overload, binding)| parameter_context(overload, binding))
-                                .collect(),
-                        )
-                    };
+                let parameter_contexts = if let Ok((overload, binding, specialization)) =
+                    overloads_with_binding.iter().exactly_one()
+                {
+                    ParameterInferenceContexts::Unique(parameter_context(
+                        overload,
+                        binding,
+                        *specialization,
+                    ))
+                } else {
+                    ParameterInferenceContexts::Multiple(
+                        overloads_with_binding
+                            .iter()
+                            .map(|(overload, binding, specialization)| {
+                                parameter_context(overload, binding, *specialization)
+                            })
+                            .collect(),
+                    )
+                };
 
                 Some(ArgumentInferenceContexts {
                     paramspec_binder_types,

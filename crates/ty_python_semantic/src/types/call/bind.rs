@@ -6316,6 +6316,7 @@ impl<'db> Binding<'db> {
     /// def wrapper[**P, R](func: Callable[P, R], /, *args: P.args) -> R: ...
     /// wrapper(put_tags, [{"Key": "k", "Value": "v"}])  # forwarded list gets `list[Tag]`
     /// ```
+    #[expect(clippy::too_many_arguments)]
     pub(crate) fn argument_type_context(
         &self,
         db: &'db dyn Db,
@@ -6324,6 +6325,7 @@ impl<'db> Binding<'db> {
         arguments_types: &CallArguments<'_, 'db>,
         argument_index: usize,
         call_expression_tcx: TypeContext<'db>,
+        specialization: Option<Specialization<'db>>,
     ) -> Option<ArgumentTypeContext<'db>> {
         let argument_matches = self.matched_argument_for_call_argument(binding, argument_index)?;
         let [parameter] = argument_matches.parameters.as_slice() else {
@@ -6349,9 +6351,9 @@ impl<'db> Binding<'db> {
             ));
         }
 
-        // If this is a generic call, attempt to specialize the parameter type using the
-        // declared type context, propagating the declared types of any type variables.
-        if let Some(generic_context) = self.signature.generic_context {
+        // If this is a generic call, apply the argument-context specialization computed once for
+        // this overload snapshot. ParamSpec components still require per-argument handling below.
+        if self.signature.generic_context.is_some() {
             let paramspec = if let Type::TypeVar(typevar) = original_parameter_type
                 && typevar.is_paramspec(db)
                 && typevar.paramspec_attr(db).is_some()
@@ -6360,91 +6362,6 @@ impl<'db> Binding<'db> {
             } else {
                 None
             };
-
-            let return_ty = self
-                .normalized_constructor_return(db)
-                .unwrap_or(self.signature.return_ty);
-            let mut return_typevar_variances = None;
-
-            let mut return_type_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
-                FxHashMap::default();
-            if let Some(declared_return_ty) = call_expression_tcx.annotation {
-                let path_bounds = return_ty.assignable_solutions_with_inferable(
-                    db,
-                    declared_return_ty,
-                    generic_context.inferable_typevars(db),
-                );
-
-                if let Solutions::Constrained(solutions) = path_bounds.solve(db, constraints) {
-                    for solution in solutions {
-                        for binding in solution {
-                            let identity = binding.bound_typevar.identity(db);
-                            return_type_solutions
-                                .entry(identity)
-                                .and_modify(|existing| {
-                                    *existing = UnionType::from_two_elements(
-                                        db,
-                                        *existing,
-                                        binding.solution,
-                                    );
-                                })
-                                .or_insert(binding.solution);
-                        }
-                    }
-                }
-            }
-
-            // Default specialize any type variables to a marker type, which will be ignored
-            // during argument inference, allowing the concrete subset of the parameter
-            // type to still affect argument inference.
-            //
-            // TODO: Eventually, we want to "tie together" the typevars of the two calls
-            // so that we can infer their specializations at the same time — or at least, for
-            // the specialization of one to influence the specialization of the other. It's
-            // not yet clear how we're going to do that. (We might have to start inferring
-            // constraint sets for each expression, instead of simple types?)
-            let unspecialized = Type::Dynamic(DynamicType::UnspecializedTypeVar);
-            let specialization = generic_context.specialize_recursive(
-                db,
-                generic_context.variables(db).map(|typevar| {
-                    let identity = typevar.identity(db);
-                    let return_type_solution = return_type_solutions.get(&identity).copied();
-                    // This is the specialization inferred from the argument types during the
-                    // previous fixpoint round. Preserve it when it is a compatible covariant
-                    // refinement of the declared return type. For non-covariant occurrences, the
-                    // declared return type specialization must take precedence.
-                    let inferred_solution = self
-                        .specialization
-                        .and_then(|specialization| specialization.get(db, typevar))
-                        .filter(|ty| !ty.has_dynamic(db))
-                        .map(|ty| ty.promote(db));
-
-                    if let Some(return_solution) = return_type_solution
-                        && let Some(inferred_solution) = inferred_solution
-                        && inferred_solution.is_assignable_to(db, return_solution)
-                    {
-                        let variances = return_typevar_variances
-                            .get_or_insert_with(|| collect_typevar_variances(db, return_ty));
-                        if variances
-                            .get(&identity)
-                            .is_some_and(|variance| variance.is_covariant())
-                        {
-                            return Some(inferred_solution);
-                        }
-                    }
-
-                    // A successful previous-round specialization already includes a
-                    // non-covariant return solution. It can be absent on the first round, or when
-                    // checking retried without the declared type after finding incompatible
-                    // arguments. For example, `result: list[int] = f("a")` retries with `T = str`,
-                    // but the return context still supplies `T = int` for the diagnostic pass.
-                    Some(
-                        return_type_solution
-                            .or(inferred_solution)
-                            .unwrap_or(unspecialized),
-                    )
-                }),
-            );
 
             // A `P.args`/`P.kwargs` parameter has a useful context only after another
             // argument, usually a `Callable[P, R]`, specializes `P`.
@@ -6474,12 +6391,105 @@ impl<'db> Binding<'db> {
                 ));
             }
 
-            parameter_type = parameter_type.apply_specialization(db, specialization);
+            debug_assert!(specialization.is_some());
+            parameter_type = parameter_type.apply_optional_specialization(db, specialization);
         }
 
         Some(ArgumentTypeContext::standard(
             original_parameter_type,
             parameter_type,
+        ))
+    }
+
+    /// Computes the specialization used as type context for every argument of this overload.
+    ///
+    /// This depends on the overload's current fixpoint specialization and the call expression's
+    /// declared return context, but not on an individual argument. Call argument inference can
+    /// therefore compute it once per overload snapshot instead of once per argument.
+    pub(crate) fn argument_type_context_specialization(
+        &self,
+        db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> Option<Specialization<'db>> {
+        let generic_context = self.signature.generic_context?;
+        let mut return_ty = None;
+        let mut return_typevar_variances = None;
+
+        let mut return_type_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> =
+            FxHashMap::default();
+        if let Some(declared_return_ty) = call_expression_tcx.annotation {
+            let normalized_return_ty = self
+                .normalized_constructor_return(db)
+                .unwrap_or(self.signature.return_ty);
+            return_ty = Some(normalized_return_ty);
+            let path_bounds = normalized_return_ty.assignable_solutions_with_inferable(
+                db,
+                declared_return_ty,
+                generic_context.inferable_typevars(db),
+            );
+
+            if let Solutions::Constrained(solutions) = path_bounds.solve(db, constraints) {
+                for solution in solutions {
+                    for binding in solution {
+                        let identity = binding.bound_typevar.identity(db);
+                        return_type_solutions
+                            .entry(identity)
+                            .and_modify(|existing| {
+                                *existing =
+                                    UnionType::from_two_elements(db, *existing, binding.solution);
+                            })
+                            .or_insert(binding.solution);
+                    }
+                }
+            }
+        }
+
+        // Default specialize any type variables to a marker type, which will be ignored during
+        // argument inference, allowing the concrete subset of the parameter type to still affect
+        // argument inference.
+        let unspecialized = Type::Dynamic(DynamicType::UnspecializedTypeVar);
+        Some(generic_context.specialize_recursive(
+            db,
+            generic_context.variables(db).map(|typevar| {
+                let identity = typevar.identity(db);
+                let return_type_solution = return_type_solutions.get(&identity).copied();
+                // This is the specialization inferred from the argument types during the previous
+                // fixpoint round. Preserve it when it is a compatible covariant refinement of the
+                // declared return type. For non-covariant occurrences, the declared return type
+                // specialization must take precedence.
+                let inferred_solution = self
+                    .specialization
+                    .and_then(|specialization| specialization.get(db, typevar))
+                    .filter(|ty| !ty.has_dynamic(db))
+                    .map(|ty| ty.promote(db));
+
+                if let Some(return_solution) = return_type_solution
+                    && let Some(inferred_solution) = inferred_solution
+                    && let Some(return_ty) = return_ty
+                    && inferred_solution.is_assignable_to(db, return_solution)
+                {
+                    let variances = return_typevar_variances
+                        .get_or_insert_with(|| collect_typevar_variances(db, return_ty));
+                    if variances
+                        .get(&identity)
+                        .is_some_and(|variance| variance.is_covariant())
+                    {
+                        return Some(inferred_solution);
+                    }
+                }
+
+                // A successful previous-round specialization already includes a non-covariant
+                // return solution. It can be absent on the first round, or when checking retried
+                // without the declared type after finding incompatible arguments. For example,
+                // `result: list[int] = f("a")` retries with `T = str`, but the return context still
+                // supplies `T = int` for the diagnostic pass.
+                Some(
+                    return_type_solution
+                        .or(inferred_solution)
+                        .unwrap_or(unspecialized),
+                )
+            }),
         ))
     }
 
