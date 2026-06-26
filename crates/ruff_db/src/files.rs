@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 use std::fmt;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use dashmap::mapref::entry::Entry;
 pub use directory::{
@@ -64,8 +65,8 @@ pub struct Files {
 
 #[derive(Default)]
 struct FilesInner {
-    /// The durability applied to every field on files created after freezing.
-    input_durability: OnceLock<Durability>,
+    /// Whether inputs on newly created files should be frozen.
+    frozen: AtomicBool,
 
     /// Lookup table that maps [`SystemPathBuf`]s to salsa interned [`File`] instances.
     ///
@@ -89,17 +90,15 @@ impl Files {
     /// Existing files retain their current durability. Callers should therefore call this before
     /// discovering any files if they need the freeze to apply to the entire project.
     pub fn freeze(&self) {
-        self.inner
-            .input_durability
-            .get_or_init(|| Durability::NEVER_CHANGE);
+        self.inner.frozen.store(true, Ordering::Relaxed);
     }
 
     fn input_durability(&self, default: Durability) -> Durability {
-        self.inner
-            .input_durability
-            .get()
-            .copied()
-            .unwrap_or(default)
+        if self.inner.frozen.load(Ordering::Relaxed) {
+            Durability::NEVER_CHANGE
+        } else {
+            default
+        }
     }
 
     /// Looks up a file by its `path`.
@@ -139,13 +138,13 @@ impl Files {
                         .permissions(metadata.permissions())
                         .revision(metadata.revision()),
                     Ok(metadata) if metadata.file_type().is_directory() => builder
-                        .durability(self.input_durability(Durability::MEDIUM.max(durability)))
+                        .durability(Durability::MEDIUM.max(durability))
                         .status(FileStatus::IsADirectory)
                         .permissions(metadata.permissions())
                         .revision(metadata.revision()),
-                    _ => builder.status(FileStatus::NotFound).status_durability(
-                        self.input_durability(Durability::MEDIUM.max(durability)),
-                    ),
+                    _ => builder
+                        .status(FileStatus::NotFound)
+                        .status_durability(Durability::MEDIUM.max(durability)),
                 };
 
                 builder.new(db)

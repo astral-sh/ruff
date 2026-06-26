@@ -75,19 +75,19 @@ impl ProjectDatabase {
         db
     }
 
-    /// Permanently freezes inputs that are immutable during a one-shot check.
+    /// Permanently freezes the most heavily read inputs that are immutable during a one-shot check.
     ///
-    /// This includes every [`Program`] input, the frequently-read immutable [`Project`] inputs,
-    /// and every field on files created after this call. Existing files retain their durability.
-    /// This must not be used by incremental consumers or checks that apply fixes.
+    /// This is intentionally not exhaustive. It includes every [`Program`] input, the most heavily
+    /// read immutable [`Project`] inputs, and every field on files created after this call. Existing
+    /// files retain their durability. This must not be used by incremental consumers or checks that
+    /// apply fixes.
     pub fn freeze(&mut self) {
         let program = Program::try_get(self).expect("the program should be initialized");
         let project = self.project();
-        let files = self.files.clone();
 
         program.freeze(self);
         project.freeze(self);
-        files.freeze();
+        self.files.freeze();
     }
 
     fn new<S, Strategy: MisconfigurationStrategy>(

@@ -3,7 +3,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use rustc_hash::FxHashSet;
-use salsa::Setter;
+use salsa::{Durability, Setter};
 
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
@@ -53,6 +53,21 @@ impl IndexedFiles {
 
     pub(super) fn is_lazy(&self) -> bool {
         matches!(*self.state.lock().unwrap(), State::Lazy)
+    }
+
+    /// Permanently freezes the project's file-set input without cloning the indexed files.
+    pub(super) fn freeze(db: &mut dyn Db, project: Project) {
+        let state = {
+            let files = project.file_set(db);
+            std::mem::replace(&mut *files.state.lock().unwrap(), State::Lazy)
+        };
+
+        project
+            .set_file_set(db)
+            .with_durability(Durability::NEVER_CHANGE)
+            .to(Self {
+                state: std::sync::Mutex::new(state),
+            });
     }
 
     /// Returns a mutable view on the index that allows cheap in-place mutations.

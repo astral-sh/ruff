@@ -62,7 +62,6 @@ impl<'a> Benchmark<'a> {
                 .map(|path| SystemPath::absolute(path, &root))
                 .collect(),
         );
-        db.freeze();
         db
     }
 }
