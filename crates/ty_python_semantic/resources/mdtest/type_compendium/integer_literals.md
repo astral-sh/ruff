@@ -70,10 +70,9 @@ And this can be used for type-narrowing using not-equal comparisons:
 ```py
 def f(x: int):
     if x == 54165:
-        # The reason that no narrowing occurs here is that there might be subclasses of `int`
-        # that override `__eq__`. This is not specific to integer literals though, and generally
-        # applies to `==` comparisons.
-        reveal_type(x)  # revealed: int
+        # By default, ty assumes that a broad `int` uses builtin equality. The
+        # `unsafe-literal-narrowing` setting disables this narrowing.
+        reveal_type(x)  # revealed: Literal[54165]
 
     if x != 54165:
         reveal_type(x)  # revealed: int & ~Literal[54165]
