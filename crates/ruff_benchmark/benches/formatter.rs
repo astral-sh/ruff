@@ -52,9 +52,8 @@ fn benchmark_formatter(criterion: &mut Criterion) {
                 let parsed = parse(case.code(), ParseOptions::from(Mode::Module))
                     .expect("Input should be a valid Python code");
 
-                let comment_ranges = CommentRanges::from(parsed.tokens());
-
                 b.iter(|| {
+                    let comment_ranges = CommentRanges::from(parsed.tokens());
                     let options = PyFormatOptions::from_extension(Path::new(case.name()))
                         .with_preview(PreviewMode::Enabled);
                     let formatted =
