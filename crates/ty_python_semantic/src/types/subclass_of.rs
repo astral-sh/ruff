@@ -6,9 +6,9 @@ use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, ClassType, DynamicType,
-    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
-    SpecialFormType, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
-    TypedDictType, UnionType, todo_type,
+    FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, MaterializationKind,
+    MemberLookupPolicy, SpecialFormType, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarVariance, TypedDictType, UnionType, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::definition::Definition;
@@ -78,8 +78,9 @@ impl<'db> SubclassOfType<'db> {
 
     /// Given an instance of the class or type variable `T`, returns a [`Type`] instance representing `type[T]`.
     pub(crate) fn try_from_instance(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
-        // Handle unions by distributing `type[]` over each element:
+        // Handle unions and intersections by distributing `type[]` over each element:
         // `type[A | B]` -> `type[A] | type[B]`
+        // `type[A & B]` -> `type[A] & type[B]`
         match ty {
             Type::Union(union) => UnionType::try_from_elements(
                 db,
@@ -88,6 +89,15 @@ impl<'db> SubclassOfType<'db> {
                     .iter()
                     .map(|element| Self::try_from_instance(db, *element)),
             ),
+            Type::Intersection(intersection) if intersection.iter_negative(db).next().is_none() => {
+                Some(IntersectionType::from_elements(
+                    db,
+                    intersection
+                        .iter_positive(db)
+                        .map(|element| Self::try_from_instance(db, element))
+                        .collect::<Option<Vec<_>>>()?,
+                ))
+            }
             Type::ProtocolInstance(protocol) => Some(protocol.to_meta_type(db)),
             _ => SubclassOfInner::try_from_instance(db, ty)
                 .map(|subclass_of| Self::from(db, subclass_of)),
