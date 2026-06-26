@@ -8,10 +8,9 @@
 
 use salsa::plumbing::AsId;
 
-use super::set_theoretic::RecursivelyDefined;
 use crate::Db;
 use crate::place::PlaceAndQualifiers;
-use crate::types::{Type, TypeAliasType, TypeContext, TypeMapping, UnionBuilder};
+use crate::types::{Type, TypeAliasType, TypeContext, TypeMapping};
 
 /// Identifier for the bound variable of a recursive type.
 ///
@@ -60,12 +59,10 @@ impl<'db> RecursiveOrigin<'db> {
         }
     }
 
-    #[expect(dead_code, reason = "staged API for recursive type construction")]
     pub(crate) fn contains_in_type(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
         crate::types::visitor::any_over_type(db, ty, false, |inner| self.matches_type(db, inner))
     }
 
-    #[expect(dead_code, reason = "staged API for recursive type construction")]
     pub(crate) fn binder_id(self, db: &'db dyn Db) -> Option<salsa::Id> {
         match self {
             Self::Implicit => None,
@@ -213,37 +210,22 @@ impl<'db> RecursiveType<'db> {
             replacement,
         };
         let folded_body = unfolded_result.apply_type_mapping(db, &mapping, TypeContext::default());
-        let folded_body = self.drop_top_level_cycle_markers(db, folded_body);
         if folded_body == self.body(db) {
             Type::Recursive(self)
         } else {
-            folded_body
-        }
-    }
-
-    fn drop_top_level_cycle_markers(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        let Type::Union(union) = ty else {
-            return ty;
-        };
-
-        let marker = Type::divergent(self.binder_id(db));
-        let mut builder = UnionBuilder::new(db)
-            .unpack_aliases(false)
-            .cycle_recovery(true)
-            .recursively_defined(union.recursively_defined(db));
-        let mut empty = true;
-        for element in union.elements(db) {
-            if element.is_top_level_cycle_marker(db, marker) {
-                // In a flat union, this marker is the active cycle approximation rather than a
-                // distinct alternative.
-                builder = builder.recursively_defined(RecursivelyDefined::Yes);
-            } else {
-                builder = builder.add(*element);
-                empty = false;
+            let marker = Type::divergent(self.binder_id(db));
+            match self.origin(db) {
+                RecursiveOrigin::Implicit => folded_body.drop_top_level_cycle_markers(db, marker),
+                RecursiveOrigin::TypeAlias(_) if folded_body.contains_cycle_marker(db, marker) => {
+                    let mapping = TypeMapping::ReplaceDivergent {
+                        binder_id: self.binder(db),
+                        replacement,
+                    };
+                    folded_body.apply_type_mapping(db, &mapping, TypeContext::default())
+                }
+                RecursiveOrigin::TypeAlias(_) => folded_body,
             }
         }
-
-        if empty { marker } else { builder.build() }
     }
 
     /// Apply an operation to one unfolded layer, then fold the result back under this binder.
@@ -304,7 +286,7 @@ mod tests {
     }
 
     #[test]
-    fn fold_maps_derived_recursive_positions_to_markers() {
+    fn fold_maps_implicit_derived_recursive_positions_to_markers() {
         let db = setup_db();
         let binder_id = salsa::plumbing::Id::from_bits(1);
         let body = Type::homogeneous_tuple(&db, Type::divergent(binder_id));
@@ -320,7 +302,7 @@ mod tests {
     }
 
     #[test]
-    fn fold_collapses_nested_generic_arguments_that_contain_markers() {
+    fn fold_collapses_implicit_nested_generic_arguments_that_contain_recursive_positions() {
         let db = setup_db();
         let binder_id = salsa::plumbing::Id::from_bits(1);
         let body = Type::homogeneous_tuple(&db, Type::divergent(binder_id));
@@ -332,8 +314,9 @@ mod tests {
         let element = UnionType::from_elements(&db, [Type::int_literal(1), recursive_ty]);
         let derived = KnownClass::List.to_specialized_instance(&db, &[element]);
         let expected = KnownClass::List.to_specialized_instance(&db, &[Type::divergent(binder_id)]);
+        let folded = recursive.fold(&db, derived);
 
-        assert_eq!(recursive.fold(&db, derived), expected);
+        assert_eq!(folded, expected);
     }
 
     #[test]

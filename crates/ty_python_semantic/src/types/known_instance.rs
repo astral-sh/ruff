@@ -382,6 +382,7 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf(..)
                 | TypeMapping::ReplaceSelf { .. }
+                | TypeMapping::ReplaceRecursiveOrigin { .. }
                 | TypeMapping::ReplaceDivergent { .. }
                 | TypeMapping::FoldRecursive { .. }
                 | TypeMapping::Materialize(_)

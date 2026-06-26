@@ -1153,6 +1153,30 @@ impl<'db> Type<'db> {
             )
     }
 
+    fn drop_top_level_cycle_markers(self, db: &'db dyn Db, marker: Type<'db>) -> Type<'db> {
+        let Type::Union(union) = self else {
+            return self;
+        };
+
+        let mut builder = UnionBuilder::new(db)
+            .unpack_aliases(false)
+            .cycle_recovery(true)
+            .recursively_defined(union.recursively_defined(db));
+        let mut empty = true;
+        for element in union.elements(db) {
+            if element.is_top_level_cycle_marker(db, marker) {
+                // In a flat union, this marker is the active cycle approximation rather than a
+                // distinct alternative.
+                builder = builder.recursively_defined(self::set_theoretic::RecursivelyDefined::Yes);
+            } else {
+                builder = builder.add(*element);
+                empty = false;
+            }
+        }
+
+        if empty { marker } else { builder.build() }
+    }
+
     fn contains_cycle_marker(self, db: &'db dyn Db, marker: Type<'db>) -> bool {
         any_over_type(db, self, false, |ty| {
             ty.is_top_level_cycle_marker(db, marker)
@@ -6449,6 +6473,11 @@ impl<'db> Type<'db> {
             TypeMapping::BindSelf(binding) if self == binding.self_type() => return self,
             _ => {}
         }
+        if let TypeMapping::ReplaceRecursiveOrigin { origin, binder_id } = type_mapping
+            && origin.matches_type(db, self)
+        {
+            return Type::divergent(binder_id.into_id());
+        }
         if let TypeMapping::FoldRecursive {
             recursive,
             replacement,
@@ -6650,7 +6679,8 @@ impl<'db> Type<'db> {
 
             Type::TypeAlias(alias) => {
                 match type_mapping {
-                    TypeMapping::ReplaceDivergent { .. } => {
+                    TypeMapping::ReplaceDivergent { .. }
+                    | TypeMapping::ReplaceRecursiveOrigin { .. } => {
                         if let Some(specialization) = alias.specialization(db) {
                             let mapped_specialization =
                                 specialization.apply_type_mapping_impl(db, type_mapping, &[], visitor);
@@ -6732,6 +6762,7 @@ impl<'db> Type<'db> {
                 TypeMapping::FreshenBoundTypeVars { .. } |
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
+                TypeMapping::ReplaceRecursiveOrigin { .. } |
                 TypeMapping::ReplaceDivergent { .. } |
                 TypeMapping::FoldRecursive { .. } |
                 TypeMapping::Materialize(_) |
@@ -6753,6 +6784,7 @@ impl<'db> Type<'db> {
                 TypeMapping::FreshenBoundTypeVars { .. } |
                 TypeMapping::BindSelf(..) |
                 TypeMapping::ReplaceSelf { .. } |
+                TypeMapping::ReplaceRecursiveOrigin { .. } |
                 TypeMapping::ReplaceDivergent { .. } |
                 TypeMapping::FoldRecursive { .. } |
                 TypeMapping::Promote(..) |
@@ -7850,6 +7882,11 @@ pub enum TypeMapping<'a, 'db> {
     BindSelf(SelfBinding<'db>),
     /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
     ReplaceSelf { new_upper_bound: Type<'db> },
+    /// Replaces recursive source-name occurrences with the binder marker.
+    ReplaceRecursiveOrigin {
+        origin: RecursiveOrigin<'db>,
+        binder_id: BinderId,
+    },
     /// Replaces a recursive-type binder marker with another type.
     ///
     /// Recursive binders block this mapping for their own marker, so this behaves like a
@@ -7916,6 +7953,7 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::Promote(..)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
+            | TypeMapping::ReplaceRecursiveOrigin { .. }
             | TypeMapping::ReplaceDivergent { .. }
             | TypeMapping::FoldRecursive { .. }
             | TypeMapping::ReplaceParameterDefaults
@@ -7964,6 +8002,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)
             | TypeMapping::ReplaceSelf { .. }
+            | TypeMapping::ReplaceRecursiveOrigin { .. }
             | TypeMapping::ReplaceDivergent { .. }
             | TypeMapping::FoldRecursive { .. }
             | TypeMapping::ReplaceParameterDefaults

@@ -7,6 +7,7 @@ use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 use rustc_hash::{FxHashMap, FxHashSet};
 
+use crate::types::RecursiveOrigin;
 use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
@@ -1291,9 +1292,12 @@ impl<'db> Specialization<'db> {
             } else {
                 ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor)
             };
-            if let TypeMapping::FoldRecursive { recursive, .. } = type_mapping {
-                // Generic arguments are nested positions for this fold: a marker anywhere in the
-                // argument means the whole argument refers back to the binder.
+            if let TypeMapping::FoldRecursive { recursive, .. } = type_mapping
+                && matches!(recursive.origin(db), RecursiveOrigin::Implicit)
+            {
+                // Implicit recursive types are cycle-recovery approximations. In nested
+                // invariant positions, any occurrence of the marker makes the next iteration grow
+                // without bound, so collapse the whole argument back to the marker.
                 let marker = Type::divergent(recursive.binder_id(db));
                 if mapped.contains_cycle_marker(db, marker) {
                     return marker;

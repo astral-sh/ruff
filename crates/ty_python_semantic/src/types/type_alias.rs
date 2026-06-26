@@ -3,8 +3,8 @@ use std::fmt::Write;
 use crate::{
     Db,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, GenericContext, Type, TypeContext,
-        TypeMapping, TypeVarVariance, definition_expression_type,
+        ApplyTypeMappingVisitor, BinderId, BoundTypeVarInstance, GenericContext, RecursiveOrigin,
+        Type, TypeContext, TypeMapping, TypeVarVariance, definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization},
         variance::VarianceInferable,
@@ -34,6 +34,36 @@ pub struct PEP695TypeAliasType<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for PEP695TypeAliasType<'_> {}
 
+fn type_alias_cycle_initial<'db>(
+    db: &'db dyn Db,
+    binder_id: salsa::Id,
+    alias: TypeAliasType<'db>,
+) -> Type<'db> {
+    Type::recursive(
+        db,
+        binder_id,
+        RecursiveOrigin::TypeAlias(alias),
+        Type::divergent(binder_id),
+    )
+}
+
+fn with_type_alias_origin<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    alias: TypeAliasType<'db>,
+) -> Type<'db> {
+    if let Type::Recursive(recursive) = ty {
+        Type::recursive(
+            db,
+            recursive.binder_id(db),
+            RecursiveOrigin::TypeAlias(alias),
+            recursive.body(db),
+        )
+    } else {
+        ty
+    }
+}
+
 pub(super) fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     type_alias: PEP695TypeAliasType<'db>,
@@ -52,15 +82,51 @@ impl<'db> PEP695TypeAliasType<'db> {
 
     /// The RHS type of a PEP-695 style type alias with specialization applied.
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
-        self.apply_function_specialization(db, self.raw_value_type(db))
+        let raw = self.raw_value_type(db);
+        let origin = RecursiveOrigin::TypeAlias(TypeAliasType::PEP695(self));
+        let Some(binder_id) = origin.binder_id(db) else {
+            return self.apply_function_specialization(db, raw);
+        };
+
+        if !origin.contains_in_type(db, raw) {
+            return with_type_alias_origin(
+                db,
+                self.apply_function_specialization(db, raw),
+                TypeAliasType::PEP695(self),
+            );
+        }
+
+        let marker = Type::divergent(binder_id);
+        let folded_raw = raw.apply_type_mapping_impl(
+            db,
+            &TypeMapping::ReplaceRecursiveOrigin {
+                origin,
+                binder_id: BinderId::new(binder_id),
+            },
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        );
+        let body = self
+            .apply_function_specialization(db, folded_raw)
+            .drop_top_level_cycle_markers(db, marker);
+
+        if body.contains_cycle_marker(db, marker) {
+            Type::recursive(db, binder_id, origin, body)
+        } else {
+            body
+        }
     }
 
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.
     /// Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
-        cycle_initial=|db, id, _| Type::implicit_recursive(db, id, Type::divergent(id)),
-        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
-            value.cycle_normalized(db, *previous, cycle)
+        cycle_initial=|db, id, alias| type_alias_cycle_initial(db, id, TypeAliasType::PEP695(alias)),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, alias| {
+            with_type_alias_origin(
+                db,
+                value.cycle_normalized(db, *previous, cycle),
+                TypeAliasType::PEP695(alias),
+            )
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -176,9 +242,13 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     /// Computed lazily from the definition to avoid including the value in the interned
     /// struct's identity. Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
-        cycle_initial=|db, id, _| Type::implicit_recursive(db, id, Type::divergent(id)),
-        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
-            value.cycle_normalized(db, *previous, cycle)
+        cycle_initial=|db, id, alias| type_alias_cycle_initial(db, id, TypeAliasType::ManualPEP695(alias)),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, alias| {
+            with_type_alias_origin(
+                db,
+                value.cycle_normalized(db, *previous, cycle),
+                TypeAliasType::ManualPEP695(alias),
+            )
         },
         heap_size=ruff_memory_usage::heap_size
     )]

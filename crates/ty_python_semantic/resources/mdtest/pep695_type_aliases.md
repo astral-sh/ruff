@@ -461,6 +461,8 @@ def g(x: B) -> None:
 ### Self-referential
 
 ```py
+from ty_extensions import Not
+
 type OptNestedInt = int | tuple[OptNestedInt, ...] | None
 
 def f(x: OptNestedInt) -> None:
@@ -472,6 +474,12 @@ type RecursiveList = list[RecursiveList]
 
 def g(x: RecursiveList):
     reveal_type(x[0])  # revealed: list[RecursiveList]
+
+type NestedRecursion = list[Not[NestedRecursion] | NestedRecursion]
+
+def h(x: NestedRecursion):
+    # error: [invalid-syntax] "Expected index or slice expression"
+    reveal_type(x[])  # revealed: list[NestedRecursion]
 ```
 
 ### Invalid self-referential
@@ -528,6 +536,12 @@ type Bar[T] = int | Foo[T]
 
 def _(x: Bar[int]):
     reveal_type(x)  # revealed: int | list[int]
+
+# error: [invalid-syntax] "Expected an expression"
+type CrashyOperation = | CrashyOperation
+
+def call_recovered_alias(x: CrashyOperation):
+    reveal_type(x())  # revealed: Unknown
 ```
 
 ### With legacy generic
@@ -581,6 +595,19 @@ type C = Callable[[], C | None]
 
 def _(x: C):
     reveal_type(x)  # revealed: () -> C | None
+```
+
+### Top materialization of self-recursive aliases
+
+```py
+from ty_extensions import Top
+
+type A = tuple[A]
+type B = Top[tuple[B]]
+
+def _(x: A, y: B):
+    reveal_type(x)  # revealed: tuple[A]
+    reveal_type(y)  # revealed: tuple[B]
 ```
 
 ### Subtyping of materializations of cyclic aliases
