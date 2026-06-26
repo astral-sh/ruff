@@ -1518,24 +1518,23 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                     })
                     .is_some_and(|ty| ty.has_typevar(self.db))
             {
-                let unknown_pattern_member_ty =
-                    Type::instance(self.db, pattern_class.unknown_specialization(self.db))
-                        .member(self.db, name.as_str())
-                        .place
-                        .ignore_possibly_undefined();
+                let unknown_pattern_class = pattern_class.unknown_specialization(self.db);
+                let unknown_pattern_member_ty = Type::instance(self.db, unknown_pattern_class)
+                    .member(self.db, name.as_str())
+                    .place
+                    .ignore_possibly_undefined();
                 // For example, `Child[int]` and `Base[T]` share a generic hierarchy, so a `Base`
                 // pattern can reuse `int` from the subject. This does not infer `Child[int]` from
                 // a `Base[int]` subject.
                 let shares_generic_hierarchy = original_subject_ty
                     .nominal_class(self.db)
                     .is_some_and(|original_class| {
-                        let pattern_class = pattern_class.unknown_specialization(self.db);
-                        pattern_class.is_subtype_of_class_literal(
+                        unknown_pattern_class.is_subtype_of_class_literal(
                             self.db,
                             original_class.class_literal(self.db),
                         ) || original_class.is_subtype_of_class_literal(
                             self.db,
-                            pattern_class.class_literal(self.db),
+                            unknown_pattern_class.class_literal(self.db),
                         )
                     });
                 if shares_generic_hierarchy {
