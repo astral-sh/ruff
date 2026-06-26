@@ -394,7 +394,7 @@ def describe(derived: Derived, from_meta: FromMeta) -> None:
 ## Runtime `TYPE_CHECKING` reachability
 
 ```py
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 class RuntimeOnly:
     if not TYPE_CHECKING:
@@ -404,13 +404,38 @@ class CheckingOnly:
     if TYPE_CHECKING:
         __match_args__ = ("value",)
 
-def describe(runtime: RuntimeOnly, checking: CheckingOnly) -> None:
+class RuntimeTuple:
+    if TYPE_CHECKING:
+        __match_args__: list[str]
+    else:
+        __match_args__ = ("value",)
+
+class RuntimeList:
+    if TYPE_CHECKING:
+        __match_args__: tuple[Literal["value"]]
+    else:
+        __match_args__ = ["value"]
+
+def describe(
+    runtime: RuntimeOnly,
+    checking: CheckingOnly,
+    runtime_tuple: RuntimeTuple,
+    runtime_list: RuntimeList,
+) -> None:
     match runtime:
         case RuntimeOnly(_):
             pass
 
     match checking:
         case CheckingOnly(_):  # error: [invalid-match-pattern]
+            pass
+
+    match runtime_tuple:
+        case RuntimeTuple(_):
+            pass
+
+    match runtime_list:
+        case RuntimeList(_):  # error: [invalid-match-pattern] "must be an exact tuple"
             pass
 ```
 

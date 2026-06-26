@@ -1,13 +1,14 @@
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ty_python_core::definition::Definition;
-use ty_python_core::{place_table, scope::ScopeId, use_def_map};
+use ty_python_core::{place_table, scope::ScopeId, symbol::ScopedSymbolId, use_def_map};
 
 use crate::Db;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Place, PlaceAndQualifiers, RequiresExplicitReExport,
     TypeOrigin, place_by_id, place_from_bindings, place_from_runtime_bindings,
 };
+use crate::reachability::evaluate_reachability_runtime;
 use crate::types::Type;
 
 /// The return type of certain member-lookup operations. Contains information
@@ -63,6 +64,31 @@ fn definition_is_runtime_binding<'db>(db: &'db dyn Db, definition: Definition<'d
         .kind(db)
         .category(file.is_stub(db), &module)
         .is_binding()
+}
+
+fn declaration_is_runtime_reachable<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    symbol_id: ScopedSymbolId,
+    definition: Definition<'db>,
+) -> bool {
+    let use_def = use_def_map(db, scope);
+    let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);
+    let predicates = declarations.predicates();
+    let reachability_constraints = declarations.reachability_constraints();
+
+    declarations.into_iter().any(|declaration| {
+        declaration
+            .declaration
+            .is_defined_and(|candidate| candidate == definition)
+            && !evaluate_reachability_runtime(
+                db,
+                reachability_constraints,
+                predicates,
+                declaration.reachability_constraint,
+            )
+            .is_always_false()
+    })
 }
 
 /// Infer the public type of a class member/symbol (its type as seen from outside its scope) in the given
@@ -144,14 +170,20 @@ pub(super) fn runtime_class_member<'db>(
             Place::Defined(
                 declared @ DefinedPlace {
                     origin: TypeOrigin::Declared,
+                    provenance,
                     ..
                 },
             ),
             Place::Defined(runtime),
-        ) => Place::Defined(DefinedPlace {
-            definedness: runtime.definedness,
-            ..declared
-        }),
+        ) if provenance.definition().is_none_or(|definition| {
+            declaration_is_runtime_reachable(db, scope, symbol_id, definition)
+        }) =>
+        {
+            Place::Defined(DefinedPlace {
+                definedness: runtime.definedness,
+                ..declared
+            })
+        }
         (Place::Defined(declared), Place::Undefined)
             if declared.provenance.definition().is_some_and(|definition| {
                 definition.file(db).is_stub(db) && definition_is_runtime_binding(db, definition)
