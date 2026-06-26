@@ -595,6 +595,16 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         {
             return self;
         }
+        if self
+            .node
+            .all_constraints_satisfy(builder, &mut |constraint| {
+                builder
+                    .constraint_data(constraint)
+                    .should_retain_for_inference(db, inferable)
+            })
+        {
+            return self;
+        }
         Self::from_node(
             builder,
             self.node.remove_noninferable(db, builder, inferable),
@@ -1442,6 +1452,20 @@ impl ConstraintId {
 }
 
 impl<'db> Constraint<'db> {
+    fn should_retain_for_inference(
+        self,
+        db: &'db dyn Db,
+        inferable: InferableTypeVars<'db>,
+    ) -> bool {
+        let is_bare_inferable_typevar = |ty: Type<'db>| {
+            ty.as_typevar()
+                .is_some_and(|typevar| typevar.is_inferable(db, inferable))
+        };
+        self.typevar.is_inferable(db, inferable)
+            || self.bounds.lower.is_some_and(is_bare_inferable_typevar)
+            || self.bounds.upper.is_some_and(is_bare_inferable_typevar)
+    }
+
     /// Returns a new range constraint.
     ///
     /// Panics if `lower` and `upper` are not both fully static.
@@ -2864,6 +2888,31 @@ impl NodeId {
         }
     }
 
+    fn all_constraints_satisfy(
+        self,
+        builder: &ConstraintSetBuilder<'_>,
+        predicate: &mut impl FnMut(ConstraintId) -> bool,
+    ) -> bool {
+        fn walk(
+            node: NodeId,
+            builder: &ConstraintSetBuilder<'_>,
+            seen: &mut FxHashSet<NodeId>,
+            predicate: &mut impl FnMut(ConstraintId) -> bool,
+        ) -> bool {
+            if node.is_terminal() || !seen.insert(node) {
+                return true;
+            }
+
+            let interior = builder.interior_node_data(node);
+            predicate(interior.constraint)
+                && walk(interior.if_true, builder, seen, predicate)
+                && walk(interior.if_uncertain, builder, seen, predicate)
+                && walk(interior.if_false, builder, seen, predicate)
+        }
+
+        walk(self, builder, &mut FxHashSet::default(), predicate)
+    }
+
     fn abstract_one_inner<'db>(
         self,
         db: &'db dyn Db,
@@ -3974,10 +4023,6 @@ impl InteriorNode {
         inferable: InferableTypeVars<'db>,
     ) -> NodeId {
         let mut path = self.path_assignments(builder);
-        let is_bare_inferable_typevar = |ty: Type<'db>| {
-            ty.as_typevar()
-                .is_some_and(|bound_typevar| bound_typevar.is_inferable(db, inferable))
-        };
         self.abstract_one_inner(
             db,
             builder,
@@ -3991,16 +4036,9 @@ impl InteriorNode {
             // only checked the inferability of the constrained typevar, we would keep the first
             // encoding but remove the second.
             &mut |constraint| {
-                let constraint = builder.constraint_data(constraint);
-                !constraint.typevar.is_inferable(db, inferable)
-                    && !constraint
-                        .bounds
-                        .lower
-                        .is_some_and(is_bare_inferable_typevar)
-                    && !constraint
-                        .bounds
-                        .upper
-                        .is_some_and(is_bare_inferable_typevar)
+                !builder
+                    .constraint_data(constraint)
+                    .should_retain_for_inference(db, inferable)
             },
             &mut path,
         )
@@ -6920,6 +6958,44 @@ mod tests {
         let storage = builder.storage.borrow();
         assert_eq!(storage.single_sequent_cache.len(), single_sequents);
         assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
+    }
+
+    #[test]
+    fn non_simple_inferable_constraints_skip_projection() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let builder = ConstraintSetBuilder::new();
+        let int = KnownClass::Int.to_instance(&db);
+        let str = KnownClass::Str.to_instance(&db);
+        let t_constraints =
+            create_constraint(&db, &builder, t, KnownClass::Int).or(&db, &builder, || {
+                create_constraint(&db, &builder, t, KnownClass::Str)
+            });
+        let inferable =
+            InferableTypeVars::from_typevars(&db, std::iter::once(t.identity(&db)).collect());
+
+        let unchanged = t_constraints.remove_noninferable(&db, &builder, inferable);
+        assert_eq!(unchanged.node, t_constraints.node);
+
+        let with_noninferable = t_constraints.and(&db, &builder, || {
+            create_constraint(&db, &builder, u, KnownClass::Bool)
+        });
+        let projected = with_noninferable.remove_noninferable(&db, &builder, inferable);
+        assert_ne!(projected.node, with_noninferable.node);
+        assert_eq!(
+            projected.solutions(&db, &builder),
+            Solutions::Constrained(vec![
+                vec![TypeVarSolution {
+                    bound_typevar: t,
+                    solution: int,
+                }],
+                vec![TypeVarSolution {
+                    bound_typevar: t,
+                    solution: str,
+                }],
+            ])
+        );
     }
 
     #[test]
