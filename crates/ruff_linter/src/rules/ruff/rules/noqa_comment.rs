@@ -40,7 +40,7 @@ use crate::{
 /// import os
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct NoqaComment {
     file_level: bool,
 }
