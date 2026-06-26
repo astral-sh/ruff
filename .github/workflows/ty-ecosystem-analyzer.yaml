@@ -69,7 +69,6 @@ jobs:
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
 
       - name: Build ty
-        id: build
         env:
           REVISION: ${{ matrix.revision }}
         run: |
@@ -78,7 +77,7 @@ jobs:
             git fetch --no-tags --filter=blob:none --unshallow origin
 
             MERGE_BASE="$(git merge-base "${GITHUB_SHA}" "origin/${GITHUB_BASE_REF}")"
-            echo "merge-base=${MERGE_BASE}" >> "$GITHUB_OUTPUT"
+            echo "${MERGE_BASE}" > merge-base.txt
             echo "Merge base: ${MERGE_BASE}"
             echo "PR commit: ${GITHUB_SHA}"
 
@@ -93,12 +92,6 @@ jobs:
             cp crates/ty_python_semantic/resources/primer/flaky.txt projects_flaky.txt
             cp .github/ty-ecosystem.toml ty-ecosystem.toml
           fi
-
-      - name: Record merge base
-        if: matrix.revision == 'base'
-        env:
-          MERGE_BASE: ${{ steps.build.outputs.merge-base }}
-        run: echo "${MERGE_BASE}" > merge-base.txt
 
       - name: Upload base ty binary
         if: matrix.revision == 'base'
