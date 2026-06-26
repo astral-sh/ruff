@@ -3339,29 +3339,52 @@ struct InteriorNodeData {
 struct ConstraintBoundsBuilder<'db> {
     lower: FxIndexSet<Type<'db>>,
     upper: UpperBound<'db>,
+    // Classify each bound before aggregation: unioning lower bounds can otherwise make separate
+    // gradual and static evidence indistinguishable from a single gradual union.
+    has_gradual_evidence: bool,
+    has_static_evidence: bool,
 }
 
 impl<'db> ConstraintBoundsBuilder<'db> {
-    fn add_lower(&mut self, _db: &'db dyn Db, ty: Type<'db>) {
+    fn classify_evidence(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+        if ty.has_unspecialized_type_var(db) {
+            return;
+        }
+        if ty.bottom_materialization(db) == ty.top_materialization(db) {
+            self.has_static_evidence = true;
+        } else {
+            self.has_gradual_evidence = true;
+        }
+    }
+
+    fn add_lower(&mut self, db: &'db dyn Db, ty: Type<'db>) {
         // Lower bounds are unioned. Our type representation is in DNF, so unioning a new
         // element is typically cheap (in that it does not involve a combinatorial
         // explosion from distributing the clause through an existing disjunction). So we
         // don't need to be as clever here as in `add_upper`.
+        self.classify_evidence(db, ty);
         self.lower.insert(ty);
     }
 
     fn add_upper(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+        self.classify_evidence(db, ty);
         self.upper.add_clause(db, ty);
     }
 
     fn finish(self, db: &'db dyn Db, bound_typevar: BoundTypeVarInstance<'db>) -> PathBound<'db> {
-        let Self { lower, mut upper } = self;
+        let Self {
+            lower,
+            mut upper,
+            has_gradual_evidence,
+            has_static_evidence,
+        } = self;
         let lower = (!lower.is_empty()).then(|| UnionType::from_elements(db, lower));
         upper.shrink_to_fit();
         PathBound {
             bound_typevar,
             lower,
             upper,
+            has_only_gradual_evidence: has_gradual_evidence && !has_static_evidence,
         }
     }
 }
@@ -3372,6 +3395,8 @@ pub(crate) struct PathBound<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
     pub(crate) lower: Option<Type<'db>>,
     pub(crate) upper: UpperBound<'db>,
+    /// Whether the path contains gradual evidence and no static evidence.
+    has_only_gradual_evidence: bool,
 }
 
 impl<'db> PathBound<'db> {
@@ -3380,6 +3405,7 @@ impl<'db> PathBound<'db> {
             bound_typevar,
             lower: Some(ty),
             upper: UpperBound::from_clause(ty),
+            has_only_gradual_evidence: false,
         }
     }
 
@@ -3400,14 +3426,8 @@ impl<'db> PathBound<'db> {
         self.upper.has_explicit_bound()
     }
 
-    fn has_gradual_bound(&self, db: &'db dyn Db) -> bool {
-        self.lower
-            .is_some_and(|lower| lower.bottom_materialization(db) != lower.top_materialization(db))
-            || self
-                .upper
-                .clauses
-                .iter()
-                .any(|upper| upper.bottom_materialization(db) != upper.top_materialization(db))
+    fn has_only_gradual_evidence(&self) -> bool {
+        self.has_only_gradual_evidence
     }
 }
 
@@ -3630,17 +3650,11 @@ impl<'db> PathBounds<'db> {
         builder: &ConstraintSetBuilder<'db>,
         path_bound: &PathBound<'db>,
     ) -> Result<Option<Type<'db>>, ()> {
-        Self::default_solve_with_ambiguity_fallback(db, builder, path_bound, false)
-    }
+        // Choose a solution type that satisfies the constraints on this path, as well as any upper
+        // bound or constraints of the typevar itself.
+        // TODO: Handle the upper bound/constraints by conjoining them with the constraint set
+        // before solving.
 
-    /// Applies the default solver, optionally leaving multiply-compatible constrained TypeVars
-    /// unsolved instead of selecting a best match.
-    pub(crate) fn default_solve_with_ambiguity_fallback(
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        path_bound: &PathBound<'db>,
-        fallback_on_ambiguous_constraints: bool,
-    ) -> Result<Option<Type<'db>>, ()> {
         let bound_typevar = path_bound.bound_typevar;
         let lower = path_bound.lower_or_never();
         match bound_typevar.typevar(db).require_bound_or_constraints(db) {
@@ -3685,7 +3699,37 @@ impl<'db> PathBounds<'db> {
             }
 
             TypeVarBoundOrConstraints::Constraints(constraints) => {
-                let is_better_solution = |candidate: Type<'db>, current_best: Type<'db>| {
+                // For a constrained typevar, the solution for this path must satisfy at least one
+                // of the constraints. If it doesn't, then this path isn't a valid solution. If it
+                // satisfies exactly one constraint, that constraint is the solution.
+                //
+                // If the path satisfies more than one constraint, we behave differently depending
+                // on whether the path solution is gradual or not. If it's gradual, then the path
+                // solution has _materializations_ that satisfy more than one constraint, and we
+                // use the (gradual) path solution as our result, so that we aren't arbitrarily
+                // preferring one materialization over the others.
+                //
+                // If the path solution is fully static, and satisfies more than one constraint, we
+                // choose the "tightest" constraint as the solution.
+                //
+                // TODO: The way we are handling constrained typevars here breaks our assumption
+                // that each solution is represented by a single path in the BDD. Moreover, the
+                // logic here for disambiguating multiple solutions is different than the logic up
+                // in `SpecializationBuilder` that disambiguates solutions that come from multiple
+                // BDD paths. Ideally we would handle multiple solutions the same way in both
+                // places. The best way to do that is addressed by the TODO comment at the top of
+                // this method: we should handle typevar constraints by conjoining them into the
+                // constraint set before solving. Because typevar constraints would be modeled by
+                // an OR across the constraints, that would "break apart" this BDD path into
+                // separate paths, one for each satisfied typevar constraint. And then we would
+                // have to move this disambiguation logic up to the code that combines/chooses
+                // between solutions from multiple paths.
+
+                // Filter out the typevar constraints that aren't satisfied by this path. If
+                // multiple constraints are satisfied, track which one is "tightest".
+                let mut compatible_constraint = None;
+                let mut multiple_compatible_constraints = false;
+                let is_tighter_solution = |candidate: Type<'db>, current_best: Type<'db>| {
                     // Lower-bound evidence asks for the narrowest compatible declared constraint
                     // above the lower bound. With only upper-bound evidence, ask for the widest
                     // compatible declared constraint below the upper bound. If the candidates are
@@ -3700,9 +3744,6 @@ impl<'db> PathBounds<'db> {
                     }
                 };
 
-                // Filter out the typevar constraints that aren't satisfied by this path.
-                let mut compatible_constraint = None;
-                let mut multiple_compatible_constraints = false;
                 for constraint in constraints.elements(db).iter().copied() {
                     let constraint_lower = constraint.bottom_materialization(db);
                     let constraint_upper = constraint.top_materialization(db);
@@ -3722,7 +3763,8 @@ impl<'db> PathBounds<'db> {
                     if compatible_constraint.is_some() {
                         multiple_compatible_constraints = true;
                     }
-                    if compatible_constraint.is_none_or(|best| is_better_solution(constraint, best))
+                    if compatible_constraint
+                        .is_none_or(|best| is_tighter_solution(constraint, best))
                     {
                         compatible_constraint = Some(constraint);
                     }
@@ -3745,21 +3787,19 @@ impl<'db> PathBounds<'db> {
                     return Ok(Some(ty));
                 }
 
-                if multiple_compatible_constraints
-                    && (fallback_on_ambiguous_constraints || path_bound.has_gradual_bound(db))
-                {
-                    return Ok(None);
+                // See above: If the path solution satisfies exactly one constraint, use that
+                // constraint as our solution. (Even if the path solution is gradual: if we are
+                // checking `list[Any]` against `T: (int, list[int])`, we select `T = list[int]`.)
+                //
+                // If the path solution satisfies multiple constraints, then we use path solution
+                // as the result if it's gradual. (Checking `Any` against `T: (int, str)` selects
+                // `T = Any`) If the path solution is fully static, we choose the "tightest"
+                // constraint. (Checking `int` against `T: (int, int | str)` selects `T = int`.)
+                if multiple_compatible_constraints && path_bound.has_only_gradual_evidence() {
+                    Ok(None)
+                } else {
+                    Ok(Some(compatible_constraint))
                 }
-
-                // TODO: This is a stable half-punt. A constrained TypeVar must solve to exactly
-                // one of its declared constraints, not a union of them. Multiple compatible
-                // choices on one path and compatible choices spread across multiple paths both
-                // represent multiple exact candidate specializations; callers should not collapse
-                // those candidates via union. A future solver should handle the declared
-                // constraint choices at the whole-set level. Until then, pick the best compatible
-                // declared constraint on this path, preserving the TypeVar's declared constraint
-                // order for equivalent or incomparable candidates.
-                Ok(Some(compatible_constraint))
             }
         }
     }
@@ -6987,6 +7027,7 @@ mod tests {
             bound_typevar: t,
             lower: None,
             upper: UpperBound::none(),
+            has_only_gradual_evidence: false,
         };
 
         assert_eq!(
