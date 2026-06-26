@@ -5,6 +5,7 @@ use crate::Db;
 use crate::reachability::{narrow_type_by_constraint, type_narrowed_by_previous_patterns};
 use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
+use crate::types::generics::GenericContext;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::{Tuple, TupleLength, TupleType, TupleUnpacker};
@@ -1504,38 +1505,38 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             }
 
             if let Some(pattern_class) = context.class
-                && pattern_class
-                    .generic_context(self.db)
-                    .and_then(|generic_context| {
-                        pattern_class
-                            .instance_member(
-                                self.db,
-                                Some(generic_context.identity_specialization(self.db)),
-                                name.as_str(),
-                            )
-                            .place
-                            .ignore_possibly_undefined()
-                    })
-                    .is_some_and(|ty| ty.has_typevar(self.db))
+                && let Some(generic_context) = pattern_class.generic_context(self.db)
+                && let Some(pattern_member_ty) = pattern_class
+                    .instance_member(
+                        self.db,
+                        Some(generic_context.identity_specialization(self.db)),
+                        name.as_str(),
+                    )
+                    .place
+                    .ignore_possibly_undefined()
+                && pattern_member_ty.has_typevar(self.db)
             {
                 let unknown_pattern_class = pattern_class.unknown_specialization(self.db);
                 let unknown_pattern_member_ty = Type::instance(self.db, unknown_pattern_class)
                     .member(self.db, name.as_str())
                     .place
                     .ignore_possibly_undefined();
-                // For example, `Child[int]` and `Base[T]` share a generic hierarchy, so a `Base`
-                // pattern can reuse `int` from the subject. This does not infer `Child[int]` from
-                // a `Base[int]` subject.
-                if original_subject_ty
+                if let Some(specialized_member_ty) = original_subject_ty
+                    .nominal_class(self.db)
+                    .and_then(|subject_class| {
+                        self.specialize_pattern_member_for_subject(
+                            pattern_class,
+                            generic_context,
+                            pattern_member_ty,
+                            subject_class,
+                        )
+                    })
+                {
+                    member_ty = Some(specialized_member_ty);
+                } else if original_subject_ty
                     .nominal_class(self.db)
                     .is_some_and(|original_class| {
-                        unknown_pattern_class.is_subtype_of_class_literal(
-                            self.db,
-                            original_class.class_literal(self.db),
-                        ) || original_class.is_subtype_of_class_literal(
-                            self.db,
-                            unknown_pattern_class.class_literal(self.db),
-                        )
+                        original_class.is_subtype_of_class_literal(self.db, pattern_class)
                     })
                 {
                     // The pattern class's unknown specialization loses type arguments known
@@ -1584,6 +1585,33 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 })
             }))
             .collect()
+    }
+
+    /// Specialize a generic pattern class member using the type of a base-class subject.
+    ///
+    /// For `Child[T](Base[T])`, matching a `Base[int]` subject against `Child` constrains `T` to
+    /// `int`. More complex and variant base expressions can leave several valid specializations;
+    /// the projected member type contains the member type from all of them.
+    fn specialize_pattern_member_for_subject(
+        &self,
+        pattern_class: ClassLiteral<'db>,
+        generic_context: GenericContext<'db>,
+        pattern_member_ty: Type<'db>,
+        subject_class: ClassType<'db>,
+    ) -> Option<Type<'db>> {
+        let pattern_base = pattern_class
+            .identity_specialization(self.db)
+            .iter_mro(self.db)
+            .filter_map(ClassBase::into_class)
+            .find(|base| base.class_literal(self.db) == subject_class.class_literal(self.db))?;
+        // The matching pattern specialization must be a subtype of the subject. This direction
+        // matters for covariant and contravariant bases.
+        let bounds = Type::instance(self.db, pattern_base).assignable_solutions_with_inferable(
+            self.db,
+            Type::instance(self.db, subject_class),
+            generic_context.inferable_typevars(self.db),
+        );
+        bounds.project_type_over_solutions(self.db, generic_context, pattern_member_ty)
     }
 
     fn class_pattern_contexts(

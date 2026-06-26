@@ -101,15 +101,15 @@ use smallvec::SmallVec;
 use ty_python_core::rank::RankBitBox;
 
 use crate::types::class::GenericAlias;
-use crate::types::generics::InferableTypeVars;
+use crate::types::generics::{ApplySpecialization, GenericContext, InferableTypeVars};
 use crate::types::typevar::{BoundTypeVarIdentity, walk_bound_type_var_type};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionType,
+    BoundTypeVarInstance, IntersectionType, Type, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 
@@ -3346,6 +3346,14 @@ pub(crate) struct PathBound<'db> {
 }
 
 impl<'db> PathBound<'db> {
+    fn unconstrained(bound_typevar: BoundTypeVarInstance<'db>) -> Self {
+        Self {
+            bound_typevar,
+            lower: None,
+            upper: UpperBound::none(),
+        }
+    }
+
     pub(crate) fn exact(bound_typevar: BoundTypeVarInstance<'db>, ty: Type<'db>) -> Self {
         Self {
             bound_typevar,
@@ -3369,6 +3377,24 @@ impl<'db> PathBound<'db> {
 
     pub(crate) fn has_upper(&self) -> bool {
         self.upper.has_explicit_bound()
+    }
+
+    fn is_constraint_compatible(
+        &self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        constraint: Type<'db>,
+    ) -> bool {
+        let when_lower = self
+            .lower_or_never()
+            .when_constraint_set_assignable_to_owned(db, constraint.bottom_materialization(db));
+        let when_upper =
+            self.upper
+                .when_satisfied_by(db, builder, constraint.top_materialization(db));
+        let when = builder
+            .load(db, &when_lower)
+            .and(db, builder, || when_upper);
+        !when.is_never_satisfied(db)
     }
 }
 
@@ -3577,6 +3603,114 @@ impl<'db> PathBounds<'db> {
         Solutions::Constrained(solutions)
     }
 
+    /// Project `ty` over every specialization described by these bounds and return a type that
+    /// contains every possible result.
+    ///
+    /// Each typevar is replaced by `(lower | Unknown) & upper`, whose bottom and top
+    /// materializations are the lower and upper bounds for that typevar. Applying the top
+    /// materialization to the completed `ty` then selects the correct endpoint at each occurrence
+    /// according to its variance, while preserving the range inside invariant types.
+    pub(crate) fn project_type_over_solutions(
+        &self,
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+        ty: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let builder = ConstraintSetBuilder::new();
+        let project_path = |path: &[PathBound<'db>]| -> Result<Type<'db>, ()> {
+            let types = generic_context
+                .variables(db)
+                .map(|typevar| {
+                    let unconstrained = PathBound::unconstrained(typevar);
+                    let path_bound = path
+                        .iter()
+                        .find(|bound| bound.bound_typevar.is_same_typevar_as(db, typevar))
+                        .unwrap_or(&unconstrained);
+                    Self::typevar_solution_range(db, &builder, path_bound).map(Some)
+                })
+                .collect::<Result<Vec<_>, ()>>()?;
+            let specialization = generic_context.specialize_recursive(db, types);
+            Ok(ty
+                .apply_type_mapping(
+                    db,
+                    &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
+                        specialization,
+                    )),
+                    TypeContext::default(),
+                )
+                .top_materialization(db))
+        };
+
+        match self {
+            PathBounds::Unsatisfiable => None,
+            PathBounds::Unconstrained => project_path(&[]).ok(),
+            PathBounds::Constrained(paths) => {
+                let projected = paths.iter().filter_map(|path| project_path(path).ok());
+                let projected = projected.collect::<Vec<_>>();
+                (!projected.is_empty()).then(|| UnionType::from_elements(db, projected))
+            }
+        }
+    }
+
+    fn typevar_solution_range(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        path_bound: &PathBound<'db>,
+    ) -> Result<Type<'db>, ()> {
+        let typevar = path_bound.bound_typevar;
+        let (lower, upper) = match typevar.typevar(db).require_bound_or_constraints(db) {
+            TypeVarBoundOrConstraints::UpperBound(declared_upper) => {
+                let lower = path_bound.lower_or_never();
+                let Some(upper) = IntersectionType::bounded_from_elements(
+                    db,
+                    path_bound
+                        .upper
+                        .clauses
+                        .iter()
+                        .copied()
+                        .chain([declared_upper.top_materialization(db)]),
+                ) else {
+                    return Ok(Type::unknown());
+                };
+                if !is_possibly_constraint_set_assignable(db, lower, upper) {
+                    return Err(());
+                }
+                (lower, upper)
+            }
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                let compatible = constraints
+                    .elements(db)
+                    .iter()
+                    .filter(|constraint| {
+                        path_bound.is_constraint_compatible(db, builder, **constraint)
+                    })
+                    .copied()
+                    .collect::<Vec<_>>();
+                if compatible.is_empty() {
+                    return Err(());
+                }
+                let lower = IntersectionType::from_elements(
+                    db,
+                    compatible.iter().map(|ty| ty.bottom_materialization(db)),
+                );
+                let upper = UnionType::from_elements(
+                    db,
+                    compatible.iter().map(|ty| ty.top_materialization(db)),
+                );
+                (lower, upper)
+            }
+        };
+
+        if lower.is_equivalent_to(db, upper) {
+            return Ok(lower);
+        }
+        Ok(IntersectionType::from_two_elements(
+            db,
+            UnionType::from_two_elements(db, lower, Type::unknown()),
+            upper,
+        ))
+    }
+
     /// The default solution selection logic for a single typevar on a single BDD path.
     ///
     /// Given the explicit lower and upper bounds for a typevar, selects the solution type.
@@ -3592,7 +3726,6 @@ impl<'db> PathBounds<'db> {
         path_bound: &PathBound<'db>,
     ) -> Result<Option<Type<'db>>, ()> {
         let bound_typevar = path_bound.bound_typevar;
-        let lower = path_bound.lower_or_never();
         match bound_typevar.typevar(db).require_bound_or_constraints(db) {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
                 let declared_upper = bound.top_materialization(db);
@@ -3637,18 +3770,7 @@ impl<'db> PathBounds<'db> {
             TypeVarBoundOrConstraints::Constraints(constraints) => {
                 // Filter out the typevar constraints that aren't satisfied by this path.
                 let compatible_constraints = constraints.elements(db).iter().filter(|constraint| {
-                    let constraint_lower = constraint.bottom_materialization(db);
-                    let constraint_upper = constraint.top_materialization(db);
-                    let when_lower =
-                        lower.when_constraint_set_assignable_to_owned(db, constraint_lower);
-                    let when_upper =
-                        path_bound
-                            .upper
-                            .when_satisfied_by(db, builder, constraint_upper);
-                    let when = builder
-                        .load(db, &when_lower)
-                        .and(db, builder, || when_upper);
-                    !when.is_never_satisfied(db)
+                    path_bound.is_constraint_compatible(db, builder, **constraint)
                 });
 
                 // If only one constraint remains, that's our specialization for this path.

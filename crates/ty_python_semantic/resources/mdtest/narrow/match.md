@@ -866,24 +866,60 @@ def test_incompatible_declared_class_capture(value: PatternBox[int]) -> None:
 
 ## Generic subclass captures
 
-We do not yet infer a generic subclass's type arguments from its base class. Attributes declared
-only on the subclass therefore use `Unknown` for those arguments, but still retain types such as
-`list[Unknown]`. Attributes inherited from a generic base can use type arguments from the subject.
-When the subject does not provide type arguments, members declared by the pattern class use
-`Unknown`; a type parameter default does not restrict which instances match at runtime.
+When a generic pattern class is a subclass of the subject's class, attributes declared on the
+pattern class include every type possible for a specialization that can match the subject. An
+invariant base can fix a type argument exactly. Covariant or contravariant bases may only restrict
+one end of the possible arguments, so the attribute type is computed from that whole range. Type
+parameters that the base does not constrain use their declared bound or constraints, not their
+default.
 
 ```py
 from typing import final, Generic
 from typing_extensions import TypeVar
 
 GenericPatternT = TypeVar("GenericPatternT")
+CovariantGenericPatternT = TypeVar("CovariantGenericPatternT", covariant=True)
+ContravariantGenericPatternT = TypeVar("ContravariantGenericPatternT", contravariant=True)
 DefaultGenericPatternT = TypeVar("DefaultGenericPatternT", default=str)
+ExtraGenericPatternT = TypeVar("ExtraGenericPatternT", default=str)
+ConstrainedGenericPatternT = TypeVar("ConstrainedGenericPatternT", int, str)
+BoundedGenericPatternT = TypeVar("BoundedGenericPatternT", bound=str)
 
 class GenericPatternBase(Generic[GenericPatternT]): ...
 
 class GenericPatternChild(GenericPatternBase[GenericPatternT]):
     item: GenericPatternT
     items: list[GenericPatternT]
+
+class PartiallySpecializedGenericPatternChild(
+    GenericPatternBase[GenericPatternT],
+    Generic[GenericPatternT, ExtraGenericPatternT],
+):
+    item: GenericPatternT
+    extra: ExtraGenericPatternT
+
+class WrappedGenericPatternChild(GenericPatternBase[list[GenericPatternT]]):
+    item: GenericPatternT
+
+class ConstrainedGenericPatternChild(GenericPatternBase[int], Generic[ConstrainedGenericPatternT]):
+    item: ConstrainedGenericPatternT
+
+class BoundedGenericPatternChild(GenericPatternBase[int], Generic[BoundedGenericPatternT]):
+    item: BoundedGenericPatternT
+
+class GenericPatternSink(Generic[ContravariantGenericPatternT]): ...
+class CovariantGenericPatternBase(Generic[CovariantGenericPatternT]): ...
+
+class CovariantGenericPatternChild(CovariantGenericPatternBase[GenericPatternT]):
+    item: GenericPatternT
+    sink: GenericPatternSink[GenericPatternT]
+
+class ContravariantGenericPatternBase(Generic[ContravariantGenericPatternT]): ...
+
+class ContravariantGenericPatternChild(ContravariantGenericPatternBase[GenericPatternT]):
+    item: GenericPatternT
+    items: list[GenericPatternT]
+    sink: GenericPatternSink[GenericPatternT]
 
 class GenericMemberBase(Generic[GenericPatternT]):
     item: GenericPatternT
@@ -901,16 +937,61 @@ class DefaultGenericPatternBox(Generic[DefaultGenericPatternT]):
 def test_match_generic_subclass_capture(value: GenericPatternBase[int]) -> None:
     match value:
         case GenericPatternChild(item=item):
-            # TODO: This should be `int` once generic subclass specialization is supported.
-            reveal_type(item)  # revealed: Unknown
+            reveal_type(item)  # revealed: int
 
 def test_match_nested_generic_subclass_capture(value: GenericPatternBase[int]) -> list[int]:
     match value:
         case GenericPatternChild(items=items):
-            # TODO: This should be `list[int]` once generic subclass specialization is supported.
-            reveal_type(items)  # revealed: list[Unknown]
+            reveal_type(items)  # revealed: list[int]
             return items
     return []
+
+def test_match_partially_specialized_generic_subclass(
+    value: GenericPatternBase[int],
+) -> None:
+    match value:
+        case PartiallySpecializedGenericPatternChild(item=item, extra=extra):
+            reveal_type(item)  # revealed: int
+            reveal_type(extra)  # revealed: object
+
+def test_match_generic_subclass_through_transformed_base(
+    value: GenericPatternBase[list[int]],
+) -> None:
+    match value:
+        case WrappedGenericPatternChild(item=item):
+            reveal_type(item)  # revealed: int
+
+def test_match_unconstrained_subclass_parameter_uses_constraints(
+    value: GenericPatternBase[int],
+) -> None:
+    match value:
+        case ConstrainedGenericPatternChild(item=item):
+            reveal_type(item)  # revealed: int | str
+
+def test_match_unconstrained_subclass_parameter_uses_bound(
+    value: GenericPatternBase[int],
+) -> None:
+    match value:
+        case BoundedGenericPatternChild(item=item):
+            reveal_type(item)  # revealed: str
+
+def test_match_covariant_generic_subclass(
+    value: CovariantGenericPatternBase[int],
+) -> None:
+    match value:
+        case CovariantGenericPatternChild(item=item, sink=sink):
+            reveal_type(item)  # revealed: int
+            reveal_type(sink)  # revealed: GenericPatternSink[Never]
+
+def test_match_contravariant_generic_subclass(
+    value: ContravariantGenericPatternBase[int],
+) -> None:
+    match value:
+        case ContravariantGenericPatternChild(item=item, items=items, sink=sink):
+            # The subject can be a `ContravariantGenericPatternChild[object]`.
+            reveal_type(item)  # revealed: object
+            reveal_type(items)  # revealed: Top[list[int | Unknown]]
+            reveal_type(sink)  # revealed: GenericPatternSink[int]
 
 def test_match_inherited_generic_subclass_capture(
     value: GenericMemberBase[GenericPatternT],
@@ -937,8 +1018,8 @@ def test_match_direct_generic_pattern_preserves_declared_member(value: object) -
 
 def test_match_generic_pattern_ignores_typevar_default(value: object) -> None:
     match value:
-        case DefaultGenericPatternBox(value=int() as item):
-            reveal_type(item)  # revealed: Unknown & int
+        case DefaultGenericPatternBox(value=item):
+            reveal_type(item)  # revealed: object
 ```
 
 ## Positional class patterns
