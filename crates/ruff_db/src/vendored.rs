@@ -176,7 +176,13 @@ impl VendoredFileSystem {
 
     /// Creates a reader with its own cursor over the shared archive data.
     ///
-    /// Cloning the reader shares both the archive bytes and the parsed central-directory metadata.
+    /// `ZipArchive` stores the current seek position in its reader. Cloning it gives each operation
+    /// an independent cursor, so reads can seek and decompress files concurrently without
+    /// synchronizing access to shared reader state.
+    ///
+    /// The clone is cheap: `ZipArchive` shares its parsed central-directory metadata, while
+    /// `ArchiveData` either copies a static reference or increments an `Arc` reference count. The
+    /// ZIP bytes themselves are never copied.
     fn archive_reader(&self) -> VendoredZipArchive {
         self.inner.as_ref().clone()
     }
