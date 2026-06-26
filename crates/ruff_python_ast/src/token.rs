@@ -7,6 +7,8 @@
 
 use std::fmt;
 
+use bitflags::bitflags;
+
 use crate::str::{Quote, TripleQuotes};
 use crate::str_prefix::{
     AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix, TStringPrefix,
@@ -108,8 +110,7 @@ impl Token {
         )
     }
 
-    const DIRECT_KIND_COUNT: u8 = TokenKind::Unknown as u8 + 1;
-    const NON_ASCII_NAME: u8 = Self::DIRECT_KIND_COUNT;
+    const NON_ASCII_NAME: u8 = TokenKind::Unknown as u8 + 1;
     const STRING_START: u8 = Self::NON_ASCII_NAME + 1;
     const INTERPOLATED_STRING_START: u8 = Self::STRING_START + 7 * 8;
     const UNCLOSED_NEWLINE: u8 = Self::INTERPOLATED_STRING_START + 6 * 12;
@@ -892,7 +893,7 @@ impl fmt::Display for TokenKind {
     }
 }
 
-bitflags::bitflags! {
+bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub struct TokenFlags: u16 {
         /// The token is a string with double quotes (`"`).
@@ -1064,15 +1065,10 @@ mod tests {
             assert_eq!(token.as_tuple(), (kind, range));
         }
 
-        for encoded in 0..Token::DIRECT_KIND_COUNT {
-            let token = Token {
-                start: [0; 4],
-                end: [0; 4],
-                kind_and_flags: encoded,
-            };
-            let (kind, flags) = token.kind_and_flags();
-            assert_eq!(kind as u8, encoded);
-            assert!(flags.is_empty());
+        for encoded in u8::MIN..=u8::MAX {
+            if let Some(kind) = TokenKind::from_repr(encoded) {
+                assert_round_trip(kind, TokenFlags::empty());
+            }
         }
         assert_round_trip(TokenKind::Name, TokenFlags::NON_ASCII_NAME);
         assert_round_trip(TokenKind::Newline, TokenFlags::UNCLOSED_STRING);
@@ -1097,41 +1093,27 @@ mod tests {
             }
         }
 
-        let interpolated = [
-            (
-                [
-                    TokenKind::FStringStart,
-                    TokenKind::FStringMiddle,
-                    TokenKind::FStringEnd,
-                ],
-                TokenFlags::F_STRING,
-            ),
-            (
-                [
-                    TokenKind::TStringStart,
-                    TokenKind::TStringMiddle,
-                    TokenKind::TStringEnd,
-                ],
-                TokenFlags::T_STRING,
-            ),
-        ];
-        for (kinds, prefix) in interpolated {
-            for kind in kinds {
-                for raw in [
-                    TokenFlags::empty(),
-                    TokenFlags::RAW_STRING_LOWERCASE,
-                    TokenFlags::RAW_STRING_UPPERCASE,
-                ] {
-                    for quote_status in 0..4 {
-                        assert_round_trip(
-                            kind,
-                            TokenFlags::with_string_status(prefix.union(raw), quote_status),
-                        );
-                    }
+        for (kind, prefix) in [
+            (TokenKind::FStringStart, TokenFlags::F_STRING),
+            (TokenKind::FStringMiddle, TokenFlags::F_STRING),
+            (TokenKind::FStringEnd, TokenFlags::F_STRING),
+            (TokenKind::TStringStart, TokenFlags::T_STRING),
+            (TokenKind::TStringMiddle, TokenFlags::T_STRING),
+            (TokenKind::TStringEnd, TokenFlags::T_STRING),
+        ] {
+            for raw in [
+                TokenFlags::empty(),
+                TokenFlags::RAW_STRING_LOWERCASE,
+                TokenFlags::RAW_STRING_UPPERCASE,
+            ] {
+                for quote_status in 0..4 {
+                    assert_round_trip(
+                        kind,
+                        TokenFlags::with_string_status(prefix.union(raw), quote_status),
+                    );
                 }
-                assert_round_trip(kind, TokenFlags::empty());
-                assert_round_trip(kind, TokenFlags::UNCLOSED_STRING);
             }
+            assert_round_trip(kind, TokenFlags::UNCLOSED_STRING);
         }
     }
 }
