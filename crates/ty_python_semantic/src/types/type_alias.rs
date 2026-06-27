@@ -1,5 +1,8 @@
 use std::cell::RefCell;
+use std::collections::hash_map::Entry;
 use std::fmt::Write;
+
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
     Db,
@@ -316,6 +319,12 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum TypeAliasIdentity<'db> {
+    PEP695(ScopeId<'db>),
+    ManualPEP695(Definition<'db>),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub enum TypeAliasType<'db> {
     /// A type alias defined using the PEP 695 `type` statement.
@@ -324,9 +333,48 @@ pub enum TypeAliasType<'db> {
     ManualPEP695(ManualPEP695TypeAliasType<'db>),
 }
 
+struct AliasDependencyGraph<'db> {
+    db: &'db dyn Db,
+    dependencies: FxHashMap<TypeAliasIdentity<'db>, Vec<TypeAliasType<'db>>>,
+}
+
+impl<'db> AliasDependencyGraph<'db> {
+    fn new(db: &'db dyn Db) -> Self {
+        Self {
+            db,
+            dependencies: FxHashMap::default(),
+        }
+    }
+
+    fn dependencies(&mut self, alias: TypeAliasType<'db>) -> &[TypeAliasType<'db>] {
+        let identity = alias.identity(self.db);
+        match self.dependencies.entry(identity) {
+            Entry::Occupied(entry) => entry.into_mut(),
+            Entry::Vacant(entry) => {
+                let dependencies =
+                    AliasDependencyCollector::collect(self.db, alias.raw_value_type(self.db));
+                entry.insert(dependencies)
+            }
+        }
+    }
+
+    fn dependencies_vec(&mut self, alias: TypeAliasType<'db>) -> Vec<TypeAliasType<'db>> {
+        self.dependencies(alias).to_vec()
+    }
+}
+
 impl<'db> TypeAliasType<'db> {
+    fn identity(self, db: &'db dyn Db) -> TypeAliasIdentity<'db> {
+        match self {
+            TypeAliasType::PEP695(alias) => TypeAliasIdentity::PEP695(alias.rhs_scope(db)),
+            TypeAliasType::ManualPEP695(alias) => {
+                TypeAliasIdentity::ManualPEP695(alias.definition(db))
+            }
+        }
+    }
+
     pub(crate) fn has_same_definition(self, db: &'db dyn Db, other: Self) -> bool {
-        self.definition(db) == other.definition(db)
+        self.identity(db) == other.identity(db)
     }
 
     pub(crate) fn is_in_component(self, db: &'db dyn Db, component: &[Self]) -> bool {
@@ -338,55 +386,55 @@ impl<'db> TypeAliasType<'db> {
     fn recursive_component(self, db: &'db dyn Db) -> Option<Vec<Self>> {
         // Fold a recursive alias against the strongly connected component that contains it.
         // Other components reachable from this alias remain ordinary aliases.
+        let mut graph = AliasDependencyGraph::new(db);
+        let dependencies = graph.dependencies_vec(self);
+        if dependencies.is_empty() {
+            return None;
+        }
+
+        let root = self.identity(db);
         let mut reachable = Vec::new();
-        self.collect_reachable_aliases(db, &mut reachable);
+        let mut seen = FxHashSet::default();
+        let mut predecessors: FxHashMap<TypeAliasIdentity<'db>, Vec<Self>> = FxHashMap::default();
+        let mut stack = vec![self];
+
+        while let Some(alias) = stack.pop() {
+            let identity = alias.identity(db);
+            if !seen.insert(identity) {
+                continue;
+            }
+            reachable.push(alias);
+
+            for dependency in graph.dependencies_vec(alias) {
+                predecessors
+                    .entry(dependency.identity(db))
+                    .or_default()
+                    .push(alias);
+                stack.push(dependency);
+            }
+        }
+
+        let mut component_identities = FxHashSet::default();
+        let mut stack = vec![self];
+        while let Some(alias) = stack.pop() {
+            let identity = alias.identity(db);
+            if !seen.contains(&identity) || !component_identities.insert(identity) {
+                continue;
+            }
+            if let Some(predecessors) = predecessors.get(&identity) {
+                stack.extend(predecessors.iter().copied());
+            }
+        }
 
         let component = reachable
             .into_iter()
-            .filter(|alias| alias.can_reach_alias(db, self, &mut Vec::new()))
+            .filter(|alias| component_identities.contains(&alias.identity(db)))
             .collect::<Vec<_>>();
-        if component.len() > 1
-            || self
-                .raw_dependencies(db)
-                .iter()
-                .any(|alias| alias.has_same_definition(db, self))
-        {
+        if component.len() > 1 || dependencies.iter().any(|alias| alias.identity(db) == root) {
             Some(component)
         } else {
             None
         }
-    }
-
-    fn collect_reachable_aliases(self, db: &'db dyn Db, reachable: &mut Vec<Self>) {
-        if reachable
-            .iter()
-            .any(|alias| alias.has_same_definition(db, self))
-        {
-            return;
-        }
-        reachable.push(self);
-
-        for dependency in self.raw_dependencies(db) {
-            dependency.collect_reachable_aliases(db, reachable);
-        }
-    }
-
-    fn can_reach_alias(self, db: &'db dyn Db, target: Self, seen: &mut Vec<Self>) -> bool {
-        if self.has_same_definition(db, target) {
-            return true;
-        }
-        if seen.iter().any(|alias| alias.has_same_definition(db, self)) {
-            return false;
-        }
-        seen.push(self);
-
-        self.raw_dependencies(db)
-            .into_iter()
-            .any(|dependency| dependency.can_reach_alias(db, target, seen))
-    }
-
-    fn raw_dependencies(self, db: &'db dyn Db) -> Vec<Self> {
-        AliasDependencyCollector::collect(db, self.raw_value_type(db))
     }
 }
 

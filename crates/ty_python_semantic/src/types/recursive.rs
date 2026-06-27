@@ -53,7 +53,7 @@ impl<'db> RecursiveOrigin<'db> {
         match (self, ty) {
             (Self::Implicit, _) => false,
             (Self::TypeAlias(alias), Type::TypeAlias(other)) => {
-                alias.definition(db) == other.definition(db)
+                alias.has_same_definition(db, other)
             }
             _ => false,
         }
