@@ -86,6 +86,7 @@ class Permission(OrMixin, Flag):
 
 reveal_type(Permission.READ | Permission.WRITE)  # revealed: Literal[Permission.READ, Permission.WRITE]
 Permission.READ | 0  # error: [unsupported-operator]
+reveal_type(0 | ReprFlag.READ)  # revealed: Literal[ReprFlag.READ]
 
 def repr_flag_or_int(condition: bool) -> ReprFlag:
     return ReprFlag.READ | (ReprFlag.WRITE if condition else 0)
@@ -98,6 +99,9 @@ class CustomFlag(FlagValue, ReprEnum, Flag):
 
 def custom_flag_or_value(value: FlagValue) -> CustomFlag:
     return CustomFlag.READ | value
+
+def value_or_custom_flag(value: FlagValue) -> CustomFlag:
+    return value | CustomFlag.READ
 
 class IntPermission(IntFlag):
     READ = 1
