@@ -2,8 +2,8 @@
 
 Checks for `ty: ignore` comments that don't specify which rules to ignore.
 
-When `unused-ignore-comment` is enabled, unused blanket comments are reported
-by that rule instead.
+Unused blanket comments aren't reported by this rule because they don't suppress
+any diagnostics. Enable `unused-ignore-comment` to report them separately.
 
 ## Why is this bad?
 

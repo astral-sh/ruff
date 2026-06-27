@@ -1,8 +1,8 @@
 # Blanket `ty: ignore` comments
 
 The optional `blanket-ignore-comment` rule requires `ty: ignore` comments to include specific rule
-codes. When `unused-ignore-comment` is enabled, unused blanket comments are reported by that rule
-instead.
+codes. Unused blanket comments aren't reported because they don't suppress any diagnostics; use
+`unused-ignore-comment` to report them separately.
 
 ```toml
 [rules]
@@ -27,10 +27,9 @@ d = 1  # ty: ignore[]
 e = 1  # ty: ignore
 ```
 
-## Disabled unused-ignore rule
+## Unused blanket ignores
 
-When `unused-ignore-comment` is disabled, unused blanket comments are reported by
-`blanket-ignore-comment`:
+Unused blanket comments aren't reported by this rule, even when `unused-ignore-comment` is disabled:
 
 ```toml
 [rules]
@@ -39,7 +38,6 @@ unused-ignore-comment = "ignore"
 ```
 
 ```py
-# error: [blanket-ignore-comment]
 a = 1  # ty: ignore
 ```
 
