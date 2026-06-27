@@ -58,6 +58,15 @@ declare_lint! {
     }
 }
 
+declare_lint! {
+    #[doc = include_str!("../resources/lint_docs/blanket-ignore-comment.md")]
+    pub(crate) static BLANKET_IGNORE_COMMENT = {
+        summary: "detects blanket `ty: ignore` comments",
+        status: LintStatus::stable("0.0.55"),
+        default_level: Level::Ignore,
+    }
+}
+
 pub fn is_unused_ignore_comment_lint(name: LintName) -> bool {
     name == UNUSED_IGNORE_COMMENT.name() || name == UNUSED_TYPE_IGNORE_COMMENT.name()
 }
@@ -127,9 +136,43 @@ pub(crate) fn check_suppressions(
 
     check_unknown_rule(&mut context);
     check_invalid_suppression(&mut context);
+    check_blanket_suppressions(&mut context);
     check_unused_suppressions(&mut context);
 
     context.diagnostics.into_inner().into_diagnostics()
+}
+
+fn check_blanket_suppressions(context: &mut CheckSuppressionsContext) {
+    if context.is_lint_disabled(&BLANKET_IGNORE_COMMENT) {
+        return;
+    }
+
+    let unused_ignore_enabled = !context.is_lint_disabled(&UNUSED_IGNORE_COMMENT);
+
+    for suppression in context.suppressions.iter().filter(|suppression| {
+        suppression.kind == SuppressionKind::Ty && suppression.target == SuppressionTarget::All
+    }) {
+        if unused_ignore_enabled && !context.is_suppression_used(suppression.id()) {
+            continue;
+        }
+
+        // A blanket suppression cannot suppress its own diagnostic, but a code-specific
+        // suppression can.
+        if let Some(code_suppression) = context
+            .suppressions
+            .lint_suppressions(suppression.range, LintId::of(&BLANKET_IGNORE_COMMENT))
+            .find(|candidate| candidate.target.is_lint())
+        {
+            context
+                .diagnostics
+                .borrow_mut()
+                .mark_used(code_suppression.id());
+        } else if let Some(diag) =
+            context.report_unchecked(&BLANKET_IGNORE_COMMENT, suppression.range)
+        {
+            diag.into_diagnostic("Use specific rule codes in `ty: ignore`");
+        }
+    }
 }
 
 /// Checks for `ty: ignore` and `type: ignore[ty:<code>]` comments that reference unknown rules.
