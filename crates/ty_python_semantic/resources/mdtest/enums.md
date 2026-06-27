@@ -34,7 +34,7 @@ python-version = "3.13"
 ```
 
 ```py
-from enum import Enum, Flag, ReprEnum
+from enum import Enum, Flag, IntFlag, ReprEnum
 from typing import Literal
 
 class StringMixin:
@@ -52,6 +52,17 @@ class ReprNumber(int, ReprEnum):
 
 class ReprFlag(int, ReprEnum, Flag):
     READ = 1
+    WRITE = 2
+
+class FlagValue(int):
+    pass
+
+class CustomFlag(FlagValue, ReprEnum, Flag):
+    READ = 1
+
+class IntPermission(IntFlag):
+    READ = 1
+    WRITE = 2
 
 class OrMixin:
     def __or__(self, other: object) -> Literal["mixin"]:
@@ -59,6 +70,7 @@ class OrMixin:
 
 class Permission(OrMixin, Flag):
     READ = 1
+    WRITE = 2
 
 reveal_type(Mixed.MEMBER.__str__)  # revealed: bound method Mixed.__str__() -> Literal["mixin"]
 reveal_type(Number.ONE.__str__)  # revealed: bound method Number.__str__() -> str
@@ -66,6 +78,25 @@ reveal_type(ReprNumber.ONE.__str__)  # revealed: bound method ReprNumber.__repr_
 reveal_type(ReprFlag.READ.__str__)  # revealed: bound method Literal[ReprFlag.READ].__repr__() -> str
 # revealed: bound method Literal[Permission.READ].__or__(other: Literal[Permission.READ]) -> Literal[Permission.READ]
 reveal_type(Permission.READ.__or__)
+reveal_type(Permission.READ | Permission.WRITE)  # revealed: Literal[Permission.READ, Permission.WRITE]
+Permission.READ | 0  # error: [unsupported-operator]
+
+def repr_flag_features(condition: bool) -> ReprFlag:
+    return ReprFlag.READ | (ReprFlag.WRITE if condition else 0)
+
+def custom_flag_features(value: FlagValue) -> CustomFlag:
+    return CustomFlag.READ | value
+
+def int_flag_features(condition: bool) -> IntPermission:
+    return IntPermission.READ | (IntPermission.WRITE if condition else 0)
+
+class Entity:
+    features: IntPermission | None
+
+    def update(self, condition: bool) -> None:
+        self.features = (self.features or 0) | IntPermission.READ | IntPermission.WRITE
+        if condition:
+            self.features |= IntPermission.WRITE
 ```
 
 For standard-library enum classes, we preserve literal `.value` types when we can model how the data

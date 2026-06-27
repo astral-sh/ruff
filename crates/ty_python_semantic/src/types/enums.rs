@@ -12,14 +12,15 @@ use crate::{
     },
     reachability::DeclarationsIteratorExtension,
     types::{
-        ClassBase, ClassLiteral, ClassType, DynamicType, EnumLiteralType, IntersectionType,
-        KnownClass, LiteralValueTypeKind, MemberLookupPolicy, NegativeIntersectionElements,
-        StaticClassLiteral, Type, UnionType, binding_type,
+        CallableType, ClassBase, ClassLiteral, ClassType, DynamicType, EnumLiteralType,
+        IntersectionType, KnownClass, LiteralValueTypeKind, MemberLookupPolicy,
+        NegativeIntersectionElements, StaticClassLiteral, Type, UnionType, binding_type,
         function::FunctionType,
         set_theoretic::{
             RecursivelyDefined,
             builder::{IntersectionBuilder, UnionBuilder},
         },
+        signatures::{CallableSignature, Parameters},
     },
 };
 use ty_module_resolver::KnownModule;
@@ -1303,11 +1304,8 @@ pub(crate) fn enum_class_creation_synthesized_member<'db>(
         && Program::get(db).python_version(db) >= PythonVersion::PY311
         && class_type_mro_contains(db, class.identity_specialization(db), KnownClass::Flag)
     {
-        return class_member_type(
-            db,
-            KnownClass::Flag.to_class_literal(db).to_class_type(db)?,
-            name,
-        );
+        let data_type = enum_data_type_class(db, class)?;
+        return flag_operator_member_type(db, data_type, name);
     }
 
     if !is_enum_representation_method {
@@ -1356,6 +1354,47 @@ pub(crate) fn enum_class_creation_synthesized_member<'db>(
     }
 
     class_member_type(db, first_enum, name)
+}
+
+fn flag_operator_member_type<'db>(
+    db: &'db dyn Db,
+    data_type: ClassType<'db>,
+    name: &str,
+) -> Option<Type<'db>> {
+    let flag = KnownClass::Flag.to_class_literal(db).to_class_type(db)?;
+    let member = class_member_type(db, flag, name)?;
+    if name == "__invert__" || data_type.known(db) == Some(KnownClass::Object) {
+        return Some(member);
+    }
+
+    let data_type = Type::instance(db, data_type);
+    Some(
+        member
+            .try_upcast_to_callable(db)?
+            .map(|callable| {
+                // Keep the `Self` overload so that combining two known members preserves both
+                // literals, and add the enum's data type as the operand accepted at runtime.
+                let signatures = CallableSignature::from_overloads(
+                    callable.signatures(db).iter().flat_map(|signature| {
+                        let data_type_signature =
+                            if let [receiver, operand] = signature.parameters().as_slice() {
+                                Some(signature.clone().with_parameters(Parameters::new(
+                                    db,
+                                    [
+                                        receiver.clone(),
+                                        operand.clone().with_annotated_type(data_type),
+                                    ],
+                                )))
+                            } else {
+                                None
+                            };
+                        std::iter::once(signature.clone()).chain(data_type_signature)
+                    }),
+                );
+                CallableType::new(db, signatures, callable.kind(db), callable.provenance(db))
+            })
+            .into_type(db),
+    )
 }
 
 fn class_type_mro_contains<'db>(db: &'db dyn Db, class: ClassType<'db>, known: KnownClass) -> bool {
