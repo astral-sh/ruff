@@ -314,6 +314,7 @@ fn run_test(
         }
         .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
         .expect("Failed to resolve search path settings"),
+        python_executable: None,
     };
 
     Program::init_or_update(db, settings);

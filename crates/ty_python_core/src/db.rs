@@ -153,6 +153,7 @@ pub(crate) mod tests {
                     search_paths: SearchPathSettings::new(vec![src_root])
                         .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
                         .context("Invalid search path settings")?,
+                    python_executable: None,
                 },
             );
 

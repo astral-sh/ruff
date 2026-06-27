@@ -142,6 +142,8 @@ pub enum KnownClass {
     Template,
     // pathlib
     Path,
+    // unittest
+    UnittestTestCase,
     // functools
     FunctoolsPartial,
     // ty_extensions
@@ -200,7 +202,8 @@ impl KnownClass {
             | Self::CoroutineType
             | Self::BuiltinFunctionType
             | Self::Template
-            | Self::Path => Some(Truthiness::AlwaysTrue),
+            | Self::Path
+            | Self::UnittestTestCase => Some(Truthiness::AlwaysTrue),
 
             Self::NoneType => Some(Truthiness::AlwaysFalse),
 
@@ -384,6 +387,7 @@ impl KnownClass {
             | KnownClass::ProtocolMeta
             | KnownClass::Template
             | KnownClass::Path
+            | KnownClass::UnittestTestCase
             | KnownClass::FunctoolsPartial => false,
         }
     }
@@ -488,6 +492,7 @@ impl KnownClass {
             | KnownClass::ProtocolMeta
             | KnownClass::Template
             | KnownClass::Path
+            | KnownClass::UnittestTestCase
             | KnownClass::FunctoolsPartial => false,
         }
     }
@@ -591,6 +596,7 @@ impl KnownClass {
             | KnownClass::ProtocolMeta
             | KnownClass::Template
             | KnownClass::Path
+            | KnownClass::UnittestTestCase
             | KnownClass::FunctoolsPartial => false,
         }
     }
@@ -705,6 +711,7 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::Template
             | Self::Path
+            | Self::UnittestTestCase
             | Self::FunctoolsPartial
             | Self::Mapping
             | Self::Sequence => false,
@@ -813,7 +820,8 @@ impl KnownClass {
             | KnownClass::FunctoolsPartial
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
-            | KnownClass::Specialization => false,
+            | KnownClass::Specialization
+            | KnownClass::UnittestTestCase => false,
             KnownClass::NamedTupleFallback | KnownClass::TypedDictFallback => true,
         }
     }
@@ -928,6 +936,7 @@ impl KnownClass {
             Self::TypedDictFallback => "TypedDictFallback",
             Self::Template => "Template",
             Self::Path => "Path",
+            Self::UnittestTestCase => "TestCase",
             Self::FunctoolsPartial => "partial",
             Self::ProtocolMeta => "_ProtocolMeta",
         }
@@ -1298,6 +1307,7 @@ impl KnownClass {
             | Self::TyExtensionsIterator => KnownModule::TyExtensions,
             Self::Template => KnownModule::Templatelib,
             Self::Path => KnownModule::Pathlib,
+            Self::UnittestTestCase => KnownModule::UnittestCase,
             Self::FunctoolsPartial => KnownModule::Functools,
         }
     }
@@ -1404,6 +1414,7 @@ impl KnownClass {
             | Self::Template
             | Self::Path
             | Self::UnionType
+            | Self::UnittestTestCase
             | Self::FunctoolsPartial => Some(false),
 
             Self::Tuple => None,
@@ -1513,6 +1524,7 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::Template
             | Self::Path
+            | Self::UnittestTestCase
             | Self::FunctoolsPartial => false,
         }
     }
@@ -1620,6 +1632,7 @@ impl KnownClass {
             "TypedDictFallback" => &[Self::TypedDictFallback],
             "Template" => &[Self::Template],
             "Path" => &[Self::Path],
+            "TestCase" => &[Self::UnittestTestCase],
             "partial" => &[Self::FunctoolsPartial],
             "_ProtocolMeta" => &[Self::ProtocolMeta],
             _ => return None,
@@ -1716,6 +1729,7 @@ impl KnownClass {
             | Self::AsyncGenerator
             | Self::Template
             | Self::Path
+            | Self::UnittestTestCase
             | Self::FunctoolsPartial => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm

@@ -272,6 +272,15 @@ impl Options {
             strategy,
         ))?;
 
+        let python_executable = python_environment.as_ref().map(|env| {
+            let sys_prefix = env.sys_prefix();
+            if cfg!(windows) {
+                sys_prefix.join("Scripts/python.exe")
+            } else {
+                sys_prefix.join("bin/python")
+            }
+        });
+
         tracing::info!(
             "Python version: Python {python_version}, platform: {python_platform}",
             python_version = python_version.version
@@ -282,6 +291,7 @@ impl Options {
                 python_version,
                 python_platform,
                 search_paths,
+                python_executable,
             },
             diagnostics,
         ))

@@ -52,6 +52,9 @@ expression: initialization_result
         "quickfix"
       ]
     },
+    "codeLensProvider": {
+      "resolveProvider": false
+    },
     "workspaceSymbolProvider": true,
     "renameProvider": {
       "prepareProvider": true
@@ -60,7 +63,8 @@ expression: initialization_result
     "selectionRangeProvider": true,
     "executeCommandProvider": {
       "commands": [
-        "ty.printDebugInformation"
+        "ty.printDebugInformation",
+        "ty.runTest"
       ],
       "workDoneProgress": false
     },
