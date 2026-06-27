@@ -100,6 +100,45 @@ fn generic_alias_cycle_recovery_rejects_unsafe_merges() {
     );
 }
 
+#[test]
+fn cycle_previous_folding_uses_guarded_occurrences() {
+    let db = setup_db();
+    let binder_id = BinderId::new(salsa::Id::from_bits(1));
+    let marker = Type::divergent(binder_id.into_id());
+    let previous =
+        KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+    let str_instance = KnownClass::Str.to_instance(&db);
+    let mapping = TypeMapping::FoldCyclePrevious {
+        binder_id,
+        replacement: previous,
+        guarded: false,
+    };
+
+    let guarded_current = KnownClass::List.to_specialized_instance(&db, &[previous]);
+    let guarded_expected = KnownClass::List.to_specialized_instance(&db, &[marker]);
+    assert_eq!(
+        guarded_current.apply_type_mapping(&db, &mapping, TypeContext::default()),
+        guarded_expected
+    );
+
+    let guarded_union = UnionType::from_elements(&db, [previous, str_instance]);
+    let guarded_union_current = KnownClass::List.to_specialized_instance(&db, &[guarded_union]);
+    let guarded_union_expected = KnownClass::List.to_specialized_instance(
+        &db,
+        &[UnionType::from_elements(&db, [marker, str_instance])],
+    );
+    assert_eq!(
+        guarded_union_current.apply_type_mapping(&db, &mapping, TypeContext::default()),
+        guarded_union_expected
+    );
+
+    let unguarded_current = UnionType::from_elements(&db, [previous, str_instance]);
+    assert_eq!(
+        unguarded_current.apply_type_mapping(&db, &mapping, TypeContext::default()),
+        unguarded_current
+    );
+}
+
 /// All other tests also make sure that `Type::Todo` works as expected. This particular
 /// test makes sure that we handle `Todo` types correctly, even if they originate from
 /// different sources.
