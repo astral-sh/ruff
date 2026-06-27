@@ -41,7 +41,12 @@ pub(super) fn synthesize_typed_dict_method<'db>(
     let instance_ty = Type::TypedDict(typed_dict);
     match method_name {
         "__init__" => Some(synthesize_typed_dict_init(db, env, typed_dict, fields())),
-        "__contains__" => Some(synthesize_typed_dict_contains(db, env, instance_ty, fields())),
+        "__contains__" => Some(synthesize_typed_dict_contains(
+            db,
+            env,
+            instance_ty,
+            fields(),
+        )),
         "__getitem__" => Some(synthesize_typed_dict_getitem(db, env, typed_dict, fields())),
         "__setitem__" => Some(synthesize_typed_dict_setitem(db, env, typed_dict, fields())),
         "__delitem__" => Some(synthesize_typed_dict_delitem(db, env, typed_dict, fields())),
