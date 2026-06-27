@@ -1134,8 +1134,7 @@ impl<'db> Type<'db> {
         any_over_type(db, self, false, |ty| ty.is_cycle_artifact(db))
     }
 
-    /// Returns `true` if both `self` and `other` are `Divergent` types originating from the
-    /// same cycle (i.e., sharing the same query ID), regardless of materialization state.
+    /// Returns `true` if both `self` and `other` are the same `Divergent` binder marker.
     fn same_divergent_marker(self, other: Type<'db>) -> bool {
         match (self.as_divergent(), other.as_divergent()) {
             (Some(left), Some(right)) => left.same_marker(right),
@@ -1183,33 +1182,13 @@ impl<'db> Type<'db> {
         })
     }
 
-    /// If `self` is a materialized `Divergent` type, returns the concrete type it should
-    /// behave as: `object` for top-materialized, `Never` for bottom-materialized.
-    /// Returns `None` if `self` is not `Divergent` or has not been materialized.
-    fn materialized_divergent_fallback(self) -> Option<Type<'db>> {
-        let Type::Divergent(divergent) = self else {
-            return None;
-        };
-
-        match divergent.materialization_kind() {
-            Some(MaterializationKind::Top) => Some(Type::object()),
-            Some(MaterializationKind::Bottom) => Some(Type::Never),
-            None => None,
-        }
-    }
-
-    /// Negating a divergent marker preserves the marker and flips its materialization, if any.
+    /// Negating a divergent marker preserves the marker.
     fn negated_divergent(self) -> Option<Type<'db>> {
         let Type::Divergent(divergent) = self else {
             return None;
         };
 
-        Some(match divergent.materialization_kind() {
-            Some(materialization_kind) => {
-                Type::Divergent(divergent.materialized(materialization_kind.flip()))
-            }
-            None => Type::Divergent(divergent),
-        })
+        Some(Type::Divergent(divergent))
     }
 
     pub const fn is_unknown(&self) -> bool {
@@ -1224,14 +1203,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) const fn is_never(&self) -> bool {
-        matches!(
-            self,
-            Type::Never
-                | Type::Divergent(DivergentType {
-                    materialization: Some(MaterializationKind::Bottom),
-                    ..
-                })
-        )
+        matches!(self, Type::Never)
     }
 
     /// Returns `true` if this type contains a `Self` type variable.
@@ -1527,14 +1499,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) const fn is_dynamic(&self) -> bool {
-        matches!(
-            self,
-            Type::Dynamic(_)
-                | Type::Divergent(DivergentType {
-                    materialization: None,
-                    ..
-                })
-        )
+        matches!(self, Type::Dynamic(_) | Type::Divergent(_))
     }
 
     const fn is_non_divergent_dynamic(&self) -> bool {
@@ -2355,7 +2320,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Performs nest reduction for recursive types (types that contain `Divergent` types).
+    /// Performs nest reduction for recursive types (types that contain `Divergent` markers).
     /// For example, consider the following implicit attribute inference:
     /// ```python
     /// class C:
@@ -2377,10 +2342,38 @@ impl<'db> Type<'db> {
         })
     }
 
-    /// Normalizes types including divergent types (recursive types), which is necessary for convergence of fixed-point iteration.
-    /// When `nested` is true, propagate `None`. That is, if the type contains a `Divergent` type, the return value of this method is `None` (so we can use the `?` operator).
-    /// When `nested` is false, create a type containing `Divergent` types instead of propagating `None` (we should use `unwrap_or(Divergent)`).
-    /// This is to preserve the structure of the non-divergent parts of the type instead of completely collapsing the type containing a `Divergent` type into a `Divergent` type.
+    /// Normalize a type inferred under a recursive type context.
+    ///
+    /// Contextual inference can expose the context binder marker in the inferred result. Close that
+    /// result before it is used outside the contextual operation.
+    pub(crate) fn normalized_for_recursive_context(
+        self,
+        db: &'db dyn Db,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        let marker = Type::divergent(recursive.binder_id(db));
+        let normalized = self
+            .recursive_type_normalized_impl(db, marker, false)
+            .unwrap_or(marker);
+
+        if normalized == recursive.body(db) {
+            Type::Recursive(recursive)
+        } else if normalized.contains_cycle_marker(db, marker) {
+            Type::recursive(
+                db,
+                recursive.binder_id(db),
+                recursive.origin(db),
+                normalized,
+            )
+        } else {
+            normalized
+        }
+    }
+
+    /// Normalizes types including divergent markers (recursive types), which is necessary for convergence of fixed-point iteration.
+    /// When `nested` is true, propagate `None`. That is, if the type contains a `Divergent` marker, the return value of this method is `None` (so we can use the `?` operator).
+    /// When `nested` is false, create a type containing `Divergent` markers instead of propagating `None` (we should use `unwrap_or(Divergent)`).
+    /// This is to preserve the structure of the non-divergent parts of the type instead of completely collapsing the type containing a `Divergent` marker into a `Divergent` marker.
     /// ```python
     /// tuple[tuple[Divergent, Literal[1]], Literal[1]].recursive_type_normalized(nested: false)
     /// => tuple[
@@ -2836,10 +2829,6 @@ impl<'db> Type<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> Option<PlaceAndQualifiers<'db>> {
-        if let Some(fallback) = (*self).materialized_divergent_fallback() {
-            return fallback.find_name_in_mro_with_policy(db, name, policy);
-        }
-
         match self {
             Type::Union(union) => Some(union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.find_name_in_mro_with_policy(db, name, policy)
@@ -3009,10 +2998,6 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         tracing::trace!("class_member: {}.{}", self.display(db), name);
-        if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.class_member_with_policy(db, name, policy);
-        }
-
         match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.class_member_with_policy(db, name.clone(), policy)
@@ -3316,10 +3301,6 @@ impl<'db> Type<'db> {
             instance: Option<Type<'db>>,
             owner: Type<'db>,
         ) -> Option<(Type<'db>, AttributeKind)> {
-            if let Some(fallback) = ty.materialized_divergent_fallback() {
-                return fallback.try_call_dunder_get(db, instance, owner);
-            }
-
             if let Some(dynamic) = ty.dynamic_descriptor_type() {
                 return Some((dynamic, AttributeKind::DataDescriptor));
             }
@@ -3445,34 +3426,6 @@ impl<'db> Type<'db> {
         instance: Option<Type<'db>>,
         owner: Type<'db>,
     ) -> (PlaceAndQualifiers<'db>, AttributeKind) {
-        if let PlaceAndQualifiers {
-            place:
-                Place::Defined(DefinedPlace {
-                    ty,
-                    origin,
-                    definedness,
-                    public_type_policy,
-                    provenance,
-                }),
-            qualifiers,
-        } = attribute
-            && let Some(fallback) = ty.materialized_divergent_fallback()
-        {
-            return Self::try_call_dunder_get_on_attribute(
-                db,
-                Place::Defined(DefinedPlace {
-                    ty: fallback,
-                    origin,
-                    definedness,
-                    public_type_policy,
-                    provenance,
-                })
-                .with_qualifiers(qualifiers),
-                instance,
-                owner,
-            );
-        }
-
         match attribute {
             // A directly dynamic attribute could be a data descriptor even though we cannot see
             // its methods. Preserve that uncertainty, along with the existing bottom and cycle
@@ -3906,10 +3859,6 @@ impl<'db> Type<'db> {
             }
 
             tracing::trace!("member_lookup_with_policy: {}.{}", this.display(db), name);
-            if let Some(fallback) = this.materialized_divergent_fallback() {
-                return fallback.member_lookup_with_policy_and_receiver(db, name, policy, receiver);
-            }
-
             let name_str = name.as_str();
 
             match this {
@@ -4438,14 +4387,12 @@ impl<'db> Type<'db> {
             }
         }
 
-        if self.materialized_divergent_fallback().is_none() {
-            if name == "__class__" {
-                return Place::bound(self.dunder_class(db)).into();
-            }
+        if name == "__class__" {
+            return Place::bound(self.dunder_class(db)).into();
+        }
 
-            if matches!(self, Type::Dynamic(_) | Type::Divergent(_) | Type::Never) {
-                return Place::bound(self).into();
-            }
+        if matches!(self, Type::Dynamic(_) | Type::Divergent(_) | Type::Never) {
+            return Place::bound(self).into();
         }
 
         member_lookup_with_policy_inner(db, self, name, policy, receiver)
@@ -4575,10 +4522,6 @@ impl<'db> Type<'db> {
     /// elements. It's usually best to only worry about "callability" relative to a particular
     /// argument list, via [`try_call`][Self::try_call] and [`CallErrorKind::NotCallable`].
     fn bindings(self, db: &'db dyn Db) -> Bindings<'db> {
-        if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.bindings(db);
-        }
-
         match self {
             Type::Callable(callable) => {
                 CallableBinding::from_overloads(self, callable.signatures(db).iter().cloned())
@@ -6817,6 +6760,12 @@ impl<'db> Type<'db> {
                             let value_type = alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
                             alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                         });
+                        // If the RHS of type alias `T` were like `Top[tuple[T]]`, this would induce a recursive call like in the example above,
+                        // so we need to return early here.
+                        // This should not be a problem with normal type inference that does not use internal APIs.
+                        if matches!(type_mapping, TypeMapping::Materialize(_)) {
+                            return mapped;
+                        }
 
                         // If the type mapping does not result in any change to this type alias, keep the
                         // alias node instead of eagerly expanding it.
@@ -6872,19 +6821,13 @@ impl<'db> Type<'db> {
                     MaterializationKind::Bottom => Type::Never,
                 }
             }
-            // `Divergent` is an internal cycle marker rather than a gradual type like `Any` or
-            // `Unknown`. Preserve the marker across materialization, while recording whether this
-            // occurrence should behave like the top (`object`) or bottom (`Never`) bound.
+            // `Divergent` is the α-binder variable of an enclosing `Type::Recursive`, not a
+            // standalone gradual type. Materialization leaves the bound variable untouched.
             Type::Divergent(divergent) => match type_mapping {
-                TypeMapping::Materialize(materialization_kind) => {
-                    Type::Divergent(divergent.materialized(*materialization_kind))
-                }
                 TypeMapping::ReplaceDivergent {
                     binder_id,
                     replacement,
-                } if self.same_divergent_marker(Type::divergent(binder_id.into_id())) => {
-                    *replacement
-                }
+                } if divergent.id() == binder_id.into_id() => *replacement,
                 _ => self,
             },
             Type::Recursive(recursive) => visitor.visit(db, self, type_mapping, || {
@@ -8100,18 +8043,16 @@ impl<'db> TypeMapping<'_, 'db> {
     }
 }
 
-/// A type that is determined to be divergent during recursive type inference.
-/// This type must never be eliminated by dynamic type reduction
-/// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reducted to `@Todo`).
-/// Otherwise, type inference cannot converge properly.
-/// For detailed properties of this type, see the unit test at the end of the file.
+/// The α-binder variable of a recursive (μ) type, minted during recursive type inference.
+///
+/// A `Divergent` is only the bound variable of an enclosing [`Type::Recursive`]: it is reached by
+/// unfolding that μ-binder, never operated on as a standalone type. It must remain visible to
+/// recursive type reduction; otherwise fixed-point iteration cannot recover the recursive
+/// structure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 pub struct DivergentType {
     /// The query ID that caused the cycle.
     id: salsa::Id,
-    /// If this divergent marker has been materialized, preserve whether it should behave like the
-    /// top (`object`) or bottom (`Never`) bound while still remaining recognizable as divergent.
-    materialization: Option<MaterializationKind>,
 }
 
 // The Salsa heap is tracked separately.
@@ -8119,10 +8060,7 @@ impl get_size2::GetSize for DivergentType {}
 
 impl DivergentType {
     const fn new(id: salsa::Id) -> Self {
-        Self {
-            id,
-            materialization: None,
-        }
+        Self { id }
     }
 
     pub(crate) const fn id(self) -> salsa::Id {
@@ -8131,17 +8069,6 @@ impl DivergentType {
 
     fn same_marker(self, other: Self) -> bool {
         self.id == other.id
-    }
-
-    const fn materialized(self, kind: MaterializationKind) -> Self {
-        Self {
-            id: self.id,
-            materialization: Some(kind),
-        }
-    }
-
-    const fn materialization_kind(self) -> Option<MaterializationKind> {
-        self.materialization
     }
 }
 

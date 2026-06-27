@@ -58,7 +58,8 @@ use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
+    ClassLiteral, KnownClass, RecursiveOrigin, StaticClassLiteral, Type, TypeAndQualifiers,
+    TypeQualifiers,
 };
 use crate::{Db, FxIndexSet};
 
@@ -608,6 +609,18 @@ impl<'db> TypeContext<'db> {
         Self {
             annotation: self.annotation.map(f),
         }
+    }
+
+    /// Close over recursive markers that were introduced by this contextual annotation.
+    pub(crate) fn normalize_inferred_type(self, db: &'db dyn Db, inferred: Type<'db>) -> Type<'db> {
+        let Some(Type::Recursive(recursive)) = self.annotation else {
+            return inferred;
+        };
+        if !matches!(recursive.origin(db), RecursiveOrigin::Implicit) {
+            return inferred;
+        }
+
+        inferred.normalized_for_recursive_context(db, recursive)
     }
 
     pub(crate) fn is_typealias(&self) -> bool {

@@ -21,8 +21,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     DivergentType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType,
-    RecursiveOrigin, SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType,
-    UpcastPolicy,
+    SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -431,7 +430,7 @@ impl<'db> Type<'db> {
     /// Returns whether constraint-set assignability is known to be unconditionally satisfied
     /// before constructing the relation checker.
     fn is_trivially_constraint_set_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        if self.materialized_divergent_fallback().is_none() && self == target {
+        if self == target {
             return true;
         }
 
@@ -444,14 +443,8 @@ impl<'db> Type<'db> {
         match (self, target) {
             (Type::Never | Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => true,
             (_, Type::NominalInstance(target)) if target.is_object() => true,
-            (_, Type::Union(union)) => {
-                self.materialized_divergent_fallback().is_none()
-                    && union.elements(db).contains(&self)
-            }
-            (Type::Intersection(intersection), _) => {
-                target.materialized_divergent_fallback().is_none()
-                    && intersection.positive(db).contains(&target)
-            }
+            (_, Type::Union(union)) => union.elements(db).contains(&self),
+            (Type::Intersection(intersection), _) => intersection.positive(db).contains(&target),
             _ => false,
         }
     }
@@ -987,20 +980,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
     }
 
-    fn normalize_counterpart_for_implicit_recursive_relation(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        recursive: RecursiveType<'db>,
-    ) -> Type<'db> {
-        if !matches!(recursive.origin(db), RecursiveOrigin::Implicit) {
-            return ty;
-        }
-
-        let marker = Type::divergent(recursive.binder_id(db));
-        ty.recursive_type_normalized_impl(db, marker, false)
-            .unwrap_or(marker)
-    }
-
     /// Is `target` a metaclass instance (a nominal instance of a subclass of `builtins.type`)?
     ///
     /// This does not include all types that are subtypes of `builtins.type`! The semantic
@@ -1195,27 +1174,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             // `Type::Recursive` records the pair on the relation visitor,
             // unwraps one step, and dispatches structurally.
-            (Type::Recursive(source_recursive), _) => {
-                self.with_recursion_guard(source, target, || {
-                    let target = Self::normalize_counterpart_for_implicit_recursive_relation(
-                        db,
-                        target,
-                        source_recursive,
-                    );
-                    self.check_type_pair(db, source.unwrap_recursive(db), target)
-                })
-            }
+            (Type::Recursive(_), _) => self.with_recursion_guard(source, target, || {
+                self.check_type_pair(db, source.unwrap_recursive(db), target)
+            }),
 
-            (_, Type::Recursive(target_recursive)) => {
-                self.with_recursion_guard(source, target, || {
-                    let source = Self::normalize_counterpart_for_implicit_recursive_relation(
-                        db,
-                        source,
-                        target_recursive,
-                    );
-                    self.check_type_pair(db, source, target.unwrap_recursive(db))
-                })
-            }
+            (_, Type::Recursive(_)) => self.with_recursion_guard(source, target, || {
+                self.check_type_pair(db, source, target.unwrap_recursive(db))
+            }),
 
             (Type::TypeAlias(source_alias), _) => self.with_recursion_guard(source, target, || {
                 self.check_type_pair(db, source_alias.value_type(db), target)

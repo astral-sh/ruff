@@ -6371,7 +6371,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .insert(tcx);
         }
 
-        ty
+        tcx.normalize_inferred_type(self.db(), ty)
     }
 
     /// Specialize a bare generic class value based on type context.

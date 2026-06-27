@@ -1649,6 +1649,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target_type: Type<'db>,
         target_materialization: MaterializationKind,
     ) -> ConstraintSet<'db, 'c> {
+        // The bottom materialization of a type is always included in the range covered by the
+        // same type's top materialization. Keep this law explicit instead of relying on recursive
+        // cycle markers to materialize to `Never` or `object`.
+        if source_materialization == MaterializationKind::Bottom
+            && target_materialization == MaterializationKind::Top
+            && source_type == target_type
+        {
+            return self.always();
+        }
+
         let source_top =
             source_type.materialize(db, MaterializationKind::Top, self.materialization_visitor);
         let source_bottom = source_type.materialize(

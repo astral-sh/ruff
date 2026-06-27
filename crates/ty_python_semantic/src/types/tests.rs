@@ -3,7 +3,6 @@ use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{typing_extensions_symbol, typing_symbol};
 use crate::types::type_alias::PEP695TypeAliasType;
 use ruff_db::system::DbWithWritableSystem as _;
-use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
 use test_case::test_case;
 
@@ -146,69 +145,65 @@ fn divergent_type() {
     let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
     assert!(div.is_dynamic());
     assert!(div.has_dynamic(&db));
+    // `Divergent` is the α-binder variable of a μ-type: materialization leaves the bound
+    // variable untouched (materializing `μα.body` materializes `body`, not `α` itself).
     let visitor = ApplyTypeMappingVisitor::default();
-    let top_div = div.materialize(&db, MaterializationKind::Top, &visitor);
-    let bottom_div = div.materialize(&db, MaterializationKind::Bottom, &visitor);
+    assert_eq!(
+        div.materialize(&db, MaterializationKind::Top, &visitor),
+        div
+    );
+    assert_eq!(
+        div.materialize(&db, MaterializationKind::Bottom, &visitor),
+        div
+    );
 
-    assert!(top_div.is_divergent());
-    assert!(bottom_div.is_divergent());
-    assert!(!top_div.is_dynamic());
-    assert!(!bottom_div.is_dynamic());
-    assert!(!top_div.has_dynamic(&db));
-    assert!(!bottom_div.has_dynamic(&db));
-    assert!(top_div.is_object());
-    assert!(!top_div.is_never());
-    assert!(!bottom_div.is_object());
-    assert!(bottom_div.is_never());
-    assert_eq!(top_div.negate(&db), bottom_div);
-    assert_eq!(bottom_div.negate(&db), top_div);
+    // A bare divergent marker is an unclosed recursive binder variable. It is neither `object` nor
+    // `Never`; relation checks keep it permissive while fixed-point inference is still open.
+    assert!(!div.is_object());
+    assert!(!div.is_never());
+    assert_eq!(div.negate(&db), div);
+    let int = KnownClass::Int.to_instance(&db);
+    assert!(div.is_assignable_to(&db, int));
+    assert!(int.is_assignable_to(&db, div));
+    assert!(
+        KnownClass::List
+            .to_specialized_instance(&db, &[UnionType::from_elements(&db, [int, div])])
+            .is_assignable_to(&db, KnownClass::List.to_specialized_instance(&db, &[div]))
+    );
+    let recursive = Type::implicit_recursive(
+        &db,
+        div.as_divergent().unwrap().id(),
+        UnionType::from_elements(
+            &db,
+            [
+                KnownClass::List.to_specialized_instance(&db, &[int]),
+                KnownClass::List.to_specialized_instance(&db, &[div]),
+            ],
+        ),
+    );
+    let Type::Recursive(recursive_context) = recursive else {
+        panic!("expected recursive type");
+    };
+    let recursive_value = UnionType::from_elements(
+        &db,
+        [
+            KnownClass::List.to_specialized_instance(&db, &[int]),
+            KnownClass::List
+                .to_specialized_instance(&db, &[UnionType::from_elements(&db, [div, int])]),
+            KnownClass::List
+                .to_specialized_instance(&db, &[UnionType::from_elements(&db, [int, div])]),
+            KnownClass::List.to_specialized_instance(&db, &[div]),
+        ],
+    )
+    .normalized_for_recursive_context(&db, recursive_context);
+    assert!(recursive_value.is_assignable_to(&db, recursive));
     assert_eq!(IntersectionBuilder::new(&db).add_negative(div).build(), div);
-    assert_eq!(
-        IntersectionBuilder::new(&db).add_negative(top_div).build(),
-        bottom_div
-    );
-    assert_eq!(
-        IntersectionBuilder::new(&db)
-            .add_negative(bottom_div)
-            .build(),
-        top_div
-    );
-    assert!(
-        KnownClass::Int
-            .to_instance(&db)
-            .is_assignable_to(&db, top_div)
-    );
-    // Relation checking treats a free `Divergent` marker as an unfixed cycle approximation even
-    // when the marker has been materialized. Other operations still use the materialization.
-    assert!(top_div.is_assignable_to(&db, KnownClass::Int.to_instance(&db)));
-    assert!(bottom_div.is_assignable_to(&db, KnownClass::Int.to_instance(&db)));
-    assert!(
-        KnownClass::Int
-            .to_instance(&db)
-            .is_assignable_to(&db, bottom_div)
-    );
-    assert_eq!(
-        top_div.member(&db, "__str__").place.expect_type(),
-        Type::object().member(&db, "__str__").place.expect_type()
-    );
-    assert_eq!(
-        top_div.member(&db, "__class__").place.expect_type(),
-        Type::object().dunder_class(&db)
-    );
-    assert!(top_div.try_upcast_to_callable(&db).is_none());
-    assert!(
-        top_div
-            .subscript(&db, Type::int_literal(0), ast::ExprContext::Load)
-            .is_err()
-    );
-    assert_eq!(top_div.recursive_type_normalized_impl(&db, div, true), None);
-    assert_eq!(
-        bottom_div.recursive_type_normalized_impl(&db, div, true),
-        None
-    );
 
-    // The `Divergent` type must not be eliminated in union with other dynamic types,
-    // as this would prevent detection of divergent type inference using `Divergent`.
+    // Normalizing the bare α-marker at a nested position propagates `None`.
+    assert_eq!(div.recursive_type_normalized_impl(&db, div, true), None);
+
+    // The `Divergent` marker must not be eliminated in union with other dynamic types, as this
+    // would prevent detection of divergent type inference using `Divergent`.
     let union = UnionType::from_elements(&db, [Type::unknown(), div]);
     assert_eq!(union.display(&db).to_string(), "Unknown | Divergent");
 
