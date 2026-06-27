@@ -1088,6 +1088,8 @@ reveal_type(x12)  # revealed: list[list[int]]
 x13 = []
 x13.append(x13)
 reveal_type(x13)  # revealed: list[Divergent]
+reveal_type(x13[0])  # revealed: list[Divergent]
+reveal_type(x13[0][0])  # revealed: list[Divergent]
 ```
 
 ```py
@@ -1098,7 +1100,11 @@ x14.append(x15)
 x15.append(x14)
 
 reveal_type(x14)  # revealed: list[Divergent]
+reveal_type(x14[0])  # revealed: list[Divergent]
+reveal_type(x14[0][0])  # revealed: list[Divergent]
 reveal_type(x15)  # revealed: list[Divergent]
+reveal_type(x15[0])  # revealed: list[Divergent]
+reveal_type(x15[0][0])  # revealed: list[Divergent]
 ```
 
 Collection-use constraints must converge when multiple collection literals are used in a container

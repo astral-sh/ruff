@@ -3396,6 +3396,7 @@ class C:
 
 reveal_type(C().x)  # revealed: tuple[Divergent, int]
 reveal_type(C().x[0])  # revealed: tuple[Divergent, int]
+reveal_type(C().x[0][0])  # revealed: tuple[Divergent, int]
 ```
 
 This also works if the tuple is not constructed directly:
