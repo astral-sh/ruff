@@ -469,37 +469,13 @@ fn extend_exclude_cli() -> Result<()> {
 extend-exclude = ["out"]
 
 [format]
-exclude = ["test.py"]
+exclude = ["format_excluded.py"]
 "#,
         ),
-        (
-            "main.py",
-            r#"
-from test import say_hy
-
-if __name__ == "__main__":
-    say_hy("dear Ruff contributor")
-"#,
-        ),
-        // Excluded by `format.exclude` from the config.
-        (
-            "test.py",
-            r#"
-def say_hy(name: str):
-        print(f"Hy {name}")"#,
-        ),
-        // Excluded by `--extend-exclude` on the CLI.
-        (
-            "generated.py",
-            r#"NUMBERS = [
-     0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
-    10, 11, 12, 13, 14, 15, 16, 17, 18, 19
-]
-OTHER = "OTHER"
-"#,
-        ),
-        // Excluded by `extend-exclude` from the config.
-        ("out/a.py", "a = a"),
+        ("main.py", "x    = 1"),
+        ("format_excluded.py", "x    = 1"),
+        ("cli_excluded.py", "x    = 1"),
+        ("out/a.py", "x    = 1"),
     ])?;
 
     assert_cmd_snapshot!(test.format_command()
@@ -508,7 +484,7 @@ OTHER = "OTHER"
             "--config",
             "ruff.toml",
             "--extend-exclude",
-            "generated.py",
+            "cli_excluded.py",
         ])
         .arg("."), @"
     success: false
@@ -1050,7 +1026,7 @@ if True:
       Cause: Failed to parse [TMP]/ruff.toml
       Cause: TOML parse error at line 1, column 1
       |
-    1 |
+    1 | 
       | ^
     unknown field `tab-size`
     ");
