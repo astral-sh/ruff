@@ -3236,8 +3236,8 @@ class NestedListsConcat:
         self.x = [self.x] + []
         self.y = [self.y].__add__(y)
 
-reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[Divergent] | Unknown
-reveal_type(NestedListsConcat().y)  # revealed: list[int] | list[Divergent] | Unknown
+reveal_type(NestedListsConcat().x)  # revealed: list[int] | Unknown | list[Divergent]
+reveal_type(NestedListsConcat().y)  # revealed: list[int] | Unknown | list[Divergent]
 ```
 
 ### Builtin types attributes

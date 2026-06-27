@@ -295,7 +295,6 @@ struct ApplyDefaultTypeMapping;
 struct ApplyTopMaterialization;
 struct ApplyBottomMaterialization;
 struct ApplyMaterializationEquivalence;
-struct ApplyGuardedCyclePrevious;
 
 type MaterializationEquivalenceVisitor<'db> =
     Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
@@ -309,7 +308,6 @@ pub(crate) struct ApplyTypeMappingVisitor<'db> {
     default: OnceCell<TypeTransformer<'db, ApplyDefaultTypeMapping>>,
     top_materialization: OnceCell<TypeTransformer<'db, ApplyTopMaterialization>>,
     bottom_materialization: OnceCell<TypeTransformer<'db, ApplyBottomMaterialization>>,
-    guarded_cycle_previous: OnceCell<TypeTransformer<'db, ApplyGuardedCyclePrevious>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
 }
 
@@ -333,10 +331,6 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
                 .visit_type(db, ty, func),
             TypeMapping::Materialize(MaterializationKind::Bottom) => self
                 .bottom_materialization
-                .get_or_init(TypeTransformer::default)
-                .visit_type(db, ty, func),
-            TypeMapping::FoldCyclePrevious { guarded: true, .. } => self
-                .guarded_cycle_previous
                 .get_or_init(TypeTransformer::default)
                 .visit_type(db, ty, func),
             _ => self
@@ -367,7 +361,6 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
             default: OnceCell::new(),
             top_materialization: OnceCell::new(),
             bottom_materialization: OnceCell::new(),
-            guarded_cycle_previous: OnceCell::new(),
             materialization_equivalence,
         }
     }
@@ -379,7 +372,6 @@ impl Default for ApplyTypeMappingVisitor<'_> {
             default: OnceCell::new(),
             top_materialization: OnceCell::new(),
             bottom_materialization: OnceCell::new(),
-            guarded_cycle_previous: OnceCell::new(),
             materialization_equivalence: OnceCell::new(),
         }
     }
@@ -1151,7 +1143,7 @@ impl<'db> Type<'db> {
     }
 
     fn matches_cycle_previous_replacement(self, db: &'db dyn Db, replacement: Type<'db>) -> bool {
-        TypeTransformer::<ApplyGuardedCyclePrevious>::same_type_identity(db, self, replacement)
+        TypeTransformer::<ApplyDefaultTypeMapping>::same_type_identity(db, self, replacement)
             || self.matches_known_instance_cycle_previous_replacement(db, replacement)
     }
 
@@ -1160,8 +1152,6 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         replacement: Type<'db>,
     ) -> bool {
-        // These value-expression wrappers carry a semantic type that can be the actual previous
-        // approximation inside a guarded recursive position.
         match (self, replacement) {
             (Type::Callable(left), Type::KnownInstance(KnownInstanceType::Callable(right)))
             | (Type::KnownInstance(KnownInstanceType::Callable(right)), Type::Callable(left)) => {
@@ -1338,10 +1328,10 @@ impl<'db> Type<'db> {
         // result directly. We still ensure monotonicity after the first couple iterations, which
         // still ensures convergence in cases that are prone to oscillation.
         if cycle.iteration() <= crate::TAINTED_CYCLES {
-            return self.recover_tainted_cycle_iteration(db, previous);
+            return self;
         }
 
-        let current = self.fold_guarded_cycle_previous(db, previous, cycle);
+        let current = self.fold_cycle_previous_approximation(db, previous, cycle);
 
         if let (Type::GenericAlias(current), Type::GenericAlias(previous)) = (current, previous)
             && let Some(merged) = current.merge_cycle_recovery(db, previous)
@@ -1357,48 +1347,49 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn fold_guarded_cycle_previous(
+    fn fold_cycle_previous_approximation(
         self,
         db: &'db dyn Db,
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
-        // Non-contractive top-level markers such as `Any | a` are normalized away, but a later
-        // iteration can still place the previous approximation under a contractive constructor.
-        // Fold those guarded occurrences back to the active marker so recovery converges.
         if self == previous {
             return self;
         }
 
         cycle.head_ids().fold(self, |ty, id| {
-            ty.apply_type_mapping(
-                db,
-                &TypeMapping::FoldCyclePrevious {
-                    binder_id: BinderId::new(id),
-                    replacement: previous,
-                    guarded: false,
-                },
-                TypeContext::default(),
-            )
+            ty.fold_cycle_previous_occurrences(db, previous, Type::divergent(id), false)
         })
     }
 
-    fn recover_tainted_cycle_iteration(self, db: &'db dyn Db, previous: Self) -> Self {
-        if self.is_overload_cycle_recovery_degradation(db, previous) {
-            UnionType::from_elements_cycle_recovery(db, [previous, self])
-        } else {
-            self
+    pub(super) fn fold_cycle_previous_occurrences(
+        self,
+        db: &'db dyn Db,
+        previous: Self,
+        marker: Self,
+        guarded: bool,
+    ) -> Self {
+        if guarded && self.matches_cycle_previous_replacement(db, previous) {
+            return marker;
         }
-    }
 
-    fn is_overload_cycle_recovery_degradation(self, db: &'db dyn Db, previous: Self) -> bool {
-        // Generally, type-inference precision improves with each iteration. Overload matching is
-        // an exception: later iterations can introduce `AmbiguousOverload` after an earlier
-        // `Divergent` approximation.
-        any_over_type(db, self, false, |ty| {
-            matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
-        }) && !any_over_type(db, self, false, |ty| ty.is_divergent())
-            && any_over_type(db, previous, false, |ty| ty.is_divergent())
+        match self {
+            Type::Union(union) => {
+                union.fold_cycle_previous_occurrences(db, previous, marker, guarded)
+            }
+            Type::Intersection(intersection) => Type::Intersection(
+                intersection.fold_cycle_previous_occurrences(db, previous, marker, guarded),
+            ),
+            Type::NominalInstance(instance) => {
+                instance.fold_cycle_previous_occurrences(db, previous, marker, guarded)
+            }
+            Type::GenericAlias(generic) => Type::GenericAlias(
+                generic.fold_cycle_previous_occurrences(db, previous, marker, guarded),
+            ),
+            // Do not call general type operations from cycle recovery. Function signatures,
+            // class specializations, and aliases can re-enter inference queries here.
+            _ => self,
+        }
     }
 
     fn normalize_active_cycle_heads(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
@@ -6541,16 +6532,6 @@ impl<'db> Type<'db> {
         {
             return Type::divergent(recursive.binder_id(db));
         }
-        if let TypeMapping::FoldCyclePrevious {
-            binder_id,
-            replacement,
-            guarded: true,
-        } = type_mapping
-            && self.matches_cycle_previous_replacement(db, *replacement)
-        {
-            return Type::divergent(binder_id.into_id());
-        }
-
         // Recursive singleton promotion only recurses into `NominalInstance` types (tuples
         // and specialized generics). For all other types, return early.
         if matches!(
@@ -6575,14 +6556,13 @@ impl<'db> Type<'db> {
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
             Type::FunctionLiteral(function) => visitor.visit(db, self, type_mapping, || {
-                let type_mapping = type_mapping.in_guarded_recursive_position();
-                match &type_mapping {
+                match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
                     TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
                         Type::FunctionLiteral(function.apply_type_mapping_impl(
                             db,
-                            &type_mapping,
+                            type_mapping,
                             tcx,
                             visitor,
                         ))
@@ -6590,7 +6570,7 @@ impl<'db> Type<'db> {
                     }
                     _ => Type::FunctionLiteral(function.apply_type_mapping_impl(
                         db,
-                        &type_mapping,
+                        type_mapping,
                         tcx,
                         visitor,
                     )),
@@ -6598,13 +6578,12 @@ impl<'db> Type<'db> {
             }),
 
             Type::BoundMethod(method) => {
-                let type_mapping = type_mapping.in_guarded_recursive_position();
                 Type::BoundMethod(BoundMethodType::new(
                     db,
-                    method.function(db).apply_type_mapping_impl(db, &type_mapping, tcx, visitor),
+                    method.function(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                     method
                         .self_instance(db)
-                        .apply_type_mapping_impl(db, &type_mapping, tcx, visitor),
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
 
@@ -6625,18 +6604,12 @@ impl<'db> Type<'db> {
             }
 
             Type::NominalInstance(instance) => {
-                instance.apply_type_mapping_impl(
-                    db,
-                    &type_mapping.in_guarded_recursive_position(),
-                    tcx,
-                    visitor,
-                )
+                instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             },
 
             Type::NewTypeInstance(newtype) => visitor.visit(db, self, type_mapping, || {
-                let type_mapping = type_mapping.in_guarded_recursive_position();
                 Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
-                    class_type.apply_type_mapping_impl(db, &type_mapping, tcx, visitor)
+                    class_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 }))
             }),
 
@@ -6650,7 +6623,7 @@ impl<'db> Type<'db> {
                 // > members on protocols act invariantly
                 Type::ProtocolInstance(instance.apply_type_mapping_impl(
                     db,
-                    &type_mapping.in_guarded_recursive_position(),
+                    type_mapping,
                     tcx,
                     visitor,
                 ))
@@ -6660,7 +6633,7 @@ impl<'db> Type<'db> {
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
                     function.apply_type_mapping_impl(
                         db,
-                        &type_mapping.in_guarded_recursive_position(),
+                        type_mapping,
                         tcx,
                         visitor,
                     ),
@@ -6671,7 +6644,7 @@ impl<'db> Type<'db> {
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(
                     function.apply_type_mapping_impl(
                         db,
-                        &type_mapping.in_guarded_recursive_position(),
+                        type_mapping,
                         tcx,
                         visitor,
                     ),
@@ -6682,7 +6655,7 @@ impl<'db> Type<'db> {
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(
                     property.apply_type_mapping_impl(
                         db,
-                        &type_mapping.in_guarded_recursive_position(),
+                        type_mapping,
                         tcx,
                         visitor,
                     ),
@@ -6693,7 +6666,7 @@ impl<'db> Type<'db> {
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(
                     property.apply_type_mapping_impl(
                         db,
-                        &type_mapping.in_guarded_recursive_position(),
+                        type_mapping,
                         tcx,
                         visitor,
                     ),
@@ -6703,7 +6676,7 @@ impl<'db> Type<'db> {
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(
                     property.apply_type_mapping_impl(
                         db,
-                        &type_mapping.in_guarded_recursive_position(),
+                        type_mapping,
                         tcx,
                         visitor,
                     ),
@@ -6713,7 +6686,7 @@ impl<'db> Type<'db> {
             Type::Callable(callable) => visitor.visit(db, self, type_mapping, || {
                 Type::Callable(callable.apply_type_mapping_impl(
                     db,
-                    &type_mapping.in_guarded_recursive_position(),
+                    type_mapping,
                     tcx,
                     visitor,
                 ))
@@ -6722,7 +6695,7 @@ impl<'db> Type<'db> {
             Type::GenericAlias(generic) => {
                 Type::GenericAlias(generic.apply_type_mapping_impl(
                     db,
-                    &type_mapping.in_guarded_recursive_position(),
+                    type_mapping,
                     tcx,
                     visitor,
                 ))
@@ -6731,7 +6704,7 @@ impl<'db> Type<'db> {
             Type::TypedDict(typed_dict) => {
                 Type::TypedDict(typed_dict.apply_type_mapping_impl(
                     db,
-                    &type_mapping.in_guarded_recursive_position(),
+                    type_mapping,
                     tcx,
                     visitor,
                 ))
@@ -6739,7 +6712,7 @@ impl<'db> Type<'db> {
 
             Type::SubclassOf(subclass_of) => subclass_of.apply_type_mapping_impl(
                 db,
-                &type_mapping.in_guarded_recursive_position(),
+                type_mapping,
                 tcx,
                 visitor,
             ),
@@ -6747,7 +6720,7 @@ impl<'db> Type<'db> {
             Type::PropertyInstance(property) => {
                 Type::PropertyInstance(property.apply_type_mapping_impl(
                     db,
-                    &type_mapping.in_guarded_recursive_position(),
+                    type_mapping,
                     tcx,
                     visitor,
                 ))
@@ -6782,32 +6755,29 @@ impl<'db> Type<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
             Type::TypeIs(type_is) => visitor.visit(db, self, type_mapping, || {
-                let type_mapping = type_mapping.in_guarded_recursive_position();
                 type_is.with_type(
                     db,
                     type_is
                         .type_argument(db)
-                        .apply_type_mapping_impl(db, &type_mapping, tcx, visitor),
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 )
             }),
 
             Type::TypeGuard(type_guard) => visitor.visit(db, self, type_mapping, || {
-                let type_mapping = type_mapping.in_guarded_recursive_position();
                 type_guard.with_type(
                     db,
                     type_guard
                         .return_type(db)
-                        .apply_type_mapping_impl(db, &type_mapping, tcx, visitor),
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 )
             }),
 
             Type::TypeForm(typeform) => visitor.visit(db, self, type_mapping, || {
-                let type_mapping = type_mapping.in_guarded_recursive_position();
                 TypeFormType::from_type_expression(
                     db,
                     typeform
                         .type_argument(db)
-                        .apply_type_mapping_impl(db, &type_mapping, tcx, visitor),
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 )
             }),
 
@@ -6842,7 +6812,7 @@ impl<'db> Type<'db> {
                     TypeMapping::ReplaceDivergent { .. }
                     | TypeMapping::ReplaceRecursiveOrigin { .. }
                     | TypeMapping::ReplaceRecursiveAliasComponent { .. }
-                    | TypeMapping::FoldCyclePrevious { .. } => {
+                    => {
                         if let Some(specialization) = alias.specialization(db) {
                             let mapped_specialization =
                                 specialization.apply_type_mapping_impl(db, type_mapping, &[], visitor);
@@ -6932,7 +6902,6 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::ReplaceRecursiveOrigin { .. } |
                 TypeMapping::ReplaceRecursiveAliasComponent { .. } |
-                TypeMapping::FoldCyclePrevious { .. } |
                 TypeMapping::ReplaceDivergent { .. } |
                 TypeMapping::FoldRecursive { .. } |
                 TypeMapping::Materialize(_) |
@@ -6956,7 +6925,6 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::ReplaceRecursiveOrigin { .. } |
                 TypeMapping::ReplaceRecursiveAliasComponent { .. } |
-                TypeMapping::FoldCyclePrevious { .. } |
                 TypeMapping::ReplaceDivergent { .. } |
                 TypeMapping::FoldRecursive { .. } |
                 TypeMapping::Promote(..) |
@@ -6988,11 +6956,6 @@ impl<'db> Type<'db> {
                     ..
                 } = type_mapping
                     && recursive.binder(db) == folded.binder(db)
-                {
-                    return self;
-                }
-                if let TypeMapping::FoldCyclePrevious { binder_id, .. } = type_mapping
-                    && recursive.binder(db) == *binder_id
                 {
                     return self;
                 }
@@ -8081,12 +8044,6 @@ pub enum TypeMapping<'a, 'db> {
         recursive: RecursiveType<'db>,
         replacement: Type<'db>,
     },
-    /// Folds a nested occurrence of the previous fixed-point approximation to the active marker.
-    FoldCyclePrevious {
-        binder_id: BinderId,
-        replacement: Type<'db>,
-        guarded: bool,
-    },
     /// Create the top or bottom materialization of a type.
     Materialize(MaterializationKind),
     /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
@@ -8101,21 +8058,6 @@ pub enum TypeMapping<'a, 'db> {
 }
 
 impl<'db> TypeMapping<'_, 'db> {
-    fn in_guarded_recursive_position(&self) -> Self {
-        match self {
-            TypeMapping::FoldCyclePrevious {
-                binder_id,
-                replacement,
-                guarded: false,
-            } => TypeMapping::FoldCyclePrevious {
-                binder_id: *binder_id,
-                replacement: *replacement,
-                guarded: true,
-            },
-            _ => self.clone(),
-        }
-    }
-
     /// Update the generic context of a [`Signature`] according to the current type mapping
     pub(crate) fn update_signature_generic_context(
         &self,
@@ -8159,7 +8101,6 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceRecursiveAliasComponent { .. }
             | TypeMapping::ReplaceDivergent { .. }
             | TypeMapping::FoldRecursive { .. }
-            | TypeMapping::FoldCyclePrevious { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => context,
@@ -8210,7 +8151,6 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceRecursiveAliasComponent { .. }
             | TypeMapping::ReplaceDivergent { .. }
             | TypeMapping::FoldRecursive { .. }
-            | TypeMapping::FoldCyclePrevious { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),

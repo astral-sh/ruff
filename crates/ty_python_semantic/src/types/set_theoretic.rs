@@ -418,6 +418,21 @@ impl<'db> UnionType<'db> {
         Some(builder.build())
     }
 
+    pub(super) fn fold_cycle_previous_occurrences(
+        self,
+        db: &'db dyn Db,
+        previous: Type<'db>,
+        marker: Type<'db>,
+        guarded: bool,
+    ) -> Type<'db> {
+        UnionType::from_elements_cycle_recovery(
+            db,
+            self.elements(db)
+                .iter()
+                .map(|ty| ty.fold_cycle_previous_occurrences(db, previous, marker, guarded)),
+        )
+    }
+
     /// Identify some specific unions of known classes, currently the ones that `float` and
     /// `complex` expand into in type position.
     pub(crate) fn known(self, db: &'db dyn Db) -> Option<KnownUnion> {
@@ -891,6 +906,26 @@ impl<'db> IntersectionType<'db> {
         };
 
         Some(IntersectionType::new(db, positive, negative))
+    }
+
+    pub(super) fn fold_cycle_previous_occurrences(
+        self,
+        db: &'db dyn Db,
+        previous: Type<'db>,
+        marker: Type<'db>,
+        guarded: bool,
+    ) -> Self {
+        let positive: FxOrderSet<_> = self
+            .positive(db)
+            .iter()
+            .map(|ty| ty.fold_cycle_previous_occurrences(db, previous, marker, guarded))
+            .collect();
+
+        let negative = self
+            .negative(db)
+            .map(|ty| ty.fold_cycle_previous_occurrences(db, previous, marker, guarded));
+
+        IntersectionType::new(db, positive, negative)
     }
 
     /// Returns an iterator over the positive elements of the intersection. If

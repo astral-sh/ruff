@@ -1388,6 +1388,30 @@ impl<'db> Specialization<'db> {
         ))
     }
 
+    pub(super) fn fold_cycle_previous_occurrences(
+        self,
+        db: &'db dyn Db,
+        previous: Type<'db>,
+        marker: Type<'db>,
+        _guarded: bool,
+    ) -> Self {
+        let types = self
+            .types(db)
+            .iter()
+            .map(|ty| ty.fold_cycle_previous_occurrences(db, previous, marker, true))
+            .collect::<Box<[_]>>();
+        let tuple_inner = self
+            .tuple_inner(db)
+            .map(|tuple| tuple.fold_cycle_previous_occurrences(db, previous, marker, true));
+        Self::new(
+            db,
+            self.generic_context(db),
+            types,
+            self.materialization_kind(db),
+            tuple_inner,
+        )
+    }
+
     pub(super) fn materialize_impl(
         self,
         db: &'db dyn Db,

@@ -386,7 +386,6 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::ReplaceRecursiveAliasComponent { .. }
                 | TypeMapping::ReplaceDivergent { .. }
                 | TypeMapping::FoldRecursive { .. }
-                | TypeMapping::FoldCyclePrevious { .. }
                 | TypeMapping::Materialize(_)
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion

@@ -401,6 +401,34 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
+    pub(super) fn fold_cycle_previous_occurrences(
+        self,
+        db: &'db dyn Db,
+        previous: Type<'db>,
+        marker: Type<'db>,
+        guarded: bool,
+    ) -> Type<'db> {
+        match self.0 {
+            NominalInstanceInner::ExactTuple(tuple) => Type::tuple_instance(
+                tuple.fold_cycle_previous_occurrences(db, previous, marker, guarded),
+            ),
+            NominalInstanceInner::NonTuple(class) => {
+                let transformed = class
+                    .class(db)
+                    .fold_cycle_previous_occurrences(db, previous, marker, guarded);
+                Type::NominalInstance(Self(NominalInstanceInner::NonTuple(
+                    class.with_class(db, transformed),
+                )))
+            }
+            NominalInstanceInner::SysVersionInfo => {
+                Type::NominalInstance(Self(NominalInstanceInner::SysVersionInfo))
+            }
+            NominalInstanceInner::Object => {
+                Type::NominalInstance(Self(NominalInstanceInner::Object))
+            }
+        }
+    }
+
     pub(super) fn is_singleton(self, db: &'db dyn Db) -> bool {
         match self.0 {
             // The empty tuple is a singleton on CPython and PyPy, but not on other Python

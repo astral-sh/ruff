@@ -1174,7 +1174,6 @@ impl<'db> BoundTypeVarInstance<'db> {
             | TypeMapping::ReplaceRecursiveAliasComponent { .. }
             | TypeMapping::ReplaceDivergent { .. }
             | TypeMapping::FoldRecursive { .. }
-            | TypeMapping::FoldCyclePrevious { .. }
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {

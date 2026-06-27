@@ -270,6 +270,21 @@ impl<'db> GenericAlias<'db> {
         ))
     }
 
+    pub(super) fn fold_cycle_previous_occurrences(
+        self,
+        db: &'db dyn Db,
+        previous: Type<'db>,
+        marker: Type<'db>,
+        guarded: bool,
+    ) -> Self {
+        Self::new(
+            db,
+            self.origin(db),
+            self.specialization(db)
+                .fold_cycle_previous_occurrences(db, previous, marker, guarded),
+        )
+    }
+
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         self.origin(db).definition(db)
     }
@@ -958,6 +973,21 @@ impl<'db> ClassType<'db> {
             Self::Generic(generic) => Some(Self::Generic(
                 generic.recursive_type_normalized_impl(db, div, nested)?,
             )),
+        }
+    }
+
+    pub(super) fn fold_cycle_previous_occurrences(
+        self,
+        db: &'db dyn Db,
+        previous: Type<'db>,
+        marker: Type<'db>,
+        guarded: bool,
+    ) -> Self {
+        match self {
+            Self::NonGeneric(class) => Self::NonGeneric(class),
+            Self::Generic(generic) => Self::Generic(
+                generic.fold_cycle_previous_occurrences(db, previous, marker, guarded),
+            ),
         }
     }
 
