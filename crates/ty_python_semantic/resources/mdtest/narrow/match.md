@@ -2107,21 +2107,13 @@ def test_match_exact_tuple_element_union_is_exhaustive(x: tuple[int | str]) -> i
 
 def test_match_exact_tuple_multiple_negative_constraints(
     value: tuple[int | str, int | str],
-) -> None:
-    match value:
-        case [int(), str()]:
-            pass
-        case _:
-            # revealed: tuple[str, int | str] | tuple[int | str, int]
-            reveal_type(value)
-
-def test_match_exact_tuple_multiple_negative_constraints_assignability(
-    value: tuple[int | str, int | str],
 ) -> tuple[str, int | str] | tuple[int | str, int]:
     match value:
         case [int(), str()]:
             raise ValueError
         case _:
+            # revealed: tuple[str, int | str] | tuple[int | str, int]
+            reveal_type(value)
             return value
 
 def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:

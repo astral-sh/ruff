@@ -11,7 +11,7 @@ use crate::place::{DefinedPlace, Place};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::equality::{evaluate_type_equality, is_same_enum_domain};
 use crate::types::signatures::CallableSignature;
-use crate::types::tuple::{TupleSpec, TupleSpecBuilder, TupleType};
+use crate::types::tuple::TupleType;
 use crate::types::visitor::any_over_type;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass,
@@ -188,39 +188,6 @@ pub(crate) fn exact_sequence_pattern_type<'db>(
     sequence_pattern_type_builder(db)
         .add_positive(protocol)
         .build()
-}
-
-/// Refine an exact tuple with the element types established by an exact sequence pattern.
-///
-/// As elsewhere in tuple-pattern narrowing, this assumes that values represented by a `tuple[...]`
-/// annotation preserve the builtin relationship between iteration and indexing. Statically known
-/// tuple subclasses are not refined here.
-///
-/// Dynamic element types remain represented by the synthesized sequence protocol. Replacing a
-/// gradual tuple element such as `Any` with the observed pattern type would lose gradualness.
-pub(crate) fn refine_exact_tuple_for_sequence_pattern<'db>(
-    db: &'db dyn Db,
-    subject_ty: Type<'db>,
-    pattern_element_types: &[Type<'db>],
-) -> Option<Type<'db>> {
-    let tuple = subject_ty.exact_tuple_instance_spec(db)?;
-    if tuple
-        .all_elements()
-        .iter()
-        .chain(pattern_element_types)
-        .any(|element| any_over_type(db, *element, true, |ty| ty.is_dynamic()))
-    {
-        return None;
-    }
-
-    let pattern_tuple = TupleSpec::heterogeneous(pattern_element_types.iter().copied());
-    Some(
-        TupleSpecBuilder::from(tuple.as_ref())
-            .intersect(db, &pattern_tuple)
-            .map_or(Type::Never, |refined| {
-                Type::tuple(TupleType::new(db, &refined.build()))
-            }),
-    )
 }
 
 /// Build the structural type used for a sequence pattern containing `*rest`.
@@ -753,17 +720,30 @@ pub(crate) fn pattern_fallthrough_type<'db>(
 /// Failure of a sequence pattern establishes length and indexed-element facts at the instant of
 /// matching, but those facts can become stale for mutable or stateful sequences. Exact tuples are
 /// immutable, so they retain normal sequence-pattern fallthrough narrowing.
+///
+/// ```python
+/// def f(value: tuple[int | str, int | str]) -> None:
+///     match value:
+///         case [int(), str()]:
+///             pass
+///         case _:
+///             # tuple[str, int | str] | tuple[int | str, int]
+///             reveal_type(value)
+/// ```
 pub(crate) fn pattern_binding_fallthrough_type<'db>(
     db: &'db dyn Db,
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
     let mut budget = ExactTuplePatternExpansionBudget::default();
-    try_pattern_binding_fallthrough_type(db, kind, subject_ty, &mut budget).unwrap_or_else(|()| {
-        pattern_binding_fallthrough_type_without_exact_tuple_expansion(db, kind, subject_ty)
-    })
+    try_pattern_binding_fallthrough_type(db, kind, subject_ty, &mut budget)
+        .unwrap_or_else(|()| conservative_pattern_binding_fallthrough_type(db, kind, subject_ty))
 }
 
+/// Compute binding fallthrough while charging every nested exact-tuple expansion to `budget`.
+///
+/// An error means that the caller must discard the partially expanded type and recompute the
+/// complete pattern conservatively.
 fn try_pattern_binding_fallthrough_type<'db>(
     db: &'db dyn Db,
     kind: &PatternPredicateKind<'db>,
@@ -786,7 +766,11 @@ fn try_pattern_binding_fallthrough_type<'db>(
     }
 }
 
-fn pattern_binding_fallthrough_type_without_exact_tuple_expansion<'db>(
+/// Compute binding fallthrough without expanding exact tuples.
+///
+/// This preserves the recursive handling of `Or` and `As` patterns while providing the fallback
+/// used when the precise traversal exceeds its expansion budget.
+fn conservative_pattern_binding_fallthrough_type<'db>(
     db: &'db dyn Db,
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
@@ -794,18 +778,20 @@ fn pattern_binding_fallthrough_type_without_exact_tuple_expansion<'db>(
     match kind {
         PatternPredicateKind::Or(patterns) => {
             patterns.iter().fold(subject_ty, |remaining, pattern| {
-                pattern_binding_fallthrough_type_without_exact_tuple_expansion(
-                    db, pattern, remaining,
-                )
+                conservative_pattern_binding_fallthrough_type(db, pattern, remaining)
             })
         }
         PatternPredicateKind::As(Some(pattern), _) => {
-            pattern_binding_fallthrough_type_without_exact_tuple_expansion(db, pattern, subject_ty)
+            conservative_pattern_binding_fallthrough_type(db, pattern, subject_ty)
         }
         _ => pattern_fallthrough_type(db, kind, subject_ty),
     }
 }
 
+/// Apply sequence-pattern binding fallthrough, expanding immutable exact tuples within `budget`.
+///
+/// The budget is shared by unions, intersections, and nested patterns so that their cumulative
+/// expansion cannot exceed the configured limits.
 fn try_sequence_pattern_binding_fallthrough_type<'db>(
     db: &'db dyn Db,
     kind: &SequencePatternPredicateKind<'db>,
@@ -870,6 +856,7 @@ fn try_sequence_pattern_binding_fallthrough_type<'db>(
 const MAX_EXACT_TUPLE_PATTERN_ALTERNATIVES: usize = 64;
 const MAX_EXACT_TUPLE_PATTERN_ELEMENTS: usize = 4_096;
 
+/// Limits the cumulative alternatives and element slots created by one pattern traversal.
 #[derive(Default)]
 struct ExactTuplePatternExpansionBudget {
     alternatives: usize,
@@ -877,8 +864,8 @@ struct ExactTuplePatternExpansionBudget {
 }
 
 impl ExactTuplePatternExpansionBudget {
-    fn add(&mut self, alternatives: usize, elements: usize) -> Result<(), ()> {
-        self.alternatives = self.alternatives.saturating_add(alternatives);
+    fn add_alternative(&mut self, elements: usize) -> Result<(), ()> {
+        self.alternatives += 1;
         self.elements = self.elements.saturating_add(elements);
         if self.alternatives > MAX_EXACT_TUPLE_PATTERN_ALTERNATIVES
             || self.elements > MAX_EXACT_TUPLE_PATTERN_ELEMENTS
@@ -935,7 +922,7 @@ fn exact_tuple_sequence_pattern_fallthrough_type<'db>(
             continue;
         }
 
-        budget.add(1, tuple.len())?;
+        budget.add_alternative(tuple.len())?;
         let mut elements = tuple.all_elements().to_vec();
         elements[index] = remaining;
         alternatives.push(Type::heterogeneous_tuple(db, elements));

@@ -7,10 +7,13 @@ use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::special_form::TypeQualifier;
-use crate::types::tuple::{Tuple, TupleLength, TupleType, TupleUnpacker};
+use crate::types::tuple::{
+    Tuple, TupleLength, TupleSpec, TupleSpecBuilder, TupleType, TupleUnpacker,
+};
 use crate::types::typed_dict::{
     TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
+use crate::types::visitor::any_over_type;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -18,9 +21,8 @@ use crate::types::{
     Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type,
     class_pattern_positional_sources, definite_match_pattern_type_for_subject,
     exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
-    pattern_binding_fallthrough_type, refine_exact_tuple_for_sequence_pattern,
-    sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
-    typed_dict_matches_class_pattern,
+    pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
+    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::frozen::FrozenMap;
@@ -932,6 +934,46 @@ fn positive_class_pattern_type<'db>(
         }
         _ => None,
     }
+}
+
+/// Refine an exact tuple with the element types established by an exact sequence pattern.
+///
+/// As elsewhere in tuple-pattern narrowing, this assumes that values represented by a `tuple[...]`
+/// annotation preserve the builtin relationship between iteration and indexing. Statically known
+/// tuple subclasses are not refined here.
+///
+/// Dynamic element types remain represented by the synthesized sequence protocol. Replacing a
+/// gradual tuple element such as `Any` with the observed pattern type would lose gradualness.
+///
+/// ```python
+/// def f(value: tuple[int | str]) -> None:
+///     match value:
+///         case [str()]:
+///             reveal_type(value)  # tuple[str]
+/// ```
+fn refine_exact_tuple_for_sequence_pattern<'db>(
+    db: &'db dyn Db,
+    subject_ty: Type<'db>,
+    pattern_element_types: &[Type<'db>],
+) -> Option<Type<'db>> {
+    let tuple = subject_ty.exact_tuple_instance_spec(db)?;
+    if tuple
+        .all_elements()
+        .iter()
+        .chain(pattern_element_types)
+        .any(|element| any_over_type(db, *element, true, |ty| ty.is_dynamic()))
+    {
+        return None;
+    }
+
+    let pattern_tuple = TupleSpec::heterogeneous(pattern_element_types.iter().copied());
+    Some(
+        TupleSpecBuilder::from(tuple.as_ref())
+            .intersect(db, &pattern_tuple)
+            .map_or(Type::Never, |refined| {
+                Type::tuple(TupleType::new(db, &refined.build()))
+            }),
+    )
 }
 
 /// Return a type that contains every value that can match `pattern`.
@@ -2423,27 +2465,24 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 })
             }
             _ => {
-                let refined_exact = if let Some(tuple) = resolved.exact_tuple_instance_spec(db)
-                    && kind.split_around_star().is_none()
-                {
-                    tuple
-                        .resize(db, TupleLength::Fixed(kind.patterns.len()))
-                        .ok()
-                        .and_then(|tuple| {
-                            let element_types = tuple
-                                .iter_all_elements()
-                                .zip(kind.patterns.iter())
-                                .map(|(element, pattern)| {
-                                    Self::necessary_match_pattern_type_for_subject(
-                                        db, pattern, element,
-                                    )
-                                })
-                                .collect::<Vec<_>>();
-                            refine_exact_tuple_for_sequence_pattern(db, resolved, &element_types)
-                        })
-                } else {
-                    None
-                };
+                let refined_exact = resolved
+                    .exact_tuple_instance_spec(db)
+                    .filter(|_| kind.split_around_star().is_none())
+                    .and_then(|tuple| {
+                        tuple
+                            .resize(db, TupleLength::Fixed(kind.patterns.len()))
+                            .ok()
+                    })
+                    .and_then(|tuple| {
+                        let element_types = tuple
+                            .iter_all_elements()
+                            .zip(kind.patterns.iter())
+                            .map(|(element, pattern)| {
+                                Self::necessary_match_pattern_type_for_subject(db, pattern, element)
+                            })
+                            .collect::<Vec<_>>();
+                        refine_exact_tuple_for_sequence_pattern(db, resolved, &element_types)
+                    });
 
                 refined_exact.unwrap_or_else(|| {
                     let sequence_ty = if resolved.exact_tuple_instance_spec(db).is_some() {
@@ -2462,6 +2501,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         if narrowed == resolved { ty } else { narrowed }
     }
 
+    /// Return the type required by `pattern`, specializing nested sequences against `subject_ty`.
+    ///
+    /// Pattern-only sequence types use a synthesized protocol. Supplying the subject preserves the
+    /// concrete shape of nested exact tuples instead.
     fn necessary_match_pattern_type_for_subject(
         db: &'db dyn Db,
         pattern: &PatternPredicateKind<'db>,
