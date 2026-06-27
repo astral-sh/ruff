@@ -1304,7 +1304,9 @@ impl<'db> Type<'db> {
             return self.recover_tainted_cycle_iteration(db, previous);
         }
 
-        if let (Type::GenericAlias(current), Type::GenericAlias(previous)) = (self, previous)
+        let current = self.fold_nested_cycle_previous_approximation(db, previous, cycle);
+
+        if let (Type::GenericAlias(current), Type::GenericAlias(previous)) = (current, previous)
             && let Some(merged) = current.merge_cycle_recovery(db, previous)
         {
             Type::GenericAlias(merged)
@@ -1314,7 +1316,44 @@ impl<'db> Type<'db> {
             // where the order of union types is different between the previous and current cycle.
             // We should use the previous union type as the base and only add new element types in
             // this cycle, if any.
-            UnionType::from_elements_cycle_recovery(db, [previous, self])
+            UnionType::from_elements_cycle_recovery(db, [previous, current])
+        }
+    }
+
+    fn fold_nested_cycle_previous_approximation(
+        self,
+        db: &'db dyn Db,
+        previous: Self,
+        cycle: &salsa::Cycle,
+    ) -> Self {
+        // Non-contractive top-level markers such as `Any | a` are normalized away, but a later
+        // iteration can still place the previous structured approximation under a constructor.
+        // Fold that nested occurrence back to the active marker so recovery converges.
+        if self == previous || !previous.can_seed_recursive_growth(db) {
+            return self;
+        }
+
+        cycle.head_ids().fold(self, |ty, id| {
+            ty.apply_type_mapping(
+                db,
+                &TypeMapping::FoldCyclePrevious {
+                    binder_id: BinderId::new(id),
+                    replacement: previous,
+                },
+                TypeContext::default(),
+            )
+        })
+    }
+
+    fn can_seed_recursive_growth(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Recursive(_) | Type::Intersection(_) => true,
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|element| element.can_seed_recursive_growth(db)),
+            Type::NominalInstance(instance) => instance.has_known_class(db, KnownClass::Tuple),
+            _ => false,
         }
     }
 
@@ -6476,6 +6515,14 @@ impl<'db> Type<'db> {
         {
             return Type::divergent(recursive.binder_id(db));
         }
+        if let TypeMapping::FoldCyclePrevious {
+            binder_id,
+            replacement,
+        } = type_mapping
+            && self == *replacement
+        {
+            return Type::divergent(binder_id.into_id());
+        }
 
         // Recursive singleton promotion only recurses into `NominalInstance` types (tuples
         // and specialized generics). For all other types, return early.
@@ -6697,7 +6744,8 @@ impl<'db> Type<'db> {
                     }
                     TypeMapping::ReplaceDivergent { .. }
                     | TypeMapping::ReplaceRecursiveOrigin { .. }
-                    | TypeMapping::ReplaceRecursiveAliasComponent { .. } => {
+                    | TypeMapping::ReplaceRecursiveAliasComponent { .. }
+                    | TypeMapping::FoldCyclePrevious { .. } => {
                         if let Some(specialization) = alias.specialization(db) {
                             let mapped_specialization =
                                 specialization.apply_type_mapping_impl(db, type_mapping, &[], visitor);
@@ -6787,6 +6835,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::ReplaceRecursiveOrigin { .. } |
                 TypeMapping::ReplaceRecursiveAliasComponent { .. } |
+                TypeMapping::FoldCyclePrevious { .. } |
                 TypeMapping::ReplaceDivergent { .. } |
                 TypeMapping::FoldRecursive { .. } |
                 TypeMapping::Materialize(_) |
@@ -6810,6 +6859,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::ReplaceRecursiveOrigin { .. } |
                 TypeMapping::ReplaceRecursiveAliasComponent { .. } |
+                TypeMapping::FoldCyclePrevious { .. } |
                 TypeMapping::ReplaceDivergent { .. } |
                 TypeMapping::FoldRecursive { .. } |
                 TypeMapping::Promote(..) |
@@ -6841,6 +6891,11 @@ impl<'db> Type<'db> {
                     ..
                 } = type_mapping
                     && recursive.binder(db) == folded.binder(db)
+                {
+                    return self;
+                }
+                if let TypeMapping::FoldCyclePrevious { binder_id, .. } = type_mapping
+                    && recursive.binder(db) == *binder_id
                 {
                     return self;
                 }
@@ -7929,6 +7984,11 @@ pub enum TypeMapping<'a, 'db> {
         recursive: RecursiveType<'db>,
         replacement: Type<'db>,
     },
+    /// Folds a nested occurrence of the previous fixed-point approximation to the active marker.
+    FoldCyclePrevious {
+        binder_id: BinderId,
+        replacement: Type<'db>,
+    },
     /// Create the top or bottom materialization of a type.
     Materialize(MaterializationKind),
     /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
@@ -7986,6 +8046,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceRecursiveAliasComponent { .. }
             | TypeMapping::ReplaceDivergent { .. }
             | TypeMapping::FoldRecursive { .. }
+            | TypeMapping::FoldCyclePrevious { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => context,
@@ -8036,6 +8097,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceRecursiveAliasComponent { .. }
             | TypeMapping::ReplaceDivergent { .. }
             | TypeMapping::FoldRecursive { .. }
+            | TypeMapping::FoldCyclePrevious { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
