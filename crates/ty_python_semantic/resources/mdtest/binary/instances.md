@@ -218,6 +218,54 @@ class C(B): ...
 reveal_type(A() + C())  # revealed: MyString
 ```
 
+## Reflected precedence uses runtime classes
+
+`IntFlag` values are commonly accumulated into a mask that starts at the integer zero. At runtime,
+the first `|=` produces a `Permission`, because reflected-method precedence depends on the operands'
+runtime classes. The enum literal is not a subtype of the specific integer literal `0`, but its
+runtime class is a strict subclass of `int`:
+
+```py
+from enum import IntFlag, auto
+
+class Permission(IntFlag):
+    READ = auto()
+    WRITE = auto()
+
+def permissions_for(editable: bool) -> Permission:
+    permissions = 0
+    permissions |= Permission.READ
+    reveal_type(permissions)  # revealed: Literal[Permission.READ]
+
+    if editable:
+        permissions |= Permission.WRITE
+
+    return permissions
+```
+
+## Bounded TypeVars do not have an exact runtime class
+
+The upper bound of a TypeVar is not necessarily its runtime class. The bound therefore cannot be
+used to decide whether the right-hand operand's reflected method takes precedence:
+
+```py
+from typing import Literal, TypeVar
+
+class Base:
+    def __add__(self, other: object) -> Literal["base"]:
+        return "base"
+
+class Child(Base):
+    def __radd__(self, other: object) -> Literal["child"]:
+        return "child"
+
+T = TypeVar("T", bound=Base)
+
+def add_child(left: T) -> Literal["base"]:
+    reveal_type(left + Child())  # revealed: Literal["base"]
+    return left + Child()
+```
+
 ## Reflected precedence 2
 
 If the right-hand operand is a subtype of the left-hand operand, but does not override the reflected
