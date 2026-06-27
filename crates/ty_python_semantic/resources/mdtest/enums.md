@@ -22,6 +22,52 @@ reveal_type(Color(1))  # revealed: Color
 reveal_type(Color.RED in Color)  # revealed: bool
 ```
 
+## Methods managed during class creation
+
+`EnumType` can replace inherited methods when it creates an enum class. It preserves ordinary mixin
+implementations, uses the data type's string methods for `ReprEnum`, and installs `Flag`'s operators
+on `Flag` subclasses:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from enum import Enum, Flag, ReprEnum
+from typing import Literal
+
+class StringMixin:
+    def __str__(self) -> Literal["mixin"]:
+        return "mixin"
+
+class Mixed(StringMixin, Enum):
+    MEMBER = 1
+
+class Number(int, Enum):
+    ONE = 1
+
+class ReprNumber(int, ReprEnum):
+    ONE = 1
+
+class ReprFlag(int, ReprEnum, Flag):
+    READ = 1
+
+class OrMixin:
+    def __or__(self, other: object) -> Literal["mixin"]:
+        return "mixin"
+
+class Permission(OrMixin, Flag):
+    READ = 1
+
+reveal_type(Mixed.MEMBER.__str__)  # revealed: bound method Mixed.__str__() -> Literal["mixin"]
+reveal_type(Number.ONE.__str__)  # revealed: bound method Number.__str__() -> str
+reveal_type(ReprNumber.ONE.__str__)  # revealed: bound method ReprNumber.__repr__() -> str
+reveal_type(ReprFlag.READ.__str__)  # revealed: bound method Literal[ReprFlag.READ].__repr__() -> str
+# revealed: bound method Literal[Permission.READ].__or__(other: Literal[Permission.READ]) -> Literal[Permission.READ]
+reveal_type(Permission.READ.__or__)
+```
+
 For standard-library enum classes, we preserve literal `.value` types when we can model how the data
 type constructs each value. The inherited `_value_` annotation remains the fallback when we cannot,
 or when accessing `.value` on the enum class as a whole:

@@ -36,7 +36,10 @@ use crate::{
         context::InferContext,
         definition_expression_type, determine_upper_bound,
         diagnostic::INVALID_DATACLASS_OVERRIDE,
-        enums::{enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value},
+        enums::{
+            enum_class_creation_synthesized_member, enum_metadata, is_enum_class_by_inheritance,
+            try_unwrap_nonmember_value,
+        },
         function::{
             DataclassTransformerParams, KnownFunction, is_implicit_classmethod,
             is_implicit_staticmethod,
@@ -1270,8 +1273,7 @@ impl<'db> StaticClassLiteral<'db> {
         member
     }
 
-    /// Returns the type of a synthesized dataclass member like `__init__` or `__lt__`, or
-    /// a synthesized `__new__` method for a `NamedTuple`.
+    /// Returns the type of a member synthesized during class creation.
     pub(crate) fn own_synthesized_member(
         self,
         db: &'db dyn Db,
@@ -1279,6 +1281,10 @@ impl<'db> StaticClassLiteral<'db> {
         inherited_generic_context: Option<GenericContext<'db>>,
         name: &str,
     ) -> Option<Type<'db>> {
+        if let Some(member) = enum_class_creation_synthesized_member(db, self, name) {
+            return Some(member);
+        }
+
         // Handle `@functools.total_ordering`: synthesize comparison methods
         // for classes that have `@total_ordering` and define at least one
         // ordering method. The decorator requires at least one of __lt__,

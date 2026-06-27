@@ -1,19 +1,20 @@
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::name::Name;
+use ruff_python_ast::{PythonVersion, name::Name};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
 use crate::FxOrderSet;
 use crate::{
-    Db, FxIndexMap,
+    Db, FxIndexMap, Program,
     place::{
-        DefinedPlace, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations,
+        DefinedPlace, Place, PlaceAndQualifiers, known_module_symbol, place_from_bindings,
+        place_from_declarations,
     },
     reachability::DeclarationsIteratorExtension,
     types::{
-        ClassBase, ClassLiteral, DynamicType, EnumLiteralType, IntersectionType, KnownClass,
-        LiteralValueTypeKind, MemberLookupPolicy, NegativeIntersectionElements, StaticClassLiteral,
-        Type, UnionType, binding_type,
+        ClassBase, ClassLiteral, ClassType, DynamicType, EnumLiteralType, IntersectionType,
+        KnownClass, LiteralValueTypeKind, MemberLookupPolicy, NegativeIntersectionElements,
+        StaticClassLiteral, Type, UnionType, binding_type,
         function::FunctionType,
         set_theoretic::{
             RecursivelyDefined,
@@ -21,6 +22,7 @@ use crate::{
         },
     },
 };
+use ty_module_resolver::KnownModule;
 use ty_python_core::{definition::DefinitionKind, place_table, scope::ScopeId, use_def_map};
 
 /// A resolved enum method, retaining both whether it is analyzable and who defines it.
@@ -1018,7 +1020,7 @@ pub(crate) fn enum_metadata<'db>(
     let new = resolve_enum_method(user_defined_new, || {
         inherited_known_enum_method(db, class, "__new__")
     });
-    let metaclass_may_transform_values = enum_metaclass_may_transform_values(db, class);
+    let metaclass_may_transform_values = enum_metaclass_may_transform_class(db, class);
     let user_defined_generate_next_value =
         custom_enum_method(db, scope_id, "_generate_next_value_")
             .or_else(|| inherited_user_defined_enum_method(db, class, "_generate_next_value_"));
@@ -1244,13 +1246,13 @@ pub(crate) fn enum_metadata<'db>(
     })
 }
 
-/// Returns whether an enum's metaclass has a custom value-transforming method before the stdlib
-/// `EnumType`/`EnumMeta` implementation.
+/// Returns whether an enum's metaclass can customize the namespace or completed class before the
+/// stdlib `EnumType`/`EnumMeta` implementation.
 ///
 /// `__prepare__` can return a namespace that rewrites assignments, and `__new__` can rewrite the
 /// completed class dictionary. Either method can therefore change member values before the stdlib
 /// enum constructor validates and forwards them to `__new__`/`__init__`.
-fn enum_metaclass_may_transform_values<'db>(
+fn enum_metaclass_may_transform_class<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
 ) -> bool {
@@ -1269,6 +1271,185 @@ fn enum_metaclass_may_transform_values<'db>(
                 .into_iter()
                 .any(|name| custom_enum_method(db, base.body_scope(db), name).is_some())
         })
+}
+
+/// Returns a member that `EnumType` adds to `class` during class creation.
+///
+/// The caller must first establish that `class` does not define `name` itself. `EnumType` preserves
+/// explicit definitions, but can replace an inherited data-type or `object` implementation with the
+/// corresponding enum implementation. Mixin implementations are preserved.
+pub(crate) fn enum_class_creation_synthesized_member<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+    name: &str,
+) -> Option<Type<'db>> {
+    let is_flag_operator = matches!(
+        name,
+        "__or__" | "__and__" | "__xor__" | "__ror__" | "__rand__" | "__rxor__" | "__invert__"
+    );
+    let is_enum_representation_method = matches!(
+        name,
+        "__repr__" | "__str__" | "__format__" | "__reduce_ex__"
+    );
+    if !is_flag_operator && !is_enum_representation_method {
+        return None;
+    }
+
+    if !is_enum_class_by_inheritance(db, class) || enum_metaclass_may_transform_class(db, class) {
+        return None;
+    }
+
+    if is_flag_operator
+        && Program::get(db).python_version(db) >= PythonVersion::PY311
+        && class_type_mro_contains(db, class.identity_specialization(db), KnownClass::Flag)
+    {
+        return class_member_type(
+            db,
+            KnownClass::Flag.to_class_literal(db).to_class_type(db)?,
+            name,
+        );
+    }
+
+    if !is_enum_representation_method {
+        return None;
+    }
+
+    let data_type = enum_data_type_class(db, class)?;
+    let first_enum = class.explicit_bases(db).last()?.to_class_type(db)?;
+    if !class_type_mro_contains(db, first_enum, KnownClass::Enum) {
+        return None;
+    }
+
+    if matches!(name, "__str__" | "__format__") && has_repr_enum_base(db, class) {
+        let data_type_method = if name == "__str__"
+            && class_member_type(db, data_type, name)
+                == class_member_type(
+                    db,
+                    KnownClass::Object.to_class_literal(db).to_class_type(db)?,
+                    name,
+                ) {
+            "__repr__"
+        } else {
+            name
+        };
+        return class_member_type(db, data_type, data_type_method);
+    }
+
+    let inherited_method = class
+        .iter_mro(db, None)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+        .find_map(|base| {
+            (!base.own_class_member(db, None, name).is_undefined())
+                .then(|| class_member_type(db, base, name))
+                .flatten()
+        })?;
+    let data_type_method = class_member_type(db, data_type, name)?;
+    let object_method = class_member_type(
+        db,
+        KnownClass::Object.to_class_literal(db).to_class_type(db)?,
+        name,
+    )?;
+
+    if inherited_method != data_type_method && inherited_method != object_method {
+        return None;
+    }
+
+    class_member_type(db, first_enum, name)
+}
+
+fn class_type_mro_contains<'db>(db: &'db dyn Db, class: ClassType<'db>, known: KnownClass) -> bool {
+    class
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .any(|base| base.known(db) == Some(known))
+}
+
+fn enum_data_type_class<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<ClassType<'db>> {
+    let object = KnownClass::Object.to_class_literal(db).to_class_type(db)?;
+    let mut selected = None;
+
+    for explicit_base in class.explicit_bases(db) {
+        let explicit_base = explicit_base.to_class_type(db)?;
+        let mut candidate = None;
+
+        for base in explicit_base.iter_mro(db) {
+            let base = base.into_class()?;
+            if base == object {
+                continue;
+            }
+
+            if class_type_is_enum(db, base) {
+                let base = base.class_literal(db).as_static()?;
+                let data_type = enum_data_type_class(db, base)?;
+                if data_type != object {
+                    if !select_enum_data_type(&mut selected, data_type) {
+                        return None;
+                    }
+                    break;
+                }
+                continue;
+            }
+
+            let defines_new = !base.own_class_member(db, None, "__new__").is_undefined();
+            let is_dataclass = Program::get(db).python_version(db) >= PythonVersion::PY311
+                && !base
+                    .own_class_member(db, None, "__dataclass_fields__")
+                    .is_undefined();
+            if defines_new || is_dataclass {
+                if !select_enum_data_type(&mut selected, candidate.unwrap_or(base)) {
+                    return None;
+                }
+                break;
+            }
+
+            candidate.get_or_insert(base);
+        }
+    }
+
+    Some(selected.unwrap_or(object))
+}
+
+fn select_enum_data_type<'db>(
+    selected: &mut Option<ClassType<'db>>,
+    candidate: ClassType<'db>,
+) -> bool {
+    if selected.is_some_and(|selected| selected != candidate) {
+        false
+    } else {
+        *selected = Some(candidate);
+        true
+    }
+}
+
+fn class_type_is_enum<'db>(db: &'db dyn Db, class: ClassType<'db>) -> bool {
+    class_type_mro_contains(db, class, KnownClass::Enum)
+}
+
+fn class_member_type<'db>(db: &'db dyn Db, class: ClassType<'db>, name: &str) -> Option<Type<'db>> {
+    class
+        .class_member(db, name, MemberLookupPolicy::default())
+        .place
+        .ignore_possibly_undefined()
+}
+
+fn has_repr_enum_base<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
+    let Some(repr_enum) = known_module_symbol(db, KnownModule::Enum, "ReprEnum")
+        .place
+        .ignore_possibly_undefined()
+        .and_then(|ty| ty.to_class_type(db))
+    else {
+        return false;
+    };
+
+    class
+        .explicit_bases(db)
+        .iter()
+        .filter_map(|base| base.to_class_type(db))
+        .any(|base| base == repr_enum)
 }
 
 /// Iterates over parent enum classes in the MRO, skipping known enum
