@@ -1006,29 +1006,15 @@ pub(super) fn typed_dict_fallback_class_member<'db>(
     lookup_policy: MemberLookupPolicy,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
-    let fallback_member = KnownClass::TypedDictFallback
+    let fallback = match module {
+        TypedDictModule::Typing => KnownClass::TypedDictFallback,
+        TypedDictModule::TypingExtensions => KnownClass::ExtensionTypedDictFallback,
+    };
+
+    fallback
         .to_class_literal(db)
         .find_name_in_mro_with_policy(db, name, lookup_policy)
-        .expect("Will return Some() when called on class literal");
-    if !fallback_member.is_undefined() || module != TypedDictModule::TypingExtensions {
-        return fallback_member;
-    }
-
-    let Some(fallback) = known_module_symbol(db, KnownModule::TypingExtensions, "_TypedDict")
-        .place
-        .ignore_possibly_undefined()
-        .filter(|ty| ty.as_class_literal().is_some())
-    else {
-        return fallback_member;
-    };
-    let member = fallback
-        .find_name_in_mro_with_policy(db, name, lookup_policy)
-        .expect("Will return Some() when called on class literal");
-    if member.is_undefined() {
-        fallback_member
-    } else {
-        member
-    }
+        .expect("Will return Some() when called on class literal")
 }
 
 pub(super) fn typed_dict_class_member<'db>(
