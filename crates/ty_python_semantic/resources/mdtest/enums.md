@@ -3020,6 +3020,13 @@ Number = IntEnum("Number", {"FALSE": False, "ZERO": 0})
 reveal_type(Number.FALSE.value)  # revealed: Literal[0]
 reveal_type(Number.ZERO)  # revealed: Number
 reveal_type(enum_members(Number))  # revealed: tuple[Literal["FALSE"]]
+
+# `int("1")` widens to `int`, but identical raw values still prove that the
+# members are aliases.
+Parsed = IntEnum("Parsed", {"A": "1", "B": "1"})
+
+reveal_type(Parsed.B)  # revealed: Parsed
+reveal_type(enum_members(Parsed))  # revealed: tuple[Literal["A"]]
 ```
 
 ### Flag function syntax

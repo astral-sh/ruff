@@ -954,6 +954,10 @@ pub(crate) fn enum_metadata<'db>(
                     .alias_detection_value(db, *ty, false)
                     .and_then(|alias_value_ty| {
                         try_register_alias(alias_value_ty, name, &mut enum_values, &mut aliases)
+                            // Identical raw literals remain aliases even when normalization widens.
+                            .or_else(|| {
+                                try_register_alias(*ty, name, &mut enum_values, &mut aliases)
+                            })
                     })
                     == Some(true)
                 {
