@@ -245,6 +245,24 @@ class Cyclic:
 reveal_type(Cyclic("").data)
 ```
 
+## Recursive operation results
+
+When a recursively inferred attribute is used in an operation, the result still preserves the
+recursive collection shape instead of exposing the intermediate cycle marker as a separate value:
+
+```py
+class RecursiveOperation:
+    def __init__(self):
+        self.x = [0]
+
+    def make_recursive(self):
+        self.x = [self.x]
+
+    def use_operation_result(self):
+        self.x = self.x + self.x
+        reveal_type(self.x)  # revealed: list[int] | list[Divergent]
+```
+
 ## Decorated methods with implicit class attributes
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3471>.
