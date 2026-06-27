@@ -146,6 +146,35 @@ def tuple_expands_only_constrained_positions(
             return 1
         case (_, False, _, _, _, _, _):
             return 2
+
+# The expansion budget is based on the alternatives that are actually produced, rather than the
+# tuple length. Each pattern below produces only one 65-element alternative.
+# fmt: off
+LongBoolTuple = tuple[
+    bool, bool, bool, bool, bool, bool, bool, bool, bool, bool,
+    bool, bool, bool, bool, bool, bool, bool, bool, bool, bool,
+    bool, bool, bool, bool, bool, bool, bool, bool, bool, bool,
+    bool, bool, bool, bool, bool, bool, bool, bool, bool, bool,
+    bool, bool, bool, bool, bool, bool, bool, bool, bool, bool,
+    bool, bool, bool, bool, bool, bool, bool, bool, bool, bool,
+    bool, bool, bool, bool, bool,
+]
+
+def long_tuple_with_one_constrained_position(value: LongBoolTuple) -> int:
+    match value:
+        case (
+            True, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+            _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+            _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+        ):
+            return 0
+        case (
+            False, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+            _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+            _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _,
+        ):
+            return 1
+# fmt: on
 ```
 
 ## Checks on enum literals

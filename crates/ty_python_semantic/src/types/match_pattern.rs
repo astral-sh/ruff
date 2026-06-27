@@ -906,13 +906,7 @@ fn exact_tuple_sequence_pattern_fallthrough_type<'db>(
     if tuple.len() != kind.patterns.len() {
         return Ok(Some(subject_ty));
     }
-    if tuple.len() > MAX_EXACT_TUPLE_PATTERN_ALTERNATIVES
-        || tuple.len().saturating_mul(tuple.len()) > MAX_EXACT_TUPLE_PATTERN_ELEMENTS
-    {
-        return Err(());
-    }
-
-    let mut alternatives = Vec::with_capacity(tuple.len());
+    let mut alternatives = Vec::new();
     for (index, (element, pattern)) in tuple
         .iter_all_elements()
         .zip(kind.patterns.iter())
@@ -926,15 +920,12 @@ fn exact_tuple_sequence_pattern_fallthrough_type<'db>(
             continue;
         }
 
+        budget.add(1, tuple.len())?;
         let mut elements = tuple.all_elements().to_vec();
         elements[index] = remaining;
         alternatives.push(Type::heterogeneous_tuple(db, elements));
     }
 
-    budget.add(
-        alternatives.len(),
-        alternatives.len().saturating_mul(tuple.len()),
-    )?;
     Ok(Some(UnionType::from_elements(db, alternatives)))
 }
 
