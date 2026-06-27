@@ -506,10 +506,13 @@ reveal_type(yaml.YamlLoader)  # revealed: <class 'YamlLoader'>
 
 ## Priority across search paths
 
-Arguably [import resolution ordering], while vague, implies that a `foo-stubs` stub package should
-have priority over a `foo` package regardless of search path ordering.
+Within the user-controlled extra-path tier, ty gives a `foo-stubs` stub package priority over a
+regular `foo` package regardless of search-path ordering. Search-path order breaks ties between
+candidates of the same kind. This matches Pyright's behavior and is required for
+<https://github.com/astral-sh/ty/issues/1967>.
 
-Regression test for <https://github.com/astral-sh/ty/issues/1967>
+The typing specification defines the broader [import resolution ordering], but does not specify
+ordering between these two kinds of candidates within the user-controlled tier.
 
 ### Stub package comes first on the search path
 
@@ -557,6 +560,38 @@ class Pentagon:
 
 ```py
 class Pentagon: ...
+```
+
+`main.py`:
+
+```py
+from shapes import Pentagon
+
+reveal_type(Pentagon().sides)  # revealed: int
+```
+
+### Stub package takes priority over a regular stub
+
+Both candidates contain stubs and have user-controlled extra paths, but the explicit `shapes-stubs`
+package is more specific than the regular `shapes` package.
+
+```toml
+[environment]
+extra-paths = ["/path-one", "/path-two"]
+```
+
+`/path-one/shapes/__init__.pyi`:
+
+```pyi
+class Pentagon:
+    sides: str
+```
+
+`/path-two/shapes-stubs/__init__.pyi`:
+
+```pyi
+class Pentagon:
+    sides: int
 ```
 
 `main.py`:

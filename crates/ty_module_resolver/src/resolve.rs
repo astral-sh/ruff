@@ -1081,6 +1081,13 @@ struct ModuleResolutionCandidate {
 /// sorts used by the resolver preserve search-path order between candidates in the same tier.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum CandidatePrecedence {
+    /// A regular PEP 561 stub-only package on a user-configured extra search path.
+    ///
+    /// Stub-only packages are more specific than regular packages on extra paths and take
+    /// precedence regardless of the relative order of those paths. Search-path order still breaks
+    /// ties between multiple extra-path stub packages.
+    ExtraStubPackage,
+
     /// A candidate from a user-configured extra search path while stubs are allowed.
     ///
     /// These paths are the equivalent of mypy's `MYPYPATH` or pyright's `stubPath`: they give the
@@ -1093,7 +1100,7 @@ enum CandidatePrecedence {
     ///
     /// Stub packages take precedence over the corresponding runtime package regardless of where
     /// that runtime package appears in the search-path order. A stub package on an extra search
-    /// path remains [`CandidatePrecedence::ExtraSearchPath`].
+    /// path receives [`CandidatePrecedence::ExtraStubPackage`].
     StubPackage,
 
     /// An ordinary runtime candidate.
@@ -1116,9 +1123,10 @@ enum ResolutionPriority {
 }
 
 impl CandidatePrecedence {
-    fn with_stub_package(self) -> Self {
+    fn with_stub_package(self, is_namespace_package: bool) -> Self {
         match self {
-            Self::ExtraSearchPath => Self::ExtraSearchPath,
+            Self::ExtraSearchPath if is_namespace_package => Self::ExtraSearchPath,
+            Self::ExtraStubPackage | Self::ExtraSearchPath => Self::ExtraStubPackage,
             Self::StubPackage | Self::Runtime => Self::StubPackage,
         }
     }
@@ -1253,7 +1261,9 @@ fn resolve_stub_package_in_search_path(
         );
         None
     } else {
-        candidate.precedence = candidate.precedence.with_stub_package();
+        candidate.precedence = candidate
+            .precedence
+            .with_stub_package(candidate.is_any_namespace_package());
         Some(candidate)
     }
 }
