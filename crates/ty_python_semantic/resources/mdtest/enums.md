@@ -22,11 +22,11 @@ reveal_type(Color(1))  # revealed: Color
 reveal_type(Color.RED in Color)  # revealed: bool
 ```
 
-## Methods managed during class creation
+## Methods replaced during enum class creation
 
-`EnumType` can replace inherited methods when it creates an enum class. It preserves ordinary mixin
-implementations, uses the data type's string methods for `ReprEnum`, and installs `Flag`'s operators
-on `Flag` subclasses:
+`EnumType` chooses some methods after the class body has been evaluated. An ordinary mixin method is
+preserved. For an enum that also inherits from a value type such as `int`, `EnumType` normally uses
+the `Enum` representation methods, while `ReprEnum` keeps the value type's representation:
 
 ```toml
 [environment]
@@ -34,7 +34,7 @@ python-version = "3.13"
 ```
 
 ```py
-from enum import Enum, Flag, IntFlag, ReprEnum
+from enum import Enum, ReprEnum
 from typing import Literal
 
 class StringMixin:
@@ -50,19 +50,31 @@ class Number(int, Enum):
 class ReprNumber(int, ReprEnum):
     ONE = 1
 
+reveal_type(Mixed.MEMBER.__str__)  # revealed: bound method Mixed.__str__() -> Literal["mixin"]
+reveal_type(Number.ONE.__str__)  # revealed: bound method Number.__str__() -> str
+reveal_type(ReprNumber.ONE.__str__)  # revealed: bound method ReprNumber.__repr__() -> str
+```
+
+## Flag operators installed during class creation
+
+Starting in Python 3.11, `EnumType` replaces inherited bitwise operators on every `Flag` subclass. A
+plain `Flag` only accepts another member of the same class. A flag with a separate value type also
+accepts values of that type:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from enum import Flag, IntFlag, ReprEnum
+from typing import Literal
+
 class ReprFlag(int, ReprEnum, Flag):
     READ = 1
     WRITE = 2
 
-class FlagValue(int):
-    pass
-
-class CustomFlag(FlagValue, ReprEnum, Flag):
-    READ = 1
-
-class IntPermission(IntFlag):
-    READ = 1
-    WRITE = 2
+reveal_type(ReprFlag.READ.__str__)  # revealed: bound method Literal[ReprFlag.READ].__repr__() -> str
 
 class OrMixin:
     def __or__(self, other: object) -> Literal["mixin"]:
@@ -72,31 +84,30 @@ class Permission(OrMixin, Flag):
     READ = 1
     WRITE = 2
 
-reveal_type(Mixed.MEMBER.__str__)  # revealed: bound method Mixed.__str__() -> Literal["mixin"]
-reveal_type(Number.ONE.__str__)  # revealed: bound method Number.__str__() -> str
-reveal_type(ReprNumber.ONE.__str__)  # revealed: bound method ReprNumber.__repr__() -> str
-reveal_type(ReprFlag.READ.__str__)  # revealed: bound method Literal[ReprFlag.READ].__repr__() -> str
-# revealed: bound method Literal[Permission.READ].__or__(other: Literal[Permission.READ]) -> Literal[Permission.READ]
-reveal_type(Permission.READ.__or__)
 reveal_type(Permission.READ | Permission.WRITE)  # revealed: Literal[Permission.READ, Permission.WRITE]
 Permission.READ | 0  # error: [unsupported-operator]
 
-def repr_flag_features(condition: bool) -> ReprFlag:
+def repr_flag_or_int(condition: bool) -> ReprFlag:
     return ReprFlag.READ | (ReprFlag.WRITE if condition else 0)
 
-def custom_flag_features(value: FlagValue) -> CustomFlag:
+class FlagValue(int):
+    pass
+
+class CustomFlag(FlagValue, ReprEnum, Flag):
+    READ = 1
+
+def custom_flag_or_value(value: FlagValue) -> CustomFlag:
     return CustomFlag.READ | value
 
-def int_flag_features(condition: bool) -> IntPermission:
+class IntPermission(IntFlag):
+    READ = 1
+    WRITE = 2
+
+def int_flag_or_int(condition: bool) -> IntPermission:
     return IntPermission.READ | (IntPermission.WRITE if condition else 0)
 
-class Entity:
-    features: IntPermission | None
-
-    def update(self, condition: bool) -> None:
-        self.features = (self.features or 0) | IntPermission.READ | IntPermission.WRITE
-        if condition:
-            self.features |= IntPermission.WRITE
+def int_fallback_before_flags(value: IntPermission | None) -> IntPermission:
+    return (value or 0) | IntPermission.READ | IntPermission.WRITE
 ```
 
 For standard-library enum classes, we preserve literal `.value` types when we can model how the data
