@@ -147,12 +147,10 @@ fn check_blanket_suppressions(context: &mut CheckSuppressionsContext) {
         return;
     }
 
-    let unused_ignore_enabled = !context.is_lint_disabled(&UNUSED_IGNORE_COMMENT);
-
     for suppression in context.suppressions.iter().filter(|suppression| {
         suppression.kind == SuppressionKind::Ty && suppression.target == SuppressionTarget::All
     }) {
-        if unused_ignore_enabled && !context.is_suppression_used(suppression.id()) {
+        if !context.is_suppression_used(suppression.id()) {
             continue;
         }
 
