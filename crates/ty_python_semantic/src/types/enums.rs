@@ -872,11 +872,10 @@ pub(crate) fn enum_metadata<'db>(
     let init = resolve_enum_method(user_defined_init, || {
         inherited_known_enum_method(db, class, "__init__")
     });
-    // CPython checks an inherited `__new_member__` before falling back to `__new__` or the
-    // data-type constructor.
+    // CPython checks `__new_member__` and then `__new__` on each enum base before continuing
+    // through the MRO or falling back to the data-type constructor.
     let user_defined_new = custom_enum_method(db, scope_id, "__new__")
-        .or_else(|| inherited_user_defined_enum_method(db, class, "__new_member__"))
-        .or_else(|| inherited_user_defined_enum_method(db, class, "__new__"))
+        .or_else(|| inherited_user_defined_enum_new(db, class))
         .or_else(|| inherited_user_defined_mixin_new(db, class));
     let new = resolve_enum_method(user_defined_new, || {
         inherited_known_enum_method(db, class, "__new__")
@@ -1217,6 +1216,20 @@ fn inherited_user_defined_enum_method<'db>(
     iter_parent_enum_classes(db, class)
         .filter(|base| base.known(db).is_none())
         .find_map(|base| custom_enum_method(db, base.body_scope(db), name))
+}
+
+/// Looks up the first user-defined enum member constructor in the MRO.
+fn inherited_user_defined_enum_new<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<EnumMethodBinding<'db>> {
+    iter_parent_enum_classes(db, class)
+        .filter(|base| base.known(db).is_none())
+        .find_map(|base| {
+            let scope = base.body_scope(db);
+            custom_enum_method(db, scope, "__new_member__")
+                .or_else(|| custom_enum_method(db, scope, "__new__"))
+        })
 }
 
 /// Looks up a user-defined `__new__` on a data-type mixin anywhere in the MRO, including through an

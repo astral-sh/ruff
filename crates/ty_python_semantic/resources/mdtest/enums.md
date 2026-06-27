@@ -714,6 +714,31 @@ class Child(Base):
 reveal_type(Child.VALUE.value)  # revealed: Any
 ```
 
+`EnumType` saves an enum's user-defined `__new__` as that class's `__new_member__`. The immediate
+parent's `__new__` therefore takes precedence over an explicit `__new_member__` in a grandparent:
+
+```py
+from enum import Enum
+
+class Grandparent(Enum):
+    def __new_member__(cls: type["Grandparent"], value: str) -> "Grandparent":
+        obj = object.__new__(cls)
+        obj._value_ = value
+        return obj
+
+class Parent(Grandparent):
+    def __new__(cls, value: int) -> "Parent":
+        obj = object.__new__(cls)
+        obj._value_ = value
+        return obj
+
+class Child(Parent):
+    VALID = 1
+    INVALID = "not an int"  # error: [invalid-assignment]
+
+reveal_type(Child.VALID.value)  # revealed: Any
+```
+
 ### Data-type mixin `__new__`
 
 A user-defined `__new__` on a data-type mixin constructs the scalar payload and can transform the
