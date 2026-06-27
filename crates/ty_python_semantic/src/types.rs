@@ -1150,6 +1150,35 @@ impl<'db> Type<'db> {
         }
     }
 
+    fn matches_cycle_previous_replacement(self, db: &'db dyn Db, replacement: Type<'db>) -> bool {
+        TypeTransformer::<ApplyGuardedCyclePrevious>::same_type_identity(db, self, replacement)
+            || self.matches_known_instance_cycle_previous_replacement(db, replacement)
+    }
+
+    fn matches_known_instance_cycle_previous_replacement(
+        self,
+        db: &'db dyn Db,
+        replacement: Type<'db>,
+    ) -> bool {
+        // These value-expression wrappers carry a semantic type that can be the actual previous
+        // approximation inside a guarded recursive position.
+        match (self, replacement) {
+            (Type::Callable(left), Type::KnownInstance(KnownInstanceType::Callable(right)))
+            | (Type::KnownInstance(KnownInstanceType::Callable(right)), Type::Callable(left)) => {
+                left == right
+            }
+            (Type::KnownInstance(KnownInstanceType::UnionType(union)), right) => union
+                .union_type(db)
+                .as_ref()
+                .is_ok_and(|union_type| *union_type == right),
+            (left, Type::KnownInstance(KnownInstanceType::UnionType(union))) => union
+                .union_type(db)
+                .as_ref()
+                .is_ok_and(|union_type| *union_type == left),
+            _ => false,
+        }
+    }
+
     fn is_top_level_cycle_marker(self, db: &'db dyn Db, marker: Type<'db>) -> bool {
         self.same_divergent_marker(marker)
             || matches!(
@@ -6517,7 +6546,7 @@ impl<'db> Type<'db> {
             replacement,
             guarded: true,
         } = type_mapping
-            && self == *replacement
+            && self.matches_cycle_previous_replacement(db, *replacement)
         {
             return Type::divergent(binder_id.into_id());
         }

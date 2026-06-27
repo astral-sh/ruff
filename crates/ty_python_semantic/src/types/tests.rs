@@ -132,6 +132,47 @@ fn cycle_previous_folding_uses_guarded_occurrences() {
         guarded_union_expected
     );
 
+    let callable = CallableType::single(
+        &db,
+        Signature::new(Parameters::empty(), KnownClass::Int.to_instance(&db)),
+    );
+    let known_callable = Type::KnownInstance(KnownInstanceType::Callable(callable));
+    let callable_mapping = TypeMapping::FoldCyclePrevious {
+        binder_id,
+        replacement: Type::Callable(callable),
+        guarded: false,
+    };
+    assert_eq!(
+        KnownClass::List
+            .to_specialized_instance(&db, &[known_callable])
+            .apply_type_mapping(&db, &callable_mapping, TypeContext::default()),
+        KnownClass::List.to_specialized_instance(&db, &[marker])
+    );
+
+    let semantic_union = UnionType::from_elements(
+        &db,
+        [
+            KnownClass::Int.to_instance(&db),
+            KnownClass::Str.to_instance(&db),
+        ],
+    );
+    let union_instance = Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::new(
+        &db,
+        None,
+        Ok(semantic_union),
+    )));
+    let union_mapping = TypeMapping::FoldCyclePrevious {
+        binder_id,
+        replacement: semantic_union,
+        guarded: false,
+    };
+    assert_eq!(
+        KnownClass::List
+            .to_specialized_instance(&db, &[union_instance])
+            .apply_type_mapping(&db, &union_mapping, TypeContext::default()),
+        KnownClass::List.to_specialized_instance(&db, &[marker])
+    );
+
     let unguarded_current = UnionType::from_elements(&db, [previous, str_instance]);
     assert_eq!(
         unguarded_current.apply_type_mapping(&db, &mapping, TypeContext::default()),

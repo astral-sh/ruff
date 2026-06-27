@@ -129,7 +129,7 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone, const INLINE_CAPACITY: usize>
 }
 
 impl<'db, Tag> TypeTransformer<'db, Tag> {
-    fn same_type_identity(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
+    pub(crate) fn same_type_identity(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
         if left == right {
             return true;
         }
