@@ -1248,6 +1248,15 @@ impl<'db> Type<'db> {
         })
     }
 
+    fn contains_recursive_type(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> bool {
+        any_over_type(
+            db,
+            self,
+            false,
+            |ty| matches!(ty, Type::Recursive(r) if r == recursive),
+        )
+    }
+
     /// Negating a divergent marker preserves the marker.
     fn negated_divergent(self) -> Option<Type<'db>> {
         let Type::Divergent(divergent) = self else {
@@ -2425,6 +2434,10 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         recursive: RecursiveType<'db>,
     ) -> Self {
+        if self.contains_recursive_type(db, recursive) {
+            return self;
+        }
+
         let marker = Type::divergent(recursive.binder_id(db));
         let normalized = self
             .recursive_type_normalized_impl(db, marker, false)

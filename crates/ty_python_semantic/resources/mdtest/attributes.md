@@ -3445,8 +3445,38 @@ reveal_type(F().x)  # revealed: tuple[Divergent, ...]
 
 ## Self-referential implicit attributes
 
-When an implicit attribute is inferred from a value that contains itself, operations such as
-subscripting and iteration can still see the recursive collection shape:
+When an implicit attribute refers to itself (the recursion flows through `self`), we infer a true
+recursive type: a μ-binder whose recursive position is still displayed as `Divergent`, but which
+unfolds one step every time a structural operation (subscript, iteration, …) descends into it.
+Without this, the type would bottom out at the bare `Divergent` marker after a single step.
+
+```py
+class Foo:
+    def __init__(self):
+        self.x = (1,)
+
+    def f(self):
+        self.x = (self.x, 0)
+
+        reveal_type(self.x)  # revealed: tuple[tuple[int] | tuple[Divergent, int], Literal[0]]
+        # Each subscript unfolds the recursive type one more step instead of collapsing to `Divergent`:
+        reveal_type(self.x[0])  # revealed: tuple[int] | tuple[Divergent, int]
+        reveal_type(self.x[0][0])  # revealed: int | tuple[int] | tuple[Divergent, int]
+        # The base case `int` (from `(1,)`) is genuinely not subscriptable:
+        # error: [not-subscriptable] "Cannot subscript object of type `int` with no `__getitem__` method"
+        reveal_type(self.x[0][0][0])  # revealed: Unknown | int | tuple[int] | tuple[Divergent, int]
+```
+
+The same recursive type is observed when the attribute is read from outside the class, so unfolding
+is a property of the type itself, not of where it is used:
+
+```py
+reveal_type(Foo().x)  # revealed: tuple[int] | tuple[Divergent, int]
+reveal_type(Foo().x[0])  # revealed: int | tuple[int] | tuple[Divergent, int]
+```
+
+Infinitely-nested generics behave the same way — subscripting keeps unfolding rather than stopping
+at `Divergent`:
 
 ```py
 class SelfRecursiveList:
@@ -3460,6 +3490,8 @@ reveal_type(SelfRecursiveList().x[0][0])  # revealed: list[Divergent]
 for item in SelfRecursiveList().x:
     reveal_type(item)  # revealed: list[Divergent]
 ```
+
+Generic class specializations also apply inside recursive implicit attribute types:
 
 ```py
 from typing import Generic, TypeVar
