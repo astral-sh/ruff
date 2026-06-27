@@ -1324,30 +1324,18 @@ impl<'db> Type<'db> {
         matches!(self, Type::Callable(..))
     }
 
-    /// Recover from a Salsa cycle using the previous fixed-point approximation.
+    /// Normalizes the type toward a fixed point using the type from the previous iteration.
     pub(crate) fn cycle_normalized(
         self,
         db: &'db dyn Db,
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
-        self.recover_cycle_iteration(db, previous.active_cycle_head_body(db, cycle), cycle)
-            .normalize_active_cycle_heads(db, cycle)
+        self.merge_with_previous(db, previous.unwrap_recursive(db), cycle)
+            .normalize_cycle_heads(db, cycle)
     }
 
-    fn active_cycle_head_body(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
-        match self {
-            Type::Recursive(recursive)
-                if cycle.head_ids().any(|id| id == recursive.binder_id(db)) =>
-            {
-                recursive.body(db)
-            }
-            _ => self,
-        }
-    }
-
-    // Recover the current fixed-point approximation before recursive marker folding.
-    fn recover_cycle_iteration(
+    fn merge_with_previous(
         self,
         db: &'db dyn Db,
         previous: Self,
@@ -1410,41 +1398,31 @@ impl<'db> Type<'db> {
         })
     }
 
-    fn normalize_active_cycle_heads(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
+    fn normalize_cycle_heads(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
         cycle
             .head_ids()
-            .fold(self.active_cycle_head_body(db, cycle), |ty, id| {
-                ty.normalize_cycle_head(db, id, cycle)
+            .fold(self.unwrap_recursive(db), |ty, id| {
+                ty.normalize_cycle_head(db, id)
             })
     }
 
-    fn normalize_cycle_head(self, db: &'db dyn Db, id: salsa::Id, cycle: &salsa::Cycle) -> Self {
+    fn normalize_cycle_head(self, db: &'db dyn Db, id: salsa::Id) -> Self {
         let marker = Type::divergent(id);
-        let body = self.cycle_body_for_marker(db, id, marker, cycle);
+        let body = self.recursive_body_for_marker(db, marker);
         let normalized = body
             .recursive_type_normalized_impl(db, marker, false)
             .unwrap_or(marker);
         normalized.wrap_implicit_recursive_body(db, id)
     }
 
-    fn cycle_body_for_marker(
+    fn recursive_body_for_marker(
         self,
         db: &'db dyn Db,
-        id: salsa::Id,
         marker: Type<'db>,
-        cycle: &salsa::Cycle,
     ) -> Self {
         let Type::Recursive(recursive) = self else {
             return self;
         };
-        if recursive.binder_id(db) == id
-            || !cycle
-                .head_ids()
-                .any(|head_id| head_id == recursive.binder_id(db))
-        {
-            return self;
-        }
-
         let body = recursive.body(db);
         if body.contains_cycle_marker(db, marker) {
             body
@@ -1454,7 +1432,7 @@ impl<'db> Type<'db> {
     }
 
     fn wrap_implicit_recursive_body(self, db: &'db dyn Db, id: salsa::Id) -> Self {
-        if !matches!(self, Type::Divergent(_)) {
+        if !self.is_divergent() {
             Type::implicit_recursive(db, id, self)
         } else {
             self
