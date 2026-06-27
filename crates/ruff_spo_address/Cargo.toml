@@ -1,0 +1,26 @@
+[package]
+name = "ruff_spo_address"
+version = "0.1.0"
+publish = false
+edition = "2024"
+rust-version = "1.86"
+description = "Deterministic (part_of:is_a) rank-minter — the brick between the ruff_*_spo SPO harvest and the lance-graph (part_of:is_a) GUID SoA. Given a corpus's part_of edges (has_field/has_function) and is_a edges (inherits_from/rdf:type), it assigns each node a deterministic (part_of-rank, is_a-rank) at each of 6 cascade tiers and packs them into a 16-byte facet whose bytes are layout-identical to lance_graph_contract::facet::FacetCascade (facet_classid(4 LE) | 6x(lo:hi)). hi_chain = part_of (mereology), lo_chain = is_a (taxonomy); both prefix-routable. Pure std + ruff_spo_triplet; no quantization (exact + roundtrip-lossless on a known class graph). See AST-as-(part_of:is_a)-address (lance-graph .claude/knowledge)."
+license = "MIT"
+
+[lib]
+name = "ruff_spo_address"
+
+[dependencies]
+ruff_spo_triplet = { workspace = true }
+
+[dev-dependencies]
+# The C# frontend's validated loader — used by the `medcare_probe` example to
+# drive the real Roslyn-harvested ndjson through the brick-1→2 seam.
+ruff_csharp_spo = { path = "../ruff_csharp_spo" }
+
+[lints]
+workspace = true
+
+[[example]]
+name = "medcare_probe"
+path = "examples/medcare_probe.rs"
