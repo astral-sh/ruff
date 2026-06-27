@@ -234,20 +234,6 @@ impl<'db> TupleType<'db> {
         ))
     }
 
-    pub(super) fn fold_cycle_previous_occurrences(
-        self,
-        db: &'db dyn Db,
-        previous: Type<'db>,
-        marker: Type<'db>,
-        guarded: bool,
-    ) -> Self {
-        Self::new_internal(
-            db,
-            self.tuple(db)
-                .fold_cycle_previous_occurrences(db, previous, marker, guarded),
-        )
-    }
-
     pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -739,20 +725,6 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         }
     }
 
-    fn fold_cycle_previous_occurrences(
-        &self,
-        db: &'db dyn Db,
-        previous: Type<'db>,
-        marker: Type<'db>,
-        _guarded: bool,
-    ) -> Self {
-        Self::from_elements(
-            self.0
-                .iter()
-                .map(|ty| ty.fold_previous_cycle_occurrences(db, previous, marker, true)),
-        )
-    }
-
     fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
@@ -760,6 +732,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        let type_mapping = type_mapping.in_cycle_guarded_position();
         let tcx_tuple = tcx
             .annotation
             .and_then(|annotation| annotation.known_specialization(db, KnownClass::Tuple))
@@ -784,7 +757,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
             self.0
                 .iter()
                 .zip(tcx_elements)
-                .map(|(ty, tcx)| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+                .map(|(ty, tcx)| ty.apply_type_mapping_impl(db, &type_mapping, tcx, visitor)),
         )
     }
 
@@ -1902,25 +1875,6 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         }
     }
 
-    fn fold_cycle_previous_occurrences(
-        &self,
-        db: &'db dyn Db,
-        previous: Type<'db>,
-        marker: Type<'db>,
-        _guarded: bool,
-    ) -> Self {
-        Self::new(
-            self.prefix_elements()
-                .iter()
-                .map(|ty| ty.fold_previous_cycle_occurrences(db, previous, marker, true)),
-            self.variable()
-                .fold_previous_cycle_occurrences(db, previous, marker, true),
-            self.suffix_elements()
-                .iter()
-                .map(|ty| ty.fold_previous_cycle_occurrences(db, previous, marker, true)),
-        )
-    }
-
     fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
@@ -1928,15 +1882,16 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> TupleSpec<'db> {
+        let type_mapping = type_mapping.in_cycle_guarded_position();
         Self::mixed(
             self.prefix_elements()
                 .iter()
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+                .map(|ty| ty.apply_type_mapping_impl(db, &type_mapping, tcx, visitor)),
             self.variable()
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                .apply_type_mapping_impl(db, &type_mapping, tcx, visitor),
             self.suffix_elements()
                 .iter()
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+                .map(|ty| ty.apply_type_mapping_impl(db, &type_mapping, tcx, visitor)),
         )
     }
 
@@ -2134,23 +2089,6 @@ impl<'db> Tuple<Type<'db>> {
             Tuple::Variable(tuple) => Some(Tuple::Variable(
                 tuple.recursive_type_normalized_impl(db, div, nested)?,
             )),
-        }
-    }
-
-    pub(super) fn fold_cycle_previous_occurrences(
-        &self,
-        db: &'db dyn Db,
-        previous: Type<'db>,
-        marker: Type<'db>,
-        guarded: bool,
-    ) -> Self {
-        match self {
-            Tuple::Fixed(tuple) => {
-                Tuple::Fixed(tuple.fold_cycle_previous_occurrences(db, previous, marker, guarded))
-            }
-            Tuple::Variable(tuple) => Tuple::Variable(
-                tuple.fold_cycle_previous_occurrences(db, previous, marker, guarded),
-            ),
         }
     }
 

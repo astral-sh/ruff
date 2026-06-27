@@ -1284,10 +1284,12 @@ impl<'db> Specialization<'db> {
             return self.materialize_impl(db, *materialization_kind, visitor);
         }
 
+        let type_mapping = type_mapping.in_cycle_guarded_position();
+
         let types = self.map_types(db, |i, typevar, ty| {
             let tcx = TypeContext::new(tcx.get(i).copied());
             if typevar.variance(db).is_covariant() {
-                ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                ty.apply_type_mapping_impl(db, &type_mapping, tcx, visitor)
             } else {
                 ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor)
             }
@@ -1295,7 +1297,7 @@ impl<'db> Specialization<'db> {
 
         let original_tuple_inner = self.tuple_inner(db);
         let tuple_inner = original_tuple_inner.and_then(|tuple| {
-            tuple.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
+            tuple.apply_type_mapping_impl(db, &type_mapping, TypeContext::default(), visitor)
         });
 
         // Keep this check in sync with every field that can be transformed above.
@@ -1386,30 +1388,6 @@ impl<'db> Specialization<'db> {
             self.materialization_kind(db),
             tuple_inner,
         ))
-    }
-
-    pub(super) fn fold_cycle_previous_occurrences(
-        self,
-        db: &'db dyn Db,
-        previous: Type<'db>,
-        marker: Type<'db>,
-        _guarded: bool,
-    ) -> Self {
-        let types = self
-            .types(db)
-            .iter()
-            .map(|ty| ty.fold_previous_cycle_occurrences(db, previous, marker, true))
-            .collect::<Box<[_]>>();
-        let tuple_inner = self
-            .tuple_inner(db)
-            .map(|tuple| tuple.fold_cycle_previous_occurrences(db, previous, marker, true));
-        Self::new(
-            db,
-            self.generic_context(db),
-            types,
-            self.materialization_kind(db),
-            tuple_inner,
-        )
     }
 
     pub(super) fn materialize_impl(

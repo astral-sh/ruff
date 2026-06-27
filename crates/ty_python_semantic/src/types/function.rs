@@ -1110,7 +1110,7 @@ impl<'db> FunctionType<'db> {
                 specialization: ApplySpecialization::ReturnCallables(_)
                     | ApplySpecialization::TypeAlias(_),
                 ..
-            }
+            } | TypeMapping::FoldCyclePrevious { .. }
         ) {
             (
                 self.updated_signature(db).map(|signature| {

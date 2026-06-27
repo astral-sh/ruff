@@ -1368,38 +1368,17 @@ impl<'db> Type<'db> {
         }
 
         cycle.head_ids().fold(self, |ty, id| {
-            ty.fold_previous_cycle_occurrences(db, previous, Type::divergent(id), false)
+            ty.apply_type_mapping_impl(
+                db,
+                &TypeMapping::FoldCyclePrevious {
+                    previous,
+                    marker: Type::divergent(id),
+                    guarded: false,
+                },
+                TypeContext::default(),
+                &ApplyTypeMappingVisitor::default(),
+            )
         })
-    }
-
-    pub(super) fn fold_previous_cycle_occurrences(
-        self,
-        db: &'db dyn Db,
-        previous: Self,
-        marker: Self,
-        guarded: bool,
-    ) -> Self {
-        if guarded && self.matches_cycle_previous_replacement(db, previous) {
-            return marker;
-        }
-
-        match self {
-            Type::Union(union) => {
-                union.fold_cycle_previous_occurrences(db, previous, marker, guarded)
-            }
-            Type::Intersection(intersection) => Type::Intersection(
-                intersection.fold_cycle_previous_occurrences(db, previous, marker, guarded),
-            ),
-            Type::NominalInstance(instance) => {
-                instance.fold_cycle_previous_occurrences(db, previous, marker, guarded)
-            }
-            Type::GenericAlias(generic) => Type::GenericAlias(
-                generic.fold_cycle_previous_occurrences(db, previous, marker, guarded),
-            ),
-            // Do not call general type operations from cycle recovery. Function signatures,
-            // class specializations, and aliases can re-enter inference queries here.
-            _ => self,
-        }
     }
 
     fn normalize_active_cycle_heads(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
@@ -6542,6 +6521,15 @@ impl<'db> Type<'db> {
         {
             return Type::divergent(recursive.binder_id(db));
         }
+        if let TypeMapping::FoldCyclePrevious {
+            previous,
+            marker,
+            guarded: true,
+        } = type_mapping
+            && self.matches_cycle_previous_replacement(db, *previous)
+        {
+            return *marker;
+        }
         // Recursive singleton promotion only recurses into `NominalInstance` types (tuples
         // and specialized generics). For all other types, return early.
         if matches!(
@@ -6822,6 +6810,7 @@ impl<'db> Type<'db> {
                     TypeMapping::ReplaceDivergent { .. }
                     | TypeMapping::ReplaceRecursiveOrigin { .. }
                     | TypeMapping::ReplaceRecursiveAliasComponent { .. }
+                    | TypeMapping::FoldCyclePrevious { .. }
                     => {
                         if let Some(specialization) = alias.specialization(db) {
                             let mapped_specialization =
@@ -6914,6 +6903,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceRecursiveAliasComponent { .. } |
                 TypeMapping::ReplaceDivergent { .. } |
                 TypeMapping::FoldRecursive { .. } |
+                TypeMapping::FoldCyclePrevious { .. } |
                 TypeMapping::Materialize(_) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
@@ -6937,6 +6927,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceRecursiveAliasComponent { .. } |
                 TypeMapping::ReplaceDivergent { .. } |
                 TypeMapping::FoldRecursive { .. } |
+                TypeMapping::FoldCyclePrevious { .. } |
                 TypeMapping::Promote(..) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
@@ -8054,6 +8045,15 @@ pub enum TypeMapping<'a, 'db> {
         recursive: RecursiveType<'db>,
         replacement: Type<'db>,
     },
+    /// Folds fixed-point growth through the previous cycle approximation.
+    ///
+    /// This mapping is used only during salsa cycle recovery. It must not force lazy type-alias
+    /// or function-signature queries while traversing the current approximation.
+    FoldCyclePrevious {
+        previous: Type<'db>,
+        marker: Type<'db>,
+        guarded: bool,
+    },
     /// Create the top or bottom materialization of a type.
     Materialize(MaterializationKind),
     /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
@@ -8111,6 +8111,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceRecursiveAliasComponent { .. }
             | TypeMapping::ReplaceDivergent { .. }
             | TypeMapping::FoldRecursive { .. }
+            | TypeMapping::FoldCyclePrevious { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => context,
@@ -8161,9 +8162,23 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceRecursiveAliasComponent { .. }
             | TypeMapping::ReplaceDivergent { .. }
             | TypeMapping::FoldRecursive { .. }
+            | TypeMapping::FoldCyclePrevious { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
+        }
+    }
+
+    fn in_cycle_guarded_position(&self) -> Self {
+        match self {
+            TypeMapping::FoldCyclePrevious {
+                previous, marker, ..
+            } => TypeMapping::FoldCyclePrevious {
+                previous: *previous,
+                marker: *marker,
+                guarded: true,
+            },
+            _ => self.clone(),
         }
     }
 }
