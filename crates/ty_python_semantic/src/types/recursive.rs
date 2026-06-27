@@ -206,12 +206,16 @@ impl<'db> RecursiveType<'db> {
             replacement,
         };
         let folded_body = unfolded_result.apply_type_mapping(db, &mapping, TypeContext::default());
-        let marker = Type::divergent(self.binder_id(db));
         if folded_body == self.body(db) {
             Type::Recursive(self)
         } else {
+            let marker = Type::divergent(self.binder_id(db));
             match self.origin(db) {
-                RecursiveOrigin::Implicit => folded_body.drop_top_level_cycle_markers(db, marker),
+                // A top-level marker in an operation result is the recursive value produced by
+                // that operation; keep it as the μ-type instead of treating it as a cycle head.
+                RecursiveOrigin::Implicit => {
+                    folded_body.replace_top_level_cycle_markers(db, marker, Type::Recursive(self))
+                }
                 RecursiveOrigin::TypeAlias(_) if folded_body.contains_cycle_marker(db, marker) => {
                     let mapping = TypeMapping::ReplaceDivergent {
                         binder_id: self.binder(db),

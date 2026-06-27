@@ -1213,6 +1213,35 @@ impl<'db> Type<'db> {
         if empty { marker } else { builder.build() }
     }
 
+    fn replace_top_level_cycle_markers(
+        self,
+        db: &'db dyn Db,
+        marker: Type<'db>,
+        replacement: Type<'db>,
+    ) -> Type<'db> {
+        if self.is_top_level_cycle_marker(db, marker) {
+            return replacement;
+        }
+
+        let Type::Union(union) = self else {
+            return self;
+        };
+
+        let mut builder = UnionBuilder::new(db)
+            .unpack_aliases(false)
+            .cycle_recovery(true)
+            .recursively_defined(union.recursively_defined(db));
+        for element in union.elements(db) {
+            if element.is_top_level_cycle_marker(db, marker) {
+                builder = builder.add(replacement);
+            } else {
+                builder = builder.add(*element);
+            }
+        }
+
+        builder.build()
+    }
+
     fn contains_cycle_marker(self, db: &'db dyn Db, marker: Type<'db>) -> bool {
         any_over_type(db, self, false, |ty| {
             ty.is_top_level_cycle_marker(db, marker)
