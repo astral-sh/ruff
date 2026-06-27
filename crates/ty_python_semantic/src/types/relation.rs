@@ -21,7 +21,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     DivergentType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType,
-    SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    RecursiveOrigin, SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType,
+    UpcastPolicy,
 };
 use crate::{
     Db,
@@ -161,9 +162,10 @@ pub(crate) enum TypeRelation {
     /// materialization of `Any` and `int | Any` may be the same type (`object`), but the
     /// two differ in their bottom materializations (`Never` and `int`, respectively).
     ///
-    /// Despite the above principles, there is one exceptional type that should never be union-simplified: the `Divergent` type.
-    /// This is a kind of dynamic type, but it acts as a marker to track recursive type structures.
-    /// If this type is accidentally eliminated by simplification, the fixed-point iteration will not converge.
+    /// Despite the above principles, there is one exceptional marker that should never be
+    /// union-simplified: the `Divergent` marker. It is the bound variable of a recursive type, not
+    /// an ordinary dynamic type. If it is accidentally eliminated by simplification, fixed-point
+    /// iteration cannot recover the recursive structure.
     ///
     /// [fully static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
     /// [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
@@ -966,6 +968,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if source.same_divergent_marker(target) {
+            return self.always();
+        }
+
         if let Type::Divergent(divergent) = source
             && let Some(recursive) = self.wrapping_recursive_for_divergent(db, divergent)
         {
@@ -978,15 +984,21 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return self.check_type_pair(db, source, Type::Recursive(recursive));
         }
 
-        if let Some(source) = source.materialized_divergent_fallback() {
-            return self.check_type_pair(db, source, target);
-        }
-
-        if let Some(target) = target.materialized_divergent_fallback() {
-            return self.check_type_pair(db, source, target);
-        }
-
         ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
+    }
+
+    fn normalize_counterpart_for_implicit_recursive_relation(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Type<'db> {
+        if !matches!(recursive.origin(db), RecursiveOrigin::Implicit) {
+            return ty;
+        }
+
+        let marker = Type::divergent(recursive.binder_id(db));
+        ty.recursive_type_normalized_impl(db, marker, false)
+            .unwrap_or(marker)
     }
 
     /// Is `target` a metaclass instance (a nominal instance of a subclass of `builtins.type`)?
@@ -1166,8 +1178,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             // Handle provisional cycle markers before the normal structural cases. If a matching
-            // `Type::Recursive` is already active, `check_divergent_type_pair` restores it;
-            // otherwise `Divergent` keeps its relation-specific gradual fallback.
+            // `Type::Recursive` is already active, `check_divergent_type_pair` restores it.
+            // Otherwise the marker is an unfixed cycle approximation; only assignability treats
+            // that approximation permissively.
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
                 self.check_divergent_type_pair(db, source, target)
             }
@@ -1182,13 +1195,27 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             // `Type::Recursive` records the pair on the relation visitor,
             // unwraps one step, and dispatches structurally.
-            (Type::Recursive(_), _) => self.with_recursion_guard(source, target, || {
-                self.check_type_pair(db, source.unwrap_recursive(db), target)
-            }),
+            (Type::Recursive(source_recursive), _) => {
+                self.with_recursion_guard(source, target, || {
+                    let target = Self::normalize_counterpart_for_implicit_recursive_relation(
+                        db,
+                        target,
+                        source_recursive,
+                    );
+                    self.check_type_pair(db, source.unwrap_recursive(db), target)
+                })
+            }
 
-            (_, Type::Recursive(_)) => self.with_recursion_guard(source, target, || {
-                self.check_type_pair(db, source, target.unwrap_recursive(db))
-            }),
+            (_, Type::Recursive(target_recursive)) => {
+                self.with_recursion_guard(source, target, || {
+                    let source = Self::normalize_counterpart_for_implicit_recursive_relation(
+                        db,
+                        source,
+                        target_recursive,
+                    );
+                    self.check_type_pair(db, source, target.unwrap_recursive(db))
+                })
+            }
 
             (Type::TypeAlias(source_alias), _) => self.with_recursion_guard(source, target, || {
                 self.check_type_pair(db, source_alias.value_type(db), target)
@@ -1373,7 +1400,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     TypeRelation::Redundancy { .. } => match source {
                         Type::Dynamic(_) => true,
                         Type::Intersection(intersection) => {
-                            // If a `Divergent` type is involved, it must not be eliminated.
+                            // If a `Divergent` marker is involved, it must not be eliminated.
                             intersection
                                 .positive(db)
                                 .iter()
@@ -2552,14 +2579,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             && let Some(recursive) = self.wrapping_recursive_for_divergent(db, divergent)
         {
             return self.check_type_pair(db, left, Type::Recursive(recursive));
-        }
-
-        if let Some(left) = left.materialized_divergent_fallback() {
-            return self.check_type_pair(db, left, right);
-        }
-
-        if let Some(right) = right.materialized_divergent_fallback() {
-            return self.check_type_pair(db, left, right);
         }
 
         self.never()

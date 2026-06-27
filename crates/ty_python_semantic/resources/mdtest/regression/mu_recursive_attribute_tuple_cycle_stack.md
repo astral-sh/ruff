@@ -19,7 +19,7 @@ class Reader:
         while chunk < len(self.contents):  # ty: ignore[unsupported-operator]
             if cursor:
                 cursor += 1
-                self.pos = (chunk, cursor)  # ty: ignore[invalid-assignment]
+                self.pos = (chunk, cursor)
                 break
             chunk += 1  # ty: ignore[unsupported-operator]
             cursor = 0

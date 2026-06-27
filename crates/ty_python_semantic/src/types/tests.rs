@@ -178,10 +178,12 @@ fn divergent_type() {
             .to_instance(&db)
             .is_assignable_to(&db, top_div)
     );
-    assert!(!top_div.is_assignable_to(&db, KnownClass::Int.to_instance(&db)));
+    // Relation checking treats a free `Divergent` marker as an unfixed cycle approximation even
+    // when the marker has been materialized. Other operations still use the materialization.
+    assert!(top_div.is_assignable_to(&db, KnownClass::Int.to_instance(&db)));
     assert!(bottom_div.is_assignable_to(&db, KnownClass::Int.to_instance(&db)));
     assert!(
-        !KnownClass::Int
+        KnownClass::Int
             .to_instance(&db)
             .is_assignable_to(&db, bottom_div)
     );
