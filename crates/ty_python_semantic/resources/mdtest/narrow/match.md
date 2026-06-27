@@ -2164,6 +2164,20 @@ def unwrap_number_or_label(value: object) -> int | str | None:
             return item
     return None
 
+def accepts_nested_tuple(value: tuple[tuple[str, int]]) -> None:
+    pass
+
+def narrow_nested_exact_tuple_subject(
+    value: tuple[tuple[int | str, int | str]],
+) -> None:
+    match value:
+        case [[str(), int()]] as whole:
+            reveal_type(value)  # revealed: tuple[tuple[str, int]]
+            reveal_type(whole)  # revealed: tuple[tuple[str, int]]
+            assigned: tuple[tuple[str, int]] = value
+            accepts_nested_tuple(value)
+            accepts_nested_tuple(whole)
+
 # Nested tuple expansions share one budget. Each inner pattern can produce 32 alternatives, so the
 # cumulative inner and outer expansion exceeds the limit and uses conservative narrowing.
 # fmt: off

@@ -2423,17 +2423,27 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 })
             }
             _ => {
-                let refined_exact = (resolved.exact_tuple_instance_spec(db).is_some()
-                    && kind.split_around_star().is_none())
-                .then(|| {
-                    kind.patterns
-                        .iter()
-                        .map(|pattern| necessary_match_pattern_type(db, pattern))
-                        .collect::<Vec<_>>()
-                })
-                .and_then(|element_types| {
-                    refine_exact_tuple_for_sequence_pattern(db, resolved, &element_types)
-                });
+                let refined_exact = if let Some(tuple) = resolved.exact_tuple_instance_spec(db)
+                    && kind.split_around_star().is_none()
+                {
+                    tuple
+                        .resize(db, TupleLength::Fixed(kind.patterns.len()))
+                        .ok()
+                        .and_then(|tuple| {
+                            let element_types = tuple
+                                .iter_all_elements()
+                                .zip(kind.patterns.iter())
+                                .map(|(element, pattern)| {
+                                    Self::necessary_match_pattern_type_for_subject(
+                                        db, pattern, element,
+                                    )
+                                })
+                                .collect::<Vec<_>>();
+                            refine_exact_tuple_for_sequence_pattern(db, resolved, &element_types)
+                        })
+                } else {
+                    None
+                };
 
                 refined_exact.unwrap_or_else(|| {
                     let sequence_ty = if resolved.exact_tuple_instance_spec(db).is_some() {
@@ -2450,6 +2460,28 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         };
 
         if narrowed == resolved { ty } else { narrowed }
+    }
+
+    fn necessary_match_pattern_type_for_subject(
+        db: &'db dyn Db,
+        pattern: &PatternPredicateKind<'db>,
+        subject_ty: Type<'db>,
+    ) -> Type<'db> {
+        match pattern {
+            PatternPredicateKind::Sequence(kind) => {
+                Self::narrow_type_by_sequence_pattern(db, subject_ty, kind)
+            }
+            PatternPredicateKind::Or(patterns) => UnionType::from_elements(
+                db,
+                patterns.iter().map(|pattern| {
+                    Self::necessary_match_pattern_type_for_subject(db, pattern, subject_ty)
+                }),
+            ),
+            PatternPredicateKind::As(Some(pattern), _) => {
+                Self::necessary_match_pattern_type_for_subject(db, pattern, subject_ty)
+            }
+            _ => necessary_match_pattern_type(db, pattern),
+        }
     }
 
     /// Filter a type based on an equality or inequality comparison against an exact length.
