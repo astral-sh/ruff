@@ -1077,14 +1077,38 @@ struct ModuleResolutionCandidate {
 /// Where a candidate sits in the typing specification's module-resolution order.
 ///
 /// Variants are declared from highest to lowest precedence so that derived ordering can be used
-/// when traversing candidates.
+/// when traversing candidates. This is a precedence tier rather than a total ordering: the stable
+/// sorts used by the resolver preserve search-path order between candidates in the same tier.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum CandidatePrecedence {
-    UserSearchPath,
+    /// A candidate from a user-configured extra search path while stubs are allowed.
+    ///
+    /// These paths are the equivalent of mypy's `MYPYPATH` or pyright's `stubPath`: they give the
+    /// user final control over typing information and may contain either stubs or Python source.
+    /// They only receive this precedence during stub-aware resolution; real-module resolution
+    /// continues to follow Python's runtime import semantics.
+    ExtraSearchPath,
+
+    /// A PEP 561 stub-only package named `<package>-stubs`.
+    ///
+    /// Stub packages take precedence over the corresponding runtime package regardless of where
+    /// that runtime package appears in the search-path order. A stub package on an extra search
+    /// path remains [`CandidatePrecedence::ExtraSearchPath`].
     StubPackage,
+
+    /// An ordinary runtime candidate.
+    ///
+    /// This includes first-party packages, editable installs, site-packages, the standard library,
+    /// and extra-path candidates when stubs are not allowed.
     Runtime,
 }
 
+/// Final ordering after all components of the requested module name have been resolved.
+///
+/// Namespace candidates must remain available while descending into submodules because they can
+/// provide a higher-precedence overlay. Once resolution reaches the requested module itself, a
+/// concrete module or package is preferred so that, for example, `import package` resolves to the
+/// runtime package's `__init__.py` rather than to an incomplete namespace overlay.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum ResolutionPriority {
     Concrete(CandidatePrecedence),
@@ -1094,7 +1118,7 @@ enum ResolutionPriority {
 impl CandidatePrecedence {
     fn with_stub_package(self) -> Self {
         match self {
-            Self::UserSearchPath => Self::UserSearchPath,
+            Self::ExtraSearchPath => Self::ExtraSearchPath,
             Self::StubPackage | Self::Runtime => Self::StubPackage,
         }
     }
@@ -1103,7 +1127,7 @@ impl CandidatePrecedence {
 impl ModuleResolutionCandidate {
     fn root(search_path: &SearchPath, mode: ModuleResolveMode) -> Self {
         let precedence = if mode.stubs_allowed() && search_path.is_extra() {
-            CandidatePrecedence::UserSearchPath
+            CandidatePrecedence::ExtraSearchPath
         } else {
             CandidatePrecedence::Runtime
         };
