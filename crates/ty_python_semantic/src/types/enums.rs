@@ -942,11 +942,21 @@ pub(crate) fn enum_metadata<'db>(
             if !spec.has_known_members(db) {
                 return None;
             }
+            let value_construction = EnumValueConstruction {
+                data_type: inherited_enum_data_type(db, ClassLiteral::DynamicEnum(enum_lit)),
+                ..EnumValueConstruction::default()
+            };
             let mut members = FxIndexMap::default();
             let mut aliases = FxHashMap::default();
             let mut enum_values: FxHashMap<LiteralValueTypeKind<'db>, Name> = FxHashMap::default();
             for (name, ty) in spec.members(db) {
-                if try_register_alias(*ty, name, &mut enum_values, &mut aliases) == Some(true) {
+                if value_construction
+                    .alias_detection_value(db, *ty, false)
+                    .and_then(|alias_value_ty| {
+                        try_register_alias(alias_value_ty, name, &mut enum_values, &mut aliases)
+                    })
+                    == Some(true)
+                {
                     continue;
                 }
                 members.insert(name.clone(), *ty);
@@ -959,7 +969,7 @@ pub(crate) fn enum_metadata<'db>(
                 aliases_are_known: true,
                 auto_members: FxHashSet::default(),
                 value_annotation: None,
-                value_construction: EnumValueConstruction::default(),
+                value_construction,
             });
         }
     };
@@ -990,7 +1000,7 @@ pub(crate) fn enum_metadata<'db>(
 
     // Look up custom construction methods, falling back to parent enum classes. An opaque binding
     // still shadows methods from classes later in the MRO.
-    let data_type = inherited_enum_data_type(db, class);
+    let data_type = inherited_enum_data_type(db, ClassLiteral::Static(class));
     let user_defined_init = custom_enum_method(db, scope_id, "__init__")
         .or_else(|| inherited_user_defined_enum_method(db, class, "__init__"));
     let init = resolve_enum_method(user_defined_init, || {
@@ -1323,7 +1333,7 @@ enum InheritedEnumDataType {
 /// precisely when no user-defined non-enum base can affect member construction or attribute access.
 fn inherited_enum_data_type<'db>(
     db: &'db dyn Db,
-    class: StaticClassLiteral<'db>,
+    class: ClassLiteral<'db>,
 ) -> InheritedEnumDataType {
     let mut selected = InheritedEnumDataType::None;
 

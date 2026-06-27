@@ -3014,6 +3014,12 @@ Color = IntEnum("Color", "RED GREEN BLUE")
 
 # revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
 reveal_type(enum_members(Color))
+
+Number = IntEnum("Number", {"FALSE": False, "ZERO": 0})
+
+reveal_type(Number.FALSE.value)  # revealed: Literal[0]
+reveal_type(Number.ZERO)  # revealed: Number
+reveal_type(enum_members(Number))  # revealed: tuple[Literal["FALSE"]]
 ```
 
 ### Flag function syntax
