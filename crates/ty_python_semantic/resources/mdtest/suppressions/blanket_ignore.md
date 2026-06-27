@@ -19,15 +19,25 @@ b = unresolved  # ty: ignore[unresolved-reference]
 
 # Blanket `type: ignore` comments are covered by Ruff's PGH003 rule.
 c = unresolved  # type: ignore
+```
 
+## Unused ignore comments
+
+### Empty ignore comments
+
+```py
 # error: [unused-ignore-comment] "Unused `ty: ignore` without a code"
 d = 1  # ty: ignore[]
+```
 
+### Blanket ignore comments
+
+```py
 # error: [unused-ignore-comment] "Unused blanket `ty: ignore` directive"
 e = 1  # ty: ignore
 ```
 
-## Unused blanket ignores
+### When `unused-ignore-comment` is disabled
 
 Unused blanket comments aren't reported by this rule, even when `unused-ignore-comment` is disabled.
 They are harmless because they don't suppress any diagnostics. Leaving all unused suppressions to
