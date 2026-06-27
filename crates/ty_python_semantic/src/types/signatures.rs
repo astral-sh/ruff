@@ -773,9 +773,9 @@ impl<'db> Signature<'db> {
     }
 
     fn cycle_normalized(&self, db: &'db dyn Db, previous: &Self, cycle: &salsa::Cycle) -> Self {
-        let return_ty =
-            self.return_ty
-                .cycle_normalized_with_previous(db, previous.return_ty, cycle);
+        let return_ty = self
+            .return_ty
+            .cycle_normalized(db, previous.return_ty, cycle);
 
         let parameters = if self.parameters.len() == previous.parameters.len() {
             Parameters::new(
@@ -4001,7 +4001,7 @@ impl<'db> Parameter<'db> {
     fn cycle_normalized(&self, db: &'db dyn Db, previous: &Self, cycle: &salsa::Cycle) -> Self {
         let annotated_type =
             self.annotated_type
-                .cycle_normalized_with_previous(db, previous.annotated_type, cycle);
+                .cycle_normalized(db, previous.annotated_type, cycle);
 
         let kind = self.kind.cycle_normalized(db, &previous.kind, cycle);
 
@@ -4295,7 +4295,7 @@ impl<'db> ParameterKind<'db> {
         cycle: &salsa::Cycle,
     ) -> Option<Type<'db>> {
         match (current, previous) {
-            (Some(curr), Some(prev)) => Some(curr.cycle_normalized_with_previous(db, *prev, cycle)),
+            (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, *prev, cycle)),
             (Some(curr), None) => Some(curr.recursive_type_normalized(db, cycle)),
             (None, _) => *current,
         }

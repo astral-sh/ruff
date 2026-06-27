@@ -927,9 +927,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             // iteration into the current result; after the first couple iterations, the same
             // applies to boundness and qualifiers.
             (Place::Defined(prev), Place::Defined(current)) => Place::Defined(DefinedPlace {
-                ty: current
-                    .ty
-                    .cycle_normalized_with_previous(db, prev.ty, cycle),
+                ty: current.ty.cycle_normalized(db, prev.ty, cycle),
                 definedness: if cycle.iteration() <= 1
                     || matches!(
                         (prev.definedness, current.definedness),

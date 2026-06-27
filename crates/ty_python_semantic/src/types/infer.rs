@@ -833,7 +833,7 @@ impl<'db> ScopeInference<'db> {
         cycle: &salsa::Cycle,
     ) -> ScopeInference<'db> {
         self.expressions.map_values(|expr, ty| {
-            ty.cycle_normalized_with_previous(db, previous_inference.expression_type(expr), cycle)
+            ty.cycle_normalized(db, previous_inference.expression_type(expr), cycle)
         });
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -1024,7 +1024,7 @@ impl<'db> DefinitionTypes<'db> {
         ty: Type<'db>,
     ) -> Type<'db> {
         if let Some(previous_ty) = previous.binding_type(owner, definition) {
-            ty.cycle_normalized_with_previous(db, previous_ty, cycle)
+            ty.cycle_normalized(db, previous_ty, cycle)
         } else {
             ty.recursive_type_normalized(db, cycle)
         }
@@ -1043,7 +1043,7 @@ impl<'db> DefinitionTypes<'db> {
             .map(|ty| ty.inner_type());
         ty.map_type(|inner| {
             if let Some(previous_ty) = previous_ty {
-                inner.cycle_normalized_with_previous(db, previous_ty, cycle)
+                inner.cycle_normalized(db, previous_ty, cycle)
             } else {
                 inner.recursive_type_normalized(db, cycle)
             }
@@ -1332,7 +1332,7 @@ impl<'db> DefinitionInference<'db> {
     ) -> DefinitionInference<'db> {
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized_with_previous(db, previous_ty, cycle);
+            *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }
         self.types = std::mem::take(&mut self.types).cycle_normalized(
             db,
@@ -1580,8 +1580,7 @@ impl<'db> ExpressionInference<'db> {
                         .iter()
                         .find(|(previous_binding, _)| previous_binding == binding)
                 }) {
-                    *binding_ty =
-                        binding_ty.cycle_normalized_with_previous(db, *previous_binding, cycle);
+                    *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, cycle);
                 } else {
                     *binding_ty = binding_ty.recursive_type_normalized(db, cycle);
                 }
@@ -1590,7 +1589,7 @@ impl<'db> ExpressionInference<'db> {
 
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous.expression_type(*expr);
-            *ty = ty.cycle_normalized_with_previous(db, previous_ty, cycle);
+            *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -1754,7 +1753,7 @@ impl<'db> StatementInferenceInner<'db> {
     ) -> StatementInferenceInner<'db> {
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized_with_previous(db, previous_ty, cycle);
+            *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }
         for (binding, binding_ty) in &mut self.bindings {
             let previous_binding = previous_inference
@@ -1763,8 +1762,7 @@ impl<'db> StatementInferenceInner<'db> {
                 .find(|(previous_binding, _)| previous_binding == binding)
                 .map(|(_, ty)| *ty);
             if let Some(previous_binding) = previous_binding {
-                *binding_ty =
-                    binding_ty.cycle_normalized_with_previous(db, previous_binding, cycle);
+                *binding_ty = binding_ty.cycle_normalized(db, previous_binding, cycle);
             } else {
                 *binding_ty = binding_ty.recursive_type_normalized(db, cycle);
             }
@@ -1777,7 +1775,7 @@ impl<'db> StatementInferenceInner<'db> {
                 .map(|(_, ty)| ty.inner_type());
             *declaration_ty = declaration_ty.map_type(|decl_ty| {
                 if let Some(previous_declaration) = previous_declaration {
-                    decl_ty.cycle_normalized_with_previous(db, previous_declaration, cycle)
+                    decl_ty.cycle_normalized(db, previous_declaration, cycle)
                 } else {
                     decl_ty.recursive_type_normalized(db, cycle)
                 }

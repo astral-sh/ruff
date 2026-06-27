@@ -1324,17 +1324,8 @@ impl<'db> Type<'db> {
         matches!(self, Type::Callable(..))
     }
 
-    pub(crate) fn cycle_normalized(
-        self,
-        db: &'db dyn Db,
-        previous: Self,
-        cycle: &salsa::Cycle,
-    ) -> Self {
-        self.cycle_normalized_with_previous(db, previous, cycle)
-    }
-
     /// Recover from a Salsa cycle using the previous fixed-point approximation.
-    pub(crate) fn cycle_normalized_with_previous(
+    pub(crate) fn cycle_normalized(
         self,
         db: &'db dyn Db,
         previous: Self,
