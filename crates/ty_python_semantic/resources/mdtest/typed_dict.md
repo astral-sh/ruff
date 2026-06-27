@@ -5055,7 +5055,7 @@ define a `"foo"` field, it could be _assigned to_ with another `TypedDict` that 
 
 ```py
 from collections.abc import Mapping
-from typing_extensions import Literal, NotRequired, TypeGuard
+from typing_extensions import Final, Literal, NotRequired, TypeGuard
 
 class Foo(TypedDict):
     foo: int
@@ -5112,12 +5112,14 @@ def combined_typed_dict_checks(u: Foo | Bar):
     has_bar = "bar" in u
     if has_foo and has_bar:
         reveal_type(u["foo"])  # revealed: object
+        reveal_type(u["bar"])  # revealed: object
 
 def combined_mapping_checks(mapping: Mapping[Literal["a", "b"], int]):
     has_c = "c" in mapping
     has_d = "d" in mapping
     if has_c and has_d:
         reveal_type(mapping["c"])  # revealed: object
+        reveal_type(mapping["d"])  # revealed: object
 
 def either_key_is_present(mapping: Mapping[Literal["a"], int]):
     if "c" in mapping or "d" in mapping:
@@ -5125,7 +5127,9 @@ def either_key_is_present(mapping: Mapping[Literal["a"], int]):
             reveal_type(mapping["d"])  # revealed: object
 ```
 
-Membership checks still apply after a `TypeGuard` replaces the original type:
+Membership checks that occur after a `TypeGuard` still apply to the replacement type. However, a
+`TypeGuard` discards membership facts from preceding conditions, along with all other previously
+known type information:
 
 ```py
 def guard_object(value: object) -> TypeGuard[object]:
@@ -5139,7 +5143,7 @@ def membership_after_typeguard(value: Foo | Literal["abc"]):
     if guard_bar(value) and has_z:
         reveal_type(value["z"])  # revealed: object
     if has_z and guard_bar(value):
-        reveal_type(value["z"])  # revealed: object
+        value["z"]  # error: [invalid-key]
 
 class OptionalKey(TypedDict):
     x: NotRequired[int]
@@ -5164,12 +5168,32 @@ def absent_key_after_typeguard(value: SometimesContains):
     if guard_mapping_or_target(value) and lacks_x:
         reveal_type(value)  # revealed: Target
     if lacks_x and guard_mapping_or_target(value):
-        reveal_type(value)  # revealed: Target
+        reveal_type(value)  # revealed: AlwaysContains | Target
 
 def mapping_membership_after_typeguard(u: Foo | Mapping[Literal["a", "b"], int]):
     has_c = "c" in u
     if guard_object(u) and has_c:
         reveal_type(u["c"])  # revealed: object
+```
+
+Precomputed refinements, such as filtering a union by a nominal tag, preserve preceding membership
+facts:
+
+```py
+class UserSettings(Mapping[Literal["user_id"], int]):
+    kind: Final[Literal["user"]] = "user"
+
+class SystemSettings(Mapping[Literal["system_id"], int]):
+    kind: Final[Literal["system"]] = "system"
+
+def read_timeout(settings: UserSettings | SystemSettings) -> object:
+    has_timeout = "timeout" in settings
+    is_user_settings = settings.kind == "user"
+
+    if has_timeout and is_user_settings:
+        return settings["timeout"]
+
+    raise KeyError("timeout")
 ```
 
 For other objects, a successful membership check does not imply that the same value can be used as a

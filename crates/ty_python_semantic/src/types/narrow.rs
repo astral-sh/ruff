@@ -607,7 +607,7 @@ impl ClassInfoConstraintFunction {
 /// `value: A | B`, converting each check in `"a" in value and "b" in value` can split both checks
 /// into `A` and `B`; combining them would then create every pairing of those branches. Keeping the
 /// checks here applies them only when the final type is evaluated. It also lets a key fact constrain
-/// a later `TypeGuard` replacement instead of restoring the original type.
+/// a later precomputed refinement instead of restoring the original type.
 #[derive(Hash, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
 struct ConstraintConjunction<'db> {
     type_constraints: SmallVec<[Type<'db>; 2]>,
@@ -803,8 +803,8 @@ impl<'db> ConstraintConjunction<'db> {
 /// Represents narrowing constraints in Disjunctive Normal Form (DNF).
 ///
 /// This is a disjunction (OR) of conjunctions (AND) of constraints.
-/// The DNF representation allows us to properly track "replacement" constraints
-/// (created by `TypeGuard` types and similar) through boolean operations.
+/// The DNF representation allows us to distinguish intersections, precomputed refinements, and
+/// `TypeGuard` replacements through boolean operations.
 ///
 /// For example:
 /// - `f(x) and g(x)` where f returns `TypeIs[A]` and g returns `TypeGuard[B]`
@@ -836,9 +836,12 @@ enum ConstraintDisjunctKind {
     /// Intersect the previous type with this disjunct.
     Intersection,
 
-    /// Replace the previous type with this disjunct. A common source of replacement constraints is
-    /// `typing.TypeGuard`.
-    Replacement,
+    /// Replace the previous type with a directly filtered refinement while retaining deferred key
+    /// facts. This is used when narrowing cannot be represented as an intersection.
+    PrecomputedRefinement,
+
+    /// Replace all previously known type information with this disjunct.
+    TypeGuardReplacement,
 }
 
 impl<'db> NarrowingConstraint<'db> {
@@ -857,11 +860,19 @@ impl<'db> NarrowingConstraint<'db> {
         )
     }
 
-    /// Create a "replacement" constraint: the previous type will be
-    /// replaced wholesale with this constraint
-    fn replacement(constraint: Type<'db>) -> Self {
+    /// Create a precomputed refinement: the previous type will be replaced with this constraint,
+    /// but preceding deferred key facts will still apply.
+    fn precomputed_refinement(constraint: Type<'db>) -> Self {
         Self::singleton(
-            ConstraintDisjunctKind::Replacement,
+            ConstraintDisjunctKind::PrecomputedRefinement,
+            ConstraintConjunction::singleton(constraint),
+        )
+    }
+
+    /// Create a `TypeGuard` replacement that discards all previously known type information.
+    fn type_guard_replacement(constraint: Type<'db>) -> Self {
+        Self::singleton(
+            ConstraintDisjunctKind::TypeGuardReplacement,
             ConstraintConjunction::singleton(constraint),
         )
     }
@@ -886,9 +897,9 @@ impl<'db> NarrowingConstraint<'db> {
         // Distribute AND over OR: (A1 | A2 | ...) AND (B1 | B2 | ...)
         // becomes (A1 & B1) | (A1 & B2) | ... | (A2 & B1) | ...
         //
-        // The RHS replacement disjuncts clobber the LHS type constraints when they are `and`ed,
-        // but facts established by LHS key checks still apply to the replacement type. Combine each
-        // replacement disjunct with the key facts from each LHS disjunct.
+        // RHS `TypeGuard` replacements discard the LHS disjuncts entirely. RHS precomputed
+        // refinements clobber the LHS type constraints, but facts established by LHS key checks
+        // still apply to the refined type.
         //
         // Each RHS intersection disjunct gets intersected with each LHS disjunct, producing the
         // cartesian product. The merged disjunct retains the LHS kind.
@@ -896,24 +907,30 @@ impl<'db> NarrowingConstraint<'db> {
         // The conjunctions still defer constructing the corresponding intersection types.
         let mut other_intersection_disjuncts: SmallVec<[ConstraintConjunction<'db>; 1]> =
             smallvec![];
-        let mut other_replacement_conjunctions: SmallVec<[ConstraintConjunction<'db>; 1]> =
-            smallvec![];
+        let mut other_precomputed_refinement_conjunctions: SmallVec<
+            [ConstraintConjunction<'db>; 1],
+        > = smallvec![];
         let mut new_disjuncts: SmallVec<[ConstraintDisjunct<'db>; 1]> = smallvec![];
         for disjunct in other.disjuncts {
             match disjunct.kind {
                 ConstraintDisjunctKind::Intersection => {
                     other_intersection_disjuncts.push(disjunct.conjunction);
                 }
-                ConstraintDisjunctKind::Replacement => {
-                    other_replacement_conjunctions.push(disjunct.conjunction);
+                ConstraintDisjunctKind::PrecomputedRefinement => {
+                    other_precomputed_refinement_conjunctions.push(disjunct.conjunction);
+                }
+                ConstraintDisjunctKind::TypeGuardReplacement => {
+                    if !new_disjuncts.contains(&disjunct) {
+                        new_disjuncts.push(disjunct);
+                    }
                 }
             }
         }
 
         for disjunct in &self.disjuncts {
-            for other_conjunction in &other_replacement_conjunctions {
+            for other_conjunction in &other_precomputed_refinement_conjunctions {
                 let merged = ConstraintDisjunct {
-                    kind: ConstraintDisjunctKind::Replacement,
+                    kind: ConstraintDisjunctKind::PrecomputedRefinement,
                     conjunction: other_conjunction
                         .clone()
                         .and_with_key_constraints_from(&disjunct.conjunction),
@@ -958,7 +975,7 @@ impl<'db> NarrowingConstraint<'db> {
         for disjunct in self.disjuncts {
             union = union.add(disjunct.conjunction.evaluate_constraint_type(
                 db,
-                disjunct.kind == ConstraintDisjunctKind::Replacement,
+                disjunct.kind != ConstraintDisjunctKind::Intersection,
             ));
         }
         union.build()
@@ -2926,7 +2943,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             });
             if filtered != Type::Union(union) {
                 let place = self.expect_place(&subscript_place_expr);
-                constraints.insert(place, NarrowingConstraint::replacement(filtered));
+                constraints.insert(place, NarrowingConstraint::precomputed_refinement(filtered));
             }
         }
 
@@ -2980,7 +2997,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     insert_narrowing_constraint(
                         &mut constraints,
                         self.expect_place(&target),
-                        NarrowingConstraint::replacement(narrowed),
+                        NarrowingConstraint::precomputed_refinement(narrowed),
                     );
                 }
             };
@@ -3325,7 +3342,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 let (_, place) = type_guard.place_info(self.db)?;
                 Some((
                     place,
-                    NarrowingConstraint::replacement(type_guard.return_type(self.db)),
+                    NarrowingConstraint::type_guard_replacement(type_guard.return_type(self.db)),
                 ))
             }
             _ => None,
@@ -3462,7 +3479,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
         PatternNarrowingResult::Possible(Some(NarrowingConstraints::from_iter([(
             place,
-            NarrowingConstraint::replacement(narrowed_ty),
+            NarrowingConstraint::precomputed_refinement(narrowed_ty),
         )])))
     }
 
@@ -3839,7 +3856,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         // Only create a constraint if we actually narrowed something.
         if filtered != Type::Union(union) {
             let place = self.expect_place(&subscript_place_expr);
-            Some((place, NarrowingConstraint::replacement(filtered)))
+            Some((place, NarrowingConstraint::precomputed_refinement(filtered)))
         } else {
             None
         }
@@ -3877,7 +3894,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
         let attribute_value_place_expr = PlaceExpr::try_from_expr(attribute_value_expr)?;
         let place = self.expect_place(&attribute_value_place_expr);
-        Some((place, NarrowingConstraint::replacement(narrowed)))
+        Some((place, NarrowingConstraint::precomputed_refinement(narrowed)))
     }
 }
 
