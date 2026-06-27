@@ -23,7 +23,7 @@ class User:  # Test normal class properties
     def stub(self): ...  # OK: A stub; doesn't return anything
 
 
-class UserMeta(metaclass=abc.ABCMeta):  # Test properies inside of an ABC class
+class UserMeta(metaclass=abc.ABCMeta):  # Test properties inside of an ABC class
     @property
     @abc.abstractmethod
     def abstr_prop1(self): ...  # OK: Abstract methods doesn't need to return anything
