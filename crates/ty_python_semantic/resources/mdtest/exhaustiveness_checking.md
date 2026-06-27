@@ -133,11 +133,12 @@ def guarded_bool_tuple(pair: tuple[bool, bool], flag: bool) -> int:  # error: [i
         case (_, False):
             return 2
 
-# Expanding this tuple would produce 128 alternatives, exceeding the limit of 64. The checker
-# falls back to its conservative behavior instead of performing an exponential expansion.
-def tuple_exceeding_expansion_limit(
+# Although this tuple has 128 possible value combinations, the patterns only constrain the first
+# two positions. Tuple-pattern fallthrough only expands positions that can fail, so it can prove
+# the match exhaustive without enumerating the remaining elements.
+def tuple_expands_only_constrained_positions(
     value: tuple[bool, bool, bool, bool, bool, bool, bool],
-) -> int:  # error: [invalid-return-type]
+) -> int:
     match value:
         case (True, True, _, _, _, _, _):
             return 0

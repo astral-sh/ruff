@@ -18,8 +18,9 @@ use crate::types::{
     Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type,
     class_pattern_positional_sources, definite_match_pattern_type_for_subject,
     exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
-    pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
-    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
+    pattern_binding_fallthrough_type, refine_exact_tuple_for_sequence_pattern,
+    sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
+    typed_dict_matches_class_pattern,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::frozen::FrozenMap;
@@ -2031,6 +2032,13 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         narrowed_subject_ty: Type<'db>,
         matched_element_types: &[Type<'db>],
     ) -> Type<'db> {
+        if kind.split_around_star().is_none()
+            && let Some(refined) =
+                refine_exact_tuple_for_sequence_pattern(self.db, subject_ty, matched_element_types)
+        {
+            return refined;
+        }
+
         if subject_ty.exact_tuple_instance_spec(self.db).is_some() {
             self.intersect_types(
                 narrowed_subject_ty,
@@ -2053,6 +2061,13 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         subject_ty: Type<'db>,
         binding_element_types: &[Type<'db>],
     ) -> Type<'db> {
+        if kind.split_around_star().is_none()
+            && let Some(refined) =
+                refine_exact_tuple_for_sequence_pattern(self.db, subject_ty, binding_element_types)
+        {
+            return refined;
+        }
+
         if subject_ty.exact_tuple_instance_spec(self.db).is_some() {
             self.intersect_types(
                 subject_ty,
@@ -2408,15 +2423,29 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 })
             }
             _ => {
-                let sequence_ty = if resolved.exact_tuple_instance_spec(db).is_some() {
-                    necessary_sequence_pattern_type(db, kind)
-                } else {
-                    sequence_pattern_type_builder(db).build()
-                };
-                IntersectionBuilder::new(db)
-                    .add_positive(resolved)
-                    .add_positive(sequence_ty)
-                    .build()
+                let refined_exact = (resolved.exact_tuple_instance_spec(db).is_some()
+                    && kind.split_around_star().is_none())
+                .then(|| {
+                    kind.patterns
+                        .iter()
+                        .map(|pattern| necessary_match_pattern_type(db, pattern))
+                        .collect::<Vec<_>>()
+                })
+                .and_then(|element_types| {
+                    refine_exact_tuple_for_sequence_pattern(db, resolved, &element_types)
+                });
+
+                refined_exact.unwrap_or_else(|| {
+                    let sequence_ty = if resolved.exact_tuple_instance_spec(db).is_some() {
+                        necessary_sequence_pattern_type(db, kind)
+                    } else {
+                        sequence_pattern_type_builder(db).build()
+                    };
+                    IntersectionBuilder::new(db)
+                        .add_positive(resolved)
+                        .add_positive(sequence_ty)
+                        .build()
+                })
             }
         };
 

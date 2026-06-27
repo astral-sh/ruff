@@ -11,7 +11,8 @@ use crate::place::{DefinedPlace, Place};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::equality::{evaluate_type_equality, is_same_enum_domain};
 use crate::types::signatures::CallableSignature;
-use crate::types::tuple::TupleType;
+use crate::types::tuple::{TupleSpec, TupleSpecBuilder, TupleType};
+use crate::types::visitor::any_over_type;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass,
     Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext,
@@ -187,6 +188,39 @@ pub(crate) fn exact_sequence_pattern_type<'db>(
     sequence_pattern_type_builder(db)
         .add_positive(protocol)
         .build()
+}
+
+/// Refine an exact tuple with the element types established by an exact sequence pattern.
+///
+/// As elsewhere in tuple-pattern narrowing, this assumes that values represented by a `tuple[...]`
+/// annotation preserve the builtin relationship between iteration and indexing. Statically known
+/// tuple subclasses are not refined here.
+///
+/// Dynamic element types remain represented by the synthesized sequence protocol. Replacing a
+/// gradual tuple element such as `Any` with the observed pattern type would lose gradualness.
+pub(crate) fn refine_exact_tuple_for_sequence_pattern<'db>(
+    db: &'db dyn Db,
+    subject_ty: Type<'db>,
+    pattern_element_types: &[Type<'db>],
+) -> Option<Type<'db>> {
+    let tuple = subject_ty.exact_tuple_instance_spec(db)?;
+    if tuple
+        .all_elements()
+        .iter()
+        .chain(pattern_element_types)
+        .any(|element| any_over_type(db, *element, true, |ty| ty.is_dynamic()))
+    {
+        return None;
+    }
+
+    let pattern_tuple = TupleSpec::heterogeneous(pattern_element_types.iter().copied());
+    Some(
+        TupleSpecBuilder::from(tuple.as_ref())
+            .intersect(db, &pattern_tuple)
+            .map_or(Type::Never, |refined| {
+                Type::tuple(TupleType::new(db, &refined.build()))
+            }),
+    )
 }
 
 /// Build the structural type used for a sequence pattern containing `*rest`.
@@ -745,14 +779,45 @@ fn sequence_pattern_binding_fallthrough_type<'db>(
     kind: &SequencePatternPredicateKind<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
+    let mut budget = ExactTuplePatternExpansionBudget::default();
+    try_sequence_pattern_binding_fallthrough_type(db, kind, subject_ty, &mut budget).unwrap_or_else(
+        |()| {
+            pattern_fallthrough_type(
+                db,
+                &PatternPredicateKind::Sequence(kind.clone()),
+                subject_ty,
+            )
+        },
+    )
+}
+
+fn try_sequence_pattern_binding_fallthrough_type<'db>(
+    db: &'db dyn Db,
+    kind: &SequencePatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+    budget: &mut ExactTuplePatternExpansionBudget,
+) -> Result<Type<'db>, ()> {
     let resolved = subject_ty.resolve_type_alias(db);
     let narrowed = match resolved {
-        Type::Union(union) => union.map(db, |element| {
-            sequence_pattern_binding_fallthrough_type(db, kind, *element)
-        }),
-        Type::Intersection(intersection) => intersection.map_positive(db, |element| {
-            sequence_pattern_binding_fallthrough_type(db, kind, *element)
-        }),
+        Type::Union(union) => union
+            .try_map(db, |element| {
+                try_sequence_pattern_binding_fallthrough_type(db, kind, *element, budget).ok()
+            })
+            .ok_or(())?,
+        Type::Intersection(intersection) => {
+            let mut failed = false;
+            let narrowed = intersection.map_positive(db, |element| {
+                try_sequence_pattern_binding_fallthrough_type(db, kind, *element, budget)
+                    .unwrap_or_else(|()| {
+                        failed = true;
+                        *element
+                    })
+            });
+            if failed {
+                return Err(());
+            }
+            narrowed
+        }
         Type::TypeVar(typevar)
             if typevar.typevar(db).upper_bound(db).is_some_and(|bound| {
                 pattern_fallthrough_type(db, &PatternPredicateKind::Sequence(kind.clone()), bound)
@@ -762,7 +827,14 @@ fn sequence_pattern_binding_fallthrough_type<'db>(
             Type::Never
         }
         _ if resolved.exact_tuple_instance_spec(db).is_some() => {
-            pattern_fallthrough_type(db, &PatternPredicateKind::Sequence(kind.clone()), resolved)
+            exact_tuple_sequence_pattern_fallthrough_type(db, kind, resolved, budget)?
+                .unwrap_or_else(|| {
+                    pattern_fallthrough_type(
+                        db,
+                        &PatternPredicateKind::Sequence(kind.clone()),
+                        resolved,
+                    )
+                })
         }
         // An irrefutable sequence pattern can only fail if the subject is not eligible for sequence
         // matching. Unlike length and indexed-element facts, eligibility is unaffected by mutation.
@@ -774,10 +846,96 @@ fn sequence_pattern_binding_fallthrough_type<'db>(
     };
 
     if narrowed == resolved {
-        subject_ty
+        Ok(subject_ty)
     } else {
-        narrowed
+        Ok(narrowed)
     }
+}
+
+const MAX_EXACT_TUPLE_PATTERN_ALTERNATIVES: usize = 64;
+const MAX_EXACT_TUPLE_PATTERN_ELEMENTS: usize = 4_096;
+
+#[derive(Default)]
+struct ExactTuplePatternExpansionBudget {
+    alternatives: usize,
+    elements: usize,
+}
+
+impl ExactTuplePatternExpansionBudget {
+    fn add(&mut self, alternatives: usize, elements: usize) -> Result<(), ()> {
+        self.alternatives = self.alternatives.saturating_add(alternatives);
+        self.elements = self.elements.saturating_add(elements);
+        if self.alternatives > MAX_EXACT_TUPLE_PATTERN_ALTERNATIVES
+            || self.elements > MAX_EXACT_TUPLE_PATTERN_ELEMENTS
+        {
+            Err(())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+/// Return the part of an exact fixed-length tuple that can remain after a sequence pattern fails.
+///
+/// A pattern fails if any aligned element pattern fails. Represent that as a union with one tuple
+/// alternative per element. Large expansions and gradual tuples keep the synthesized-protocol
+/// representation used by the general fallthrough path.
+fn exact_tuple_sequence_pattern_fallthrough_type<'db>(
+    db: &'db dyn Db,
+    kind: &SequencePatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+    budget: &mut ExactTuplePatternExpansionBudget,
+) -> Result<Option<Type<'db>>, ()> {
+    if kind.split_around_star().is_some() {
+        return Ok(None);
+    }
+
+    let Some(tuple) = subject_ty.exact_tuple_instance_spec(db) else {
+        return Ok(None);
+    };
+    let Some(tuple) = tuple.as_fixed_length() else {
+        return Ok(None);
+    };
+    if tuple
+        .all_elements()
+        .iter()
+        .any(|element| any_over_type(db, *element, true, |ty| ty.is_dynamic()))
+    {
+        return Ok(None);
+    }
+    if tuple.len() != kind.patterns.len() {
+        return Ok(Some(subject_ty));
+    }
+    if tuple.len() > MAX_EXACT_TUPLE_PATTERN_ALTERNATIVES
+        || tuple.len().saturating_mul(tuple.len()) > MAX_EXACT_TUPLE_PATTERN_ELEMENTS
+    {
+        return Err(());
+    }
+
+    let mut alternatives = Vec::with_capacity(tuple.len());
+    for (index, (element, pattern)) in tuple
+        .iter_all_elements()
+        .zip(kind.patterns.iter())
+        .enumerate()
+    {
+        let remaining = pattern_binding_fallthrough_type(db, pattern, element);
+        if remaining == element {
+            return Ok(Some(subject_ty));
+        }
+        if remaining.is_never() {
+            continue;
+        }
+
+        let mut elements = tuple.all_elements().to_vec();
+        elements[index] = remaining;
+        alternatives.push(Type::heterogeneous_tuple(db, elements));
+    }
+
+    budget.add(
+        alternatives.len(),
+        alternatives.len().saturating_mul(tuple.len()),
+    )?;
+    Ok(Some(UnionType::from_elements(db, alternatives)))
 }
 
 /// Return whether every possible value of `ty` belongs to the same enum as `right`, including
