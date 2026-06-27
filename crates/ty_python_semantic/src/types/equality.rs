@@ -1485,6 +1485,10 @@ fn known_literal_equality<'db>(
             if same_enum_member(db, left, right) {
                 return Some(true);
             }
+            let enum_class = left.enum_class_literal(db);
+            if enum_class == right.enum_class_literal(db) && !enum_class.aliases_are_known(db) {
+                return None;
+            }
             if left_semantics == KnownComparisonSemantics::Object {
                 return Some(false);
             }
@@ -1532,14 +1536,7 @@ fn enum_literal_value<'db>(db: &'db dyn Db, literal: EnumLiteralType<'db>) -> Op
     let enum_class_literal = literal.enum_class_literal(db);
     let metadata = enum_metadata(db, enum_class_literal.class_literal(db))?;
     let name = enum_class_literal.resolve_member(db, literal.name(db))?;
-    if metadata.member_value_may_be_transformed(name) {
-        return None;
-    }
-    if metadata.auto_members.contains(name) {
-        metadata.value_type(db, name)
-    } else {
-        metadata.members.get(name).copied()
-    }
+    metadata.concrete_value_type(db, name)
 }
 
 /// Return whether two enum literals resolve to the same member, including aliases.

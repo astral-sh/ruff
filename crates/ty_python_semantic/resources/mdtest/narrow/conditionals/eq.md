@@ -194,16 +194,30 @@ class RuntimeIntAlias(IntEnum):
 reveal_type(RuntimeIntAlias.FIRST == RuntimeIntAlias.SECOND)  # revealed: Literal[True]
 ```
 
-A scalar mixin can normalize member values before `Enum` checks for aliases. Here, `str` converts
-`1` to `"1"`, so the two members are aliases at runtime. Since ty does not model this constructor
-call, the comparison remains `bool`:
+An enum with a `str` data type constructs its values before checking for aliases. Here, `str`
+converts `1` to `"1"`, so the two members are aliases:
 
 ```py
 class CoercingAlias(str, Enum):
     FIRST = 1
     SECOND = "1"
 
-reveal_type(CoercingAlias.FIRST == CoercingAlias.SECOND)  # revealed: bool
+reveal_type(CoercingAlias.FIRST == CoercingAlias.SECOND)  # revealed: Literal[True]
+reveal_type(CoercingAlias.SECOND == "1")  # revealed: Literal[True]
+```
+
+When alias detection is inconclusive, equality between different declarations is also unknown. The
+two declarations below are aliases at runtime:
+
+```py
+class Behavior:
+    pass
+
+class OpaqueAliases(Behavior, Enum):
+    FIRST = 1
+    SECOND = 1
+
+reveal_type(OpaqueAliases.FIRST == OpaqueAliases.SECOND)  # revealed: bool
 ```
 
 Equality can transfer restrictions on enum members, but other intersection elements must stay on the
@@ -533,6 +547,12 @@ class IntegerKey(IntEnum):
     ZERO = 0
 
 reveal_type(BooleanKey.FALSE == IntegerKey.ZERO)  # revealed: Literal[True]
+
+class IntegerAliases(IntEnum):
+    ZERO = 0
+    FALSE = False
+
+reveal_type(IntegerAliases.ZERO == IntegerAliases.FALSE)  # revealed: Literal[True]
 ```
 
 Plain enum members from different classes use identity comparison, even when their declared values
@@ -663,9 +683,22 @@ def _(value: Foo | Shifted):
         reveal_type(value)  # revealed: Literal[Foo.Y] | Shifted
 ```
 
-An explicit `_value_` annotation can make `.value` precise, but it does not describe the scalar
-payload used by inherited comparison methods. We therefore cannot compare members transformed by a
-custom constructor using their annotated values:
+An explicit `_value_` annotation controls the public `.value` type without erasing a concrete
+comparison payload:
+
+```py
+from enum import IntEnum
+
+class AnnotatedInteger(IntEnum):
+    _value_: int
+    ONE = 1
+
+reveal_type(AnnotatedInteger.ONE.value)  # revealed: int
+reveal_type(AnnotatedInteger.ONE == 1)  # revealed: Literal[True]
+```
+
+When a custom constructor transforms the member, however, the annotation does not describe the
+scalar payload used by inherited comparison methods:
 
 ```py
 from enum import IntEnum

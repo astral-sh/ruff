@@ -2065,7 +2065,9 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty)] = overload.parameter_types() {
                                 let return_ty = match ty {
                                     Type::ClassLiteral(class) => {
-                                        if let Some(metadata) = enums::enum_metadata(db, *class) {
+                                        if let Some(metadata) = enums::enum_metadata(db, *class)
+                                            && metadata.aliases_are_known
+                                        {
                                             Type::heterogeneous_tuple(
                                                 db,
                                                 metadata
