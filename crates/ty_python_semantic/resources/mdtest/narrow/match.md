@@ -2163,6 +2163,39 @@ def unwrap_number_or_label(value: object) -> int | str | None:
             reveal_type(item)  # revealed: int | str
             return item
     return None
+
+# Nested tuple expansions share one budget. Each inner pattern can produce 32 alternatives, so the
+# cumulative inner and outer expansion exceeds the limit and uses conservative narrowing.
+# fmt: off
+NestedExpansionInner = tuple[
+    bool, bool, bool, bool, bool, bool, bool, bool,
+    bool, bool, bool, bool, bool, bool, bool, bool,
+    bool, bool, bool, bool, bool, bool, bool, bool,
+    bool, bool, bool, bool, bool, bool, bool, bool,
+]
+NestedExpansionOuter = tuple[NestedExpansionInner, NestedExpansionInner]
+
+def nested_tuple_expansion_limit(value: NestedExpansionOuter) -> None:
+    match value:
+        case (
+            (
+                True, True, True, True, True, True, True, True,
+                True, True, True, True, True, True, True, True,
+                True, True, True, True, True, True, True, True,
+                True, True, True, True, True, True, True, True,
+            ),
+            (
+                True, True, True, True, True, True, True, True,
+                True, True, True, True, True, True, True, True,
+                True, True, True, True, True, True, True, True,
+                True, True, True, True, True, True, True, True,
+            ),
+        ):
+            pass
+        case _:
+            # revealed: tuple[tuple[bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool], tuple[bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool]] & ~<Protocol with members '__getitem__', '__len__'>
+            reveal_type(value)
+# fmt: on
 ```
 
 ## Sequence display subjects

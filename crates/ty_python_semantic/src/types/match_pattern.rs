@@ -758,37 +758,52 @@ pub(crate) fn pattern_binding_fallthrough_type<'db>(
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
+    let mut budget = ExactTuplePatternExpansionBudget::default();
+    try_pattern_binding_fallthrough_type(db, kind, subject_ty, &mut budget).unwrap_or_else(|()| {
+        pattern_binding_fallthrough_type_without_exact_tuple_expansion(db, kind, subject_ty)
+    })
+}
+
+fn try_pattern_binding_fallthrough_type<'db>(
+    db: &'db dyn Db,
+    kind: &PatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+    budget: &mut ExactTuplePatternExpansionBudget,
+) -> Result<Type<'db>, ()> {
     match kind {
         PatternPredicateKind::Sequence(sequence) => {
-            sequence_pattern_binding_fallthrough_type(db, sequence, subject_ty)
+            try_sequence_pattern_binding_fallthrough_type(db, sequence, subject_ty, budget)
         }
         PatternPredicateKind::Or(patterns) => {
-            patterns.iter().fold(subject_ty, |remaining, pattern| {
-                pattern_binding_fallthrough_type(db, pattern, remaining)
+            patterns.iter().try_fold(subject_ty, |remaining, pattern| {
+                try_pattern_binding_fallthrough_type(db, pattern, remaining, budget)
             })
         }
         PatternPredicateKind::As(Some(pattern), _) => {
-            pattern_binding_fallthrough_type(db, pattern, subject_ty)
+            try_pattern_binding_fallthrough_type(db, pattern, subject_ty, budget)
         }
-        _ => pattern_fallthrough_type(db, kind, subject_ty),
+        _ => Ok(pattern_fallthrough_type(db, kind, subject_ty)),
     }
 }
 
-fn sequence_pattern_binding_fallthrough_type<'db>(
+fn pattern_binding_fallthrough_type_without_exact_tuple_expansion<'db>(
     db: &'db dyn Db,
-    kind: &SequencePatternPredicateKind<'db>,
+    kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
-    let mut budget = ExactTuplePatternExpansionBudget::default();
-    try_sequence_pattern_binding_fallthrough_type(db, kind, subject_ty, &mut budget).unwrap_or_else(
-        |()| {
-            pattern_fallthrough_type(
-                db,
-                &PatternPredicateKind::Sequence(kind.clone()),
-                subject_ty,
-            )
-        },
-    )
+    match kind {
+        PatternPredicateKind::Or(patterns) => {
+            patterns.iter().fold(subject_ty, |remaining, pattern| {
+                pattern_binding_fallthrough_type_without_exact_tuple_expansion(
+                    db, pattern, remaining,
+                )
+            })
+        }
+        PatternPredicateKind::As(Some(pattern), _) => {
+            pattern_binding_fallthrough_type_without_exact_tuple_expansion(db, pattern, subject_ty)
+        }
+        _ => pattern_fallthrough_type(db, kind, subject_ty),
+    }
 }
 
 fn try_sequence_pattern_binding_fallthrough_type<'db>(
@@ -912,7 +927,7 @@ fn exact_tuple_sequence_pattern_fallthrough_type<'db>(
         .zip(kind.patterns.iter())
         .enumerate()
     {
-        let remaining = pattern_binding_fallthrough_type(db, pattern, element);
+        let remaining = try_pattern_binding_fallthrough_type(db, pattern, element, budget)?;
         if remaining == element {
             return Ok(Some(subject_ty));
         }
