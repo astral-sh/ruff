@@ -29,7 +29,10 @@ e = 1  # ty: ignore
 
 ## Unused blanket ignores
 
-Unused blanket comments aren't reported by this rule, even when `unused-ignore-comment` is disabled:
+Unused blanket comments aren't reported by this rule, even when `unused-ignore-comment` is disabled.
+They are harmless because they don't suppress any diagnostics. Leaving all unused suppressions to
+`unused-ignore-comment` also keeps their treatment consistent and avoids overlapping diagnostics
+when that rule is enabled:
 
 ```toml
 [rules]
@@ -43,12 +46,16 @@ a = 1  # ty: ignore
 
 ## Suppression diagnostics
 
-Suppression-related diagnostics also count as using a blanket ignore.
+Suppression-related diagnostics are checked before `blanket-ignore-comment`. A blanket ignore that
+suppresses an `ignore-comment-unknown-rule` or `invalid-ignore-comment` diagnostic therefore counts
+as used:
 
 ```py
+# The nested ignore contains an unknown rule.
 # error: [blanket-ignore-comment]
 a = 1  # ty: ignore # ty: ignore[not-a-rule]
 
+# The nested ignore is invalid.
 # error: [blanket-ignore-comment]
 b = 1  # ty: ignore # ty: ignore[*]
 ```
