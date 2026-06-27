@@ -1286,6 +1286,31 @@ impl<'db> Specialization<'db> {
 
         let type_mapping = type_mapping.in_cycle_guarded_position();
 
+        if type_mapping.is_cycle_recovery_mapping() {
+            let types = self
+                .types(db)
+                .iter()
+                .map(|ty| {
+                    ty.apply_type_mapping_impl(db, &type_mapping, TypeContext::default(), visitor)
+                })
+                .collect::<Box<[_]>>();
+            let original_tuple_inner = self.tuple_inner(db);
+            let tuple_inner = original_tuple_inner.and_then(|tuple| {
+                tuple.apply_type_mapping_impl(db, &type_mapping, TypeContext::default(), visitor)
+            });
+
+            if types.as_ref() == self.types(db) && tuple_inner == original_tuple_inner {
+                return self;
+            }
+            return Specialization::new(
+                db,
+                self.generic_context(db),
+                types,
+                self.materialization_kind(db),
+                tuple_inner,
+            );
+        }
+
         let types = self.map_types(db, |i, typevar, ty| {
             let tcx = TypeContext::new(tcx.get(i).copied());
             if typevar.variance(db).is_covariant() {

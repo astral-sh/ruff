@@ -6724,9 +6724,38 @@ impl<'db> Type<'db> {
                 ))
             }
 
+            Type::Union(union) if type_mapping.is_cycle_recovery_mapping() => {
+                UnionType::from_elements_cycle_recovery(
+                    db,
+                    union.elements(db).iter().map(|element| {
+                        element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                    }),
+                )
+            }
             Type::Union(union) => union.map_leave_aliases(db, |element| {
                 element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }),
+            Type::Intersection(intersection)
+                if type_mapping.is_cycle_recovery_mapping() =>
+            {
+                let positive: FxOrderSet<_> = intersection
+                    .positive(db)
+                    .iter()
+                    .map(|positive| {
+                        positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                    })
+                    .collect();
+                let mut negative = NegativeIntersectionElements::default();
+                for ty in intersection.negative(db) {
+                    negative.insert(ty.apply_type_mapping_impl(
+                        db,
+                        &type_mapping.flip(),
+                        tcx,
+                        visitor,
+                    ));
+                }
+                Type::Intersection(IntersectionType::new(db, positive, negative))
+            }
             Type::Intersection(intersection) => {
                 let mut builder = IntersectionBuilder::new(db);
                 for positive in intersection.positive(db) {
@@ -8045,10 +8074,9 @@ pub enum TypeMapping<'a, 'db> {
         recursive: RecursiveType<'db>,
         replacement: Type<'db>,
     },
-    /// Folds fixed-point growth through the previous cycle approximation.
+    /// Folds fixed-point growth through the previous cycle type.
     ///
-    /// This mapping is used only during salsa cycle recovery. It must not force lazy type-alias
-    /// or function-signature queries while traversing the current approximation.
+    /// This mapping is only used during salsa cycle recovery. Type inference queries must not be used when traversing the current type.
     FoldCyclePrevious {
         previous: Type<'db>,
         marker: Type<'db>,
@@ -8068,6 +8096,11 @@ pub enum TypeMapping<'a, 'db> {
 }
 
 impl<'db> TypeMapping<'_, 'db> {
+    /// The type mapping called during cycle recovery cannot perform transformations such as calling a cyclic inference query.
+    fn is_cycle_recovery_mapping(&self) -> bool {
+        matches!(self, TypeMapping::FoldCyclePrevious { .. })
+    }
+
     /// Update the generic context of a [`Signature`] according to the current type mapping
     pub(crate) fn update_signature_generic_context(
         &self,
