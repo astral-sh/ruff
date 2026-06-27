@@ -180,6 +180,8 @@ impl<'db> RecursiveType<'db> {
         body.apply_type_mapping(db, &mapping, TypeContext::default())
     }
 
+    /// `μa. body -> [a -> μa. body]body`
+    /// e.g. `μa. tuple[a, int] -> tuple[μa. tuple[a, int], int]`
     fn unfold(self, db: &'db dyn Db) -> Type<'db> {
         let body = self.body(db);
         let replacement = self.unfold_replacement(db);
@@ -196,6 +198,8 @@ impl<'db> RecursiveType<'db> {
             .unwrap_or(Type::Recursive(self))
     }
 
+    /// `[a -> μa. body]body -> μa. body`
+    /// e.g. `tuple[μa. tuple[a, int], int] -> μa. tuple[a, int]`
     fn fold(self, db: &'db dyn Db, unfolded_result: Type<'db>) -> Type<'db> {
         let replacement = self.unfold_replacement(db);
         if unfolded_result == replacement || unfolded_result == Type::Recursive(self) {
