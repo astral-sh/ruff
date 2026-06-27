@@ -795,7 +795,11 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
         fn new(db: &'db dyn Db, generic_context: GenericContext<'db>) -> Self {
             let base_identities = generic_context
                 .variables(db)
-                .map(|typevar| typevar.identity(db).without_freshness(db))
+                .map(|typevar| {
+                    let mut identity = typevar.identity(db);
+                    identity.freshness = TypeVarNonce::NONE;
+                    identity
+                })
                 .collect();
             Self {
                 base_identities,
@@ -815,7 +819,8 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
             db: &'db dyn Db,
             bound_typevar: BoundTypeVarInstance<'db>,
         ) {
-            let identity = bound_typevar.identity(db).without_freshness(db);
+            let mut identity = bound_typevar.identity(db);
+            identity.freshness = TypeVarNonce::NONE;
             if self.base_identities.contains(&identity) {
                 self.max_freshness.set(
                     self.max_freshness
@@ -860,26 +865,25 @@ impl<'db> BoundTypeVarInstance<'db> {
         paramspec_attr: Option<ParamSpecAttrKind>,
         freshness: TypeVarNonce,
     ) -> Self {
-        let identity = BoundTypeVarIdentity::new(
-            db,
-            typevar.identity(db),
+        let identity = BoundTypeVarIdentity {
+            identity: typevar.identity(db),
             binding_context,
             paramspec_attr,
             freshness,
-        );
+        };
         Self::new_internal(db, typevar, identity)
     }
 
     pub(super) fn binding_context(self, db: &'db dyn Db) -> BindingContext<'db> {
-        self.identity(db).binding_context(db)
+        self.identity(db).binding_context
     }
 
     pub(super) fn paramspec_attr(self, db: &'db dyn Db) -> Option<ParamSpecAttrKind> {
-        self.identity(db).paramspec_attr(db)
+        self.identity(db).paramspec_attr
     }
 
     pub(super) fn freshness(self, db: &'db dyn Db) -> TypeVarNonce {
-        self.identity(db).freshness(db)
+        self.identity(db).freshness
     }
 
     pub(crate) fn with_name_suffix(self, db: &'db dyn Db, suffix: &str) -> Self {
@@ -985,7 +989,7 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// Returns whether two bound typevars represent the same occurrence, regardless of e.g.
     /// differences in their bounds or constraints due to materialization.
     pub(crate) fn is_same_typevar_as(self, db: &'db dyn Db, other: Self) -> bool {
-        self == other || self.identity(db) == other.identity(db)
+        self.identity(db) == other.identity(db)
     }
 
     /// Create a new PEP 695 type variable that can be used in signatures
@@ -1430,10 +1434,7 @@ impl std::fmt::Display for ParamSpecAttrKind {
 /// bounds or constraints. Two bound typevars have the same identity if they represent the same
 /// occurrence, even if their bounds have been materialized differently. Two fresh occurrences of
 /// the same source-level typevar have different bound identities.
-///
-/// Interning keeps this frequently copied and hashed identity compact while allowing multiple
-/// materialized [`BoundTypeVarInstance`]s to share it.
-#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub struct BoundTypeVarIdentity<'db> {
     pub(crate) identity: TypeVarIdentity<'db>,
     pub(crate) binding_context: BindingContext<'db>,
@@ -1444,50 +1445,24 @@ pub struct BoundTypeVarIdentity<'db> {
     pub(super) freshness: TypeVarNonce,
 }
 
-// The Salsa heap is tracked separately.
-impl get_size2::GetSize for BoundTypeVarIdentity<'_> {}
-
 impl<'db> BoundTypeVarIdentity<'db> {
     fn kind(self, db: &'db dyn Db) -> TypeVarKind {
-        self.identity(db).kind(db)
+        self.identity.kind(db)
     }
 
     pub(crate) fn is_paramspec(self, db: &'db dyn Db) -> bool {
         self.kind(db).is_paramspec()
     }
 
-    pub(crate) fn without_paramspec_attr(self, db: &'db dyn Db) -> Self {
+    pub(crate) fn without_paramspec_attr(mut self, db: &'db dyn Db) -> Self {
         debug_assert!(
             self.is_paramspec(db),
             "Expected a ParamSpec, got {:?}",
             self.kind(db)
         );
 
-        if self.paramspec_attr(db).is_none() {
-            self
-        } else {
-            Self::new(
-                db,
-                self.identity(db),
-                self.binding_context(db),
-                None,
-                self.freshness(db),
-            )
-        }
-    }
-
-    fn without_freshness(self, db: &'db dyn Db) -> Self {
-        if self.freshness(db) == TypeVarNonce::NONE {
-            self
-        } else {
-            Self::new(
-                db,
-                self.identity(db),
-                self.binding_context(db),
-                self.paramspec_attr(db),
-                TypeVarNonce::NONE,
-            )
-        }
+        self.paramspec_attr = None;
+        self
     }
 }
 
