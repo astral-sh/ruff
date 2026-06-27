@@ -169,6 +169,157 @@ reveal_type(Reader)  # revealed: <class 'Reader'>
 reveal_type(Analysis)  # revealed: <class 'Analysis'>
 ```
 
+## User stub overlay for a first-party package
+
+Regression test for <https://github.com/astral-sh/ty/issues/3870>.
+
+A user-provided namespace package on an extra path can override a submodule of a regular first-party
+package. Modules not provided by the overlay still resolve from the runtime package.
+
+```toml
+[environment]
+extra-paths = ["/stubs"]
+```
+
+`/stubs/pkg_a/vendor/get_rate.pyi`:
+
+```pyi
+RATE: str
+```
+
+`/src/pkg_a/__init__.py`:
+
+```py
+ROOT = "runtime"
+```
+
+`/src/pkg_a/vendor/__init__.py`:
+
+```py
+```
+
+`/src/pkg_a/vendor/get_rate.py`:
+
+```py
+RATE = 1
+```
+
+`main.py`:
+
+```py
+from pkg_a import ROOT
+from pkg_a.vendor.get_rate import RATE
+
+reveal_type(ROOT)  # revealed: Literal["runtime"]
+reveal_type(RATE)  # revealed: str
+```
+
+## User stub overlay for an editable package
+
+Regression test for <https://github.com/astral-sh/ty/issues/3870>.
+
+The same overlay behavior applies when the runtime package is available through an editable
+installation instead of a first-party root.
+
+```toml
+[environment]
+python = "/.venv"
+extra-paths = ["/stubs"]
+```
+
+`/stubs/pkg_b/vendor/get_rate.pyi`:
+
+```pyi
+RATE: str
+```
+
+`/.venv/<path-to-site-packages>/pkg-b.pth`:
+
+```pth
+/editable
+```
+
+`/editable/pkg_b/__init__.py`:
+
+```py
+ROOT = "runtime"
+```
+
+`/editable/pkg_b/vendor/__init__.py`:
+
+```py
+```
+
+`/editable/pkg_b/vendor/get_rate.py`:
+
+```py
+RATE = 1
+```
+
+`main.py`:
+
+```py
+from pkg_b import ROOT
+from pkg_b.vendor.get_rate import RATE
+
+reveal_type(ROOT)  # revealed: Literal["runtime"]
+reveal_type(RATE)  # revealed: str
+```
+
+## User partial stub package for a first-party package
+
+Regression test for <https://github.com/astral-sh/ty/issues/3770>.
+
+A partial stub package on an extra path overrides the modules it provides and falls back to the
+regular first-party package for missing modules and package attributes.
+
+```toml
+[environment]
+extra-paths = ["/typings"]
+```
+
+`/typings/lib-stubs/py.typed`:
+
+```text
+partial
+```
+
+`/typings/lib-stubs/b.pyi`:
+
+```pyi
+c: int
+```
+
+`/src/lib/__init__.py`:
+
+```py
+a = "runtime"
+```
+
+`/src/lib/b.py`:
+
+```py
+c = "runtime"
+```
+
+`/src/lib/runtime_only.py`:
+
+```py
+value = 42
+```
+
+`main.py`:
+
+```py
+from lib import a
+from lib.b import c
+from lib.runtime_only import value
+
+reveal_type(a)  # revealed: Literal["runtime"]
+reveal_type(c)  # revealed: int
+reveal_type(value)  # revealed: Literal[42]
+```
+
 ## Inconsistent stub packages
 
 Stub packages where one is a namespace package and the other is a regular package. Module resolution
