@@ -534,6 +534,9 @@ type DirectRecursiveList[T] = list[DirectRecursiveList[T]]
 type Foo[T] = list[T] | Bar[T]
 type Bar[T] = int | Foo[T]
 
+def _(x: Foo[int]):
+    reveal_type(x)  # revealed: list[int] | int
+
 def _(x: Bar[int]):
     reveal_type(x)  # revealed: int | list[int]
 
@@ -567,22 +570,29 @@ def f(b: B):
 ### Mutually recursive
 
 ```py
+from ty_extensions import Intersection
+
 type A = tuple[B] | None
 type B = tuple[A] | None
 
-def f(x: A):
+def _(x: A):
     if x is not None:
         reveal_type(x)  # revealed: tuple[tuple[A] | None]
         y = x[0]
         if y is not None:
             reveal_type(y)  # revealed: tuple[A]
 
-def g(x: A | B):
-    reveal_type(x)  # revealed: tuple[tuple[A] | None] | None
+def _(x: B):
+    if x is not None:
+        reveal_type(x)  # revealed: tuple[tuple[B] | None]
+        y = x[0]
+        if y is not None:
+            reveal_type(y)  # revealed: tuple[B]
 
-from ty_extensions import Intersection
+def _(x: A | B):
+    reveal_type(x)  # revealed: tuple[tuple[A] | None] | None | tuple[tuple[B] | None] | None
 
-def h(x: Intersection[A, B]):
+def _(x: Intersection[A, B]):
     reveal_type(x)  # revealed: tuple[tuple[A] | None] | None
 ```
 

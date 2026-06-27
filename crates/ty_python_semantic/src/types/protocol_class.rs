@@ -162,10 +162,14 @@ impl<'db> ProtocolClass<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
-        Some(Self(
-            self.0.recursive_type_normalized_impl(db, div, nested)?,
-        ))
+        Some(Self(self.0.recursive_type_normalized_impl(
+            db,
+            div,
+            nested,
+            collapse_nested_unions,
+        )?))
     }
 }
 
@@ -343,6 +347,7 @@ impl<'db> ProtocolInterface<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         Some(Self::new(
             db,
@@ -351,7 +356,12 @@ impl<'db> ProtocolInterface<'db> {
                 .map(|(name, data)| {
                     Some((
                         name.clone(),
-                        data.recursive_type_normalized_impl(db, div, nested)?,
+                        data.recursive_type_normalized_impl(
+                            db,
+                            div,
+                            nested,
+                            collapse_nested_unions,
+                        )?,
                     ))
                 })
                 .collect::<Option<BTreeMap<_, _>>>()?,
@@ -447,20 +457,31 @@ impl<'db> ProtocolMemberData<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         Some(Self {
             kind: match &self.kind {
-                ProtocolMemberKind::Method(callable) => ProtocolMemberKind::Method(
-                    callable.recursive_type_normalized_impl(db, div, nested)?,
-                ),
-                ProtocolMemberKind::Property(property) => ProtocolMemberKind::Property(
-                    property.recursive_type_normalized_impl(db, div, nested)?,
-                ),
-                ProtocolMemberKind::Other(ty) if nested => {
-                    ProtocolMemberKind::Other(ty.recursive_type_normalized_impl(db, div, true)?)
+                ProtocolMemberKind::Method(callable) => {
+                    ProtocolMemberKind::Method(callable.recursive_type_normalized_impl(
+                        db,
+                        div,
+                        nested,
+                        collapse_nested_unions,
+                    )?)
                 }
+                ProtocolMemberKind::Property(property) => {
+                    ProtocolMemberKind::Property(property.recursive_type_normalized_impl(
+                        db,
+                        div,
+                        nested,
+                        collapse_nested_unions,
+                    )?)
+                }
+                ProtocolMemberKind::Other(ty) if nested => ProtocolMemberKind::Other(
+                    ty.recursive_type_normalized_impl(db, div, true, collapse_nested_unions)?,
+                ),
                 ProtocolMemberKind::Other(ty) => ProtocolMemberKind::Other(
-                    ty.recursive_type_normalized_impl(db, div, true)
+                    ty.recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
                         .unwrap_or(div),
                 ),
             },

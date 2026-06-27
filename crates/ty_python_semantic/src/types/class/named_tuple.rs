@@ -167,12 +167,17 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         Some(Self::new(
             db,
             self.name(db),
-            self.anchor(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+            self.anchor(db).recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?,
         ))
     }
 }
@@ -539,11 +544,17 @@ impl<'db> DynamicNamedTupleAnchor<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         match self {
             Self::CollectionsDefinition { definition, spec } => Some(Self::CollectionsDefinition {
                 definition: *definition,
-                spec: spec.recursive_type_normalized_impl(db, div, nested)?,
+                spec: spec.recursive_type_normalized_impl(
+                    db,
+                    div,
+                    nested,
+                    collapse_nested_unions,
+                )?,
             }),
             Self::TypingDefinition(definition) => Some(Self::TypingDefinition(*definition)),
             Self::ScopeOffset {
@@ -553,7 +564,12 @@ impl<'db> DynamicNamedTupleAnchor<'db> {
             } => Some(Self::ScopeOffset {
                 scope: *scope,
                 offset: *offset,
-                spec: spec.recursive_type_normalized_impl(db, div, nested)?,
+                spec: spec.recursive_type_normalized_impl(
+                    db,
+                    div,
+                    nested,
+                    collapse_nested_unions,
+                )?,
             }),
         }
     }
@@ -585,16 +601,23 @@ impl<'db> NamedTupleSpec<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         let fields = self
             .fields(db)
             .iter()
             .map(|f| {
-                let ty = f.ty.recursive_type_normalized_impl(db, div, true);
+                let ty =
+                    f.ty.recursive_type_normalized_impl(db, div, true, collapse_nested_unions);
                 let ty = if nested { ty? } else { ty.unwrap_or(div) };
                 let default = match f.default {
                     Some(default) => {
-                        let default = default.recursive_type_normalized_impl(db, div, true);
+                        let default = default.recursive_type_normalized_impl(
+                            db,
+                            div,
+                            true,
+                            collapse_nested_unions,
+                        );
                         Some(if nested {
                             default?
                         } else {

@@ -601,8 +601,11 @@ impl<'db> TypeContext<'db> {
         db: &'db dyn Db,
         known_class: KnownClass,
     ) -> Option<Specialization<'db>> {
-        self.annotation
-            .and_then(|ty| ty.known_specialization(db, known_class))
+        let annotation = match self.annotation? {
+            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => recursive.body(db),
+            annotation => annotation,
+        };
+        annotation.known_specialization(db, known_class)
     }
 
     pub(crate) fn map(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {

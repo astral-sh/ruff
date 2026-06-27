@@ -226,11 +226,16 @@ impl<'db> TupleType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         Some(Self::new_internal(
             db,
-            self.tuple(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+            self.tuple(db).recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?,
         ))
     }
 
@@ -704,12 +709,23 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        _collapse_nested_unions: bool,
     ) -> Option<Self> {
+        // Tuple elements are structural output positions. Preserve their base arms even when a
+        // contextual recursive close collapses unions inside invariant generic arguments.
+        let collapse_tuple_element_unions = false;
         if nested {
             Some(Self::from_elements(
                 self.0
                     .iter()
-                    .map(|ty| ty.recursive_type_normalized_impl(db, div, true))
+                    .map(|ty| {
+                        ty.recursive_type_normalized_impl(
+                            db,
+                            div,
+                            true,
+                            collapse_tuple_element_unions,
+                        )
+                    })
                     .collect::<Option<Box<[_]>>>()?,
             ))
         } else {
@@ -717,8 +733,13 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                 self.0
                     .iter()
                     .map(|ty| {
-                        ty.recursive_type_normalized_impl(db, div, true)
-                            .unwrap_or(div)
+                        ty.recursive_type_normalized_impl(
+                            db,
+                            div,
+                            true,
+                            collapse_tuple_element_unions,
+                        )
+                        .unwrap_or(div)
                     })
                     .collect::<Box<[_]>>(),
             ))
@@ -1838,36 +1859,41 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        _collapse_nested_unions: bool,
     ) -> Option<Self> {
+        // Tuple elements are structural output positions. Preserve their base arms even when a
+        // contextual recursive close collapses unions inside invariant generic arguments.
+        let collapse_tuple_element_unions = false;
         if nested {
-            let prefix = self
-                .prefix_elements()
-                .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, div, true));
+            let prefix = self.prefix_elements().iter().map(|ty| {
+                ty.recursive_type_normalized_impl(db, div, true, collapse_tuple_element_unions)
+            });
 
-            let variable = self
-                .variable()
-                .recursive_type_normalized_impl(db, div, true)?;
+            let variable = self.variable().recursive_type_normalized_impl(
+                db,
+                div,
+                true,
+                collapse_tuple_element_unions,
+            )?;
 
-            let suffix = self
-                .suffix_elements()
-                .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, div, true));
+            let suffix = self.suffix_elements().iter().map(|ty| {
+                ty.recursive_type_normalized_impl(db, div, true, collapse_tuple_element_unions)
+            });
 
             Self::try_new(prefix, variable, suffix)
         } else {
             let prefix = self.prefix_elements().iter().map(|ty| {
-                ty.recursive_type_normalized_impl(db, div, true)
+                ty.recursive_type_normalized_impl(db, div, true, collapse_tuple_element_unions)
                     .unwrap_or(div)
             });
 
             let variable = self
                 .variable()
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, div, true, collapse_tuple_element_unions)
                 .unwrap_or(div);
 
             let suffix = self.suffix_elements().iter().map(|ty| {
-                ty.recursive_type_normalized_impl(db, div, true)
+                ty.recursive_type_normalized_impl(db, div, true, collapse_tuple_element_unions)
                     .unwrap_or(div)
             });
 
@@ -2081,14 +2107,21 @@ impl<'db> Tuple<Type<'db>> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         match self {
-            Tuple::Fixed(tuple) => Some(Tuple::Fixed(
-                tuple.recursive_type_normalized_impl(db, div, nested)?,
-            )),
-            Tuple::Variable(tuple) => Some(Tuple::Variable(
-                tuple.recursive_type_normalized_impl(db, div, nested)?,
-            )),
+            Tuple::Fixed(tuple) => Some(Tuple::Fixed(tuple.recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?)),
+            Tuple::Variable(tuple) => Some(Tuple::Variable(tuple.recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?)),
         }
     }
 

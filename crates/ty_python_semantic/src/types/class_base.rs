@@ -47,13 +47,17 @@ impl<'db> ClassBase<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         match self {
             Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
             Self::Divergent(_) => Some(self),
-            Self::Class(class) => Some(Self::Class(
-                class.recursive_type_normalized_impl(db, div, nested)?,
-            )),
+            Self::Class(class) => Some(Self::Class(class.recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?)),
             Self::Any | Self::Protocol | Self::Generic | Self::TypedDict(_) => Some(self),
         }
     }

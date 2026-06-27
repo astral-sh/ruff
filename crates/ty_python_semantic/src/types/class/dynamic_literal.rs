@@ -107,11 +107,31 @@ pub enum DynamicClassAnchor<'db> {
 }
 
 impl<'db> DynamicClassAnchor<'db> {
+    pub(super) fn same_cycle_recovery_identity(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Definition(left), Self::Definition(right)) => left == right,
+            (
+                Self::ScopeOffset {
+                    scope: left_scope,
+                    offset: left_offset,
+                    ..
+                },
+                Self::ScopeOffset {
+                    scope: right_scope,
+                    offset: right_offset,
+                    ..
+                },
+            ) => left_scope == right_scope && left_offset == right_offset,
+            _ => false,
+        }
+    }
+
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         match self {
             Self::Definition(definition) => Some(Self::Definition(*definition)),
@@ -123,7 +143,12 @@ impl<'db> DynamicClassAnchor<'db> {
                 let explicit_bases = explicit_bases
                     .iter()
                     .map(|base| {
-                        let base = base.recursive_type_normalized_impl(db, div, true);
+                        let base = base.recursive_type_normalized_impl(
+                            db,
+                            div,
+                            true,
+                            collapse_nested_unions,
+                        );
                         if nested {
                             base
                         } else {
@@ -160,6 +185,11 @@ pub(crate) fn dynamic_class_bases_argument(arguments: &ast::Arguments) -> Option
 
 #[salsa::tracked]
 impl<'db> DynamicClassLiteral<'db> {
+    pub(super) fn same_cycle_recovery_identity(self, db: &'db dyn Db, other: Self) -> bool {
+        self.anchor(db)
+            .same_cycle_recovery_identity(other.anchor(db))
+    }
+
     /// Returns the definition where this class is created, if it was assigned to a variable.
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self.anchor(db) {
@@ -537,21 +567,30 @@ impl<'db> DynamicClassLiteral<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
-        let anchor = self
-            .anchor(db)
-            .recursive_type_normalized_impl(db, div, nested)?;
+        let anchor = self.anchor(db).recursive_type_normalized_impl(
+            db,
+            div,
+            nested,
+            collapse_nested_unions,
+        )?;
         let members = self
             .members(db)
             .iter()
             .map(|(name, ty)| {
-                let ty = ty.recursive_type_normalized_impl(db, div, true);
+                let ty = ty.recursive_type_normalized_impl(db, div, true, collapse_nested_unions);
                 let ty = if nested { ty? } else { ty.unwrap_or(div) };
                 Some((name.clone(), ty))
             })
             .collect::<Option<Box<_>>>()?;
         let dataclass_params = match self.dataclass_params(db) {
-            Some(params) => Some(params.recursive_type_normalized_impl(db, div, nested)?),
+            Some(params) => Some(params.recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?),
             None => None,
         };
 

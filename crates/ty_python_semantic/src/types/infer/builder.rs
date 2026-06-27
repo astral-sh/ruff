@@ -3743,7 +3743,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Place::bound(object_ty).into()
                 }
                 Type::Recursive(recursive) => {
-                    recursive.map(db, |unfolded| unfolded.instance_member(db, attribute))
+                    recursive.project(db, |unfolded| unfolded.instance_member(db, attribute))
                 }
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                     object_ty.class_object_member(db, attribute, MemberLookupPolicy::default())
@@ -7182,6 +7182,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             annotation.filter_disjoint_elements(self.db(), collection_ty, inferable)
         });
 
+        let has_literal_elements = elts.iter().flatten().any(Option::is_some);
+        let empty_literal_with_recursive_context = !has_literal_elements
+            && tcx
+                .annotation
+                .is_some_and(|annotation| annotation.contains_cycle_artifact(self.db()));
+
+        // Dictionary unpacking always contributes constraints on the inferred key and value types,
+        // even when the unpacked mapping is assignable to the context. Keep it on the general path
+        // so gradual types such as `Any` are preserved.
+        let has_dict_unpack = collection_class == KnownClass::Dict
+            && elts
+                .iter()
+                .any(|elts| matches!(elts.as_slice(), [None, Some(_)]));
+
         // Collect type constraints from the declared element types.
         //
         // We use a forward assignability check (`identity_instance ≤ tcx`) to infer what each
@@ -7195,7 +7209,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut elt_tcx_variance: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
                 FxHashMap::default();
 
-            if let Some(tcx) = tcx.annotation.map(|tcx| tcx.resolve_type_alias(self.db()))
+            if !empty_literal_with_recursive_context
+                && let Some(tcx) = tcx.annotation.map(|tcx| tcx.resolve_type_alias(self.db()))
                 && let Some(specialization) = tcx.known_specialization(self.db(), collection_class)
                 && specialization.generic_context(self.db()) == generic_context
                 && generic_context.variables(self.db()).all(|typevar| {
@@ -7227,7 +7242,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     elt_tcx_constraints.insert(identity, UnionAccumulator::new(inferred_ty));
                     elt_tcx_variance.insert(identity, typevar.variance(self.db()));
                 }
-            } else if let Some(tcx) = tcx.annotation
+            } else if !empty_literal_with_recursive_context
+                && let Some(tcx) = tcx.annotation
                 && tcx.class_specialization(self.db()).is_some()
             {
                 let db = self.db();
@@ -7300,19 +7316,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (elt_tcx_constraints, elt_tcx_variance)
         };
 
-        // Dictionary unpacking always contributes constraints on the inferred key and value types,
-        // even when the unpacked mapping is assignable to the context. Keep it on the general path
-        // so gradual types such as `Any` are preserved.
-        let has_dict_unpack = collection_class == KnownClass::Dict
-            && elts
-                .iter()
-                .any(|elts| matches!(elts.as_slice(), [None, Some(_)]));
-
         let mut pre_inferred_elt_tys = None;
 
         // Avoid projecting and solving a constraint set when contextual inference has already
         // provided the complete specialization and every literal element is compatible with it.
         if !has_dict_unpack
+            && !empty_literal_with_recursive_context
             && tcx.annotation.is_some()
             && let Some(specialization) = generic_context
                 .variables(self.db())
@@ -7416,7 +7425,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        if tcx.annotation.is_none()
+        let infer_from_later_collection_uses =
+            tcx.annotation.is_none() || empty_literal_with_recursive_context;
+
+        if infer_from_later_collection_uses
             && let Some(collection_expr) = collection_expr
             && let InferenceRegion::Expression(current_expr, _) = self.region
             && current_expr.node_ref(self.db()).index() == *collection_expr.node_index()
@@ -7432,27 +7444,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 let statement_use_types = infer_statement_types(self.db(), statement);
 
-                let expression_ty = statement_use_types.expression_type(use_expression);
-                let divergent_ty = match expression_ty {
-                    Type::Divergent(divergent) => Some(Type::Divergent(divergent)),
-                    Type::Recursive(recursive) => Some(Type::Recursive(recursive)),
-                    _ => None,
-                };
-                if let Some(divergent_ty) = divergent_ty {
-                    // Infer `collection[Divergent]` for the initial cycle result.
-                    let divergent_instance = collection_alias
-                        .origin(self.db())
-                        .apply_specialization(self.db(), |generic_context| {
-                            generic_context.repeat_specialization(self.db(), divergent_ty)
-                        });
-
-                    builder
-                        .infer(
-                            identity_instance,
-                            Type::instance(self.db(), divergent_instance),
-                        )
-                        .ok()?;
-                } else if let Some(constraints) =
+                let mut inferred_from_constraint = false;
+                if let Some(constraints) =
                     statement_use_types.collection_use_constraints(collection_def)
                 {
                     for constraint in constraints {
@@ -7461,7 +7454,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
 
                         builder.infer(identity_instance, *constraint).ok()?;
+                        inferred_from_constraint = true;
                     }
+                }
+
+                let expression_ty = statement_use_types.expression_type(use_expression);
+                let cycle_artifact = match expression_ty {
+                    Type::Divergent(divergent) => Some(Type::Divergent(divergent)),
+                    Type::Recursive(recursive) => {
+                        Some(Type::divergent(recursive.binder_id(self.db())))
+                    }
+                    _ => None,
+                };
+                if !inferred_from_constraint && let Some(cycle_artifact) = cycle_artifact {
+                    // Infer `collection[Divergent]` for the initial cycle result.
+                    let cycle_artifact_instance = collection_alias
+                        .origin(self.db())
+                        .apply_specialization(self.db(), |generic_context| {
+                            generic_context.repeat_specialization(self.db(), cycle_artifact)
+                        });
+
+                    builder
+                        .infer(
+                            identity_instance,
+                            Type::instance(self.db(), cycle_artifact_instance),
+                        )
+                        .ok()?;
                 }
             }
         }
@@ -7581,7 +7599,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 builder.build_with(generic_context, |current_typevar, bounds| {
                     let lower = bounds?.lower?;
 
-                    let lower = if tcx.annotation.is_none() {
+                    let lower = if infer_from_later_collection_uses {
                         // Constraints learned from later collection uses should follow the same
                         // promotion policy as literal elements: promote element literal types in
                         // invariant position unless an explicit annotation made them unpromotable.
@@ -9061,63 +9079,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             call_expression_tcx,
         );
 
-        let mut bindings = match bindings_result {
-            Ok(()) => bindings,
-            Err(_) => {
-                bindings.report_diagnostics(&self.context, call_expression.into());
-                return bindings.return_type(self.db());
-            }
-        };
-
-        for binding in bindings.iter_flat_mut() {
-            let binding_type = binding.callable_type;
-            for (_, overload) in binding.matching_overloads_mut() {
-                match binding_type {
-                    Type::FunctionLiteral(function_literal) => {
-                        if let Some(known_function) = function_literal.known(self.db()) {
-                            known_function.check_call(
-                                &self.context,
-                                overload,
-                                &call_arguments,
-                                call_expression,
-                                self.file(),
-                            );
-                        }
-                    }
-                    Type::ClassLiteral(class) => {
-                        if let Some(known_class) = class.known(self.db()) {
-                            known_class.check_call(
-                                &self.context,
-                                self.index,
-                                overload,
-                                call_expression,
-                            );
-                        }
-                    }
-                    Type::Never => {
-                        // In unreachable sections of code, we infer `Never` for symbols that were
-                        // defined outside the unreachable part. We still want to emit revealed-type
-                        // diagnostics in these sections, so check on the name of the callable here
-                        // and assume that it's actually `typing.reveal_type`.
-                        let is_reveal_type = match func.as_ref() {
-                            ast::Expr::Name(name) => name.id == "reveal_type",
-                            ast::Expr::Attribute(attr) => {
-                                attr.attr.id == "reveal_type" && is_dotted_name(func)
-                            }
-                            _ => false,
-                        };
-                        if is_reveal_type && let Some(first_arg) = arguments.args.first() {
-                            let revealed_ty = self.expression_type(first_arg);
-                            report_revealed_type(&self.context, revealed_ty, first_arg);
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-
         // Record the constraints for the receiver of a bound method call, if the receiver is an
         // unannotated collection initializer.
+        //
+        // This must run before returning call diagnostics. During recursive inference, the current
+        // approximation of the receiver can be `list[Divergent]`, causing the real call check to
+        // fail even though the identity collection call below can still learn the element type that
+        // makes the next iteration converge.
         if let ast::Expr::Attribute(attribute @ ast::ExprAttribute { value, .. }) = func.as_ref() {
             let value_type = self.expression_type(value);
 
@@ -9174,6 +9142,61 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .or_default()
                             .insert(constraints);
                     }
+                }
+            }
+        }
+
+        let mut bindings = match bindings_result {
+            Ok(()) => bindings,
+            Err(_) => {
+                bindings.report_diagnostics(&self.context, call_expression.into());
+                return bindings.return_type(self.db());
+            }
+        };
+
+        for binding in bindings.iter_flat_mut() {
+            let binding_type = binding.callable_type;
+            for (_, overload) in binding.matching_overloads_mut() {
+                match binding_type {
+                    Type::FunctionLiteral(function_literal) => {
+                        if let Some(known_function) = function_literal.known(self.db()) {
+                            known_function.check_call(
+                                &self.context,
+                                overload,
+                                &call_arguments,
+                                call_expression,
+                                self.file(),
+                            );
+                        }
+                    }
+                    Type::ClassLiteral(class) => {
+                        if let Some(known_class) = class.known(self.db()) {
+                            known_class.check_call(
+                                &self.context,
+                                self.index,
+                                overload,
+                                call_expression,
+                            );
+                        }
+                    }
+                    Type::Never => {
+                        // In unreachable sections of code, we infer `Never` for symbols that were
+                        // defined outside the unreachable part. We still want to emit revealed-type
+                        // diagnostics in these sections, so check on the name of the callable here
+                        // and assume that it's actually `typing.reveal_type`.
+                        let is_reveal_type = match func.as_ref() {
+                            ast::Expr::Name(name) => name.id == "reveal_type",
+                            ast::Expr::Attribute(attr) => {
+                                attr.attr.id == "reveal_type" && is_dotted_name(func)
+                            }
+                            _ => false,
+                        };
+                        if is_reveal_type && let Some(first_arg) = arguments.args.first() {
+                            let revealed_ty = self.expression_type(first_arg);
+                            report_revealed_type(&self.context, revealed_ty, first_arg);
+                        }
+                    }
+                    _ => {}
                 }
             }
         }

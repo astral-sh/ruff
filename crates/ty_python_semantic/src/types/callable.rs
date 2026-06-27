@@ -581,11 +581,16 @@ impl<'db> CallableType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         Some(CallableType::new(
             db,
-            self.signatures(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+            self.signatures(db).recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?,
             self.kind(db),
             self.provenance(db),
         ))

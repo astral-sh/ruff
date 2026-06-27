@@ -19,7 +19,7 @@ use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
 use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
-use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
+use crate::types::tuple::{TupleSpec, TupleSpecBuilder, TupleType, walk_tuple_type};
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
@@ -1386,23 +1386,29 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         let types = if nested {
             self.types(db)
                 .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, div, true))
+                .map(|ty| ty.recursive_type_normalized_impl(db, div, true, collapse_nested_unions))
                 .collect::<Option<Box<[_]>>>()?
         } else {
             self.types(db)
                 .iter()
                 .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, div, true)
+                    ty.recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
                         .unwrap_or(div)
                 })
                 .collect::<Box<[_]>>()
         };
         let tuple_inner = match self.tuple_inner(db) {
-            Some(tuple) => Some(tuple.recursive_type_normalized_impl(db, div, nested)?),
+            Some(tuple) => Some(tuple.recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?),
             None => None,
         };
         let context = self.generic_context(db);
@@ -1839,8 +1845,8 @@ impl<'db> Foldable<'db> for Specialization<'db> {
 
         let original_tuple_inner = self.tuple_inner(db);
         let tuple_inner = original_tuple_inner.and_then(|tuple| {
-            let folded_tuple = Cow::Borrowed(tuple.tuple(db)).fold(db, rec);
-            TupleType::new(db, folded_tuple.as_ref())
+            let folded_tuple = fold_tuple_spec(db, tuple.tuple(db), rec);
+            TupleType::new(db, &folded_tuple)
         });
 
         let specialization_unchanged =
@@ -1857,6 +1863,28 @@ impl<'db> Foldable<'db> for Specialization<'db> {
             )
         }
     }
+}
+
+fn fold_tuple_spec<'db>(
+    db: &'db dyn Db,
+    tuple: &TupleSpec<'db>,
+    rec: RecursiveType<'db>,
+) -> TupleSpec<'db> {
+    match TupleSpecBuilder::from(tuple) {
+        TupleSpecBuilder::Fixed(elements) => {
+            TupleSpecBuilder::Fixed(elements.into_iter().map(|ty| ty.fold(db, rec)).collect())
+        }
+        TupleSpecBuilder::Variable {
+            prefix,
+            variable,
+            suffix,
+        } => TupleSpecBuilder::Variable {
+            prefix: prefix.into_iter().map(|ty| ty.fold(db, rec)).collect(),
+            variable: variable.fold(db, rec),
+            suffix: suffix.into_iter().map(|ty| ty.fold(db, rec)).collect(),
+        },
+    }
+    .build()
 }
 
 impl<'db> Foldable<'db> for (StaticClassLiteral<'db>, Specialization<'db>) {

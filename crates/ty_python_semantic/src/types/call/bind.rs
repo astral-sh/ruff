@@ -129,6 +129,24 @@ fn generic_contexts_mentioned_in_type<'db>(
     collector.generic_contexts.into_inner()
 }
 
+fn is_valid_classinfo_runtime_target<'db>(
+    db: &'db dyn Db,
+    function: KnownFunction,
+    ty: Type<'db>,
+) -> bool {
+    match ty {
+        Type::ClassLiteral(_) | Type::SubclassOf(_) => true,
+        Type::SpecialForm(SpecialFormType::Any) => function == KnownFunction::IsSubclass,
+        Type::SpecialForm(special_form) => special_form.is_valid_isinstance_target(),
+        Type::NominalInstance(instance) => instance.tuple_spec(db).is_some_and(|tuple| {
+            tuple
+                .iter_all_elements()
+                .all(|element| is_valid_classinfo_runtime_target(db, function, element))
+        }),
+        _ => false,
+    }
+}
+
 fn freshen_generic_contexts_in_type<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
@@ -7171,15 +7189,11 @@ impl<'db> BindingError<'db> {
                 // error-prone, due to the fact that they are annotated with recursive type aliases.
                 if parameter.index == 1
                     && *argument_index == Some(1)
-                    && matches!(
+                    && let Some(function @ (KnownFunction::IsInstance | KnownFunction::IsSubclass)) =
                         callable_ty
                             .as_function_literal()
-                            .and_then(|function| function.known(context.db())),
-                        Some(KnownFunction::IsInstance | KnownFunction::IsSubclass)
-                    )
-                    && provided_ty
-                        .as_special_form()
-                        .is_some_and(SpecialFormType::is_valid_isinstance_target)
+                            .and_then(|function| function.known(context.db()))
+                    && is_valid_classinfo_runtime_target(context.db(), function, *provided_ty)
                 {
                     return;
                 }

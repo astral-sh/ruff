@@ -236,11 +236,15 @@ impl<'db> SubclassOfType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         Some(Self {
-            subclass_of: self
-                .subclass_of
-                .recursive_type_normalized_impl(db, div, nested)?,
+            subclass_of: self.subclass_of.recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?,
         })
     }
 
@@ -501,11 +505,15 @@ impl<'db> SubclassOfInner<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         match self {
-            Self::Class(class) => Some(Self::Class(
-                class.recursive_type_normalized_impl(db, div, nested)?,
-            )),
+            Self::Class(class) => Some(Self::Class(class.recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?)),
             Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
             Self::TypeVar(_) => Some(self),
         }

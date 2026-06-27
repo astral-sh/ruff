@@ -612,19 +612,11 @@ impl<'db> Type<'db> {
             }
 
             (Type::Recursive(recursive), _) => {
-                Some(recursive.map(db, |unfolded| {
-                    unfolded.subscript(db, slice_ty, expr_context)
-                }))
-            }
-
-            (_, Type::Recursive(recursive)) if recursive.is_non_contractive(db) => {
-                Some(value_ty.subscript(db, Type::divergent(recursive.binder_id(db)), expr_context))
-            }
-
-            (_, Type::Recursive(recursive)) => {
-                Some(recursive.map(db, |unfolded| {
-                    value_ty.subscript(db, unfolded, expr_context)
-                }))
+                Some(recursive.project_or_else(
+                    db,
+                    || Ok(value_ty),
+                    |unfolded| unfolded.subscript(db, slice_ty, expr_context),
+                ))
             }
 
             (Type::Union(union), _) => Some(map_union_subscript(db, union, |element| {

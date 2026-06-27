@@ -120,7 +120,7 @@ std::thread_local! {
 ///
 /// `TypeOf` can make a function signature refer back to the same function through many different
 /// type components. Keeping this guard scoped here lets those components keep their ordinary
-/// `recursive_type_normalized_impl(db, div, nested)` signatures.
+/// `recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)` signatures.
 fn visit_recursive_type_normalization<R>(
     function_literal: FunctionLiteral<'_>,
     nested: bool,
@@ -1501,6 +1501,7 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         visit_recursive_type_normalization(
             self.literal(db),
@@ -1509,16 +1510,22 @@ impl<'db> FunctionType<'db> {
             || {
                 let literal = self.literal(db);
                 let updated_signature = match self.updated_signature(db) {
-                    Some(signature) => {
-                        Some(signature.recursive_type_normalized_impl(db, div, nested)?)
-                    }
+                    Some(signature) => Some(signature.recursive_type_normalized_impl(
+                        db,
+                        div,
+                        nested,
+                        collapse_nested_unions,
+                    )?),
                     None => None,
                 };
                 let updated_implementation_signature =
                     match self.updated_implementation_signature(db) {
-                        Some(signature) => {
-                            Some(signature.recursive_type_normalized_impl(db, div, nested)?)
-                        }
+                        Some(signature) => Some(signature.recursive_type_normalized_impl(
+                            db,
+                            div,
+                            nested,
+                            collapse_nested_unions,
+                        )?),
                         None => None,
                     };
                 Some(Self::new(

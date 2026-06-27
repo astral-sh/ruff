@@ -318,14 +318,12 @@ from types import UnionType
 RecursiveTuple: TypeAlias = tuple["int | RecursiveTuple", str]
 
 def _(rec: RecursiveTuple):
-    # TODO should be `tuple[int | RecursiveTuple, str]`
-    reveal_type(rec)  # revealed: tuple[Divergent, str]
+    reveal_type(rec)  # revealed: tuple[int | Divergent, str]
 
 RecursiveHomogeneousTuple: TypeAlias = tuple["int | RecursiveHomogeneousTuple", ...]
 
 def _(rec: RecursiveHomogeneousTuple):
-    # TODO should be `tuple[int | RecursiveHomogeneousTuple, ...]`
-    reveal_type(rec)  # revealed: tuple[Divergent, ...]
+    reveal_type(rec)  # revealed: tuple[int | Divergent, ...]
 
 ClassInfo: TypeAlias = type | UnionType | tuple["ClassInfo", ...]
 reveal_type(ClassInfo)  # revealed: <types.UnionType special-form 'type | UnionType | tuple[Divergent, ...]'>
@@ -340,8 +338,8 @@ V = TypeVar("V")
 NestedDict: TypeAlias = dict[K, Union[V, "NestedDict[K, V]"]]
 
 def _(nested: NestedDict[str, int]):
-    # TODO should be `dict[str, int | NestedDict[str, int]]`
-    reveal_type(nested)  # revealed: dict[@Todo(specialized recursive generic type alias), <class 'dict[@Todo(specialized recursive generic type alias), Divergent]'>]
+    # revealed: dict[@Todo(specialized recursive generic type alias), @Todo(specialized recursive generic type alias) | Divergent]
+    reveal_type(nested)
 
 my_isinstance(1, int)
 my_isinstance(1, int | str)
@@ -350,7 +348,7 @@ my_isinstance(1, (int, (str, float)))
 my_isinstance(1, (int, (str | float)))
 # error: [invalid-argument-type]
 my_isinstance(1, 1)
-# TODO should be an invalid-argument-type error
+# error: [invalid-argument-type]
 my_isinstance(1, (int, (str, 1)))
 ```
 

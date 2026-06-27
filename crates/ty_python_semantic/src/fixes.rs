@@ -1012,9 +1012,9 @@ mod tests {
 
         def f() -> None:
             diag = get_data()
-            diag["home_assistant"]["entities"] = sorted(  # ty:ignore[invalid-assignment]
+            diag["home_assistant"]["entities"] = sorted(
                 diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty:ignore[invalid-argument-type, not-subscriptable]
-            )
+            )  # ty:ignore[invalid-assignment, no-matching-overload]
         ```
         "#);
     }

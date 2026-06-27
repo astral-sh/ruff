@@ -982,7 +982,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 }
                 let body = recursive
                     .body_with_origin_marker(self.db)
-                    .recursive_type_normalized_impl(self.db, marker, false)
+                    .recursive_type_normalized_impl(self.db, marker, false, false)
                     .unwrap_or(marker);
                 body.display_with(self.db, self.settings.with_recursive_type_binder(binder_id))
                     .fmt_detailed(f)

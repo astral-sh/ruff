@@ -7,7 +7,6 @@ use crate::{
         call::CallErrorKind,
         context::InferContext,
         diagnostic::NOT_ITERABLE,
-        recursive::{Foldable, RecursiveType},
         todo_type,
         tuple::{TupleSpec, TupleSpecBuilder},
     },
@@ -161,7 +160,7 @@ impl<'db> Type<'db> {
                     Some(Cow::Owned(TupleSpec::homogeneous(ty)))
                 }
                 Type::Recursive(recursive) => {
-                    recursive.map(db, |unfolded| non_async_special_case(db, unfolded))
+                    recursive.project(db, |unfolded| non_async_special_case(db, unfolded))
                 }
                 Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
@@ -260,7 +259,7 @@ impl<'db> Type<'db> {
         if let Type::Recursive(recursive) = self
             && !recursive.is_non_contractive(db)
         {
-            return recursive.map(db, |unfolded| unfolded.try_iterate_with_mode(db, mode));
+            return recursive.project(db, |unfolded| unfolded.try_iterate_with_mode(db, mode));
         }
 
         if mode.is_async() {
@@ -497,77 +496,6 @@ pub(super) enum IterationError<'db> {
 
     /// The asynchronous iterable has no `__aiter__` method.
     UnboundAiterError,
-}
-
-impl<'db> Foldable<'db> for Cow<'db, TupleSpec<'db>> {
-    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
-        Cow::Owned(
-            match TupleSpecBuilder::from(&self.into_owned()) {
-                TupleSpecBuilder::Fixed(elements) => TupleSpecBuilder::Fixed(
-                    elements
-                        .into_iter()
-                        .map(|element| element.fold(db, rec))
-                        .collect(),
-                ),
-                TupleSpecBuilder::Variable {
-                    prefix,
-                    variable,
-                    suffix,
-                } => TupleSpecBuilder::Variable {
-                    prefix: prefix
-                        .into_iter()
-                        .map(|element| element.fold(db, rec))
-                        .collect(),
-                    variable: variable.fold(db, rec),
-                    suffix: suffix
-                        .into_iter()
-                        .map(|element| element.fold(db, rec))
-                        .collect(),
-                },
-            }
-            .build(),
-        )
-    }
-}
-
-impl<'db> Foldable<'db> for IterationError<'db> {
-    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
-        match self {
-            Self::IterCallError {
-                kind,
-                bindings,
-                mode,
-            } => Self::IterCallError {
-                kind,
-                bindings: bindings.fold(db, rec),
-                mode,
-            },
-            Self::IterReturnsInvalidIterator {
-                iterator,
-                dunder_error,
-                mode,
-            } => Self::IterReturnsInvalidIterator {
-                iterator: iterator.fold(db, rec),
-                dunder_error: dunder_error.fold(db, rec),
-                mode,
-            },
-            Self::PossiblyUnboundIterAndGetitemError {
-                dunder_next_return,
-                unbound_on_iter,
-                dunder_getitem_error,
-            } => Self::PossiblyUnboundIterAndGetitemError {
-                dunder_next_return: dunder_next_return.fold(db, rec),
-                unbound_on_iter: unbound_on_iter.fold(db, rec),
-                dunder_getitem_error: dunder_getitem_error.fold(db, rec),
-            },
-            Self::UnboundIterAndGetitemError {
-                dunder_getitem_error,
-            } => Self::UnboundIterAndGetitemError {
-                dunder_getitem_error: dunder_getitem_error.fold(db, rec),
-            },
-            Self::UnboundAiterError => Self::UnboundAiterError,
-        }
-    }
 }
 
 impl<'db> IterationError<'db> {

@@ -145,13 +145,17 @@ impl<'db> TypedDictOpenness<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         match self {
             Self::ImplicitlyOpen | Self::Closed => Some(self),
             Self::Extra(extra_items) => {
-                let declared_ty = extra_items
-                    .declared_ty
-                    .recursive_type_normalized_impl(db, div, true);
+                let declared_ty = extra_items.declared_ty.recursive_type_normalized_impl(
+                    db,
+                    div,
+                    true,
+                    collapse_nested_unions,
+                );
                 let declared_ty = if nested {
                     declared_ty?
                 } else {
@@ -2992,12 +2996,16 @@ impl<'db> TypedDictSchema<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         self.iter()
             .map(|(name, field)| {
-                let declared_ty = field
-                    .declared_ty
-                    .recursive_type_normalized_impl(db, div, true);
+                let declared_ty = field.declared_ty.recursive_type_normalized_impl(
+                    db,
+                    div,
+                    true,
+                    collapse_nested_unions,
+                );
                 let declared_ty = if nested {
                     declared_ty?
                 } else {

@@ -258,12 +258,20 @@ impl<'db> CallableSignature<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         Some(Self {
             overloads: self
                 .overloads
                 .iter()
-                .map(|signature| signature.recursive_type_normalized_impl(db, div, nested))
+                .map(|signature| {
+                    signature.recursive_type_normalized_impl(
+                        db,
+                        div,
+                        nested,
+                        collapse_nested_unions,
+                    )
+                })
                 .collect::<Option<SmallVec<_>>>()?,
         })
     }
@@ -803,19 +811,25 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         let return_ty = if nested {
             self.return_ty
-                .recursive_type_normalized_impl(db, div, true)?
+                .recursive_type_normalized_impl(db, div, true, collapse_nested_unions)?
         } else {
             self.return_ty
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
                 .unwrap_or(div)
         };
         let parameters = {
             let mut parameters = Vec::with_capacity(self.parameters.len());
             for param in &self.parameters {
-                parameters.push(param.recursive_type_normalized_impl(db, div, nested)?);
+                parameters.push(param.recursive_type_normalized_impl(
+                    db,
+                    div,
+                    nested,
+                    collapse_nested_unions,
+                )?);
             }
             Parameters::new(db, parameters)
         };
@@ -4019,6 +4033,7 @@ impl<'db> Parameter<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         let Parameter {
             annotated_type,
@@ -4029,17 +4044,17 @@ impl<'db> Parameter<'db> {
         } = self;
 
         let annotated_type = if nested {
-            annotated_type.recursive_type_normalized_impl(db, div, true)?
+            annotated_type.recursive_type_normalized_impl(db, div, true, collapse_nested_unions)?
         } else {
             annotated_type
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
                 .unwrap_or(div)
         };
         let default_type_normalized = |default_type: Option<Type<'db>>| {
             // Default-value types are used for diagnostics and display, not callable compatibility.
             // Preserve the callable shape when only the default value is recursive.
             default_type.map(|ty| {
-                ty.recursive_type_normalized_impl(db, div, true)
+                ty.recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
                     .unwrap_or(div)
             })
         };

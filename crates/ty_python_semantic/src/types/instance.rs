@@ -379,21 +379,28 @@ impl<'db> NominalInstanceType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         match self.0 {
-            NominalInstanceInner::ExactTuple(tuple) => {
-                Some(Self(NominalInstanceInner::ExactTuple(
-                    tuple.recursive_type_normalized_impl(db, div, nested)?,
-                )))
-            }
+            NominalInstanceInner::ExactTuple(tuple) => Some(Self(
+                NominalInstanceInner::ExactTuple(tuple.recursive_type_normalized_impl(
+                    db,
+                    div,
+                    nested,
+                    collapse_nested_unions,
+                )?),
+            )),
             NominalInstanceInner::SysVersionInfo => {
                 Some(Self(NominalInstanceInner::SysVersionInfo))
             }
             NominalInstanceInner::Object => Some(Self(NominalInstanceInner::Object)),
             NominalInstanceInner::NonTuple(class) => {
-                let transformed = class
-                    .class(db)
-                    .recursive_type_normalized_impl(db, div, nested)?;
+                let transformed = class.class(db).recursive_type_normalized_impl(
+                    db,
+                    div,
+                    nested,
+                    collapse_nested_unions,
+                )?;
                 Some(Self(NominalInstanceInner::NonTuple(
                     class.with_class(db, transformed),
                 )))
@@ -866,9 +873,15 @@ impl<'db> ProtocolInstanceType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         Some(Self {
-            inner: self.inner.recursive_type_normalized_impl(db, div, nested)?,
+            inner: self.inner.recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?,
             _phantom: PhantomData,
         })
     }
@@ -947,13 +960,22 @@ impl<'db> Protocol<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         match self {
-            Self::FromClass(class) => Some(Self::FromClass(
-                class.recursive_type_normalized_impl(db, div, nested)?,
-            )),
+            Self::FromClass(class) => Some(Self::FromClass(class.recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?)),
             Self::Synthesized(synthesized) => Some(Self::Synthesized(
-                synthesized.recursive_type_normalized_impl(db, div, nested)?,
+                synthesized.recursive_type_normalized_impl(
+                    db,
+                    div,
+                    nested,
+                    collapse_nested_unions,
+                )?,
             )),
         }
     }
@@ -1025,10 +1047,14 @@ mod synthesized_protocol {
             db: &'db dyn Db,
             div: Type<'db>,
             nested: bool,
+            collapse_nested_unions: bool,
         ) -> Option<Self> {
-            Some(Self(
-                self.0.recursive_type_normalized_impl(db, div, nested)?,
-            ))
+            Some(Self(self.0.recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?))
         }
     }
 

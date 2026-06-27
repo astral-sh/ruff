@@ -293,14 +293,21 @@ impl<'db> ResolvedSuperOwner<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         Some(Self {
-            owner_type: self
-                .owner_type
-                .recursive_type_normalized_impl(db, div, nested)?,
-            lookup_anchor: self
-                .lookup_anchor
-                .recursive_type_normalized_impl(db, div, nested)?,
+            owner_type: self.owner_type.recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?,
+            lookup_anchor: self.lookup_anchor.recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?,
             receiver: self.receiver,
         })
     }
@@ -328,6 +335,7 @@ impl<'db> SuperOwnerKind<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         match self {
             SuperOwnerKind::Dynamic(dynamic) => {
@@ -335,7 +343,12 @@ impl<'db> SuperOwnerKind<'db> {
             }
             SuperOwnerKind::Divergent(_) => Some(self.clone()),
             SuperOwnerKind::Resolved(resolved_owner) => Some(SuperOwnerKind::Resolved(
-                resolved_owner.recursive_type_normalized_impl(db, div, nested)?,
+                resolved_owner.recursive_type_normalized_impl(
+                    db,
+                    div,
+                    nested,
+                    collapse_nested_unions,
+                )?,
             )),
         }
     }
@@ -983,13 +996,22 @@ impl<'db> BoundSuperType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         Some(Self::new(
             db,
-            self.pivot_class(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
-            self.owner(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+            self.pivot_class(db).recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?,
+            self.owner(db).recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?,
         ))
     }
 }

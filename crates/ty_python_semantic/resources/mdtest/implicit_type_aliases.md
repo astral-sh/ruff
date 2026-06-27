@@ -1727,7 +1727,7 @@ from typing import Union
 Recursive = list[Union["Recursive", None]]
 
 def _(r: Recursive):
-    reveal_type(r)  # revealed: list[Divergent]
+    reveal_type(r)  # revealed: list[Divergent | None]
 ```
 
 ### New union syntax
@@ -1755,10 +1755,10 @@ def _(
     recursive_dict3: RecursiveDict3,
     recursive_dict4: RecursiveDict4,
 ):
-    reveal_type(recursive_list1)  # revealed: list[Divergent]
-    reveal_type(recursive_list2)  # revealed: list[Divergent]
-    reveal_type(recursive_dict1)  # revealed: dict[str, Divergent]
-    reveal_type(recursive_dict2)  # revealed: dict[str, Divergent]
+    reveal_type(recursive_list1)  # revealed: list[Divergent | None]
+    reveal_type(recursive_list2)  # revealed: list[Divergent | None]
+    reveal_type(recursive_dict1)  # revealed: dict[str, Divergent | None]
+    reveal_type(recursive_dict2)  # revealed: dict[str, Divergent | None]
     reveal_type(recursive_dict3)  # revealed: dict[Divergent, int]
     reveal_type(recursive_dict4)  # revealed: dict[Divergent, int]
 ```
@@ -1777,8 +1777,8 @@ def _(
     nested_dict_int: NestedDict[int],
     nested_list_str: NestedList[str],
 ):
-    reveal_type(nested_dict_int)  # revealed: dict[str, Divergent]
-    reveal_type(nested_list_str)  # revealed: list[Divergent]
+    reveal_type(nested_dict_int)  # revealed: dict[str, Divergent | @Todo(specialized recursive generic type alias)]
+    reveal_type(nested_list_str)  # revealed: list[Divergent | None]
 ```
 
 ### Materialization of self-referential generic implicit type aliases

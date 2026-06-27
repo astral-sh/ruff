@@ -732,27 +732,34 @@ impl<'db> PropertyInstanceType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         let getter = match self.getter(db) {
-            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
+            Some(ty) if nested => {
+                Some(ty.recursive_type_normalized_impl(db, div, true, collapse_nested_unions)?)
+            }
             Some(ty) => Some(
-                ty.recursive_type_normalized_impl(db, div, true)
+                ty.recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
                     .unwrap_or(div),
             ),
             None => None,
         };
         let setter = match self.setter(db) {
-            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
+            Some(ty) if nested => {
+                Some(ty.recursive_type_normalized_impl(db, div, true, collapse_nested_unions)?)
+            }
             Some(ty) => Some(
-                ty.recursive_type_normalized_impl(db, div, true)
+                ty.recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
                     .unwrap_or(div),
             ),
             None => None,
         };
         let deleter = match self.deleter(db) {
-            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
+            Some(ty) if nested => {
+                Some(ty.recursive_type_normalized_impl(db, div, true, collapse_nested_unions)?)
+            }
             Some(ty) => Some(
-                ty.recursive_type_normalized_impl(db, div, true)
+                ty.recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
                     .unwrap_or(div),
             ),
             None => None,
@@ -885,12 +892,13 @@ impl<'db> DataclassParams<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         let field_specifiers = self
             .field_specifiers(db)
             .iter()
             .map(|ty| {
-                let ty = ty.recursive_type_normalized_impl(db, div, true);
+                let ty = ty.recursive_type_normalized_impl(db, div, true, collapse_nested_unions);
                 if nested { ty } else { Some(ty.unwrap_or(div)) }
             })
             .collect::<Option<Box<_>>>()?;
@@ -1016,15 +1024,19 @@ fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
     guard: T,
     div: Type<'db>,
     nested: bool,
+    collapse_nested_unions: bool,
 ) -> Option<Type<'db>> {
     let ty = if nested {
-        guard
-            .type_argument(db)
-            .recursive_type_normalized_impl(db, div, true)?
+        guard.type_argument(db).recursive_type_normalized_impl(
+            db,
+            div,
+            true,
+            collapse_nested_unions,
+        )?
     } else {
         guard
             .type_argument(db)
-            .recursive_type_normalized_impl(db, div, true)
+            .recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
             .unwrap_or(div)
     };
     Some(guard.with_type(db, ty))
@@ -1078,6 +1090,12 @@ impl<'db> Type<'db> {
         origin: RecursiveOrigin<'db>,
         body: Type<'db>,
     ) -> Self {
+        if let Type::Recursive(recursive) = body
+            && recursive.binder_id(db) == binder_id
+        {
+            return body;
+        }
+
         let marker = Type::divergent(binder_id);
         if body.contains_cycle_marker(db, marker) {
             RecursiveType::build(db, binder_id, origin, body)
@@ -1179,6 +1197,19 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(crate) fn same_cycle_recovery_identity(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+        if self == other {
+            return true;
+        }
+
+        match (self, other) {
+            (Type::ClassLiteral(left), Type::ClassLiteral(right)) => {
+                left.same_cycle_recovery_identity(db, right)
+            }
+            _ => false,
+        }
+    }
+
     fn is_top_level_cycle_marker(self, db: &'db dyn Db, marker: Type<'db>) -> bool {
         self.same_divergent_marker(marker)
             || matches!(
@@ -1211,35 +1242,6 @@ impl<'db> Type<'db> {
         }
 
         if empty { marker } else { builder.build() }
-    }
-
-    fn replace_top_level_cycle_markers(
-        self,
-        db: &'db dyn Db,
-        marker: Type<'db>,
-        replacement: Type<'db>,
-    ) -> Type<'db> {
-        if self.is_top_level_cycle_marker(db, marker) {
-            return replacement;
-        }
-
-        let Type::Union(union) = self else {
-            return self;
-        };
-
-        let mut builder = UnionBuilder::new(db)
-            .unpack_aliases(false)
-            .cycle_recovery(true)
-            .recursively_defined(union.recursively_defined(db));
-        for element in union.elements(db) {
-            if element.is_top_level_cycle_marker(db, marker) {
-                builder = builder.add(replacement);
-            } else {
-                builder = builder.add(*element);
-            }
-        }
-
-        builder.build()
     }
 
     fn contains_cycle_marker(self, db: &'db dyn Db, marker: Type<'db>) -> bool {
@@ -1335,12 +1337,7 @@ impl<'db> Type<'db> {
             .normalize_cycle_heads(db, cycle)
     }
 
-    fn merge_with_previous(
-        self,
-        db: &'db dyn Db,
-        previous: Self,
-        cycle: &salsa::Cycle,
-    ) -> Self {
+    fn merge_with_previous(self, db: &'db dyn Db, previous: Self, cycle: &salsa::Cycle) -> Self {
         // When we encounter a salsa cycle, we want to avoid oscillating between two or more types
         // without converging on a fixed-point result. Most of the time, we union together the
         // types from each cycle iteration to ensure that our result is monotonic, even if we
@@ -1399,27 +1396,21 @@ impl<'db> Type<'db> {
     }
 
     fn normalize_cycle_heads(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
-        cycle
-            .head_ids()
-            .fold(self.unwrap_recursive(db), |ty, id| {
-                ty.normalize_cycle_head(db, id)
-            })
+        cycle.head_ids().fold(self.unwrap_recursive(db), |ty, id| {
+            ty.normalize_cycle_head(db, id)
+        })
     }
 
     fn normalize_cycle_head(self, db: &'db dyn Db, id: salsa::Id) -> Self {
         let marker = Type::divergent(id);
         let body = self.recursive_body_for_marker(db, marker);
         let normalized = body
-            .recursive_type_normalized_impl(db, marker, false)
+            .recursive_type_normalized_impl(db, marker, false, false)
             .unwrap_or(marker);
         normalized.wrap_implicit_recursive_body(db, id)
     }
 
-    fn recursive_body_for_marker(
-        self,
-        db: &'db dyn Db,
-        marker: Type<'db>,
-    ) -> Self {
+    fn recursive_body_for_marker(self, db: &'db dyn Db, marker: Type<'db>) -> Self {
         let Type::Recursive(recursive) = self else {
             return self;
         };
@@ -1644,7 +1635,7 @@ impl<'db> Type<'db> {
             Type::ProtocolInstance(instance) => instance.to_nominal_instance().map(|i| i.class(db)),
             Type::TypeAlias(alias) => alias.value_type(db).nominal_class(db),
             Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
-                recursive.map(db, |unfolded| unfolded.nominal_class(db))
+                recursive.project(db, |unfolded| unfolded.nominal_class(db))
             }
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).nominal_class(db),
             Type::TypeVar(typevar) => {
@@ -1703,7 +1694,7 @@ impl<'db> Type<'db> {
     fn tuple_instance_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
         match self {
             Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
-                recursive.map(db, |unfolded| unfolded.tuple_instance_spec(db))
+                recursive.project(db, |unfolded| unfolded.tuple_instance_spec(db))
             }
             _ => self
                 .as_nominal_instance()
@@ -1724,7 +1715,7 @@ impl<'db> Type<'db> {
     fn exact_tuple_instance_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
         match self {
             Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
-                recursive.map(db, |unfolded| unfolded.exact_tuple_instance_spec(db))
+                recursive.project(db, |unfolded| unfolded.exact_tuple_instance_spec(db))
             }
             _ => self
                 .as_nominal_instance()
@@ -1765,13 +1756,6 @@ impl<'db> Type<'db> {
 
     pub(crate) fn has_dynamic(self, db: &'db dyn Db) -> bool {
         any_over_type(db, self, false, |ty| ty.is_dynamic())
-    }
-
-    pub(crate) const fn as_special_form(self) -> Option<SpecialFormType> {
-        match self {
-            Type::SpecialForm(special_form) => Some(special_form),
-            _ => None,
-        }
     }
 
     pub const fn as_property_instance(self) -> Option<PropertyInstanceType<'db>> {
@@ -2268,7 +2252,7 @@ impl<'db> Type<'db> {
         match self.resolve_type_alias(db) {
             Type::Union(union) => union.filter(db, f),
             Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
-                recursive.map(db, |unfolded| unfolded.filter_union(db, f))
+                recursive.map_type(db, |unfolded| unfolded.filter_union(db, f))
             }
             _ => self,
         }
@@ -2389,7 +2373,7 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn recursive_type_normalized(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
         cycle.head_ids().fold(self, |ty, id| {
-            ty.recursive_type_normalized_impl(db, Type::divergent(id), false)
+            ty.recursive_type_normalized_impl(db, Type::divergent(id), false, false)
                 .unwrap_or(Type::divergent(id))
         })
     }
@@ -2403,18 +2387,40 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         recursive: RecursiveType<'db>,
     ) -> Self {
+        if self == Type::Recursive(recursive) {
+            return self;
+        }
+
+        if self.is_non_contractive_recursive(db) {
+            return Type::Recursive(recursive);
+        }
+
+        let marker = Type::divergent(recursive.binder_id(db));
+        if let Type::Recursive(updated) = self
+            && updated.binder_id(db) == recursive.binder_id(db)
+        {
+            let normalized = updated
+                .body(db)
+                .recursive_type_normalized_impl(db, marker, false, true)
+                .unwrap_or(marker);
+            return Type::recursive(
+                db,
+                recursive.binder_id(db),
+                recursive.origin(db),
+                normalized,
+            );
+        }
+
         if self.contains_recursive_type(db, recursive) {
             return self;
         }
 
-        let marker = Type::divergent(recursive.binder_id(db));
-        let normalized = self
-            .recursive_type_normalized_impl(db, marker, false)
-            .unwrap_or(marker);
-
-        if normalized == recursive.body(db) {
+        if self.is_top_level_cycle_marker(db, marker) || self == recursive.body(db) {
             Type::Recursive(recursive)
-        } else if normalized.contains_cycle_marker(db, marker) {
+        } else if self.contains_cycle_marker(db, marker) {
+            let normalized = self
+                .recursive_type_normalized_impl(db, marker, false, true)
+                .unwrap_or(marker);
             Type::recursive(
                 db,
                 recursive.binder_id(db),
@@ -2422,7 +2428,7 @@ impl<'db> Type<'db> {
                 normalized,
             )
         } else {
-            normalized
+            self
         }
     }
 
@@ -2442,11 +2448,16 @@ impl<'db> Type<'db> {
     /// Structural types such as union and intersection do not need to send `nested=true` for element types; that is, types that are "flat" from the perspective of recursive types. `T | U` should send `nested` as is for `T`, `U`.
     /// For other types, the decision depends on whether they are interpreted as nominal or structural.
     /// For example, `KnownInstanceType::UnionType` should simply send `nested` as is.
+    ///
+    /// `collapse_nested_unions` controls whether a nested `T | Divergent` is reduced to
+    /// `Divergent`. Cycle recovery keeps the base arm available for later constraints; contextual
+    /// closure collapses it so values are compared against the closed recursive context.
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         if nested && self.same_divergent_marker(div) {
             return None;
@@ -2459,7 +2470,7 @@ impl<'db> Type<'db> {
                 } else {
                     let body = recursive.body(db);
                     let folded_body = body
-                        .recursive_type_normalized_impl(db, div, true)
+                        .recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
                         .unwrap_or(div);
                     if folded_body == body {
                         Some(self)
@@ -2473,59 +2484,69 @@ impl<'db> Type<'db> {
                     }
                 }
             }
-            Type::Union(union) => union.recursive_type_normalized_impl(db, div, nested),
+            Type::Union(union) => {
+                union.recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
+            }
             Type::Intersection(intersection) => intersection
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                 .map(Type::Intersection),
             Type::EnumComplement(complement) => complement
                 .to_intersection(db)
-                .recursive_type_normalized_impl(db, div, nested),
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions),
             Type::Callable(callable) => callable
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                 .map(Type::Callable),
             Type::ProtocolInstance(protocol) => protocol
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                 .map(Type::ProtocolInstance),
             Type::NominalInstance(instance) => instance
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                 .map(Type::NominalInstance),
             Type::FunctionLiteral(function) => function
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                 .map(Type::FunctionLiteral),
             Type::PropertyInstance(property) => property
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                 .map(Type::PropertyInstance),
             Type::KnownBoundMethod(method_kind) => method_kind
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                 .map(Type::KnownBoundMethod),
             Type::BoundMethod(method) => method
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                 .map(Type::BoundMethod),
             Type::BoundSuper(bound_super) => bound_super
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                 .map(Type::BoundSuper),
             Type::GenericAlias(generic) => generic
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                 .map(Type::GenericAlias),
             Type::ClassLiteral(class) => class
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                 .map(Type::ClassLiteral),
             Type::SubclassOf(subclass_of) => subclass_of
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                 .map(Type::SubclassOf),
             Type::TypeVar(_) => Some(self),
             Type::KnownInstance(known_instance) => known_instance
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                 .map(Type::KnownInstance),
-            Type::TypeIs(type_is) => {
-                recursive_type_normalize_type_guard_like(db, type_is, div, nested)
-            }
-            Type::TypeGuard(type_guard) => {
-                recursive_type_normalize_type_guard_like(db, type_guard, div, nested)
-            }
+            Type::TypeIs(type_is) => recursive_type_normalize_type_guard_like(
+                db,
+                type_is,
+                div,
+                nested,
+                collapse_nested_unions,
+            ),
+            Type::TypeGuard(type_guard) => recursive_type_normalize_type_guard_like(
+                db,
+                type_guard,
+                div,
+                nested,
+                collapse_nested_unions,
+            ),
             Type::TypeForm(typeform) => typeform
                 .type_argument(db)
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
                 .map(|ty| TypeFormType::from_type_expression(db, ty)),
             Type::Divergent(_) => Some(self),
             Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
@@ -2535,7 +2556,7 @@ impl<'db> Type<'db> {
             }
             Type::TypeAlias(_) => Some(self),
             Type::NewTypeInstance(newtype) => newtype
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                 .map(Type::NewTypeInstance),
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -2909,7 +2930,7 @@ impl<'db> Type<'db> {
             Type::Recursive(recursive) if recursive.is_non_contractive(db) => {
                 Some(Place::bound(self).into())
             }
-            Type::Recursive(recursive) => recursive.map(db, |unfolded| {
+            Type::Recursive(recursive) => recursive.project(db, |unfolded| {
                 unfolded.find_name_in_mro_with_policy(db, name, policy)
             }),
 
@@ -3223,7 +3244,7 @@ impl<'db> Type<'db> {
                 Place::bound(self).into()
             }
             Type::Recursive(recursive) => {
-                recursive.map(db, |unfolded| unfolded.instance_member(db, name))
+                recursive.project(db, |unfolded| unfolded.instance_member(db, name))
             }
 
             Type::NominalInstance(instance) => instance.class(db).instance_member(db, name),
@@ -3952,7 +3973,7 @@ impl<'db> Type<'db> {
                 Type::Recursive(recursive) if recursive.is_non_contractive(db) => {
                     Place::bound(this).into()
                 }
-                Type::Recursive(recursive) => recursive.map(db, |unfolded| {
+                Type::Recursive(recursive) => recursive.project(db, |unfolded| {
                     unfolded.member_lookup_with_policy_and_receiver(db, name, policy, receiver)
                 }),
 
@@ -4869,7 +4890,7 @@ impl<'db> Type<'db> {
             Type::Recursive(recursive) if recursive.is_non_contractive(db) => {
                 Binding::single(self, Signature::dynamic(self)).into()
             }
-            Type::Recursive(recursive) => recursive.map(db, |unfolded| unfolded.bindings(db)),
+            Type::Recursive(recursive) => recursive.project(db, |unfolded| unfolded.bindings(db)),
 
             // Note that this correctly returns `None` if none of the union elements are callable.
             Type::Union(union) => Bindings::from_union(
@@ -6528,7 +6549,9 @@ impl<'db> Type<'db> {
             recursive,
             replacement,
         } = type_mapping
-            && (self == *replacement || self == Type::Recursive(*recursive))
+            && (self == Type::Recursive(*recursive)
+                || self == *replacement
+                || recursive.origin(db).matches_type(db, self))
         {
             return Type::divergent(recursive.binder_id(db));
         }
@@ -6850,6 +6873,7 @@ impl<'db> Type<'db> {
                     TypeMapping::ReplaceDivergent { .. }
                     | TypeMapping::ReplaceRecursiveOrigin { .. }
                     | TypeMapping::ReplaceRecursiveAliasComponent { .. }
+                    | TypeMapping::FoldRecursive { .. }
                     | TypeMapping::FoldCyclePrevious { .. }
                     => {
                         if let Some(specialization) = alias.specialization(db) {
@@ -6998,7 +7022,7 @@ impl<'db> Type<'db> {
                 } = type_mapping
                     && recursive.binder(db) == folded.binder(db)
                 {
-                    return self;
+                    return Type::divergent(folded.binder_id(db));
                 }
                 let body = recursive.body(db);
                 let mapped = body.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
@@ -8080,7 +8104,7 @@ pub enum TypeMapping<'a, 'db> {
         binder_id: BinderId,
         replacement: Type<'db>,
     },
-    /// Folds occurrences introduced by unfolding a recursive type back to the binder marker.
+    /// Replaces occurrences of a recursive type's unfolded source with its binder marker.
     FoldRecursive {
         recursive: RecursiveType<'db>,
         replacement: Type<'db>,

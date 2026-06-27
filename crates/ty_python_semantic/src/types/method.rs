@@ -117,13 +117,22 @@ impl<'db> BoundMethodType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         Some(Self::new(
             db,
-            self.function(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
-            self.self_instance(db)
-                .recursive_type_normalized_impl(db, div, true)?,
+            self.function(db).recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?,
+            self.self_instance(db).recursive_type_normalized_impl(
+                db,
+                div,
+                true,
+                collapse_nested_unions,
+            )?,
         ))
     }
 }
@@ -222,31 +231,53 @@ impl<'db> KnownBoundMethodType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         match self {
             KnownBoundMethodType::FunctionTypeDunderGet(function) => {
                 Some(KnownBoundMethodType::FunctionTypeDunderGet(
-                    function.recursive_type_normalized_impl(db, div, nested)?,
+                    function.recursive_type_normalized_impl(
+                        db,
+                        div,
+                        nested,
+                        collapse_nested_unions,
+                    )?,
                 ))
             }
             KnownBoundMethodType::FunctionTypeDunderCall(function) => {
                 Some(KnownBoundMethodType::FunctionTypeDunderCall(
-                    function.recursive_type_normalized_impl(db, div, nested)?,
+                    function.recursive_type_normalized_impl(
+                        db,
+                        div,
+                        nested,
+                        collapse_nested_unions,
+                    )?,
                 ))
             }
-            KnownBoundMethodType::PropertyDunderGet(property) => {
-                Some(KnownBoundMethodType::PropertyDunderGet(
-                    property.recursive_type_normalized_impl(db, div, nested)?,
-                ))
-            }
-            KnownBoundMethodType::PropertyDunderSet(property) => {
-                Some(KnownBoundMethodType::PropertyDunderSet(
-                    property.recursive_type_normalized_impl(db, div, nested)?,
-                ))
-            }
+            KnownBoundMethodType::PropertyDunderGet(property) => Some(
+                KnownBoundMethodType::PropertyDunderGet(property.recursive_type_normalized_impl(
+                    db,
+                    div,
+                    nested,
+                    collapse_nested_unions,
+                )?),
+            ),
+            KnownBoundMethodType::PropertyDunderSet(property) => Some(
+                KnownBoundMethodType::PropertyDunderSet(property.recursive_type_normalized_impl(
+                    db,
+                    div,
+                    nested,
+                    collapse_nested_unions,
+                )?),
+            ),
             KnownBoundMethodType::PropertyDunderDelete(property) => {
                 Some(KnownBoundMethodType::PropertyDunderDelete(
-                    property.recursive_type_normalized_impl(db, div, nested)?,
+                    property.recursive_type_normalized_impl(
+                        db,
+                        div,
+                        nested,
+                        collapse_nested_unions,
+                    )?,
                 ))
             }
             KnownBoundMethodType::StrStartswith(_)

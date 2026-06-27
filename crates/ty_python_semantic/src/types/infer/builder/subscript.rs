@@ -219,9 +219,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         match value_ty {
             Type::Recursive(recursive) if recursive.is_non_contractive(db) => {}
             Type::Recursive(recursive) => {
-                return recursive.map(db, |unfolded| {
-                    self.infer_subscript_load_impl(unfolded, subscript)
-                });
+                return recursive.project_or_else(
+                    db,
+                    || Type::Recursive(recursive),
+                    |unfolded| self.infer_subscript_load_impl(unfolded, subscript),
+                );
             }
             Type::ClassLiteral(class) => {
                 // HACK ALERT: If we are subscripting a generic class, short-circuit the rest of the

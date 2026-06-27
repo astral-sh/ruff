@@ -29,12 +29,13 @@ impl<'db> EnumSpec<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         let members = self
             .members(db)
             .iter()
             .map(|(name, ty)| {
-                let ty = ty.recursive_type_normalized_impl(db, div, true);
+                let ty = ty.recursive_type_normalized_impl(db, div, true, collapse_nested_unions);
                 let ty = if nested { ty? } else { ty.unwrap_or(div) };
                 Some((name.clone(), ty))
             })
@@ -70,11 +71,17 @@ impl<'db> DynamicEnumAnchor<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         match self {
             Self::Definition { definition, spec } => Some(Self::Definition {
                 definition: *definition,
-                spec: spec.recursive_type_normalized_impl(db, div, nested)?,
+                spec: spec.recursive_type_normalized_impl(
+                    db,
+                    div,
+                    nested,
+                    collapse_nested_unions,
+                )?,
             }),
             Self::ScopeOffset {
                 scope,
@@ -83,7 +90,12 @@ impl<'db> DynamicEnumAnchor<'db> {
             } => Some(Self::ScopeOffset {
                 scope: *scope,
                 offset: *offset,
-                spec: spec.recursive_type_normalized_impl(db, div, nested)?,
+                spec: spec.recursive_type_normalized_impl(
+                    db,
+                    div,
+                    nested,
+                    collapse_nested_unions,
+                )?,
             }),
         }
     }
@@ -108,10 +120,12 @@ impl<'db> DynamicEnumLiteral<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         let mixin_type = match self.mixin_type(db) {
             Some(mixin) => {
-                let mixin = mixin.recursive_type_normalized_impl(db, div, true);
+                let mixin =
+                    mixin.recursive_type_normalized_impl(db, div, true, collapse_nested_unions);
                 Some(if nested { mixin? } else { mixin.unwrap_or(div) })
             }
             None => None,
@@ -120,8 +134,12 @@ impl<'db> DynamicEnumLiteral<'db> {
         Some(Self::new(
             db,
             self.name(db),
-            self.anchor(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+            self.anchor(db).recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?,
             self.base_class(db),
             mixin_type,
         ))

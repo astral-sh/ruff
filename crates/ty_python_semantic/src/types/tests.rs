@@ -170,6 +170,21 @@ fn divergent_type() {
             .to_specialized_instance(&db, &[UnionType::from_elements(&db, [int, div])])
             .is_assignable_to(&db, KnownClass::List.to_specialized_instance(&db, &[div]))
     );
+    let non_contractive_recursive =
+        Type::implicit_recursive(&db, div.as_divergent().unwrap().id(), div);
+    assert!(
+        KnownClass::List
+            .to_specialized_instance(&db, &[non_contractive_recursive])
+            .is_assignable_to(&db, non_contractive_recursive)
+    );
+    let recursive_list = Type::implicit_recursive(
+        &db,
+        div.as_divergent().unwrap().id(),
+        KnownClass::List.to_specialized_instance(&db, &[div]),
+    );
+    let unfolded_recursive_list = KnownClass::List.to_specialized_instance(&db, &[recursive_list]);
+    assert!(unfolded_recursive_list.is_assignable_to(&db, recursive_list));
+    assert!(recursive_list.is_assignable_to(&db, unfolded_recursive_list));
     let recursive = Type::implicit_recursive(
         &db,
         div.as_divergent().unwrap().id(),
@@ -200,7 +215,10 @@ fn divergent_type() {
     assert_eq!(IntersectionBuilder::new(&db).add_negative(div).build(), div);
 
     // Normalizing the bare α-marker at a nested position propagates `None`.
-    assert_eq!(div.recursive_type_normalized_impl(&db, div, true), None);
+    assert_eq!(
+        div.recursive_type_normalized_impl(&db, div, true, true),
+        None
+    );
 
     // The `Divergent` marker must not be eliminated in union with other dynamic types, as this
     // would prevent detection of divergent type inference using `Divergent`.
@@ -266,7 +284,7 @@ fn divergent_type() {
         "list[list[Divergent] | None]"
     );
     let normalized = nested_rec
-        .recursive_type_normalized_impl(&db, div, false)
+        .recursive_type_normalized_impl(&db, div, false, true)
         .unwrap();
     assert_eq!(normalized.display(&db).to_string(), "list[Divergent]");
 
@@ -290,9 +308,12 @@ fn divergent_type() {
         ],
     );
     let normalized = recursive_tuple
-        .recursive_type_normalized_impl(&db, div, false)
+        .recursive_type_normalized_impl(&db, div, false, true)
         .unwrap();
-    assert_eq!(normalized.display(&db).to_string(), "tuple[Divergent, str]");
+    assert_eq!(
+        normalized.display(&db).to_string(),
+        "tuple[int | tuple[int | Divergent, str], str]"
+    );
 
     let recursive_dict = KnownClass::Dict.to_specialized_instance(
         &db,
@@ -314,7 +335,7 @@ fn divergent_type() {
         ],
     );
     let normalized = recursive_dict
-        .recursive_type_normalized_impl(&db, div, false)
+        .recursive_type_normalized_impl(&db, div, false, true)
         .unwrap();
     assert_eq!(normalized.display(&db).to_string(), "dict[str, Divergent]");
 
@@ -325,7 +346,7 @@ fn divergent_type() {
         assert!(when.query(|_builder, when| when.is_always_satisfied(&db)));
     }
     let normalized = union
-        .recursive_type_normalized_impl(&db, div, false)
+        .recursive_type_normalized_impl(&db, div, false, true)
         .unwrap();
     assert_eq!(normalized.display(&db).to_string(), "int");
 
@@ -581,13 +602,13 @@ type H[T] = G[T]
     let rec_list = get_type_alias(&db, "RecursiveList");
     assert_eq!(
         rec_list.expand_eagerly(&db).display(&db).to_string(),
-        "list[Divergent]",
+        "list[T@RecursiveList | Divergent]",
     );
 
     let rec_int_list = get_type_alias(&db, "RecursiveIntList");
     assert_eq!(
         rec_int_list.expand_eagerly(&db).display(&db).to_string(),
-        "list[Divergent]",
+        "list[T@RecursiveList | Divergent]",
     );
 
     let itself = get_type_alias(&db, "Itself");

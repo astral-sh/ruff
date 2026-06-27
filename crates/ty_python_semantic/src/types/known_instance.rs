@@ -220,6 +220,7 @@ impl<'db> KnownInstanceType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         match self {
             // Nothing to normalize
@@ -231,39 +232,39 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeVar(typevar) => Some(Self::TypeVar(typevar)),
             Self::TypeAliasType(type_alias) => Some(Self::TypeAliasType(type_alias)),
             Self::Field(field) => field
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                 .map(Self::Field),
             Self::UnionType(union_type) => union_type
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                 .map(Self::UnionType),
             Self::Literal(ty) => ty
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
                 .map(Self::Literal),
             Self::Annotated(ty) => ty
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
                 .map(Self::Annotated),
             Self::TypeGenericAlias(ty) => ty
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
                 .map(Self::TypeGenericAlias),
             Self::LiteralStringAlias(ty) => ty
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
                 .map(Self::LiteralStringAlias),
             Self::Callable(callable) => callable
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                 .map(Self::Callable),
             Self::NewType(newtype) => newtype
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
                 .map(Self::NewType),
             Self::Sentinel(sentinel) => Some(Self::Sentinel(sentinel)),
             Self::GenericContext(generic) => Some(Self::GenericContext(generic)),
             Self::Specialization(specialization) => specialization
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
                 .map(Self::Specialization),
             Self::NamedTupleSpec(spec) => spec
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
                 .map(Self::NamedTupleSpec),
             Self::FunctoolsPartial(partial) => partial
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                 .map(Self::FunctoolsPartial),
         }
     }
@@ -508,27 +509,33 @@ impl<'db> FieldInstance<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         let default_type = match self.default_type(db) {
-            Some(default) if nested => Some(default.recursive_type_normalized_impl(db, div, true)?),
+            Some(default) if nested => Some(default.recursive_type_normalized_impl(
+                db,
+                div,
+                true,
+                collapse_nested_unions,
+            )?),
             Some(default) => Some(
                 default
-                    .recursive_type_normalized_impl(db, div, true)
+                    .recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
                     .unwrap_or(div),
             ),
             None => None,
         };
         let converter = match self.converter(db) {
             Some((input_ty, output_ty)) if nested => Some((
-                input_ty.recursive_type_normalized_impl(db, div, true)?,
-                output_ty.recursive_type_normalized_impl(db, div, true)?,
+                input_ty.recursive_type_normalized_impl(db, div, true, collapse_nested_unions)?,
+                output_ty.recursive_type_normalized_impl(db, div, true, collapse_nested_unions)?,
             )),
             Some((input_ty, output_ty)) => Some((
                 input_ty
-                    .recursive_type_normalized_impl(db, div, true)
+                    .recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
                     .unwrap_or(div),
                 output_ty
-                    .recursive_type_normalized_impl(db, div, true)
+                    .recursive_type_normalized_impl(db, div, true, collapse_nested_unions)
                     .unwrap_or(div),
             )),
             None => None,
@@ -670,28 +677,31 @@ impl<'db> UnionTypeInstance<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         // The `Divergent` elimination rules are different within union types.
         // See `UnionType::recursive_type_normalized_impl` for details.
         let value_expr_types = match self._value_expr_types(db).as_ref() {
             Some([first, second]) if nested => Some([
-                first.recursive_type_normalized_impl(db, div, nested)?,
-                second.recursive_type_normalized_impl(db, div, nested)?,
+                first.recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)?,
+                second.recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)?,
             ]),
             Some([first, second]) => Some([
                 first
-                    .recursive_type_normalized_impl(db, div, nested)
+                    .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                     .unwrap_or(div),
                 second
-                    .recursive_type_normalized_impl(db, div, nested)
+                    .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                     .unwrap_or(div),
             ]),
             None => None,
         };
         let union_type = match self.union_type(db).clone() {
-            Ok(ty) if nested => Ok(ty.recursive_type_normalized_impl(db, div, nested)?),
+            Ok(ty) if nested => {
+                Ok(ty.recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)?)
+            }
             Ok(ty) => Ok(ty
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                 .unwrap_or(div)),
             Err(err) => Err(err),
         };
@@ -707,17 +717,25 @@ impl<'db> FunctoolsPartialInstance<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         Some(Self::new(
             db,
             InternedType::new(
                 db,
-                self.wrapped(db)
-                    .inner(db)
-                    .recursive_type_normalized_impl(db, div, nested)?,
+                self.wrapped(db).inner(db).recursive_type_normalized_impl(
+                    db,
+                    div,
+                    nested,
+                    collapse_nested_unions,
+                )?,
             ),
-            self.partial(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+            self.partial(db).recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?,
         ))
     }
 
@@ -757,13 +775,18 @@ impl<'db> InternedType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         let inner = if nested {
-            self.inner(db)
-                .recursive_type_normalized_impl(db, div, nested)?
+            self.inner(db).recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?
         } else {
             self.inner(db)
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                 .unwrap_or(div)
         };
         Some(InternedType::new(db, inner))

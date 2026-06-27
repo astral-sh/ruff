@@ -383,6 +383,7 @@ impl<'db> UnionType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Type<'db>> {
         let mut builder = UnionBuilder::new(db)
             .unpack_aliases(false)
@@ -390,17 +391,24 @@ impl<'db> UnionType<'db> {
             .recursively_defined(self.recursively_defined(db));
         let mut empty = true;
         for ty in self.elements(db) {
-            if nested {
+            if nested && collapse_nested_unions {
                 // list[T | Divergent] => list[Divergent]
-                let ty = ty.recursive_type_normalized_impl(db, div, nested)?;
+                let ty =
+                    ty.recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)?;
                 if ty.same_divergent_marker(div) {
                     return Some(ty);
                 }
                 builder = builder.add(ty);
                 empty = false;
+            } else if nested {
+                let ty = ty
+                    .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
+                    .unwrap_or(div);
+                builder = builder.add(ty);
+                empty = false;
             } else {
                 let ty = ty
-                    .recursive_type_normalized_impl(db, div, nested)
+                    .recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                     .unwrap_or(div);
                 // Top-level cycle markers in a union do not mean true divergence, so skip them
                 // if not nested. e.g. T | Divergent == T | (T | (T | ...)) == T.
@@ -864,28 +872,32 @@ impl<'db> IntersectionType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         let positive = if nested {
             self.positive(db)
                 .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, div, nested))
+                .map(|ty| {
+                    ty.recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
+                })
                 .collect::<Option<FxOrderSet<Type<'db>>>>()?
         } else {
             self.positive(db)
                 .iter()
                 .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, div, nested)
+                    ty.recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                         .unwrap_or(div)
                 })
                 .collect()
         };
 
         let negative = if nested {
-            self.negative(db)
-                .try_map(|ty| ty.recursive_type_normalized_impl(db, div, nested))?
+            self.negative(db).try_map(|ty| {
+                ty.recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
+            })?
         } else {
             self.negative(db).map(|ty| {
-                ty.recursive_type_normalized_impl(db, div, nested)
+                ty.recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)
                     .unwrap_or(div)
             })
         };

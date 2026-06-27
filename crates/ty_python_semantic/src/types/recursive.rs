@@ -184,51 +184,26 @@ impl<'db> RecursiveType<'db> {
     /// e.g. `μa. tuple[a, int] -> tuple[μa. tuple[a, int], int]`
     fn unfold(self, db: &'db dyn Db) -> Type<'db> {
         let body = self.body(db);
-        let replacement = self.unfold_replacement(db);
         let mapping = TypeMapping::ReplaceDivergent {
             binder_id: self.binder(db),
-            replacement,
+            replacement: Type::Recursive(self),
         };
         body.apply_type_mapping(db, &mapping, TypeContext::default())
     }
 
-    fn unfold_replacement(self, db: &'db dyn Db) -> Type<'db> {
-        self.origin(db)
-            .source_type()
-            .unwrap_or(Type::Recursive(self))
-    }
-
-    /// `[a -> μa. body]body -> μa. body`
+    /// `T[μa. body] -> μa. T[a]`
     /// e.g. `tuple[μa. tuple[a, int], int] -> μa. tuple[a, int]`
-    fn fold(self, db: &'db dyn Db, unfolded_result: Type<'db>) -> Type<'db> {
-        let replacement = self.unfold_replacement(db);
-        if unfolded_result == replacement || unfolded_result == Type::Recursive(self) {
-            return unfolded_result;
-        }
+    pub(crate) fn fold(self, db: &'db dyn Db, unfolded_result: Type<'db>) -> Type<'db> {
         let mapping = TypeMapping::FoldRecursive {
             recursive: self,
-            replacement,
+            replacement: Type::Recursive(self),
         };
         let folded_body = unfolded_result.apply_type_mapping(db, &mapping, TypeContext::default());
-        if folded_body == self.body(db) {
-            Type::Recursive(self)
+        let marker = Type::divergent(self.binder_id(db));
+        if folded_body == unfolded_result && !folded_body.contains_cycle_marker(db, marker) {
+            unfolded_result
         } else {
-            let marker = Type::divergent(self.binder_id(db));
-            match self.origin(db) {
-                // A top-level marker in an operation result is the recursive value produced by
-                // that operation; keep it as the μ-type instead of treating it as a cycle head.
-                RecursiveOrigin::Implicit => {
-                    folded_body.replace_top_level_cycle_markers(db, marker, Type::Recursive(self))
-                }
-                RecursiveOrigin::TypeAlias(_) if folded_body.contains_cycle_marker(db, marker) => {
-                    let mapping = TypeMapping::ReplaceDivergent {
-                        binder_id: self.binder(db),
-                        replacement,
-                    };
-                    folded_body.apply_type_mapping(db, &mapping, TypeContext::default())
-                }
-                RecursiveOrigin::TypeAlias(_) => folded_body,
-            }
+            Type::recursive(db, self.binder_id(db), self.origin(db), folded_body)
         }
     }
 
@@ -239,6 +214,53 @@ impl<'db> RecursiveType<'db> {
         operation: impl FnOnce(Type<'db>) -> F,
     ) -> F {
         operation(self.unfold(db)).fold(db, self)
+    }
+
+    /// Apply an operation, or use a caller-provided fallback if unfolding makes no progress.
+    pub(crate) fn map_or_else<F: Foldable<'db>>(
+        self,
+        db: &'db dyn Db,
+        fallback: impl FnOnce() -> F,
+        operation: impl FnOnce(Type<'db>) -> F,
+    ) -> F {
+        let unfolded = self.unfold(db);
+        if unfolded == Type::Recursive(self) {
+            fallback()
+        } else {
+            operation(unfolded).fold(db, self)
+        }
+    }
+
+    /// Apply a type-producing operation if one-step unfolding exposes a new outer structure.
+    pub(crate) fn map_type(
+        self,
+        db: &'db dyn Db,
+        operation: impl FnOnce(Type<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        self.map_or_else(db, || Type::Recursive(self), operation)
+    }
+
+    /// Inspect one unfolded layer without closing the result under this binder.
+    ///
+    /// This is for projections such as asking for the outer nominal class. Transformations that
+    /// produce a new type should use [`map`](Self::map) so recursive occurrences are re-bound.
+    pub(crate) fn project<F>(self, db: &'db dyn Db, operation: impl FnOnce(Type<'db>) -> F) -> F {
+        operation(self.unfold(db))
+    }
+
+    /// Inspect one unfolded layer, or use a caller-provided fallback if unfolding makes no progress.
+    pub(crate) fn project_or_else<F>(
+        self,
+        db: &'db dyn Db,
+        fallback: impl FnOnce() -> F,
+        operation: impl FnOnce(Type<'db>) -> F,
+    ) -> F {
+        let unfolded = self.unfold(db);
+        if unfolded == Type::Recursive(self) {
+            fallback()
+        } else {
+            operation(unfolded)
+        }
     }
 
     /// Whether this recursive type is the non-contractive `mu a. a`.
@@ -262,7 +284,7 @@ mod tests {
     };
 
     #[test]
-    fn map_folds_operation_result_back_to_recursive_type() {
+    fn project_reads_from_one_unfolded_layer() {
         let db = setup_db();
         let binder_id = salsa::plumbing::Id::from_bits(1);
         let body = Type::homogeneous_tuple(&db, Type::divergent(binder_id));
@@ -271,13 +293,31 @@ mod tests {
             panic!("expected recursive type");
         };
 
-        let element = recursive.map(&db, |unfolded| {
+        let element = recursive.project(&db, |unfolded| {
             unfolded
                 .subscript(&db, Type::int_literal(0), ast::ExprContext::Load)
                 .expect("tuple subscript should succeed")
         });
 
         assert_eq!(element, recursive_ty);
+    }
+
+    #[test]
+    fn fold_closes_top_level_recursive_occurrence() {
+        let db = setup_db();
+        let binder_id = salsa::plumbing::Id::from_bits(1);
+        let body = Type::homogeneous_tuple(&db, Type::divergent(binder_id));
+        let recursive_ty = Type::recursive(&db, binder_id, RecursiveOrigin::Implicit, body);
+        let Type::Recursive(recursive) = recursive_ty else {
+            panic!("expected recursive type");
+        };
+
+        let folded = recursive.fold(&db, recursive_ty);
+        let Type::Recursive(folded_recursive) = folded else {
+            panic!("expected non-contractive recursive type");
+        };
+
+        assert!(folded_recursive.is_non_contractive(&db));
     }
 
     #[test]
@@ -293,6 +333,19 @@ mod tests {
         let unfolded_body = Type::homogeneous_tuple(&db, recursive_ty);
 
         assert_eq!(recursive.fold(&db, unfolded_body), recursive_ty);
+    }
+
+    #[test]
+    fn map_identity_preserves_implicit_recursive_type() {
+        let db = setup_db();
+        let binder_id = salsa::plumbing::Id::from_bits(1);
+        let body = Type::homogeneous_tuple(&db, Type::divergent(binder_id));
+        let recursive_ty = Type::recursive(&db, binder_id, RecursiveOrigin::Implicit, body);
+        let Type::Recursive(recursive) = recursive_ty else {
+            panic!("expected recursive type");
+        };
+
+        assert_eq!(recursive.map(&db, |unfolded| unfolded), recursive_ty);
     }
 
     #[test]
@@ -328,7 +381,30 @@ mod tests {
     }
 
     #[test]
-    fn callable_fold_rebinds_signature_types_without_folding_the_callable_payload() {
+    fn map_identity_preserves_explicit_recursive_alias_type() {
+        let mut db = setup_db();
+        db.write_dedented("/src/a.py", "type RecursiveList = list[RecursiveList]")
+            .unwrap();
+
+        let module = system_path_to_file(&db, "/src/a.py").unwrap();
+        let alias_ty = global_symbol(&db, module, "RecursiveList")
+            .place
+            .expect_type();
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))) =
+            alias_ty
+        else {
+            panic!("expected RecursiveList to be a PEP 695 type alias");
+        };
+        let recursive_ty = alias.value_type(&db);
+        let Type::Recursive(recursive) = recursive_ty else {
+            panic!("expected RecursiveList to resolve to a recursive type");
+        };
+
+        assert_eq!(recursive.map(&db, |unfolded| unfolded), recursive_ty);
+    }
+
+    #[test]
+    fn callable_fold_closes_signature_types() {
         let db = setup_db();
         let binder_id = salsa::plumbing::Id::from_bits(1);
         let body = Type::single_callable(
@@ -343,17 +419,18 @@ mod tests {
         let unfolded_callable =
             CallableType::single(&db, Signature::new(Parameters::empty(), recursive_ty));
         let folded_callable = unfolded_callable.fold(&db, recursive);
+        let return_ty = folded_callable
+            .signatures(&db)
+            .overload_return_type_or_unknown(&db);
+        let Type::Recursive(return_recursive) = return_ty else {
+            panic!("expected folded return type to remain recursive");
+        };
 
-        assert_eq!(
-            folded_callable
-                .signatures(&db)
-                .overload_return_type_or_unknown(&db),
-            recursive_ty
-        );
+        assert!(return_recursive.is_non_contractive(&db));
     }
 
     #[test]
-    fn fold_maps_implicit_derived_recursive_positions_to_markers() {
+    fn fold_closes_recursive_positions_inside_operation_results() {
         let db = setup_db();
         let binder_id = salsa::plumbing::Id::from_bits(1);
         let body = Type::homogeneous_tuple(&db, Type::divergent(binder_id));
@@ -363,13 +440,15 @@ mod tests {
         };
 
         let derived = KnownClass::List.to_specialized_instance(&db, &[recursive_ty]);
-        let expected = KnownClass::List.to_specialized_instance(&db, &[Type::divergent(binder_id)]);
+        let expected_body =
+            KnownClass::List.to_specialized_instance(&db, &[Type::divergent(binder_id)]);
+        let expected = Type::recursive(&db, binder_id, RecursiveOrigin::Implicit, expected_body);
 
         assert_eq!(recursive.fold(&db, derived), expected);
     }
 
     #[test]
-    fn fold_preserves_non_recursive_union_members_in_nested_generic_arguments() {
+    fn fold_preserves_non_recursive_union_members_in_closed_result() {
         let db = setup_db();
         let binder_id = salsa::plumbing::Id::from_bits(1);
         let body = Type::homogeneous_tuple(&db, Type::divergent(binder_id));
@@ -380,13 +459,10 @@ mod tests {
 
         let element = UnionType::from_elements(&db, [Type::int_literal(1), recursive_ty]);
         let derived = KnownClass::List.to_specialized_instance(&db, &[element]);
-        let expected = KnownClass::List.to_specialized_instance(
-            &db,
-            &[UnionType::from_elements(
-                &db,
-                [Type::int_literal(1), Type::divergent(binder_id)],
-            )],
-        );
+        let expected_element =
+            UnionType::from_elements(&db, [Type::int_literal(1), Type::divergent(binder_id)]);
+        let expected_body = KnownClass::List.to_specialized_instance(&db, &[expected_element]);
+        let expected = Type::recursive(&db, binder_id, RecursiveOrigin::Implicit, expected_body);
         let folded = recursive.fold(&db, derived);
 
         assert_eq!(folded, expected);

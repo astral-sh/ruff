@@ -261,12 +261,17 @@ impl<'db> GenericAlias<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         Some(Self::new(
             db,
             self.origin(db),
-            self.specialization(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+            self.specialization(db).recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?,
         ))
     }
 
@@ -380,6 +385,15 @@ pub enum ClassLiteral<'db> {
 
 #[salsa::tracked]
 impl<'db> ClassLiteral<'db> {
+    pub(super) fn same_cycle_recovery_identity(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self, other) {
+            (Self::Dynamic(left), Self::Dynamic(right)) => {
+                left.same_cycle_recovery_identity(db, right)
+            }
+            _ => self == other,
+        }
+    }
+
     /// Return a `ClassLiteral` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db) -> Self {
         KnownClass::Object
@@ -393,19 +407,38 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         match self {
-            Self::Dynamic(dynamic) => Some(Self::Dynamic(
-                dynamic.recursive_type_normalized_impl(db, div, nested)?,
-            )),
+            Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?)),
             Self::DynamicNamedTuple(named_tuple) => Some(Self::DynamicNamedTuple(
-                named_tuple.recursive_type_normalized_impl(db, div, nested)?,
+                named_tuple.recursive_type_normalized_impl(
+                    db,
+                    div,
+                    nested,
+                    collapse_nested_unions,
+                )?,
             )),
             Self::DynamicTypedDict(typed_dict) => Some(Self::DynamicTypedDict(
-                typed_dict.recursive_type_normalized_impl(db, div, nested)?,
+                typed_dict.recursive_type_normalized_impl(
+                    db,
+                    div,
+                    nested,
+                    collapse_nested_unions,
+                )?,
             )),
             Self::DynamicEnum(enum_literal) => Some(Self::DynamicEnum(
-                enum_literal.recursive_type_normalized_impl(db, div, nested)?,
+                enum_literal.recursive_type_normalized_impl(
+                    db,
+                    div,
+                    nested,
+                    collapse_nested_unions,
+                )?,
             )),
             Self::Static(_) => Some(self),
         }
@@ -950,14 +983,18 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
+        collapse_nested_unions: bool,
     ) -> Option<Self> {
         match self {
             Self::NonGeneric(class) => Some(Self::NonGeneric(
-                class.recursive_type_normalized_impl(db, div, nested)?,
+                class.recursive_type_normalized_impl(db, div, nested, collapse_nested_unions)?,
             )),
-            Self::Generic(generic) => Some(Self::Generic(
-                generic.recursive_type_normalized_impl(db, div, nested)?,
-            )),
+            Self::Generic(generic) => Some(Self::Generic(generic.recursive_type_normalized_impl(
+                db,
+                div,
+                nested,
+                collapse_nested_unions,
+            )?)),
         }
     }
 

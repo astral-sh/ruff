@@ -1001,7 +1001,8 @@ impl<'db> UnionBuilder<'db> {
         // If an alias gets here, it means we aren't unpacking aliases, and we also
         // shouldn't try to simplify aliases out of the union, because that will require
         // unpacking them.
-        let should_simplify_full = !matches!(ty, Type::TypeAlias(_)) && !self.cycle_recovery;
+        let should_simplify_full =
+            !matches!(ty, Type::TypeAlias(_) | Type::Recursive(_)) && !self.cycle_recovery;
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
@@ -1025,6 +1026,10 @@ impl<'db> UnionBuilder<'db> {
             };
 
             if ty == element_type {
+                return;
+            }
+
+            if self.cycle_recovery && ty.same_cycle_recovery_identity(self.db, element_type) {
                 return;
             }
 
@@ -1079,7 +1084,9 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             }
 
-            if should_simplify_full && !matches!(element_type, Type::TypeAlias(_)) {
+            if should_simplify_full
+                && !matches!(element_type, Type::TypeAlias(_) | Type::Recursive(_))
+            {
                 if ty.is_redundant_with(self.db, element_type) {
                     return;
                 }
