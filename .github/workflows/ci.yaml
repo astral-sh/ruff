@@ -463,10 +463,8 @@ jobs:
       - name: "Run OS-sensitive tests"
         if: ${{ runner.os == 'macOS' && github.event_name == 'pull_request' }}
         run: |
-          # Run CLI and real-filesystem/process integration tests. Only the server
-          # end-to-end tests are OS-sensitive.
+          # Run CLI and real-filesystem/process integration tests.
           cargo nextest run --all-features --profile ci \
-            -E 'not (package(ruff_server) | package(ty_server)) | binary(e2e)' \
             --package ruff \
             --package ruff_db \
             --package ruff_server \
