@@ -129,18 +129,15 @@ fn synthesize_typed_dict_contains<'db>(
                 Parameter::positional_only(Some(Name::new_static("key")))
                     .with_annotated_type(Type::string_literal(db, field_name)),
             ];
-            Signature::new(Parameters::new(db, parameters), Type::bool_literal(true))
+            Signature::new(Parameters::standard(parameters), Type::bool_literal(true))
         })
         .chain(std::iter::once(Signature::new(
-            Parameters::new(
-                db,
-                [
-                    Parameter::positional_only(Some(Name::new_static("self")))
-                        .with_annotated_type(instance_ty),
-                    Parameter::positional_only(Some(Name::new_static("key")))
-                        .with_annotated_type(Type::object()),
-                ],
-            ),
+            Parameters::standard([
+                Parameter::positional_only(Some(Name::new_static("self")))
+                    .with_annotated_type(instance_ty),
+                Parameter::positional_only(Some(Name::new_static("key")))
+                    .with_annotated_type(Type::object()),
+            ]),
             KnownClass::Bool.to_instance(db),
         )));
 
