@@ -1,0 +1,3 @@
+# .NET build artifacts from `dotnet build` / `dotnet run`.
+bin/
+obj/
