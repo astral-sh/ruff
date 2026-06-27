@@ -851,7 +851,10 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
 )]
 pub struct BoundTypeVarInstance<'db> {
     pub typevar: TypeVarInstance<'db>,
-    stored_identity: StoredBoundTypeVarIdentity<'db>,
+    // This duplicates the source-level identity accessible through `typevar`, but keeps
+    // `identity()` to a single interned-field read. Storing only the occurrence-specific fields
+    // and reconstructing the full identity regresses hot-path project benchmarks.
+    identity_inner: BoundTypeVarIdentity<'db>,
 }
 
 // The Salsa heap is tracked separately.
@@ -865,24 +868,25 @@ impl<'db> BoundTypeVarInstance<'db> {
         paramspec_attr: Option<ParamSpecAttrKind>,
         freshness: TypeVarNonce,
     ) -> Self {
-        let stored_identity = StoredBoundTypeVarIdentity {
+        let identity = BoundTypeVarIdentity {
+            identity: typevar.identity(db),
             binding_context,
             paramspec_attr,
             freshness,
         };
-        Self::new_internal(db, typevar, stored_identity)
+        Self::new_internal(db, typevar, identity)
     }
 
     pub(super) fn binding_context(self, db: &'db dyn Db) -> BindingContext<'db> {
-        self.stored_identity(db).binding_context
+        self.identity(db).binding_context
     }
 
     pub(super) fn paramspec_attr(self, db: &'db dyn Db) -> Option<ParamSpecAttrKind> {
-        self.stored_identity(db).paramspec_attr
+        self.identity(db).paramspec_attr
     }
 
     pub(super) fn freshness(self, db: &'db dyn Db) -> TypeVarNonce {
-        self.stored_identity(db).freshness
+        self.identity(db).freshness
     }
 
     pub(crate) fn with_name_suffix(self, db: &'db dyn Db, suffix: &str) -> Self {
@@ -902,13 +906,7 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// occurrence, regardless of e.g. differences in their bounds or constraints due to
     /// materialization.
     pub(crate) fn identity(self, db: &'db dyn Db) -> BoundTypeVarIdentity<'db> {
-        let stored_identity = self.stored_identity(db);
-        BoundTypeVarIdentity {
-            identity: self.typevar(db).identity(db),
-            binding_context: stored_identity.binding_context,
-            paramspec_attr: stored_identity.paramspec_attr,
-            freshness: stored_identity.freshness,
-        }
+        self.identity_inner(db)
     }
 
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db Name {
@@ -1430,17 +1428,6 @@ impl std::fmt::Display for ParamSpecAttrKind {
             ParamSpecAttrKind::Kwargs => f.write_str("kwargs"),
         }
     }
-}
-
-/// The fields that distinguish occurrences of the same source-level type variable.
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
-pub struct StoredBoundTypeVarIdentity<'db> {
-    binding_context: BindingContext<'db>,
-    /// If [`Some`], this indicates that this type variable is the `args` or `kwargs` component
-    /// of a `ParamSpec` i.e., `P.args` or `P.kwargs`.
-    paramspec_attr: Option<ParamSpecAttrKind>,
-    /// The freshness nonce for this bound typevar occurrence; `0` is the source-level occurrence.
-    freshness: TypeVarNonce,
 }
 
 /// The identity of a bound type variable occurrence.
