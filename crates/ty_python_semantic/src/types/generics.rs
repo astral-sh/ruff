@@ -1398,7 +1398,7 @@ impl<'db> Specialization<'db> {
         let types = self
             .types(db)
             .iter()
-            .map(|ty| ty.fold_cycle_previous_occurrences(db, previous, marker, true))
+            .map(|ty| ty.fold_previous_cycle_occurrences(db, previous, marker, true))
             .collect::<Box<[_]>>();
         let tuple_inner = self
             .tuple_inner(db)

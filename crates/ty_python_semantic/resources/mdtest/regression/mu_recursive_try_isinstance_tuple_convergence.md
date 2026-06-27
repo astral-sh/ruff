@@ -52,3 +52,48 @@ def process_action(
 
     return alert, action, text, timeout
 ```
+
+The same recursive state can arise even if the fresh value is concrete. Cycle recovery must not
+depend on the current iteration containing a dynamic type.
+
+```py
+class ConcretePlugin:
+    def take_action(
+        self,
+        alert: Alert,
+        action: str,
+        text: str,
+        timeout: int | None = None,
+    ) -> int:
+        raise NotImplementedError
+
+concrete_plugins: list[ConcretePlugin]
+
+def process_concrete_action(
+    alert: Alert,
+    action: str,
+    text: str,
+    timeout: int | None = None,
+) -> tuple[Alert, str, str, int | None]:
+    updated = None
+
+    for plugin in concrete_plugins:
+        if alert.is_suppressed:
+            break
+
+        try:
+            updated = plugin.take_action(alert, action, text, timeout=timeout)
+        except Exception:
+            pass
+
+        if isinstance(updated, Alert):
+            updated = updated, action, text, timeout
+
+        if isinstance(updated, tuple):
+            if len(updated) == 4:
+                alert, action, text, timeout = updated
+            elif len(updated) == 3:
+                alert, action, text = updated
+
+    return alert, action, text, timeout
+```

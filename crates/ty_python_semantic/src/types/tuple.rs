@@ -749,7 +749,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         Self::from_elements(
             self.0
                 .iter()
-                .map(|ty| ty.fold_cycle_previous_occurrences(db, previous, marker, true)),
+                .map(|ty| ty.fold_previous_cycle_occurrences(db, previous, marker, true)),
         )
     }
 
@@ -1912,12 +1912,12 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         Self::new(
             self.prefix_elements()
                 .iter()
-                .map(|ty| ty.fold_cycle_previous_occurrences(db, previous, marker, true)),
+                .map(|ty| ty.fold_previous_cycle_occurrences(db, previous, marker, true)),
             self.variable()
-                .fold_cycle_previous_occurrences(db, previous, marker, true),
+                .fold_previous_cycle_occurrences(db, previous, marker, true),
             self.suffix_elements()
                 .iter()
-                .map(|ty| ty.fold_cycle_previous_occurrences(db, previous, marker, true)),
+                .map(|ty| ty.fold_previous_cycle_occurrences(db, previous, marker, true)),
         )
     }
 

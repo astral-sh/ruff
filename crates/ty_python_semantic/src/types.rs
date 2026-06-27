@@ -1145,6 +1145,16 @@ impl<'db> Type<'db> {
     fn matches_cycle_previous_replacement(self, db: &'db dyn Db, replacement: Type<'db>) -> bool {
         TypeTransformer::<ApplyDefaultTypeMapping>::same_type_identity(db, self, replacement)
             || self.matches_known_instance_cycle_previous_replacement(db, replacement)
+            || match replacement {
+                // Cycle recovery widens fixed-point approximations by unioning previous
+                // iterations. A later iteration can grow from any prior approximation element,
+                // not necessarily from the joined union as a whole.
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .any(|element| self.matches_cycle_previous_replacement(db, *element)),
+                _ => false,
+            }
     }
 
     fn matches_known_instance_cycle_previous_replacement(
@@ -1331,7 +1341,7 @@ impl<'db> Type<'db> {
             return self;
         }
 
-        let current = self.fold_cycle_previous_approximation(db, previous, cycle);
+        let current = self.fold_previous_cycle_structure(db, previous, cycle);
 
         if let (Type::GenericAlias(current), Type::GenericAlias(previous)) = (current, previous)
             && let Some(merged) = current.merge_cycle_recovery(db, previous)
@@ -1347,7 +1357,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn fold_cycle_previous_approximation(
+    fn fold_previous_cycle_structure(
         self,
         db: &'db dyn Db,
         previous: Self,
@@ -1358,11 +1368,11 @@ impl<'db> Type<'db> {
         }
 
         cycle.head_ids().fold(self, |ty, id| {
-            ty.fold_cycle_previous_occurrences(db, previous, Type::divergent(id), false)
+            ty.fold_previous_cycle_occurrences(db, previous, Type::divergent(id), false)
         })
     }
 
-    pub(super) fn fold_cycle_previous_occurrences(
+    pub(super) fn fold_previous_cycle_occurrences(
         self,
         db: &'db dyn Db,
         previous: Self,

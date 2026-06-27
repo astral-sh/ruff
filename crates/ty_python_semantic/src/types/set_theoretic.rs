@@ -429,7 +429,7 @@ impl<'db> UnionType<'db> {
             db,
             self.elements(db)
                 .iter()
-                .map(|ty| ty.fold_cycle_previous_occurrences(db, previous, marker, guarded)),
+                .map(|ty| ty.fold_previous_cycle_occurrences(db, previous, marker, guarded)),
         )
     }
 
@@ -918,12 +918,12 @@ impl<'db> IntersectionType<'db> {
         let positive: FxOrderSet<_> = self
             .positive(db)
             .iter()
-            .map(|ty| ty.fold_cycle_previous_occurrences(db, previous, marker, guarded))
+            .map(|ty| ty.fold_previous_cycle_occurrences(db, previous, marker, guarded))
             .collect();
 
         let negative = self
             .negative(db)
-            .map(|ty| ty.fold_cycle_previous_occurrences(db, previous, marker, guarded));
+            .map(|ty| ty.fold_previous_cycle_occurrences(db, previous, marker, guarded));
 
         IntersectionType::new(db, positive, negative)
     }
