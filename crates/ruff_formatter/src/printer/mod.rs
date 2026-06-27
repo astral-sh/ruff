@@ -1153,6 +1153,9 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
     }
 
     /// Tests if the passed element fits on the current line or not.
+    // LLVM considers this function too large to inline on its own, but it is called for every
+    // element visited by the fitting loop.
+    #[inline(always)]
     fn fits_element(&mut self, element: &'a FormatElement) -> PrintResult<Fits> {
         #[allow(clippy::enum_glob_use)]
         use Tag::*;
