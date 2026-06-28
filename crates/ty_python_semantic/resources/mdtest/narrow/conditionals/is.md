@@ -237,7 +237,9 @@ def f(value: tuple[int] | tuple[None] | tuple[EllipsisType], other: T) -> None:
 Calling a `NewType` returns its argument unchanged, so values with statically disjoint `NewType`s
 can still be the same object at runtime. An identity comparison between distinct `NewType`s with the
 same base is therefore not always false. In the true branch, we preserve both nominal types,
-including when they appear in unions or intersections.
+including when they appear in unions or intersections. A positive check on a tuple element can
+also remove tuple alternatives whose element is runtime-disjoint, even when the compared value is
+not a singleton.
 
 ```py
 from typing import NewType
@@ -248,6 +250,8 @@ class FooSub(Foo): ...
 
 FooNewType1 = NewType("FooNewType1", Foo)
 FooNewType2 = NewType("FooNewType2", Foo)
+IntNewType1 = NewType("IntNewType1", int)
+IntNewType2 = NewType("IntNewType2", int)
 
 def same_base(foo1: FooNewType1, foo2: FooNewType2) -> None:
     reveal_type(foo1 is foo2)  # revealed: bool
@@ -265,6 +269,10 @@ def intersection(left: Intersection[FooNewType1, FooSub], right: FooNewType2) ->
     if left is right:
         reveal_type(left)  # revealed: FooNewType1 & FooSub
         reveal_type(right)  # revealed: FooNewType2 & FooSub
+
+def tuple_element(value: tuple[IntNewType1] | tuple[str], other: IntNewType2) -> None:
+    if value[0] is other:
+        reveal_type(value)  # revealed: tuple[IntNewType1]
 ```
 
 ### `NewType`s in `TypeVar` bounds and constraints
