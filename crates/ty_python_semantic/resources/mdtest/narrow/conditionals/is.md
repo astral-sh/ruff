@@ -190,6 +190,24 @@ def narrow_generic_alias[T: (Generic[int], Specialized)](klass: type[T]) -> None
         reveal_type(Generic[int])  # revealed: <class 'Generic[int]'>
 ```
 
+## `is not` with a constrained `TypeVar`
+
+An `is not` check excludes the current specialization of a constrained `TypeVar`. A subsequent
+identity check against the same value is therefore unreachable.
+
+```py
+from types import EllipsisType
+from typing import TypeVar
+from typing_extensions import assert_never
+
+T = TypeVar("T", None, EllipsisType)
+
+def f(value: int | None | EllipsisType, other: T) -> None:
+    if value is not other:
+        if value is other:
+            assert_never(value)
+```
+
 ## `is` with `NewType`s
 
 ### Distinct `NewType`s with the same base

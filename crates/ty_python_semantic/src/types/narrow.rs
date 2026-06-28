@@ -3060,9 +3060,14 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
         match op {
             ast::CmpOp::IsNot => {
-                let rhs_identity_ty = rhs_ty.identity_comparison_type(self.db);
-                if rhs_identity_ty.is_singleton(self.db) {
-                    Some(rhs_identity_ty.negate(self.db))
+                // Keep a constrained `TypeVar` symbolic so that another occurrence refers to the
+                // same specialization. Other types use their runtime identity representation.
+                let rhs_constraint = match rhs_ty.resolve_type_alias(self.db) {
+                    Type::TypeVar(_) if rhs_ty.is_singleton(self.db) => rhs_ty,
+                    _ => rhs_ty.identity_comparison_type(self.db),
+                };
+                if rhs_constraint.is_singleton(self.db) {
+                    Some(rhs_constraint.negate(self.db))
                 } else {
                     // Non-singletons cannot be safely narrowed using `is not`
                     None
@@ -3074,15 +3079,32 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 // LHS as well so that applying the constraint does not erase that possibility.
                 let mut builder = UnionBuilder::new(self.db).add(rhs_ty);
                 let add_runtime_overlap = |builder: UnionBuilder<'db>, element: Type<'db>| {
+                    let overlaps_only_at_runtime = |rhs_element| {
+                        element.is_disjoint_from(self.db, rhs_element)
+                            && !element.is_disjoint_from_for_identity(self.db, rhs_element)
+                    };
                     let has_runtime_only_overlap = match rhs_ty.resolve_type_alias(self.db) {
-                        Type::Union(union) => union.elements(self.db).iter().any(|rhs_element| {
-                            element.is_disjoint_from(self.db, *rhs_element)
-                                && !element.is_disjoint_from_for_identity(self.db, *rhs_element)
-                        }),
-                        rhs_ty => {
-                            element.is_disjoint_from(self.db, rhs_ty)
-                                && !element.is_disjoint_from_for_identity(self.db, rhs_ty)
+                        Type::Union(union) => union
+                            .elements(self.db)
+                            .iter()
+                            .copied()
+                            .any(overlaps_only_at_runtime),
+                        Type::TypeVar(typevar) => {
+                            match typevar.typevar(self.db).bound_or_constraints(self.db) {
+                                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                                    overlaps_only_at_runtime(bound)
+                                }
+                                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                                    constraints
+                                        .elements(self.db)
+                                        .iter()
+                                        .copied()
+                                        .any(overlaps_only_at_runtime)
+                                }
+                                None => overlaps_only_at_runtime(rhs_ty),
+                            }
                         }
+                        rhs_ty => overlaps_only_at_runtime(rhs_ty),
                     };
                     if !has_runtime_only_overlap {
                         builder
