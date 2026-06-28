@@ -321,6 +321,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         match (left_ty, right_ty, op) {
+            (Type::Recursive(_), _, _) | (_, Type::Recursive(_), _) => Some(Type::unknown()),
+
             (Type::Union(lhs_union), rhs, _) => lhs_union.try_map(db, |lhs_element| {
                 self.infer_binary_expression_type_impl(
                     node,

@@ -79,7 +79,7 @@ pub(crate) mod tests {
         }
 
         /// Takes the salsa events.
-        pub(crate) fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
+        pub(crate) fn take_salsa_events(&self) -> Vec<salsa::Event> {
             let mut events = self.events.lock().unwrap();
 
             std::mem::take(&mut *events)
@@ -89,7 +89,7 @@ pub(crate) mod tests {
         ///
         /// ## Panics
         /// If there are any pending salsa snapshots.
-        pub(crate) fn clear_salsa_events(&mut self) {
+        pub(crate) fn clear_salsa_events(&self) {
             self.take_salsa_events();
         }
     }

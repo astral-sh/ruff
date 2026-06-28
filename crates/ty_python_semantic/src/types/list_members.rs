@@ -278,6 +278,13 @@ impl<'db> AllMembers<'db> {
             }
 
             Type::TypeAlias(alias) => self.extend_with_type(db, alias.value_type(db)),
+            Type::Recursive(recursive) => {
+                if let Some(unfolded) = recursive.map_if_unfolded(db, std::convert::identity) {
+                    self.extend_with_type(db, unfolded);
+                } else {
+                    self.extend_with_type(db, Type::object());
+                }
+            }
 
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {

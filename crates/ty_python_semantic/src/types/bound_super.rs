@@ -744,6 +744,19 @@ impl<'db> BoundSuperType<'db> {
             Type::TypeAlias(alias) => {
                 return delegate_to(alias.value_type(db));
             }
+            Type::Recursive(recursive) => {
+                return recursive.map_or_else(
+                    db,
+                    || {
+                        Err(BoundSuperError::AbstractOwnerType {
+                            owner_type,
+                            pivot_class: pivot_class_type,
+                            typevar_context: None,
+                        })
+                    },
+                    delegate_to,
+                );
+            }
             Type::TypeVar(bound_typevar) => {
                 let typevar = bound_typevar.typevar(db);
                 match typevar.bound_or_constraints(db) {

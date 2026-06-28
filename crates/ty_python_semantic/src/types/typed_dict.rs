@@ -1851,6 +1851,11 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
         Type::TypeAlias(alias) => {
             extract_unpacked_typed_dict_from_value_type(db, alias.value_type(db))
         }
+        Type::Recursive(recursive) => recursive.map_or_else(
+            db,
+            || None,
+            |unfolded| extract_unpacked_typed_dict_from_value_type(db, unfolded),
+        ),
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)
         | Type::Divergent(_)

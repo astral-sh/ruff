@@ -2912,7 +2912,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 false
             }
 
-            Type::Dynamic(..) | Type::Divergent(_) | Type::Never => {
+            Type::Dynamic(..) | Type::Divergent(_) | Type::Never | Type::Recursive(_) => {
                 infer_value_ty(self, TypeContext::default());
                 true
             }
@@ -3679,6 +3679,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::Dynamic(..)
             | Type::Divergent(_)
             | Type::Never
+            | Type::Recursive(_)
             | Type::ModuleLiteral(..)
             | Type::BoundSuper(..) => true,
         }
@@ -3728,6 +3729,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::Union(..)
                 | Type::Intersection(..)
                 | Type::TypeAlias(..)
+                | Type::Recursive(_)
                 | Type::Dynamic(..)
                 | Type::Divergent(_)
                 | Type::Never
@@ -5549,6 +5551,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::ClassLiteral(_)
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
+                | Type::Recursive(_)
                 | Type::NominalInstance(_)
                 | Type::ProtocolInstance(_)
                 | Type::SpecialForm(_)
@@ -10601,6 +10604,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (_, Type::TypeAlias(alias)) => {
                 self.infer_unary_expression_type(op, alias.value_type(self.db()), unary)
             }
+            (_, Type::Recursive(_)) => Type::unknown(),
 
             (ast::UnaryOp::UAdd, Type::LiteralValue(literal)) => match literal.kind() {
                 LiteralValueTypeKind::Int(value) => Type::int_literal(value.as_i64()),

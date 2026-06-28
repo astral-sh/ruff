@@ -86,6 +86,7 @@ pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDes
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
 use crate::types::newtype::NewType;
+pub use crate::types::recursive::{Foldable, RecursiveOrigin, RecursiveType};
 use crate::types::signatures::walk_signature;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::special_form::TypeQualifier;
@@ -147,6 +148,7 @@ pub(crate) mod narrow;
 mod newtype;
 mod overrides;
 mod protocol_class;
+mod recursive;
 pub(crate) mod relation;
 mod relation_error;
 mod set_theoretic;
@@ -904,6 +906,8 @@ pub enum Type<'db> {
     Dynamic(DynamicType<'db>),
     /// A cycle marker used during recursive type inference.
     Divergent(DivergentType),
+    /// A recursive type bound by a `Divergent` cycle marker.
+    Recursive(RecursiveType<'db>),
     /// The empty set of values
     Never,
     /// A specific function object
@@ -1069,6 +1073,12 @@ impl<'db> Type<'db> {
             (Type::Divergent(left), Type::Divergent(right)) => left.same_marker(right),
             _ => false,
         }
+    }
+
+    fn contains_divergent_marker(self, db: &'db dyn Db, marker: DivergentType) -> bool {
+        any_over_type(db, self, false, |ty| {
+            ty.same_divergent_marker(Type::Divergent(marker))
+        })
     }
 
     /// If `self` is a materialized `Divergent` type, returns the concrete type it should
@@ -1837,6 +1847,18 @@ impl<'db> Type<'db> {
                 .negated_divergent()
                 .expect("matched `Type::Divergent` above"),
 
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                || {
+                    Type::Intersection(IntersectionType::new(
+                        db,
+                        FxOrderSet::default(),
+                        NegativeIntersectionElements::Single(*self),
+                    ))
+                },
+                |unfolded| unfolded.negate(db),
+            ),
+
             Type::NominalInstance(instance) if instance.is_object() => Type::Never,
 
             Type::AlwaysTruthy
@@ -1906,6 +1928,7 @@ impl<'db> Type<'db> {
             Type::TypeForm(typeform) => typeform.type_argument(db).is_spellable(db),
             Type::Intersection(_) => false,
             Type::EnumComplement(complement) => complement.is_spellable(db),
+            Type::Recursive(_) => false,
             Type::Divergent(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
@@ -1939,6 +1962,7 @@ impl<'db> Type<'db> {
 
             Type::Intersection(_)
             | Type::EnumComplement(_)
+            | Type::Recursive(_)
             | Type::Divergent(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
@@ -2210,6 +2234,7 @@ impl<'db> Type<'db> {
                 .type_argument(db)
                 .recursive_type_normalized_impl(db, div, true)
                 .map(|ty| TypeFormType::from_type_expression(db, ty)),
+            Type::Recursive(_) => Some(self),
             Type::Divergent(_) => Some(self),
             Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
             Type::TypedDict(_) => {
@@ -2320,6 +2345,9 @@ impl<'db> Type<'db> {
     pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
         match self {
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => false,
+            Type::Recursive(recursive) => {
+                recursive.map_or_else(db, || false, |unfolded| unfolded.is_singleton(db))
+            }
 
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(..)
@@ -2512,6 +2540,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_)
             | Type::Divergent(_)
+            | Type::Recursive(_)
             | Type::Never
             | Type::Union(..)
             | Type::AlwaysTruthy
@@ -2568,6 +2597,12 @@ impl<'db> Type<'db> {
             }
 
             Type::Dynamic(_) if policy.require_concrete() => Some(Place::Undefined.into()),
+
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                || Some(Place::bound(self).into()),
+                |unfolded| unfolded.find_name_in_mro_with_policy(db, name, policy),
+            ),
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(Place::bound(self).into()),
 
@@ -2878,6 +2913,12 @@ impl<'db> Type<'db> {
             Type::EnumComplement(complement) => {
                 enums::instance_member_for_enum_complement(db, *complement, name)
             }
+
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                || Place::bound(self).into(),
+                |unfolded| unfolded.instance_member(db, name),
+            ),
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
 
@@ -3635,6 +3676,19 @@ impl<'db> Type<'db> {
                     enums::member_lookup_for_enum_complement(db, complement, name_str, policy)
                 }
 
+                Type::Recursive(recursive) => recursive.map_or_else(
+                    db,
+                    || Place::bound(this).into(),
+                    |unfolded| {
+                        unfolded.member_lookup_with_policy_and_receiver(
+                            db,
+                            name_str.into(),
+                            policy,
+                            receiver,
+                        )
+                    },
+                ),
+
                 Type::Dynamic(..) | Type::Divergent(_) | Type::Never => Place::bound(this).into(),
 
                 Type::FunctionLiteral(function) if name == "__get__" => Place::bound(
@@ -4266,6 +4320,12 @@ impl<'db> Type<'db> {
         }
 
         match self {
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                || Binding::single(self, Signature::dynamic(Type::unknown())).into(),
+                |unfolded| unfolded.bindings(db),
+            ),
+
             Type::Callable(callable) => {
                 CallableBinding::from_overloads(self, callable.signatures(db).iter().cloned())
                     .into()
@@ -5655,6 +5715,9 @@ impl<'db> Type<'db> {
                 send_ty: Some(ty),
                 return_ty: Some(ty),
             }),
+            Type::Recursive(recursive) => {
+                recursive.map_or_else(db, || None, |unfolded| unfolded.generator_types(db))
+            }
             _ => None,
         }
     }
@@ -5673,6 +5736,9 @@ impl<'db> Type<'db> {
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(self),
+            Type::Recursive(recursive) => {
+                recursive.map_or_else(db, || Some(self), |unfolded| unfolded.to_instance(db))
+            }
             Type::ClassLiteral(class) => Some(Type::instance(db, class.default_specialization(db))),
             Type::GenericAlias(alias) => Some(Type::instance(db, ClassType::from(alias))),
             Type::SubclassOf(subclass_of_ty) => Some(subclass_of_ty.to_instance(db)),
@@ -5921,7 +5987,7 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::Dynamic(_) | Type::Divergent(_) => Ok(*self),
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) => Ok(*self),
 
             Type::NominalInstance(instance) => match instance.known_class(db) {
                 Some(KnownClass::NoneType) => Ok(Type::none(db)),
@@ -5969,6 +6035,11 @@ impl<'db> Type<'db> {
     pub(crate) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::Never => Type::Never,
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                || Type::object().to_meta_type(db),
+                |unfolded| unfolded.to_meta_type(db),
+            ),
             Type::NominalInstance(instance) => instance.to_meta_type(db),
             Type::KnownInstance(known_instance) => known_instance.to_meta_type(db),
             Type::SpecialForm(special_form) => special_form.to_meta_type(db),
@@ -6172,6 +6243,12 @@ impl<'db> Type<'db> {
             _ => {}
         }
 
+        if let TypeMapping::FoldRecursive(recursive) = type_mapping {
+            if self == recursive.unfolded(db) {
+                return Type::Recursive(*recursive);
+            }
+        }
+
         // Recursive singleton promotion only recurses into `NominalInstance` types (tuples
         // and specialized generics). For all other types, return early.
         if matches!(
@@ -6307,6 +6384,14 @@ impl<'db> Type<'db> {
                 Type::PropertyInstance(property.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
 
+            Type::Union(union) if type_mapping.used_in_cycle_recovery() => {
+                UnionType::from_elements_cycle_recovery(
+                    db,
+                    union.elements(db).iter().map(|element| {
+                        element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                    }),
+                )
+            }
             Type::Union(union) => union.map_leave_aliases(db, |element| {
                 element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }),
@@ -6362,7 +6447,20 @@ impl<'db> Type<'db> {
                 )
             }),
 
+            Type::Recursive(recursive) => match type_mapping {
+                TypeMapping::UnfoldRecursive(target) if recursive.has_same_binder(db, *target) => {
+                    recursive.unfolded(db)
+                }
+                _ => visitor.visit(db, self, type_mapping, || {
+                    recursive.map_type(db, type_mapping, tcx, visitor)
+                }),
+            },
+
             Type::TypeAlias(alias) => {
+                if type_mapping.used_in_cycle_recovery() {
+                    return self;
+                }
+
                 match type_mapping {
                     // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
                     // detection rather than the visitor's cycle detection, because the visitor tracks
@@ -6434,6 +6532,8 @@ impl<'db> Type<'db> {
                 TypeMapping::Materialize(_) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
+                TypeMapping::UnfoldRecursive(_) |
+                TypeMapping::FoldRecursive(_) |
                 TypeMapping::RescopeReturnCallables(_) |
                 TypeMapping::Promote(PromotionMode::Off, _) |
                 TypeMapping::Promote(
@@ -6453,6 +6553,8 @@ impl<'db> Type<'db> {
                 TypeMapping::Promote(..) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
+                TypeMapping::UnfoldRecursive(_) |
+                TypeMapping::FoldRecursive(_) |
                 TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
@@ -6465,6 +6567,11 @@ impl<'db> Type<'db> {
             Type::Divergent(divergent) => match type_mapping {
                 TypeMapping::Materialize(materialization_kind) => {
                     Type::Divergent(divergent.materialized(*materialization_kind))
+                }
+                TypeMapping::UnfoldRecursive(recursive)
+                    if self.same_divergent_marker(Type::Divergent(recursive.binder(db))) =>
+                {
+                    Type::Recursive(*recursive)
                 }
                 _ => self,
             },
@@ -6666,6 +6773,17 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => {
                 visitor.visit(self, || {
                     alias.value_type(db).find_legacy_typevars_impl(
+                        db,
+                        binding_context,
+                        typevars,
+                        visitor,
+                    );
+                });
+            }
+
+            Type::Recursive(recursive) => {
+                visitor.visit(self, || {
+                    recursive.body(db).find_legacy_typevars_impl(
                         db,
                         binding_context,
                         typevars,
@@ -6937,6 +7055,7 @@ impl<'db> Type<'db> {
             },
 
             Self::TypedDict(typed_dict) => typed_dict.type_definition(db),
+            Self::Recursive(_) => None,
 
             Self::Union(_) => None,
             Self::Intersection(intersection) => {
@@ -7331,6 +7450,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::TypeForm(typeform_type) => typeform_type.variance_of(db, typevar),
             Type::KnownInstance(known_instance) => known_instance.variance_of(db, typevar),
             Type::TypeAlias(alias) => alias.variance_of(db, typevar),
+            Type::Recursive(recursive) => recursive.body(db).variance_of(db, typevar),
             Type::Dynamic(_)
             | Type::Divergent(_)
             | Type::Never
@@ -7513,6 +7633,10 @@ pub enum TypeMapping<'a, 'db> {
     /// Apply eager expansion to the type.
     /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
     EagerExpansion,
+    /// Replace occurrences of a recursive binder with the recursive type it binds.
+    UnfoldRecursive(RecursiveType<'db>),
+    /// Collapse occurrences of the unfolded body of a recursive type back into that recursive type.
+    FoldRecursive(RecursiveType<'db>),
 
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
@@ -7560,6 +7684,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
+            | TypeMapping::UnfoldRecursive(_)
+            | TypeMapping::FoldRecursive(_)
             | TypeMapping::RescopeReturnCallables(_) => context,
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {
@@ -7606,8 +7732,17 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceSelf { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
+            | TypeMapping::UnfoldRecursive(_)
+            | TypeMapping::FoldRecursive(_)
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
+    }
+
+    pub(crate) const fn used_in_cycle_recovery(&self) -> bool {
+        matches!(
+            self,
+            TypeMapping::UnfoldRecursive(_) | TypeMapping::FoldRecursive(_)
+        )
     }
 }
 

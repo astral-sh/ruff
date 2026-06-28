@@ -538,7 +538,25 @@ impl<'db> Type<'db> {
 
         let value_ty = self;
 
+        if let Type::Recursive(recursive) = value_ty {
+            return recursive.map_or_else(
+                db,
+                || Ok(Type::unknown()),
+                |unfolded| unfolded.subscript(db, slice_ty, expr_context),
+            );
+        }
+
+        if let Type::Recursive(recursive) = slice_ty {
+            return recursive.map_or_else(
+                db,
+                || Ok(Type::unknown()),
+                |unfolded| value_ty.subscript(db, unfolded, expr_context),
+            );
+        }
+
         let inferred = match (value_ty, slice_ty) {
+            (Type::Recursive(_), _) | (_, Type::Recursive(_)) => Some(Ok(Type::unknown())),
+
             (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
 
             (Type::TypeAlias(alias), _) => {

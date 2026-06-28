@@ -1,10 +1,12 @@
 use super::*;
-use crate::db::tests::{TestDbBuilder, setup_db};
+use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
 use crate::place::{typing_extensions_symbol, typing_symbol};
 use crate::types::type_alias::PEP695TypeAliasType;
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
+use salsa::Database as _;
+use salsa::plumbing::AsId as _;
 use test_case::test_case;
 
 /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
@@ -338,6 +340,437 @@ fn divergent_type() {
 
     let intersection = IntersectionType::from_elements(&db, [div, Type::Never]);
     assert_eq!(intersection.display(&db).to_string(), "Never");
+}
+
+fn divergent_marker(bits: u32) -> DivergentType {
+    Type::divergent(salsa::plumbing::Id::from_bits(u64::from(bits)))
+        .as_divergent()
+        .expect("Type::divergent should create a divergent type")
+}
+
+fn recursive_list_type(db: &dyn Db, marker_bits: u32) -> (Type<'_>, RecursiveType<'_>, Type<'_>) {
+    let binder = divergent_marker(marker_bits);
+    let body = KnownClass::List.to_specialized_instance(
+        db,
+        &[UnionType::from_elements(
+            db,
+            [KnownClass::Int.to_instance(db), Type::Divergent(binder)],
+        )],
+    );
+    let recursive_ty = RecursiveType::new(db, binder, RecursiveOrigin::Implicit, body);
+    let Type::Recursive(recursive) = recursive_ty else {
+        panic!("expected recursive list body to contain its binder");
+    };
+    (recursive_ty, recursive, body)
+}
+
+fn get_pep695_type_alias<'db>(db: &'db TestDb, name: &str) -> PEP695TypeAliasType<'db> {
+    let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
+    let ty = crate::place::global_symbol(db, module, name)
+        .place
+        .expect_type();
+    let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(type_alias))) =
+        ty
+    else {
+        panic!("Expected `{name}` to be a type alias");
+    };
+    type_alias
+}
+
+fn query_was_run(
+    db: &TestDb,
+    query_name_pattern: &str,
+    input: salsa::Id,
+    events: &[salsa::Event],
+) -> bool {
+    events.iter().any(|event| {
+        if let salsa::EventKind::WillExecute { database_key } = event.kind {
+            db.ingredient_debug_name(database_key.ingredient_index())
+                .contains(query_name_pattern)
+                && database_key.key_index() == input
+        } else {
+            false
+        }
+    })
+}
+
+fn assert_query_was_not_run(
+    db: &TestDb,
+    query_name_pattern: &str,
+    input: salsa::Id,
+    events: &[salsa::Event],
+) {
+    db.attach(|_| {
+        assert!(
+            !query_was_run(db, query_name_pattern, input, events),
+            "Expected query matching {query_name_pattern}({input:?}) not to have run but it did:\n{events:#?}",
+        );
+    });
+}
+
+fn assert_query_was_run(
+    db: &TestDb,
+    query_name_pattern: &str,
+    input: salsa::Id,
+    events: &[salsa::Event],
+) {
+    db.attach(|_| {
+        assert!(
+            query_was_run(db, query_name_pattern, input, events),
+            "Expected query matching {query_name_pattern}({input:?}) to have run but it did not:\n{events:#?}",
+        );
+    });
+}
+
+fn type_inference_query_names_run(db: &TestDb, events: &[salsa::Event]) -> Vec<String> {
+    const TYPE_INFERENCE_QUERY_PATTERNS: &[&str] = &[
+        "function_known_decorators",
+        "infer_definition_types",
+        "infer_deferred_types",
+        "infer_scope_types_impl",
+        "infer_expression_types_impl",
+        "infer_expression_type_impl",
+        "infer_statement_types_impl",
+        "infer_unpack_types",
+    ];
+
+    db.attach(|_| {
+        events
+            .iter()
+            .filter_map(|event| {
+                let salsa::EventKind::WillExecute { database_key } = event.kind else {
+                    return None;
+                };
+
+                let query_name = db.ingredient_debug_name(database_key.ingredient_index());
+                (query_name.contains("types::infer")
+                    || TYPE_INFERENCE_QUERY_PATTERNS
+                        .iter()
+                        .any(|pattern| query_name.contains(pattern)))
+                .then(|| format!("{query_name}({:?})", database_key.key_index()))
+            })
+            .collect()
+    })
+}
+
+fn assert_no_type_inference_queries_were_run(db: &TestDb, events: &[salsa::Event]) {
+    let type_inference_queries = type_inference_query_names_run(db, events);
+    assert!(
+        type_inference_queries.is_empty(),
+        "Expected fold/unfold not to invoke type inference queries, but it invoked:\n{type_inference_queries:#?}\nAll events:\n{events:#?}",
+    );
+}
+
+#[test]
+fn recursive_type_constructor_elides_unused_binder() {
+    let db = setup_db();
+    let binder = divergent_marker(10);
+    let int = KnownClass::Int.to_instance(&db);
+
+    assert_eq!(
+        RecursiveType::new(&db, binder, RecursiveOrigin::Implicit, int),
+        int
+    );
+}
+
+#[test]
+fn recursive_type_alias_origin_is_display_only() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/a.py",
+        r#"
+type Alias = int
+"#,
+    )?;
+
+    let alias = get_pep695_type_alias(&db, "Alias");
+    let binder = divergent_marker(16);
+    let body = KnownClass::List.to_specialized_instance(
+        &db,
+        &[UnionType::from_elements(
+            &db,
+            [KnownClass::Int.to_instance(&db), Type::Divergent(binder)],
+        )],
+    );
+    let implicit = RecursiveType::new(&db, binder, RecursiveOrigin::Implicit, body);
+    let alias_origin = RecursiveType::new(
+        &db,
+        binder,
+        RecursiveOrigin::TypeAlias(TypeAliasType::PEP695(alias)),
+        body,
+    );
+
+    assert!(alias_origin.display(&db).to_string().contains("Alias = "));
+    assert!(implicit.is_equivalent_to(&db, alias_origin));
+    assert!(
+        UnionType::from_elements(&db, [implicit, alias_origin]).is_equivalent_to(&db, implicit)
+    );
+
+    Ok(())
+}
+
+#[test]
+fn recursive_type_fold_and_unfold() {
+    let db = setup_db();
+    let (recursive_ty, recursive, body) = recursive_list_type(&db, 11);
+
+    let unfolded = recursive.unfolded(&db);
+    let expected = KnownClass::List.to_specialized_instance(
+        &db,
+        &[UnionType::from_elements(
+            &db,
+            [KnownClass::Int.to_instance(&db), recursive_ty],
+        )],
+    );
+
+    assert_eq!(unfolded, expected);
+    assert_eq!(body.unfold_recursive(&db, recursive), expected);
+    assert_eq!(expected.fold_recursive(&db, recursive), recursive_ty);
+    assert_eq!(body.fold_recursive(&db, recursive), body);
+
+    let element_ty =
+        UnionType::from_elements(&db, [KnownClass::Int.to_instance(&db), recursive_ty]);
+    assert_eq!(element_ty.fold_recursive(&db, recursive), element_ty);
+
+    let nested_unfolded = KnownClass::List.to_specialized_instance(&db, &[expected]);
+    let nested_folded = KnownClass::List.to_specialized_instance(&db, &[recursive_ty]);
+    assert_eq!(
+        nested_unfolded.fold_recursive(&db, recursive),
+        nested_folded
+    );
+}
+
+#[test]
+fn recursive_type_identity_map_preserves_recursive_type() {
+    let db = setup_db();
+    let (recursive_ty, recursive, _) = recursive_list_type(&db, 12);
+    let identity_mapping = TypeMapping::Promote(PromotionMode::Off, PromotionKind::Regular);
+
+    assert_eq!(
+        recursive.map_type(
+            &db,
+            &identity_mapping,
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        ),
+        recursive_ty
+    );
+    assert_eq!(
+        recursive_ty.apply_type_mapping(&db, &identity_mapping, TypeContext::default()),
+        recursive_ty
+    );
+}
+
+#[test]
+fn recursive_type_subscript_uses_unfolded_structure() {
+    let db = setup_db();
+    let (recursive_ty, recursive, _) = recursive_list_type(&db, 17);
+
+    let element_ty = recursive_ty
+        .subscript(&db, Type::int_literal(0), ast::ExprContext::Load)
+        .expect("recursive list should be subscriptable");
+    let expected = UnionType::from_elements(&db, [KnownClass::Int.to_instance(&db), recursive_ty]);
+
+    assert!(
+        element_ty.is_equivalent_to(&db, expected),
+        "got {}, expected {}",
+        element_ty.display(&db),
+        expected.display(&db)
+    );
+
+    let reconstructed = KnownClass::List.to_specialized_instance(&db, &[element_ty]);
+    assert_eq!(reconstructed, recursive.unfolded(&db));
+    assert_eq!(reconstructed.fold_recursive(&db, recursive), recursive_ty);
+}
+
+#[test]
+fn recursive_type_iteration_uses_unfolded_structure() {
+    let db = setup_db();
+    let (recursive_ty, recursive, _) = recursive_list_type(&db, 19);
+
+    let recursive_iter = recursive_ty
+        .try_iterate(&db)
+        .expect("recursive list should be iterable");
+    let unfolded_iter = recursive
+        .unfolded(&db)
+        .try_iterate(&db)
+        .expect("unfolded recursive list should be iterable");
+
+    assert_eq!(recursive_iter.as_ref(), unfolded_iter.as_ref());
+}
+
+#[test]
+fn recursive_type_does_not_unfold_identity_forever() {
+    let db = setup_db();
+    let binder = divergent_marker(12);
+    let recursive_ty = RecursiveType::new(
+        &db,
+        binder,
+        RecursiveOrigin::Implicit,
+        Type::Divergent(binder),
+    );
+    let Type::Recursive(recursive) = recursive_ty else {
+        panic!("expected identity recursive body to contain its binder");
+    };
+
+    assert_eq!(recursive.unfolded(&db), recursive_ty);
+    assert_eq!(
+        recursive.map_if_unfolded(&db, |_| Type::Never),
+        None::<Type<'_>>
+    );
+    assert_eq!(
+        recursive.map_or_else(&db, Type::unknown, |_| Type::Never),
+        Type::unknown()
+    );
+}
+
+#[test]
+fn recursive_type_relation_uses_unfolded_structure() {
+    let db = setup_db();
+    let (left_ty, left_recursive, _) = recursive_list_type(&db, 13);
+    let (right_ty, _, _) = recursive_list_type(&db, 14);
+
+    assert_ne!(left_ty, right_ty);
+    assert!(left_ty.is_equivalent_to(&db, right_ty));
+    assert!(left_ty.is_equivalent_to(&db, left_recursive.unfolded(&db)));
+}
+
+#[test]
+fn recursive_fold_unfold_does_not_expand_type_aliases() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/a.py",
+        r#"
+type Alias = int
+"#,
+    )?;
+
+    let alias = get_pep695_type_alias(&db, "Alias");
+    let alias_id = alias.as_id();
+    let alias_ty = Type::TypeAlias(TypeAliasType::PEP695(alias));
+    let (_, recursive, _) = recursive_list_type(&db, 15);
+
+    db.clear_salsa_events();
+    assert_eq!(alias_ty.unfold_recursive(&db, recursive), alias_ty);
+    assert_eq!(alias_ty.fold_recursive(&db, recursive), alias_ty);
+
+    let events = db.take_salsa_events();
+    assert_no_type_inference_queries_were_run(&db, &events);
+    assert_query_was_not_run(
+        &db,
+        "PEP695TypeAliasType < 'db >::raw_value_type_",
+        alias_id,
+        &events,
+    );
+
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/a.py",
+        r#"
+type Alias = int
+"#,
+    )?;
+
+    db.clear_salsa_events();
+    let alias_id = {
+        let alias = get_pep695_type_alias(&db, "Alias");
+        let alias_id = alias.as_id();
+
+        let _ = alias.raw_value_type(&db);
+
+        alias_id
+    };
+
+    let events = db.take_salsa_events();
+    assert_query_was_run(
+        &db,
+        "PEP695TypeAliasType < 'db >::raw_value_type_",
+        alias_id,
+        &events,
+    );
+
+    Ok(())
+}
+
+#[test]
+fn recursive_fold_unfold_does_not_build_function_signatures() -> anyhow::Result<()> {
+    use crate::place::global_symbol;
+
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/a.py",
+        r#"
+def f(x: int) -> int:
+    return x
+"#,
+    )?;
+
+    let module = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
+    let function_ty = global_symbol(&db, module, "f").place.expect_type();
+    let Type::FunctionLiteral(function) = function_ty else {
+        panic!("Expected `f` to be a function literal");
+    };
+
+    let function_id = function.as_id();
+    let binder = divergent_marker(18);
+    let body = KnownClass::List.to_specialized_instance(
+        &db,
+        &[UnionType::from_elements(
+            &db,
+            [Type::Divergent(binder), function_ty],
+        )],
+    );
+    let recursive_ty = RecursiveType::new(&db, binder, RecursiveOrigin::Implicit, body);
+    let Type::Recursive(recursive) = recursive_ty else {
+        panic!("expected recursive body to contain its binder");
+    };
+
+    db.clear_salsa_events();
+    let _ = body.unfold_recursive(&db, recursive);
+    let _ = recursive_ty.fold_recursive(&db, recursive);
+
+    let events = db.take_salsa_events();
+    assert_no_type_inference_queries_were_run(&db, &events);
+    assert_query_was_not_run(
+        &db,
+        "FunctionType < 'db >::signature_",
+        function_id,
+        &events,
+    );
+
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/a.py",
+        r#"
+def f(x: int) -> int:
+    return x
+"#,
+    )?;
+
+    db.clear_salsa_events();
+    let function_id = {
+        let module = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
+        let function_ty = global_symbol(&db, module, "f").place.expect_type();
+        let Type::FunctionLiteral(function) = function_ty else {
+            panic!("Expected `f` to be a function literal");
+        };
+
+        let function_id = function.as_id();
+
+        let _ = function.signature(&db);
+
+        function_id
+    };
+
+    let events = db.take_salsa_events();
+    assert_query_was_run(
+        &db,
+        "FunctionType < 'db >::signature_",
+        function_id,
+        &events,
+    );
+
+    Ok(())
 }
 
 #[test]

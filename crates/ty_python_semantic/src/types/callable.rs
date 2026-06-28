@@ -224,6 +224,13 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => alias
                 .value_type(db)
                 .try_upcast_to_callable_with_policy_and_context(db, policy, context),
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                || None,
+                |unfolded| {
+                    unfolded.try_upcast_to_callable_with_policy_and_context(db, policy, context)
+                },
+            ),
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function))
                 if context.is_recursive_reference(db, function) =>

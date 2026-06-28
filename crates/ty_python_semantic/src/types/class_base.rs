@@ -139,6 +139,11 @@ impl<'db> ClassBase<'db> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
             Type::Divergent(divergent) => Some(Self::Divergent(divergent)),
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                || None,
+                |unfolded| Self::try_from_type(db, unfolded, subclass),
+            ),
             Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)
