@@ -691,6 +691,28 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db)
     }
 
+    /// Return the type that describes the possible runtime objects represented by `self` in an
+    /// identity comparison.
+    ///
+    /// A `NewType` wrapper is an identity function at runtime, so it contributes its concrete base
+    /// type here while remaining distinct for ordinary type relations and intersections.
+    pub(crate) fn identity_comparison_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self.resolve_type_alias(db) {
+            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db),
+            Type::Union(union) => union.map(db, |element| element.identity_comparison_type(db)),
+            Type::Intersection(intersection) => {
+                intersection.map_positive(db, |element| element.identity_comparison_type(db))
+            }
+            ty => ty,
+        }
+    }
+
+    /// Return `true` if `self` and `other` cannot describe the same runtime object.
+    pub(crate) fn is_disjoint_from_for_identity(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+        self.identity_comparison_type(db)
+            .is_disjoint_from(db, other.identity_comparison_type(db))
+    }
+
     pub(crate) fn when_disjoint_from<'c>(
         self,
         db: &'db dyn Db,

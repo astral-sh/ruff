@@ -154,7 +154,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 membership_test_comparison(MembershipTestCompareOperator::NotIn, range)
             }
             ast::CmpOp::Is => {
-                if left.is_disjoint_from(db, right) {
+                if left.is_disjoint_from_for_identity(db, right) {
                     Ok(Type::bool_literal(false))
                 } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
                     Ok(Type::bool_literal(true))
@@ -163,7 +163,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 }
             }
             ast::CmpOp::IsNot => {
-                if left.is_disjoint_from(db, right) {
+                if left.is_disjoint_from_for_identity(db, right) {
                     Ok(Type::bool_literal(true))
                 } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
                     Ok(Type::bool_literal(false))

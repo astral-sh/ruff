@@ -3067,7 +3067,18 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     None
                 }
             }
-            ast::CmpOp::Is => Some(rhs_ty),
+            ast::CmpOp::Is => {
+                let rhs_constraint = rhs_ty.identity_comparison_type(self.db);
+                if lhs_ty.is_disjoint_from(self.db, rhs_constraint)
+                    && !lhs_ty.is_disjoint_from_for_identity(self.db, rhs_ty)
+                {
+                    // A static intersection cannot represent overlap that exists only because a
+                    // `NewType` wrapper is transparent at runtime.
+                    None
+                } else {
+                    Some(rhs_constraint)
+                }
+            }
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
             ast::CmpOp::NotIn => self.evaluate_expr_not_in(lhs_ty, rhs_ty),
             _ => None,
@@ -3219,7 +3230,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     .is_none_or(|el_ty| {
                         if is_positive_check {
                             // `is X` context: keep tuples where element could be X
-                            !el_ty.is_disjoint_from(self.db, rhs_ty)
+                            !el_ty.is_disjoint_from_for_identity(self.db, rhs_ty)
                         } else {
                             // `is not X` context: keep tuples where element is not always X
                             !el_ty.is_subtype_of(self.db, rhs_ty)

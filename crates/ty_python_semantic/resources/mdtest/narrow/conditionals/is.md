@@ -190,6 +190,83 @@ def narrow_generic_alias[T: (Generic[int], Specialized)](klass: type[T]) -> None
         reveal_type(Generic[int])  # revealed: <class 'Generic[int]'>
 ```
 
+## `is` with `NewType`s
+
+Distinct `NewType`s can describe the same runtime object even though they are statically disjoint.
+An identity comparison between them must not be considered always false or narrow either operand:
+
+```py
+from typing import NewType, final
+from ty_extensions import Intersection, is_disjoint_from, static_assert
+
+class Foo: ...
+class FooSub(Foo): ...
+
+FooNewType1 = NewType("FooNewType1", Foo)
+FooNewType2 = NewType("FooNewType2", Foo)
+
+static_assert(is_disjoint_from(FooNewType1, FooNewType2))
+
+def same_base(foo1: FooNewType1, foo2: FooNewType2) -> None:
+    reveal_type(foo1 is foo2)  # revealed: bool
+    if foo1 is foo2:
+        reveal_type(foo1)  # revealed: FooNewType1
+        reveal_type(foo2)  # revealed: FooNewType2
+
+def unions(left: FooNewType1 | str, right: FooNewType2 | bytes) -> None:
+    reveal_type(left is right)  # revealed: bool
+    if left is right:
+        reveal_type(left)  # revealed: FooNewType1 | (str & Foo)
+        reveal_type(right)  # revealed: FooNewType2 | (bytes & Foo)
+
+def intersection(left: Intersection[FooNewType1, FooSub], right: FooNewType2) -> None:
+    reveal_type(left is right)  # revealed: bool
+    if left is right:
+        reveal_type(left)  # revealed: FooNewType1 & FooSub
+        reveal_type(right)  # revealed: FooNewType2 & FooSub
+
+BoolNewType = NewType("BoolNewType", bool)
+IntNewType = NewType("IntNewType", int)
+StrNewType = NewType("StrNewType", str)
+BytesNewType = NewType("BytesNewType", bytes)
+
+def literals(
+    bool_newtype: BoolNewType,
+    int_newtype: IntNewType,
+    str_newtype: StrNewType,
+    bytes_newtype: BytesNewType,
+) -> None:
+    true = True
+    forty_two = 42
+    some_string = "some_string"
+    some_bytes = b"some_bytes"
+
+    reveal_type(bool_newtype is true)  # revealed: bool
+    if bool_newtype is true:
+        reveal_type(true)  # revealed: Literal[True]
+    if int_newtype is forty_two:
+        reveal_type(forty_two)  # revealed: Literal[42]
+    if str_newtype is some_string:
+        reveal_type(some_string)  # revealed: Literal["some_string"]
+    if bytes_newtype is some_bytes:
+        reveal_type(some_bytes)  # revealed: Literal[b"some_bytes"]
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+ANewType = NewType("ANewType", A)
+BNewType = NewType("BNewType", B)
+
+def disjoint_bases(a: ANewType, b: BNewType) -> None:
+    reveal_type(a is b)  # revealed: Literal[False]
+    if a is b:
+        reveal_type(a)  # revealed: Never
+        reveal_type(b)  # revealed: Never
+```
+
 ## `is` where the other operand is a call expression
 
 ```py
