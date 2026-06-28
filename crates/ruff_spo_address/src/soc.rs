@@ -4,38 +4,42 @@
 //! into a **reusable library function** so it can run in `ruff check` / CI
 //! instead of by hand (the first step of TD-23 / the `OGAR-SOC` lint).
 //!
-//! The law: every class whose member set overflows the per-tier `u8` cascade
-//! rank (`> 256` siblings) is a DESIGN smell, never a storage limit, and is one
-//! (or both) of:
+//! The law: every class whose sibling set overflows the per-tier cascade rank
+//! is a DESIGN smell, never a storage limit, and is one (or both) of:
 //!
-//! 1. **Duplication** — the data members collapse to `<= 256` distinct
-//!    `field_type`s; mask them by classid into a `ClassView` (`render_rows <= 64`).
+//! 1. **Duplication** — the data members collapse to a representable number of
+//!    distinct `field_type`s; mask them by classid into a `ClassView`.
 //! 2. **Conflation** — data (`has_field`) and behaviour (`has_function`) are
 //!    mixed under one parent; split the concerns.
 //!
-//! [`law_holds`] is the falsifier: it returns `false` iff some over-cap class is
-//! *neither* (a `> 256`, genuinely-distinct, well-separated sibling set).
+//! [`law_holds`] is the falsifier: `false` iff some over-cap class is *neither*.
 
 use ruff_spo_triplet::Triple;
 use std::collections::{BTreeMap, BTreeSet};
 
-/// Per-tier sibling cap: a level with more than this many members overflows the
-/// 8-bit cascade rank — the smell the law detects.
-pub const TIER_CAP: usize = 256;
+/// Per-tier sibling budget. The cascade rank is a 1-based `u8` with `0` reserved
+/// ("no tier here"), so ranks `1..=255` are representable — a level with more
+/// than `u8::MAX` (255) siblings overflows (the 256th saturates to rank 255 and
+/// collides with the 255th, matching `ruff_spo_address::ranks`). The lint
+/// therefore fires when `members > MAX_SIBLINGS_PER_TIER`. (Colloquially the
+/// "256-cap": 256 is the byte's cardinality; 255 is the representable count.)
+pub const MAX_SIBLINGS_PER_TIER: usize = u8::MAX as usize;
 
 /// A class's field set must fit one `u64` `FieldMask`.
 pub const FIELD_MASK_CAP: usize = 64;
 
-/// The verdict for a class whose member set exceeds [`TIER_CAP`].
+/// The verdict for a class whose sibling set exceeds [`MAX_SIBLINGS_PER_TIER`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SocVerdict {
-    /// Data rows collapse to `<= TIER_CAP` distinct `field_type`s — mask via a `ClassView`.
+    /// Data rows collapse to a representable number of distinct `field_type`s —
+    /// mask via a `ClassView`.
     Duplication,
     /// `has_field` data + `has_function` behaviour conflated under one parent — split.
     Conflation,
     /// Both duplication and conflation are present.
     DuplicationAndConflation,
-    /// Neither — the law's counterexample (`> TIER_CAP` distinct, well-separated siblings).
+    /// Neither — the law's counterexample (an over-cap set that is provably
+    /// neither type-collapsible nor data⊥behaviour-mixed).
     Counterexample,
 }
 
@@ -46,23 +50,25 @@ pub struct SocFinding {
     pub class: String,
     /// Total members (`has_field` ∪ `has_function`).
     pub members: usize,
-    /// Members carrying a `field_type` (data).
+    /// `has_field` members (data).
     pub data: usize,
-    /// Members without a `field_type` (`has_function`).
+    /// `has_function` members (behaviour).
     pub funcs: usize,
-    /// Distinct `field_type`s among the data members.
+    /// Distinct `field_type`s among the typed data members.
     pub distinct_field_types: usize,
-    /// Data rows reclaimable by a masked `ClassView` (`data - distinct`).
+    /// Typed data rows reclaimable by a masked `ClassView` (`typed_data - distinct`).
     pub duplicate_rows: usize,
     /// The law's classification of this overflow.
     pub verdict: SocVerdict,
 }
 
-/// Classify every class whose member set exceeds [`TIER_CAP`].
+/// Classify every class whose sibling set exceeds [`MAX_SIBLINGS_PER_TIER`].
 ///
-/// Mirrors the `medcare_probe` §[G] logic exactly: groups `has_field` /
-/// `has_function` members by class, and for each over-cap class derives the
-/// duplication (type-collapse) and conflation (data⊥behaviour) verdict.
+/// Mirrors the `medcare_probe` §[G] logic, with two corrections over the
+/// example: `funcs` is derived from the `has_function` predicate (not the
+/// untyped-data complement, which would false-positive on `has_field` members
+/// whose type lives only in the IR, e.g. `cpp_field`), and the overflow
+/// threshold is `> u8::MAX` siblings (the representable rank count).
 #[must_use]
 pub fn soc_findings(triples: &[Triple]) -> Vec<SocFinding> {
     let field_type: BTreeMap<&str, &str> = triples
@@ -71,32 +77,40 @@ pub fn soc_findings(triples: &[Triple]) -> Vec<SocFinding> {
         .map(|t| (t.s.as_str(), t.o.as_str()))
         .collect();
 
-    let mut members_by_class: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    // Bucket each member with its predicate (true == has_function).
+    let mut members_by_class: BTreeMap<&str, Vec<(&str, bool)>> = BTreeMap::new();
     for t in triples {
-        if t.p == "has_field" || t.p == "has_function" {
+        let is_fn = t.p == "has_function";
+        if is_fn || t.p == "has_field" {
             members_by_class
                 .entry(t.s.as_str())
                 .or_default()
-                .push(t.o.as_str());
+                .push((t.o.as_str(), is_fn));
         }
     }
 
     let mut out = Vec::new();
     for (class, members) in &members_by_class {
-        if members.len() <= TIER_CAP {
+        if members.len() <= MAX_SIBLINGS_PER_TIER {
             continue;
         }
-        let data: Vec<&str> = members
+        let funcs = members.iter().filter(|(_, is_fn)| *is_fn).count();
+        let data_members: Vec<&str> = members
             .iter()
-            .copied()
-            .filter(|m| field_type.contains_key(m))
+            .filter(|(_, is_fn)| !*is_fn)
+            .map(|(m, _)| *m)
             .collect();
-        let funcs = members.len() - data.len();
-        let distinct: BTreeSet<&str> =
-            data.iter().filter_map(|m| field_type.get(m).copied()).collect();
-        let duplicate_rows = data.len().saturating_sub(distinct.len());
-        let is_dup = !distinct.is_empty() && distinct.len() <= TIER_CAP;
-        let is_conflated = funcs > 0 && !data.is_empty();
+        let data = data_members.len();
+        let distinct: BTreeSet<&str> = data_members
+            .iter()
+            .filter_map(|m| field_type.get(m).copied())
+            .collect();
+        // Typed data rows reclaimable by a masked ClassView = typed members minus
+        // the distinct types they collapse to.
+        let typed = data_members.iter().filter_map(|m| field_type.get(m)).count();
+        let duplicate_rows = typed.saturating_sub(distinct.len());
+        let is_dup = !distinct.is_empty() && distinct.len() <= MAX_SIBLINGS_PER_TIER;
+        let is_conflated = funcs > 0 && data > 0;
         let verdict = match (is_dup, is_conflated) {
             (true, true) => SocVerdict::DuplicationAndConflation,
             (true, false) => SocVerdict::Duplication,
@@ -106,7 +120,7 @@ pub fn soc_findings(triples: &[Triple]) -> Vec<SocFinding> {
         out.push(SocFinding {
             class: (*class).to_string(),
             members: members.len(),
-            data: data.len(),
+            data,
             funcs,
             distinct_field_types: distinct.len(),
             duplicate_rows,
@@ -116,7 +130,7 @@ pub fn soc_findings(triples: &[Triple]) -> Vec<SocFinding> {
     out
 }
 
-/// Does the corpus uphold the 256-cap-is-a-lint law (no counterexample)?
+/// Does the corpus uphold the law (no counterexample)?
 #[must_use]
 pub fn law_holds(triples: &[Triple]) -> bool {
     soc_findings(triples)
@@ -129,13 +143,7 @@ mod tests {
     use super::*;
 
     fn t(s: &str, p: &str, o: &str) -> Triple {
-        Triple {
-            s: s.into(),
-            p: p.into(),
-            o: o.into(),
-            f: 1.0,
-            c: 1.0,
-        }
+        Triple { s: s.into(), p: p.into(), o: o.into(), f: 1.0, c: 1.0 }
     }
 
     #[test]
@@ -149,10 +157,25 @@ mod tests {
         let f = soc_findings(&tr);
         assert_eq!(f.len(), 1);
         assert_eq!(f[0].members, 300);
+        assert_eq!(f[0].funcs, 0);
         assert_eq!(f[0].distinct_field_types, 2);
         assert_eq!(f[0].duplicate_rows, 298);
         assert_eq!(f[0].verdict, SocVerdict::Duplication);
         assert!(law_holds(&tr));
+    }
+
+    #[test]
+    fn untyped_fields_are_not_counted_as_functions() {
+        // 300 has_field members, NONE with a field_type triple (type in the IR).
+        let mut tr = Vec::new();
+        for i in 0..300 {
+            tr.push(t("U", "has_field", &format!("U.f{i}")));
+        }
+        let f = soc_findings(&tr);
+        assert_eq!(f[0].funcs, 0, "has_field with no field_type must not be a function");
+        assert_eq!(f[0].data, 300);
+        // No types resolved and no functions -> not provably dup/conflation.
+        assert_eq!(f[0].verdict, SocVerdict::Counterexample);
     }
 
     #[test]
@@ -164,26 +187,28 @@ mod tests {
             tr.push(t(&m, "field_type", "str"));
         }
         for i in 0..100 {
-            let m = format!("D.fn{i}");
-            tr.push(t("D", "has_function", &m));
+            tr.push(t("D", "has_function", &format!("D.fn{i}")));
         }
         let f = soc_findings(&tr);
-        assert_eq!(f.len(), 1);
         assert_eq!(f[0].members, 300);
         assert_eq!(f[0].funcs, 100);
+        assert_eq!(f[0].data, 200);
         assert_eq!(f[0].verdict, SocVerdict::DuplicationAndConflation);
     }
 
     #[test]
-    fn flat_function_root_is_a_counterexample() {
-        // 300 pure has_function siblings, no data → neither dup nor conflation.
-        let mut tr = Vec::new();
-        for i in 0..300 {
-            tr.push(t("ogit:Function", "has_function", &format!("fn{i}")));
-        }
-        let f = soc_findings(&tr);
-        assert_eq!(f[0].verdict, SocVerdict::Counterexample);
-        assert!(!law_holds(&tr));
+    fn boundary_255_ignored_256_caught() {
+        let mk = |n: usize| {
+            let mut tr = Vec::new();
+            for i in 0..n {
+                let m = format!("B.f{i}");
+                tr.push(t("B", "has_field", &m));
+                tr.push(t(&m, "field_type", "str"));
+            }
+            tr
+        };
+        assert!(soc_findings(&mk(255)).is_empty(), "255 siblings are representable");
+        assert_eq!(soc_findings(&mk(256)).len(), 1, "256 overflows the u8 rank");
     }
 
     #[test]
