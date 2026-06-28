@@ -1416,6 +1416,7 @@ fn enum_data_type_class<'db>(
     class: StaticClassLiteral<'db>,
 ) -> Option<ClassType<'db>> {
     let object = KnownClass::Object.to_class_literal(db).to_class_type(db)?;
+    let python_version = Program::get(db).python_version(db);
     let mut selected = None;
 
     for explicit_base in class.explicit_bases(db) {
@@ -1441,7 +1442,7 @@ fn enum_data_type_class<'db>(
             }
 
             let defines_new = !base.own_class_member(db, None, "__new__").is_undefined();
-            let is_dataclass = Program::get(db).python_version(db) >= PythonVersion::PY311
+            let is_dataclass = python_version >= PythonVersion::PY311
                 && !base
                     .own_class_member(db, None, "__dataclass_fields__")
                     .is_undefined();
@@ -1452,7 +1453,11 @@ fn enum_data_type_class<'db>(
                 break;
             }
 
-            candidate.get_or_insert(base);
+            if python_version == PythonVersion::PY38 {
+                candidate = Some(base);
+            } else if python_version >= PythonVersion::PY39 {
+                candidate.get_or_insert(base);
+            }
         }
     }
 

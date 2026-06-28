@@ -55,6 +55,65 @@ reveal_type(Number.ONE.__str__)  # revealed: bound method Number.__str__() -> st
 reveal_type(ReprNumber.ONE.__str__)  # revealed: bound method ReprNumber.__repr__() -> str
 ```
 
+## Python 3.8 enum data type selection
+
+Before Python 3.9, `EnumType` used a different rule to select a data type from a base's MRO:
+
+```toml
+[environment]
+python-version = "3.8"
+```
+
+```py
+from enum import Enum
+from typing import Literal
+
+class Root:
+    def __new__(cls, value: int): ...
+
+class Middle(Root): ...
+
+class Leaf(Middle):
+    def __str__(self) -> Literal["leaf"]:
+        return "leaf"
+
+class Number(Leaf, Enum):
+    ONE = 1
+
+reveal_type(Number.ONE.__str__)  # revealed: bound method Number.__str__() -> Literal["leaf"]
+```
+
+## Python 3.7 enum data type selection
+
+Python 3.7 selected the class that defined `__new__` instead:
+
+```toml
+[environment]
+python-version = "3.7"
+```
+
+```py
+from enum import Enum
+from typing import Literal
+
+class Root:
+    def __new__(cls, value: int): ...
+
+    def __str__(self) -> str:
+        return "root"
+
+class Middle(Root):
+    def __str__(self) -> Literal["middle"]:
+        return "middle"
+
+class Leaf(Middle): ...
+
+class Number(Leaf, Enum):
+    ONE = 1
+
+reveal_type(Number.ONE.__str__)  # revealed: bound method Number.__str__() -> Literal["middle"]
+```
+
 ## Flag operators installed during class creation
 
 Starting in Python 3.11, `EnumType` replaces inherited bitwise operators on every `Flag` subclass. A
