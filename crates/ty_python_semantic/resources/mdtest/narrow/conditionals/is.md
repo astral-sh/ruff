@@ -311,7 +311,7 @@ def literals(
         reveal_type(some_bytes)  # revealed: Literal[b"some_bytes"]
 ```
 
-### Negative-only types
+### Static exclusions
 
 A static exclusion does not necessarily exclude an object's runtime type. In the example below,
 `BoolNewType` is statically disjoint from `Literal[True]`, so it inhabits `Not[Literal[True]]`.
@@ -330,24 +330,29 @@ def excludes_true(value: Not[Literal[True]]) -> None:
 excludes_true(BoolNewType(True))
 ```
 
+The same applies when an intersection has positive elements. `IntNewType(1)` is accepted as
+`Intersection[int, Not[Literal[1]]]`, but still returns the `1` object unchanged.
+
+```py
+from typing import Literal, NewType
+from ty_extensions import Intersection, Not
+
+IntNewType = NewType("IntNewType", int)
+
+def excludes_one(value: Intersection[int, Not[Literal[1]]]) -> None:
+    reveal_type(value is 1)  # revealed: bool
+    if value is 1:
+        reveal_type(value)  # revealed: int & ~Literal[1]
+
+excludes_one(IntNewType(1))
+```
+
 ### Comparisons that are always false
 
-These comparisons are still always false when a positive type excludes the other operand and when
-the two runtime types are distinct final classes.
+An identity comparison is still always false when the two runtime types are distinct final classes.
 
 ```py
 from typing import NewType, final
-from ty_extensions import Intersection, Not
-
-class Foo: ...
-class FooSub(Foo): ...
-
-FooNewType = NewType("FooNewType", Foo)
-FooSubNewType = NewType("FooSubNewType", FooSub)
-
-def excluded_subtype(left: Intersection[FooNewType, Not[FooSub]], right: FooSubNewType) -> None:
-    reveal_type(left is right)  # revealed: Literal[False]
-    reveal_type(left is not right)  # revealed: Literal[True]
 
 @final
 class A: ...

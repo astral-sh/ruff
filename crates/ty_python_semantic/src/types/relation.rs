@@ -697,9 +697,9 @@ impl<'db> Type<'db> {
     /// A `NewType` wrapper is an identity function at runtime, so it contributes its concrete base
     /// type here while remaining distinct for ordinary type relations and intersections.
     ///
-    /// Negative-only intersections are widened to `object`. A static exclusion alone does not
-    /// imply a runtime exclusion: `NewType("N", bool)(True)` can inhabit `Not[Literal[True]]`, but
-    /// evaluates to the `True` singleton at runtime.
+    /// Negative intersection elements are omitted. A static exclusion does not imply a runtime
+    /// exclusion: `NewType("N", bool)(True)` can inhabit `Not[Literal[True]]`, but evaluates to
+    /// the `True` singleton at runtime.
     pub(crate) fn identity_comparison_type(self, db: &'db dyn Db) -> Type<'db> {
         struct IdentityComparisonProjection;
 
@@ -725,12 +725,13 @@ impl<'db> Type<'db> {
                     }
                 }),
                 Type::Union(union) => union.map(db, |element| project(db, *element, visitor)),
-                Type::Intersection(intersection) if intersection.positive(db).is_empty() => {
-                    Type::object()
-                }
-                Type::Intersection(intersection) => {
-                    intersection.map_positive(db, |element| project(db, *element, visitor))
-                }
+                Type::Intersection(intersection) => IntersectionType::from_elements(
+                    db,
+                    intersection
+                        .positive(db)
+                        .iter()
+                        .map(|element| project(db, *element, visitor)),
+                ),
                 _ => ty,
             }
         }
