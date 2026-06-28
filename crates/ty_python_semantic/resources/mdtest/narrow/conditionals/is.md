@@ -192,12 +192,16 @@ def narrow_generic_alias[T: (Generic[int], Specialized)](klass: type[T]) -> None
 
 ## `is` with `NewType`s
 
-Distinct `NewType`s can describe the same runtime object even though they are statically disjoint.
-An identity comparison between them must not be considered always false or narrow either operand:
+### Distinct `NewType`s with the same base
+
+Calling a `NewType` returns its argument unchanged, so values with statically disjoint `NewType`s
+can still be the same object at runtime. An identity comparison between distinct `NewType`s with
+the same base is therefore not always false. In the true branch, we preserve both nominal types,
+including when they appear in unions or intersections.
 
 ```py
-from typing import NewType, TypeVar, final
-from ty_extensions import Intersection, Not, is_disjoint_from, static_assert
+from typing import NewType
+from ty_extensions import Intersection
 
 class Foo: ...
 class FooSub(Foo): ...
@@ -205,38 +209,13 @@ class FooSub(Foo): ...
 FooNewType1 = NewType("FooNewType1", Foo)
 FooNewType2 = NewType("FooNewType2", Foo)
 
-static_assert(is_disjoint_from(FooNewType1, FooNewType2))
-
 def same_base(foo1: FooNewType1, foo2: FooNewType2) -> None:
     reveal_type(foo1 is foo2)  # revealed: bool
     if foo1 is foo2:
         reveal_type(foo1)  # revealed: FooNewType1
         reveal_type(foo2)  # revealed: FooNewType2
 
-BoundedT = TypeVar("BoundedT", bound=FooNewType1)
-BoundedU = TypeVar("BoundedU", bound=FooNewType2)
-
-def bounded_typevars(left: BoundedT, right: BoundedU) -> None:
-    reveal_type(left is right)  # revealed: bool
-    reveal_type(left is not right)  # revealed: bool
-    if left is right:
-        reveal_type(left)  # revealed: BoundedT@bounded_typevars
-        reveal_type(right)  # revealed: BoundedU@bounded_typevars
-
-FooNewType3 = NewType("FooNewType3", Foo)
-FooNewType4 = NewType("FooNewType4", Foo)
-ConstrainedT = TypeVar("ConstrainedT", FooNewType1, FooNewType2)
-ConstrainedU = TypeVar("ConstrainedU", FooNewType3, FooNewType4)
-
-def constrained_typevars(left: ConstrainedT, right: ConstrainedU) -> None:
-    reveal_type(left is right)  # revealed: bool
-    reveal_type(left is not right)  # revealed: bool
-    if left is right:
-        reveal_type(left)  # revealed: ConstrainedT@constrained_typevars
-        reveal_type(right)  # revealed: ConstrainedU@constrained_typevars
-
 def unions(left: FooNewType1 | str, right: FooNewType2 | bytes) -> None:
-    reveal_type(left is right)  # revealed: bool
     if left is right:
         reveal_type(left)  # revealed: (str & FooNewType2) | FooNewType1
         reveal_type(right)  # revealed: (bytes & FooNewType1) | FooNewType2
@@ -246,25 +225,65 @@ def intersection(left: Intersection[FooNewType1, FooSub], right: FooNewType2) ->
     if left is right:
         reveal_type(left)  # revealed: FooNewType1 & FooSub
         reveal_type(right)  # revealed: FooNewType2 & FooSub
+```
 
-FooSubNewType = NewType("FooSubNewType", FooSub)
+### `NewType`s in `TypeVar` bounds and constraints
 
-def negative_intersection(left: Intersection[FooNewType1, Not[FooSub]], right: FooSubNewType) -> None:
-    reveal_type(left is right)  # revealed: Literal[False]
-    reveal_type(right is left)  # revealed: Literal[False]
-    reveal_type(left is not right)  # revealed: Literal[True]
-    reveal_type(right is not left)  # revealed: Literal[True]
+The same runtime behavior applies when the operands are `TypeVar`s whose bounds or constraints are
+distinct `NewType`s with the same base. The result is not statically known, and a true branch
+preserves the `TypeVar`.
+
+```py
+from typing import NewType, TypeVar
+
+class Foo: ...
+
+FooNewType1 = NewType("FooNewType1", Foo)
+FooNewType2 = NewType("FooNewType2", Foo)
+FooNewType3 = NewType("FooNewType3", Foo)
+FooNewType4 = NewType("FooNewType4", Foo)
+
+BoundedT = TypeVar("BoundedT", bound=FooNewType1)
+BoundedU = TypeVar("BoundedU", bound=FooNewType2)
+
+def bounded_typevars(left: BoundedT, right: BoundedU) -> None:
+    reveal_type(left is right)  # revealed: bool
+    reveal_type(left is not right)  # revealed: bool
     if left is right:
-        reveal_type(left)  # revealed: Never
-        reveal_type(right)  # revealed: Never
+        reveal_type(left)  # revealed: BoundedT@bounded_typevars
+
+ConstrainedT = TypeVar("ConstrainedT", FooNewType1, FooNewType2)
+ConstrainedU = TypeVar("ConstrainedU", FooNewType3, FooNewType4)
+
+def constrained_typevars(left: ConstrainedT, right: ConstrainedU) -> None:
+    reveal_type(left is right)  # revealed: bool
+    if left is right:
+        reveal_type(left)  # revealed: ConstrainedT@constrained_typevars
+```
+
+### Preserving a `NewType` in the true branch
+
+If an object is identical to a value with a `NewType`, the true branch preserves the `NewType`
+rather than replacing it with its underlying type. The call below should not emit an error.
+
+```py
+from typing import NewType
 
 UserId = NewType("UserId", int)
 
 def takes_user_id(value: UserId) -> None: ...
-def preserve_newtype_constraint(x: object, user_id: UserId) -> None:
+def preserve_newtype(x: object, user_id: UserId) -> None:
     if x is user_id:
-        reveal_type(x)  # revealed: UserId
         takes_user_id(x)
+```
+
+### `NewType`s of builtin literal types
+
+`NewType`s of `bool`, `int`, `str`, and `bytes` also return their arguments unchanged. An identity
+comparison with the original literal can therefore succeed, so the true branch remains reachable.
+
+```py
+from typing import NewType
 
 BoolNewType = NewType("BoolNewType", bool)
 IntNewType = NewType("IntNewType", int)
@@ -282,7 +301,6 @@ def literals(
     some_string = "some_string"
     some_bytes = b"some_bytes"
 
-    reveal_type(bool_newtype is true)  # revealed: bool
     if bool_newtype is true:
         reveal_type(true)  # revealed: Literal[True]
     if int_newtype is forty_two:
@@ -291,6 +309,27 @@ def literals(
         reveal_type(some_string)  # revealed: Literal["some_string"]
     if bytes_newtype is some_bytes:
         reveal_type(some_bytes)  # revealed: Literal[b"some_bytes"]
+```
+
+### Comparisons that are always false
+
+These comparisons are still always false when the declared types rule out a shared object. This is
+true when one operand excludes the other's base class and when the two bases are distinct final
+classes.
+
+```py
+from typing import NewType, final
+from ty_extensions import Intersection, Not
+
+class Foo: ...
+class FooSub(Foo): ...
+
+FooNewType = NewType("FooNewType", Foo)
+FooSubNewType = NewType("FooSubNewType", FooSub)
+
+def excluded_subtype(left: Intersection[FooNewType, Not[FooSub]], right: FooSubNewType) -> None:
+    reveal_type(left is right)  # revealed: Literal[False]
+    reveal_type(left is not right)  # revealed: Literal[True]
 
 @final
 class A: ...
@@ -303,9 +342,6 @@ BNewType = NewType("BNewType", B)
 
 def disjoint_bases(a: ANewType, b: BNewType) -> None:
     reveal_type(a is b)  # revealed: Literal[False]
-    if a is b:
-        reveal_type(a)  # revealed: Never
-        reveal_type(b)  # revealed: Never
 ```
 
 ## `is` where the other operand is a call expression
