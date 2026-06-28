@@ -3203,7 +3203,7 @@ impl<'db> Parameters<'db> {
 
         for parameter in parameters {
             if let Some(unpacked_typed_dict) = parameter.unpacked_typed_dict(db) {
-                Self::push_unpacked_typed_dict(db, &mut value, parameter, unpacked_typed_dict);
+                Self::push_unpacked_typed_dict(db, &mut value, &parameter, unpacked_typed_dict);
             } else {
                 value.push(parameter);
             }
@@ -3215,7 +3215,7 @@ impl<'db> Parameters<'db> {
     fn push_unpacked_typed_dict(
         db: &'db dyn Db,
         value: &mut Vec<Parameter<'db>>,
-        parameter: Parameter<'db>,
+        parameter: &Parameter<'db>,
         unpacked_typed_dict: TypedDictType<'db>,
     ) {
         let kwargs_name = parameter
