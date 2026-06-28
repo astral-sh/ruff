@@ -22,7 +22,7 @@ UP034 [*] Avoid extraneous parentheses
  --> UP034.py:5:7
   |
 4 | # UP034
-5 | print(("hell((goodybe))o"))
+5 | print(("hell((goodbye))o"))
   |       ^^^^^^^^^^^^^^^^^^^^
 6 |
 7 | # UP034
@@ -30,8 +30,8 @@ UP034 [*] Avoid extraneous parentheses
 help: Remove extraneous parentheses
   |
 4 | # UP034
-  - print(("hell((goodybe))o"))
-5 + print("hell((goodybe))o")
+  - print(("hell((goodbye))o"))
+5 + print("hell((goodbye))o")
 6 |
   |
 
