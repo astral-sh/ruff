@@ -193,13 +193,11 @@ warning[unused-type-ignore-comment]: Unused `type: ignore` directive
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Remove the unused suppression comment
-60 |     A,
-61 |     A
+   |
 62 | # error: [unused-type-ignore-comment]
    - ):  # type: ignore[ty:duplicate-base]
 63 + ):
 64 |     x: int
-65 |
-66 | # fmt: on
+   |
 
 ```

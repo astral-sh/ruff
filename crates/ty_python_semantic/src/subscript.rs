@@ -2,6 +2,8 @@
 //! operations (`PySlice`) on iterators, following the semantics of equivalent
 //! operations in Python.
 
+use std::num::NonZeroI32;
+
 use itertools::Either;
 
 use crate::Db;
@@ -119,6 +121,82 @@ pub(crate) trait PySlice<'db> {
     ) -> Result<impl Iterator<Item = Self::Item>, StepSizeZeroError>;
 }
 
+/// Returns a static Python slice for a known non-zero step.
+pub(crate) fn py_slice_with_step<T>(
+    elements: &[T],
+    start: Option<i32>,
+    stop: Option<i32>,
+    step_int: NonZeroI32,
+) -> impl Iterator<Item = T> + '_
+where
+    T: Copy,
+{
+    let len = elements.len();
+    if len == 0 {
+        // The iterator needs to have the same type as the step>0 case below,
+        // so we need to use `.skip(0)`.
+        #[expect(clippy::iter_skip_zero)]
+        return Either::Left(elements.iter().skip(0).take(0).step_by(1)).copied();
+    }
+
+    let to_position = |index| Nth::from_index(index).to_position(len);
+    let step_int = step_int.get();
+
+    let iter = if step_int.is_positive() {
+        let step = from_nonnegative_i32(step_int);
+
+        let start = start.map(to_position).unwrap_or(Position::BeforeStart);
+        let stop = stop.map(to_position).unwrap_or(Position::AfterEnd);
+
+        let (skip, take, step) = if start < stop {
+            let skip = match start {
+                Position::BeforeStart => 0,
+                Position::AtIndex(start_index) => start_index,
+                Position::AfterEnd => len,
+            };
+
+            let take = match stop {
+                Position::BeforeStart => 0,
+                Position::AtIndex(stop_index) => stop_index - skip,
+                Position::AfterEnd => len - skip,
+            };
+
+            (skip, take, step)
+        } else {
+            (0, 0, step)
+        };
+
+        Either::Left(elements.iter().skip(skip).take(take).step_by(step))
+    } else {
+        let step = from_negative_i32(step_int);
+
+        let start = start.map(to_position).unwrap_or(Position::AfterEnd);
+        let stop = stop.map(to_position).unwrap_or(Position::BeforeStart);
+
+        let (skip, take, step) = if start <= stop {
+            (0, 0, step)
+        } else {
+            let skip = match start {
+                Position::BeforeStart => len,
+                Position::AtIndex(start_index) => len - 1 - start_index,
+                Position::AfterEnd => 0,
+            };
+
+            let take = match stop {
+                Position::BeforeStart => len - skip,
+                Position::AtIndex(stop_index) => (len - 1) - skip - stop_index,
+                Position::AfterEnd => 0,
+            };
+
+            (skip, take, step)
+        };
+
+        Either::Right(elements.iter().rev().skip(skip).take(take).step_by(step))
+    };
+
+    iter.copied()
+}
+
 impl<'db, T> PySlice<'db> for [T]
 where
     T: Copy + 'db,
@@ -133,73 +211,11 @@ where
         step_int: Option<i32>,
     ) -> Result<impl Iterator<Item = Self::Item>, StepSizeZeroError> {
         let step_int = step_int.unwrap_or(1);
-        if step_int == 0 {
+        let Some(step_int) = NonZeroI32::new(step_int) else {
             return Err(StepSizeZeroError);
-        }
-
-        let len = self.len();
-        if len == 0 {
-            // The iterator needs to have the same type as the step>0 case below,
-            // so we need to use `.skip(0)`.
-            #[expect(clippy::iter_skip_zero)]
-            return Ok(Either::Left(self.iter().skip(0).take(0).step_by(1)).copied());
-        }
-
-        let to_position = |index| Nth::from_index(index).to_position(len);
-
-        let iter = if step_int.is_positive() {
-            let step = from_nonnegative_i32(step_int);
-
-            let start = start.map(to_position).unwrap_or(Position::BeforeStart);
-            let stop = stop.map(to_position).unwrap_or(Position::AfterEnd);
-
-            let (skip, take, step) = if start < stop {
-                let skip = match start {
-                    Position::BeforeStart => 0,
-                    Position::AtIndex(start_index) => start_index,
-                    Position::AfterEnd => len,
-                };
-
-                let take = match stop {
-                    Position::BeforeStart => 0,
-                    Position::AtIndex(stop_index) => stop_index - skip,
-                    Position::AfterEnd => len - skip,
-                };
-
-                (skip, take, step)
-            } else {
-                (0, 0, step)
-            };
-
-            Either::Left(self.iter().skip(skip).take(take).step_by(step))
-        } else {
-            let step = from_negative_i32(step_int);
-
-            let start = start.map(to_position).unwrap_or(Position::AfterEnd);
-            let stop = stop.map(to_position).unwrap_or(Position::BeforeStart);
-
-            let (skip, take, step) = if start <= stop {
-                (0, 0, step)
-            } else {
-                let skip = match start {
-                    Position::BeforeStart => len,
-                    Position::AtIndex(start_index) => len - 1 - start_index,
-                    Position::AfterEnd => 0,
-                };
-
-                let take = match stop {
-                    Position::BeforeStart => len - skip,
-                    Position::AtIndex(stop_index) => (len - 1) - skip - stop_index,
-                    Position::AfterEnd => 0,
-                };
-
-                (skip, take, step)
-            };
-
-            Either::Right(self.iter().rev().skip(skip).take(take).step_by(step))
         };
 
-        Ok(iter.copied())
+        Ok(py_slice_with_step(self, start, stop, step_int))
     }
 }
 

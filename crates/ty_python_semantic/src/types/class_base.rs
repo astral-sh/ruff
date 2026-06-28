@@ -5,7 +5,7 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DivergentType, DynamicType, KnownClass,
     KnownInstanceType, MaterializationKind, SpecialFormType, StaticMroError, Type, TypeContext,
-    TypeMapping, todo_type,
+    TypeMapping, TypedDictModule, todo_type,
 };
 use crate::{Db, DisplaySettings};
 
@@ -34,7 +34,7 @@ pub enum ClassBase<'db> {
     /// but nonetheless appears in the MRO of classes that inherit from `Generic[T]`,
     /// `Protocol[T]`, or bare `Protocol`.
     Generic,
-    TypedDict,
+    TypedDict(TypedDictModule),
 }
 
 impl<'db> ClassBase<'db> {
@@ -54,7 +54,7 @@ impl<'db> ClassBase<'db> {
             Self::Class(class) => Some(Self::Class(
                 class.recursive_type_normalized_impl(db, div, nested)?,
             )),
-            Self::Any | Self::Protocol | Self::Generic | Self::TypedDict => Some(self),
+            Self::Any | Self::Protocol | Self::Generic | Self::TypedDict(_) => Some(self),
         }
     }
 
@@ -79,7 +79,7 @@ impl<'db> ClassBase<'db> {
             ClassBase::Divergent(_) => "Divergent",
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",
-            ClassBase::TypedDict => "TypedDict",
+            ClassBase::TypedDict(_) => "TypedDict",
         }
     }
 
@@ -89,7 +89,25 @@ impl<'db> ClassBase<'db> {
     }
 
     pub(super) const fn is_typed_dict(self) -> bool {
-        matches!(self, ClassBase::TypedDict)
+        self.typed_dict_module().is_some()
+    }
+
+    pub(super) const fn typed_dict_module(self) -> Option<TypedDictModule> {
+        match self {
+            ClassBase::TypedDict(module) => Some(module),
+            _ => None,
+        }
+    }
+
+    /// Return the identity of this base for method-resolution-order construction.
+    ///
+    /// The `TypedDict` module affects member lookup, but both special forms represent the same
+    /// pseudo-base when detecting duplicate or conflicting bases.
+    pub(super) const fn mro_identity(self) -> Self {
+        match self {
+            Self::TypedDict(_) => Self::TypedDict(TypedDictModule::Typing),
+            _ => self,
+        }
     }
 
     /// Return whether this is an explicit `Any` base.
@@ -145,6 +163,10 @@ impl<'db> ClassBase<'db> {
                 }
             }
             Type::Union(union) => {
+                if let Some(module) = TypedDictModule::from_type(db, ty) {
+                    return Some(ClassBase::TypedDict(module));
+                }
+
                 // We do not support full unions of MROs (yet). Until we do,
                 // support the cases where one of the types in the union is
                 // a dynamic type such as `Any` or `Unknown`, and all other
@@ -219,6 +241,7 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::LiteralStringAlias(_)
                 | KnownInstanceType::NamedTupleSpec(_)
                 | KnownInstanceType::Sentinel(_)
+                | KnownInstanceType::Range { .. }
                 // A class inheriting from a newtype would make intuitive sense, but newtype
                 // wrappers are just identity callables at runtime, so this sort of inheritance
                 // doesn't work and isn't allowed.
@@ -262,6 +285,7 @@ impl<'db> ClassBase<'db> {
                 | SpecialFormType::CallableTypeOf
                 | SpecialFormType::RegularCallableTypeOf
                 | SpecialFormType::Divergent
+                | SpecialFormType::Todo
                 | SpecialFormType::AlwaysTruthy
                 | SpecialFormType::AlwaysFalsy
                 | SpecialFormType::TypeForm => None,
@@ -270,7 +294,7 @@ impl<'db> ClassBase<'db> {
                 SpecialFormType::Unknown => Some(Self::unknown()),
                 SpecialFormType::Protocol => Some(Self::Protocol),
                 SpecialFormType::Generic => Some(Self::Generic),
-                SpecialFormType::TypedDict => Some(Self::TypedDict),
+                SpecialFormType::TypedDict(module) => Some(Self::TypedDict(module)),
 
                 SpecialFormType::NamedTuple => {
                     let class = subclass?.as_static()?;
@@ -319,7 +343,7 @@ impl<'db> ClassBase<'db> {
             | Self::Divergent(_)
             | Self::Generic
             | Self::Protocol
-            | Self::TypedDict => None,
+            | Self::TypedDict(_) => None,
         }
     }
 
@@ -331,7 +355,7 @@ impl<'db> ClassBase<'db> {
             Self::Dynamic(dynamic) => Type::Dynamic(dynamic),
             Self::Divergent(divergent) => Type::Divergent(divergent),
             // TODO: all `Protocol` classes actually have `_ProtocolMeta` as their metaclass.
-            Self::Protocol | Self::Generic | Self::TypedDict => KnownClass::Type.to_instance(db),
+            Self::Protocol | Self::Generic | Self::TypedDict(_) => KnownClass::Type.to_instance(db),
         }
     }
 
@@ -351,7 +375,7 @@ impl<'db> ClassBase<'db> {
             | Self::Divergent(_)
             | Self::Generic
             | Self::Protocol
-            | Self::TypedDict => self,
+            | Self::TypedDict(_) => self,
         }
     }
 
@@ -406,7 +430,7 @@ impl<'db> ClassBase<'db> {
             | ClassBase::Divergent(_)
             | ClassBase::Generic
             | ClassBase::Protocol
-            | ClassBase::TypedDict => false,
+            | ClassBase::TypedDict(_) => false,
         }
     }
 
@@ -422,7 +446,7 @@ impl<'db> ClassBase<'db> {
             | ClassBase::Dynamic(_)
             | ClassBase::Divergent(_)
             | ClassBase::Generic
-            | ClassBase::TypedDict => ClassBaseMroIterator::length_2(db, self),
+            | ClassBase::TypedDict(_) => ClassBaseMroIterator::length_2(db, self),
             ClassBase::Class(class) => {
                 ClassBaseMroIterator::from_class(db, class, additional_specialization)
             }
@@ -455,7 +479,7 @@ impl<'db> ClassBase<'db> {
                         .fmt(f),
                     ClassBase::Protocol => f.write_str("typing.Protocol"),
                     ClassBase::Generic => f.write_str("typing.Generic"),
-                    ClassBase::TypedDict => f.write_str("typing.TypedDict"),
+                    ClassBase::TypedDict(_) => f.write_str("typing.TypedDict"),
                 }
             }
         }
@@ -483,7 +507,7 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
             ClassBase::Class(class) => class.into(),
             ClassBase::Protocol => Type::SpecialForm(SpecialFormType::Protocol),
             ClassBase::Generic => Type::SpecialForm(SpecialFormType::Generic),
-            ClassBase::TypedDict => Type::SpecialForm(SpecialFormType::TypedDict),
+            ClassBase::TypedDict(module) => Type::SpecialForm(SpecialFormType::TypedDict(module)),
         }
     }
 }

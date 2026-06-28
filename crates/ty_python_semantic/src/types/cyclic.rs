@@ -24,6 +24,7 @@ use std::cell::RefCell;
 use std::cmp::Eq;
 use std::hash::Hash;
 use std::marker::PhantomData;
+use std::mem;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -37,7 +38,7 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
     fn default() -> Self {
         CycleDetector {
             seen: RefCell::new(SmallVec::new()),
-            cache: RefCell::new(FxHashMap::default()),
+            cache: RefCell::new(CycleDetectorCache::new()),
             fallback: None,
             _tag: PhantomData,
         }
@@ -61,7 +62,7 @@ pub struct CycleDetector<Tag, T, R, const INLINE_CAPACITY: usize> {
     /// chain we're currently in. Since this cache is just a performance optimisation, it doesn't
     /// make sense to pop items off the end of the cache after they've been visited (it would
     /// sort-of defeat the point of a cache if we did!)
-    cache: RefCell<FxHashMap<T, R>>,
+    cache: RefCell<CycleDetectorCache<T, R>>,
 
     fallback: Option<R>,
 
@@ -72,7 +73,7 @@ impl<Tag, T, R, const INLINE_CAPACITY: usize> CycleDetector<Tag, T, R, INLINE_CA
     pub fn new(fallback: R) -> Self {
         CycleDetector {
             seen: RefCell::new(SmallVec::new()),
-            cache: RefCell::new(FxHashMap::default()),
+            cache: RefCell::new(CycleDetectorCache::new()),
             fallback: Some(fallback),
             _tag: PhantomData,
         }
@@ -92,8 +93,8 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone, const INLINE_CAPACITY: usize>
         on_cycle: impl FnOnce(T) -> R,
         func: impl FnOnce() -> R,
     ) -> R {
-        if let Some(val) = self.cache.borrow().get(&item) {
-            return val.clone();
+        if let Some(result) = self.cache.borrow().get(&item) {
+            return result.clone();
         }
 
         // We hit a cycle
@@ -105,7 +106,7 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone, const INLINE_CAPACITY: usize>
         let ret = func();
 
         self.seen.borrow_mut().pop();
-        self.cache.borrow_mut().insert(item, ret.clone());
+        self.cache.borrow_mut().insert_new(item, ret.clone());
 
         ret
     }
@@ -171,6 +172,69 @@ impl<Tag, T, R: Default, const INLINE_CAPACITY: usize> Default
     }
 }
 
+/// The memoized results for a [`CycleDetector`].
+///
+/// Most populated cycle-detector caches contain at most two results. Keep those results inline,
+/// but spill on the third distinct result so lookups in wider caches remain hashed.
+#[derive(Debug)]
+enum CycleDetectorCache<T, R> {
+    Empty,
+    One((T, R)),
+    Two([(T, R); 2]),
+    Spilled(FxHashMap<T, R>),
+}
+
+impl<T, R> CycleDetectorCache<T, R> {
+    const fn new() -> Self {
+        Self::Empty
+    }
+
+    fn get(&self, item: &T) -> Option<&R>
+    where
+        T: Hash + Eq,
+    {
+        match self {
+            Self::Empty => None,
+            Self::One((cached_item, result)) => (cached_item == item).then_some(result),
+            Self::Two(entries) => entries
+                .iter()
+                .find_map(|(cached_item, result)| (cached_item == item).then_some(result)),
+            Self::Spilled(cache) => cache.get(item),
+        }
+    }
+
+    /// Inserts a result after the caller has checked that `item` is not already cached.
+    fn insert_new(&mut self, item: T, result: R)
+    where
+        T: Hash + Eq,
+    {
+        debug_assert!(self.get(&item).is_none());
+        let entry = (item, result);
+        *self = match mem::replace(self, Self::Empty) {
+            Self::Empty => Self::One(entry),
+            Self::One(first) => Self::Two([first, entry]),
+            Self::Two(entries) => Self::spill(entries, entry),
+            Self::Spilled(mut cache) => {
+                cache.insert(entry.0, entry.1);
+                Self::Spilled(cache)
+            }
+        };
+    }
+
+    #[cold]
+    fn spill(entries: [(T, R); 2], third: (T, R)) -> Self
+    where
+        T: Hash + Eq,
+    {
+        Self::Spilled(entries.into_iter().chain([third]).collect())
+    }
+
+    #[cfg(test)]
+    const fn is_spilled(&self) -> bool {
+        matches!(self, Self::Spilled(_))
+    }
+}
+
 /// Recursion detection without memoization.
 ///
 /// This is useful when a recursive relation needs a coinductive-style "we're already proving this
@@ -219,5 +283,28 @@ struct ActiveRecursionGuard<'a, T: Hash + Eq> {
 impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
     fn drop(&mut self) {
         self.seen.borrow_mut().remove(self.item);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CycleDetector;
+
+    struct TestCycleDetector;
+    type Detector = CycleDetector<TestCycleDetector, u8, u8, 1>;
+
+    #[test]
+    fn caches_results_and_spills_after_two_entries() {
+        let detector = Detector::new(0);
+
+        assert_eq!(detector.visit(1, || 10), 10);
+        assert_eq!(detector.visit(1, || 40), 10);
+        assert_eq!(detector.visit(2, || 20), 20);
+        assert!(!detector.cache.borrow().is_spilled());
+        assert_eq!(detector.visit(3, || 30), 30);
+        assert!(detector.cache.borrow().is_spilled());
+
+        assert_eq!(detector.visit(2, || 40), 20);
+        assert_eq!(detector.visit(3, || 40), 30);
     }
 }

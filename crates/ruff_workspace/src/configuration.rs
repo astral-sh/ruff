@@ -13,6 +13,7 @@ use glob::{GlobError, Paths, PatternError, glob};
 use itertools::Itertools;
 use log::debug;
 use regex::Regex;
+use ruff_linter::preview::is_warn_on_unknown_selectors_enabled;
 use rustc_hash::{FxHashMap, FxHashSet};
 use shellexpand;
 use shellexpand::LookupError;
@@ -22,8 +23,8 @@ use ruff_cache::cache_dir;
 use ruff_formatter::IndentStyle;
 use ruff_graph::{AnalyzeSettings, Direction, StringImports};
 use ruff_linter::line_width::{IndentWidth, LineLength};
-use ruff_linter::registry::{INCOMPATIBLE_CODES, Rule, RuleNamespace, RuleSet};
-use ruff_linter::rule_selector::{PreviewOptions, Specificity};
+use ruff_linter::registry::{INCOMPATIBLE_CODES, Rule, RuleSet};
+use ruff_linter::rule_selector::{PreviewOptions, RuleResolutionError, Specificity};
 use ruff_linter::rules::pydocstyle::settings::Convention;
 use ruff_linter::rules::{flake8_import_conventions, isort, pycodestyle};
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
@@ -38,7 +39,8 @@ use ruff_linter::settings::{
     TargetVersion,
 };
 use ruff_linter::{
-    RuleSelector, fs, warn_user_once, warn_user_once_by_id, warn_user_once_by_message,
+    RuleSelector, UnresolvedRuleSelector, fs, warn_user_once, warn_user_once_by_id,
+    warn_user_once_by_message,
 };
 use ruff_python_ast as ast;
 use ruff_python_formatter::{
@@ -65,12 +67,21 @@ use crate::settings::{
 
 #[derive(Clone, Debug, Default)]
 pub struct RuleSelection {
-    pub select: Option<Vec<RuleSelector>>,
-    pub ignore: Vec<RuleSelector>,
-    pub extend_select: Vec<RuleSelector>,
-    pub fixable: Option<Vec<RuleSelector>>,
-    pub unfixable: Vec<RuleSelector>,
-    pub extend_fixable: Vec<RuleSelector>,
+    pub select: Option<Vec<UnresolvedRuleSelector>>,
+    pub ignore: Vec<UnresolvedRuleSelector>,
+    pub extend_select: Vec<UnresolvedRuleSelector>,
+    pub fixable: Option<Vec<UnresolvedRuleSelector>>,
+    pub unfixable: Vec<UnresolvedRuleSelector>,
+    pub extend_fixable: Vec<UnresolvedRuleSelector>,
+}
+
+struct ResolvedRuleSelection {
+    select: Option<Vec<RuleSelector>>,
+    ignore: Vec<RuleSelector>,
+    extend_select: Vec<RuleSelector>,
+    fixable: Option<Vec<RuleSelector>>,
+    unfixable: Vec<RuleSelector>,
+    extend_fixable: Vec<RuleSelector>,
 }
 
 #[derive(Debug, Eq, PartialEq, is_macro::Is)]
@@ -84,7 +95,50 @@ pub enum RuleSelectorKind {
 }
 
 impl RuleSelection {
-    pub fn selectors_by_kind(&self) -> impl Iterator<Item = (RuleSelectorKind, &RuleSelector)> {
+    fn resolve(&self, preview: PreviewMode) -> Result<ResolvedRuleSelection, RuleResolutionError> {
+        fn resolve(
+            setting: &'static str,
+            selectors: &[UnresolvedRuleSelector],
+            preview: PreviewMode,
+        ) -> Result<Vec<RuleSelector>, RuleResolutionError> {
+            selectors
+                .iter()
+                .filter_map(|selector| match selector.resolve(preview) {
+                    Ok(selector) => Some(Ok(selector)),
+                    Err(mut err) => {
+                        err = err.with_setting(setting);
+                        if is_warn_on_unknown_selectors_enabled(preview) {
+                            err.log_warning();
+                            None
+                        } else {
+                            Some(Err(err))
+                        }
+                    }
+                })
+                .collect()
+        }
+
+        Ok(ResolvedRuleSelection {
+            select: self
+                .select
+                .as_deref()
+                .map(|selectors| resolve("select", selectors, preview))
+                .transpose()?,
+            ignore: resolve("ignore", &self.ignore, preview)?,
+            extend_select: resolve("extend-select", &self.extend_select, preview)?,
+            fixable: self
+                .fixable
+                .as_deref()
+                .map(|selectors| resolve("fixable", selectors, preview))
+                .transpose()?,
+            unfixable: resolve("unfixable", &self.unfixable, preview)?,
+            extend_fixable: resolve("extend-fixable", &self.extend_fixable, preview)?,
+        })
+    }
+}
+
+impl ResolvedRuleSelection {
+    fn selectors_by_kind(&self) -> impl Iterator<Item = (RuleSelectorKind, &RuleSelector)> {
         self.select
             .iter()
             .flatten()
@@ -340,6 +394,7 @@ impl Configuration {
                         .into_iter()
                         .chain(lint.extend_per_file_ignores)
                         .collect(),
+                    lint_preview,
                 )?,
                 fix_safety: FixSafetyTable::from_rule_selectors(
                     &lint.extend_safe_fixes,
@@ -348,7 +403,7 @@ impl Configuration {
                         mode: lint_preview,
                         require_explicit: false,
                     },
-                ),
+                )?,
                 src: self
                     .src
                     .unwrap_or_else(|| vec![project_root.to_path_buf(), project_root.join("src")]),
@@ -690,8 +745,8 @@ pub struct LintConfiguration {
     pub explicit_preview_rules: Option<bool>,
 
     // Fix configuration
-    pub extend_unsafe_fixes: Vec<RuleSelector>,
-    pub extend_safe_fixes: Vec<RuleSelector>,
+    pub extend_unsafe_fixes: Vec<UnresolvedRuleSelector>,
+    pub extend_safe_fixes: Vec<UnresolvedRuleSelector>,
 
     // Global lint settings
     pub allowed_confusables: Option<Vec<char>>,
@@ -799,7 +854,7 @@ impl LintConfiguration {
                     per_file_ignores
                         .into_iter()
                         .map(|(pattern, prefixes)| {
-                            PerFileIgnore::new(pattern, &prefixes, Some(project_root))
+                            PerFileIgnore::new(pattern, prefixes, Some(project_root))
                         })
                         .collect()
                 })
@@ -811,7 +866,7 @@ impl LintConfiguration {
                 per_file_ignores
                     .into_iter()
                     .map(|(pattern, prefixes)| {
-                        PerFileIgnore::new(pattern, &prefixes, Some(project_root))
+                        PerFileIgnore::new(pattern, prefixes, Some(project_root))
                     })
                     .collect()
             }),
@@ -873,6 +928,12 @@ impl LintConfiguration {
         // The fixable set keeps track of which rules are fixable.
         let mut fixable_set: RuleSet = RuleSelector::All.all_rules().collect();
 
+        let rule_selections = self
+            .rule_selections
+            .iter()
+            .map(|selection| selection.resolve(preview.mode))
+            .collect::<std::result::Result<Vec<_>, RuleResolutionError>>()?;
+
         // Ignores normally only subtract from the current set of selected
         // rules.  By that logic the ignore in `select = [], ignore = ["E501"]`
         // would be effectless. Instead we carry over the ignores to the next
@@ -893,7 +954,7 @@ impl LintConfiguration {
         // which lets us override the docstring convention ignore-list
         let mut docstring_overrides: FxHashSet<Rule> = FxHashSet::default();
 
-        for selection in &self.rule_selections {
+        for selection in &rule_selections {
             // If a selection only specifies extend-select we cannot directly
             // apply its rule selectors to the select_set because we firstly have
             // to resolve the effectively selected rules within the current rule selection
@@ -1043,7 +1104,7 @@ impl LintConfiguration {
                 // Deprecated rules
                 if kind.is_enable() && selector.is_exact() {
                     if selector.all_rules().all(|rule| rule.is_deprecated()) {
-                        deprecated_selectors.insert(selector.clone());
+                        deprecated_selectors.insert(selector);
                     }
                 }
 
@@ -1060,15 +1121,15 @@ impl LintConfiguration {
 
                 // Redirected rules
                 if let RuleSelector::Prefix {
-                    prefix,
                     redirected_from: Some(redirect_from),
+                    ..
                 }
                 | RuleSelector::Rule {
-                    prefix,
                     redirected_from: Some(redirect_from),
+                    ..
                 } = selector
                 {
-                    redirects.insert(redirect_from, prefix);
+                    redirects.insert(*redirect_from, selector);
                 }
             }
         }
@@ -1111,13 +1172,9 @@ impl LintConfiguration {
         }
 
         for (from, target) in redirects.iter().sorted_by_key(|item| item.0) {
+            let (prefix, code) = target.prefix_and_code();
             // TODO(martin): This belongs into the ruff crate.
-            warn_user_once_by_id!(
-                from,
-                "`{from}` has been remapped to `{}{}`.",
-                target.linter().common_prefix(),
-                target.short_code()
-            );
+            warn_user_once_by_id!(from, "`{from}` has been remapped to `{prefix}{code}`.");
         }
 
         if preview.mode.is_disabled() {
@@ -1765,13 +1822,10 @@ fn conflicting_required_import_pyi025(
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use anyhow::Result;
 
-    use ruff_linter::RuleSelector;
-    use ruff_linter::codes::{Flake8Copyright, Pycodestyle, Refurb};
-    use ruff_linter::registry::{Linter, Rule, RuleSet};
+    use ruff_linter::UnresolvedRuleSelector;
+    use ruff_linter::registry::{Rule, RuleSet};
     use ruff_linter::rule_selector::PreviewOptions;
     use ruff_linter::settings::types::PreviewMode;
 
@@ -1812,7 +1866,10 @@ mod tests {
     fn select_linter() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![Linter::Pycodestyle.into()]),
+                select: Some(vec![
+                    UnresolvedRuleSelector::cli("E"),
+                    UnresolvedRuleSelector::cli("W"),
+                ]),
                 ..RuleSelection::default()
             }],
             None,
@@ -1853,7 +1910,7 @@ mod tests {
     fn select_one_char_prefix() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![Pycodestyle::W.into()]),
+                select: Some(vec![UnresolvedRuleSelector::cli("W")]),
                 ..RuleSelection::default()
             }],
             None,
@@ -1875,7 +1932,7 @@ mod tests {
     fn select_two_char_prefix() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![Pycodestyle::W6.into()]),
+                select: Some(vec![UnresolvedRuleSelector::cli("W6")]),
                 ..RuleSelection::default()
             }],
             None,
@@ -1889,8 +1946,8 @@ mod tests {
     fn select_prefix_ignore_code() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![Pycodestyle::W.into()]),
-                ignore: vec![Pycodestyle::W292.into()],
+                select: Some(vec![UnresolvedRuleSelector::cli("W")]),
+                ignore: vec![UnresolvedRuleSelector::cli("W292")],
                 ..RuleSelection::default()
             }],
             None,
@@ -1910,8 +1967,8 @@ mod tests {
     fn select_code_ignore_prefix() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![Pycodestyle::W292.into()]),
-                ignore: vec![Pycodestyle::W.into()],
+                select: Some(vec![UnresolvedRuleSelector::cli("W292")]),
+                ignore: vec![UnresolvedRuleSelector::cli("W")],
                 ..RuleSelection::default()
             }],
             None,
@@ -1925,8 +1982,8 @@ mod tests {
     fn select_code_ignore_code() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![Pycodestyle::W605.into()]),
-                ignore: vec![Pycodestyle::W605.into()],
+                select: Some(vec![UnresolvedRuleSelector::cli("W605")]),
+                ignore: vec![UnresolvedRuleSelector::cli("W605")],
                 ..RuleSelection::default()
             }],
             None,
@@ -1941,12 +1998,12 @@ mod tests {
         let actual = resolve_rules(
             [
                 RuleSelection {
-                    select: Some(vec![Pycodestyle::W.into()]),
-                    ignore: vec![Pycodestyle::W292.into()],
+                    select: Some(vec![UnresolvedRuleSelector::cli("W")]),
+                    ignore: vec![UnresolvedRuleSelector::cli("W292")],
                     ..RuleSelection::default()
                 },
                 RuleSelection {
-                    extend_select: vec![Pycodestyle::W292.into()],
+                    extend_select: vec![UnresolvedRuleSelector::cli("W292")],
                     ..RuleSelection::default()
                 },
             ],
@@ -1969,13 +2026,13 @@ mod tests {
         let actual = resolve_rules(
             [
                 RuleSelection {
-                    select: Some(vec![Pycodestyle::W.into()]),
-                    ignore: vec![Pycodestyle::W292.into()],
+                    select: Some(vec![UnresolvedRuleSelector::cli("W")]),
+                    ignore: vec![UnresolvedRuleSelector::cli("W292")],
                     ..RuleSelection::default()
                 },
                 RuleSelection {
-                    extend_select: vec![Pycodestyle::W292.into()],
-                    ignore: vec![Pycodestyle::W.into()],
+                    extend_select: vec![UnresolvedRuleSelector::cli("W292")],
+                    ignore: vec![UnresolvedRuleSelector::cli("W")],
                     ..RuleSelection::default()
                 },
             ],
@@ -1992,11 +2049,11 @@ mod tests {
             [
                 RuleSelection {
                     select: Some(vec![]),
-                    ignore: vec![Pycodestyle::W292.into()],
+                    ignore: vec![UnresolvedRuleSelector::cli("W292")],
                     ..RuleSelection::default()
                 },
                 RuleSelection {
-                    select: Some(vec![Pycodestyle::W.into()]),
+                    select: Some(vec![UnresolvedRuleSelector::cli("W")]),
                     ..RuleSelection::default()
                 },
             ],
@@ -2019,12 +2076,12 @@ mod tests {
             [
                 RuleSelection {
                     select: Some(vec![]),
-                    ignore: vec![Pycodestyle::W292.into()],
+                    ignore: vec![UnresolvedRuleSelector::cli("W292")],
                     ..RuleSelection::default()
                 },
                 RuleSelection {
-                    select: Some(vec![Pycodestyle::W.into()]),
-                    ignore: vec![Pycodestyle::W505.into()],
+                    select: Some(vec![UnresolvedRuleSelector::cli("W")]),
+                    ignore: vec![UnresolvedRuleSelector::cli("W505")],
                     ..RuleSelection::default()
                 },
             ],
@@ -2044,7 +2101,7 @@ mod tests {
     fn select_all_preview() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![RuleSelector::All]),
+                select: Some(vec![UnresolvedRuleSelector::cli("ALL")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2056,7 +2113,7 @@ mod tests {
 
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![RuleSelector::All]),
+                select: Some(vec![UnresolvedRuleSelector::cli("ALL")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2073,7 +2130,7 @@ mod tests {
     fn select_linter_preview() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![Linter::Flake8Copyright.into()]),
+                select: Some(vec![UnresolvedRuleSelector::cli("CPY")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2086,7 +2143,7 @@ mod tests {
 
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![Linter::Flake8Copyright.into()]),
+                select: Some(vec![UnresolvedRuleSelector::cli("CPY")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2103,7 +2160,7 @@ mod tests {
     fn select_prefix_preview() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![Flake8Copyright::_0.into()]),
+                select: Some(vec![UnresolvedRuleSelector::cli("CPY0")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2116,7 +2173,7 @@ mod tests {
 
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![Flake8Copyright::_0.into()]),
+                select: Some(vec![UnresolvedRuleSelector::cli("CPY0")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2134,7 +2191,7 @@ mod tests {
         // Test inclusion when toggling preview on and off
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![Refurb::_145.into()]),
+                select: Some(vec![UnresolvedRuleSelector::cli("FURB145")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2147,7 +2204,7 @@ mod tests {
 
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![Refurb::_145.into()]),
+                select: Some(vec![UnresolvedRuleSelector::cli("FURB145")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2161,7 +2218,7 @@ mod tests {
         // Test inclusion when preview is on but explicit codes are required
         let actual = resolve_rules(
             [RuleSelection {
-                select: Some(vec![Refurb::_145.into()]),
+                select: Some(vec![UnresolvedRuleSelector::cli("FURB145")]),
                 ..RuleSelection::default()
             }],
             Some(PreviewOptions {
@@ -2212,8 +2269,8 @@ mod tests {
             Ok(())
         }
 
-        let d41 = RuleSelector::from_str("D41").unwrap();
-        let d417 = RuleSelector::from_str("D417").unwrap();
+        let d41 = UnresolvedRuleSelector::cli("D41");
+        let d417 = UnresolvedRuleSelector::cli("D417");
 
         // D417 does not appear when D41 is provided...
         assert_override(

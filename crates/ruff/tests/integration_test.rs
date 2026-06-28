@@ -1411,7 +1411,7 @@ fn preview_disabled_does_not_warn_for_empty_fixable_selections() {
 
 #[test]
 fn preview_group_selector() {
-    // `--select PREVIEW` should error (selector was removed)
+    // `--select PREVIEW` should warn (selector was removed)
     let mut cmd = RuffCheck::default()
         .args([
             "--select",
@@ -1422,14 +1422,13 @@ fn preview_group_selector() {
         .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @"
-    success: false
-    exit_code: 2
+    success: true
+    exit_code: 0
     ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
-    error: invalid value 'PREVIEW' for '--select <RULE_CODE>'
-
-    For more information, try '--help'.
+    warning: Removed selector `PREVIEW` in `select` from the CLI
     ");
 }
 

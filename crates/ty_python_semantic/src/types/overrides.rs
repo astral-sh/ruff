@@ -340,7 +340,7 @@ fn check_class_declaration<'db>(
                     has_dynamic_superclass = true;
                     continue;
                 }
-                ClassBase::TypedDict => {
+                ClassBase::TypedDict(_) => {
                     has_typeddict_in_mro = true;
                     continue;
                 }

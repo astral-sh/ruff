@@ -122,6 +122,7 @@ pub enum KnownClass {
     Mapping,
     // typing_extensions
     ExtensionsTypeVar, // must be distinct from typing.TypeVar, backports new features
+    ExtensionTypedDictFallback,
     Sentinel,
     // Collections
     ChainMap,
@@ -277,6 +278,7 @@ impl KnownClass {
             | Self::Specialization
             | Self::ProtocolMeta
             | Self::FunctoolsPartial
+            | Self::ExtensionTypedDictFallback
             | Self::TypedDictFallback => Some(Truthiness::Ambiguous),
 
             Self::Tuple => None,
@@ -380,6 +382,7 @@ impl KnownClass {
             | KnownClass::GenericContext
             | KnownClass::Specialization
             | KnownClass::TypedDictFallback
+            | KnownClass::ExtensionTypedDictFallback
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
             | KnownClass::Template
@@ -484,6 +487,7 @@ impl KnownClass {
             | KnownClass::GenericContext
             | KnownClass::Specialization
             | KnownClass::TypedDictFallback
+            | KnownClass::ExtensionTypedDictFallback
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
             | KnownClass::Template
@@ -582,6 +586,7 @@ impl KnownClass {
             | KnownClass::Field
             | KnownClass::KwOnly
             | KnownClass::TypedDictFallback
+            | KnownClass::ExtensionTypedDictFallback
             | KnownClass::NamedTupleLike
             | KnownClass::NamedTupleFallback
             | KnownClass::ConstraintSet
@@ -701,6 +706,7 @@ impl KnownClass {
             | Self::GenericContext
             | Self::Specialization
             | Self::TypedDictFallback
+            | Self::ExtensionTypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
             | Self::Template
@@ -814,7 +820,9 @@ impl KnownClass {
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
             | KnownClass::Specialization => false,
-            KnownClass::NamedTupleFallback | KnownClass::TypedDictFallback => true,
+            KnownClass::NamedTupleFallback
+            | KnownClass::TypedDictFallback
+            | KnownClass::ExtensionTypedDictFallback => true,
         }
     }
 
@@ -870,7 +878,7 @@ impl KnownClass {
             Self::ParamSpecArgs => "ParamSpecArgs",
             Self::ParamSpecKwargs => "ParamSpecKwargs",
             Self::TypeVarTuple => "TypeVarTuple",
-            Self::Sentinel => "Sentinel",
+            Self::Sentinel => "sentinel",
             Self::TypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
             Self::NewType => "NewType",
@@ -926,6 +934,7 @@ impl KnownClass {
             Self::GenericContext => "GenericContext",
             Self::Specialization => "Specialization",
             Self::TypedDictFallback => "TypedDictFallback",
+            Self::ExtensionTypedDictFallback => "_TypedDict",
             Self::Template => "Template",
             Self::Path => "Path",
             Self::FunctoolsPartial => "partial",
@@ -1257,12 +1266,19 @@ impl KnownClass {
             Self::TypeAliasType
             | Self::ExtensionsTypeVar
             | Self::TypeVarTuple
-            | Self::Sentinel
             | Self::ExtensionsParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::Deprecated
+            | Self::ExtensionTypedDictFallback
             | Self::NewType => KnownModule::TypingExtensions,
+            Self::Sentinel => {
+                if Program::get(db).python_version(db) >= PythonVersion::PY315 {
+                    KnownModule::Builtins
+                } else {
+                    KnownModule::TypingExtensions
+                }
+            }
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
 
@@ -1393,6 +1409,7 @@ impl KnownClass {
             | Self::GenericContext
             | Self::Specialization
             | Self::TypedDictFallback
+            | Self::ExtensionTypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
             | Self::Template
@@ -1503,6 +1520,7 @@ impl KnownClass {
             | Self::GenericContext
             | Self::Specialization
             | Self::TypedDictFallback
+            | Self::ExtensionTypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
             | Self::Template
@@ -1574,7 +1592,7 @@ impl KnownClass {
             "ParamSpecArgs" => &[Self::ParamSpecArgs],
             "ParamSpecKwargs" => &[Self::ParamSpecKwargs],
             "TypeVarTuple" => &[Self::TypeVarTuple],
-            "Sentinel" => &[Self::Sentinel],
+            "sentinel" => &[Self::Sentinel],
             "ChainMap" => &[Self::ChainMap],
             "Counter" => &[Self::Counter],
             "defaultdict" => &[Self::DefaultDict],
@@ -1616,6 +1634,7 @@ impl KnownClass {
             "Path" => &[Self::Path],
             "partial" => &[Self::FunctoolsPartial],
             "_ProtocolMeta" => &[Self::ProtocolMeta],
+            "_TypedDict" => &[Self::ExtensionTypedDictFallback],
             _ => return None,
         };
 
@@ -1692,6 +1711,7 @@ impl KnownClass {
             | Self::KwOnly
             | Self::NamedTupleFallback
             | Self::TypedDictFallback
+            | Self::ExtensionTypedDictFallback
             | Self::TypeVar
             | Self::ExtensionsTypeVar
             | Self::ParamSpec

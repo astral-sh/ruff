@@ -122,6 +122,252 @@ def enum_complement_rhs(x: Color, y: Intersection[Color, Not[Literal[Color.RED]]
         reveal_type(x)  # revealed: Literal[Color.GREEN, Color.BLUE]
 ```
 
+When both operands are restricted to members of the same enum, equality narrows each operand to the
+members allowed by both. If the restrictions do not overlap, the comparison is always false:
+
+```py
+from enum import Enum, IntEnum, StrEnum
+from typing import Literal
+
+class Choice(StrEnum):
+    FIRST = "first"
+    SECOND = "second"
+    THIRD = "third"
+    FOURTH = "fourth"
+
+def compare_after_truthiness_check(left: Choice, right: Choice):
+    if right and left != right:
+        reveal_type(right)  # revealed: Choice & ~AlwaysFalsy
+        return
+
+    reveal_type(right)  # revealed: Choice
+
+def compare_with_narrowed_right(left: Choice, right: Choice):
+    if right == Choice.FIRST:
+        return
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Choice.SECOND, Choice.THIRD, Choice.FOURTH]
+
+def compare_non_overlapping_narrowed_values(left: Choice, right: Choice):
+    if left == Choice.FIRST or left == Choice.SECOND:
+        return
+    if right == Choice.THIRD or right == Choice.FOURTH:
+        return
+
+    reveal_type(left == right)  # revealed: Literal[False]
+
+def compare_literal_unions(
+    left: Literal[Choice.FIRST, Choice.SECOND],
+    right: Literal[Choice.SECOND, Choice.THIRD],
+):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Choice.SECOND]
+        reveal_type(right)  # revealed: Literal[Choice.SECOND]
+
+def compare_non_overlapping_literal_unions(
+    left: Literal[Choice.FIRST, Choice.SECOND],
+    right: Literal[Choice.THIRD, Choice.FOURTH],
+):
+    reveal_type(left == right)  # revealed: Literal[False]
+```
+
+Members with the same known value are aliases, even when one value comes from a function call.
+Comparisons between their canonical members are always true:
+
+```py
+def make_value() -> Literal["value"]:
+    return "value"
+
+class RuntimeAlias(StrEnum):
+    FIRST = make_value()
+    SECOND = "value"
+
+reveal_type(RuntimeAlias.FIRST == RuntimeAlias.SECOND)  # revealed: Literal[True]
+
+def make_int_value() -> Literal[1]:
+    return 1
+
+class RuntimeIntAlias(IntEnum):
+    FIRST = make_int_value()
+    SECOND = 1
+
+reveal_type(RuntimeIntAlias.FIRST == RuntimeIntAlias.SECOND)  # revealed: Literal[True]
+```
+
+An enum with a `str` data type constructs its values before checking for aliases. Here, `str`
+converts `1` to `"1"`, so the two members are aliases:
+
+```py
+class CoercingAlias(str, Enum):
+    FIRST = 1
+    SECOND = "1"
+
+reveal_type(CoercingAlias.FIRST == CoercingAlias.SECOND)  # revealed: Literal[True]
+reveal_type(CoercingAlias.SECOND == "1")  # revealed: Literal[True]
+```
+
+When alias detection is inconclusive, equality between different declarations is also unknown. The
+two declarations below are aliases at runtime:
+
+```py
+class Behavior:
+    pass
+
+class OpaqueAliases(Behavior, Enum):
+    FIRST = 1
+    SECOND = 1
+
+reveal_type(OpaqueAliases.FIRST == OpaqueAliases.SECOND)  # revealed: bool
+```
+
+Equality can transfer restrictions on enum members, but other intersection elements must stay on the
+operand where they originated:
+
+```py
+from enum import StrEnum
+from typing import Any, Literal, NewType
+from ty_extensions import Intersection
+
+class Response(StrEnum):
+    ACCEPT = "accept"
+    REJECT = "reject"
+
+Tag = NewType("Tag", str)
+
+def compare_any(
+    left: Response,
+    right: Intersection[Literal[Response.REJECT], Any],
+):
+    if left != right:
+        return
+    reveal_type(left)  # revealed: Literal[Response.REJECT]
+    reveal_type(right)  # revealed: Literal[Response.REJECT] & Any
+
+def compare_newtype(left: Response, right: Intersection[Response, Tag]):
+    if left != right:
+        return
+    reveal_type(left)  # revealed: Response
+```
+
+`Flag` and `IntFlag` values can include zero and unnamed combinations, so their named members do not
+cover every possible value:
+
+```py
+from enum import Flag, IntFlag
+from typing import Literal
+
+class Permission(Flag):
+    READ = 1
+
+class Mode(IntFlag):
+    READ = 1
+
+FunctionalPermission = Flag("FunctionalPermission", {"READ": 1})
+
+def compare_flags(left: Permission, right: Permission):
+    reveal_type(left == right)  # revealed: bool
+
+    if left != right:
+        reveal_type(left)  # revealed: Permission
+
+def exclude_declared_flag(value: Permission):
+    if value is Permission.READ:
+        return
+    reveal_type(value)  # revealed: Permission & ~Literal[Permission.READ]
+
+def compare_flag_literals(
+    left: Literal[Permission.READ],
+    right: Literal[Permission.READ],
+):
+    reveal_type(left == right)  # revealed: Literal[True]
+
+def compare_int_flags(left: Mode, right: Mode):
+    reveal_type(left == right)  # revealed: bool
+
+def compare_functional_flags(left: FunctionalPermission, right: FunctionalPermission):
+    reveal_type(left == right)  # revealed: bool
+```
+
+An enum with a custom `_missing_` method can create unnamed members, so two values need not be equal
+even when only one member is declared:
+
+```py
+from enum import Enum
+
+class MissingValueEnum(Enum):
+    ONLY = 1
+
+    @classmethod
+    def _missing_(cls, value: object) -> "MissingValueEnum":
+        return object.__new__(cls)
+
+def compare_open_enums(left: MissingValueEnum, right: MissingValueEnum):
+    reveal_type(left == right)  # revealed: bool
+
+    if left != right:
+        reveal_type(left)  # revealed: MissingValueEnum
+```
+
+A custom enum metaclass can add members that do not appear in the class body. Two values of a
+one-member class therefore need not be equal:
+
+```py
+from enum import Enum, EnumMeta
+
+class InjectingEnumMeta(EnumMeta):
+    def __new__(metacls, name, bases, namespace, **kwargs):
+        namespace["INJECTED"] = 2
+        return super().__new__(metacls, name, bases, namespace, **kwargs)
+
+class TransformedEnum(Enum, metaclass=InjectingEnumMeta):
+    ONLY = 1
+
+def compare_transformed_enums(left: TransformedEnum, right: TransformedEnum):
+    reveal_type(left == right)  # revealed: bool
+```
+
+A custom comparison method determines the result even when both operands have the same enum type:
+
+```py
+from enum import Enum
+from typing import Literal
+
+class NeverEqual(Enum):
+    FIRST = 1
+    SECOND = 2
+    THIRD = 3
+
+    def __eq__(self, other: object) -> Literal[False]:
+        return False
+
+def compare_custom(left: NeverEqual, right: NeverEqual):
+    reveal_type(left == right)  # revealed: Literal[False]
+
+    if left is NeverEqual.FIRST:
+        return
+    reveal_type(left == right)  # revealed: Literal[False]
+```
+
+When member values are not known statically, two different members may still compare equal:
+
+```py
+from enum import StrEnum
+from typing import Literal
+
+def runtime_value(value: str) -> str:
+    return value
+
+class UnknownValues(StrEnum):
+    FIRST = runtime_value("first")
+    SECOND = runtime_value("second")
+
+def compare_unknown_values(
+    left: Literal[UnknownValues.FIRST],
+    right: Literal[UnknownValues.SECOND],
+):
+    reveal_type(left == right)  # revealed: bool
+```
+
 Unlike plain `Enum` members, `IntEnum` members inherit integer equality. Members of different
 `IntEnum` classes therefore compare equal when they have the same integer value, so both equality
 and inequality narrowing must account for matching members from every class in the union:
@@ -149,6 +395,214 @@ def _(value: Foo | Bar):
         reveal_type(value)  # revealed: Literal[Foo.Y, Bar.B]
     else:
         reveal_type(value)  # revealed: Literal[Foo.X, Bar.A]
+```
+
+`StrEnum` domains from different classes are compared by their string values. Equality retains the
+members whose values occur in both domains; inequality against a singleton excludes the matching
+member. Exact member comparisons are true or false when both values are known:
+
+```py
+from enum import StrEnum
+from typing import Literal
+
+class Left(StrEnum):
+    A = "a"
+    SHARED = "shared"
+    C = "c"
+
+class Right(StrEnum):
+    SHARED = "shared"
+    B = "b"
+    D = "d"
+
+reveal_type(Left.SHARED == Right.SHARED)  # revealed: Literal[True]
+reveal_type(Left.A == Right.B)  # revealed: Literal[False]
+reveal_type(Left.SHARED != Right.SHARED)  # revealed: Literal[False]
+
+def compare_domains(left: Left, right: Right):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED]
+        reveal_type(right)  # revealed: Literal[Right.SHARED]
+    else:
+        reveal_type(left)  # revealed: Left
+        reveal_type(right)  # revealed: Right
+
+    if left != right:
+        reveal_type(left)  # revealed: Left
+        reveal_type(right)  # revealed: Right
+    else:
+        reveal_type(left)  # revealed: Literal[Left.SHARED]
+        reveal_type(right)  # revealed: Literal[Right.SHARED]
+
+def compare_singleton(left: Left, right: Literal[Right.SHARED]):
+    if left != right:
+        reveal_type(left)  # revealed: Literal[Left.A, Left.C]
+    else:
+        reveal_type(left)  # revealed: Literal[Left.SHARED]
+
+def compare_subsets(
+    left: Literal[Left.A, Left.SHARED],
+    right: Literal[Right.SHARED, Right.B],
+):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[Left.SHARED]
+        reveal_type(right)  # revealed: Literal[Right.SHARED]
+```
+
+The same comparison-key projection applies when each operand spans several enum classes. This
+example represents 18 possible values on each side, which would otherwise require 324 pairwise
+comparisons:
+
+```py
+from enum import IntEnum
+
+class MixedLeft0(IntEnum):
+    A = 0
+    B = 1
+    C = 2
+    D = 3
+    E = 4
+    F = 5
+    G = 6
+    H = 7
+    I = 8
+
+class MixedLeft1(IntEnum):
+    A = 9
+    B = 10
+    C = 11
+    D = 12
+    E = 13
+    F = 14
+    G = 15
+    H = 16
+    I = 17
+
+class MixedRight0(IntEnum):
+    A = 0
+    B = 1
+    C = 2
+    D = 3
+    E = 4
+    F = 5
+    G = 6
+    H = 7
+    I = 8
+
+class MixedRight1(IntEnum):
+    A = 18
+    B = 19
+    C = 20
+    D = 21
+    E = 22
+    F = 23
+    G = 24
+    H = 25
+    I = 26
+
+def compare_mixed_domains(
+    left: MixedLeft0 | MixedLeft1,
+    right: MixedRight0 | MixedRight1,
+):
+    if left == right:
+        reveal_type(left)  # revealed: MixedLeft0
+        reveal_type(right)  # revealed: MixedRight0
+```
+
+An open identity-comparing enum can still be narrowed to all of its declared members. Undeclared
+runtime members are not retained merely because every declared member matches:
+
+```py
+from enum import Enum
+from typing import Literal
+
+class OpenIdentity(Enum):
+    A = "a"
+    B = "b"
+
+    @classmethod
+    def _missing_(cls, value: object) -> "OpenIdentity":
+        raise ValueError
+
+class OtherIdentity(Enum):
+    C = "c"
+
+def compare_open_identity(
+    left: OpenIdentity | OtherIdentity,
+    right: Literal[OpenIdentity.A, OpenIdentity.B],
+):
+    if left == right:
+        reveal_type(left)  # revealed: Literal[OpenIdentity.A, OpenIdentity.B]
+```
+
+Integer comparison keys normalize booleans in the same way as Python equality:
+
+```py
+from enum import Enum, IntEnum
+
+class BooleanKey(int, Enum):
+    FALSE = False
+
+class IntegerKey(IntEnum):
+    ZERO = 0
+
+reveal_type(BooleanKey.FALSE == IntegerKey.ZERO)  # revealed: Literal[True]
+
+class IntegerAliases(IntEnum):
+    ZERO = 0
+    FALSE = False
+
+reveal_type(IntegerAliases.ZERO == IntegerAliases.FALSE)  # revealed: Literal[True]
+```
+
+Plain enum members from different classes use identity comparison, even when their declared values
+are equal. Custom comparison methods and open scalar enums remain ambiguous:
+
+```py
+from enum import Enum, StrEnum
+
+class PlainLeft(Enum):
+    MEMBER = "shared"
+
+class PlainRight(Enum):
+    MEMBER = "shared"
+
+reveal_type(PlainLeft.MEMBER == PlainRight.MEMBER)  # revealed: Literal[False]
+
+def compare_plain(left: PlainLeft, right: PlainRight):
+    if left == right:
+        reveal_type(left)  # revealed: Never
+
+class CustomLeft(StrEnum):
+    MEMBER = "shared"
+
+    def __eq__(self, other: object) -> bool:
+        return False
+
+class CustomRight(StrEnum):
+    MEMBER = "shared"
+
+reveal_type(CustomLeft.MEMBER == CustomRight.MEMBER)  # revealed: bool
+
+class CustomNeLeft(StrEnum):
+    MEMBER = "shared"
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+reveal_type(CustomNeLeft.MEMBER == CustomRight.MEMBER)  # revealed: Literal[True]
+reveal_type(CustomNeLeft.MEMBER != CustomRight.MEMBER)  # revealed: bool
+
+class OpenLeft(StrEnum):
+    MEMBER = "shared"
+
+    @classmethod
+    def _missing_(cls, value: object) -> "OpenLeft":
+        raise ValueError
+
+def compare_open(left: OpenLeft, right: CustomRight):
+    if left == right:
+        reveal_type(left)  # revealed: OpenLeft
 ```
 
 The same narrowing applies when comparing enum members directly with their inherited integer or
@@ -229,6 +683,80 @@ def _(value: Foo | Shifted):
         reveal_type(value)  # revealed: Literal[Foo.Y] | Shifted
 ```
 
+An explicit `_value_` annotation controls the public `.value` type without erasing a concrete
+comparison payload:
+
+```py
+from enum import IntEnum
+
+class AnnotatedInteger(IntEnum):
+    _value_: int
+    ONE = 1
+
+reveal_type(AnnotatedInteger.ONE.value)  # revealed: int
+reveal_type(AnnotatedInteger.ONE == 1)  # revealed: Literal[True]
+```
+
+When a custom constructor transforms the member, however, the annotation does not describe the
+scalar payload used by inherited comparison methods:
+
+```py
+from enum import IntEnum
+from typing import Literal
+
+class AnnotatedShifted(IntEnum):
+    _value_: Literal[1]
+
+    def __new__(cls, value: int) -> "AnnotatedShifted":
+        member = int.__new__(cls, value + 1)
+        member._value_ = 1
+        return member
+
+    MEMBER = 1
+
+class Other(IntEnum):
+    MEMBER = 1
+
+reveal_type(AnnotatedShifted.MEMBER.value)  # revealed: Literal[1]
+reveal_type(AnnotatedShifted.MEMBER == Other.MEMBER)  # revealed: bool
+
+if AnnotatedShifted.MEMBER != Other.MEMBER:
+    reveal_type(AnnotatedShifted.MEMBER)  # revealed: AnnotatedShifted
+
+class AnnotatedInitialized(IntEnum):
+    _value_: Literal[2]
+
+    def __init__(self, value: int) -> None:
+        self._value_ = 2
+
+    MEMBER = 1
+
+reveal_type(AnnotatedInitialized.MEMBER.value)  # revealed: Literal[2]
+reveal_type(AnnotatedInitialized.MEMBER == Other.MEMBER)  # revealed: bool
+```
+
+A scalar data-type mixin can also transform a declared value before it becomes the enum member's
+comparison payload. Such a value is not a safe comparison key:
+
+```py
+from enum import Enum, IntEnum
+
+class ShiftedInt(int):
+    def __new__(cls, value: int) -> "ShiftedInt":
+        return int.__new__(cls, value + 1)
+
+class MixinShifted(ShiftedInt, Enum):
+    MEMBER = 1
+
+class Normal(IntEnum):
+    MEMBER = 2
+
+reveal_type(MixinShifted.MEMBER == Normal.MEMBER)  # revealed: bool
+
+if MixinShifted.MEMBER == Normal.MEMBER:
+    reveal_type(MixinShifted.MEMBER)  # revealed: MixinShifted
+```
+
 The return value of `_generate_next_value_` is not necessarily the final value of an `IntEnum`
 member. Here, the inherited `int.__new__` converts the generated string `"1"` to the integer `1`.
 Because the generated value's exact conversion is not modeled, we cannot use it to decide whether
@@ -249,6 +777,7 @@ class Other(IntEnum):
     ONE = 1
 
 reveal_type(Generated.ONE.value)  # revealed: int
+reveal_type(Generated.ONE == Other.ONE)  # revealed: bool
 
 def _(value: Generated | Other):
     if value == Generated.ONE:
@@ -298,9 +827,9 @@ def _(new: Any, init: Any, prepare: Any):
 
     def transformed_by_metaclass(value: Literal[TransformedByMeta.MEMBER] | Literal["member"]):
         if value == "member":
-            reveal_type(value)  # revealed: TransformedByMeta | Literal["member"]
+            reveal_type(value)  # revealed: Literal[TransformedByMeta.MEMBER, "member"]
         else:
-            reveal_type(value)  # revealed: TransformedByMeta
+            reveal_type(value)  # revealed: Literal[TransformedByMeta.MEMBER]
 ```
 
 An opaque `_generate_next_value_` affects `auto()` members, but explicit members still have their
@@ -415,6 +944,28 @@ def _(answer: CoupledInequality):
         reveal_type(answer)  # revealed: CoupledInequality
     else:
         reveal_type(answer)  # revealed: CoupledInequality
+```
+
+## Recursive aliases containing enum domains
+
+Enum domains nested in a recursive alias fall back to general comparison inference:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum
+
+class EnumValue(Enum):
+    VALUE = 1
+    OTHER = 2
+
+type Recursive = EnumValue | Recursive
+
+def _(left: Recursive, right: EnumValue):
+    reveal_type(left == right)  # revealed: bool
 ```
 
 ## Known built-in equality behavior

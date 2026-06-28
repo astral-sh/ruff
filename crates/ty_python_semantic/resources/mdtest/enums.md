@@ -22,9 +22,9 @@ reveal_type(Color(1))  # revealed: Color
 reveal_type(Color.RED in Color)  # revealed: bool
 ```
 
-Known standard-library enum constructors preserve literal `.value` types when they do not normalize
-the declared value. The inherited `_value_` annotation remains the fallback when construction does
-normalize the value or when accessing `.value` on the enum class as a whole:
+For standard-library enum classes, we preserve literal `.value` types when we can model how the data
+type constructs each value. The inherited `_value_` annotation remains the fallback when we cannot,
+or when accessing `.value` on the enum class as a whole:
 
 ```py
 from enum import IntEnum, auto
@@ -33,10 +33,12 @@ from typing import Literal
 class Integer(IntEnum):
     ONE = 1
     TRUE = True
+    TWO = 2
 
 reveal_type(Integer.ONE.value)  # revealed: Literal[1]
 reveal_type(Integer.ONE._value_)  # revealed: Literal[1]
-reveal_type(Integer.TRUE.value)  # revealed: int
+reveal_type(Integer.TRUE.value)  # revealed: Literal[1]
+reveal_type(Integer.TRUE)  # revealed: Literal[Integer.ONE]
 
 def _(value: Integer):
     reveal_type(value.value)  # revealed: int
@@ -694,6 +696,234 @@ class Child(Base):
     GITHUB = "github"  # error: [invalid-assignment]
 ```
 
+### Inherited `__new_member__`
+
+An inherited `__new_member__` takes precedence over the default enum constructor and can replace the
+member value:
+
+```py
+from enum import Enum
+
+class Base(Enum):
+    def __new_member__(cls: type["Base"], value: int) -> "Base":
+        obj = object.__new__(cls)
+        obj._value_ = str(value)
+        return obj
+
+class Child(Base):
+    VALUE = 1
+
+reveal_type(Child.VALUE.value)  # revealed: Any
+```
+
+`EnumType` saves an enum's user-defined `__new__` as that class's `__new_member__`. The immediate
+parent's `__new__` therefore takes precedence over an explicit `__new_member__` in a grandparent:
+
+```py
+from enum import Enum
+
+class Grandparent(Enum):
+    def __new_member__(cls: type["Grandparent"], value: str) -> "Grandparent":
+        obj = object.__new__(cls)
+        obj._value_ = value
+        return obj
+
+class Parent(Grandparent):
+    def __new__(cls, value: int) -> "Parent":
+        obj = object.__new__(cls)
+        obj._value_ = value
+        return obj
+
+class Child(Parent):
+    VALID = 1
+    INVALID = "not an int"  # error: [invalid-assignment]
+
+reveal_type(Child.VALID.value)  # revealed: Any
+```
+
+### Data-type mixin `__new__`
+
+A user-defined `__new__` on a data-type mixin constructs the scalar payload and can transform the
+declared member value. Members are validated against its signature, and their `.value` types remain
+dynamic when we cannot model the transformation:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+class OffsetInt(int):
+    def __new__(cls, value: int) -> "OffsetInt":
+        return int.__new__(cls, value + 1)
+
+class OffsetEnum(OffsetInt, Enum):
+    VALID = 1
+    INVALID = "not an int"  # error: [invalid-assignment]
+
+reveal_type(OffsetEnum.VALID.value)  # revealed: Any
+
+class WeirdInt(int):
+    def __new__(cls, value: int) -> "WeirdInt":
+        return int.__new__(cls, 100 if value is False else value)
+
+class EmptyWeirdEnum(WeirdInt, Enum):
+    pass
+
+class InheritedWeirdEnum(EmptyWeirdEnum):
+    FROM_BOOL = False
+    FROM_INT = 0
+    OTHER = 2
+
+reveal_type(InheritedWeirdEnum.FROM_BOOL.value)  # revealed: Any
+reveal_type(InheritedWeirdEnum.FROM_INT)  # revealed: Literal[InheritedWeirdEnum.FROM_INT]
+reveal_type(enum_members(InheritedWeirdEnum))  # revealed: Unknown
+```
+
+### Built-in data types
+
+An enum with an `int` or `str` data type stores the value produced by that type's constructor.
+Aliases are determined from the constructed values rather than the original assignments:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+from typing import Literal
+
+class IntegerValues(int, Enum):
+    FALSE = False
+    ZERO = 0
+
+reveal_type(IntegerValues.FALSE.value)  # revealed: Literal[0]
+# revealed: tuple[Literal["FALSE"]]
+reveal_type(enum_members(IntegerValues))
+
+class StringValues(str, Enum):
+    INTEGER = 1
+    STRING = "1"
+    BOOLEAN = False
+    BOOLEAN_STRING = "False"
+
+reveal_type(StringValues.INTEGER.value)  # revealed: Literal["1"]
+reveal_type(StringValues.BOOLEAN.value)  # revealed: Literal["False"]
+# revealed: tuple[Literal["INTEGER"], Literal["BOOLEAN"]]
+reveal_type(enum_members(StringValues))
+
+def union_member_value(value: Literal[False, 2]):
+    class UnionValues(int, Enum):
+        MEMBER = value
+
+    reveal_type(UnionValues.MEMBER.value)  # revealed: Literal[0, 2]
+
+class IntegerBase(int, Enum):
+    pass
+
+class InheritedValues(IntegerBase):
+    FALSE = False
+    ZERO = 0
+
+reveal_type(InheritedValues.FALSE.value)  # revealed: Literal[0]
+# revealed: tuple[Literal["FALSE"]]
+reveal_type(enum_members(InheritedValues))
+```
+
+Non-member declarations do not make alias detection inconclusive:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+class ValuesWithHelper(int, Enum):
+    VALUE = 1
+
+    class Helper:
+        pass
+
+    ALIAS = 1
+
+# revealed: tuple[Literal["VALUE"]]
+reveal_type(enum_members(ValuesWithHelper))
+```
+
+When a built-in conversion cannot be modeled precisely, its aliases remain unknown:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+class ParsedIntegerValues(int, Enum):
+    FIRST = "1"
+    SECOND = "1"
+
+reveal_type(ParsedIntegerValues.FIRST is ParsedIntegerValues.SECOND)  # revealed: bool
+reveal_type(enum_members(ParsedIntegerValues))  # revealed: Unknown
+```
+
+Other built-in data types retain exact assigned values when no coercion is needed:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+class ByteValues(bytes, Enum):
+    VALUE = b"value"
+    ALIAS = b"value"
+
+reveal_type(ByteValues.VALUE.value)  # revealed: Literal[b"value"]
+# revealed: tuple[Literal["VALUE"]]
+reveal_type(enum_members(ByteValues))
+```
+
+If the data type would coerce the assigned value, its value and aliases remain unknown:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+class CoercingByteValues(bytes, Enum):
+    FROM_INT = 1
+    FROM_BYTES = b"\0"
+
+reveal_type(CoercingByteValues.FROM_INT.value)  # revealed: Any
+reveal_type(CoercingByteValues.FROM_INT is CoercingByteValues.FROM_BYTES)  # revealed: bool
+reveal_type(enum_members(CoercingByteValues))  # revealed: Unknown
+```
+
+### User-defined data types
+
+User-defined data types remain opaque even when they inherit from `int` or `str` without overriding
+any methods. Their construction, attribute access, equality, and hashing can all differ from the
+built-in type:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+class CustomInt(int):
+    pass
+
+class CustomValues(CustomInt, Enum):
+    FALSE = False
+    ZERO = 0
+
+reveal_type(CustomValues.FALSE.value)  # revealed: Any
+reveal_type(CustomValues.FALSE is CustomValues.ZERO)  # revealed: bool
+reveal_type(CustomValues.ZERO.name)  # revealed: str
+reveal_type(enum_members(CustomValues))  # revealed: Unknown
+```
+
+A user-defined behavior base can still affect member construction and attribute access, so it keeps
+the enum's values opaque even when a separate base selects a built-in data type:
+
+```py
+class Behavior:
+    pass
+
+class ValuesWithBehavior(Behavior, int, Enum):
+    FALSE = False
+    ZERO = 0
+
+reveal_type(ValuesWithBehavior.FALSE.value)  # revealed: Any
+```
+
 ### Assigned `__new__`
 
 Assigning to `__new__` can prevent us from validating members against its signature or inferring
@@ -1019,6 +1249,26 @@ reveal_type(enum_members(Color))
 reveal_type(Color.red)
 ```
 
+Literal metadata does not affect aliasing at runtime. A value returned from a function is therefore
+still an alias of the same literal written directly in the class body:
+
+```py
+from enum import Enum
+from typing import Literal
+from ty_extensions import enum_members
+
+def make_alias_value() -> Literal["value"]:
+    return "value"
+
+class RuntimeAlias(Enum):
+    FIRST = make_alias_value()
+    SECOND = "value"
+
+# revealed: tuple[Literal["FIRST"]]
+reveal_type(enum_members(RuntimeAlias))
+reveal_type(RuntimeAlias.SECOND)  # revealed: RuntimeAlias
+```
+
 Multiple aliases to the same member are also supported. This is a regression test for
 <https://github.com/astral-sh/ty/issues/1293>:
 
@@ -1215,10 +1465,10 @@ reveal_type(Answer.YES.value)  # revealed: Literal[1]
 reveal_type(Answer.NO.value)  # revealed: Literal[2]
 ```
 
-It's [hard to predict](https://github.com/astral-sh/ruff/pull/20541#discussion_r2381878613) what the
-effect of using `auto()` will be for an arbitrary non-integer mixin, so for anything that isn't a
-`StrEnum` and has a non-`int` mixin, we simply fallback to typeshed's annotation of `Any` for the
-`value` property:
+For an enum with a `str` data type, the generated value is still normalized to `str`. The result of
+using `auto()` with other non-integer data types is
+[hard to predict](https://github.com/astral-sh/ruff/pull/20541#discussion_r2381878613), so we use
+typeshed's `Any` annotation for `.value` in those cases:
 
 ```python
 from enum import Enum, auto
@@ -1228,7 +1478,7 @@ class A(str, Enum):
     X = auto()
     Y = auto()
 
-reveal_type(A.X.value)  # revealed: Any
+reveal_type(A.X.value)  # revealed: str
 
 class B(bytes, Enum):
     X = auto()
@@ -1556,6 +1806,26 @@ reveal_type(InheritedCustomNextValueChild.C)  # revealed: Literal[InheritedCusto
 
 def _inherited_mixed_instance(x: InheritedCustomNextValueChild):
     reveal_type(x.value)  # revealed: str | Literal[1]
+```
+
+### `auto()` after an alias
+
+Even when a declaration becomes an alias, its original value is included in the `last_values` passed
+to `_generate_next_value_`. Here, `TRUE` is an alias of `ONE`, but `AFTER` still receives the value
+`2`:
+
+```py
+from enum import Enum, auto
+from ty_extensions import enum_members
+
+class Mixed(int, Enum):
+    ONE = 1
+    TRUE = True
+    AFTER = auto()
+
+reveal_type(Mixed.AFTER.value)  # revealed: Literal[2]
+# revealed: tuple[Literal["ONE"], Literal["AFTER"]]
+reveal_type(enum_members(Mixed))
 ```
 
 ### `member` and `nonmember`
@@ -2744,6 +3014,19 @@ Color = IntEnum("Color", "RED GREEN BLUE")
 
 # revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
 reveal_type(enum_members(Color))
+
+Number = IntEnum("Number", {"FALSE": False, "ZERO": 0})
+
+reveal_type(Number.FALSE.value)  # revealed: Literal[0]
+reveal_type(Number.ZERO)  # revealed: Number
+reveal_type(enum_members(Number))  # revealed: tuple[Literal["FALSE"]]
+
+# `int("1")` widens to `int`, but identical raw values still prove that the
+# members are aliases.
+Parsed = IntEnum("Parsed", {"A": "1", "B": "1"})
+
+reveal_type(Parsed.B)  # revealed: Parsed
+reveal_type(enum_members(Parsed))  # revealed: tuple[Literal["A"]]
 ```
 
 ### Flag function syntax

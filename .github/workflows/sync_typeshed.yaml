@@ -86,7 +86,7 @@ jobs:
           git config --global user.email '<>'
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          version: "0.11.21"
+          version: "0.11.24"
       - name: Sync typeshed stubs
         run: |
           rm -rf "ruff/${VENDORED_TYPESHED}"
@@ -142,7 +142,7 @@ jobs:
           ref: ${{ env.UPSTREAM_BRANCH}}
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          version: "0.11.21"
+          version: "0.11.24"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -184,7 +184,7 @@ jobs:
           ref: ${{ env.UPSTREAM_BRANCH}}
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          version: "0.11.21"
+          version: "0.11.24"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -268,7 +268,7 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
       - name: "Install cargo nextest and insta"
-        uses: taiki-e/install-action@fd2f5e3d644b484055ebf4268f474c565f148f25 # v2.81.9
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
         with:
           tool: |
             cargo-nextest

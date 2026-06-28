@@ -2858,20 +2858,8 @@ def ab(a: int, *, c: int): ...
             )
             .build();
 
-        // TODO(submodule-imports): Ok this one is FASCINATING but definitely wrong!
-        //
-        // So there's 3 relevant definitions here:
-        //
-        // * `subpkg: int = 10` in the other file is in fact the original definition.
-        //    Including it here is accurate and possibly useful?
-        //
-        // *  the LHS `subpkg` in the import is an instance of `subpkg = ...`
-        //    because it's a `DefinitionKind::ImportFromSubmodle`.
-        //    Including it here is Pedantically Correct but Unhelpful.
-        //
-        // * `the RHS `subpkg` in the import is a second instance of `subpkg = ...`
-        //    that *immediately* overwrites the `ImportFromSubmodule`'s definition.
-        //    This is the most important one and doesn't show up at all! Sadness!
+        // The transient submodule binding is skipped because this import statement
+        // immediately shadows it with the imported symbol.
         assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> mypackage/__init__.py:4:5
@@ -2879,13 +2867,8 @@ def ab(a: int, *, c: int): ...
         4 | x = subpkg
           |     ^^^^^^ Clicking here
           |
-        info: Found 2 declarations
-         --> mypackage/__init__.py:2:7
-          |
-        2 | from .subpkg import subpkg
-          |       ------
-          |
-         ::: mypackage/subpkg/__init__.py:2:1
+        info: Found 1 declaration
+         --> mypackage/subpkg/__init__.py:2:1
           |
         2 | subpkg: int = 10
           | ------

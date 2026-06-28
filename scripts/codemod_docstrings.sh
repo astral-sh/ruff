@@ -18,7 +18,7 @@
 
 set -eu
 
-docstring_adder="git+https://github.com/astral-sh/docstring-adder.git@084654f4e9c94481f4a1ebeeb9f5dbc82c1933df"
+docstring_adder="git+https://github.com/astral-sh/docstring-adder.git@701ead71db935e67c25756b9cb1617d58d85bb84"
 stdlib_path="./crates/ty_vendored/vendor/typeshed/stdlib"
 
 for python_version in 3.15 3.14 3.13 3.12 3.11 3.10

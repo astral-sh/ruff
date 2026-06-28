@@ -1,7 +1,7 @@
 [package]
 name = "ty_vendored"
-version = "0.0.0"
-publish = false
+version = "0.0.3"
+description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -18,7 +18,7 @@ zip = { workspace = true }
 [build-dependencies]
 path-slash = { workspace = true }
 walkdir = { workspace = true }
-zip = { workspace = true, features = ["zstd", "deflate-flate2-zlib-rs"] }
+zip = { workspace = true }
 
 [dev-dependencies]
 walkdir = { workspace = true }

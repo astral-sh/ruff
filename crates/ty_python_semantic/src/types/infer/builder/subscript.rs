@@ -1253,9 +1253,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         // Record the constraints for the object of the subscript assignment, if the object is an
-        // unannotated collection literal.
+        // unannotated collection initializer.
         if is_valid_assignment
-            && let Some(collection_def) = self.index.unannotated_collection_literal(object)
+            && let Some(collection_def) = self.index.unannotated_collection_initializer(object)
             && let Some((class_literal, _)) = object_ty.class_specialization(db)
         {
             let identity_instance = Type::instance(db, class_literal.identity_specialization(db));
@@ -1286,21 +1286,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Perform inference against the type variables on the receiver's generic context.
                     .with_generic_context(db, collection_generic_context);
 
-                let call_result = self.speculate().infer_and_check_argument_types(
-                    ArgumentsIter::synthesized(&ast_arguments),
-                    &mut call_arguments,
-                    &mut |builder, (_, expr, tcx)| {
-                        // TODO: The argument types have already been inferred and stored in `call_arguments`.
-                        // However, `object` would have been inferred to a be a collection with `Divergent`
-                        // element types, meaning the type context for a given argument, by which the inferred
-                        // type is keyed, may not be the same as the type context we get here. It is not immediately
-                        // clear how to retrieve those types, and so we just re-infer the argument expressions
-                        // for simplicity.
-                        builder.infer_maybe_standalone_expression(expr, tcx)
-                    },
-                    &mut identity_bindings,
-                    TypeContext::default(),
-                );
+                let call_result = self
+                    .speculate_without_diagnostics()
+                    .infer_and_check_argument_types(
+                        ArgumentsIter::synthesized(&ast_arguments),
+                        &mut call_arguments,
+                        &mut |builder, (_, expr, tcx)| {
+                            // TODO: The argument types have already been inferred and stored in `call_arguments`.
+                            // However, `object` would have been inferred to a be a collection with `Divergent`
+                            // element types, meaning the type context for a given argument, by which the inferred
+                            // type is keyed, may not be the same as the type context we get here. It is not immediately
+                            // clear how to retrieve those types, and so we just re-infer the argument expressions
+                            // for simplicity.
+                            builder.infer_maybe_standalone_expression(expr, tcx)
+                        },
+                        &mut identity_bindings,
+                        TypeContext::default(),
+                    );
 
                 if call_result.is_ok() && boundness == Definedness::AlwaysDefined {
                     for call_specialization in identity_bindings

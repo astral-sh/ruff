@@ -18,6 +18,7 @@ I001 [*] Import block is un-sorted or un-formatted
    | |_^
    |
 help: Organize imports
+   |
 1  | from module1 import (
    -     loooooooooooooong,
 2  +     short,
@@ -33,3 +34,4 @@ help: Organize imports
 9  |     λοοοοοοοοοοοοοονγ,
 10 +     looooooooooooooong,
 11 | )
+   |

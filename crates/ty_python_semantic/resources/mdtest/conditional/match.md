@@ -66,10 +66,8 @@ def sequence_prefix_star_pattern_is_not_catch_all(paths: Sequence[str]) -> None:
         case [_first, _second, *_paths]:
             raise ValueError
 
-    # Exact sequence alternatives and the definitely matched tuple subset of the
-    # starred alternative remain as negative constraints.
-    # revealed: (Sequence[str] & ~<Protocol with members '__len__'> & ~<Protocol with members '__getitem__', '__len__'> & ~tuple[object, object, *tuple[object, ...]]) | str | (Sequence[str] & bytes) | (Sequence[str] & bytearray)
-    reveal_type(paths)
+    # The failed length checks are not retained for a sequence whose length can change.
+    reveal_type(paths)  # revealed: Sequence[str]
 
 def normalize_version(
     version: str | tuple[int, int] | tuple[int, int, int],
@@ -211,7 +209,8 @@ def _(target: FooSub | str):
 
 ### Dynamic class
 
-A dynamically typed class pattern is not known to match every subject, so later cases remain
+A dynamically typed class expression may match any value, but we cannot prove which values it does
+not match. The failed branch therefore keeps the original subject type, and later cases remain
 reachable.
 
 ```py
@@ -221,11 +220,12 @@ DynamicClass: Any = int
 
 def _(target: int | str):
     match target:
-        case DynamicClass():
+        case DynamicClass() as whole:
             reveal_type(target)  # revealed: (int & Any) | (str & Any)
+            reveal_type(whole)  # revealed: (int & Any) | (str & Any)
             y = 1
         case _:
-            reveal_type(target)  # revealed: (int & Any) | (str & Any)
+            reveal_type(target)  # revealed: int | str
             y = 2
 
     reveal_type(y)  # revealed: Literal[1, 2]
@@ -336,6 +336,15 @@ def _(target: Point | Other):
             reveal_type(target)  # revealed: Point
         case Other():
             reveal_type(target)  # revealed: Other
+
+def missing_attribute_does_not_make_or_pattern_exhaustive(target: Point):
+    y = 1
+
+    match target:
+        case Point(missing=_) | Other():
+            y = 2
+
+    reveal_type(y)  # revealed: Literal[1, 2]
 ```
 
 ## Singleton match
@@ -539,6 +548,16 @@ def _(target: None | Foo):
 
 ## `as` patterns
 
+An `as` pattern binds the value matched by the pattern on its left. The bound name gets the type of
+the subject after that pattern succeeds.
+
+### Value-pattern aliases
+
+Value patterns use `==`, and `as` binds the original subject rather than the value written in the
+pattern. An `int` or `str` subclass can define `__eq__` so that it compares equal to `1`, so `x`
+remains `int | str` in the first branch. If that branch fails, we can rule out the exact integer
+literal `1` and `True`, which compares equal to `1`, but not the rest of either class.
+
 ```py
 def _(target: int | str):
     y = 1
@@ -546,14 +565,47 @@ def _(target: int | str):
     match target:
         case 1 as x:
             y = 2
-            reveal_type(x)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(x)  # revealed: int | str
         case "foo" as x:
             y = 3
-            reveal_type(x)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(x)  # revealed: (int & ~Literal[1] & ~Literal[True]) | str
         case _:
             y = 4
 
     reveal_type(y)  # revealed: Literal[2, 3, 4]
+```
+
+### Narrowing a value alias
+
+When every possible value has known equality behavior, the value pattern can narrow the bound name.
+Here, matching `1` narrows `item` to `Literal[1]`.
+
+```py
+from typing import Literal
+
+def value_alias(target: Literal[1, 2]):
+    match target:
+        case 1 as item:
+            reveal_type(item)  # revealed: Literal[1]
+```
+
+### Bindings that always match
+
+A wildcard alias and a capture pattern both match every subject, so they bind the subject's full
+type.
+
+```py
+from typing import Literal
+
+def wildcard_alias(target: Literal[1, 2]):
+    match target:
+        case _ as item:
+            reveal_type(item)  # revealed: Literal[1, 2]
+
+def capture_pattern(target: Literal[1, 2]):
+    match target:
+        case item:
+            reveal_type(item)  # revealed: Literal[1, 2]
 ```
 
 ## Guard with object that implements `__bool__` incorrectly

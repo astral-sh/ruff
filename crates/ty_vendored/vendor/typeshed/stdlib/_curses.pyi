@@ -374,7 +374,15 @@ def endwin() -> None:
 def erasechar() -> bytes:
     """Return the user's current erase character."""
 
-def filter() -> None: ...
+def filter() -> None:
+    """Restrict screen updates to the current line.
+
+    Must be called before initscr().  Afterwards curses confines the cursor
+    and screen updates to a single line, which is useful for enabling
+    character-at-a-time line editing without touching the rest of the
+    screen.
+    """
+
 def flash() -> None:
     """Flash the screen.
 
@@ -504,7 +512,14 @@ def initscr() -> window:
     Return a WindowObject which represents the whole screen.
     """
 
-def intrflush(flag: bool, /) -> None: ...
+def intrflush(flag: bool, /) -> None:
+    """Control flushing of the output buffer when an interrupt key is pressed.
+
+    If flag is true, pressing an interrupt key (interrupt, break, or quit)
+    flushes all output in the terminal driver queue.  If flag is false, no
+    flushing is done.
+    """
+
 def is_term_resized(nlines: int, ncols: int, /) -> bool:
     """Return True if resize_term() would modify the window structure, False otherwise.
 
@@ -553,13 +568,12 @@ def mouseinterval(interval: int, /) -> None:
     """
 
 def mousemask(newmask: int, /) -> tuple[int, int]:
-    """Set the mouse events to be reported, and return a tuple (availmask, oldmask).
+    """Set the mouse events to be reported, and return (availmask, oldmask).
 
     Return a tuple (availmask, oldmask).  availmask indicates which of the
     specified mouse events can be reported; on complete failure it returns
-    0.  oldmask is the previous value of the given window's mouse event
-    mask.  If this function is never called, no mouse events are ever
-    reported.
+    0.  oldmask is the previous value of the mouse event mask.  If this
+    function is never called, no mouse events are ever reported.
     """
 
 def napms(ms: int, /) -> int:
@@ -855,7 +869,12 @@ def ungetmouse(id: int, x: int, y: int, z: int, bstate: int, /) -> None:
     The following getmouse() will return the given state data.
     """
 
-def update_lines_cols() -> None: ...
+def update_lines_cols() -> None:
+    """Update the LINES and COLS module variables.
+
+    This is useful for detecting manual screen resize.
+    """
+
 def use_default_colors() -> None:
     """Equivalent to assume_default_colors(-1, -1)."""
 
@@ -1055,26 +1074,39 @@ class window:  # undocumented
     @overload
     def chgat(self, y: int, x: int, num: int, attr: int) -> None: ...
 
-    def clear(self) -> None: ...
-    def clearok(self, yes: int) -> None: ...
-    def clrtobot(self) -> None: ...
-    def clrtoeol(self) -> None: ...
-    def cursyncup(self) -> None: ...
+    def clear(self) -> None:
+        """Clear the window and repaint it completely on the next refresh()."""
+
+    def clearok(self, flag: bool, /) -> None:
+        """Clear the window on the next refresh() if flag is true."""
+
+    def clrtobot(self) -> None:
+        """Erase from the cursor to the end of the window."""
+
+    def clrtoeol(self) -> None:
+        """Erase from the cursor to the end of the line."""
+
+    def cursyncup(self) -> None:
+        """Update the cursor position of all ancestor windows to match."""
 
     @overload
     def delch(self) -> None:
         """delch([y, x])
-        Delete any character at (y, x).
+        Delete the character under the cursor, or at (y, x) if specified.
 
           y
             Y-coordinate.
           x
             X-coordinate.
+
+        All characters to the right on the same line are shifted one
+        position left.
         """
     @overload
     def delch(self, y: int, x: int) -> None: ...
 
-    def deleteln(self) -> None: ...
+    def deleteln(self) -> None:
+        """Delete the line under the cursor; move following lines up by one."""
 
     @overload
     def derwin(self, begin_y: int, begin_x: int) -> window:
@@ -1115,8 +1147,12 @@ class window:  # undocumented
           X-coordinate.
         """
 
-    def erase(self) -> None: ...
-    def getbegyx(self) -> tuple[int, int]: ...
+    def erase(self) -> None:
+        """Clear the window."""
+
+    def getbegyx(self) -> tuple[int, int]:
+        """Return a tuple (y, x) of the upper-left corner coordinates."""
+
     def getbkgd(self) -> tuple[int, int]:
         """Return the window's current background character/attribute pair."""
 
@@ -1172,8 +1208,11 @@ class window:  # undocumented
     @overload
     def getkey(self, y: int, x: int) -> str: ...
 
-    def getmaxyx(self) -> tuple[int, int]: ...
-    def getparyx(self) -> tuple[int, int]: ...
+    def getmaxyx(self) -> tuple[int, int]:
+        """Return a tuple (y, x) of the window height and width."""
+
+    def getparyx(self) -> tuple[int, int]:
+        """Return (y, x) relative to the parent window, or (-1, -1) if none."""
 
     @overload
     def getstr(self) -> bytes:
@@ -1194,7 +1233,8 @@ class window:  # undocumented
     @overload
     def getstr(self, y: int, x: int, n: int) -> bytes: ...
 
-    def getyx(self) -> tuple[int, int]: ...
+    def getyx(self) -> tuple[int, int]:
+        """Return a tuple (y, x) of the current cursor position."""
 
     @overload
     def hline(self, ch: _ChType, n: int) -> None:
@@ -1215,9 +1255,14 @@ class window:  # undocumented
     @overload
     def hline(self, y: int, x: int, ch: _ChType, n: int) -> None: ...
 
-    def idcok(self, flag: bool) -> None: ...
-    def idlok(self, yes: bool) -> None: ...
-    def immedok(self, flag: bool) -> None: ...
+    def idcok(self, flag: bool, /) -> None:
+        """Enable or disable the hardware insert/delete character feature."""
+
+    def idlok(self, flag: bool, /) -> None:
+        """Enable or disable the hardware insert/delete line feature."""
+
+    def immedok(self, flag: bool, /) -> None:
+        """If flag is true, refresh the window on every change to it."""
 
     @overload
     def inch(self) -> int:
@@ -1255,8 +1300,11 @@ class window:  # undocumented
     @overload
     def insch(self, y: int, x: int, ch: _ChType, attr: int = ...) -> None: ...
 
-    def insdelln(self, nlines: int) -> None: ...
-    def insertln(self) -> None: ...
+    def insdelln(self, nlines: int, /) -> None:
+        """Insert (nlines > 0) or delete (nlines < 0) lines above the cursor."""
+
+    def insertln(self) -> None:
+        """Insert a blank line under the cursor; move following lines down."""
 
     @overload
     def insnstr(self, str: str, n: int, attr: int = ...) -> None:
@@ -1319,10 +1367,12 @@ class window:  # undocumented
           n
             Maximal number of characters.
 
-        Return a string of characters, extracted from the window starting at the
-        current cursor position, or at y, x if specified.  Attributes are stripped
-        from the characters.  If n is specified, instr() returns a string at most
-        n characters long (exclusive of the trailing NUL).
+        Return a string of characters, extracted from the window starting
+        at the current cursor position, or at y, x if specified, and
+        stopping at the end of the line.  Attributes and color
+        information are stripped from the characters.  If n is specified,
+        instr() returns a string at most n characters long (exclusive of
+        the trailing NUL).
         """
     @overload
     def instr(self, y: int, x: int, n: int = 2047) -> bytes: ...
@@ -1337,14 +1387,29 @@ class window:  # undocumented
         window.
         """
 
-    def is_wintouched(self) -> bool: ...
-    def keypad(self, yes: bool, /) -> None: ...
-    def leaveok(self, yes: bool) -> None: ...
-    def move(self, new_y: int, new_x: int) -> None: ...
-    def mvderwin(self, y: int, x: int) -> None: ...
-    def mvwin(self, new_y: int, new_x: int) -> None: ...
-    def nodelay(self, yes: bool) -> None: ...
-    def notimeout(self, yes: bool) -> None: ...
+    def is_wintouched(self) -> bool:
+        """Return True if the window changed since the last refresh()."""
+
+    def keypad(self, flag: bool, /) -> None:
+        """Interpret escape sequences for special keys if flag is true."""
+
+    def leaveok(self, flag: bool, /) -> None:
+        """If flag is true, leave the cursor where the update leaves it."""
+
+    def move(self, new_y: int, new_x: int, /) -> None:
+        """Move the cursor to (new_y, new_x)."""
+
+    def mvderwin(self, y: int, x: int, /) -> None:
+        """Move the window inside its parent window."""
+
+    def mvwin(self, new_y: int, new_x: int, /) -> None:
+        """Move the window so its upper-left corner is at (new_y, new_x)."""
+
+    def nodelay(self, flag: bool, /) -> None:
+        """If flag is true, getch() becomes non-blocking."""
+
+    def notimeout(self, flag: bool, /) -> None:
+        """If flag is true, do not time out escape sequences."""
 
     @overload
     def noutrefresh(self) -> None:
@@ -1416,7 +1481,8 @@ class window:  # undocumented
         They should be completely redrawn on the next refresh() call.
         """
 
-    def redrawwin(self) -> None: ...
+    def redrawwin(self) -> None:
+        """Mark the entire window for redraw on the next refresh()."""
 
     @overload
     def refresh(self) -> None:
@@ -1439,7 +1505,9 @@ class window:  # undocumented
     @overload
     def refresh(self, pminrow: int, pmincol: int, sminrow: int, smincol: int, smaxrow: int, smaxcol: int) -> None: ...
 
-    def resize(self, nlines: int, ncols: int) -> None: ...
+    def resize(self, nlines: int, ncols: int, /) -> None:
+        """Resize the window to nlines rows and ncols columns."""
+
     def scroll(self, lines: int = 1) -> None:
         """scroll([lines=1])
         Scroll the screen or scrolling region.
@@ -1451,7 +1519,9 @@ class window:  # undocumented
         negative.
         """
 
-    def scrollok(self, flag: bool) -> None: ...
+    def scrollok(self, flag: bool, /) -> None:
+        """Control whether the window scrolls when the cursor moves off it."""
+
     def setscrreg(self, top: int, bottom: int, /) -> None:
         """Define a software scrolling region.
 
@@ -1463,8 +1533,11 @@ class window:  # undocumented
         All scrolling actions will take place in this region.
         """
 
-    def standend(self) -> None: ...
-    def standout(self) -> None: ...
+    def standend(self) -> None:
+        """Turn off the standout attribute."""
+
+    def standout(self) -> None:
+        """Turn on the A_STANDOUT attribute."""
 
     @overload
     def subpad(self, begin_y: int, begin_x: int) -> window:
@@ -1506,10 +1579,18 @@ class window:  # undocumented
     @overload
     def subwin(self, nlines: int, ncols: int, begin_y: int, begin_x: int) -> window: ...
 
-    def syncdown(self) -> None: ...
-    def syncok(self, flag: bool) -> None: ...
-    def syncup(self) -> None: ...
-    def timeout(self, delay: int) -> None: ...
+    def syncdown(self) -> None:
+        """Touch each location changed in any ancestor of the window."""
+
+    def syncok(self, flag: bool, /) -> None:
+        """If flag is true, call syncup() on every change to the window."""
+
+    def syncup(self) -> None:
+        """Touch locations in ancestors that changed in this window."""
+
+    def timeout(self, delay: int, /) -> None:
+        """Set blocking or non-blocking read behavior for the window."""
+
     def touchline(self, start: int, count: int, changed: bool = True) -> None:
         """touchline(start, count, [changed=True])
         Pretend count lines have been changed, starting with line start.
@@ -1519,8 +1600,11 @@ class window:  # undocumented
         (changed=False).
         """
 
-    def touchwin(self) -> None: ...
-    def untouchwin(self) -> None: ...
+    def touchwin(self) -> None:
+        """Mark the whole window as changed."""
+
+    def untouchwin(self) -> None:
+        """Mark all lines in the window as unchanged since last refresh()."""
 
     @overload
     def vline(self, ch: _ChType, n: int) -> None:

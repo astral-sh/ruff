@@ -149,13 +149,13 @@ pub fn lint_documentation_url(lint_name: LintName) -> String {
 }
 
 #[doc(hidden)]
-pub const fn lint_metadata_defaults() -> LintMetadata {
+pub const fn lint_metadata_defaults(status: LintStatus) -> LintMetadata {
     LintMetadata {
         name: LintName::of(""),
         summary: "",
         raw_documentation: "",
         default_level: Level::Error,
-        status: LintStatus::preview("0.0.0"),
+        status,
         file: "",
         line: 1,
     }
@@ -168,15 +168,9 @@ pub const fn lint_metadata_defaults() -> LintMetadata {
     serde(tag = "type", rename_all = "lowercase")
 )]
 pub enum LintStatus {
-    /// The lint has been added to the linter, but is not yet stable.
-    Preview {
-        /// The version in which the lint was added.
-        since: &'static str,
-    },
-
     /// The lint is stable.
     Stable {
-        /// The version in which the lint was stabilized.
+        /// The version in which the lint was added.
         since: &'static str,
     },
 
@@ -203,10 +197,6 @@ pub enum LintStatus {
 }
 
 impl LintStatus {
-    pub const fn preview(since: &'static str) -> Self {
-        LintStatus::Preview { since }
-    }
-
     pub const fn stable(since: &'static str) -> Self {
         LintStatus::Stable { since }
     }
@@ -248,7 +238,7 @@ impl LintStatus {
 ///     /// ```
 ///     pub(crate) static UNRESOLVED_REFERENCE = {
 ///         summary: "detects references to names that are not defined",
-///         status: LintStatus::preview("1.0.0"),
+///         status: LintStatus::stable("1.0.0"),
 ///         default_level: Level::Warn,
 ///     }
 /// }
@@ -267,16 +257,14 @@ macro_rules! declare_lint {
     ) => {
         $(#[expect($($expect)*)])?
         $( #[doc = $doc] )+
-        #[expect(clippy::needless_update)]
         $vis static $name: $crate::lint::LintMetadata = $crate::lint::LintMetadata {
             name: ruff_db::diagnostic::LintName::of(ruff_macros::kebab_case!($name)),
             summary: $summary,
             raw_documentation: concat!($($doc, '\n',)+),
-            status: $status,
             file: file!(),
             line: line!(),
             $( $key: $value, )*
-            ..$crate::lint::lint_metadata_defaults()
+            ..$crate::lint::lint_metadata_defaults($status)
         };
     };
 }
@@ -291,7 +279,7 @@ mod tests {
         ///     indented
         static INLINE_DOCUMENTATION = {
             summary: "inline documentation",
-            status: LintStatus::preview("0.0.0"),
+            status: LintStatus::stable("0.0.0"),
             default_level: Level::Error,
         }
     }
@@ -300,7 +288,7 @@ mod tests {
         #[doc = include_str!("../resources/lint_docs/invalid-attribute-access.md")]
         static INCLUDED_DOCUMENTATION = {
             summary: "included documentation",
-            status: LintStatus::preview("0.0.0"),
+            status: LintStatus::stable("0.0.0"),
             default_level: Level::Error,
         }
     }
@@ -524,7 +512,7 @@ impl std::fmt::Display for GetLintError {
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum LintEntry {
-    /// An existing lint rule. Can be in preview, stable or deprecated.
+    /// An existing lint rule. Can be stable or deprecated.
     Lint(LintId),
     /// A lint rule that has been removed.
     Removed(LintId),

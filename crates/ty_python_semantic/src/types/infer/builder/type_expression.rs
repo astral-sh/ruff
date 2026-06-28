@@ -224,7 +224,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                         // Detect runtime errors from e.g. `int | "bytes"` on Python <3.14 without `__future__` annotations.
                         if !ignore_runtime_errors(self) {
-                            let mut speculative_builder = self.speculate();
+                            let mut speculative_builder = self.speculate_without_diagnostics();
                             // If the left-hand side of the union is itself a PEP-604 union,
                             // we'll already have checked whether it can be used with `|` in a previous inference step
                             // and emitted a diagnostic if it was appropriate. We should skip inferring it here to
@@ -360,7 +360,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         if !ignore_runtime_errors(self) {
                             // Infer the operands as values to report the types used by the runtime
                             // operation rather than their interpretation as type expressions.
-                            let mut speculative_builder = self.speculate();
+                            let mut speculative_builder = self.speculate_without_diagnostics();
                             let left_value = speculative_builder
                                 .infer_expression(&binary.left, TypeContext::default());
                             let right_value = speculative_builder
@@ -509,7 +509,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ),
                 ) && let [single_element] = &*list.elts
                 {
-                    let mut speculative_builder = self.speculate();
+                    let mut speculative_builder = self.speculate_without_diagnostics();
                     let inner_type = speculative_builder.infer_type_expression(single_element);
 
                     if inner_type.is_hintable(self.db()) {
@@ -540,7 +540,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             self.type_expression_context()
                         ),
                     ) {
-                        let mut speculative = self.speculate();
+                        let mut speculative = self.speculate_without_diagnostics();
                         let inner_types: Vec<Type<'db>> = tuple
                             .elts
                             .iter()
@@ -607,7 +607,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 if !ignore_runtime_errors(self) {
                     let operand_value = self
-                        .speculate()
+                        .speculate_without_diagnostics()
                         .infer_expression(operand, TypeContext::default());
                     if let Err(error) = operand_value.try_call_dunder(
                         self.db(),
@@ -687,7 +687,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     },
                 ] = &*dict.items
                 {
-                    let mut speculative = self.speculate();
+                    let mut speculative = self.speculate_without_diagnostics();
                     let key_type = speculative.infer_type_expression(key);
                     let value_type = speculative.infer_type_expression(value);
                     if key_type.is_hintable(self.db()) && value_type.is_hintable(self.db()) {
@@ -714,7 +714,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ),
                 ) && let [single_element] = &*set.elts
                 {
-                    let mut speculative_builder = self.speculate();
+                    let mut speculative_builder = self.speculate_without_diagnostics();
                     let inner_type = speculative_builder.infer_type_expression(single_element);
 
                     if inner_type.is_hintable(self.db()) {
@@ -1714,6 +1714,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
+                KnownInstanceType::Range { .. } => {
+                    if !self.in_string_annotation() {
+                        self.infer_expression(&subscript.slice, TypeContext::default());
+                    }
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "`range` instances cannot be specialized"
+                        ));
+                    }
+                    Type::unknown()
+                }
             },
             Type::Dynamic(DynamicType::UnknownGeneric(_)) => {
                 self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
@@ -2457,9 +2468,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             SpecialFormType::TypingSelf
             | SpecialFormType::TypeAlias
-            | SpecialFormType::TypedDict
+            | SpecialFormType::TypedDict(_)
             | SpecialFormType::Unknown
             | SpecialFormType::Divergent
+            | SpecialFormType::Todo
             | SpecialFormType::Any
             | SpecialFormType::NamedTuple => {
                 if !self.in_string_annotation() {

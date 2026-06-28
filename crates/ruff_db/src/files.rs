@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 use std::fmt;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use dashmap::mapref::entry::Entry;
 pub use directory::{
@@ -64,6 +65,9 @@ pub struct Files {
 
 #[derive(Default)]
 struct FilesInner {
+    /// Whether inputs on newly created files should be frozen.
+    frozen: AtomicBool,
+
     /// Lookup table that maps [`SystemPathBuf`]s to salsa interned [`File`] instances.
     ///
     /// The map also stores entries for files that don't exist on the file system. This is necessary
@@ -81,6 +85,22 @@ struct FilesInner {
 }
 
 impl Files {
+    /// Freezes all inputs on files created from now on.
+    ///
+    /// Existing files retain their current durability. Callers should therefore call this before
+    /// discovering any files if they need the freeze to apply to the entire project.
+    pub fn freeze(&self) {
+        self.inner.frozen.store(true, Ordering::Relaxed);
+    }
+
+    fn input_durability(&self, default: Durability) -> Durability {
+        if self.inner.frozen.load(Ordering::Relaxed) {
+            Durability::NEVER_CHANGE
+        } else {
+            default
+        }
+    }
+
     /// Looks up a file by its `path`.
     ///
     /// For a non-existing file, creates a new salsa [`File`] ingredient and stores it for future lookups.
@@ -104,13 +124,14 @@ impl Files {
 
                 tracing::trace!("Adding file '{absolute}'");
 
-                let durability = self
-                    .root(db, &absolute)
-                    .map_or(Durability::default(), |root| root.durability(db));
+                let durability = self.input_durability(
+                    self.root(db, &absolute)
+                        .map_or(Durability::default(), |root| root.durability(db)),
+                );
 
                 let builder = File::builder(FilePath::from(absolute))
                     .durability(durability)
-                    .path_durability(Durability::HIGH);
+                    .path_durability(Durability::NEVER_CHANGE);
 
                 let builder = match metadata {
                     Ok(metadata) if metadata.file_type().is_file() => builder
@@ -161,7 +182,7 @@ impl Files {
                 let file = File::builder(FilePath::from(path))
                     .permissions(Some(0o444))
                     .revision(metadata.revision())
-                    .durability(Durability::HIGH)
+                    .durability(Durability::NEVER_CHANGE)
                     .new(db);
 
                 entry.insert(file);
@@ -181,11 +202,12 @@ impl Files {
         tracing::trace!("Adding virtual file {}", path);
         let virtual_file = VirtualFile(
             File::builder(FilePath::from(path))
-                .path_durability(Durability::HIGH)
+                .durability(self.input_durability(Durability::LOW))
+                .path_durability(Durability::NEVER_CHANGE)
                 .status(FileStatus::Exists)
                 .revision(FileRevision::zero())
                 .permissions(None)
-                .permissions_durability(Durability::HIGH)
+                .permissions_durability(Durability::NEVER_CHANGE)
                 .new(db),
         );
         self.inner
@@ -677,8 +699,12 @@ impl TryFrom<Span> for FileRange {
 
 #[cfg(test)]
 mod tests {
+    use salsa::Setter;
+
+    use crate::Db as _;
     use crate::file_revision::FileRevision;
     use crate::files::{FileError, system_path_to_file, vendored_path_to_file};
+    use crate::source::source_text;
     use crate::system::DbWithWritableSystem as _;
     use crate::tests::TestDb;
     use crate::vendored::VendoredFileSystemBuilder;
@@ -721,6 +747,32 @@ mod tests {
             system_path_to_file(&db, "/root/.././test.py"),
             system_path_to_file(&db, "/root/test.py")
         );
+    }
+
+    #[test]
+    #[should_panic]
+    fn freeze_applies_to_new_file_overrides() {
+        let mut db = TestDb::new();
+        db.write_file("test.py", "x = 1").unwrap();
+        db.files().freeze();
+
+        let file = system_path_to_file(&db, "test.py").unwrap();
+        let source = source_text(&db, file);
+        file.set_source_text_override(&mut db).to(Some(source));
+    }
+
+    #[test]
+    fn freeze_does_not_change_existing_files() {
+        let mut db = TestDb::new();
+        db.write_file("test.py", "x = 1").unwrap();
+
+        let file = system_path_to_file(&db, "test.py").unwrap();
+        db.files().freeze();
+
+        let source = source_text(&db, file);
+        file.set_source_text_override(&mut db)
+            .to(Some(source.clone()));
+        assert_eq!(file.source_text_override(&db).as_ref(), Some(&source));
     }
 
     #[test]

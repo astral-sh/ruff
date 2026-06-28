@@ -144,14 +144,14 @@ impl<'db> NewType<'db> {
                     for inner_newtype in inner_newtype_stack.into_iter().rev() {
                         mapped_base = NewTypeBase::NewType(NewType::new(
                             db,
-                            inner_newtype.name(db).clone(),
+                            inner_newtype.name(db),
                             inner_newtype.definition(db),
                             Some(mapped_base),
                         ));
                     }
                     return Some(NewType::new(
                         db,
-                        self.name(db).clone(),
+                        self.name(db),
                         self.definition(db),
                         Some(mapped_base),
                     ));
@@ -189,7 +189,7 @@ impl<'db> NewType<'db> {
 
         Some(NewType::new(
             db,
-            self.name(db).clone(),
+            self.name(db),
             self.definition(db),
             eager_base,
         ))

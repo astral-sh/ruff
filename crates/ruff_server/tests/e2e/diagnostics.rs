@@ -41,7 +41,7 @@ fn uses_human_readable_names_in_preview() -> Result<()> {
             1
           ],
           "data": {
-            "code": "F401",
+            "code": "unused-import",
             "edits": [
               {
                 "newText": "",

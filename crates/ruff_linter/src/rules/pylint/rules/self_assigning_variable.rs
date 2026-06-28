@@ -45,11 +45,11 @@ pub(crate) fn self_assignment(checker: &Checker, assign: &ast::StmtAssign) {
         return;
     }
 
-    for (left, right) in assign
+    for [left, right] in assign
         .targets
         .iter()
         .chain(std::iter::once(assign.value.as_ref()))
-        .tuple_combinations()
+        .array_combinations()
     {
         visit_assignments(checker, left, right);
     }

@@ -12,6 +12,7 @@ I001 [*] Import block is un-sorted or un-formatted
   | |________________________________^
   |
 help: Organize imports
+  |
 1 + import os
 2 | import sys
 3 +
@@ -21,3 +22,4 @@ help: Organize imports
   - import numpy as np
   - import os
 7 | from leading_prefix import Class
+  |

@@ -21,11 +21,10 @@ PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
 77 |     ...
    |
 help: Remove implied `scope` argument
-72 | def error_multiple_args():
-73 |     ...
+   |
 74 |
    - @pytest_asyncio.fixture(scope="function")
 75 + @pytest_asyncio.fixture()
 76 | async def asyncio_error():
-77 |     ...
+   |
 note: This is an unsafe fix and may change runtime behavior

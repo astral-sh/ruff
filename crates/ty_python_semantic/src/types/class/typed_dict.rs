@@ -23,8 +23,8 @@ use crate::types::typed_dict::{
 };
 use crate::types::{
     BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType, KnownClass,
-    MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictType, UnionType,
-    determine_upper_bound,
+    MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictModule,
+    TypedDictType, UnionType, determine_upper_bound,
 };
 use crate::{Db, FxIndexMap};
 use ty_python_core::definition::Definition;
@@ -841,6 +841,8 @@ pub struct DynamicTypedDictLiteral<'db> {
     ///   eagerly computed spec is stored on the anchor.
     #[returns(ref)]
     pub(crate) anchor: DynamicTypedDictAnchor<'db>,
+
+    pub(crate) typed_dict_module: TypedDictModule,
 }
 
 impl get_size2::GetSize for DynamicTypedDictLiteral<'_> {}
@@ -854,9 +856,10 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     ) -> Option<Self> {
         Some(Self::new(
             db,
-            self.name(db).clone(),
+            self.name(db),
             self.anchor(db)
                 .recursive_type_normalized_impl(db, div, nested)?,
+            self.typed_dict_module(db),
         ))
     }
 }
@@ -948,7 +951,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         let object_class = ClassType::object(db);
         Mro::from([
             self_base,
-            ClassBase::TypedDict,
+            ClassBase::TypedDict(self.typed_dict_module(db)),
             ClassBase::Class(object_class),
         ])
     }
@@ -989,25 +992,40 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         // This mirrors the behavior of StaticClassLiteral::typed_dict_member.
         typed_dict_class_member(
             db,
-            TypedDictType::new(ClassType::NonGeneric(ClassLiteral::DynamicTypedDict(self))),
-            ClassLiteral::DynamicTypedDict(self),
+            ClassType::NonGeneric(ClassLiteral::DynamicTypedDict(self)),
+            self.typed_dict_module(db),
             policy,
             name,
         )
     }
 }
 
-pub(super) fn typed_dict_class_member<'db>(
+pub(super) fn typed_dict_fallback_class_member<'db>(
     db: &'db dyn Db,
-    typed_dict: TypedDictType<'db>,
-    self_class: ClassLiteral<'db>,
+    module: TypedDictModule,
     lookup_policy: MemberLookupPolicy,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
-    let fallback_member = KnownClass::TypedDictFallback
+    let fallback = match module {
+        TypedDictModule::Typing => KnownClass::TypedDictFallback,
+        TypedDictModule::TypingExtensions => KnownClass::ExtensionTypedDictFallback,
+    };
+
+    fallback
         .to_class_literal(db)
         .find_name_in_mro_with_policy(db, name, lookup_policy)
         .expect("Will return Some() when called on class literal")
+}
+
+pub(super) fn typed_dict_class_member<'db>(
+    db: &'db dyn Db,
+    class: ClassType<'db>,
+    module: TypedDictModule,
+    lookup_policy: MemberLookupPolicy,
+    name: &str,
+) -> PlaceAndQualifiers<'db> {
+    let self_class = class.class_literal(db);
+    let fallback_member = typed_dict_fallback_class_member(db, module, lookup_policy, name)
         .map_type(|ty| {
             let new_upper_bound = determine_upper_bound(db, self_class, ClassBase::is_typed_dict);
             let mapping = TypeMapping::ReplaceSelf { new_upper_bound };
@@ -1017,22 +1035,7 @@ pub(super) fn typed_dict_class_member<'db>(
         return fallback_member;
     }
 
-    // `typing_extensions.TypedDict` backports these attributes to Python versions before 3.15,
-    // where the stdlib fallback intentionally omits them.
-    if matches!(name, "__closed__" | "__extra_items__")
-        && let Some(typing_extensions_fallback) =
-            known_module_symbol(db, KnownModule::TypingExtensions, "_TypedDict")
-                .place
-                .ignore_possibly_undefined()
-                .and_then(Type::as_class_literal)
-    {
-        let member = typing_extensions_fallback.class_member(db, name, lookup_policy);
-        if !member.is_undefined() {
-            return member;
-        }
-    }
-
-    if let Some(value_ty) = typed_dict.dict_value_type(db)
+    if let Some(value_ty) = TypedDictType::new(class).dict_value_type(db)
         && let Some(dict_class) = KnownClass::Dict
             .to_specialized_class_type(db, &[KnownClass::Str.to_instance(db), value_ty])
     {

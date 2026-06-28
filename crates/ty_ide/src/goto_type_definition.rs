@@ -753,10 +753,21 @@ mod tests {
             "#,
         );
 
-        // TODO: Goto type definition currently doesn't work for type var tuples
-        // because the inference doesn't support them yet.
-        // This snapshot should show a single target pointing to `T`
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+        // TODO: Point to `Ts` once inference supports type-variable tuples here.
+        assert_snapshot!(test.goto_type_definition(), @"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:31
+           |
+        LL | type Alias[*Ts = ()] = tuple[*Ts]
+           |                               ^^ Clicking here
+           |
+        info: Found 1 type definition
+          --> stdlib/ty_extensions.pyi:LL:1
+           |
+        LL | Todo: _SpecialForm
+           | ----
+           |
+        ");
     }
 
     #[test]
@@ -1275,7 +1286,20 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:17
+           |
+        LL |             x = ab
+           |                 ^^ Clicking here
+           |
+        info: Found 1 type definition
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+           |
+        "#);
     }
 
     #[test]
@@ -1303,7 +1327,20 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:17
+           |
+        LL |             x = ab
+           |                 ^^ Clicking here
+           |
+        info: Found 1 type definition
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class list(MutableSequence[_T]):
+           |       ----
+           |
+        "#);
     }
 
     #[test]
@@ -1331,7 +1368,20 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:17
+           |
+        LL |             x = ab
+           |                 ^^ Clicking here
+           |
+        info: Found 1 type definition
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+           |
+        "#);
     }
 
     #[test]
@@ -1371,7 +1421,20 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+        assert_snapshot!(test.goto_type_definition(), @"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:17
+           |
+        LL |             x = ab
+           |                 ^^ Clicking here
+           |
+        info: Found 1 type definition
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+           |
+        ");
     }
 
     #[test]
@@ -1518,7 +1581,20 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+        assert_snapshot!(test.goto_type_definition(), @"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:38
+           |
+        LL | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
+           |                                      ^^ Clicking here
+           |
+        info: Found 1 type definition
+          --> stdlib/ty_extensions.pyi:LL:1
+           |
+        LL | Todo: _SpecialForm
+           | ----
+           |
+        ");
     }
 
     #[test]

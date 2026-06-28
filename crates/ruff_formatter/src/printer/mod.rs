@@ -440,25 +440,28 @@ impl<'a> Printer<'a> {
 
     fn print_text(&mut self, text: Text) {
         if !self.state.pending_indent.is_empty() {
-            let (indent_char, repeat_count) = match self.options.indent_style() {
-                IndentStyle::Tab => ('\t', 1),
-                IndentStyle::Space => (' ', self.options.indent_width()),
+            let indent = std::mem::take(&mut self.state.pending_indent);
+            let indent_level = indent.level();
+            let align = indent.align();
+            let indent_width = self.options.indent_width();
+            let line_width = u32::from(indent_level) * indent_width + u32::from(align);
+            let indent_level = usize::from(indent_level);
+            let align = usize::from(align);
+            let (indent_char, total_indent_char_count) = match self.options.indent_style() {
+                IndentStyle::Tab => ('\t', indent_level),
+                IndentStyle::Space => (' ', indent_level * indent_width as usize),
             };
 
-            let indent = std::mem::take(&mut self.state.pending_indent);
-            let total_indent_char_count = indent.level() as usize * repeat_count as usize;
-
-            self.state
-                .buffer
-                .reserve(total_indent_char_count + indent.align() as usize);
-
+            let buffer = &mut self.state.buffer;
+            buffer.reserve(total_indent_char_count + align);
             for _ in 0..total_indent_char_count {
-                self.print_char(indent_char);
+                buffer.push(indent_char);
+            }
+            for _ in 0..align {
+                buffer.push(' ');
             }
 
-            for _ in 0..indent.align() {
-                self.print_char(' ');
-            }
+            self.state.line_width += line_width;
         }
 
         self.push_marker();
@@ -1150,6 +1153,9 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
     }
 
     /// Tests if the passed element fits on the current line or not.
+    // LLVM considers this function too large to inline on its own, but it is called for every
+    // element visited by the fitting loop.
+    #[inline(always)]
     fn fits_element(&mut self, element: &'a FormatElement) -> PrintResult<Fits> {
         #[allow(clippy::enum_glob_use)]
         use Tag::*;

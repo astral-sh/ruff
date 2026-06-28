@@ -976,11 +976,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source_subclass: SubclassOfType<'db>,
         target: Type<'db>,
     ) -> bool {
-        let is_exact_upper_bound = source_subclass.into_type_var().is_some_and(|source_i| {
-            source_i.typevar(db).upper_bound(db).and_then(|bound| {
-                SubclassOfType::try_from_instance(db, bound.resolve_type_alias(db))
-            }) == Some(target)
-        });
+        let is_exact_upper_bound = source_subclass.exact_typevar_upper_bound(db) == Some(target);
 
         (!matches!(target, Type::ClassLiteral(_) | Type::GenericAlias(_)) || is_exact_upper_bound)
             && (Self::is_metaclass_instance(db, target) || target.to_instance(db).is_some())
@@ -1127,7 +1123,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // but this is not true for divergent types (and moving this case any lower down appears to cause
             // "too many cycle iterations" panics).
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
-                ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
+                ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
             }
 
             // Instances of classes that inherit from an explicit `Any` base retain their nominal
@@ -1507,6 +1503,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (Type::Union(union), _) => {
+                if let Some(supertype) = union.common_literal_supertype(db) {
+                    // Use the broader supertype only as a positive proof. If it has the requested
+                    // relation to the target, then every literal in the union does too. Otherwise,
+                    // check each literal individually.
+                    let supertype_result = self
+                        .without_context_collection(|| self.check_type_pair(db, supertype, target));
+                    if supertype_result.is_always_satisfied(db) {
+                        return supertype_result;
+                    }
+                }
+
                 union
                     .elements(db)
                     .iter()
@@ -2686,7 +2693,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             }
 
             (Type::LiteralValue(left), Type::LiteralValue(right)) => {
-                ConstraintSet::from_bool(self.constraints, left.kind() != right.kind())
+                if let (Some(left), Some(right)) = (left.as_enum(), right.as_enum())
+                    && left.enum_class_literal(db) == right.enum_class_literal(db)
+                    && !left.enum_class_literal(db).aliases_are_known(db)
+                {
+                    self.never()
+                } else {
+                    ConstraintSet::from_bool(self.constraints, left.kind() != right.kind())
+                }
             }
 
             (Type::PropertyInstance(left), Type::PropertyInstance(right)) => {

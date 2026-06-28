@@ -92,6 +92,61 @@ def exhaustiveness_using_containment_checks():
         assert_never(norm_str)
 ```
 
+## Checks on fixed-length tuples
+
+Finite tuple elements are expanded into their Cartesian product when checking whether a `match`
+statement is exhaustive. The expansion is used only for reachability; it does not affect the
+inferred type of the subject or pattern captures.
+
+```py
+def constructed_bool_tuple(b_1: bool, b_2: bool) -> int:
+    match (b_1, b_2):
+        case (True, True):
+            return 0
+        case (False, _):
+            return 1
+        case (_, False):
+            return 2
+
+def direct_bool_tuple(pair: tuple[bool, bool]) -> int:
+    match pair:
+        case (True, True):
+            return 0
+        case (False, _):
+            return 1
+        case (_, False):
+            return 2
+
+def non_exhaustive_bool_tuple(pair: tuple[bool, bool]) -> int:  # error: [invalid-return-type]
+    match pair:
+        case (True, True):
+            return 0
+        case (False, _):
+            return 1
+
+def guarded_bool_tuple(pair: tuple[bool, bool], flag: bool) -> int:  # error: [invalid-return-type]
+    match pair:
+        case (True, True) if flag:
+            return 0
+        case (False, _):
+            return 1
+        case (_, False):
+            return 2
+
+# Expanding this tuple would produce 128 alternatives, exceeding the limit of 64. The checker
+# falls back to its conservative behavior instead of performing an exponential expansion.
+def tuple_exceeding_expansion_limit(
+    value: tuple[bool, bool, bool, bool, bool, bool, bool],
+) -> int:  # error: [invalid-return-type]
+    match value:
+        case (True, True, _, _, _, _, _):
+            return 0
+        case (False, _, _, _, _, _, _):
+            return 1
+        case (_, False, _, _, _, _, _):
+            return 2
+```
+
 ## Checks on enum literals
 
 ```py
@@ -190,6 +245,32 @@ def match_non_exhaustive(x: Color):
 
             # this diagnostic is correct: inferred type of `x` is `Literal[Color.GREEN]`
             assert_never(x)  # error: [type-assertion-failure]
+```
+
+Matching every named member is not exhaustive for enums that can also have unnamed members.
+
+```py
+from enum import Enum, Flag
+
+class Permission(Flag):
+    READ = 1
+
+class MissingValueEnum(Enum):
+    ONLY = 1
+
+    @classmethod
+    def _missing_(cls, value: object) -> "MissingValueEnum":
+        return object.__new__(cls)
+
+def match_flag(value: Permission) -> int:  # error: [invalid-return-type]
+    match value:
+        case Permission.READ:
+            return 1
+
+def match_open_enum(value: MissingValueEnum) -> int:  # error: [invalid-return-type]
+    match value:
+        case MissingValueEnum.ONLY:
+            return 1
 ```
 
 ## Checks on enum literal subsets
@@ -349,7 +430,7 @@ def match_exhaustive_generic[T](obj: GenericClass[T]) -> GenericClass[T]:
             reveal_type(obj)  # revealed: GenericClass[T@match_exhaustive_generic]
             return obj
         case GenericClass(x=x):
-            reveal_type(x)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(x)  # revealed: T@match_exhaustive_generic
             reveal_type(obj)  # revealed: GenericClass[T@match_exhaustive_generic]
             return obj
 ```

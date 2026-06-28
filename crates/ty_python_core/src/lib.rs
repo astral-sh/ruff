@@ -34,7 +34,7 @@ use scope::{NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, Scope
 use symbol::ScopedSymbolId;
 pub use use_def::{
     ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
-    DeclarationWithConstraint, DeclarationsIterator, LiveBinding, NarrowingEvaluator,
+    DeclarationWithConstraint, DeclarationsIterator, LiveBinding, LoopHeaderId, NarrowingEvaluator,
     ScopedDefinitionId, UseDefMap,
 };
 use use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId};
@@ -132,9 +132,10 @@ pub fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'
 /// literals (`Literal[0, 1, 2, ...]`) until we eventually reach the threshold for widening to
 /// `int` and stop iterating. (See `should_widen` and `widen_literal_types`.)
 ///
-/// There's a chicken-and-egg problem with synthesizing the `DefinitionKind::LoopHeader`
-/// definitions at the top of the loop, and assembling all the bindings in the `LoopHeader` struct
-/// that they refer to. See `LoopToken` below for how we work around that.
+/// Loop header definitions are synthesized before walking the loop body, but the bindings in the
+/// header are only known after walking all loop-back edges. The builder reserves a [`LoopHeaderId`]
+/// before the walk, fills the corresponding header afterward, and publishes the completed headers
+/// in the scope's [`UseDefMap`].
 #[derive(Debug, Clone, Default, PartialEq, Eq, Update, get_size2::GetSize)]
 pub struct LoopHeader {
     bindings: FxHashMap<ScopedPlaceId, SmallVec<[LiveBinding; 1]>>,
@@ -161,33 +162,6 @@ impl LoopHeader {
             .into_iter()
             .flatten()
     }
-}
-
-/// A Salsa token for retrieving a `LoopHeader`. See `get_loop_header` below.
-#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
-pub struct LoopToken<'db> {}
-
-impl get_size2::GetSize for LoopToken<'_> {}
-
-/// Look up a `LoopHeader` given a `LoopToken`.
-///
-/// Loop header definitions are the very first things we encounter (synthesize) when we walk a
-/// loop, and they need to refer to the corresponding the `LoopHeader` struct that records their
-/// bindings, but that struct isn't available until we've finished walking the loop. To make this
-/// work in the largely immutable world of Salsa, we add a layer of indirection using a Salsa
-/// feature called "specify":
-/// <https://salsa-rs.github.io/salsa/overview.html#specify-the-result-of-tracked-functions-for-particular-structs>
-///
-/// When we first encounter a loop, we generate a `LoopToken` that uniquely identifies the loop but
-/// doesn't contain any data. We do a lightweight pre-walk to collect bound places (see
-/// `LoopBindingsVisitor`), and for each bound place we create a loop header definition that stores
-/// the `LoopToken`. Then after we've finished visiting the loop, we call
-/// `get_loop_header::specify` to associate the token with the completed `LoopHeader`. All of this
-/// happens while we're building the semantic index, and nothing needs to call `get_loop_header`
-/// until we get to type inference later, so the order of operations always works out.
-#[salsa::tracked(specify, heap_size=ruff_memory_usage::heap_size)]
-pub fn get_loop_header<'db>(_db: &'db dyn Db, _loop_token: LoopToken<'db>) -> LoopHeader {
-    panic!("should always be set by specify()");
 }
 
 /// Returns all attribute assignments as scope IDs for a specific class body scope.
@@ -332,10 +306,10 @@ pub struct SemanticIndex<'db> {
     /// Map from a lambda expression to its containing statement.
     enclosing_lambda_statements: FrozenMap<ExpressionNodeKey, Statement<'db>>,
 
-    // Map from a constraining use of a collection literal to its definition.
+    // Map from a constraining use of a collection initializer to its definition.
     collections_by_use: FrozenMap<ExpressionNodeKey, Definition<'db>>,
 
-    // Map from a collection literal definition to statements containing a constraining use.
+    // Map from a collection initializer definition to statements containing a constraining use.
     uses_by_collection: FrozenMap<Definition<'db>, Box<[(Statement<'db>, ExpressionNodeKey)]>>,
 
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
@@ -550,16 +524,16 @@ impl<'db> SemanticIndex<'db> {
         self.enclosing_lambda_statements.get(&lambda).copied()
     }
 
-    /// If this is a potentially constraining use of an unannotated collection literal, returns
+    /// If this is a potentially constraining use of an unannotated collection initializer, returns
     /// its definition.
-    pub fn unannotated_collection_literal(
+    pub fn unannotated_collection_initializer(
         &self,
         collection_use: &ast::Expr,
     ) -> Option<Definition<'db>> {
         self.collections_by_use.get(&collection_use.into()).copied()
     }
 
-    /// Returns all potentially constraining uses of the given unnannotated collection literal.
+    /// Returns all potentially constraining uses of the given unannotated collection initializer.
     pub fn constraining_collection_uses(
         &self,
         collection_def: Definition<'db>,
@@ -1937,28 +1911,11 @@ match subject:
         );
 
         let use_def = use_def_map(&db, global_scope_id);
-        for (name, expected_index) in [
-            ("a", 0),
-            ("b", 0),
-            ("c", 1),
-            ("d", 2),
-            ("e", 0),
-            ("f", 1),
-            ("g", 0),
-            ("h", 1),
-            ("i", 0),
-            ("j", 1),
-            ("k", 0),
-            ("l", 1),
-        ] {
+        for name in ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"] {
             let binding = use_def
                 .first_public_binding(global_table.symbol_id(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
-            if let DefinitionKind::MatchPattern(pattern) = binding.kind(&db) {
-                assert_eq!(pattern.index(), expected_index);
-            } else {
-                panic!("Expected match pattern definition for {name}");
-            }
+            assert!(matches!(binding.kind(&db), DefinitionKind::MatchPattern(_)));
         }
     }
 
@@ -1980,15 +1937,11 @@ match 1:
         assert_eq!(names(global_table), vec!["first", "second"]);
 
         let use_def = use_def_map(&db, global_scope_id);
-        for (name, expected_index) in [("first", 0), ("second", 0)] {
+        for name in ["first", "second"] {
             let binding = use_def
                 .first_public_binding(global_table.symbol_id(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
-            if let DefinitionKind::MatchPattern(pattern) = binding.kind(&db) {
-                assert_eq!(pattern.index(), expected_index);
-            } else {
-                panic!("Expected match pattern definition for {name}");
-            }
+            assert!(matches!(binding.kind(&db), DefinitionKind::MatchPattern(_)));
         }
     }
 

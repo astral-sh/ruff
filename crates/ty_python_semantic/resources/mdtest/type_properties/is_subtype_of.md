@@ -136,6 +136,20 @@ static_assert(is_subtype_of(Literal[Single.VALUE], Single))
 static_assert(is_subtype_of(Single, Literal[Single.VALUE]))
 ```
 
+## Statically empty and non-empty ranges
+
+```py
+from ty_extensions import TypeOf, is_subtype_of, static_assert
+
+type EmptyRange = TypeOf[range(0)]
+type NonEmptyRange = TypeOf[range(1)]
+
+static_assert(not is_subtype_of(EmptyRange, NonEmptyRange))
+static_assert(not is_subtype_of(NonEmptyRange, EmptyRange))
+static_assert(is_subtype_of(EmptyRange, range))
+static_assert(is_subtype_of(NonEmptyRange, range))
+```
+
 ## Heterogeneous tuple types
 
 ```py

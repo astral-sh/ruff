@@ -12,6 +12,7 @@ I001 [*] Import block is un-sorted or un-formatted
   | |_______________^
   |
 help: Organize imports
+  |
 1 + import datetime
 2 + import datetime as dt
 3 + from datetime import timedelta
@@ -21,3 +22,4 @@ help: Organize imports
   - from datetime import timedelta
   - import datetime as dt
   - import datetime
+  |

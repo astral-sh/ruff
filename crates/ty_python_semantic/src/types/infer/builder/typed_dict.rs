@@ -19,7 +19,8 @@ use crate::types::typed_dict::{
     validate_typed_dict_constructor, validate_typed_dict_dict_literal,
 };
 use crate::types::{
-    IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictType,
+    IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictModule,
+    TypedDictType,
 };
 use ty_python_core::definition::Definition;
 
@@ -72,6 +73,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         call_expr: &ast::ExprCall,
         definition: Option<Definition<'db>>,
+        typed_dict_module: TypedDictModule,
     ) -> Type<'db> {
         let db = self.db();
 
@@ -314,7 +316,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         };
 
-        let typeddict = DynamicTypedDictLiteral::new(db, name, anchor);
+        let typeddict = DynamicTypedDictLiteral::new(db, name, anchor, typed_dict_module);
         Type::ClassLiteral(ClassLiteral::DynamicTypedDict(typeddict))
     }
 

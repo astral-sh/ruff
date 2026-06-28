@@ -1,7 +1,7 @@
 [package]
 name = "ruff_workspace"
-version = "0.0.0"
-publish = false
+version = "0.0.3"
+description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -18,6 +18,7 @@ ignored = ["colored"]
 
 [dependencies]
 ruff_cache = { workspace = true }
+ruff_db = { workspace = true }
 ruff_formatter = { workspace = true }
 ruff_graph = { workspace = true, features = ["serde", "schemars"] }
 ruff_linter = { workspace = true }
@@ -27,6 +28,7 @@ ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true, features = ["serde"] }
 ruff_python_semantic = { workspace = true, features = ["serde"] }
 ruff_python_stdlib = { workspace = true }
+ruff_ranged_value = { workspace = true }
 ruff_source_file = { workspace = true }
 
 anyhow = { workspace = true }

@@ -11,11 +11,11 @@ PLR1712 [*] Unnecessary temporary variable
   | |________^
   |
 help: Use `x, y = y, x` instead
-3 | """
-4 |
+  |
 5 | x, y = 1, 2
   - temp = x  # PLR1712
   - x = y
   - y = temp
 6 + x, y = y, x
+  |
 note: This is an unsafe fix and may change runtime behavior

@@ -46,8 +46,8 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     )?;
 
     assert_cmd_snapshot!(case.command().arg("--verbose"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:2:5
@@ -126,8 +126,8 @@ fn cli_rule_severity() -> anyhow::Result<()> {
             .arg("--warn")
             .arg("unresolved-import"),
         @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[unresolved-import]: Cannot resolve imported module `does_not_exit`
      --> test.py:2:8
@@ -205,8 +205,8 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
             .arg("--ignore")
             .arg("unresolved-reference"),
         @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> test.py:2:5
@@ -241,8 +241,8 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
     ])?;
 
     assert_cmd_snapshot!(case.command(), @r#"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[unknown-rule]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
      --> pyproject.toml:3:1
@@ -265,8 +265,8 @@ fn cli_unknown_rules() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", "print(10)")?;
 
     assert_cmd_snapshot!(case.command().arg("--ignore").arg("division-by-zer"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[unknown-rule]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
 
@@ -390,8 +390,8 @@ fn overrides_precedence() -> anyhow::Result<()> {
     ])?;
 
     assert_cmd_snapshot!(case.command().arg("--verbose"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
      --> tests/test_main.py:2:5
@@ -659,8 +659,8 @@ fn overrides_missing_include_exclude() -> anyhow::Result<()> {
     ])?;
 
     assert_cmd_snapshot!(case.command().arg("--verbose"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[unnecessary-overrides-section]: Unnecessary `overrides` section
      --> pyproject.toml:5:1
@@ -915,8 +915,8 @@ fn cli_all_rules_warn() -> anyhow::Result<()> {
             .arg("--warn")
             .arg("all"),
         @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[unresolved-reference]: Name `prin` used when not defined
      --> test.py:2:1

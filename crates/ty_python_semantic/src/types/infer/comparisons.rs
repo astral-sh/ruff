@@ -7,6 +7,7 @@ use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
 use crate::types::cyclic::CycleDetector;
+use crate::types::equality::{equality_truthiness, inequality_truthiness};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
@@ -169,6 +170,15 @@ pub(super) fn infer_binary_type_comparison<'db>(
             }
         }
     };
+
+    let comparison_truthiness = match op {
+        ast::CmpOp::Eq => equality_truthiness(db, left, right),
+        ast::CmpOp::NotEq => inequality_truthiness(db, left, right),
+        _ => Truthiness::Ambiguous,
+    };
+    if comparison_truthiness != Truthiness::Ambiguous {
+        return Ok(Type::from_truthiness(db, comparison_truthiness));
+    }
 
     let comparison_result = match (left, right) {
         (Type::EnumComplement(complement), right) => Some(infer_binary_type_comparison(
@@ -545,27 +555,34 @@ pub(super) fn infer_binary_type_comparison<'db>(
                     Some(Ok(result))
                 }
 
-                (LiteralValueTypeKind::Enum(literal_1), LiteralValueTypeKind::Enum(literal_2))
-                    if op == ast::CmpOp::Eq =>
-                {
-                    Some(Ok(
-                        match try_dunder(MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
-                            Ok(ty) => ty,
-                            Err(_) => Type::bool_literal(literal_1 == literal_2),
-                        },
-                    ))
+                // Same-kind exact literals and the special relationship between `int` and `bool`
+                // are handled above. Any remaining pair of exact builtin literals compares
+                // unequal. `LiteralString` also compares unequal to non-string literals, but its
+                // comparison with an exact string literal remains ambiguous.
+                (
+                    LiteralValueTypeKind::Int(_)
+                    | LiteralValueTypeKind::Bool(_)
+                    | LiteralValueTypeKind::String(_)
+                    | LiteralValueTypeKind::Bytes(_),
+                    LiteralValueTypeKind::Int(_)
+                    | LiteralValueTypeKind::Bool(_)
+                    | LiteralValueTypeKind::String(_)
+                    | LiteralValueTypeKind::Bytes(_),
+                )
+                | (
+                    LiteralValueTypeKind::LiteralString,
+                    LiteralValueTypeKind::Int(_)
+                    | LiteralValueTypeKind::Bool(_)
+                    | LiteralValueTypeKind::Bytes(_),
+                )
+                | (
+                    LiteralValueTypeKind::Int(_)
+                    | LiteralValueTypeKind::Bool(_)
+                    | LiteralValueTypeKind::Bytes(_),
+                    LiteralValueTypeKind::LiteralString,
+                ) if matches!(op, ast::CmpOp::Eq | ast::CmpOp::NotEq) => {
+                    Some(Ok(Type::bool_literal(op == ast::CmpOp::NotEq)))
                 }
-                (LiteralValueTypeKind::Enum(literal_1), LiteralValueTypeKind::Enum(literal_2))
-                    if op == ast::CmpOp::NotEq =>
-                {
-                    Some(Ok(
-                        match try_dunder(MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
-                            Ok(ty) => ty,
-                            Err(_) => Type::bool_literal(literal_1 != literal_2),
-                        },
-                    ))
-                }
-
                 _ => None,
             }
         }

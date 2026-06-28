@@ -1,7 +1,7 @@
 [package]
 name = "ruff_linter"
-version = "0.15.18"
-publish = false
+version = "0.15.20"
+description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -27,6 +27,7 @@ ruff_python_parser = { workspace = true }
 ruff_python_semantic = { workspace = true }
 ruff_python_stdlib = { workspace = true }
 ruff_python_trivia = { workspace = true }
+ruff_ranged_value = { workspace = true }
 ruff_source_file = { workspace = true, features = ["serde"] }
 ruff_text_size = { workspace = true }
 

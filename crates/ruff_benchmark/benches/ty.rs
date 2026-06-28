@@ -18,9 +18,10 @@ use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{InMemorySystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
+use ruff_ranged_value::RangedValue;
 use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options};
 use ty_project::metadata::python_version::SupportedPythonVersion;
-use ty_project::metadata::value::{RangedValue, RelativePathBuf};
+use ty_project::metadata::value::RelativePathBuf;
 use ty_project::watch::{ChangeEvent, ChangedKind};
 use ty_project::{CheckMode, Db, ProjectDatabase, ProjectMetadata};
 
@@ -597,6 +598,167 @@ fn benchmark_many_enum_members(criterion: &mut Criterion) {
             BatchSize::SmallInput,
         );
     });
+}
+
+/// Regression benchmark for membership narrowing over a large enum.
+///
+/// The right-hand-side union should be evaluated one listed member at a time. Evaluating it as a
+/// single union expands the complete enum once per function instead.
+fn benchmark_large_enum_membership(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 512;
+    const NUM_FUNCTIONS: usize = 128;
+
+    setup_rayon();
+
+    let mut code = "from enum import Enum\n\nclass E(Enum):\n".to_string();
+    for i in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    m{i} = {i}").ok();
+    }
+    code.push('\n');
+
+    for i in 0..NUM_FUNCTIONS {
+        writeln!(
+            &mut code,
+            "def check_{i}(value: E) -> E:\n    if value in (E.m0, E.m1):\n        return value\n    return value\n"
+        )
+        .ok();
+    }
+
+    criterion.bench_function("ty_micro[large_enum_membership]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_enum_comparison(criterion: &mut Criterion, name: &str, code: &str) {
+    setup_rayon();
+
+    criterion.bench_function(name, |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/3830>.
+fn benchmark_narrowed_str_enum_comparison(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 256;
+
+    let mut code = "from enum import StrEnum\n\nclass LargeEnum(StrEnum):\n".to_string();
+    for index in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    VALUE_{index} = \"value_{index}\"").ok();
+    }
+    code.push_str(
+        "\n\ndef compare(left: LargeEnum, right: LargeEnum):\n    if right and left != right:\n        return\n    return left == right\n",
+    );
+
+    benchmark_enum_comparison(criterion, "ty_micro[narrowed_str_enum_comparison]", &code);
+}
+
+/// Ensure explicit enum-literal unions are compared as value sets, not member pairs.
+fn benchmark_enum_literal_union_comparison(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 256;
+
+    let mut code =
+        "from enum import StrEnum\nfrom typing import Literal\n\nclass LargeEnum(StrEnum):\n"
+            .to_string();
+    for index in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    VALUE_{index} = \"value_{index}\"").ok();
+    }
+    code.push_str("\nLeft = Literal[\n");
+    for index in 0..NUM_ENUM_MEMBERS / 2 {
+        writeln!(&mut code, "    LargeEnum.VALUE_{index},").ok();
+    }
+    code.push_str("]\nRight = Literal[\n");
+    for index in NUM_ENUM_MEMBERS / 2..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    LargeEnum.VALUE_{index},").ok();
+    }
+    code.push_str("]\n\n\ndef compare(left: Left, right: Right):\n    return left == right\n");
+
+    benchmark_enum_comparison(criterion, "ty_micro[enum_literal_union_comparison]", &code);
+}
+
+/// Ensure the comparison profile is reused instead of scanning every member per expression.
+fn benchmark_repeated_str_enum_comparisons(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 1_024;
+    const NUM_COMPARISONS: usize = 1_000;
+
+    let mut code = "from enum import StrEnum\n\nclass LargeEnum(StrEnum):\n".to_string();
+    for index in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    VALUE_{index} = \"value_{index}\"").ok();
+    }
+    code.push_str("\n\ndef compare(left: LargeEnum, right: LargeEnum):\n");
+    for _ in 0..NUM_COMPARISONS {
+        code.push_str("    left == right\n");
+    }
+
+    benchmark_enum_comparison(criterion, "ty_micro[repeated_str_enum_comparisons]", &code);
+}
+
+/// Ensure comparison constraints between two large scalar enums do not compare every member pair.
+fn benchmark_cross_str_enum_comparison(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 256;
+
+    let mut code = "from enum import StrEnum\n".to_string();
+    for side in ["Left", "Right"] {
+        writeln!(&mut code, "\nclass {side}(StrEnum):").ok();
+        for index in 0..NUM_ENUM_MEMBERS {
+            writeln!(&mut code, "    VALUE_{index} = \"value_{index}\"").ok();
+        }
+    }
+    code.push_str(
+        "\n\ndef compare(left: Left, right: Right):\n    if left != right:\n        return\n    return left == right\n",
+    );
+
+    benchmark_enum_comparison(criterion, "ty_micro[cross_str_enum_comparison]", &code);
+}
+
+/// Ensure comparisons of unions spanning several scalar enum classes avoid member-pair expansion.
+fn benchmark_mixed_str_enum_comparison(criterion: &mut Criterion) {
+    const NUM_ENUM_CLASSES: usize = 8;
+    const NUM_ENUM_MEMBERS: usize = 32;
+
+    let mut code = "from enum import StrEnum\n".to_string();
+    for side in ["Left", "Right"] {
+        for class_index in 0..NUM_ENUM_CLASSES {
+            writeln!(&mut code, "\nclass {side}{class_index}(StrEnum):").ok();
+            for member_index in 0..NUM_ENUM_MEMBERS {
+                writeln!(
+                    &mut code,
+                    "    VALUE_{member_index} = \"class_{class_index}_value_{member_index}\""
+                )
+                .ok();
+            }
+        }
+    }
+    let class_union = |side| {
+        (0..NUM_ENUM_CLASSES)
+            .map(|index| format!("{side}{index}"))
+            .collect::<Vec<_>>()
+            .join(" | ")
+    };
+    writeln!(
+        &mut code,
+        "\ndef compare(left: {}, right: {}):\n    if left != right:\n        return\n    return left == right",
+        class_union("Left"),
+        class_union("Right"),
+    )
+    .ok();
+
+    benchmark_enum_comparison(criterion, "ty_micro[mixed_str_enum_comparison]", &code);
 }
 
 /// Micro-benchmark that tests our performance when slicing and unpacking
@@ -1216,6 +1378,61 @@ fn benchmark_typeis_narrowing(criterion: &mut Criterion) {
     });
 }
 
+/// Benchmarks solving many union-bearing upper bounds while inferring a generic call.
+///
+/// Each callable argument places a distinct union upper bound on `T` through callable-parameter
+/// contravariance. Fully materializing the conjunction of these bounds would require constructing
+/// the cross product of all union alternatives. Factored path bounds and bounded intersection
+/// keep the work bounded instead.
+fn benchmark_factored_upper_bounds(criterion: &mut Criterion) {
+    const NUM_CLAUSES: usize = 12;
+    const ALTERNATIVES_PER_CLAUSE: usize = 8;
+
+    setup_rayon();
+
+    let mut code = "from collections.abc import Callable\n\n".to_string();
+    for clause in 0..NUM_CLAUSES {
+        for alternative in 0..ALTERNATIVES_PER_CLAUSE {
+            writeln!(&mut code, "class C{clause}_{alternative}: ...").ok();
+        }
+    }
+
+    code.push_str("\ndef infer[T](\n");
+    for clause in 0..NUM_CLAUSES {
+        writeln!(&mut code, "    consumer{clause}: Callable[[T], None],").ok();
+    }
+    code.push_str(") -> T:\n    raise NotImplementedError\n\n");
+
+    for clause in 0..NUM_CLAUSES {
+        write!(&mut code, "def consume{clause}(value: ").ok();
+        for alternative in 0..ALTERNATIVES_PER_CLAUSE {
+            if alternative > 0 {
+                code.push_str(" | ");
+            }
+            write!(&mut code, "C{clause}_{alternative}").ok();
+        }
+        code.push_str(") -> None: ...\n");
+    }
+
+    code.push_str("\nresult = infer(\n");
+    for clause in 0..NUM_CLAUSES {
+        writeln!(&mut code, "    consume{clause},").ok();
+    }
+    code.push_str(")\n");
+
+    criterion.bench_function("ty_micro[factored_upper_bounds]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_pandas_tdd(criterion: &mut Criterion) {
     setup_rayon();
     let venv_path = setup_micro_case_venv("pandas_tdd", &["pandas-stubs"]);
@@ -1352,6 +1569,7 @@ struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
     max_diagnostics: usize,
+    freeze_inputs: bool,
 }
 
 impl<'a> ProjectBenchmark<'a> {
@@ -1365,7 +1583,13 @@ impl<'a> ProjectBenchmark<'a> {
             project: setup_project,
             fs,
             max_diagnostics,
+            freeze_inputs: false,
         }
+    }
+
+    fn freeze_inputs(mut self) -> Self {
+        self.freeze_inputs = true;
+        self
     }
 
     fn setup_iteration(&self) -> ProjectDatabase {
@@ -1394,12 +1618,25 @@ impl<'a> ProjectBenchmark<'a> {
                 .collect(),
         );
 
+        if self.freeze_inputs {
+            db.freeze();
+        }
+
         db
     }
 }
 
 #[track_caller]
 fn bench_project(benchmark: &ProjectBenchmark, criterion: &mut Criterion) {
+    bench_project_named(benchmark, criterion, benchmark.project.config.name);
+}
+
+#[track_caller]
+fn bench_project_named(
+    benchmark: &ProjectBenchmark,
+    criterion: &mut Criterion,
+    benchmark_name: &str,
+) {
     fn check_project(db: &mut ProjectDatabase, project_name: &str, max_diagnostics: usize) {
         let result = db.check();
         let diagnostics = result.len();
@@ -1421,10 +1658,10 @@ fn bench_project(benchmark: &ProjectBenchmark, criterion: &mut Criterion) {
 
     let mut group = criterion.benchmark_group("project");
     group.sampling_mode(criterion::SamplingMode::Flat);
-    group.bench_function(benchmark.project.config.name, |b| {
+    group.bench_function(benchmark_name, |b| {
         b.iter_batched_ref(
             || benchmark.setup_iteration(),
-            |db| check_project(db, benchmark.project.config.name, benchmark.max_diagnostics),
+            |db| check_project(db, benchmark_name, benchmark.max_diagnostics),
             BatchSize::SmallInput,
         );
     });
@@ -1496,6 +1733,10 @@ fn datetype(criterion: &mut Criterion) {
     );
 
     bench_project(&benchmark, criterion);
+
+    // Keep one cheap real-world benchmark frozen to catch regressions from newly added inputs.
+    let frozen_benchmark = benchmark.freeze_inputs();
+    bench_project_named(&frozen_benchmark, criterion, "DateType (frozen inputs)");
 }
 
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);
@@ -1507,10 +1748,16 @@ criterion_group!(
     benchmark_complex_constrained_attributes_1,
     benchmark_complex_constrained_attributes_2,
     benchmark_complex_constrained_attributes_3,
+    benchmark_gradual_vararg_call,
+    benchmark_large_enum_membership,
     benchmark_many_enum_members,
+    benchmark_narrowed_str_enum_comparison,
+    benchmark_enum_literal_union_comparison,
+    benchmark_repeated_str_enum_comparisons,
+    benchmark_cross_str_enum_comparison,
+    benchmark_mixed_str_enum_comparison,
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
-    benchmark_gradual_vararg_call,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typevar_mapping_large_accumulation,
     benchmark_typevar_mapping_small_accumulations,
@@ -1521,6 +1768,7 @@ criterion_group!(
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,
     benchmark_typeis_narrowing,
+    benchmark_factored_upper_bounds,
     benchmark_pandas_tdd,
     benchmark_recursive_typed_dict_union_contextual_inference,
     benchmark_pydantic_core_schema_dict,

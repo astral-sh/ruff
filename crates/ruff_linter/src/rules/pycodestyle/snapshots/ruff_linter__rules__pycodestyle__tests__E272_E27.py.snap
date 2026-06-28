@@ -12,14 +12,12 @@ E272 [*] Multiple spaces before keyword
 23 | a  and  2
    |
 help: Replace with single space
-18 | #: E271
-19 | a and  2
+   |
 20 | #: E271 E272
    - 1  and  b
 21 + 1 and  b
 22 | #: E271 E272
-23 | a  and  2
-24 | #: E272
+   |
 
 E272 [*] Multiple spaces before keyword
   --> E27.py:23:2
@@ -32,14 +30,12 @@ E272 [*] Multiple spaces before keyword
 25 | this  and False
    |
 help: Replace with single space
-20 | #: E271 E272
-21 | 1  and  b
+   |
 22 | #: E271 E272
    - a  and  2
 23 + a and  2
 24 | #: E272
-25 | this  and False
-26 | #: E273
+   |
 
 E272 [*] Multiple spaces before keyword
   --> E27.py:25:5
@@ -52,11 +48,9 @@ E272 [*] Multiple spaces before keyword
 27 | a and    b
    |
 help: Replace with single space
-22 | #: E271 E272
-23 | a  and  2
+   |
 24 | #: E272
    - this  and False
 25 + this and False
 26 | #: E273
-27 | a and	b
-28 | #: E274
+   |

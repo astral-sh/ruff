@@ -46,16 +46,17 @@ env:
 
 jobs:
   build-ty:
-    name: Build ty
+    name: Build ty (${{ matrix.revision }})
+    strategy:
+      matrix:
+        revision: [base, pr]
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 5
-    outputs:
-      timestamp: ${{ steps.build.outputs.timestamp }}
-      merge-base: ${{ steps.build.outputs.merge-base }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
+          ref: ${{ github.sha }}
 
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
@@ -67,38 +68,48 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
 
-      - name: Build ty for both commits
-        id: build
+      - name: Build ty
+        env:
+          REVISION: ${{ matrix.revision }}
         run: |
-          echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          if [[ "${REVISION}" == "base" ]]; then
+            # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
+            git fetch --no-tags --filter=blob:none --unshallow origin
 
-          # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
-          git fetch --no-tags --filter=blob:none --unshallow origin
+            MERGE_BASE="$(git merge-base "${GITHUB_SHA}" "origin/${GITHUB_BASE_REF}")"
+            echo "${MERGE_BASE}" > merge-base.txt
+            echo "Merge base: ${MERGE_BASE}"
+            echo "PR commit: ${GITHUB_SHA}"
 
-          MERGE_BASE="$(git merge-base "${GITHUB_SHA}" "origin/${GITHUB_BASE_REF}")"
-          echo "merge-base=${MERGE_BASE}" >> "$GITHUB_OUTPUT"
-          echo "Merge base: ${MERGE_BASE}"
-          echo "PR commit: ${GITHUB_SHA}"
+            git checkout "${MERGE_BASE}"
+          fi
 
-          git checkout "${MERGE_BASE}"
+          echo "Building ${REVISION} revision $(git rev-parse HEAD)"
           cargo build --package ty --profile profiling
-          cp target/profiling/ty ty-base
+          cp target/profiling/ty "ty-${REVISION}"
 
-          git checkout "${GITHUB_SHA}"
-          cargo build --package ty --profile profiling
-          cp target/profiling/ty ty-pr
+          if [[ "${REVISION}" == "pr" ]]; then
+            cp crates/ty_python_semantic/resources/primer/flaky.txt projects_flaky.txt
+            cp .github/ty-ecosystem.toml ty-ecosystem.toml
+          fi
 
-          # Extract the flaky project list and config for the shard jobs
-          cp crates/ty_python_semantic/resources/primer/flaky.txt projects_flaky.txt
-          cp .github/ty-ecosystem.toml ty-ecosystem.toml
-
-      - name: Upload ty binaries, flaky project list, and config
+      - name: Upload base ty binary
+        if: matrix.revision == 'base'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ty-builds
+          name: ty-build-base
           compression-level: 1
           path: |
             ty-base
+            merge-base.txt
+
+      - name: Upload PR ty binary, flaky project list, and config
+        if: matrix.revision == 'pr'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ty-build-pr
+          compression-level: 1
+          path: |
             ty-pr
             projects_flaky.txt
             ty-ecosystem.toml
@@ -110,28 +121,31 @@ jobs:
         shard: [0, 1, 2, 3]
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 10
+    env:
+      EXCLUDE_NEWER: ${{ github.event.pull_request.updated_at }}
     steps:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           enable-cache: true
-          version: "0.11.21"
+          version: "0.11.24"
 
       - name: Download ty binaries, flaky project list, and config
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: ty-builds
+          pattern: ty-build-*
+          merge-multiple: true
 
       - name: Analyze shard ${{ matrix.shard }}
         env:
           SHARD: ${{ matrix.shard }}
-          EXCLUDE_NEWER: ${{ needs.build-ty.outputs.timestamp }}
-          MERGE_BASE: ${{ needs.build-ty.outputs.merge-base }}
         run: |
           mkdir -p ~/.config/ty
           cp ty-ecosystem.toml ~/.config/ty/ty.toml
 
           chmod +x ty-base ty-pr
+          MERGE_BASE="$(< merge-base.txt)"
+          echo "MERGE_BASE: ${MERGE_BASE}"
 
           uvx \
             --from "git+https://github.com/astral-sh/ecosystem-analyzer@${ECOSYSTEM_ANALYZER_COMMIT}" \
@@ -167,7 +181,7 @@ jobs:
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           enable-cache: true
-          version: "0.11.21"
+          version: "0.11.24"
 
       - name: Download shard diagnostics
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -222,7 +236,8 @@ jobs:
 
           echo "diff_statistics_exit_code=$DIFF_STATISTICS_EXIT_CODE" >> "$GITHUB_OUTPUT"
 
-      # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
+      # NOTE: astral-bot deploys both HTML files in this artifact and uses the
+      # deployed URLs for the report links in its PR comment.
       # Make sure to update the bot if you rename the artifact.
       - name: "Upload full report"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -237,18 +252,6 @@ jobs:
         with:
           name: comment.md
           path: comment.md
-
-      - name: Upload diagnostics diff
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: diff.html
-          path: dist/diff.html
-
-      - name: Upload timing diff
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: timing.html
-          path: dist/timing.html
 
       - name: Fail on new abnormal exits
         if: steps.generate-reports.outputs.diff_statistics_exit_code != '0'

@@ -1035,7 +1035,7 @@ fn leading_nbsp_no_overflow() {
     // Regression test: an annotation pointing at leading whitespace caused a
     // subtraction overflow in Margin::compute because `label_right` can be less
     // than `whitespace_left`. See https://github.com/astral-sh/ty/issues/836
-    let source = " \u{00A0}                                     'betting_env.datastructure.team_lineup.Tamheet.get_latest': ( 'dataStrcuture/team_lineup.htm#teamsheet.getlatest',";
+    let source = " \u{00A0}                                     'betting_env.datastructure.team_lineup.Tamheet.get_latest': ( 'dataStructure/team_lineup.htm#teamsheet.getlatest',";
     let input = Level::Error.title("test").snippet(
         Snippet::source(source)
             .line_start(1)

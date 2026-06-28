@@ -17,10 +17,10 @@ use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{
-    CycleDetector, Type, TypeQualifiers, binding_type, infer_complete_scope_types,
+    CycleDetector, SpecialFormType, Type, TypeQualifiers, binding_type, infer_complete_scope_types,
     inferred_declaration,
 };
-use ty_python_core::definition::Definition;
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place_table;
 use ty_python_core::scope::{FileScopeId, Scope};
 use ty_python_core::semantic_index;
@@ -460,6 +460,27 @@ impl<'db> SemanticModel<'db> {
             )),
         };
         Some((ast, model))
+    }
+
+    /// Returns whether `annotation` declares a PEP 613 type alias.
+    pub fn is_type_alias_annotation(&self, annotation: &Expr) -> bool {
+        matches!(
+            annotation.inferred_type(self),
+            Some(Type::SpecialForm(SpecialFormType::TypeAlias))
+        )
+    }
+
+    /// Returns whether `definition` defines a PEP 613 or PEP 695 type alias.
+    pub fn is_type_alias_definition(&self, definition: Definition<'db>) -> bool {
+        match definition.kind(self.db) {
+            DefinitionKind::TypeAlias(_) => true,
+            DefinitionKind::AnnotatedAssignment(assignment) => {
+                let parsed = parsed_module(self.db, definition.file(self.db));
+                let model = Self::new(self.db, definition.file(self.db));
+                model.is_type_alias_annotation(assignment.annotation(&parsed.load(self.db)))
+            }
+            _ => false,
+        }
     }
 
     /// Returns the type qualifiers (e.g. `Final`, `ClassVar`) for a given expression,

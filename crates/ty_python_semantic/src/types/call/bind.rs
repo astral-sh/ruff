@@ -32,7 +32,7 @@ use crate::subscript::PyIndex;
 use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
-    ConstraintBounds, ConstraintSet, ConstraintSetBuilder, PathBounds, Solutions,
+    ConstraintSet, ConstraintSetBuilder, PathBound, PathBounds, Solutions,
 };
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_DATACLASS,
@@ -579,25 +579,30 @@ impl<'db> Bindings<'db> {
     where
         I: IntoIterator<Item = Bindings<'db>>,
     {
-        let mut implicit_dunder_new_is_possibly_unbound = false;
-        let mut implicit_dunder_init_is_possibly_unbound = false;
-        let mut elements_acc = SmallVec::new();
+        let mut bindings_iter = bindings_iter.into_iter();
+        // Use the first binding as the accumulator to reuse its elements buffer.
+        let Self {
+            callable_type: _,
+            mut implicit_dunder_new_is_possibly_unbound,
+            mut implicit_dunder_init_is_possibly_unbound,
+            mut elements,
+            enclosing_binding_contexts: _,
+        } = bindings_iter.next().expect("bindings must not be empty");
 
-        // Preserve each input's existing union/intersection structure.
-        for set in bindings_iter {
-            implicit_dunder_new_is_possibly_unbound |= set.implicit_dunder_new_is_possibly_unbound;
+        for bindings in bindings_iter {
+            implicit_dunder_new_is_possibly_unbound |=
+                bindings.implicit_dunder_new_is_possibly_unbound;
             implicit_dunder_init_is_possibly_unbound |=
-                set.implicit_dunder_init_is_possibly_unbound;
-            elements_acc.extend(set.elements);
+                bindings.implicit_dunder_init_is_possibly_unbound;
+            elements.extend(bindings.elements);
         }
 
-        let elements = elements_acc;
         assert!(!elements.is_empty());
         Self {
             callable_type,
-            elements,
             implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound,
+            elements,
             enclosing_binding_contexts: None,
         }
     }
@@ -2060,7 +2065,9 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty)] = overload.parameter_types() {
                                 let return_ty = match ty {
                                     Type::ClassLiteral(class) => {
-                                        if let Some(metadata) = enums::enum_metadata(db, *class) {
+                                        if let Some(metadata) = enums::enum_metadata(db, *class)
+                                            && metadata.aliases_are_known
+                                        {
                                             Type::heterogeneous_tuple(
                                                 db,
                                                 metadata
@@ -4899,13 +4906,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 // lower/upper bounds on each BDD path.
                 let mut variance_map: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
                     FxHashMap::default();
-                let solutions = path_bounds.solve_with(|typevar, variance, bounds| {
-                    let identity = typevar.identity(self.db);
+                let solutions = path_bounds.solve_with(|variance, path_bound| {
+                    let identity = path_bound.bound_typevar.identity(self.db);
                     variance_map
                         .entry(identity)
                         .and_modify(|current| *current = current.join(variance))
                         .or_insert(variance);
-                    PathBounds::default_solve(self.db, constraints, typevar, bounds)
+                    PathBounds::default_solve(self.db, constraints, path_bound)
                 });
 
                 let Solutions::Constrained(solutions) = solutions else {
@@ -5020,7 +5027,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Attempt to promote any promotable types assigned to the specialization.
         // The hook receives (typevar, bounds) and returns Some(ty) to override the default
         // solution, or None to keep it.
-        let maybe_promote = |typevar: BoundTypeVarInstance<'db>, bounds: ConstraintBounds<'db>| {
+        let maybe_promote = |typevar: BoundTypeVarInstance<'db>, bounds: &PathBound<'db>| {
             let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
 
             // For constrained TypeVars, the inferred type is already one of the
@@ -5065,19 +5072,18 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             Some(promoted)
         };
 
-        let choose_solution =
-            |typevar: BoundTypeVarInstance<'db>, bounds: Option<ConstraintBounds<'db>>| {
-                let bounds = bounds?;
-                if let Some(lower) = bounds.lower
-                    && let Some(&preferred_ty) =
-                        preferred_type_mappings.get(&typevar.identity(self.db))
-                    && lower.is_assignable_to(self.db, preferred_ty)
-                {
-                    return Some(preferred_ty);
-                }
+        let choose_solution = |typevar: BoundTypeVarInstance<'db>,
+                               bounds: Option<&PathBound<'db>>| {
+            let bounds = bounds?;
+            if let Some(lower) = bounds.lower
+                && let Some(&preferred_ty) = preferred_type_mappings.get(&typevar.identity(self.db))
+                && lower.is_assignable_to(self.db, preferred_ty)
+            {
+                return Some(preferred_ty);
+            }
 
-                maybe_promote(typevar, bounds)
-            };
+            maybe_promote(typevar, bounds)
+        };
 
         let specialization = builder.build_with(generic_context, choose_solution);
 

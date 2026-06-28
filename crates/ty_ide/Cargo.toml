@@ -27,7 +27,7 @@ ruff_python_trivia = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 ty_module_resolver = { workspace = true }
-ty_project = { workspace = true, features = ["testing"] }
+ty_project = { workspace = true }
 ty_python_semantic = { workspace = true }
 ty_vendored = { workspace = true }
 ty_python_core = { workspace = true, features = ["serde"] }
@@ -48,6 +48,7 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 ruff_python_parser = { workspace = true }
+ty_project = { workspace = true, features = ["testing"] }
 
 camino = { workspace = true }
 insta = { workspace = true, features = ["filters"] }
