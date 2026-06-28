@@ -43,6 +43,22 @@ reveal_type(list[int] is list[int])  # revealed: bool
 reveal_type(list[int] is not list[int])  # revealed: bool
 ```
 
+## Same constrained `TypeVar`
+
+Every occurrence of the same constrained `TypeVar` has the same specialization. If every
+constraint is a singleton, two values with that `TypeVar` must therefore be the same object.
+
+```py
+from types import EllipsisType
+from typing import TypeVar
+
+T = TypeVar("T", None, EllipsisType)
+
+def f(left: T, right: T) -> None:
+    reveal_type(left is right)  # revealed: Literal[True]
+    reveal_type(left is not right)  # revealed: Literal[False]
+```
+
 ## Recursive type aliases
 
 Projecting a recursive alias for an identity comparison must stop when it encounters the alias
