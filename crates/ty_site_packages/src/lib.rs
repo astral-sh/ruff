@@ -1214,11 +1214,17 @@ fn user_site_packages_directories(
         return Vec::new();
     };
 
-    // TODO: PyPy uses a different user-site directory layout.
-    if matches!(layout.implementation, PythonImplementation::PyPy) {
-        return Vec::new();
-    }
+    let is_pypy = matches!(layout.implementation, PythonImplementation::PyPy);
 
+    // The implementation component of the user-site directory name. PyPy uses `pypy`/`PyPy`;
+    // other implementations follows CPython's `python`/`Python` layout.
+    let (implementation_lower, implementation_capitalized) = if is_pypy {
+        ("pypy", "PyPy")
+    } else {
+        ("python", "Python")
+    };
+
+    // The free-threaded ABI suffix only applies to CPython.
     let free_threaded_suffix = if layout.implementation.is_cpython() {
         layout.variant.suffix()
     } else {
@@ -1235,12 +1241,12 @@ fn user_site_packages_directories(
     // The path from a user base directory to its `site-packages` directory.
     let user_site_relative = if cfg!(windows) {
         format!(
-            "Python{major}{minor}{free_threaded_suffix}\\site-packages",
+            "{implementation_capitalized}{major}{minor}{free_threaded_suffix}\\site-packages",
             major = version.major,
             minor = version.minor,
         )
     } else {
-        format!("lib/python{version}{free_threaded_suffix}/site-packages")
+        format!("lib/{implementation_lower}{version}{free_threaded_suffix}/site-packages")
     };
 
     // `PYTHONUSERBASE` overrides the default user base directory entirely.
@@ -1255,7 +1261,7 @@ fn user_site_packages_directories(
         if let Ok(appdata) = system.env_var("APPDATA") {
             push_if_dir(
                 SystemPathBuf::from(appdata)
-                    .join("Python")
+                    .join(implementation_capitalized)
                     .join(&user_site_relative),
             );
         }
@@ -1264,7 +1270,7 @@ fn user_site_packages_directories(
         push_if_dir(home.join(".local").join(&user_site_relative));
 
         // Framework builds of CPython add a second, framework-specific user-site directory.
-        if cfg!(target_os = "macos") {
+        if cfg!(target_os = "macos") && !is_pypy {
             let framework = if free_threaded_suffix.is_empty() {
                 "Python"
             } else {
@@ -2791,6 +2797,41 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
+    fn finds_user_site_packages_for_pypy() {
+        let system = TestSystem::default();
+        system.set_env_var("HOME", "/home/user");
+        let memory_fs = system.memory_file_system();
+        memory_fs
+            .write_file_all("/PyPy3.11/bin/pypy3.11", "")
+            .unwrap();
+        memory_fs
+            .create_directory_all("/PyPy3.11/lib/pypy3.11/site-packages")
+            .unwrap();
+        // PyPy uses a `pypy`-prefixed user-site directory, not `python`.
+        memory_fs
+            .create_directory_all("/home/user/.local/lib/pypy3.11/site-packages")
+            .unwrap();
+
+        let env = PythonEnvironment::new(
+            "/PyPy3.11/bin/pypy3.11",
+            SysPrefixPathOrigin::PythonCliFlag,
+            &system,
+        )
+        .unwrap();
+        let site_packages = env.site_packages_paths(&system).unwrap();
+
+        assert_eq!(
+            site_packages,
+            [
+                SystemPathBuf::from("/home/user/.local/lib/pypy3.11/site-packages"),
+                SystemPathBuf::from("/PyPy3.11/lib/pypy3.11/site-packages"),
+            ]
+            .as_slice()
+        );
+    }
+
+    #[test]
     #[cfg(target_os = "macos")]
     fn finds_user_site_packages_for_system_environment_macos() {
         let system = TestSystem::default();
@@ -2896,6 +2937,41 @@ mod tests {
             [
                 SystemPathBuf::from(r"C:\Users\me\AppData\Roaming\Python\Python312\site-packages"),
                 SystemPathBuf::from(r"\Python3.12\Lib\site-packages"),
+            ]
+            .as_slice()
+        );
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn finds_user_site_packages_for_pypy_windows() {
+        let system = TestSystem::default();
+        system.set_env_var("APPDATA", r"C:\Users\me\AppData\Roaming");
+        let memory_fs = system.memory_file_system();
+        memory_fs
+            .write_file_all(r"\PyPy3.11\pypy3.11.exe", "")
+            .unwrap();
+        memory_fs
+            .create_directory_all(r"\PyPy3.11\Lib\site-packages")
+            .unwrap();
+        // PyPy's Windows user base is `%APPDATA%\PyPy`, with a `PyPy`-prefixed version directory.
+        memory_fs
+            .create_directory_all(r"C:\Users\me\AppData\Roaming\PyPy\PyPy311\site-packages")
+            .unwrap();
+
+        let env = PythonEnvironment::new(
+            r"\PyPy3.11\pypy3.11.exe",
+            SysPrefixPathOrigin::PythonCliFlag,
+            &system,
+        )
+        .unwrap();
+        let site_packages = env.site_packages_paths(&system).unwrap();
+
+        assert_eq!(
+            site_packages,
+            [
+                SystemPathBuf::from(r"C:\Users\me\AppData\Roaming\PyPy\PyPy311\site-packages"),
+                SystemPathBuf::from(r"\PyPy3.11\Lib\site-packages"),
             ]
             .as_slice()
         );
