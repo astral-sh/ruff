@@ -1279,6 +1279,14 @@ fn enum_metaclass_may_transform_class<'db>(
 /// The caller must first establish that `class` does not define `name` itself. `EnumType` preserves
 /// explicit definitions, but can replace an inherited data-type or `object` implementation with the
 /// corresponding enum implementation. Mixin implementations are preserved.
+///
+/// ```python
+/// class Number(int, Enum):
+///     ONE = 1
+///
+/// # EnumType replaces the inherited int implementation with Enum.__str__.
+/// Number.ONE.__str__()
+/// ```
 pub(crate) fn enum_class_creation_synthesized_member<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
@@ -1356,6 +1364,11 @@ pub(crate) fn enum_class_creation_synthesized_member<'db>(
     class_member_type(db, first_enum, name)
 }
 
+/// Returns the effective `Flag` operator installed by `EnumType`.
+///
+/// The stdlib declaration accepts another instance of `Self`, but a scalar-backed flag also accepts
+/// its selected data type at runtime. We retain the `Self` overload for enum-literal precision and
+/// add an overload for that data type. Unary `__invert__` needs no additional overload.
 fn flag_operator_member_type<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
@@ -1411,6 +1424,12 @@ fn class_type_mro_contains<'db>(db: &'db dyn Db, class: ClassType<'db>, known: K
         .any(|base| base.known(db) == Some(known))
 }
 
+/// Returns the data type that `EnumType` records as the class's `_member_type_`.
+///
+/// Each explicit base contributes the closest class before the `__new__` implementation (or
+/// dataclass marker) that makes it a data type. Enum bases contribute their recursively selected
+/// data type. If different bases imply different data types, this returns `None` so synthesized
+/// methods do not claim a runtime contract for a class that Python would reject.
 fn enum_data_type_class<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
@@ -1429,16 +1448,16 @@ fn enum_data_type_class<'db>(
                 continue;
             }
 
-            if class_type_is_enum(db, base) {
+            if class_type_mro_contains(db, base, KnownClass::Enum) {
                 let base = base.class_literal(db).as_static()?;
                 let data_type = enum_data_type_class(db, base)?;
-                if data_type != object {
-                    if !select_enum_data_type(&mut selected, data_type) {
-                        return None;
-                    }
-                    break;
+                if data_type == object {
+                    continue;
                 }
-                continue;
+                if !select_enum_data_type(&mut selected, data_type) {
+                    return None;
+                }
+                break;
             }
 
             let defines_new = !base.own_class_member(db, None, "__new__").is_undefined();
@@ -1464,6 +1483,10 @@ fn enum_data_type_class<'db>(
     Some(selected.unwrap_or(object))
 }
 
+/// Merges one explicit base's data type into the selected type.
+///
+/// Returns `false` when another base selected a different data type; `EnumType` rejects that
+/// ambiguity rather than choosing one by MRO order.
 fn select_enum_data_type<'db>(
     selected: &mut Option<ClassType<'db>>,
     candidate: ClassType<'db>,
@@ -1474,10 +1497,6 @@ fn select_enum_data_type<'db>(
         *selected = Some(candidate);
         true
     }
-}
-
-fn class_type_is_enum<'db>(db: &'db dyn Db, class: ClassType<'db>) -> bool {
-    class_type_mro_contains(db, class, KnownClass::Enum)
 }
 
 fn class_member_type<'db>(db: &'db dyn Db, class: ClassType<'db>, name: &str) -> Option<Type<'db>> {

@@ -1273,7 +1273,10 @@ impl<'db> StaticClassLiteral<'db> {
         member
     }
 
-    /// Returns the type of a member synthesized during class creation.
+    /// Returns the type of a member synthesized for this class.
+    ///
+    /// This includes methods installed by `EnumType`, `functools.total_ordering`, dataclass-like
+    /// transforms, and `NamedTuple` construction.
     pub(crate) fn own_synthesized_member(
         self,
         db: &'db dyn Db,
