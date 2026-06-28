@@ -187,7 +187,10 @@ pub(super) fn infer_binary_type_comparison<'db>(
     };
 
     let same_typevar = matches!(
-        (left, right),
+        (
+            left.resolve_type_alias(db),
+            right.resolve_type_alias(db)
+        ),
         (Type::TypeVar(left), Type::TypeVar(right)) if left.is_same_typevar_as(db, right)
     );
     if !same_typevar {
