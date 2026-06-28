@@ -2232,6 +2232,40 @@ def unused(x):  # noqa: ANN001, ARG001, D103
 }
 
 #[test]
+fn add_noqa_existing_noqa_with_trailing_content() -> Result<()> {
+    let fixture = CliTest::new()?;
+
+    fixture.write_file(
+        "noqa.py",
+        r#"
+import math  # noqa: RUF100 with a trailing reason
+import sys  # noqa: RUF100 # fmt:skip
+"#,
+    )?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .arg("--add-noqa")
+        .arg("--select=F401,RUF100,I002")
+        .arg("noqa.py"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 2 noqa directives.
+    ");
+
+    let content = fs::read_to_string(fixture.root().join("noqa.py"))?;
+    insta::assert_snapshot!(content, @r"
+    import math  # noqa: F401, RUF100 with a trailing reason
+    import sys  # noqa: F401, RUF100 # fmt:skip
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn add_noqa_existing_file_level_noqa() -> Result<()> {
     let fixture = CliTest::new()?;
     fixture.write_file(

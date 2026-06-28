@@ -984,6 +984,13 @@ struct NoqaEdit<'a> {
     line_ending: LineEnding,
     reason: Option<&'a str>,
     blank_line: bool,
+    /// Whether the [`NoqaEdit::write`] should append the line ending.
+    ///
+    /// This is `false` when the edit only replaces an existing `noqa`
+    /// directive (but not the rest of the line), so that any trailing content
+    /// on the line (e.g. a trailing reason or a `# fmt: skip` comment) is
+    /// preserved verbatim.
+    emit_line_ending: bool,
 }
 
 impl NoqaEdit<'_> {
@@ -1017,7 +1024,9 @@ impl NoqaEdit<'_> {
         if let Some(reason) = self.reason {
             write!(writer, " {reason}").unwrap();
         }
-        write!(writer, "{}", self.line_ending.as_str()).unwrap();
+        if self.emit_line_ending {
+            write!(writer, "{}", self.line_ending.as_str()).unwrap();
+        }
     }
 }
 
@@ -1040,6 +1049,7 @@ fn generate_noqa_edit<'a>(
     let edit_range;
     let codes;
     let blank_line;
+    let emit_line_ending;
 
     // Add codes.
     match directive {
@@ -1048,6 +1058,10 @@ fn generate_noqa_edit<'a>(
             blank_line = trimmed_line.trim_whitespace_start().is_empty();
             edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
             codes = None;
+            // The edit extends to the end of the line (including the line
+            // ending), so the line ending has to be emitted as part of the
+            // edit.
+            emit_line_ending = true;
         }
         Some(Directive::Codes(existing_codes)) => {
             // find trimmed line without the noqa
@@ -1055,8 +1069,18 @@ fn generate_noqa_edit<'a>(
                 .slice(TextRange::new(line_range.start(), existing_codes.start()))
                 .trim_end();
             blank_line = false;
-            edit_range = TextRange::new(TextSize::of(trimmed_line), line_range.len()) + offset;
+            // Only replace from the end of the trimmed code line up to the end
+            // of the existing `noqa` directive, leaving any trailing content
+            // (e.g. a trailing reason or a `# fmt: skip` comment) untouched.
+            edit_range = TextRange::new(
+                TextSize::of(trimmed_line),
+                existing_codes.end() - line_range.start(),
+            ) + line_range.start();
             codes = Some(existing_codes);
+            // The edit only covers the `noqa` directive, not the rest of the
+            // line, so the line ending must not be emitted (it is preserved
+            // together with any trailing content).
+            emit_line_ending = false;
         }
         Some(Directive::All(_)) => return None,
     }
@@ -1068,6 +1092,7 @@ fn generate_noqa_edit<'a>(
         line_ending,
         reason,
         blank_line,
+        emit_line_ending,
     })
 }
 
