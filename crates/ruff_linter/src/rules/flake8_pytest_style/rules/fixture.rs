@@ -840,9 +840,9 @@ fn check_fixture_returns(checker: &Checker, name: &str, body: &[Stmt], returns: 
             ))
         });
         if let Some(return_type_edit) = return_type_edit {
-            diagnostic.set_fix(Fix::safe_edits(yield_edit, [return_type_edit]));
+            diagnostic.set_fix(Fix::unsafe_edits(yield_edit, [return_type_edit]));
         } else {
-            diagnostic.set_fix(Fix::safe_edit(yield_edit));
+            diagnostic.set_fix(Fix::unsafe_edit(yield_edit));
         }
     }
 }
