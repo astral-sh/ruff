@@ -193,22 +193,16 @@ pub(super) fn infer_binary_type_comparison<'db>(
         ),
         (Type::TypeVar(left), Type::TypeVar(right)) if left.is_same_typevar_as(db, right)
     );
-    if !same_typevar {
-        match op {
-            ast::CmpOp::Is => {
-                return Ok(Type::from_truthiness(
-                    db,
-                    identity_comparison_truthiness(db, left, right),
-                ));
-            }
-            ast::CmpOp::IsNot => {
-                return Ok(Type::from_truthiness(
-                    db,
-                    identity_comparison_truthiness(db, left, right).negate(),
-                ));
-            }
-            _ => {}
-        }
+    if !same_typevar && matches!(op, ast::CmpOp::Is | ast::CmpOp::IsNot) {
+        let truthiness = identity_comparison_truthiness(db, left, right);
+        return Ok(Type::from_truthiness(
+            db,
+            if op == ast::CmpOp::Is {
+                truthiness
+            } else {
+                truthiness.negate()
+            },
+        ));
     }
 
     let soundness_policy =

@@ -3066,11 +3066,12 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 // another occurrence refers to the same specialization.
                 let rhs_constraint = if rhs_identity_ty.is_singleton(self.db) {
                     rhs_identity_ty
+                } else if matches!(rhs_ty.resolve_type_alias(self.db), Type::TypeVar(_))
+                    && rhs_ty.is_singleton(self.db)
+                {
+                    rhs_ty
                 } else {
-                    match rhs_ty.resolve_type_alias(self.db) {
-                        Type::TypeVar(_) if rhs_ty.is_singleton(self.db) => rhs_ty,
-                        _ => return None,
-                    }
+                    return None;
                 };
                 Some(rhs_constraint.negate(self.db))
             }
@@ -3079,12 +3080,14 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 // creates additional runtime-only overlap, retain the corresponding part of the
                 // LHS as well so that applying the constraint does not erase that possibility.
                 let mut builder = UnionBuilder::new(self.db).add(rhs_ty);
+                let rhs_resolved = rhs_ty.resolve_type_alias(self.db);
+                let rhs_identity_ty = rhs_ty.identity_comparison_type(self.db);
                 let add_runtime_overlap = |builder: UnionBuilder<'db>, element: Type<'db>| {
                     let overlaps_only_at_runtime = |rhs_element| {
                         element.is_disjoint_from(self.db, rhs_element)
                             && !element.is_disjoint_from_for_identity(self.db, rhs_element)
                     };
-                    let has_runtime_only_overlap = match rhs_ty.resolve_type_alias(self.db) {
+                    let has_runtime_only_overlap = match rhs_resolved {
                         Type::Union(union) => union
                             .elements(self.db)
                             .iter()
@@ -3110,11 +3113,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     if !has_runtime_only_overlap {
                         builder
                     } else {
-                        let runtime_overlap = IntersectionType::from_two_elements(
-                            self.db,
-                            element,
-                            rhs_ty.identity_comparison_type(self.db),
-                        );
+                        let runtime_overlap =
+                            IntersectionType::from_two_elements(self.db, element, rhs_identity_ty);
                         builder.add(if runtime_overlap.is_never() {
                             element
                         } else {

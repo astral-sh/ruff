@@ -92,8 +92,8 @@ def _(x: int):
 
 ### Identity comparisons
 
-A `~None` constraint excludes the `None` singleton at runtime. A `NewType` of `NoneType` does not
-invalidate this constraint because it is a subtype of `NoneType` and cannot inhabit `~None`.
+The type `~None` excludes the `None` object. A `NewType` based on `NoneType` is still a subtype of
+`NoneType`, so it cannot be passed where `~None` is expected.
 
 ```py
 def _(o: object):
@@ -105,9 +105,8 @@ def _(o: object):
         reveal_type(o is not n)  # revealed: Literal[True]
 ```
 
-A user-defined single-member enum is also a singleton nominal instance. Excluding the enum makes an
-identity check against its only member always false, so the branch below is unreachable and must not
-emit an attribute error.
+A single-member enum contains only one object. A value excluded from `E` cannot be `E.ONLY`, so the
+branch below is unreachable and must not emit an attribute error.
 
 ```py
 from enum import Enum
@@ -121,8 +120,8 @@ def f(value: Not[E]) -> None:
         value.missing
 ```
 
-Excluding an entire class also rules out identity with any instance of that class, even when the
-class has multiple possible instances. The branch below is therefore unreachable.
+After `not isinstance(value, B)`, `value` cannot be identical to a `B` instance. This remains true
+when `value` has also been narrowed to `A`, so the inner branch is unreachable.
 
 ```py
 class A: ...

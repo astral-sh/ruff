@@ -718,11 +718,8 @@ impl<'db> Type<'db> {
                 Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db),
                 Type::TypeVar(typevar) => visitor.visit_type(db, ty, || {
                     match typevar.typevar(db).bound_or_constraints(db) {
-                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                            project(db, bound, visitor)
-                        }
-                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                            project(db, constraints.as_type(db), visitor)
+                        Some(bound_or_constraints) => {
+                            project(db, bound_or_constraints.as_type(db), visitor)
                         }
                         None => ty,
                     }

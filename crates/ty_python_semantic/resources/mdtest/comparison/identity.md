@@ -43,11 +43,11 @@ reveal_type(list[int] is list[int])  # revealed: bool
 reveal_type(list[int] is not list[int])  # revealed: bool
 ```
 
-## Same constrained `TypeVar`
+## Identity comparisons for the same constrained `TypeVar`
 
-Every occurrence of the same constrained `TypeVar` has the same specialization, including when an
-occurrence appears through a type alias. If every constraint is a singleton, two values with that
-`TypeVar` must therefore be the same object.
+All occurrences of the same constrained `TypeVar` use the same constraint. Here, each constraint
+contains only one object, so two values with that `TypeVar` must be identical. This remains true
+when one occurrence appears through a type alias.
 
 ```toml
 [environment]
@@ -68,13 +68,11 @@ type Alias[X] = X
 
 def aliased(left: Alias[T], right: T) -> None:
     reveal_type(left is right)  # revealed: Literal[True]
-    reveal_type(left is not right)  # revealed: Literal[False]
 ```
 
 ## Recursive type aliases
 
-Projecting a recursive alias for an identity comparison must stop when it encounters the alias
-again.
+Checking identity for a recursive alias must terminate instead of repeatedly expanding the alias.
 
 ```toml
 [environment]

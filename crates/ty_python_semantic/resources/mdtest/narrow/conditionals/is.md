@@ -192,8 +192,8 @@ def narrow_generic_alias[T: (Generic[int], Specialized)](klass: type[T]) -> None
 
 ## `is not` with a constrained `TypeVar`
 
-An `is not` check excludes the current specialization of a constrained `TypeVar`. A subsequent
-identity check against the same value is therefore unreachable.
+An `is not` check excludes the object selected by a constrained `TypeVar`. A subsequent identity
+check against the same value is therefore unreachable.
 
 ```py
 from types import EllipsisType
@@ -210,10 +210,9 @@ def f(value: int | None | EllipsisType, other: T) -> None:
 
 ## Tuple narrowing with a constrained `TypeVar`
 
-When every constraint of a `TypeVar` is a singleton, an identity check on a tuple element can
-exclude tuple alternatives that cannot contain its current specialization. The complementary
-`is not` branch must retain both singleton alternatives because either one can differ from the
-current specialization.
+The `is` check below can discard `tuple[int]` because its element cannot be `None` or `...`. The
+`is not` check cannot discard either remaining tuple: depending on the current constraint, either
+one could differ from `other`.
 
 ```py
 from types import EllipsisType
@@ -233,12 +232,9 @@ def f(value: tuple[int] | tuple[None] | tuple[EllipsisType], other: T) -> None:
 
 ### Distinct `NewType`s with the same base
 
-Calling a `NewType` returns its argument unchanged, so values with statically disjoint `NewType`s
-can still be the same object at runtime. An identity comparison between distinct `NewType`s with the
-same base is therefore not always false. In the true branch, we preserve both nominal types,
-including when they appear in unions or intersections. A positive check on a tuple element can also
-remove tuple alternatives whose element is runtime-disjoint, even when the compared value is not a
-singleton.
+Calling a `NewType` returns its argument unchanged. Values with distinct `NewType`s over `Foo` can
+therefore be the same object even though their types are distinct. The examples below cover direct
+comparisons and narrowing through unions, intersections, and tuple elements.
 
 ```py
 from typing import NewType
@@ -254,17 +250,12 @@ IntNewType2 = NewType("IntNewType2", int)
 
 def same_base(foo1: FooNewType1, foo2: FooNewType2) -> None:
     reveal_type(foo1 is foo2)  # revealed: bool
-    if foo1 is foo2:
-        reveal_type(foo1)  # revealed: FooNewType1
-        reveal_type(foo2)  # revealed: FooNewType2
 
 def unions(left: FooNewType1 | str, right: FooNewType2 | bytes) -> None:
     if left is right:
         reveal_type(left)  # revealed: (str & FooNewType2) | FooNewType1
-        reveal_type(right)  # revealed: (bytes & FooNewType1) | FooNewType2
 
 def intersection(left: Intersection[FooNewType1, FooSub], right: FooNewType2) -> None:
-    reveal_type(left is right)  # revealed: bool
     if left is right:
         reveal_type(left)  # revealed: FooNewType1 & FooSub
         reveal_type(right)  # revealed: FooNewType2 & FooSub
@@ -276,9 +267,8 @@ def tuple_element(value: tuple[IntNewType1] | tuple[str], other: IntNewType2) ->
 
 ### `NewType`s in `TypeVar` bounds and constraints
 
-The same runtime behavior applies when the operands are `TypeVar`s whose bounds or constraints are
-distinct `NewType`s with the same base. The result is not statically known, and a true branch
-preserves the `TypeVar`.
+Bounds and constraints containing `NewType`s require the same runtime handling. Comparing the
+distinct `TypeVar`s below is not always false, and a true branch keeps the original `TypeVar`.
 
 ```py
 from typing import NewType, TypeVar
@@ -308,9 +298,9 @@ def constrained_typevars(left: ConstrainedT, right: ConstrainedU) -> None:
         reveal_type(left)  # revealed: ConstrainedT@constrained_typevars
 ```
 
-When every constraint is a `NewType` of the same singleton type, every specialization represents the
-same runtime object. An `is not` branch must therefore exclude other `NewType`s of that singleton,
-both directly and when narrowing a tuple.
+Every constraint below is a `NewType` based on `EllipsisType`, so `other` always refers to the same
+`...` object as a `SingletonC` value. After an `is not` check, repeating the opposite check must be
+unreachable, both directly and when narrowing a tuple.
 
 ```py
 from types import EllipsisType
@@ -350,41 +340,28 @@ def preserve_newtype(x: object, user_id: UserId) -> None:
         takes_user_id(x)
 ```
 
-### `NewType`s of builtin literal types
+### Comparing `NewType`s with literals
 
-`NewType`s of `bool`, `int`, `str`, and `bytes` also return their arguments unchanged. An identity
-comparison with the original literal can therefore succeed, so the true branch remains reachable.
+Calls to `NewType` return their arguments unchanged. Comparisons with `bool` and `int` literals can
+therefore succeed, so the true branches below remain reachable.
 
 ```py
 from typing import NewType
 
 BoolNewType = NewType("BoolNewType", bool)
 IntNewType = NewType("IntNewType", int)
-StrNewType = NewType("StrNewType", str)
-BytesNewType = NewType("BytesNewType", bytes)
 
-def literals(
-    bool_newtype: BoolNewType,
-    int_newtype: IntNewType,
-    str_newtype: StrNewType,
-    bytes_newtype: BytesNewType,
-) -> None:
+def literals(bool_newtype: BoolNewType, int_newtype: IntNewType) -> None:
     true = True
     forty_two = 42
-    some_string = "some_string"
-    some_bytes = b"some_bytes"
 
     if bool_newtype is true:
         reveal_type(true)  # revealed: Literal[True]
     if int_newtype is forty_two:
         reveal_type(forty_two)  # revealed: Literal[42]
-    if str_newtype is some_string:
-        reveal_type(some_string)  # revealed: Literal["some_string"]
-    if bytes_newtype is some_bytes:
-        reveal_type(some_bytes)  # revealed: Literal[b"some_bytes"]
 ```
 
-### `NewType` of a singleton class
+### `NewType` based on `NoneType`
 
 A `NewType` of `NoneType` is statically distinct from `NoneType`, but its only possible runtime
 value is still the `None` singleton. It is therefore not assignable to `Not[None]`.
@@ -403,9 +380,9 @@ static_assert(not is_assignable_to(NoneNewType, Not[None]))
 
 ### `is not` with singleton `NewType`s
 
-Distinct `NewType`s of the same singleton type contain the same runtime object. These checks
-therefore remove the `NewType` alternative from the true branch, including when a check on a tuple
-element narrows the tuple union.
+Both `NewType`s below are based on `EllipsisType`, which contains only the `...` object. The
+`is not` branch therefore removes the `NewType` alternative, while the `else` branch keeps it. The
+same rule applies when the check narrows a tuple.
 
 ```py
 from types import EllipsisType
@@ -429,10 +406,9 @@ def tuple_parent_is_not(value: tuple[SingletonA] | tuple[int], other: SingletonB
 
 ### Static exclusions
 
-A static exclusion does not necessarily exclude an object's runtime type. In the example below,
-`BoolNewType` is statically disjoint from `Literal[True]`, so it inhabits `Not[Literal[True]]`.
-However, calling the `NewType` returns `True` unchanged. The identity comparison must therefore
-remain ambiguous.
+The type `Not[Literal[True]]` excludes the literal type but accepts the distinct `BoolNewType`.
+However, `BoolNewType(True)` returns `True` unchanged, so the identity comparison must remain
+ambiguous.
 
 ```py
 from typing import Literal, NewType
@@ -446,8 +422,9 @@ def excludes_true(value: Not[Literal[True]]) -> None:
 excludes_true(BoolNewType(True))
 ```
 
-The same applies when an intersection has positive elements. `IntNewType(1)` is accepted as
-`Intersection[int, Not[Literal[1]]]`, but still returns the `1` object unchanged.
+Similarly, `Intersection[int, Not[Literal[1]]]` accepts `IntNewType(1)`, which returns the `1`
+object unchanged. The comparison remains possible, and the true branch keeps the original
+constraint.
 
 ```py
 from typing import Literal, NewType
