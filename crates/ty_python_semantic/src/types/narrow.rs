@@ -3060,8 +3060,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
         match op {
             ast::CmpOp::IsNot => {
-                if rhs_ty.is_singleton(self.db) {
-                    Some(rhs_ty.negate(self.db))
+                let rhs_identity_ty = rhs_ty.identity_comparison_type(self.db);
+                if rhs_identity_ty.is_singleton(self.db) {
+                    Some(rhs_identity_ty.negate(self.db))
                 } else {
                     // Non-singletons cannot be safely narrowed using `is not`
                     None

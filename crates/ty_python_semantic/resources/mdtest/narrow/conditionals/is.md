@@ -311,6 +311,25 @@ def literals(
         reveal_type(some_bytes)  # revealed: Literal[b"some_bytes"]
 ```
 
+### `is not` with singleton `NewType`s
+
+Distinct `NewType`s of the same singleton type contain the same runtime object. In the true branch
+below, `value` can therefore only be the `int` alternative.
+
+```py
+from types import EllipsisType
+from typing import NewType
+
+SingletonA = NewType("SingletonA", EllipsisType)
+SingletonB = NewType("SingletonB", EllipsisType)
+
+def singleton_is_not(value: SingletonA | int, other: SingletonB) -> None:
+    if value is not other:
+        reveal_type(value)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: SingletonA
+```
+
 ### Static exclusions
 
 A static exclusion does not necessarily exclude an object's runtime type. In the example below,
