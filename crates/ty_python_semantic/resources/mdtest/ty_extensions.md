@@ -31,11 +31,10 @@ o: Not[()]
 p: Not[(int,)]
 
 def static_truthiness(not_one: Not[Literal[1]]) -> None:
-    # TODO: `bool` is not incorrect, but these would ideally be `Literal[True]` and `Literal[False]`
-    # respectively, since all possible runtime objects that are created by the literal syntax `1`
-    # are members of the type `Literal[1]`
-    reveal_type(not_one is not 1)  # revealed: bool
-    reveal_type(not_one is 1)  # revealed: bool
+    # All possible runtime objects created by the literal syntax `1` are members of
+    # `Literal[1]`, so `not_one` cannot be the same object as `1`.
+    reveal_type(not_one is not 1)  # revealed: Literal[True]
+    reveal_type(not_one is 1)  # revealed: Literal[False]
 
     # But these are both `bool`, rather than `Literal[True]` or `Literal[False]`
     # as there are many runtime objects that inhabit the type `~Literal[1]`

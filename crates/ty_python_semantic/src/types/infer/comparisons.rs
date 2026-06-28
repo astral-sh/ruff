@@ -116,6 +116,39 @@ pub(crate) struct UnsupportedComparisonError<'db> {
     pub(crate) right_ty: Type<'db>,
 }
 
+/// Return the truthiness of `left is right` when it is known for every represented runtime value.
+///
+/// Checking the complete types before the comparison dispatch below is important for intersections.
+/// Otherwise, decomposing an intersection into its positive elements can lose an exclusion that
+/// proves two values cannot be identical:
+///
+/// ```python
+/// from typing import NewType
+/// from ty_extensions import Intersection, Not
+///
+/// class A: ...
+/// class ASub(A): ...
+///
+/// N = NewType("N", A)
+/// NSub = NewType("NSub", ASub)
+///
+/// def f(x: Intersection[N, Not[ASub]], y: NSub) -> None:
+///     reveal_type(x is y)  # Literal[False]
+/// ```
+fn identity_comparison_truthiness<'db>(
+    db: &'db dyn Db,
+    left: Type<'db>,
+    right: Type<'db>,
+) -> Truthiness {
+    if left.is_disjoint_from_for_identity(db, right) {
+        Truthiness::AlwaysFalse
+    } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
+        Truthiness::AlwaysTrue
+    } else {
+        Truthiness::Ambiguous
+    }
+}
+
 /// Infers the type of a binary comparison (e.g. 'left == right'). See
 /// `TypeInferenceBuilder::infer_compare_expression` for the higher level logic dealing with
 /// multi-comparison expressions.
@@ -132,41 +165,6 @@ pub(super) fn infer_binary_type_comparison<'db>(
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     let db = context.db();
 
-    // Check identity disjointness before the general comparison code below decomposes an
-    // intersection into its positive elements. Otherwise, we would lose the exclusion in this
-    // example:
-    //
-    // ```python
-    // from typing import NewType
-    // from ty_extensions import Intersection, Not
-    //
-    // class A: ...
-    // class ASub(A): ...
-    //
-    // N = NewType("N", A)
-    // NSub = NewType("NSub", ASub)
-    //
-    // def f(x: Intersection[N, Not[ASub]], y: NSub) -> None:
-    //     reveal_type(x is y)  # Literal[False]
-    // ```
-    //
-    // `y` is always an `ASub`, while `x` explicitly excludes `ASub`.
-    if matches!(op, ast::CmpOp::Is | ast::CmpOp::IsNot) {
-        let left_resolved = left.resolve_type_alias(db);
-        let right_resolved = right.resolve_type_alias(db);
-        if (left_resolved.is_intersection() || right_resolved.is_intersection())
-            && (left.identity_comparison_type(db) != left_resolved
-                || right.identity_comparison_type(db) != right_resolved)
-            && left.is_disjoint_from_for_identity(db, right)
-        {
-            return Ok(Type::bool_literal(op == ast::CmpOp::IsNot));
-        }
-    }
-
-    // Note: identity (is, is not) for equal builtin types is unreliable and not part of the
-    // language spec.
-    // - `[ast::CompOp::Is]`: return `false` if unequal, `bool` if equal
-    // - `[ast::CompOp::IsNot]`: return `true` if unequal, `bool` if equal
     let try_dunder = |policy: MemberLookupPolicy| {
         let rich_comparison = |op| infer_rich_comparison(db, left, right, op, policy);
         let membership_test_comparison = |op, range: TextRange| {
@@ -184,24 +182,8 @@ pub(super) fn infer_binary_type_comparison<'db>(
             ast::CmpOp::NotIn => {
                 membership_test_comparison(MembershipTestCompareOperator::NotIn, range)
             }
-            ast::CmpOp::Is => {
-                if left.is_disjoint_from_for_identity(db, right) {
-                    Ok(Type::bool_literal(false))
-                } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
-                    Ok(Type::bool_literal(true))
-                } else {
-                    Ok(KnownClass::Bool.to_instance(db))
-                }
-            }
-            ast::CmpOp::IsNot => {
-                if left.is_disjoint_from_for_identity(db, right) {
-                    Ok(Type::bool_literal(true))
-                } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
-                    Ok(Type::bool_literal(false))
-                } else {
-                    Ok(KnownClass::Bool.to_instance(db))
-                }
-            }
+            // Definite identity results are returned by `identity_comparison_truthiness` below.
+            ast::CmpOp::Is | ast::CmpOp::IsNot => Ok(KnownClass::Bool.to_instance(db)),
         }
     };
 
@@ -210,6 +192,8 @@ pub(super) fn infer_binary_type_comparison<'db>(
     let comparison_truthiness = match op {
         ast::CmpOp::Eq => equality_truthiness(db, left, right, soundness_policy),
         ast::CmpOp::NotEq => inequality_truthiness(db, left, right, soundness_policy),
+        ast::CmpOp::Is => identity_comparison_truthiness(db, left, right),
+        ast::CmpOp::IsNot => identity_comparison_truthiness(db, left, right).negate(),
         _ => Truthiness::Ambiguous,
     };
     if comparison_truthiness != Truthiness::Ambiguous {
