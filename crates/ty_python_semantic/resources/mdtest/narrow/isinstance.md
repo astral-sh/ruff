@@ -390,11 +390,11 @@ def _(x: Literal[1, "a"]):
 from typing import Literal
 
 def _(x: Literal[1, "a"]):
-    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["a"]"
+    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[type | UnionType | tuple[type | UnionType | tuple[type | UnionType, ...], ...], ...]`, found `Literal["a"]`"
     if isinstance(x, "a"):
         reveal_type(x)  # revealed: Literal[1, "a"]
 
-    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["int"]"
+    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[type | UnionType | tuple[type | UnionType | tuple[type | UnionType, ...], ...], ...]`, found `Literal["int"]`"
     if isinstance(x, "int"):
         reveal_type(x)  # revealed: Literal[1, "a"]
 ```

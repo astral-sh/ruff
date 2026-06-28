@@ -590,7 +590,7 @@ def _(x: B):
             reveal_type(y)  # revealed: tuple[B]
 
 def _(x: A | B):
-    reveal_type(x)  # revealed: tuple[tuple[A] | None] | None | tuple[tuple[B] | None] | None
+    reveal_type(x)  # revealed: tuple[tuple[A] | None] | None
 
 def _(x: Intersection[A, B]):
     reveal_type(x)  # revealed: tuple[tuple[A] | None] | None

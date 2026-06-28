@@ -258,7 +258,7 @@ class RecursiveOperation:
 
     def use_operation_result(self):
         self.x = self.x + self.x
-        reveal_type(self.x)  # revealed: list[int] | list[Divergent]
+        reveal_type(self.x)  # revealed: list[Divergent] | list[int]
 ```
 
 ## Decorated methods with implicit class attributes

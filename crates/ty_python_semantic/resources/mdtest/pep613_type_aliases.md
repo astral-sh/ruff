@@ -326,11 +326,13 @@ def _(rec: RecursiveHomogeneousTuple):
     reveal_type(rec)  # revealed: tuple[int | Divergent, ...]
 
 ClassInfo: TypeAlias = type | UnionType | tuple["ClassInfo", ...]
-reveal_type(ClassInfo)  # revealed: <types.UnionType special-form 'type | UnionType | tuple[Divergent, ...]'>
+# revealed: <types.UnionType special-form 'type | UnionType | tuple[type | UnionType | tuple[type | UnionType | tuple[type | UnionType, ...], ...], ...]'> | <types.UnionType special-form 'type | UnionType | tuple[Divergent, ...]'>
+reveal_type(ClassInfo)
 
 def my_isinstance(obj: object, classinfo: ClassInfo) -> bool:
     # TODO should be `type | UnionType | tuple[ClassInfo, ...]`
-    reveal_type(classinfo)  # revealed: type | UnionType | tuple[Divergent, ...]
+    # revealed: type | UnionType | tuple[type | UnionType | tuple[type | UnionType | tuple[type | UnionType, ...], ...], ...]
+    reveal_type(classinfo)
     return isinstance(obj, classinfo)
 
 K = TypeVar("K")
