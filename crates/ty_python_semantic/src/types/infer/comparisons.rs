@@ -186,20 +186,26 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
     };
 
-    match op {
-        ast::CmpOp::Is => {
-            return Ok(Type::from_truthiness(
-                db,
-                identity_comparison_truthiness(db, left, right),
-            ));
+    let same_typevar = matches!(
+        (left, right),
+        (Type::TypeVar(left), Type::TypeVar(right)) if left.is_same_typevar_as(db, right)
+    );
+    if !same_typevar {
+        match op {
+            ast::CmpOp::Is => {
+                return Ok(Type::from_truthiness(
+                    db,
+                    identity_comparison_truthiness(db, left, right),
+                ));
+            }
+            ast::CmpOp::IsNot => {
+                return Ok(Type::from_truthiness(
+                    db,
+                    identity_comparison_truthiness(db, left, right).negate(),
+                ));
+            }
+            _ => {}
         }
-        ast::CmpOp::IsNot => {
-            return Ok(Type::from_truthiness(
-                db,
-                identity_comparison_truthiness(db, left, right).negate(),
-            ));
-        }
-        _ => {}
     }
 
     let soundness_policy =
