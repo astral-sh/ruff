@@ -2019,7 +2019,6 @@ impl<'db> Type<'db> {
 
             Type::Intersection(_)
             | Type::EnumComplement(_)
-            | Type::Recursive(_)
             | Type::Divergent(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
@@ -2049,6 +2048,10 @@ impl<'db> Type<'db> {
             // but they're generally not spellable with the syntax we use by default
             // in our type display
             Type::Callable(_) => false,
+
+            Type::Recursive(recursive) => {
+                recursive.map_or_else(db, || false, |unfolded| unfolded.is_hintable(db))
+            }
 
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Class(_) => true,
@@ -6044,7 +6047,20 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) => Ok(*self),
+            Type::Dynamic(_) | Type::Divergent(_) => Ok(*self),
+
+            Type::Recursive(recursive) => recursive.map_or_else_folded(
+                db,
+                || Ok(*self),
+                |unfolded| {
+                    unfolded.in_type_expression(
+                        db,
+                        scope_id,
+                        typevar_binding_context,
+                        inference_flags,
+                    )
+                },
+            ),
 
             Type::NominalInstance(instance) => match instance.known_class(db) {
                 Some(KnownClass::NoneType) => Ok(Type::none(db)),
@@ -6094,7 +6110,7 @@ impl<'db> Type<'db> {
             Type::Never => Type::Never,
             Type::Recursive(recursive) => recursive.map_or_else_folded(
                 db,
-                || Type::object().to_meta_type(db),
+                || Type::Recursive(recursive),
                 |unfolded| unfolded.to_meta_type(db),
             ),
             Type::NominalInstance(instance) => instance.to_meta_type(db),
@@ -7117,7 +7133,9 @@ impl<'db> Type<'db> {
             },
 
             Self::TypedDict(typed_dict) => typed_dict.type_definition(db),
-            Self::Recursive(_) => None,
+            Self::Recursive(recursive) => {
+                recursive.map_or_else(db, || None, |unfolded| unfolded.definition(db))
+            }
 
             Self::Union(_) => None,
             Self::Intersection(intersection) => {
@@ -8101,6 +8119,30 @@ impl<'db> InvalidTypeExpressionError<'db> {
     }
 }
 
+impl<'db> Foldable<'db> for InvalidTypeExpressionError<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            fallback_type: self.fallback_type.fold_recursive(db, recursive),
+            invalid_expressions: self
+                .invalid_expressions
+                .into_iter()
+                .map(|error| error.fold_recursive(db, recursive))
+                .collect(),
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            fallback_type: self.fallback_type.unfold_recursive(db, recursive),
+            invalid_expressions: self
+                .invalid_expressions
+                .into_iter()
+                .map(|error| error.unfold_recursive(db, recursive))
+                .collect(),
+        }
+    }
+}
+
 /// Enumeration of various types that are invalid in type-expression contexts
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
 enum InvalidTypeExpression<'db> {
@@ -8145,6 +8187,26 @@ enum InvalidTypeExpression<'db> {
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>, ScopeId<'db>),
     InvalidBareParamSpec(TypeVarInstance<'db>),
+}
+
+impl<'db> Foldable<'db> for InvalidTypeExpression<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        match self {
+            Self::InvalidType(ty, scope_id) => {
+                Self::InvalidType(ty.fold_recursive(db, recursive), scope_id)
+            }
+            _ => self,
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        match self {
+            Self::InvalidType(ty, scope_id) => {
+                Self::InvalidType(ty.unfold_recursive(db, recursive), scope_id)
+            }
+            _ => self,
+        }
+    }
 }
 
 impl<'db> InvalidTypeExpression<'db> {

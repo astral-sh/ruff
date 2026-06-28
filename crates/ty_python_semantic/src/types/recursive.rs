@@ -59,7 +59,8 @@ impl<'db> RecursiveType<'db> {
         Type::Divergent(self.binder(db)).same_divergent_marker(Type::Divergent(other.binder(db)))
     }
 
-    pub(crate) fn unfolded(self, db: &'db dyn Db) -> Type<'db> {
+    /// Return the recursive body with occurrences of the binder replaced by this recursive type.
+    pub fn unfolded(self, db: &'db dyn Db) -> Type<'db> {
         self.body(db).unfold_recursive(db, self)
     }
 

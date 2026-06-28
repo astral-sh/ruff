@@ -3122,6 +3122,9 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
             Type::Intersection(intersection) => intersection
                 .iter_positive(db)
                 .find_map(|ty| imp(db, ty, visitor))?,
+            Type::Recursive(recursive) => {
+                visitor.visit(ty, || imp(db, recursive.unfolded(db), visitor))?
+            }
             Type::Dynamic(_)
             | Type::Divergent(_)
             | Type::Never

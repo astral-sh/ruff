@@ -13,6 +13,7 @@ use ruff_python_ast::PythonVersion;
 use salsa::Database as _;
 use salsa::plumbing::AsId as _;
 use test_case::test_case;
+use ty_python_core::global_scope;
 
 /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
 /// the fallback to `typing_extensions` is working correctly.
@@ -413,6 +414,22 @@ fn recursive_list_element_type<'db>(db: &'db dyn Db, recursive_ty: Type<'db>) ->
     UnionType::from_elements(db, [KnownClass::Int.to_instance(db), recursive_ty])
 }
 
+fn recursive_list_type_expression(db: &dyn Db, marker_bits: u32) -> (Type<'_>, RecursiveType<'_>) {
+    let binder = divergent_marker(marker_bits);
+    let body = Type::GenericAlias(list_alias(
+        db,
+        UnionType::from_elements(
+            db,
+            [KnownClass::Int.to_instance(db), Type::Divergent(binder)],
+        ),
+    ));
+    let recursive_ty = RecursiveType::new(db, binder, RecursiveOrigin::Implicit, body);
+    let Type::Recursive(recursive) = recursive_ty else {
+        panic!("expected recursive list type expression body to contain its binder");
+    };
+    (recursive_ty, recursive)
+}
+
 fn get_pep695_type_alias<'db>(db: &'db TestDb, name: &str) -> PEP695TypeAliasType<'db> {
     let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
     let ty = crate::place::global_symbol(db, module, name)
@@ -587,6 +604,123 @@ fn recursive_type_fold_and_unfold() {
         nested_unfolded.fold_recursive(&db, recursive),
         nested_folded
     );
+}
+
+#[test]
+fn recursive_type_identity_meta_type_preserves_marker() {
+    let db = setup_db();
+    let binder = divergent_marker(35);
+    let recursive_ty = RecursiveType::new(
+        &db,
+        binder,
+        RecursiveOrigin::Implicit,
+        Type::Divergent(binder),
+    );
+    let Type::Recursive(_) = recursive_ty else {
+        panic!("expected identity recursive body to contain its binder");
+    };
+
+    let meta_ty = recursive_ty.to_meta_type(&db);
+
+    assert_eq!(meta_ty, recursive_ty);
+}
+
+#[test]
+fn recursive_type_meta_type_uses_unfolded_structure() {
+    let db = setup_db();
+    let (recursive_ty, recursive, _) = recursive_list_type(&db, 36);
+
+    let meta_ty = recursive_ty.to_meta_type(&db);
+    let expected = recursive.unfolded(&db).to_meta_type(&db);
+
+    assert_eq!(meta_ty, expected);
+}
+
+#[test]
+fn recursive_type_in_type_expression_uses_unfolded_type_expression() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented("/src/a.py", "")?;
+
+    let (recursive_ty, recursive) = recursive_list_type_expression(&db, 37);
+    let file = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
+    let scope = global_scope(&db, file);
+
+    let type_expression_ty = recursive_ty
+        .in_type_expression(&db, scope, None, InferenceFlags::empty())
+        .expect("recursive list type expression should be valid");
+    let expected = KnownClass::List
+        .to_specialized_instance(&db, &[recursive_list_element_type(&db, recursive_ty)]);
+
+    assert_eq!(type_expression_ty, expected);
+    assert_eq!(
+        type_expression_ty,
+        recursive
+            .unfolded(&db)
+            .in_type_expression(&db, scope, None, InferenceFlags::empty())
+            .expect("unfolded recursive list type expression should be valid")
+            .fold_recursive(&db, recursive)
+    );
+
+    Ok(())
+}
+
+#[test]
+fn recursive_type_definition_and_hintable_use_unfolded_structure() {
+    let db = setup_db();
+    let (recursive_ty, recursive, _) = recursive_list_type(&db, 38);
+
+    assert_eq!(
+        recursive_ty.definition(&db),
+        recursive.unfolded(&db).definition(&db)
+    );
+    assert!(recursive_ty.definition(&db).is_some());
+    assert!(recursive_ty.is_hintable(&db));
+}
+
+#[test]
+fn recursive_type_attribute_assignment_and_deletion_use_unfolded_structure() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/a.py",
+        r#"
+from typing_extensions import Never
+
+class Frozen:
+    existing: int = 1
+
+    def __setattr__(self, name: str, value: object) -> Never:
+        raise AttributeError
+
+    def __delattr__(self, name: str) -> Never:
+        raise AttributeError
+
+type RecursiveFrozen = Frozen | list[RecursiveFrozen]
+
+def assign(x: RecursiveFrozen):
+    x.existing = 2
+
+def delete(x: RecursiveFrozen):
+    del x.existing
+"#,
+    )?;
+
+    let file = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
+    let diagnostics = check_types(&db, file);
+    let messages = diagnostics
+        .iter()
+        .map(ruff_db::diagnostic::Diagnostic::primary_message)
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        messages,
+        [
+            "Object of type `Literal[2]` is not assignable to attribute `existing` on type `Frozen | list[RecursiveFrozen]`",
+            "Attribute `existing` is not defined on `list[RecursiveFrozen]` in union `RecursiveFrozen`",
+            "Cannot delete attribute `existing` on type `Frozen` whose `__delattr__` method returns `Never`/`NoReturn`",
+        ]
+    );
+
+    Ok(())
 }
 
 #[test]
@@ -814,6 +948,19 @@ fn recursive_type_list_construction_operation_folds_constructed_body_only() {
         mapped,
         Type::heterogeneous_tuple(&db, [expected_element, recursive_ty])
     );
+}
+
+#[test]
+fn recursive_type_list_construction_map_folds_constructed_unfolded_body() {
+    let db = setup_db();
+    let (recursive_ty, recursive, _) = recursive_list_type(&db, 39);
+
+    let mapped = recursive.map_or_else_folded(&db, Type::unknown, |unfolded| {
+        KnownClass::List.to_specialized_instance(&db, &[unfolded])
+    });
+    let expected = KnownClass::List.to_specialized_instance(&db, &[recursive_ty]);
+
+    assert_eq!(mapped, expected);
 }
 
 #[test]

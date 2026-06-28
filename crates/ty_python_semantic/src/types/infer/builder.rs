@@ -2912,7 +2912,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 false
             }
 
-            Type::Dynamic(..) | Type::Divergent(_) | Type::Never | Type::Recursive(_) => {
+            Type::Recursive(recursive) => {
+                let Some(unfolded) = recursive.map_if_unfolded(db, |unfolded| unfolded) else {
+                    infer_value_ty(self, TypeContext::default());
+                    return true;
+                };
+
+                self.validate_attribute_assignment(
+                    target,
+                    unfolded,
+                    attribute,
+                    infer_value_ty,
+                    emit_diagnostics,
+                )
+            }
+
+            Type::Dynamic(..) | Type::Divergent(_) | Type::Never => {
                 infer_value_ty(self, TypeContext::default());
                 true
             }
@@ -3676,10 +3691,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 true
             }
 
+            Type::Recursive(recursive) => {
+                let Some(unfolded) = recursive.map_if_unfolded(db, |unfolded| unfolded) else {
+                    return true;
+                };
+
+                self.validate_attribute_deletion(target, unfolded, attribute, emit_diagnostics)
+            }
+
             Type::Dynamic(..)
             | Type::Divergent(_)
             | Type::Never
-            | Type::Recursive(_)
             | Type::ModuleLiteral(..)
             | Type::BoundSuper(..) => true,
         }
