@@ -3068,16 +3068,48 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 }
             }
             ast::CmpOp::Is => {
-                let rhs_constraint = rhs_ty.identity_comparison_type(self.db);
-                if lhs_ty.is_disjoint_from(self.db, rhs_constraint)
-                    && !lhs_ty.is_disjoint_from_for_identity(self.db, rhs_ty)
-                {
-                    // A static intersection cannot represent overlap that exists only because a
-                    // `NewType` wrapper is transparent at runtime.
-                    None
+                // Preserve the nominal RHS constraint for ordinary overlaps. If a `NewType`
+                // creates additional runtime-only overlap, retain the corresponding part of the
+                // LHS as well so that applying the constraint does not erase that possibility.
+                let mut builder = UnionBuilder::new(self.db).add(rhs_ty);
+                let add_runtime_overlap = |builder: UnionBuilder<'db>, element: Type<'db>| {
+                    let has_runtime_only_overlap = match rhs_ty.resolve_type_alias(self.db) {
+                        Type::Union(union) => union.elements(self.db).iter().any(|rhs_element| {
+                            element.is_disjoint_from(self.db, *rhs_element)
+                                && !element.is_disjoint_from_for_identity(self.db, *rhs_element)
+                        }),
+                        rhs_ty => {
+                            element.is_disjoint_from(self.db, rhs_ty)
+                                && !element.is_disjoint_from_for_identity(self.db, rhs_ty)
+                        }
+                    };
+                    if !has_runtime_only_overlap {
+                        builder
+                    } else {
+                        let runtime_overlap = IntersectionType::from_two_elements(
+                            self.db,
+                            element,
+                            rhs_ty.identity_comparison_type(self.db),
+                        );
+                        builder.add(if runtime_overlap.is_never() {
+                            element
+                        } else {
+                            runtime_overlap
+                        })
+                    }
+                };
+
+                if let Type::Union(union) = lhs_ty.resolve_type_alias(self.db) {
+                    builder = union
+                        .elements(self.db)
+                        .iter()
+                        .copied()
+                        .fold(builder, add_runtime_overlap);
                 } else {
-                    Some(rhs_constraint)
+                    builder = add_runtime_overlap(builder, lhs_ty);
                 }
+
+                Some(builder.build())
             }
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
             ast::CmpOp::NotIn => self.evaluate_expr_not_in(lhs_ty, rhs_ty),

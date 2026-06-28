@@ -216,14 +216,22 @@ def same_base(foo1: FooNewType1, foo2: FooNewType2) -> None:
 def unions(left: FooNewType1 | str, right: FooNewType2 | bytes) -> None:
     reveal_type(left is right)  # revealed: bool
     if left is right:
-        reveal_type(left)  # revealed: FooNewType1 | (str & Foo)
-        reveal_type(right)  # revealed: FooNewType2 | (bytes & Foo)
+        reveal_type(left)  # revealed: (str & FooNewType2) | FooNewType1
+        reveal_type(right)  # revealed: (bytes & FooNewType1) | FooNewType2
 
 def intersection(left: Intersection[FooNewType1, FooSub], right: FooNewType2) -> None:
     reveal_type(left is right)  # revealed: bool
     if left is right:
         reveal_type(left)  # revealed: FooNewType1 & FooSub
         reveal_type(right)  # revealed: FooNewType2 & FooSub
+
+UserId = NewType("UserId", int)
+
+def takes_user_id(value: UserId) -> None: ...
+def preserve_newtype_constraint(x: object, user_id: UserId) -> None:
+    if x is user_id:
+        reveal_type(x)  # revealed: UserId
+        takes_user_id(x)
 
 BoolNewType = NewType("BoolNewType", bool)
 IntNewType = NewType("IntNewType", int)
