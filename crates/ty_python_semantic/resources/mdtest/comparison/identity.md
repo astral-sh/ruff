@@ -45,8 +45,14 @@ reveal_type(list[int] is not list[int])  # revealed: bool
 
 ## Same constrained `TypeVar`
 
-Every occurrence of the same constrained `TypeVar` has the same specialization. If every
-constraint is a singleton, two values with that `TypeVar` must therefore be the same object.
+Every occurrence of the same constrained `TypeVar` has the same specialization, including when an
+occurrence appears through a type alias. If every constraint is a singleton, two values with that
+`TypeVar` must therefore be the same object.
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 from types import EllipsisType
@@ -55,6 +61,12 @@ from typing import TypeVar
 T = TypeVar("T", None, EllipsisType)
 
 def f(left: T, right: T) -> None:
+    reveal_type(left is right)  # revealed: Literal[True]
+    reveal_type(left is not right)  # revealed: Literal[False]
+
+type Alias[X] = X
+
+def aliased(left: Alias[T], right: T) -> None:
     reveal_type(left is right)  # revealed: Literal[True]
     reveal_type(left is not right)  # revealed: Literal[False]
 ```
