@@ -105,6 +105,22 @@ def _(o: object):
         reveal_type(o is not n)  # revealed: Literal[True]
 ```
 
+A user-defined single-member enum is also a singleton nominal instance. Excluding the enum makes an
+identity check against its only member always false, so the branch below is unreachable and must not
+emit an attribute error.
+
+```py
+from enum import Enum
+from ty_extensions import Not
+
+class E(Enum):
+    ONLY = 1
+
+def f(value: Not[E]) -> None:
+    if value is E.ONLY:
+        value.missing
+```
+
 ## Diagnostics
 
 ### Unsupported operators for positive contributions

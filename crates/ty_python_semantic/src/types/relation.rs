@@ -700,8 +700,8 @@ impl<'db> Type<'db> {
     ///
     /// Negative intersection elements are generally omitted. A static exclusion does not imply a
     /// runtime exclusion: `NewType("N", bool)(True)` can inhabit `Not[Literal[True]]`, but evaluates
-    /// to the `True` singleton at runtime. However, excluding an entire known singleton class is
-    /// stable under `NewType` erasure, so constraints such as `Not[None]` are preserved.
+    /// to the `True` singleton at runtime. However, excluding an entire singleton nominal instance
+    /// is stable under `NewType` erasure, so constraints such as `Not[None]` are preserved.
     pub(crate) fn identity_comparison_type(self, db: &'db dyn Db) -> Type<'db> {
         struct IdentityComparisonProjection;
 
@@ -733,12 +733,11 @@ impl<'db> Type<'db> {
                         builder = builder.add_positive(project(db, *element, visitor));
                     }
                     for element in intersection.negative(db) {
-                        let is_known_singleton_class = element
+                        if element
                             .resolve_type_alias(db)
                             .as_nominal_instance()
-                            .and_then(|instance| instance.known_class(db))
-                            .is_some_and(KnownClass::is_singleton);
-                        if is_known_singleton_class {
+                            .is_some_and(|instance| instance.is_singleton(db))
+                        {
                             builder = builder.add_negative(*element);
                         }
                     }
