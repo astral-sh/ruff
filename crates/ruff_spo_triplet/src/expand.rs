@@ -171,6 +171,22 @@ impl Expander {
                     Provenance::Authoritative,
                 );
             }
+            if let Some(target) = &field.target {
+                self.push(
+                    field_iri.clone(),
+                    Predicate::Target,
+                    target.clone(),
+                    Provenance::Authoritative,
+                );
+            }
+            if let Some(inverse_name) = &field.inverse_name {
+                self.push(
+                    field_iri.clone(),
+                    Predicate::InverseName,
+                    inverse_name.clone(),
+                    Provenance::Authoritative,
+                );
+            }
         }
 
         // 3 + 6 + 7 + 8. functions
@@ -925,13 +941,7 @@ fn extract_validation_kinds(options: &[(String, String)]) -> Vec<&'static str> {
     // Codex P2 on #21: any of these gating options makes the
     // validation conditional in Rails — suppress kind emission so
     // the schema doesn't invent an unconditional constraint.
-    const GATING_OPTIONS: &[&str] = &[
-        "if",
-        "unless",
-        "on",
-        "allow_nil",
-        "allow_blank",
-    ];
+    const GATING_OPTIONS: &[&str] = &["if", "unless", "on", "allow_nil", "allow_blank"];
     if options
         .iter()
         .any(|(k, _)| GATING_OPTIONS.contains(&k.as_str()))
@@ -1085,6 +1095,7 @@ mod tests {
                     name: "amount_total".to_string(),
                     depends_on: vec!["line_ids.balance".to_string()],
                     emitted_by: Some("_compute_amount".to_string()),
+                    ..Default::default()
                 }],
                 functions: vec![Function {
                     name: "_compute_amount".to_string(),
@@ -1782,10 +1793,7 @@ mod tests {
         );
         // Combined with other kinds.
         assert_eq!(
-            extract_validation_kinds(&mk(&[
-                ("presence", "true"),
-                ("absence", "true"),
-            ])),
+            extract_validation_kinds(&mk(&[("presence", "true"), ("absence", "true"),])),
             vec!["presence", "absence"],
         );
     }
@@ -1869,10 +1877,7 @@ mod tests {
         user.validations.push(Validation {
             kind: ValidationKind::Validates,
             target: "age".to_string(),
-            options: vec![(
-                "numericality".to_string(),
-                "{:greater_than: 0}".to_string(),
-            )],
+            options: vec![("numericality".to_string(), "{:greater_than: 0}".to_string())],
         });
         // Non-hash kind — no validation_param triples.
         user.validations.push(Validation {
@@ -1915,7 +1920,10 @@ mod tests {
                 .map(|t| t.o.as_str())
                 .collect()
         };
-        assert_eq!(kinds_for("openproject:User.name"), BTreeSet::from(["length"]));
+        assert_eq!(
+            kinds_for("openproject:User.name"),
+            BTreeSet::from(["length"])
+        );
         assert_eq!(
             kinds_for("openproject:User.age"),
             BTreeSet::from(["numericality"]),

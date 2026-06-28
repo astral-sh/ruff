@@ -3567,6 +3567,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruff_python_spo"
+version = "0.1.0"
+dependencies = [
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_spo_triplet",
+]
+
+[[package]]
 name = "ruff_python_stdlib"
 version = "0.0.0"
 dependencies = [

@@ -398,6 +398,17 @@ pub enum Predicate {
     /// public methods are the adapter surface; private/protected are likely
     /// internal (a routing hint for the codegen's hand-port deny-list).
     HasVisibility,
+
+    // ───── Odoo-relational extension ─────
+    /// `(model.field, target, "<comodel>")` — a relational field's comodel
+    /// as the raw dotted Odoo model name (`res.partner`), emitted verbatim:
+    /// NOT an IRI, NOT underscore-normalised, so a relation resolver
+    /// (e.g. od-ontology's `RelationMap`) reads the comodel directly.
+    Target,
+    /// `(model.field, inverse_name, "<inverse>")` — a One2many field's
+    /// inverse Many2one field name (`move_id`), raw. Pairs with
+    /// [`Self::Target`] for the One2many `(comodel, inverse)` shape.
+    InverseName,
 }
 
 impl Predicate {
@@ -465,6 +476,9 @@ impl Predicate {
             Self::IsConst => "is_const",
             Self::IsStatic => "is_static",
             Self::HasVisibility => "has_visibility",
+            // Odoo-relational extension
+            Self::Target => "target",
+            Self::InverseName => "inverse_name",
         }
     }
 
@@ -538,6 +552,9 @@ impl Predicate {
             "is_const" => Self::IsConst,
             "is_static" => Self::IsStatic,
             "has_visibility" => Self::HasVisibility,
+            // Odoo-relational extension
+            "target" => Self::Target,
+            "inverse_name" => Self::InverseName,
             _ => return None,
         })
     }
@@ -546,10 +563,10 @@ impl Predicate {
     /// closed-vocab round-trip test and by any consumer that needs to
     /// enumerate the whole surface (e.g. the ndjson validator).
     ///
-    /// **Length invariant:** `ALL.len() == 53` (7 core + 29 AR-shape +
-    /// 17 C++ machine-plane). A new variant added to [`Predicate`] **must**
-    /// be appended here in the same order, or the closed-vocab round-trip
-    /// test fails.
+    /// **Length invariant:** `ALL.len() == 59` (7 core + 32 AR-shape +
+    /// 18 C++ machine-plane + 2 Odoo-relational). A new variant added to
+    /// [`Predicate`] **must** be appended here in the same order, or the
+    /// closed-vocab round-trip test fails.
     pub const ALL: &'static [Predicate] = &[
         // Core 7
         Self::RdfType,
@@ -611,6 +628,9 @@ impl Predicate {
         Self::IsConst,
         Self::IsStatic,
         Self::HasVisibility,
+        // Odoo-relational extension
+        Self::Target,
+        Self::InverseName,
     ];
 
     /// The default provenance tier for this predicate, per the Odoo
@@ -640,7 +660,9 @@ impl Predicate {
             | Self::ConcernIncludedBlock
             | Self::IsFriendOf => Provenance::Structural,
             // Body-authoritative (Odoo + Rails declared)
-            Self::EmittedBy | Self::DependsOn | Self::Raises => Provenance::Authoritative,
+            Self::EmittedBy | Self::DependsOn | Self::Raises | Self::Target | Self::InverseName => {
+                Provenance::Authoritative
+            }
             // Body-inferred (heuristic by definition) — including the two
             // C++ metaprogramming-residual predicates (macro provenance,
             // single-TU template instantiation visibility).
@@ -807,7 +829,7 @@ mod tests {
     }
 
     #[test]
-    fn predicate_count_locked_at_57() {
+    fn predicate_count_locked_at_59() {
         // The exact count is part of the schema contract: 7 core (Odoo
         // Python) + 32 OpenProject AR-shape (PR #15 added
         // `association_kind`; #18 added `class_name`; #21 added
@@ -815,10 +837,10 @@ mod tests {
         // parametric Rails validators (`length: { maximum: N }`,
         // `numericality: { greater_than: N }`, etc.) lift to richer
         // SurrealQL clauses than the catch-all presence ASSERT)
-        // + 18 C++ machine-plane = 57. Council review of any new
-        // variant means this number changes — the test must change
-        // with the source.
-        assert_eq!(Predicate::ALL.len(), 57);
+        // + 18 C++ machine-plane + 2 Odoo-relational (`target`,
+        // `inverse_name`) = 59. Council review of any new variant means
+        // this number changes — the test must change with the source.
+        assert_eq!(Predicate::ALL.len(), 59);
     }
 
     #[test]

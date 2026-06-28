@@ -85,6 +85,7 @@ mod integration_tests {
                 name: "total_hours".to_string(),
                 depends_on: vec!["time_entries.hours".to_string()],
                 emitted_by: Some("compute_total_hours".to_string()),
+                ..Default::default()
             }],
             functions: vec![Function {
                 name: "compute_total_hours".to_string(),
