@@ -589,7 +589,7 @@ fn name_matches_parameter(argument_name: &str, parameter_name: &str) -> bool {
 /// Given a function call, check if the expression is the "same name"
 /// as the function being called.
 ///
-/// This allows us to filter out reptitive inlay hints like `x: T = T(...)`.
+/// This allows us to filter out repetitive inlay hints like `x: T = T(...)`.
 /// While still allowing non-trivial ones like `x: T[U] = T()`.
 fn call_matches_name(expr: &Expr, name: &str) -> bool {
     // Only care about function calls

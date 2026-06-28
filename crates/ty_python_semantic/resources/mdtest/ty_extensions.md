@@ -276,7 +276,7 @@ import secrets
 static_assert(1 < 2)
 ```
 
-When the argument evalutes to `False`:
+When the argument evaluates to `False`:
 
 ```py
 # snapshot: static-assert-error

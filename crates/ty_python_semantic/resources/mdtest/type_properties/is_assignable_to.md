@@ -1456,7 +1456,7 @@ This might appear to be the same principle as the "gradual equivalence" relation
 different. Two gradual types can be said to be "gradually equivalent" iff they have exactly the same
 sets of possible materializations -- if they represent the same sets of possible types (the same
 sets of sets of possible runtime objects). By this principle `int | Any` is gradually equivalent to
-`Unknown | int`, since they have exactly the same sets of posisble materializations. But
+`Unknown | int`, since they have exactly the same sets of possible materializations. But
 `bool | Any` is not equivalent to `int`, since there are many possible materializations of
 `bool | Any` that are not assignable to `int`. It is therefore _not_ necessary for `X` to be
 gradually equivalent to `Y` in order for `Foo[X]` to be assignable to `Foo[Y]`; it is _only_

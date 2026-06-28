@@ -531,7 +531,7 @@ impl<'db> NegativeIntersectionElements<'db> {
 
     pub(crate) fn is_empty(&self) -> bool {
         // See struct-level comment: we don't try to maintain the invariant that empty
-        // collections are representend as `Self::Empty`
+        // collections are represented as `Self::Empty`
         self.len() == 0
     }
 

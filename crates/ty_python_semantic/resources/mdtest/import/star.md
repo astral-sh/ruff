@@ -120,7 +120,7 @@ from c import X
 from c import Y  # error: [unresolved-import]
 ```
 
-## Esoteric definitions and redefinintions
+## Esoteric definitions and redefinitions
 
 ```toml
 [environment]

@@ -150,7 +150,7 @@ This duality is also reflected in other facts:
 - `Never` is assignable to every type, while `object` is assignable from every type.
 - `Never` is disjoint from every type, while `object` overlaps with every type.
 - Building a union with `Never` is a no-op, intersecting with `object` is a no-op.
-- Interecting with `Never` results in `Never`, building a union with `object` results in `object`.
+- Intersecting with `Never` results in `Never`, building a union with `object` results in `object`.
 
 ## Lists of `Never`
 

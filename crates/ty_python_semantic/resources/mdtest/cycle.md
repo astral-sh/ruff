@@ -165,7 +165,7 @@ falling back to `Unknown` for the type of the default value, which does not have
 impact except for the displayed type. We could also consider inferring `Divergent` when we encounter
 too many layers of nesting (instead of just one), but that would require a type traversal which
 could have performance implications. So for now, we mainly make sure not to panic or stack overflow
-for these seeminly rare cases.
+for these seemingly rare cases.
 
 ### Functions
 
