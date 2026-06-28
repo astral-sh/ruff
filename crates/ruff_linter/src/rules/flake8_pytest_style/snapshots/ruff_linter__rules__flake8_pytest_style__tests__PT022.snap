@@ -1,54 +1,54 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT022.py:15:5: PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
+PT022.py:17:5: PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
    |
-13 | @pytest.fixture()
-14 | def error():
-15 |     yield resource
+15 | def error():
+16 |     resource = acquire_resource()
+17 |     yield resource
    |     ^^^^^ PT022
-16 | 
-17 | 
+18 | 
+19 | 
    |
 help: Replace `yield` with `return`
    |
-13 | @pytest.fixture()
-14 | def error():
-15 -     yield resource
-15 +     return resource
+15 | def error():
+16 |     resource = acquire_resource()
+17 -     yield resource
+17 +     return resource
    |
 note: This is an unsafe fix and may change runtime behavior
 
-PT022.py:35:5: PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
+PT022.py:37:5: PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
    |
-33 | @pytest.fixture
-34 | def error():
-35 |     yield resource
+35 | @pytest.fixture
+36 | def error():
+37 |     yield resource
    |     ^^^^^ PT022
-36 | 
-37 | 
+38 | 
+39 | 
    |
 help: Replace `yield` with `return`
    |
-33 | @pytest.fixture
-34 | def error():
-35 -     yield resource
-35 +     return resource
+35 | @pytest.fixture
+36 | def error():
+37 -     yield resource
+37 +     return resource
    |
 note: This is an unsafe fix and may change runtime behavior
 
-PT022.py:41:5: PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
+PT022.py:43:5: PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
    |
-39 | @pytest.yield_fixture
-40 | def error():
-41 |     yield resource
+41 | @pytest.yield_fixture
+42 | def error():
+43 |     yield resource
    |     ^^^^^ PT022
    |
 help: Replace `yield` with `return`
    |
-39 | @pytest.yield_fixture
-40 | def error():
-41 -     yield resource
-41 +     return resource
+41 | @pytest.yield_fixture
+42 | def error():
+43 -     yield resource
+43 +     return resource
    |
 note: This is an unsafe fix and may change runtime behavior
