@@ -33,10 +33,14 @@ The interlingua already exists and is already bidirectional:
 ```
 
 Three load-bearing facts (verified against `main`):
-1. **`ruff_spo_triplet::ir::ModelGraph` is the interlingua**, and it is
-   already bidirectional — `expand` (ModelGraph→triples) ⇄ `reassemble`
-   (triples→ModelGraph). "A new language is a new frontend, not a new
-   ontology" (crate doc).
+1. **`ruff_spo_triplet::ir::ModelGraph` is the interlingua.** `expand`
+   (ModelGraph→triples) is general, but **`reassemble` (triples→ModelGraph)
+   today recovers only the C++ machine-plane projection** — it does *not*
+   reconstruct the core-7 `fields`/`functions` or the OpenProject collections
+   (`ruff_spo_triplet/src/reassemble.rs:16-20`). So a **general reassembler is
+   the first build item (Phase 0)**, not a given. "A new language is a new
+   frontend, not a new ontology" (crate doc) — the *intent* is bidirectional;
+   the *reassembler* is not yet general.
 2. **The asymmetry is 4 frontends vs 1 backend.** `ruff_cpp_codegen` already
    proves `ModelGraph → Rust source` (it renders `MethodSig` manifests
    targeting `lance_graph_contract::codegen_manifest`). The superpower is
@@ -110,7 +114,13 @@ wired as a diagnostic — see Phase 2.
 - Freeze `ModelGraph` + a **versioned closed `Predicate` registry**: a core
   agnostic set (`part_of`, `is_a`, `has_field`, `has_function`,
   `inherits_from`, `rdf:type` — the six the mint needs) + per-plane extension
-  predicates, all under one registry with a conformance test.
+  predicates, all under one registry with a conformance test. (Current totals:
+  **18 C++ machine-plane variants**, 57 total in `Predicate::ALL` — see
+  `triple.rs:595-613,810-821`.)
+- **Build a general reassembler** that recovers the core-7 `fields`/`functions`
+  + per-plane collections — today `reassemble` is C++-projection-only
+  (`reassemble.rs:16-20`), which is the prerequisite for the Phase-1 round-trip
+  gate to hold for Python/Ruby.
 - Lock the dual-mode `FacetMode` + the `[Facet; 32]` / tenant layout +
   `tenant_schema`.
 - Fix the predicate-count doc-drift (comments say 34/53; code/test carry 57).
@@ -118,11 +128,12 @@ wired as a diagnostic — see Phase 2.
 ### Phase 1 — Normalize the three frontends to one `extract() -> ModelGraph`
 | Lang | Today | Action |
 |---|---|---|
-| **C++** | `ruff_cpp_spo::extract() -> ModelGraph` (reference) | register its 13 predicates; widen corpus |
+| **C++** | working entry points are `ruff_cpp_spo::extract_dir` / `extract_tree` (libclang, caller-supplied args); the convenience `extract()` is a `todo!()` panic stub (`lib.rs:151-156`) | fill `extract()`; register its **18** C++ predicates (incl. `returns_type`, `has_param_type`, `is_const`, `is_static`, `has_visibility`); widen corpus |
 | **Python** | `ruff_python_dto_check` → JSON `ModuleHarvest`, not ModelGraph | add `bundle → ModelGraph` adapter (reuse extractors/matcher); the parse is done, only the IR shape is missing |
 | **C#** | Roslyn `.NET` tool → ndjson → `load() -> Vec<Triple>`, `NAMESPACE="medcare"` hardcoded | generalize the harvester past MedCare; wrap `load → reassemble → ModelGraph` as a one-call `extract()`; document the out-of-proc Roslyn seam |
 - **Gate:** each frontend round-trips `ModelGraph → expand → ndjson → reassemble`
-  losslessly (`#[cfg(test)]` per crate).
+  losslessly (`#[cfg(test)]` per crate). **Prerequisite:** the Phase-0 general
+  reassembler — today this gate only holds for the C++ projection.
 
 ### Phase 2 — Convergence + the SoC lint (guardrails)
 - **Cross-language convergence:** the same construct in Python/C++/C# mints the
@@ -169,8 +180,10 @@ transpilation (method bodies → executable target logic) is a separate research
 arm via `ActionDef` / `KausalSpec`, **not** Phase 3.
 
 ## 4 · Critical path
-`Phase 0 → Phase 1 (Python + C# normalization) → Phase 3 (LangBackend +
-Python backend)`. C++ is already both a frontend and (via `ruff_cpp_codegen`)
-the backend reference, so it is the end-to-end smoke test on day one. This work
-lives entirely in `ruff` + `OGAR`/`lance-graph` and does not touch any
-consumer's parity trunk.
+`Phase 0 (incl. general reassembler) → Phase 1 (Python + C# normalization) →
+Phase 3 (LangBackend + Python backend)`. C++ is the end-to-end smoke test
+(frontend via `extract_dir`/`extract_tree` + backend via `ruff_cpp_codegen`),
+because `reassemble` already covers the C++ projection — but the smoke test
+must call `extract_dir`/`extract_tree` directly (or fill the `todo!()`
+`extract()` first), not the panic stub. This work lives entirely in `ruff` +
+`OGAR`/`lance-graph` and does not touch any consumer's parity trunk.
