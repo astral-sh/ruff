@@ -1265,8 +1265,13 @@ fn user_site_packages_directories(
 
         // Framework builds of CPython add a second, framework-specific user-site directory.
         if cfg!(target_os = "macos") {
+            let framework = if free_threaded_suffix.is_empty() {
+                "Python"
+            } else {
+                "PythonT"
+            };
             push_if_dir(home.join(format!(
-                "Library/Python/{version}{free_threaded_suffix}/lib/python/site-packages"
+                "Library/{framework}/{version}/lib/python/site-packages"
             )));
         }
     }
@@ -2818,6 +2823,45 @@ mod tests {
                 SystemPathBuf::from("/Users/me/.local/lib/python3.12/site-packages"),
                 SystemPathBuf::from("/Users/me/Library/Python/3.12/lib/python/site-packages"),
                 SystemPathBuf::from("/Python3.12/lib/python3.12/site-packages"),
+            ]
+            .as_slice()
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn finds_user_site_packages_for_free_threaded_framework_build_macos() {
+        let system = TestSystem::default();
+        system.set_env_var("HOME", "/Users/me");
+        let memory_fs = system.memory_file_system();
+        memory_fs
+            .write_file_all("/Python3.13/bin/python3.13t", "")
+            .unwrap();
+        memory_fs
+            .create_directory_all("/Python3.13/lib/python3.13t/site-packages")
+            .unwrap();
+        memory_fs
+            .create_directory_all("/Users/me/.local/lib/python3.13t/site-packages")
+            .unwrap();
+        // Free-threaded framework builds live under a `PythonT` framework, not `Python/3.13t`.
+        memory_fs
+            .create_directory_all("/Users/me/Library/PythonT/3.13/lib/python/site-packages")
+            .unwrap();
+
+        let env = PythonEnvironment::new(
+            "/Python3.13/bin/python3.13t",
+            SysPrefixPathOrigin::PythonCliFlag,
+            &system,
+        )
+        .unwrap();
+        let site_packages = env.site_packages_paths(&system).unwrap();
+
+        assert_eq!(
+            site_packages,
+            [
+                SystemPathBuf::from("/Users/me/.local/lib/python3.13t/site-packages"),
+                SystemPathBuf::from("/Users/me/Library/PythonT/3.13/lib/python/site-packages"),
+                SystemPathBuf::from("/Python3.13/lib/python3.13t/site-packages"),
             ]
             .as_slice()
         );
