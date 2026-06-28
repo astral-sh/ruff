@@ -92,22 +92,17 @@ def _(x: int):
 
 ### Identity comparisons
 
-An intersection type does not record how a negative facet arose. The same `~None` type can come from
-an annotation that accepts a `NewType` of `NoneType`, which still evaluates to the `None` singleton
-at runtime. Identity inference therefore cannot rely on the negative facet alone, even when it came
-from an identity guard in this example.
+A `~None` constraint excludes the `None` singleton at runtime. A `NewType` of `NoneType` does not
+invalidate this constraint because it is a subtype of `NoneType` and cannot inhabit `~None`.
 
 ```py
-class A: ...
-
 def _(o: object):
-    a = A()
     n = None
 
     if o is not None:
-        reveal_type(o)  # revealed:  ~None
-        reveal_type(o is n)  # revealed: bool
-        reveal_type(o is not n)  # revealed: bool
+        reveal_type(o)  # revealed: ~None
+        reveal_type(o is n)  # revealed: Literal[False]
+        reveal_type(o is not n)  # revealed: Literal[True]
 ```
 
 ## Diagnostics
