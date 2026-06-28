@@ -135,12 +135,9 @@ pub(super) fn infer_binary_type_comparison<'db>(
     if matches!(op, ast::CmpOp::Is | ast::CmpOp::IsNot) {
         let left_resolved = left.resolve_type_alias(db);
         let right_resolved = right.resolve_type_alias(db);
-        let has_intersection = matches!(left_resolved, Type::Intersection(_))
-            || matches!(right_resolved, Type::Intersection(_));
-        let identity_projection_changes_type = left.identity_comparison_type(db) != left_resolved
-            || right.identity_comparison_type(db) != right_resolved;
-        if has_intersection
-            && identity_projection_changes_type
+        if (left_resolved.is_intersection() || right_resolved.is_intersection())
+            && (left.identity_comparison_type(db) != left_resolved
+                || right.identity_comparison_type(db) != right_resolved)
             && left.is_disjoint_from_for_identity(db, right)
         {
             return Ok(Type::bool_literal(op == ast::CmpOp::IsNot));
