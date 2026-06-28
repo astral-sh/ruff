@@ -132,6 +132,25 @@ pub(super) fn infer_binary_type_comparison<'db>(
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     let db = context.db();
 
+    // Check identity disjointness before the general comparison code below decomposes an
+    // intersection into its positive elements. Otherwise, we would lose the exclusion in this
+    // example:
+    //
+    // ```python
+    // from typing import NewType
+    // from ty_extensions import Intersection, Not
+    //
+    // class A: ...
+    // class ASub(A): ...
+    //
+    // N = NewType("N", A)
+    // NSub = NewType("NSub", ASub)
+    //
+    // def f(x: Intersection[N, Not[ASub]], y: NSub) -> None:
+    //     reveal_type(x is y)  # Literal[False]
+    // ```
+    //
+    // `y` is always an `ASub`, while `x` explicitly excludes `ASub`.
     if matches!(op, ast::CmpOp::Is | ast::CmpOp::IsNot) {
         let left_resolved = left.resolve_type_alias(db);
         let right_resolved = right.resolve_type_alias(db);
