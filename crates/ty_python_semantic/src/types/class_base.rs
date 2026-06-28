@@ -5,7 +5,9 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DivergentType, DynamicType, KnownClass,
     KnownInstanceType, MaterializationKind, SpecialFormType, StaticMroError, Type, TypeContext,
-    TypeMapping, TypedDictModule, todo_type,
+    TypeMapping, TypedDictModule,
+    recursive::{Foldable, RecursiveType},
+    todo_type,
 };
 use crate::{Db, DisplaySettings};
 
@@ -139,7 +141,7 @@ impl<'db> ClassBase<'db> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
             Type::Divergent(divergent) => Some(Self::Divergent(divergent)),
-            Type::Recursive(recursive) => recursive.map_or_else(
+            Type::Recursive(recursive) => recursive.map_or_else_folded(
                 db,
                 || None,
                 |unfolded| Self::try_from_type(db, unfolded, subclass),
@@ -494,6 +496,26 @@ impl<'db> ClassBase<'db> {
             base: self,
             settings: display_settings,
         }
+    }
+}
+
+impl<'db> Foldable<'db> for ClassBase<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::FoldRecursive(recursive),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::UnfoldRecursive(recursive),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
     }
 }
 

@@ -26,6 +26,7 @@ use crate::types::TypeContext;
 use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::recursive::{Foldable, RecursiveType};
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use ty_python_core::definition::Definition;
 
@@ -176,6 +177,38 @@ pub struct TypedDictExtraItems<'db> {
 impl TypedDictExtraItems<'_> {
     pub(crate) const fn is_read_only(self) -> bool {
         self.is_read_only
+    }
+}
+
+impl<'db> Foldable<'db> for TypedDictExtraItems<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            declared_ty: self.declared_ty.fold_recursive(db, recursive),
+            is_read_only: self.is_read_only,
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            declared_ty: self.declared_ty.unfold_recursive(db, recursive),
+            is_read_only: self.is_read_only,
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for TypedDictOpenness<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        match self {
+            Self::Extra(extra_items) => Self::Extra(extra_items.fold_recursive(db, recursive)),
+            Self::ImplicitlyOpen | Self::Closed => self,
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        match self {
+            Self::Extra(extra_items) => Self::Extra(extra_items.unfold_recursive(db, recursive)),
+            Self::ImplicitlyOpen | Self::Closed => self,
+        }
     }
 }
 
@@ -620,6 +653,26 @@ impl<'db> TypedDictType<'db> {
             TypedDictType::Class(defining_class) => defining_class.type_definition(db),
             TypedDictType::Synthesized(_) => None,
         }
+    }
+}
+
+impl<'db> Foldable<'db> for TypedDictType<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::FoldRecursive(recursive),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::UnfoldRecursive(recursive),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
     }
 }
 
@@ -1606,6 +1659,48 @@ pub(crate) struct UnpackedTypedDict<'db> {
     pub(crate) openness: TypedDictOpenness<'db>,
 }
 
+impl<'db> Foldable<'db> for UnpackedTypedDictKey<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            value_ty: self.value_ty.fold_recursive(db, recursive),
+            is_required: self.is_required,
+            definition: self.definition,
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            value_ty: self.value_ty.unfold_recursive(db, recursive),
+            is_required: self.is_required,
+            definition: self.definition,
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for UnpackedTypedDict<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            keys: self
+                .keys
+                .into_iter()
+                .map(|(name, key)| (name, key.fold_recursive(db, recursive)))
+                .collect(),
+            openness: self.openness.fold_recursive(db, recursive),
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            keys: self
+                .keys
+                .into_iter()
+                .map(|(name, key)| (name, key.unfold_recursive(db, recursive)))
+                .collect(),
+            openness: self.openness.unfold_recursive(db, recursive),
+        }
+    }
+}
+
 /// Combines the openness policies of intersected `TypedDict`-shaped values.
 ///
 /// An intersection must satisfy every constituent, so `Closed` dominates, `ImplicitlyOpen` adds no
@@ -1851,7 +1946,7 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
         Type::TypeAlias(alias) => {
             extract_unpacked_typed_dict_from_value_type(db, alias.value_type(db))
         }
-        Type::Recursive(recursive) => recursive.map_or_else(
+        Type::Recursive(recursive) => recursive.map_or_else_folded(
             db,
             || None,
             |unfolded| extract_unpacked_typed_dict_from_value_type(db, unfolded),

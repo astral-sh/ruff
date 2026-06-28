@@ -3726,10 +3726,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                     object_ty.class_object_member(db, attribute, MemberLookupPolicy::default())
                 }
+                Type::Recursive(recursive) => {
+                    return recursive.map_or_else_folded(
+                        db,
+                        || None,
+                        |unfolded| self.assignment_attribute_members(unfolded, attribute),
+                    );
+                }
                 Type::Union(..)
                 | Type::Intersection(..)
                 | Type::TypeAlias(..)
-                | Type::Recursive(_)
                 | Type::Dynamic(..)
                 | Type::Divergent(_)
                 | Type::Never
@@ -5534,6 +5540,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::TypeAlias(alias) => {
                     propagate_callable_kind(db, alias.value_type(db), kind, provenance)
                 }
+                Type::Recursive(recursive) => recursive.map_or_else_folded(
+                    db,
+                    || None,
+                    |unfolded| propagate_callable_kind(db, unfolded, kind, provenance),
+                ),
                 // Intersections are currently not handled here because that would require
                 // the decorator to be explicitly annotated as returning an intersection.
                 Type::Intersection(_) | Type::EnumComplement(_) => None,
@@ -5551,7 +5562,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::ClassLiteral(_)
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
-                | Type::Recursive(_)
                 | Type::NominalInstance(_)
                 | Type::ProtocolInstance(_)
                 | Type::SpecialForm(_)
@@ -10604,7 +10614,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (_, Type::TypeAlias(alias)) => {
                 self.infer_unary_expression_type(op, alias.value_type(self.db()), unary)
             }
-            (_, Type::Recursive(recursive)) => recursive.map_or_else(
+            (_, Type::Recursive(recursive)) => recursive.map_or_else_folded(
                 self.db(),
                 || operand_type,
                 |unfolded| self.infer_unary_expression_type(op, unfolded, unary),

@@ -457,7 +457,7 @@ impl ClassInfoConstraintFunction {
             Type::TypeAlias(alias) => {
                 self.generate_constraint(db, alias.value_type(db), is_positive)
             }
-            Type::Recursive(recursive) => recursive.map_or_else(
+            Type::Recursive(recursive) => recursive.map_or_else_folded(
                 db,
                 || None,
                 |unfolded| self.generate_constraint(db, unfolded, is_positive),

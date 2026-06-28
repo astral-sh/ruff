@@ -14,6 +14,7 @@ use crate::{
         constraints::ConstraintSet,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
+        recursive::{Foldable, RecursiveType},
         relation::EquivalenceChecker,
         signatures::{Parameter, Parameters, Signature},
         typevar::{TypeVarConstraints, TypeVarInstance},
@@ -87,6 +88,62 @@ pub(crate) enum BoundSuperError<'db> {
     /// It was a single-argument `super()` call, but we were unable to determine
     /// the implicit arguments provided by the Python interpreter.
     UnavailableImplicitArguments,
+}
+
+impl<'db> Foldable<'db> for BoundSuperError<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        match self {
+            Self::AbstractOwnerType {
+                owner_type,
+                pivot_class,
+                typevar_context,
+            } => Self::AbstractOwnerType {
+                owner_type: owner_type.fold_recursive(db, recursive),
+                pivot_class: pivot_class.fold_recursive(db, recursive),
+                typevar_context,
+            },
+            Self::InvalidPivotClassType { pivot_class } => Self::InvalidPivotClassType {
+                pivot_class: pivot_class.fold_recursive(db, recursive),
+            },
+            Self::FailingConditionCheck {
+                pivot_class,
+                owner,
+                typevar_context,
+            } => Self::FailingConditionCheck {
+                pivot_class: pivot_class.fold_recursive(db, recursive),
+                owner: owner.fold_recursive(db, recursive),
+                typevar_context,
+            },
+            Self::UnavailableImplicitArguments => Self::UnavailableImplicitArguments,
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        match self {
+            Self::AbstractOwnerType {
+                owner_type,
+                pivot_class,
+                typevar_context,
+            } => Self::AbstractOwnerType {
+                owner_type: owner_type.unfold_recursive(db, recursive),
+                pivot_class: pivot_class.unfold_recursive(db, recursive),
+                typevar_context,
+            },
+            Self::InvalidPivotClassType { pivot_class } => Self::InvalidPivotClassType {
+                pivot_class: pivot_class.unfold_recursive(db, recursive),
+            },
+            Self::FailingConditionCheck {
+                pivot_class,
+                owner,
+                typevar_context,
+            } => Self::FailingConditionCheck {
+                pivot_class: pivot_class.unfold_recursive(db, recursive),
+                owner: owner.unfold_recursive(db, recursive),
+                typevar_context,
+            },
+            Self::UnavailableImplicitArguments => Self::UnavailableImplicitArguments,
+        }
+    }
 }
 
 impl<'db> BoundSuperError<'db> {
@@ -745,7 +802,7 @@ impl<'db> BoundSuperType<'db> {
                 return delegate_to(alias.value_type(db));
             }
             Type::Recursive(recursive) => {
-                return recursive.map_or_else(
+                return recursive.map_or_else_folded(
                     db,
                     || {
                         Err(BoundSuperError::AbstractOwnerType {

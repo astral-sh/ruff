@@ -1,6 +1,11 @@
+use super::constraints::ConstraintSetBuilder;
+use super::generics::SpecializationError;
+use super::typevar::TypeVarInstance;
 use super::*;
 use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
 use crate::place::{typing_extensions_symbol, typing_symbol};
+use crate::types::call::bind::BindingError;
+use crate::types::subscript::{DunderMethod, SubscriptErrorKind};
 use crate::types::type_alias::PEP695TypeAliasType;
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_python_ast as ast;
@@ -404,6 +409,10 @@ fn recursive_list_type(db: &dyn Db, marker_bits: u32) -> (Type<'_>, RecursiveTyp
     (recursive_ty, recursive, body)
 }
 
+fn recursive_list_element_type<'db>(db: &'db dyn Db, recursive_ty: Type<'db>) -> Type<'db> {
+    UnionType::from_elements(db, [KnownClass::Int.to_instance(db), recursive_ty])
+}
+
 fn get_pep695_type_alias<'db>(db: &'db TestDb, name: &str) -> PEP695TypeAliasType<'db> {
     let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
     let ty = crate::place::global_symbol(db, module, name)
@@ -742,6 +751,277 @@ fn recursive_type_subscript_uses_unfolded_structure() {
 }
 
 #[test]
+fn recursive_type_subscript_preserves_unfolded_element_shape() {
+    let db = setup_db();
+    let (recursive_ty, recursive, _) = recursive_list_type(&db, 24);
+
+    let element_ty = recursive_ty
+        .subscript(&db, Type::int_literal(0), ast::ExprContext::Load)
+        .expect("recursive list should be subscriptable");
+    let expected_element = recursive_list_element_type(&db, recursive_ty);
+
+    assert_eq!(element_ty, expected_element);
+    assert_ne!(element_ty, recursive_ty);
+    assert_eq!(element_ty.fold_recursive(&db, recursive), expected_element);
+
+    let reconstructed_body = KnownClass::List.to_specialized_instance(&db, &[element_ty]);
+    assert_eq!(
+        reconstructed_body.fold_recursive(&db, recursive),
+        recursive_ty
+    );
+}
+
+#[test]
+fn recursive_type_fold_back_collapses_only_unfolded_body() {
+    let db = setup_db();
+    let (recursive_ty, recursive, _) = recursive_list_type(&db, 25);
+
+    let element_ty = recursive_list_element_type(&db, recursive_ty);
+    let non_body_container = Type::heterogeneous_tuple(&db, [element_ty]);
+
+    assert_eq!(
+        non_body_container.fold_recursive(&db, recursive),
+        non_body_container
+    );
+
+    let unfolded_body = KnownClass::List.to_specialized_instance(&db, &[element_ty]);
+    let nested_unfolded_body = KnownClass::List.to_specialized_instance(&db, &[unfolded_body]);
+    let expected_nested = KnownClass::List.to_specialized_instance(&db, &[recursive_ty]);
+
+    assert_eq!(unfolded_body.fold_recursive(&db, recursive), recursive_ty);
+    assert_eq!(
+        nested_unfolded_body.fold_recursive(&db, recursive),
+        expected_nested
+    );
+}
+
+#[test]
+fn recursive_type_list_construction_operation_folds_constructed_body_only() {
+    let db = setup_db();
+    let (recursive_ty, recursive, _) = recursive_list_type(&db, 28);
+    let expected_element = recursive_list_element_type(&db, recursive_ty);
+
+    let mapped = recursive.map_or_else_folded(&db, Type::unknown, |unfolded| {
+        let element_ty = unfolded
+            .subscript(&db, Type::int_literal(0), ast::ExprContext::Load)
+            .expect("unfolded recursive list should be subscriptable");
+        let constructed_list = KnownClass::List.to_specialized_instance(&db, &[element_ty]);
+
+        Type::heterogeneous_tuple(&db, [element_ty, constructed_list])
+    });
+
+    assert_eq!(
+        mapped,
+        Type::heterogeneous_tuple(&db, [expected_element, recursive_ty])
+    );
+}
+
+#[test]
+fn recursive_type_call_bindings_fold_callable_and_return_payloads() {
+    let db = setup_db();
+    let (recursive_ty, recursive, _) = recursive_list_type(&db, 29);
+    let unfolded_body = recursive.unfolded(&db);
+    let binding = Binding::single(
+        unfolded_body,
+        Signature::new(Parameters::new(&db, []), unfolded_body),
+    );
+    let bindings = Bindings::from(binding).fold_recursive(&db, recursive);
+    let callable = bindings
+        .single_element()
+        .expect("test callable has exactly one binding")
+        .clone();
+    let mut overloads = callable.matching_overloads();
+    let Some((_, binding)) = overloads.next() else {
+        panic!("test callable should have one matching overload");
+    };
+    assert!(
+        overloads.next().is_none(),
+        "test callable should not have more than one matching overload"
+    );
+
+    assert_eq!(bindings.callable_type(), recursive_ty);
+    assert_eq!(callable.callable_type, recursive_ty);
+    assert_eq!(binding.return_type(), recursive_ty);
+    assert_ne!(binding.return_type(), unfolded_body);
+}
+
+#[test]
+fn recursive_type_call_binding_folds_inferred_specialization() {
+    let db = setup_db();
+    let (recursive_ty, recursive, _) = recursive_list_type(&db, 32);
+    let unfolded_body = recursive.unfolded(&db);
+    let typevar = BoundTypeVarInstance::synthetic(
+        &db,
+        ast::name::Name::new_static("T"),
+        TypeVarVariance::Invariant,
+    );
+    let generic_context = GenericContext::from_typevar_instances(&db, [typevar]);
+    let typevar_ty = Type::TypeVar(typevar);
+    let signature = Signature::new_generic(
+        Some(generic_context),
+        Parameters::new(
+            &db,
+            [Parameter::positional_only(None).with_annotated_type(typevar_ty)],
+        ),
+        typevar_ty,
+    );
+    let callable_ty = Type::single_callable(&db, signature.clone());
+    let call_arguments = CallArguments::positional([unfolded_body]);
+    let constraints = ConstraintSetBuilder::new();
+
+    let bindings = Bindings::from(Binding::single(callable_ty, signature))
+        .match_parameters(&db, &call_arguments)
+        .check_types(
+            &db,
+            &constraints,
+            &call_arguments,
+            TypeContext::default(),
+            &[],
+        )
+        .expect("generic call should bind successfully")
+        .fold_recursive(&db, recursive);
+    let callable = bindings
+        .single_element()
+        .expect("test callable has exactly one binding");
+    let mut overloads = callable.matching_overloads();
+    let Some((_, binding)) = overloads.next() else {
+        panic!("test callable should have one matching overload");
+    };
+    assert!(
+        overloads.next().is_none(),
+        "test callable should not have more than one matching overload"
+    );
+
+    let specialization = binding
+        .specialization()
+        .expect("generic binding should infer a specialization");
+    assert_eq!(specialization.get(&db, typevar), Some(recursive_ty));
+    assert_ne!(specialization.get(&db, typevar), Some(unfolded_body));
+    assert_eq!(binding.return_type(), recursive_ty);
+}
+
+#[test]
+fn recursive_type_binding_error_folds_error_payload() {
+    let db = setup_db();
+    let (recursive_ty, recursive, _) = recursive_list_type(&db, 31);
+    let error = BindingError::InvalidKeyType {
+        argument_index: None,
+        provided_ty: recursive.unfolded(&db),
+    }
+    .fold_recursive(&db, recursive);
+    let BindingError::InvalidKeyType { provided_ty, .. } = error else {
+        panic!("folding should preserve the binding error kind");
+    };
+
+    assert_eq!(provided_ty, recursive_ty);
+}
+
+#[test]
+fn recursive_type_specialization_errors_fold_argument_payloads() {
+    let db = setup_db();
+    let (recursive_ty, recursive, _) = recursive_list_type(&db, 33);
+    let typevar = BoundTypeVarInstance::synthetic(
+        &db,
+        ast::name::Name::new_static("T"),
+        TypeVarVariance::Invariant,
+    );
+
+    let binding_error = BindingError::SpecializationError {
+        error: SpecializationError::MismatchedBound {
+            bound_typevar: typevar,
+            argument: recursive.unfolded(&db),
+        },
+        argument_index: Some(0),
+    }
+    .fold_recursive(&db, recursive);
+    let BindingError::SpecializationError {
+        error,
+        argument_index,
+    } = binding_error
+    else {
+        panic!("folding should preserve the binding error kind");
+    };
+
+    assert_eq!(argument_index, Some(0));
+    assert_eq!(error.bound_typevar(), typevar);
+    assert_eq!(error.argument_type(), recursive_ty);
+
+    let specialization_error = SpecializationError::MismatchedConstraint {
+        bound_typevar: typevar,
+        argument: recursive.unfolded(&db),
+    }
+    .fold_recursive(&db, recursive);
+
+    assert_eq!(specialization_error.bound_typevar(), typevar);
+    assert_eq!(specialization_error.argument_type(), recursive_ty);
+}
+
+#[test]
+fn recursive_type_specialization_fold_folds_generic_context_bounds_and_defaults() {
+    let db = setup_db();
+    let (recursive_ty, recursive, _) = recursive_list_type(&db, 34);
+    let unfolded_body = recursive.unfolded(&db);
+    let typevar = BoundTypeVarInstance::synthetic(
+        &db,
+        ast::name::Name::new_static("T"),
+        TypeVarVariance::Invariant,
+    );
+    let typevar = BoundTypeVarInstance::new(
+        &db,
+        TypeVarInstance::new(
+            &db,
+            typevar.typevar(&db).identity(&db),
+            Some(TypeVarBoundOrConstraints::UpperBound(unfolded_body).into()),
+            Some(TypeVarVariance::Invariant),
+            Some(unfolded_body.into()),
+        ),
+        BindingContext::Synthetic,
+        None,
+        TypeVarNonce::NONE,
+    );
+    let generic_context = GenericContext::from_typevar_instances(&db, [typevar]);
+
+    let specialization = generic_context
+        .specialize(&db, &[KnownClass::Str.to_instance(&db)])
+        .fold_recursive(&db, recursive);
+    let folded_typevar = specialization
+        .generic_context(&db)
+        .variables(&db)
+        .next()
+        .expect("specialization should preserve its type variable");
+    let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
+        folded_typevar.typevar(&db).bound_or_constraints(&db)
+    else {
+        panic!("test type variable should have an upper bound");
+    };
+
+    assert_eq!(
+        (bound, folded_typevar.default_type(&db)),
+        (recursive_ty, Some(recursive_ty))
+    );
+}
+
+#[test]
+fn recursive_type_subscript_error_kind_folds_diagnostic_type_payload() {
+    let db = setup_db();
+    let (recursive_ty, recursive, _) = recursive_list_type(&db, 30);
+    let element_ty = recursive_list_element_type(&db, recursive_ty);
+    let unfolded_body = KnownClass::List.to_specialized_instance(&db, &[element_ty]);
+
+    let error = SubscriptErrorKind::NotSubscriptable {
+        value_ty: unfolded_body,
+        method: DunderMethod::GetItem,
+    }
+    .fold_recursive(&db, recursive);
+    let SubscriptErrorKind::NotSubscriptable { value_ty, method } = error else {
+        panic!("folding should preserve the subscript error kind");
+    };
+
+    assert_eq!(value_ty, recursive_ty);
+    assert_eq!(method, DunderMethod::GetItem);
+}
+
+#[test]
 fn recursive_type_iteration_uses_unfolded_structure() {
     let db = setup_db();
     let (recursive_ty, recursive, _) = recursive_list_type(&db, 19);
@@ -755,6 +1035,52 @@ fn recursive_type_iteration_uses_unfolded_structure() {
         .expect("unfolded recursive list should be iterable");
 
     assert_eq!(recursive_iter.as_ref(), unfolded_iter.as_ref());
+}
+
+#[test]
+fn recursive_type_iteration_preserves_unfolded_element_shape() {
+    let db = setup_db();
+    let (recursive_ty, recursive, _) = recursive_list_type(&db, 26);
+
+    let element_ty = recursive_ty
+        .try_iterate(&db)
+        .expect("recursive list should be iterable")
+        .homogeneous_element_type(&db);
+    let expected_element = recursive_list_element_type(&db, recursive_ty);
+
+    assert_eq!(element_ty, expected_element);
+    assert_ne!(element_ty, recursive_ty);
+
+    let reconstructed_body = KnownClass::List.to_specialized_instance(&db, &[element_ty]);
+    assert_eq!(
+        reconstructed_body.fold_recursive(&db, recursive),
+        recursive_ty
+    );
+}
+
+#[test]
+fn recursive_type_identity_subscript_preserves_recursive_marker() {
+    let db = setup_db();
+    let binder = divergent_marker(27);
+    let recursive_ty = RecursiveType::new(
+        &db,
+        binder,
+        RecursiveOrigin::Implicit,
+        Type::Divergent(binder),
+    );
+    let Type::Recursive(recursive) = recursive_ty else {
+        panic!("expected identity recursive body to contain its binder");
+    };
+
+    let subscripted = recursive_ty
+        .subscript(&db, Type::int_literal(0), ast::ExprContext::Load)
+        .expect("identity recursive type should preserve the recursive marker");
+
+    assert_eq!(subscripted, recursive_ty);
+    let Type::Recursive(subscripted_recursive) = subscripted else {
+        panic!("subscript should preserve the recursive type");
+    };
+    assert!(subscripted_recursive.has_same_binder(&db, recursive));
 }
 
 #[test]

@@ -20,6 +20,7 @@ use super::diagnostic::{
 };
 use super::infer::TypeContext;
 use super::instance::SliceLiteral;
+use super::recursive::{Foldable, RecursiveType};
 use super::special_form::SpecialFormType;
 use super::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
@@ -179,6 +180,146 @@ impl<'db> SubscriptError<'db> {
         let slice_node = subscript.slice.as_ref();
         for error in &self.errors {
             error.report_diagnostic(context, subscript, value_node, slice_node);
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for SubscriptError<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            result_ty: self.result_ty.fold_recursive(db, recursive),
+            errors: self
+                .errors
+                .into_iter()
+                .map(|error| error.fold_recursive(db, recursive))
+                .collect(),
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            result_ty: self.result_ty.unfold_recursive(db, recursive),
+            errors: self
+                .errors
+                .into_iter()
+                .map(|error| error.unfold_recursive(db, recursive))
+                .collect(),
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for SubscriptErrorKind<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        match self {
+            Self::IndexOutOfBounds {
+                kind,
+                tuple_ty,
+                length,
+                index,
+            } => Self::IndexOutOfBounds {
+                kind,
+                tuple_ty: tuple_ty.fold_recursive(db, recursive),
+                length,
+                index,
+            },
+            Self::DunderPossiblyUnbound { method, value_ty } => Self::DunderPossiblyUnbound {
+                method,
+                value_ty: value_ty.fold_recursive(db, recursive),
+            },
+            Self::DunderCallError {
+                method,
+                value_ty,
+                slice_ty,
+                kind,
+                bindings,
+            } => Self::DunderCallError {
+                method,
+                value_ty: value_ty.fold_recursive(db, recursive),
+                slice_ty: slice_ty.fold_recursive(db, recursive),
+                kind,
+                bindings: Box::new(bindings.fold_recursive(db, recursive)),
+            },
+            Self::InvalidTypedDictKey {
+                typed_dict,
+                slice_ty,
+                full_object_ty,
+            } => Self::InvalidTypedDictKey {
+                typed_dict: typed_dict.fold_recursive(db, recursive),
+                slice_ty: slice_ty.fold_recursive(db, recursive),
+                full_object_ty: full_object_ty.fold_recursive(db, recursive),
+            },
+            Self::NotSubscriptable { value_ty, method } => Self::NotSubscriptable {
+                value_ty: value_ty.fold_recursive(db, recursive),
+                method,
+            },
+            Self::InvalidLegacyGenericArgument {
+                origin,
+                argument_ty,
+            } => Self::InvalidLegacyGenericArgument {
+                origin,
+                argument_ty: argument_ty.fold_recursive(db, recursive),
+            },
+            Self::SliceStepSizeZero
+            | Self::NonGenericTypeAlias { .. }
+            | Self::DuplicateTypevar { .. }
+            | Self::TypeVarTupleNotUnpacked { .. } => self,
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        match self {
+            Self::IndexOutOfBounds {
+                kind,
+                tuple_ty,
+                length,
+                index,
+            } => Self::IndexOutOfBounds {
+                kind,
+                tuple_ty: tuple_ty.unfold_recursive(db, recursive),
+                length,
+                index,
+            },
+            Self::DunderPossiblyUnbound { method, value_ty } => Self::DunderPossiblyUnbound {
+                method,
+                value_ty: value_ty.unfold_recursive(db, recursive),
+            },
+            Self::DunderCallError {
+                method,
+                value_ty,
+                slice_ty,
+                kind,
+                bindings,
+            } => Self::DunderCallError {
+                method,
+                value_ty: value_ty.unfold_recursive(db, recursive),
+                slice_ty: slice_ty.unfold_recursive(db, recursive),
+                kind,
+                bindings: Box::new(bindings.unfold_recursive(db, recursive)),
+            },
+            Self::InvalidTypedDictKey {
+                typed_dict,
+                slice_ty,
+                full_object_ty,
+            } => Self::InvalidTypedDictKey {
+                typed_dict: typed_dict.unfold_recursive(db, recursive),
+                slice_ty: slice_ty.unfold_recursive(db, recursive),
+                full_object_ty: full_object_ty.unfold_recursive(db, recursive),
+            },
+            Self::NotSubscriptable { value_ty, method } => Self::NotSubscriptable {
+                value_ty: value_ty.unfold_recursive(db, recursive),
+                method,
+            },
+            Self::InvalidLegacyGenericArgument {
+                origin,
+                argument_ty,
+            } => Self::InvalidLegacyGenericArgument {
+                origin,
+                argument_ty: argument_ty.unfold_recursive(db, recursive),
+            },
+            Self::SliceStepSizeZero
+            | Self::NonGenericTypeAlias { .. }
+            | Self::DuplicateTypevar { .. }
+            | Self::TypeVarTupleNotUnpacked { .. } => self,
         }
     }
 }
@@ -539,13 +680,13 @@ impl<'db> Type<'db> {
         let value_ty = self;
 
         let inferred = match (value_ty, slice_ty) {
-            (Type::Recursive(recursive), _) => Some(recursive.map_or_else(
+            (Type::Recursive(recursive), _) => Some(recursive.map_or_else_folded(
                 db,
-                || Ok(Type::unknown()),
+                || Ok(value_ty),
                 |unfolded| unfolded.subscript(db, slice_ty, expr_context),
             )),
 
-            (_, Type::Recursive(recursive)) => Some(recursive.map_or_else(
+            (_, Type::Recursive(recursive)) => Some(recursive.map_or_else_folded(
                 db,
                 || Ok(slice_ty),
                 |unfolded| value_ty.subscript(db, unfolded, expr_context),

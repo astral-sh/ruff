@@ -1904,7 +1904,7 @@ impl<'db> Type<'db> {
                 .negated_divergent()
                 .expect("matched `Type::Divergent` above"),
 
-            Type::Recursive(recursive) => recursive.map_or_else(
+            Type::Recursive(recursive) => recursive.map_or_else_folded(
                 db,
                 || {
                     Type::Intersection(IntersectionType::new(
@@ -2655,7 +2655,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) if policy.require_concrete() => Some(Place::Undefined.into()),
 
-            Type::Recursive(recursive) => recursive.map_or_else(
+            Type::Recursive(recursive) => recursive.map_or_else_folded(
                 db,
                 || Some(Place::bound(self).into()),
                 |unfolded| unfolded.find_name_in_mro_with_policy(db, name, policy),
@@ -2971,7 +2971,7 @@ impl<'db> Type<'db> {
                 enums::instance_member_for_enum_complement(db, *complement, name)
             }
 
-            Type::Recursive(recursive) => recursive.map_or_else(
+            Type::Recursive(recursive) => recursive.map_or_else_folded(
                 db,
                 || Place::bound(self).into(),
                 |unfolded| unfolded.instance_member(db, name),
@@ -3733,7 +3733,7 @@ impl<'db> Type<'db> {
                     enums::member_lookup_for_enum_complement(db, complement, name_str, policy)
                 }
 
-                Type::Recursive(recursive) => recursive.map_or_else(
+                Type::Recursive(recursive) => recursive.map_or_else_folded(
                     db,
                     || Place::bound(this).into(),
                     |unfolded| {
@@ -4377,7 +4377,7 @@ impl<'db> Type<'db> {
         }
 
         match self {
-            Type::Recursive(recursive) => recursive.map_or_else(
+            Type::Recursive(recursive) => recursive.map_or_else_folded(
                 db,
                 || Binding::single(self, Signature::dynamic(self)).into(),
                 |unfolded| unfolded.bindings(db),
@@ -5773,7 +5773,7 @@ impl<'db> Type<'db> {
                 return_ty: Some(ty),
             }),
             Type::Recursive(recursive) => {
-                recursive.map_or_else(db, || None, |unfolded| unfolded.generator_types(db))
+                recursive.map_or_else_folded(db, || None, |unfolded| unfolded.generator_types(db))
             }
             _ => None,
         }
@@ -5794,7 +5794,7 @@ impl<'db> Type<'db> {
         match self {
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(self),
             Type::Recursive(recursive) => {
-                recursive.map_or_else(db, || Some(self), |unfolded| unfolded.to_instance(db))
+                recursive.map_or_else_folded(db, || Some(self), |unfolded| unfolded.to_instance(db))
             }
             Type::ClassLiteral(class) => Some(Type::instance(db, class.default_specialization(db))),
             Type::GenericAlias(alias) => Some(Type::instance(db, ClassType::from(alias))),
@@ -6092,7 +6092,7 @@ impl<'db> Type<'db> {
     pub(crate) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::Never => Type::Never,
-            Type::Recursive(recursive) => recursive.map_or_else(
+            Type::Recursive(recursive) => recursive.map_or_else_folded(
                 db,
                 || Type::object().to_meta_type(db),
                 |unfolded| unfolded.to_meta_type(db),

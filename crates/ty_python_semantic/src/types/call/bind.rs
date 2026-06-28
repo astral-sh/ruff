@@ -59,12 +59,14 @@ use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_fr
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
-    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType,
-    TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    ApplyTypeMappingVisitor, BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType,
+    CallableTypes, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType,
+    GenericAlias, InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
+    SpecialFormType, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
+    list_members,
+    recursive::{Foldable, RecursiveType},
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -72,6 +74,19 @@ use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
 use ty_python_core::semantic_index;
 
 pub(crate) use self::constructor::ConstructorCallableKind;
+
+fn apply_recursive_mapping_to_signature<'db>(
+    db: &'db dyn Db,
+    signature: &Signature<'db>,
+    type_mapping: &TypeMapping<'_, 'db>,
+) -> Signature<'db> {
+    signature.apply_type_mapping_impl(
+        db,
+        type_mapping,
+        TypeContext::default(),
+        &ApplyTypeMappingVisitor::default(),
+    )
+}
 
 fn generic_contexts_mentioned_in_type<'db>(
     db: &'db dyn Db,
@@ -175,6 +190,24 @@ fn generic_context_has_paramspec<'db>(
 enum CallableItem<'db> {
     Regular(CallableBinding<'db>),
     Constructor(ConstructorBinding<'db>),
+}
+
+impl<'db> Foldable<'db> for CallableItem<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        match self {
+            Self::Regular(binding) => Self::Regular(binding.fold_recursive(db, recursive)),
+            Self::Constructor(binding) => Self::Constructor(binding.fold_recursive(db, recursive)),
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        match self {
+            Self::Regular(binding) => Self::Regular(binding.unfold_recursive(db, recursive)),
+            Self::Constructor(binding) => {
+                Self::Constructor(binding.unfold_recursive(db, recursive))
+            }
+        }
+    }
 }
 
 impl<'db> CallableItem<'db> {
@@ -338,6 +371,28 @@ impl<'db> CallableItem<'db> {
 #[derive(Debug, Clone)]
 struct BindingsElement<'db> {
     items: SmallVec<[CallableItem<'db>; 1]>,
+}
+
+impl<'db> Foldable<'db> for BindingsElement<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            items: self
+                .items
+                .into_iter()
+                .map(|item| item.fold_recursive(db, recursive))
+                .collect(),
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            items: self
+                .items
+                .into_iter()
+                .map(|item| item.unfold_recursive(db, recursive))
+                .collect(),
+        }
+    }
 }
 
 impl<'db> BindingsElement<'db> {
@@ -2751,6 +2806,36 @@ impl<'db> Bindings<'db> {
     }
 }
 
+impl<'db> Foldable<'db> for Bindings<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            callable_type: self.callable_type.fold_recursive(db, recursive),
+            implicit_dunder_new_is_possibly_unbound: self.implicit_dunder_new_is_possibly_unbound,
+            implicit_dunder_init_is_possibly_unbound: self.implicit_dunder_init_is_possibly_unbound,
+            elements: self
+                .elements
+                .into_iter()
+                .map(|element| element.fold_recursive(db, recursive))
+                .collect(),
+            enclosing_binding_contexts: self.enclosing_binding_contexts,
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            callable_type: self.callable_type.unfold_recursive(db, recursive),
+            implicit_dunder_new_is_possibly_unbound: self.implicit_dunder_new_is_possibly_unbound,
+            implicit_dunder_init_is_possibly_unbound: self.implicit_dunder_init_is_possibly_unbound,
+            elements: self
+                .elements
+                .into_iter()
+                .map(|element| element.unfold_recursive(db, recursive))
+                .collect(),
+            enclosing_binding_contexts: self.enclosing_binding_contexts,
+        }
+    }
+}
+
 impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
     fn from(from: CallableBinding<'db>) -> Bindings<'db> {
         Bindings {
@@ -4073,6 +4158,42 @@ impl<'db> CallableBinding<'db> {
     }
 }
 
+impl<'db> Foldable<'db> for CallableBinding<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            callable_type: self.callable_type.fold_recursive(db, recursive),
+            signature_type: self.signature_type.fold_recursive(db, recursive),
+            dunder_call_is_possibly_unbound: self.dunder_call_is_possibly_unbound,
+            bound_type: self.bound_type.fold_recursive(db, recursive),
+            overload_call_return_type: self.overload_call_return_type.fold_recursive(db, recursive),
+            matching_overload_before_type_checking: self.matching_overload_before_type_checking,
+            overloads: self
+                .overloads
+                .into_iter()
+                .map(|binding| binding.fold_recursive(db, recursive))
+                .collect(),
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            callable_type: self.callable_type.unfold_recursive(db, recursive),
+            signature_type: self.signature_type.unfold_recursive(db, recursive),
+            dunder_call_is_possibly_unbound: self.dunder_call_is_possibly_unbound,
+            bound_type: self.bound_type.unfold_recursive(db, recursive),
+            overload_call_return_type: self
+                .overload_call_return_type
+                .unfold_recursive(db, recursive),
+            matching_overload_before_type_checking: self.matching_overload_before_type_checking,
+            overloads: self
+                .overloads
+                .into_iter()
+                .map(|binding| binding.unfold_recursive(db, recursive))
+                .collect(),
+        }
+    }
+}
+
 impl<'a, 'db> IntoIterator for &'a CallableBinding<'db> {
     type Item = &'a Binding<'db>;
     type IntoIter = std::slice::Iter<'a, Binding<'db>>;
@@ -4096,6 +4217,32 @@ enum OverloadCallReturnType<'db> {
     ArgumentTypeExpansion(Type<'db>),
     ArgumentTypeExpansionLimitReached(usize),
     Ambiguous,
+}
+
+impl<'db> Foldable<'db> for OverloadCallReturnType<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        match self {
+            Self::ArgumentTypeExpansion(ty) => {
+                Self::ArgumentTypeExpansion(ty.fold_recursive(db, recursive))
+            }
+            Self::ArgumentTypeExpansionLimitReached(limit) => {
+                Self::ArgumentTypeExpansionLimitReached(limit)
+            }
+            Self::Ambiguous => Self::Ambiguous,
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        match self {
+            Self::ArgumentTypeExpansion(ty) => {
+                Self::ArgumentTypeExpansion(ty.unfold_recursive(db, recursive))
+            }
+            Self::ArgumentTypeExpansionLimitReached(limit) => {
+                Self::ArgumentTypeExpansionLimitReached(limit)
+            }
+            Self::Ambiguous => Self::Ambiguous,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -5592,10 +5739,50 @@ pub struct MatchedParameter<'db> {
     provenance: InvalidArgumentTypeProvenance,
 }
 
+impl<'db> Foldable<'db> for MatchedParameter<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            argument_type: self.argument_type.fold_recursive(db, recursive),
+            ..self
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            argument_type: self.argument_type.unfold_recursive(db, recursive),
+            ..self
+        }
+    }
+}
+
 impl<'db> MatchedArgument<'db> {
     /// Returns an iterator over the matched parameters.
     fn iter(&self) -> impl Iterator<Item = MatchedParameter<'db>> + '_ {
         self.parameters.iter().copied()
+    }
+}
+
+impl<'db> Foldable<'db> for MatchedArgument<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            parameters: self
+                .parameters
+                .into_iter()
+                .map(|parameter| parameter.fold_recursive(db, recursive))
+                .collect(),
+            matched: self.matched,
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            parameters: self
+                .parameters
+                .into_iter()
+                .map(|parameter| parameter.unfold_recursive(db, recursive))
+                .collect(),
+            matched: self.matched,
+        }
     }
 }
 
@@ -6572,6 +6759,78 @@ impl<'db> Binding<'db> {
     }
 }
 
+impl<'db> Foldable<'db> for Binding<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        let type_mapping = TypeMapping::FoldRecursive(recursive);
+        Self {
+            signature: apply_recursive_mapping_to_signature(db, &self.signature, &type_mapping),
+            source_overload_index: self.source_overload_index,
+            callable_type: self.callable_type.fold_recursive(db, recursive),
+            signature_type: self.signature_type.fold_recursive(db, recursive),
+            return_ty: self.return_ty.fold_recursive(db, recursive),
+            constructor_context: self.constructor_context.fold_recursive(db, recursive),
+            inferable_typevars: self.inferable_typevars,
+            specialization: self
+                .specialization
+                .map(|specialization| specialization.fold_recursive(db, recursive)),
+            argument_matches: self
+                .argument_matches
+                .into_vec()
+                .into_iter()
+                .map(|matched| matched.fold_recursive(db, recursive))
+                .collect(),
+            variadic_argument_matched_to_variadic_parameter: self
+                .variadic_argument_matched_to_variadic_parameter,
+            parameter_tys: self
+                .parameter_tys
+                .into_vec()
+                .into_iter()
+                .map(|ty| ty.fold_recursive(db, recursive))
+                .collect(),
+            errors: self
+                .errors
+                .into_iter()
+                .map(|error| error.fold_recursive(db, recursive))
+                .collect(),
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        let type_mapping = TypeMapping::UnfoldRecursive(recursive);
+        Self {
+            signature: apply_recursive_mapping_to_signature(db, &self.signature, &type_mapping),
+            source_overload_index: self.source_overload_index,
+            callable_type: self.callable_type.unfold_recursive(db, recursive),
+            signature_type: self.signature_type.unfold_recursive(db, recursive),
+            return_ty: self.return_ty.unfold_recursive(db, recursive),
+            constructor_context: self.constructor_context.unfold_recursive(db, recursive),
+            inferable_typevars: self.inferable_typevars,
+            specialization: self
+                .specialization
+                .map(|specialization| specialization.unfold_recursive(db, recursive)),
+            argument_matches: self
+                .argument_matches
+                .into_vec()
+                .into_iter()
+                .map(|matched| matched.unfold_recursive(db, recursive))
+                .collect(),
+            variadic_argument_matched_to_variadic_parameter: self
+                .variadic_argument_matched_to_variadic_parameter,
+            parameter_tys: self
+                .parameter_tys
+                .into_vec()
+                .into_iter()
+                .map(|ty| ty.unfold_recursive(db, recursive))
+                .collect(),
+            errors: self
+                .errors
+                .into_iter()
+                .map(|error| error.unfold_recursive(db, recursive))
+                .collect(),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 struct BindingSnapshot<'db> {
     return_ty: Type<'db>,
@@ -6916,6 +7175,110 @@ pub(crate) enum BindingError<'db> {
     InvalidDataclassApplication(InvalidDataclassTarget),
     /// The stdlib `dataclass` decorator factory was called with incompatible arguments.
     InvalidDataclassArgument(InvalidDataclassArgument),
+}
+
+impl<'db> Foldable<'db> for BindingError<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        match self {
+            Self::InvalidArgumentType {
+                parameter,
+                argument_index,
+                expected_ty,
+                provided_ty,
+                provenance,
+            } => Self::InvalidArgumentType {
+                parameter,
+                argument_index,
+                expected_ty: expected_ty.fold_recursive(db, recursive),
+                provided_ty: provided_ty.fold_recursive(db, recursive),
+                provenance,
+            },
+            Self::InvalidKeyType {
+                argument_index,
+                provided_ty,
+            } => Self::InvalidKeyType {
+                argument_index,
+                provided_ty: provided_ty.fold_recursive(db, recursive),
+            },
+            Self::CalledTopCallable(ty) => {
+                Self::CalledTopCallable(ty.fold_recursive(db, recursive))
+            }
+            Self::SpecializationError {
+                error,
+                argument_index,
+            } => Self::SpecializationError {
+                error: error.fold_recursive(db, recursive),
+                argument_index,
+            },
+            Self::PropertyHasNoSetter(property) => {
+                Self::PropertyHasNoSetter(property.fold_recursive(db, recursive))
+            }
+            Self::PropertyHasNoDeleter(property) => {
+                Self::PropertyHasNoDeleter(property.fold_recursive(db, recursive))
+            }
+            Self::MissingArguments { .. }
+            | Self::UnknownArgument { .. }
+            | Self::UnknownKeywordVariadicArgument { .. }
+            | Self::PositionalOnlyParameterAsKwarg { .. }
+            | Self::TooManyPositionalArguments { .. }
+            | Self::ParameterAlreadyAssigned { .. }
+            | Self::InternalCallError(_)
+            | Self::UnmatchedOverload
+            | Self::InvalidDataclassApplication(_)
+            | Self::InvalidDataclassArgument(_) => self,
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        match self {
+            Self::InvalidArgumentType {
+                parameter,
+                argument_index,
+                expected_ty,
+                provided_ty,
+                provenance,
+            } => Self::InvalidArgumentType {
+                parameter,
+                argument_index,
+                expected_ty: expected_ty.unfold_recursive(db, recursive),
+                provided_ty: provided_ty.unfold_recursive(db, recursive),
+                provenance,
+            },
+            Self::InvalidKeyType {
+                argument_index,
+                provided_ty,
+            } => Self::InvalidKeyType {
+                argument_index,
+                provided_ty: provided_ty.unfold_recursive(db, recursive),
+            },
+            Self::CalledTopCallable(ty) => {
+                Self::CalledTopCallable(ty.unfold_recursive(db, recursive))
+            }
+            Self::SpecializationError {
+                error,
+                argument_index,
+            } => Self::SpecializationError {
+                error: error.unfold_recursive(db, recursive),
+                argument_index,
+            },
+            Self::PropertyHasNoSetter(property) => {
+                Self::PropertyHasNoSetter(property.unfold_recursive(db, recursive))
+            }
+            Self::PropertyHasNoDeleter(property) => {
+                Self::PropertyHasNoDeleter(property.unfold_recursive(db, recursive))
+            }
+            Self::MissingArguments { .. }
+            | Self::UnknownArgument { .. }
+            | Self::UnknownKeywordVariadicArgument { .. }
+            | Self::PositionalOnlyParameterAsKwarg { .. }
+            | Self::TooManyPositionalArguments { .. }
+            | Self::ParameterAlreadyAssigned { .. }
+            | Self::InternalCallError(_)
+            | Self::UnmatchedOverload
+            | Self::InvalidDataclassApplication(_)
+            | Self::InvalidDataclassArgument(_) => self,
+        }
+    }
 }
 
 impl BindingError<'_> {

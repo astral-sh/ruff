@@ -321,7 +321,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         match (left_ty, right_ty, op) {
-            (Type::Recursive(recursive), rhs, _) => recursive.map_or_else(
+            (Type::Recursive(recursive), rhs, _) => recursive.map_or_else_folded(
                 db,
                 || Some(left_ty),
                 |unfolded| {
@@ -335,7 +335,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     )
                 },
             ),
-            (lhs, Type::Recursive(recursive), _) => recursive.map_or_else(
+            (lhs, Type::Recursive(recursive), _) => recursive.map_or_else_folded(
                 db,
                 || Some(right_ty),
                 |unfolded| {

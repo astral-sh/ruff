@@ -1,7 +1,12 @@
+use std::borrow::Cow;
+
 use crate::Db;
+use crate::place::{Place, PlaceAndQualifiers};
 use crate::types::visitor;
 use crate::types::{
-    ApplyTypeMappingVisitor, DivergentType, Type, TypeAliasType, TypeContext, TypeMapping,
+    ApplyTypeMappingVisitor, CallableTypes, DivergentType, GeneratorTypes, PropertyInstanceType,
+    TupleSpec, Type, TypeAliasType, TypeContext, TypeMapping,
+    generics::{Specialization, SpecializationError},
 };
 
 /// The source that introduced a recursive type.
@@ -92,6 +97,17 @@ impl<'db> RecursiveType<'db> {
     ) -> T {
         self.map_if_unfolded(db, map).unwrap_or_else(default)
     }
+
+    pub(crate) fn map_or_else_folded<T: Foldable<'db>>(
+        self,
+        db: &'db dyn Db,
+        default: impl FnOnce() -> T,
+        map: impl FnOnce(Type<'db>) -> T,
+    ) -> T {
+        self.map_or_else(db, default, |unfolded| {
+            map(unfolded).fold_recursive(db, self)
+        })
+    }
 }
 
 pub trait Foldable<'db>: Sized {
@@ -119,5 +135,202 @@ impl<'db> Foldable<'db> for Type<'db> {
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
         )
+    }
+}
+
+impl<'db, T> Foldable<'db> for Option<T>
+where
+    T: Foldable<'db>,
+{
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.map(|value| value.fold_recursive(db, recursive))
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.map(|value| value.unfold_recursive(db, recursive))
+    }
+}
+
+impl<'db, T, U> Foldable<'db> for (T, U)
+where
+    T: Foldable<'db>,
+    U: Foldable<'db>,
+{
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        (
+            self.0.fold_recursive(db, recursive),
+            self.1.fold_recursive(db, recursive),
+        )
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        (
+            self.0.unfold_recursive(db, recursive),
+            self.1.unfold_recursive(db, recursive),
+        )
+    }
+}
+
+impl<'db, T, E> Foldable<'db> for Result<T, E>
+where
+    T: Foldable<'db>,
+    E: Foldable<'db>,
+{
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.map(|value| value.fold_recursive(db, recursive))
+            .map_err(|err| err.fold_recursive(db, recursive))
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.map(|value| value.unfold_recursive(db, recursive))
+            .map_err(|err| err.unfold_recursive(db, recursive))
+    }
+}
+
+impl<'db> Foldable<'db> for Place<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.map_type(|ty| ty.fold_recursive(db, recursive))
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.map_type(|ty| ty.unfold_recursive(db, recursive))
+    }
+}
+
+impl<'db> Foldable<'db> for PlaceAndQualifiers<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.map_type(|ty| ty.fold_recursive(db, recursive))
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.map_type(|ty| ty.unfold_recursive(db, recursive))
+    }
+}
+
+impl<'db> Foldable<'db> for GeneratorTypes<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            yield_ty: self.yield_ty.fold_recursive(db, recursive),
+            send_ty: self.send_ty.fold_recursive(db, recursive),
+            return_ty: self.return_ty.fold_recursive(db, recursive),
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            yield_ty: self.yield_ty.unfold_recursive(db, recursive),
+            send_ty: self.send_ty.unfold_recursive(db, recursive),
+            return_ty: self.return_ty.unfold_recursive(db, recursive),
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for CallableTypes<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.map(|callable| callable.fold_recursive(db, recursive))
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.map(|callable| callable.unfold_recursive(db, recursive))
+    }
+}
+
+impl<'db> Foldable<'db> for PropertyInstanceType<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::FoldRecursive(recursive),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::UnfoldRecursive(recursive),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
+    }
+}
+
+impl<'db> Foldable<'db> for Specialization<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.apply_type_mapping(db, &TypeMapping::FoldRecursive(recursive))
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.apply_type_mapping(db, &TypeMapping::UnfoldRecursive(recursive))
+    }
+}
+
+impl<'db> Foldable<'db> for SpecializationError<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        match self {
+            Self::MismatchedBound {
+                bound_typevar,
+                argument,
+            } => Self::MismatchedBound {
+                bound_typevar,
+                argument: argument.fold_recursive(db, recursive),
+            },
+            Self::MismatchedConstraint {
+                bound_typevar,
+                argument,
+            } => Self::MismatchedConstraint {
+                bound_typevar,
+                argument: argument.fold_recursive(db, recursive),
+            },
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        match self {
+            Self::MismatchedBound {
+                bound_typevar,
+                argument,
+            } => Self::MismatchedBound {
+                bound_typevar,
+                argument: argument.unfold_recursive(db, recursive),
+            },
+            Self::MismatchedConstraint {
+                bound_typevar,
+                argument,
+            } => Self::MismatchedConstraint {
+                bound_typevar,
+                argument: argument.unfold_recursive(db, recursive),
+            },
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for TupleSpec<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::FoldRecursive(recursive),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::UnfoldRecursive(recursive),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
+    }
+}
+
+impl<'db> Foldable<'db> for Cow<'db, TupleSpec<'db>> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Cow::Owned(self.into_owned().fold_recursive(db, recursive))
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Cow::Owned(self.into_owned().unfold_recursive(db, recursive))
     }
 }

@@ -1180,6 +1180,48 @@ impl<'db> BoundTypeVarInstance<'db> {
             }
         }
     }
+
+    pub(super) fn apply_type_mapping_to_eager_attributes<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let typevar = self.typevar(db);
+        let bound_or_constraints = typevar._bound_or_constraints(db).map(|evaluation| {
+            if let TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) = evaluation {
+                bound_or_constraints
+                    .apply_type_mapping_impl(db, type_mapping, visitor)
+                    .into()
+            } else {
+                evaluation
+            }
+        });
+        let default = typevar._default(db).map(|evaluation| {
+            if let TypeVarDefaultEvaluation::Eager(default) = evaluation {
+                default
+                    .apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
+                    .into()
+            } else {
+                evaluation
+            }
+        });
+
+        let mapped_typevar = TypeVarInstance::new(
+            db,
+            typevar.identity(db),
+            bound_or_constraints,
+            typevar.explicit_variance(db),
+            default,
+        );
+        Self::new(
+            db,
+            mapped_typevar,
+            self.binding_context(db),
+            self.paramspec_attr(db),
+            self.freshness(db),
+        )
+    }
 }
 
 pub(super) fn walk_bound_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(

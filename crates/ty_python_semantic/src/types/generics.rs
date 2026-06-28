@@ -514,6 +514,20 @@ impl<'db> GenericContext<'db> {
         self.variables_inner(db).values().copied()
     }
 
+    fn apply_type_mapping_to_eager_attributes(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        Self::from_typevar_instances(
+            db,
+            self.variables(db).map(|typevar| {
+                typevar.apply_type_mapping_to_eager_attributes(db, type_mapping, visitor)
+            }),
+        )
+    }
+
     pub(crate) fn contains(
         self,
         db: &'db dyn Db,
@@ -1297,16 +1311,27 @@ impl<'db> Specialization<'db> {
         let tuple_inner = original_tuple_inner.and_then(|tuple| {
             tuple.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
         });
+        let original_generic_context = self.generic_context(db);
+        let generic_context = if type_mapping.used_in_cycle_recovery() {
+            original_generic_context.apply_type_mapping_to_eager_attributes(
+                db,
+                type_mapping,
+                visitor,
+            )
+        } else {
+            original_generic_context
+        };
 
         // Keep this check in sync with every field that can be transformed above.
-        let specialization_unchanged =
-            matches!(&types, Cow::Borrowed(_)) && tuple_inner == original_tuple_inner;
+        let specialization_unchanged = generic_context == original_generic_context
+            && matches!(&types, Cow::Borrowed(_))
+            && tuple_inner == original_tuple_inner;
         if specialization_unchanged {
             self
         } else {
             Specialization::new(
                 db,
-                self.generic_context(db),
+                generic_context,
                 types,
                 self.materialization_kind(db),
                 tuple_inner,

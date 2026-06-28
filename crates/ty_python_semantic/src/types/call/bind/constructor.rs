@@ -3,6 +3,7 @@ use crate::db::Db;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::generics::Specialization;
+use crate::types::recursive::{Foldable, RecursiveType};
 use crate::types::signatures::Parameter;
 use crate::types::{BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext};
 
@@ -500,6 +501,28 @@ impl<'db> ConstructorBinding<'db> {
     }
 }
 
+impl<'db> Foldable<'db> for ConstructorBinding<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            entry: self.entry.fold_recursive(db, recursive),
+            constructor_context: self.constructor_context.fold_recursive(db, recursive),
+            downstream_constructor: self
+                .downstream_constructor
+                .map(|bindings| Box::new(bindings.fold_recursive(db, recursive))),
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            entry: self.entry.unfold_recursive(db, recursive),
+            constructor_context: self.constructor_context.unfold_recursive(db, recursive),
+            downstream_constructor: self
+                .downstream_constructor
+                .map(|bindings| Box::new(bindings.unfold_recursive(db, recursive))),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct ConstructorContext<'db> {
     instance_type: Type<'db>,
@@ -527,6 +550,22 @@ impl<'db> ConstructorContext<'db> {
 
     fn kind(self) -> ConstructorCallableKind {
         self.kind
+    }
+}
+
+impl<'db> Foldable<'db> for ConstructorContext<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            instance_type: self.instance_type.fold_recursive(db, recursive),
+            kind: self.kind,
+        }
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            instance_type: self.instance_type.unfold_recursive(db, recursive),
+            kind: self.kind,
+        }
     }
 }
 

@@ -156,7 +156,7 @@ impl<'db> Type<'db> {
                 Type::TypeAlias(alias) => {
                     non_async_special_case(db, alias.value_type(db))
                 }
-                Type::Recursive(recursive) => recursive.map_or_else(
+                Type::Recursive(recursive) => recursive.map_or_else_folded(
                     db,
                     || None,
                     |unfolded| non_async_special_case(db, unfolded),

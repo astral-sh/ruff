@@ -12,6 +12,7 @@ use crate::{
         SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         known_instance::FunctoolsPartialInstance,
+        recursive::{Foldable, RecursiveType},
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
         visitor, walk_signature,
@@ -224,7 +225,7 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => alias
                 .value_type(db)
                 .try_upcast_to_callable_with_policy_and_context(db, policy, context),
-            Type::Recursive(recursive) => recursive.map_or_else(
+            Type::Recursive(recursive) => recursive.map_or_else_folded(
                 db,
                 || None,
                 |unfolded| {
@@ -710,6 +711,26 @@ impl<'db> CallableTypes<'db> {
             CallableFunctionProvenance::None,
         )
         .into_precise_functools_partial_instance(db, wrapped)
+    }
+}
+
+impl<'db> Foldable<'db> for CallableType<'db> {
+    fn fold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::FoldRecursive(recursive),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
+    }
+
+    fn unfold_recursive(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::UnfoldRecursive(recursive),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
     }
 }
 
