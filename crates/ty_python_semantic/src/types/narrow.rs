@@ -3276,8 +3276,12 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 .as_int_literal()
             && let Ok(index) = i32::try_from(index)
             && let rhs_ty = inference.expression_type(&comparators[0])
+            && let rhs_is_correlated_singleton = matches!(
+                rhs_ty.resolve_type_alias(self.db),
+                Type::TypeVar(_)
+            ) && rhs_ty.is_singleton(self.db)
             && let rhs_identity_ty = rhs_ty.identity_comparison_type(self.db)
-            && rhs_identity_ty.is_singleton(self.db)
+            && (rhs_is_correlated_singleton || rhs_identity_ty.is_singleton(self.db))
         {
             let is_positive_check = is_positive == (ops[0] == ast::CmpOp::Is);
             let filtered = union.filter(self.db, |elem| {
@@ -3287,6 +3291,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         if is_positive_check {
                             // `is X` context: keep tuples where element could be X
                             !el_ty.is_disjoint_from_for_identity(self.db, rhs_ty)
+                        } else if rhs_is_correlated_singleton {
+                            // Preserve the shared specialization instead of excluding every
+                            // constraint in the projected union.
+                            !el_ty.is_subtype_of(self.db, rhs_ty)
                         } else {
                             // `is not X` context: keep tuples where element is not always X
                             !el_ty

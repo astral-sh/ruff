@@ -208,6 +208,28 @@ def f(value: int | None | EllipsisType, other: T) -> None:
             assert_never(value)
 ```
 
+## Tuple narrowing with a constrained `TypeVar`
+
+When every constraint of a `TypeVar` is a singleton, an identity check on a tuple element can
+exclude tuple alternatives that cannot contain its current specialization. The complementary
+`is not` branch must retain both singleton alternatives because either one can differ from the
+current specialization.
+
+```py
+from types import EllipsisType
+from typing import TypeVar
+
+T = TypeVar("T", None, EllipsisType)
+
+def takes_singleton_tuple(value: tuple[None] | tuple[EllipsisType]) -> None: ...
+
+def f(value: tuple[int] | tuple[None] | tuple[EllipsisType], other: T) -> None:
+    if value[0] is other:
+        takes_singleton_tuple(value)
+    if value[0] is not other:
+        reveal_type(value)  # revealed: tuple[int] | tuple[None] | tuple[EllipsisType]
+```
+
 ## `is` with `NewType`s
 
 ### Distinct `NewType`s with the same base
