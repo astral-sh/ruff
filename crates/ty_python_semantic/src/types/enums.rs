@@ -1305,7 +1305,7 @@ pub(crate) fn enum_class_creation_synthesized_member<'db>(
         && class_type_mro_contains(db, class.identity_specialization(db), KnownClass::Flag)
     {
         let data_type = enum_data_type_class(db, class)?;
-        return flag_operator_member_type(db, data_type, name);
+        return flag_operator_member_type(db, class, data_type, name);
     }
 
     if !is_enum_representation_method {
@@ -1358,6 +1358,7 @@ pub(crate) fn enum_class_creation_synthesized_member<'db>(
 
 fn flag_operator_member_type<'db>(
     db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
     data_type: ClassType<'db>,
     name: &str,
 ) -> Option<Type<'db>> {
@@ -1368,6 +1369,7 @@ fn flag_operator_member_type<'db>(
     }
 
     let data_type = Type::instance(db, data_type);
+    let enum_instance = Type::instance(db, class.identity_specialization(db));
     Some(
         member
             .try_upcast_to_callable(db)?
@@ -1378,13 +1380,18 @@ fn flag_operator_member_type<'db>(
                     callable.signatures(db).iter().flat_map(|signature| {
                         let data_type_signature =
                             if let [receiver, operand] = signature.parameters().as_slice() {
-                                Some(signature.clone().with_parameters(Parameters::new(
-                                    db,
-                                    [
-                                        receiver.clone(),
-                                        operand.clone().with_annotated_type(data_type),
-                                    ],
-                                )))
+                                Some(
+                                    signature
+                                        .clone()
+                                        .with_parameters(Parameters::new(
+                                            db,
+                                            [
+                                                receiver.clone(),
+                                                operand.clone().with_annotated_type(data_type),
+                                            ],
+                                        ))
+                                        .with_return_type(enum_instance),
+                                )
                             } else {
                                 None
                             };

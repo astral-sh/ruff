@@ -86,7 +86,11 @@ class Permission(OrMixin, Flag):
 
 reveal_type(Permission.READ | Permission.WRITE)  # revealed: Literal[Permission.READ, Permission.WRITE]
 Permission.READ | 0  # error: [unsupported-operator]
-reveal_type(0 | ReprFlag.READ)  # revealed: Literal[ReprFlag.READ]
+reveal_type(ReprFlag.READ | 2)  # revealed: ReprFlag
+reveal_type(2 | ReprFlag.READ)  # revealed: ReprFlag
+
+def flag_with_data_operand_is_not_a_known_member() -> Literal[ReprFlag.READ]:
+    return ReprFlag.READ | 2  # error: [invalid-return-type]
 
 def repr_flag_or_int(condition: bool) -> ReprFlag:
     return ReprFlag.READ | (ReprFlag.WRITE if condition else 0)
