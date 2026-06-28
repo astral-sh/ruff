@@ -10604,7 +10604,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (_, Type::TypeAlias(alias)) => {
                 self.infer_unary_expression_type(op, alias.value_type(self.db()), unary)
             }
-            (_, Type::Recursive(_)) => Type::unknown(),
+            (_, Type::Recursive(recursive)) => recursive.map_or_else(
+                self.db(),
+                || operand_type,
+                |unfolded| self.infer_unary_expression_type(op, unfolded, unary),
+            ),
 
             (ast::UnaryOp::UAdd, Type::LiteralValue(literal)) => match literal.kind() {
                 LiteralValueTypeKind::Int(value) => Type::int_literal(value.as_i64()),

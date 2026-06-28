@@ -321,7 +321,34 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         match (left_ty, right_ty, op) {
-            (Type::Recursive(_), _, _) | (_, Type::Recursive(_), _) => Some(Type::unknown()),
+            (Type::Recursive(recursive), rhs, _) => recursive.map_or_else(
+                db,
+                || Some(left_ty),
+                |unfolded| {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        emitted_division_by_zero_diagnostic,
+                        unfolded,
+                        rhs,
+                        op,
+                        visitor,
+                    )
+                },
+            ),
+            (lhs, Type::Recursive(recursive), _) => recursive.map_or_else(
+                db,
+                || Some(right_ty),
+                |unfolded| {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        emitted_division_by_zero_diagnostic,
+                        lhs,
+                        unfolded,
+                        op,
+                        visitor,
+                    )
+                },
+            ),
 
             (Type::Union(lhs_union), rhs, _) => lhs_union.try_map(db, |lhs_element| {
                 self.infer_binary_expression_type_impl(

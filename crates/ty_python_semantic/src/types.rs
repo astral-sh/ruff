@@ -4379,7 +4379,7 @@ impl<'db> Type<'db> {
         match self {
             Type::Recursive(recursive) => recursive.map_or_else(
                 db,
-                || Binding::single(self, Signature::dynamic(Type::unknown())).into(),
+                || Binding::single(self, Signature::dynamic(self)).into(),
                 |unfolded| unfolded.bindings(db),
             ),
 
