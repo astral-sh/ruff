@@ -3,10 +3,12 @@
 //!
 //! The body walk uses ruff's own [`Visitor`] (the existing mechanism) rather
 //! than hand-rolling recursion. `Visitor` walks in evaluation order, so a
-//! `for record in self:` loop binds `record` as a record-variable *before* its
-//! body is visited — that's what lets `record.attr` register as a field read.
+//! `for line in self.line_ids:` loop binds `line` (carrying its `line_ids`
+//! relation prefix) *before* its body is visited — that's what lets
+//! `line.amount` register as a read of `line_ids.amount`, preserving the
+//! relation hop instead of collapsing it to a bare `amount`.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
 use ruff_python_ast::{Expr, Stmt, StmtFunctionDef};
@@ -36,12 +38,14 @@ pub(crate) fn analyze_method(func: &StmtFunctionDef) -> RawMethod {
     }
 }
 
-/// Walks a method body collecting record-variable attribute reads, raised
-/// exception types, and `self.<rel>` loop traversals.
+/// Walks a method body collecting record-variable field reads, raised
+/// exception types, and relation traversals.
 struct BodyWalker {
-    /// Variables bound to a recordset: `self` plus loop variables iterating
-    /// over `self` or `self.<rel>`.
-    record_vars: HashSet<String>,
+    /// Variables bound to a recordset, mapped to the **relation prefix** that
+    /// reaches them: `self` → `""` (direct), and a loop variable from
+    /// `for line in self.line_ids:` → `"line_ids"`, so `line.amount` reads
+    /// `line_ids.amount`. Nested loops compose the prefix.
+    record_vars: HashMap<String, String>,
     reads: Vec<String>,
     raises: Vec<String>,
     traverses: Vec<String>,
@@ -50,69 +54,79 @@ struct BodyWalker {
 impl BodyWalker {
     fn new() -> Self {
         Self {
-            record_vars: HashSet::from(["self".to_string()]),
+            record_vars: HashMap::from([("self".to_string(), String::new())]),
             reads: Vec::new(),
             raises: Vec::new(),
             traverses: Vec::new(),
         }
     }
 
-    /// Whether `expr` iterates a recordset (`self`, a known record var, or
-    /// `self.<rel>`) — i.e. its loop variable is itself a record.
-    fn iterates_record(&self, expr: &Expr) -> bool {
-        match expr {
-            Expr::Name(n) => self.record_vars.contains(n.id.as_str()),
-            _ => self_attr(expr).is_some(),
+    /// If `expr` is `<record-var>.<attr>`, the relation path it denotes
+    /// (`self.line_ids` → `"line_ids"`; `line.tax_ids` with `line`→`line_ids`
+    /// → `"line_ids.tax_ids"`). `None` if the base isn't a known record var.
+    fn relation_path(&self, expr: &Expr) -> Option<String> {
+        if let Expr::Attribute(attr) = expr
+            && let Expr::Name(base) = &*attr.value
+            && let Some(prefix) = self.record_vars.get(base.id.as_str())
+        {
+            return Some(join_path(prefix, attr.attr.id.as_str()));
         }
+        None
     }
 }
 
 impl<'a> Visitor<'a> for BodyWalker {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::For(for_stmt) => {
-                if let Some(rel) = self_attr(&for_stmt.iter) {
-                    self.traverses.push(rel);
-                }
-                if self.iterates_record(&for_stmt.iter)
-                    && let Expr::Name(target) = &*for_stmt.target
-                {
-                    self.record_vars.insert(target.id.as_str().to_string());
-                }
-                walk_stmt(self, stmt);
+        if let Stmt::For(for_stmt) = stmt {
+            // The relation prefix the loop variable inherits.
+            let bind_prefix = if let Some(rel) = self.relation_path(&for_stmt.iter) {
+                // `for line in self.line_ids:` — traverse + bind via the relation.
+                self.traverses.push(rel.clone());
+                Some(rel)
+            } else if let Expr::Name(iter) = &*for_stmt.iter {
+                // `for r in <record-var>:` — same prefix as the iterated var.
+                self.record_vars.get(iter.id.as_str()).cloned()
+            } else {
+                None
+            };
+            if let Some(prefix) = bind_prefix
+                && let Expr::Name(target) = &*for_stmt.target
+            {
+                self.record_vars
+                    .insert(target.id.as_str().to_string(), prefix);
             }
-            Stmt::Raise(raise) => {
-                if let Some(exc) = &raise.exc
-                    && let Expr::Call(call) = &**exc
-                    && let Some(name) = terminal_name(&call.func)
-                {
-                    self.raises.push(name.to_string());
-                }
-                walk_stmt(self, stmt);
-            }
-            _ => walk_stmt(self, stmt),
+        } else if let Stmt::Raise(raise) = stmt
+            && let Some(exc) = &raise.exc
+            && let Expr::Call(call) = &**exc
+            && let Some(name) = terminal_name(&call.func)
+        {
+            self.raises.push(name.to_string());
         }
+        walk_stmt(self, stmt);
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
+        // Only *load* reads of `<record-var>.<attr>` count — a store target
+        // (`self.total = ...`) is a write, not a read.
         if let Expr::Attribute(attr) = expr
+            && attr.ctx.is_load()
             && let Expr::Name(base) = &*attr.value
-            && self.record_vars.contains(base.id.as_str())
+            && let Some(prefix) = self.record_vars.get(base.id.as_str())
         {
-            self.reads.push(attr.attr.id.as_str().to_string());
+            self.reads.push(join_path(prefix, attr.attr.id.as_str()));
         }
         walk_expr(self, expr);
     }
 }
 
-/// `self.<attr>` → `Some("<attr>")`, else `None`.
-fn self_attr(expr: &Expr) -> Option<String> {
-    let Expr::Attribute(attr) = expr else {
-        return None;
-    };
-    match &*attr.value {
-        Expr::Name(n) if n.id.as_str() == "self" => Some(attr.attr.id.as_str().to_string()),
-        _ => None,
+/// Join a relation prefix and a member into a dotted path:
+/// `("line_ids", "amount")` → `"line_ids.amount"`; `("", "rounding")` →
+/// `"rounding"`.
+fn join_path(prefix: &str, member: &str) -> String {
+    if prefix.is_empty() {
+        member.to_string()
+    } else {
+        format!("{prefix}.{member}")
     }
 }
 

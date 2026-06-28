@@ -60,6 +60,10 @@ pub(crate) struct RawField {
     pub name: String,
     /// The `compute='_compute_x'` method name, if any.
     pub compute: Option<String>,
+    /// Relational comodel (raw dotted, e.g. `res.partner`), if relational.
+    pub target: Option<String>,
+    /// One2many inverse field name, if applicable.
+    pub inverse_name: Option<String>,
 }
 
 /// One `def ...` declaration with its extracted body facts.
@@ -134,52 +138,68 @@ fn resolve_name(class: &RawClass) -> Option<String> {
         .map(|dotted| dotted.replace('.', "_"))
 }
 
-/// Assemble raw classes into a [`ModelGraph`], performing the compute→depends
-/// join (each computed field inherits its `_compute_` method's `@api.depends`
-/// args — the per-(field × dep) `depends_on` fan-out) and merging classes that
-/// resolve to the same model (Odoo `_inherit` reopens).
+/// Assemble raw classes into a [`ModelGraph`].
+///
+/// Classes that resolve to the same model (Odoo `_inherit` reopens across
+/// files) are accumulated first, then each model's `compute`→`@api.depends`
+/// join runs at the **model** level — so a computed field declared in one
+/// reopen still gets the `depends_on` fan-out from its `_compute_*` method
+/// even when the method lives in a sibling reopen (the per-(field × dep)
+/// fan-out). Building the join per-class would drop those cross-reopen deps.
 fn build_graph(classes: &[RawClass], namespace: &str) -> ModelGraph {
-    let mut models: HashMap<String, Model> = HashMap::new();
-
+    // Phase 1: accumulate raw fields + methods per resolved model name.
+    let mut by_model: HashMap<String, (Vec<&RawField>, Vec<&RawMethod>)> = HashMap::new();
     for class in classes {
         let Some(model_name) = resolve_name(class) else {
             continue;
         };
-
-        let depends_by_method: HashMap<&str, &Vec<String>> = class
-            .methods
-            .iter()
-            .map(|m| (m.name.as_str(), &m.depends))
-            .collect();
-
-        let fields = class.fields.iter().map(|f| Field {
-            name: f.name.clone(),
-            emitted_by: f.compute.clone(),
-            depends_on: f
-                .compute
-                .as_deref()
-                .and_then(|m| depends_by_method.get(m))
-                .map(|deps| (*deps).clone())
-                .unwrap_or_default(),
-        });
-
-        let methods = class.methods.iter().map(|m| Function {
-            name: m.name.clone(),
-            reads: m.reads.clone(),
-            raises: m.raises.clone(),
-            traverses: m.traverses.clone(),
-        });
-
-        let entry = models
-            .entry(model_name.clone())
-            .or_insert_with(|| Model::new(&model_name));
-        entry.fields.extend(fields);
-        entry.functions.extend(methods);
+        let entry = by_model.entry(model_name).or_default();
+        entry.0.extend(&class.fields);
+        entry.1.extend(&class.methods);
     }
+
+    // Phase 2: build each model with a model-level compute→depends join.
+    let models = by_model
+        .into_iter()
+        .map(|(name, (fields, methods))| {
+            let depends_by_method: HashMap<&str, &Vec<String>> = methods
+                .iter()
+                .map(|m| (m.name.as_str(), &m.depends))
+                .collect();
+            Model {
+                fields: fields
+                    .iter()
+                    .map(|f| Field {
+                        name: f.name.clone(),
+                        emitted_by: f.compute.clone(),
+                        depends_on: f
+                            .compute
+                            .as_deref()
+                            .and_then(|m| depends_by_method.get(m))
+                            .map(|deps| (*deps).clone())
+                            .unwrap_or_default(),
+                        target: f.target.clone(),
+                        inverse_name: f.inverse_name.clone(),
+                    })
+                    .collect(),
+                functions: methods
+                    .iter()
+                    .map(|m| Function {
+                        name: m.name.clone(),
+                        reads: m.reads.clone(),
+                        raises: m.raises.clone(),
+                        traverses: m.traverses.clone(),
+                    })
+                    .collect(),
+                name,
+                ..Default::default()
+            }
+        })
+        .collect();
 
     ModelGraph {
         namespace: namespace.to_string(),
-        models: models.into_values().collect(),
+        models,
     }
 }
 
@@ -308,6 +328,20 @@ class AccountCashRounding(models.Model):
             "exc:ValidationError"
         ));
 
+        // Many2one comodels surface as `target` (raw dotted, not an IRI).
+        assert!(has(
+            &t,
+            "odoo:account_cash_rounding.profit_account_id",
+            "target",
+            "account.account"
+        ));
+        assert!(has(
+            &t,
+            "odoo:account_cash_rounding.loss_account_id",
+            "target",
+            "account.account"
+        ));
+
         // `for record in self: record.rounding` → a read on the loop-bound record.
         assert!(has(
             &t,
@@ -334,6 +368,7 @@ class Foo(models.Model):
     _name = 'x.foo'
     tax = fields.Float()
     total = fields.Monetary(compute='_compute_total', store=True)
+    line_ids = fields.One2many('x.line', 'foo_id')
 
     @api.depends('line_ids.amount', 'tax')
     def _compute_total(self):
@@ -370,6 +405,65 @@ class Foo(models.Model):
             "traverses_relation",
             "odoo:x_foo.line_ids"
         ));
+
+        // One2many relation: target (raw dotted comodel) + inverse_name.
+        assert!(has(&t, "odoo:x_foo.line_ids", "target", "x.line"));
+        assert!(has(&t, "odoo:x_foo.line_ids", "inverse_name", "foo_id"));
+
+        // Codex P2: `line.amount` keeps its relation hop (line ← self.line_ids).
+        assert!(has(
+            &t,
+            "odoo:x_foo._compute_total",
+            "reads_field",
+            "odoo:x_foo.line_ids.amount"
+        ));
+        // Codex P2: the store target `self.total = ...` is NOT a read.
+        assert!(!has(
+            &t,
+            "odoo:x_foo._compute_total",
+            "reads_field",
+            "odoo:x_foo.total"
+        ));
+    }
+
+    // Reopen scenario: a model split across classes via `_inherit`.
+    const REOPEN: &str = r#"
+from odoo import models, fields, api
+
+
+class FooBase(models.Model):
+    _name = 'x.foo'
+    total = fields.Monetary(compute='_compute_total', store=True)
+
+
+class FooExt(models.Model):
+    _inherit = 'x.foo'
+
+    @api.depends('amount', 'tax')
+    def _compute_total(self):
+        self.total = self.amount + self.tax
+"#;
+
+    #[test]
+    fn reopened_model_joins_depends_across_classes() {
+        // The computed field is declared in FooBase; its @api.depends method
+        // lives in the FooExt reopen. The compute→depends join must run at the
+        // model level, after the two classes merge (Codex P2 #3).
+        let graph = extract_from_source(REOPEN);
+        let t = expand(&graph);
+        assert!(has(
+            &t,
+            "odoo:x_foo.total",
+            "emitted_by",
+            "odoo:x_foo._compute_total"
+        ));
+        assert!(has(
+            &t,
+            "odoo:x_foo.total",
+            "depends_on",
+            "odoo:x_foo.amount"
+        ));
+        assert!(has(&t, "odoo:x_foo.total", "depends_on", "odoo:x_foo.tax"));
     }
 
     #[test]

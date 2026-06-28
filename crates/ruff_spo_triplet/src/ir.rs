@@ -207,6 +207,15 @@ pub struct Field {
     /// The function that computes/writes this field, if any. Emitted as
     /// `(field, emitted_by, fn)` (Authoritative).
     pub emitted_by: Option<String>,
+    /// For a relational field, the comodel as the raw dotted Odoo model
+    /// name (`res.partner`). Emitted as `(field, target, "<comodel>")`
+    /// (Authoritative) — the object is the string verbatim, NOT an IRI.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
+    /// For a One2many field, the inverse Many2one field name (`move_id`),
+    /// raw. Emitted as `(field, inverse_name, "<inverse>")` (Authoritative).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inverse_name: Option<String>,
 }
 
 /// One method / function.

@@ -5,7 +5,7 @@
 //! Odoo model when it either subclasses `models.{Model,AbstractModel,
 //! TransientModel}` or declares `_name` / `_inherit`.
 
-use ruff_python_ast::{Expr, Stmt, StmtAssign, StmtClassDef};
+use ruff_python_ast::{Arguments, Expr, Stmt, StmtAssign, StmtClassDef};
 
 use crate::functions::analyze_method;
 use crate::{RawClass, RawField, expr_str, name_id};
@@ -105,11 +105,38 @@ fn field_from_assign(name: &str, value: &Expr) -> Option<RawField> {
     if name_id(&func.value) != Some("fields") {
         return None;
     }
+    let (target, inverse_name) = relation_target_inverse(func.attr.id.as_str(), &call.arguments);
     Some(RawField {
         name: name.to_string(),
         compute: call
             .arguments
             .find_keyword("compute")
             .and_then(|kw| expr_str(&kw.value)),
+        target,
+        inverse_name,
     })
+}
+
+/// Resolve a relational field's comodel (`target`) and, for One2many, its
+/// inverse field name. Handles both Odoo forms: the comodel as a leading
+/// positional string or a `comodel_name=` kwarg; the One2many inverse as the
+/// second positional or an `inverse_name=` kwarg. Non-relational kinds (and
+/// `Many2many`, whose inverse is a join table, not a field) yield no inverse.
+fn relation_target_inverse(kind: &str, args: &Arguments) -> (Option<String>, Option<String>) {
+    let comodel = || {
+        args.find_keyword("comodel_name")
+            .and_then(|kw| expr_str(&kw.value))
+            .or_else(|| args.find_positional(0).and_then(expr_str))
+    };
+    match kind {
+        "Many2one" | "Many2many" => (comodel(), None),
+        "One2many" => {
+            let inverse = args
+                .find_keyword("inverse_name")
+                .and_then(|kw| expr_str(&kw.value))
+                .or_else(|| args.find_positional(1).and_then(expr_str));
+            (comodel(), inverse)
+        }
+        _ => (None, None),
+    }
 }
