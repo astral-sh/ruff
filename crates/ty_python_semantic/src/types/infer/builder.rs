@@ -3745,7 +3745,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeForm(_)
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_) => object_ty.instance_member(db, attribute),
-                Type::Recursive(recursive) => recursive.project_or_else(
+                Type::Recursive(recursive) => recursive.map_or_else(
                     db,
                     || Place::bound(object_ty).into(),
                     |unfolded| unfolded.instance_member(db, attribute),

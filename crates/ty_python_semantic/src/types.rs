@@ -2949,7 +2949,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(Place::bound(self).into()),
 
-            Type::Recursive(recursive) => recursive.project_or_else(
+            Type::Recursive(recursive) => recursive.map_or_else(
                 db,
                 || Some(Place::bound(self).into()),
                 |unfolded| unfolded.find_name_in_mro_with_policy(db, name, policy),
@@ -3261,7 +3261,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
 
-            Type::Recursive(recursive) => recursive.project_or_else(
+            Type::Recursive(recursive) => recursive.map_or_else(
                 db,
                 || Place::bound(self).into(),
                 |unfolded| unfolded.instance_member(db, name),
@@ -3990,7 +3990,7 @@ impl<'db> Type<'db> {
 
                 Type::Dynamic(..) | Type::Divergent(_) | Type::Never => Place::bound(this).into(),
 
-                Type::Recursive(recursive) => recursive.project_or_else(
+                Type::Recursive(recursive) => recursive.map_or_else(
                     db,
                     || Place::bound(this).into(),
                     |unfolded| {
@@ -4908,7 +4908,7 @@ impl<'db> Type<'db> {
                 Binding::single(self, Signature::dynamic(self)).into()
             }
 
-            Type::Recursive(recursive) => recursive.project_or_else(
+            Type::Recursive(recursive) => recursive.map_or_else(
                 db,
                 || Binding::single(self, Signature::dynamic(self)).into(),
                 |unfolded| unfolded.bindings(db),
