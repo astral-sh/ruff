@@ -17,9 +17,10 @@ use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeTransformer, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    IntersectionBuilder, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType,
+    SubclassOfInner, SubclassOfType, TypeTransformer, TypeVarBoundOrConstraints, UnionType,
+    UpcastPolicy,
 };
 use crate::{
     Db,
@@ -697,9 +698,10 @@ impl<'db> Type<'db> {
     /// A `NewType` wrapper is an identity function at runtime, so it contributes its concrete base
     /// type here while remaining distinct for ordinary type relations and intersections.
     ///
-    /// Negative intersection elements are omitted. A static exclusion does not imply a runtime
-    /// exclusion: `NewType("N", bool)(True)` can inhabit `Not[Literal[True]]`, but evaluates to
-    /// the `True` singleton at runtime.
+    /// Negative intersection elements are generally omitted. A static exclusion does not imply a
+    /// runtime exclusion: `NewType("N", bool)(True)` can inhabit `Not[Literal[True]]`, but evaluates
+    /// to the `True` singleton at runtime. However, excluding an entire known singleton class is
+    /// stable under `NewType` erasure, so constraints such as `Not[None]` are preserved.
     pub(crate) fn identity_comparison_type(self, db: &'db dyn Db) -> Type<'db> {
         struct IdentityComparisonProjection;
 
@@ -725,13 +727,23 @@ impl<'db> Type<'db> {
                     }
                 }),
                 Type::Union(union) => union.map(db, |element| project(db, *element, visitor)),
-                Type::Intersection(intersection) => IntersectionType::from_elements(
-                    db,
-                    intersection
-                        .positive(db)
-                        .iter()
-                        .map(|element| project(db, *element, visitor)),
-                ),
+                Type::Intersection(intersection) => {
+                    let mut builder = IntersectionBuilder::new(db);
+                    for element in intersection.positive(db) {
+                        builder = builder.add_positive(project(db, *element, visitor));
+                    }
+                    for element in intersection.negative(db) {
+                        let is_known_singleton_class = element
+                            .resolve_type_alias(db)
+                            .as_nominal_instance()
+                            .and_then(|instance| instance.known_class(db))
+                            .is_some_and(KnownClass::is_singleton);
+                        if is_known_singleton_class {
+                            builder = builder.add_negative(*element);
+                        }
+                    }
+                    builder.build()
+                }
                 _ => ty,
             }
         }

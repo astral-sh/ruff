@@ -359,6 +359,23 @@ def literals(
         reveal_type(some_bytes)  # revealed: Literal[b"some_bytes"]
 ```
 
+### `NewType` of a singleton class
+
+A `NewType` of `NoneType` is statically distinct from `NoneType`, but its only possible runtime
+value is still the `None` singleton. It is therefore not assignable to `Not[None]`.
+
+```py
+from types import NoneType
+from typing import NewType
+from ty_extensions import Not, is_assignable_to, static_assert
+
+NoneNewType = NewType("NoneNewType", NoneType)
+
+value = NoneNewType(None)
+reveal_type(value is None)  # revealed: Literal[True]
+static_assert(not is_assignable_to(NoneNewType, Not[None]))
+```
+
 ### `is not` with singleton `NewType`s
 
 Distinct `NewType`s of the same singleton type contain the same runtime object. These checks
