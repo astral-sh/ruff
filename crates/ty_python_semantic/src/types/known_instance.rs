@@ -387,6 +387,7 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::EagerExpansion
                 | TypeMapping::UnfoldRecursive(_)
                 | TypeMapping::FoldRecursive(_)
+                | TypeMapping::CycleFoldRecursive { .. }
                 | TypeMapping::RescopeReturnCallables(_) => Type::KnownInstance(self),
             },
             KnownInstanceType::UnionType(instance) => {

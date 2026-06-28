@@ -1173,6 +1173,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             | TypeMapping::EagerExpansion
             | TypeMapping::UnfoldRecursive(_)
             | TypeMapping::FoldRecursive(_)
+            | TypeMapping::CycleFoldRecursive { .. }
             | TypeMapping::RescopeReturnCallables(_) => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {
                 Type::TypeVar(self.materialize_impl(db, *materialization_kind, visitor))

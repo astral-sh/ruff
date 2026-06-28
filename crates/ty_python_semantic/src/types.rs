@@ -1194,7 +1194,7 @@ impl<'db> Type<'db> {
         // So we avoid unioning in the first couple iterations, and just use the later iteration's
         // result directly. We still ensure monotonicity after the first couple iterations, which
         // still ensures convergence in cases that are prone to oscillation.
-        if cycle.iteration() <= crate::TAINTED_CYCLES {
+        let recovered = if cycle.iteration() <= crate::TAINTED_CYCLES {
             let self_degraded_by_overload =
                 any_over_type(db, self, false, |ty| {
                     matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
@@ -1219,8 +1219,65 @@ impl<'db> Type<'db> {
             // We should use the previous union type as the base and only add new element types in
             // this cycle, if any.
             UnionType::from_elements_cycle_recovery(db, [previous, self])
+        };
+        let fold_input = if matches!(previous, Type::Recursive(_)) {
+            UnionType::from_elements_cycle_recovery(db, [previous, recovered])
+        } else {
+            recovered
+        };
+
+        fold_input
+            .cycle_fold_recursive(db, previous)
+            .unwrap_or_else(|| recovered.recursive_type_normalized(db, cycle))
+    }
+
+    fn cycle_fold_recursive(self, db: &'db dyn Db, previous: Self) -> Option<Self> {
+        let Type::Recursive(recursive) = previous else {
+            return None;
+        };
+        let binder = recursive.binder(db);
+        let origin = recursive.origin(db);
+
+        // Cycle recovery folds the previous approximation itself, not arbitrary unfolded bodies.
+        let folded = self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::CycleFoldRecursive { previous, binder },
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        );
+        let body = folded.without_top_level_divergent_marker(db, binder);
+
+        Some(RecursiveType::new(db, binder, origin, body))
+    }
+
+    fn without_top_level_divergent_marker(self, db: &'db dyn Db, marker: DivergentType) -> Self {
+        let Type::Union(union) = self else {
+            return self;
+        };
+
+        let div = Type::Divergent(marker);
+        let mut builder = UnionBuilder::new(db)
+            .cycle_recovery(true)
+            .recursively_defined(union.recursively_defined(db));
+        let mut removed_marker = false;
+        let mut kept_element = false;
+
+        for element in union.elements(db) {
+            if element.same_divergent_marker(div) {
+                removed_marker = true;
+            } else {
+                builder = builder.add(*element);
+                kept_element = true;
+            }
         }
-        .recursive_type_normalized(db, cycle)
+
+        if removed_marker && !kept_element {
+            div
+        } else if removed_marker {
+            builder.build()
+        } else {
+            Type::Union(union)
+        }
     }
 
     pub fn is_none(&self, db: &'db dyn Db) -> bool {
@@ -6240,6 +6297,9 @@ impl<'db> Type<'db> {
         // the type, if it's something that can contain a `Self` reference.
         match type_mapping {
             TypeMapping::BindSelf(binding) if self == binding.self_type() => return self,
+            TypeMapping::CycleFoldRecursive { previous, binder } if self == *previous => {
+                return Type::Divergent(*binder);
+            }
             _ => {}
         }
 
@@ -6534,6 +6594,7 @@ impl<'db> Type<'db> {
                 TypeMapping::EagerExpansion |
                 TypeMapping::UnfoldRecursive(_) |
                 TypeMapping::FoldRecursive(_) |
+                TypeMapping::CycleFoldRecursive { .. } |
                 TypeMapping::RescopeReturnCallables(_) |
                 TypeMapping::Promote(PromotionMode::Off, _) |
                 TypeMapping::Promote(
@@ -6555,6 +6616,7 @@ impl<'db> Type<'db> {
                 TypeMapping::EagerExpansion |
                 TypeMapping::UnfoldRecursive(_) |
                 TypeMapping::FoldRecursive(_) |
+                TypeMapping::CycleFoldRecursive { .. } |
                 TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
@@ -7637,6 +7699,11 @@ pub enum TypeMapping<'a, 'db> {
     UnfoldRecursive(RecursiveType<'db>),
     /// Collapse occurrences of the unfolded body of a recursive type back into that recursive type.
     FoldRecursive(RecursiveType<'db>),
+    /// Replace occurrences of the previous cycle value with its recursive binder.
+    CycleFoldRecursive {
+        previous: Type<'db>,
+        binder: DivergentType,
+    },
 
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
@@ -7686,6 +7753,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::EagerExpansion
             | TypeMapping::UnfoldRecursive(_)
             | TypeMapping::FoldRecursive(_)
+            | TypeMapping::CycleFoldRecursive { .. }
             | TypeMapping::RescopeReturnCallables(_) => context,
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {
@@ -7734,6 +7802,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::EagerExpansion
             | TypeMapping::UnfoldRecursive(_)
             | TypeMapping::FoldRecursive(_)
+            | TypeMapping::CycleFoldRecursive { .. }
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
     }
@@ -7741,7 +7810,9 @@ impl<'db> TypeMapping<'_, 'db> {
     pub(crate) const fn used_in_cycle_recovery(&self) -> bool {
         matches!(
             self,
-            TypeMapping::UnfoldRecursive(_) | TypeMapping::FoldRecursive(_)
+            TypeMapping::UnfoldRecursive(_)
+                | TypeMapping::FoldRecursive(_)
+                | TypeMapping::CycleFoldRecursive { .. }
         )
     }
 }
