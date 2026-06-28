@@ -1048,7 +1048,7 @@ impl<'m> ContextCursor<'m> {
             // invalid we extract the token under the self and check if it makes
             // up that "empty space" inside the Parameters Node. If it does, we know
             // that we are still binding variables, just that the current state is
-            // syntactically invalid. Hence we suppress autocomplete suggestons
+            // syntactically invalid. Hence we suppress autocomplete suggestions
             // also in those cases.
             ast::AnyNodeRef::Parameters(params) => {
                 if !params.range.contains_range(self.range) {

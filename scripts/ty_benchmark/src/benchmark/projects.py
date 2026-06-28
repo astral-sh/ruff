@@ -172,7 +172,7 @@ ALL: Final = [
     ),
     # Fairly chunky project, requires the pydantic mypy plugin.
     #
-    # Pyrefly reports significantely more diagnostics than ty and, unlike ty, has partial pydantic support.
+    # Pyrefly reports significantly more diagnostics than ty and, unlike ty, has partial pydantic support.
     # Both could be the reason why Pyrefly is slower than ty (it's notable that it's mainly slower because it has a much higher system time)
     Project(
         name="homeassistant",

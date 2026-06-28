@@ -2674,7 +2674,7 @@ literal as a normal Python expression.
 
 
 ```python
-def foo() -> "intstance of C":  # error
+def foo() -> "instance of C":  # error
     return 42
 
 

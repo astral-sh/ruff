@@ -8,7 +8,7 @@ our purposes, so we try to parse it when possible. However, the key is not read 
 standard library, and is provided under different keys depending on which virtual-environment
 creation tool created the `pyvenv.cfg` file (the stdlib `venv` module calls the key `version`,
 whereas uv and virtualenv both call it `version_info`). We therefore do not return an error when
-discovering a virtual environment's `site-packages` directory if the virtula environment contains a
+discovering a virtual environment's `site-packages` directory if the virtual environment contains a
 `pyvenv.cfg` file which doesn't have this key, or if the associated value of the key doesn't parse
 according to our expectations. The file isn't really *invalid* in this situation.
 
