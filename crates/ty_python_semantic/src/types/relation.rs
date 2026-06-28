@@ -691,11 +691,15 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db)
     }
 
-    /// Return the type that describes the possible runtime objects represented by `self` in an
-    /// identity comparison.
+    /// Return a type that conservatively describes the possible runtime objects represented by
+    /// `self` in an identity comparison.
     ///
     /// A `NewType` wrapper is an identity function at runtime, so it contributes its concrete base
     /// type here while remaining distinct for ordinary type relations and intersections.
+    ///
+    /// Negative-only intersections are widened to `object`. A static exclusion alone does not
+    /// imply a runtime exclusion: `NewType("N", bool)(True)` can inhabit `Not[Literal[True]]`, but
+    /// evaluates to the `True` singleton at runtime.
     pub(crate) fn identity_comparison_type(self, db: &'db dyn Db) -> Type<'db> {
         match self.resolve_type_alias(db) {
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db),
@@ -709,9 +713,12 @@ impl<'db> Type<'db> {
                 None => Type::TypeVar(typevar),
             },
             Type::Union(union) => union.map(db, |element| element.identity_comparison_type(db)),
-            Type::Intersection(intersection) => {
-                intersection.map_positive(db, |element| element.identity_comparison_type(db))
+            Type::Intersection(intersection) if intersection.positive(db).is_empty() => {
+                Type::object()
             }
+            Type::Intersection(intersection) => intersection.map_positive(db, |element| {
+                element.identity_comparison_type(db)
+            }),
             ty => ty,
         }
     }

@@ -118,29 +118,28 @@ pub(crate) struct UnsupportedComparisonError<'db> {
 
 /// Return the truthiness of `left is right` when it is known for every represented runtime value.
 ///
-/// Checking the complete types before the comparison dispatch below is important for intersections.
-/// Otherwise, decomposing an intersection into its positive elements can lose an exclusion that
-/// proves two values cannot be identical:
+/// Projecting the complete types before the comparison dispatch below accounts for `NewType`'s
+/// runtime behavior. Distinct `NewType`s are statically disjoint, but their constructors can return
+/// the same object unchanged:
 ///
 /// ```python
 /// from typing import NewType
-/// from ty_extensions import Intersection, Not
 ///
-/// class A: ...
-/// class ASub(A): ...
+/// UserId = NewType("UserId", int)
+/// OrderId = NewType("OrderId", int)
 ///
-/// N = NewType("N", A)
-/// NSub = NewType("NSub", ASub)
-///
-/// def f(x: Intersection[N, Not[ASub]], y: NSub) -> None:
-///     reveal_type(x is y)  # Literal[False]
+/// def same_object(user_id: UserId, order_id: OrderId) -> None:
+///     reveal_type(user_id is order_id)  # bool
 /// ```
 fn identity_comparison_truthiness<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
     right: Type<'db>,
 ) -> Truthiness {
-    if left.is_disjoint_from_for_identity(db, right) {
+    let left = left.identity_comparison_type(db);
+    let right = right.identity_comparison_type(db);
+
+    if left.is_disjoint_from(db, right) {
         Truthiness::AlwaysFalse
     } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
         Truthiness::AlwaysTrue
@@ -182,18 +181,32 @@ pub(super) fn infer_binary_type_comparison<'db>(
             ast::CmpOp::NotIn => {
                 membership_test_comparison(MembershipTestCompareOperator::NotIn, range)
             }
-            // Definite identity results are returned by `identity_comparison_truthiness` below.
+            // Identity results are returned by `identity_comparison_truthiness` below.
             ast::CmpOp::Is | ast::CmpOp::IsNot => Ok(KnownClass::Bool.to_instance(db)),
         }
     };
+
+    match op {
+        ast::CmpOp::Is => {
+            return Ok(Type::from_truthiness(
+                db,
+                identity_comparison_truthiness(db, left, right),
+            ));
+        }
+        ast::CmpOp::IsNot => {
+            return Ok(Type::from_truthiness(
+                db,
+                identity_comparison_truthiness(db, left, right).negate(),
+            ));
+        }
+        _ => {}
+    }
 
     let soundness_policy =
         ComparisonSoundnessPolicy::from_analysis_settings(db.analysis_settings(context.file()));
     let comparison_truthiness = match op {
         ast::CmpOp::Eq => equality_truthiness(db, left, right, soundness_policy),
         ast::CmpOp::NotEq => inequality_truthiness(db, left, right, soundness_policy),
-        ast::CmpOp::Is => identity_comparison_truthiness(db, left, right),
-        ast::CmpOp::IsNot => identity_comparison_truthiness(db, left, right).negate(),
         _ => Truthiness::Ambiguous,
     };
     if comparison_truthiness != Truthiness::Ambiguous {

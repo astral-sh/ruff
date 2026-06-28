@@ -311,11 +311,29 @@ def literals(
         reveal_type(some_bytes)  # revealed: Literal[b"some_bytes"]
 ```
 
+### Negative-only types
+
+A static exclusion does not necessarily exclude an object's runtime type. In the example below,
+`BoolNewType` is statically disjoint from `Literal[True]`, so it inhabits `Not[Literal[True]]`.
+However, calling the `NewType` returns `True` unchanged. The identity comparison must therefore
+remain ambiguous.
+
+```py
+from typing import Literal, NewType
+from ty_extensions import Not
+
+BoolNewType = NewType("BoolNewType", bool)
+
+def excludes_true(value: Not[Literal[True]]) -> None:
+    reveal_type(value is True)  # revealed: bool
+
+excludes_true(BoolNewType(True))
+```
+
 ### Comparisons that are always false
 
-These comparisons are still always false when the declared types rule out a shared object. This is
-true when one operand excludes the other's base class and when the two bases are distinct final
-classes.
+These comparisons are still always false when a positive type excludes the other operand and when
+the two runtime types are distinct final classes.
 
 ```py
 from typing import NewType, final
