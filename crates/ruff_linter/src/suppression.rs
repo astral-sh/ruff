@@ -385,7 +385,16 @@ impl Suppressions {
                 }
             }
 
-            if group.any_unused() {
+            if group.any_unused()
+                && !group
+                    .suppression
+                    .comments
+                    .first()
+                    .codes_as_str(locator.contents())
+                    .any(|code| {
+                        get_redirect_target(code).unwrap_or(code) == Rule::UnusedNOQA.noqa_code()
+                    })
+            {
                 let mut codes = group.disabled_codes.clone();
                 codes.extend(group.unused_codes.clone());
                 Suppressions::report_suppression_codes(
