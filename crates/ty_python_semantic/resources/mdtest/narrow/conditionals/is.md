@@ -222,7 +222,6 @@ from typing import TypeVar
 T = TypeVar("T", None, EllipsisType)
 
 def takes_singleton_tuple(value: tuple[None] | tuple[EllipsisType]) -> None: ...
-
 def f(value: tuple[int] | tuple[None] | tuple[EllipsisType], other: T) -> None:
     if value[0] is other:
         takes_singleton_tuple(value)
@@ -237,9 +236,9 @@ def f(value: tuple[int] | tuple[None] | tuple[EllipsisType], other: T) -> None:
 Calling a `NewType` returns its argument unchanged, so values with statically disjoint `NewType`s
 can still be the same object at runtime. An identity comparison between distinct `NewType`s with the
 same base is therefore not always false. In the true branch, we preserve both nominal types,
-including when they appear in unions or intersections. A positive check on a tuple element can
-also remove tuple alternatives whose element is runtime-disjoint, even when the compared value is
-not a singleton.
+including when they appear in unions or intersections. A positive check on a tuple element can also
+remove tuple alternatives whose element is runtime-disjoint, even when the compared value is not a
+singleton.
 
 ```py
 from typing import NewType
