@@ -79,29 +79,34 @@ A cascade tier `(part_of:is_a)` is a degenerate triplet with its predicate
 implied; triplet mode is the generalization (spend 2 tiers → buy an explicit
 predicate).
 
-### 1.2 The 512-byte record as 32 tenants
+### 1.2 The 512-byte record as 32 tenants — canon `key(16) + value(496)`
 
 ```
-NodeRow 512B ≡ [Facet; 32]            (AoS row)
-            ≡ 32 tenants × [GUID; N]  (SoA: each "tenant" = one GUID column)
-   tenant 0      = Self GUID
-   tenant 1      = Edges (EdgeBlock: in_family[12] | out_family[4])
-   tenants 2..31 = 30 composition slots → GUID references to other classes
+NodeRow 512B  =  key(16) | value(496)        (OGAR canon, CLAUDE.md:51-52)
+            ≡  32 × 16B slots ≡ 32 tenants × [GUID; N]  ("tenant" = one GUID column)
+   slot 0        = Self GUID (the 16B key; addressable with zero value decode)
+   slots 1..31   = 31 value tenants → GUID references / facets
 ```
 
-`ClassView::tenant_schema(classid) -> [TenantRole; 32]`, static per classid
-(keeps every tenant a homogeneous, SIMD-scannable GUID column). Roles:
-`{ Self, Edges, Structural, Do, Think, Adapter }` + `nested: bool`. The
-`Do`/`Think`/`Adapter` tenants are the behaviour / cognitive / projection
-planes reached *through* the classid, never inlined. Nesting = a content-
-addressed foreign-key column → a columnar composition DAG with dedup-by-content.
+**No separate `EdgeBlock`** — the `12+4` block is superseded canon
+(`NODEGUID-CANON-AUDIT.md` F-5: "relations ARE the addressing"); edges are
+GUID-reference tenants. **Tenant typing lives on `Class`, not `ClassView`**
+(`CLASSVIEW-MATERIALIZATION-PLAN.md` §3 + anti-pattern #2 — `ClassView` is
+label-only). So this is an expansion of the existing `lance_graph_contract::Class`:
+`Class::tenant_schema() -> [TenantRole; 31]`, static per classid, roles
+`{ Structural, Edge, Do, Think, Adapter }` (+ `nested`). The `Do`/`Think`/
+`Adapter` tenants are the behaviour / cognitive / projection planes reached
+*through* the classid; nesting = a content-addressed FK column → a columnar
+composition DAG with dedup-by-content.
 
 ### 1.3 Capacity == the separation-of-concerns lint
 Every cap is a structural-quality signal, on both axes:
 `>64 fields` (FieldMask) · `>256 per tier` / `>6 deep` (cascade) · `>4 edges`
-(triplet) · `>30 composition slots` / `>32 tenants`. Overflow is **the
-signal**; the fix is always "reference another class" (grow a limb), never
-widen. The law already exists as a falsifier
+(triplet) · `>31 value tenants`. Overflow is **the signal**; the fix is always
+"reference another class" / "paginate via class hierarchy" (grow a limb) —
+already canon (`CLASSVIEW-MATERIALIZATION-PLAN.md` §5, `≤64` enforced by
+`field_basis_fits_in_one_u64_mask`), never widen. The law already exists as a
+falsifier
 (`ruff_spo_address/examples/medcare_probe.rs` §[G] "the 256-cap-is-a-lint
 law", classifying overflow as DUPLICATION and/or CONFLATION) but is **not**
 wired as a diagnostic — see Phase 2.
