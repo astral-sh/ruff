@@ -1,4 +1,6 @@
-# Identity tests
+# Identity comparisons
+
+## Basic comparisons
 
 ```py
 from typing_extensions import TypeAliasType
@@ -39,4 +41,21 @@ def _(a1: TypeAliasType, a2: TypeAliasType):
 
 reveal_type(list[int] is list[int])  # revealed: bool
 reveal_type(list[int] is not list[int])  # revealed: bool
+```
+
+## Recursive type aliases
+
+Projecting a recursive alias for an identity comparison must stop when it encounters the alias
+again.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Recursive = Recursive | int
+
+def f(value: Recursive) -> None:
+    reveal_type(value is 1)  # revealed: bool
 ```

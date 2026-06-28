@@ -19,7 +19,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    SubclassOfType, TypeTransformer, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -701,26 +701,45 @@ impl<'db> Type<'db> {
     /// imply a runtime exclusion: `NewType("N", bool)(True)` can inhabit `Not[Literal[True]]`, but
     /// evaluates to the `True` singleton at runtime.
     pub(crate) fn identity_comparison_type(self, db: &'db dyn Db) -> Type<'db> {
-        match self.resolve_type_alias(db) {
-            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db),
-            Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    bound.identity_comparison_type(db)
+        struct IdentityComparisonProjection;
+
+        fn project<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            visitor: &TypeTransformer<'db, IdentityComparisonProjection>,
+        ) -> Type<'db> {
+            match ty {
+                Type::TypeAlias(alias) => {
+                    visitor.visit_type(db, ty, || project(db, alias.value_type(db), visitor))
                 }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    constraints.as_type(db).identity_comparison_type(db)
+                Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db),
+                Type::TypeVar(typevar) => visitor.visit_type(db, ty, || {
+                    match typevar.typevar(db).bound_or_constraints(db) {
+                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                            project(db, bound, visitor)
+                        }
+                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                            project(db, constraints.as_type(db), visitor)
+                        }
+                        None => ty,
+                    }
+                }),
+                Type::Union(union) => union.map(db, |element| project(db, *element, visitor)),
+                Type::Intersection(intersection) if intersection.positive(db).is_empty() => {
+                    Type::object()
                 }
-                None => Type::TypeVar(typevar),
-            },
-            Type::Union(union) => union.map(db, |element| element.identity_comparison_type(db)),
-            Type::Intersection(intersection) if intersection.positive(db).is_empty() => {
-                Type::object()
+                Type::Intersection(intersection) => {
+                    intersection.map_positive(db, |element| project(db, *element, visitor))
+                }
+                _ => ty,
             }
-            Type::Intersection(intersection) => intersection.map_positive(db, |element| {
-                element.identity_comparison_type(db)
-            }),
-            ty => ty,
         }
+
+        project(
+            db,
+            self,
+            &TypeTransformer::<IdentityComparisonProjection>::default(),
+        )
     }
 
     /// Return `true` if `self` and `other` cannot describe the same runtime object.
