@@ -1206,6 +1206,17 @@ impl<'db> Type<'db> {
             (Type::ClassLiteral(left), Type::ClassLiteral(right)) => {
                 left.same_cycle_recovery_identity(db, right)
             }
+            (
+                Type::KnownInstance(KnownInstanceType::UnionType(left)),
+                Type::KnownInstance(KnownInstanceType::UnionType(right)),
+            ) => match (left.union_type(db), right.union_type(db)) {
+                (Ok(left), Ok(right)) => {
+                    TypeTransformer::<ApplyDefaultTypeMapping>::same_type_identity(
+                        db, *left, *right,
+                    )
+                }
+                _ => false,
+            },
             _ => false,
         }
     }
@@ -1356,6 +1367,15 @@ impl<'db> Type<'db> {
         }
 
         let current = self.fold_previous_cycle_structure(db, previous, cycle);
+        if current != self
+            && !previous.contains_cycle_artifact(db)
+            && current.contains_cycle_artifact(db)
+        {
+            // `FoldCyclePrevious` only rewrites occurrences in guarded positions. If it fired, the
+            // previous type is already represented by the cycle marker inside `current`;
+            // unioning `previous` back in would leak a finite unfolding outside the binder.
+            return current;
+        }
 
         if let (Type::GenericAlias(current), Type::GenericAlias(previous)) = (current, previous)
             && let Some(merged) = current.merge_cycle_recovery(db, previous)
