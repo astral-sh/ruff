@@ -197,7 +197,7 @@ An identity comparison between them must not be considered always false or narro
 
 ```py
 from typing import NewType, final
-from ty_extensions import Intersection, is_disjoint_from, static_assert
+from ty_extensions import Intersection, Not, is_disjoint_from, static_assert
 
 class Foo: ...
 class FooSub(Foo): ...
@@ -224,6 +224,17 @@ def intersection(left: Intersection[FooNewType1, FooSub], right: FooNewType2) ->
     if left is right:
         reveal_type(left)  # revealed: FooNewType1 & FooSub
         reveal_type(right)  # revealed: FooNewType2 & FooSub
+
+FooSubNewType = NewType("FooSubNewType", FooSub)
+
+def negative_intersection(left: Intersection[FooNewType1, Not[FooSub]], right: FooSubNewType) -> None:
+    reveal_type(left is right)  # revealed: Literal[False]
+    reveal_type(right is left)  # revealed: Literal[False]
+    reveal_type(left is not right)  # revealed: Literal[True]
+    reveal_type(right is not left)  # revealed: Literal[True]
+    if left is right:
+        reveal_type(left)  # revealed: Never
+        reveal_type(right)  # revealed: Never
 
 UserId = NewType("UserId", int)
 
