@@ -19,11 +19,10 @@ use ruff_python_ast::{
     self as ast, AnyNodeRef,
     visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::Ranged;
 use ty_python_core::definition::{Definition, DefinitionState};
 use ty_python_core::scope::ScopeKind;
-use ty_python_semantic::types::Type;
-use ty_python_semantic::{HasType, ImportAliasResolution, ResolvedDefinition, SemanticModel};
+use ty_python_semantic::{ImportAliasResolution, ResolvedDefinition, SemanticModel};
 
 /// Mode for references search behavior
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -398,13 +397,6 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
             AnyNodeRef::ExprAttribute(attr_expr) => {
                 let kind = OccurrenceKind::from(attr_expr.ctx);
                 self.check_identifier(&attr_expr.attr, kind);
-                // For dotted module references like `pkg.old_sub`, the expression-based
-                // attribute resolution above may not find the definition (submodules
-                // aren't always explicit in the parent scope). Fall back to resolving
-                // as an ImportModuleComponent with semantic verification.
-                if attr_expr.attr.id == self.target_text {
-                    self.check_attribute_as_module_component(attr_expr);
-                }
             }
             AnyNodeRef::StmtFunctionDef(func) => {
                 self.check_declaration_identifier(&func.name);
@@ -475,11 +467,6 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                     sub_finder.visit_expr(sub_ast.expr());
                 }
             }
-            AnyNodeRef::StmtImportFrom(import_from) => {
-                if let Some(module_id) = &import_from.module {
-                    self.check_import_module_path(module_id, import_from.level);
-                }
-            }
             AnyNodeRef::Alias(alias) => {
                 // Handle import alias declarations
                 if let Some(asname) = &alias.asname {
@@ -489,11 +476,6 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                 // This is for cases where we're renaming the imported symbol name itself
                 if alias.name.id == self.target_text {
                     self.check_declaration_identifier(&alias.name);
-                }
-                // For dotted import names (e.g., `import pkg.old_sub`), also check
-                // individual components since `alias.name` contains the full dotted name.
-                if alias.name.id.contains('.') {
-                    self.check_import_module_path(&alias.name, 0);
                 }
             }
             _ => {}
@@ -544,106 +526,6 @@ impl<'a> LocalReferencesFinder<'a> {
     /// Checks an identifier that's part of a declaration, e.g. the name of the class.
     fn check_declaration_identifier(&mut self, identifier: &ast::Identifier) {
         self.check_identifier(identifier, OccurrenceKind::Declaration);
-    }
-
-    /// Check if an attribute access chain like `pkg.old_sub` represents a dotted
-    /// module reference. Reconstructs the dotted name from the expression tree and
-    /// verifies it semantically via `ImportModuleComponent`.
-    fn check_attribute_as_module_component(&mut self, attr_expr: &ast::ExprAttribute) {
-        let component_range = attr_expr.attr.range;
-        // Skip if check_identifier already added a reference for this range
-        if self
-            .references
-            .iter()
-            .any(|r| r.range() == component_range && r.file() == self.model.file())
-        {
-            return;
-        }
-
-        let Some(chain_name) = dotted_name_with_attr(&attr_expr.value, attr_expr.attr.as_str())
-        else {
-            return;
-        };
-
-        // Verify the root expression is actually a module, not a local variable
-        // that shadows the module import (e.g. a parameter named `pkg`).
-        if let Some(root_name) = root_name_of_chain(&attr_expr.value) {
-            if !root_name
-                .inferred_type(self.model)
-                .is_some_and(|ty| matches!(ty, Type::ModuleLiteral(_)))
-            {
-                return;
-            }
-        }
-
-        let component_index = chain_name.matches('.').count();
-        let goto_target = GotoTarget::ImportModuleComponent {
-            module_name: chain_name,
-            level: 0,
-            component_index,
-            component_range,
-        };
-
-        if let Some(current_defs) = goto_target
-            .definitions(self.model, self.mode.to_import_alias_resolution())
-            .and_then(|defs| defs.goto_declaration(self.model, &goto_target))
-        {
-            if self.target_definitions.intersects(&current_defs) {
-                self.references.push(ReferenceTarget::new(
-                    self.model.file(),
-                    component_range,
-                    ReferenceKind::Other,
-                ));
-            }
-        }
-    }
-
-    /// Check each component of a dotted module path in an import statement for
-    /// references to the target symbol.
-    ///
-    /// Import statements can contain dotted module paths (e.g., `import pkg.old_sub`
-    /// or `from pkg.old_sub import x`). This checks each dot-separated component
-    /// individually, using semantic resolution to verify it refers to the same module.
-    fn check_import_module_path(&mut self, module_id: &ast::Identifier, level: u32) {
-        let full_name = module_id.as_str();
-        let mut current_pos = 0usize;
-        for (i, component) in full_name.split('.').enumerate() {
-            if component == self.target_text {
-                let Ok(start_offset) = u32::try_from(current_pos) else {
-                    current_pos += component.len() + 1;
-                    continue;
-                };
-                let Ok(end_offset) = u32::try_from(current_pos + component.len()) else {
-                    current_pos += component.len() + 1;
-                    continue;
-                };
-                let component_range = TextRange::new(
-                    module_id.start() + TextSize::from(start_offset),
-                    module_id.start() + TextSize::from(end_offset),
-                );
-
-                let goto_target = GotoTarget::ImportModuleComponent {
-                    module_name: full_name.to_string(),
-                    level,
-                    component_index: i,
-                    component_range,
-                };
-
-                if let Some(current_definitions) = goto_target
-                    .definitions(self.model, self.mode.to_import_alias_resolution())
-                    .and_then(|defs| defs.goto_declaration(self.model, &goto_target))
-                {
-                    if self.target_definitions.intersects(&current_definitions) {
-                        self.references.push(ReferenceTarget::new(
-                            self.model.file(),
-                            component_range,
-                            ReferenceKind::Other,
-                        ));
-                    }
-                }
-            }
-            current_pos += component.len() + 1;
-        }
     }
 
     fn check_identifier(&mut self, identifier: &ast::Identifier, kind: OccurrenceKind) {
@@ -749,33 +631,6 @@ impl<'a> LocalReferencesFinder<'a> {
                     DefinitionState::Deleted | DefinitionState::Undefined
                 )
             })
-    }
-}
-
-/// Walk an expression chain to find the root `ExprName`.
-/// E.g. for `a.b.c`, returns `ExprName("a")`.
-fn root_name_of_chain(expr: &ast::Expr) -> Option<&ast::ExprName> {
-    match expr {
-        ast::Expr::Name(name) => Some(name),
-        ast::Expr::Attribute(attr) => root_name_of_chain(&attr.value),
-        _ => None,
-    }
-}
-
-/// Reconstruct a dotted name from an expression with an additional attribute component.
-/// E.g. for `ExprName("pkg")` + `"old_sub"` → `"pkg.old_sub"`.
-fn dotted_name_with_attr(expr: &ast::Expr, attr: &str) -> Option<String> {
-    let prefix = dotted_name_from_expr(expr)?;
-    Some(format!("{prefix}.{attr}"))
-}
-
-/// Reconstruct a dotted name from an expression chain.
-/// Returns `None` if the expression is not a simple name/attribute chain.
-fn dotted_name_from_expr(expr: &ast::Expr) -> Option<String> {
-    match expr {
-        ast::Expr::Name(name) => Some(name.id.to_string()),
-        ast::Expr::Attribute(attr) => dotted_name_with_attr(&attr.value, attr.attr.as_str()),
-        _ => None,
     }
 }
 

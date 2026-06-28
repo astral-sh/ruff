@@ -1,0 +1,62 @@
+---
+source: crates/ty_server/tests/e2e/will_rename_files.rs
+expression: edits
+---
+{
+  "changes": {
+    "file://<temp_dir>/consumer.py": [
+      {
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 7
+          },
+          "end": {
+            "line": 0,
+            "character": 12
+          }
+        },
+        "newText": "new_a"
+      },
+      {
+        "range": {
+          "start": {
+            "line": 1,
+            "character": 7
+          },
+          "end": {
+            "line": 1,
+            "character": 12
+          }
+        },
+        "newText": "new_b"
+      },
+      {
+        "range": {
+          "start": {
+            "line": 3,
+            "character": 6
+          },
+          "end": {
+            "line": 3,
+            "character": 11
+          }
+        },
+        "newText": "new_a"
+      },
+      {
+        "range": {
+          "start": {
+            "line": 3,
+            "character": 15
+          },
+          "end": {
+            "line": 3,
+            "character": 20
+          }
+        },
+        "newText": "new_b"
+      }
+    ]
+  }
+}
