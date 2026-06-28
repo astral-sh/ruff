@@ -1654,8 +1654,8 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance) => Some(instance.class(db)),
             Type::ProtocolInstance(instance) => instance.to_nominal_instance().map(|i| i.class(db)),
             Type::TypeAlias(alias) => alias.value_type(db).nominal_class(db),
-            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
-                recursive.project(db, |unfolded| unfolded.nominal_class(db))
+            Type::Recursive(recursive) => {
+                recursive.project_or_else(db, || None, |unfolded| unfolded.nominal_class(db))
             }
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).nominal_class(db),
             Type::TypeVar(typevar) => {
@@ -1713,8 +1713,8 @@ impl<'db> Type<'db> {
     /// For a subclass of `tuple[int, str]`, it will return the same tuple spec.
     fn tuple_instance_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
         match self {
-            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
-                recursive.project(db, |unfolded| unfolded.tuple_instance_spec(db))
+            Type::Recursive(recursive) => {
+                recursive.project_or_else(db, || None, |unfolded| unfolded.tuple_instance_spec(db))
             }
             _ => self
                 .as_nominal_instance()
@@ -1734,9 +1734,11 @@ impl<'db> Type<'db> {
     /// But for a subclass of `tuple[int, str]`, it will return `None`.
     fn exact_tuple_instance_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
         match self {
-            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
-                recursive.project(db, |unfolded| unfolded.exact_tuple_instance_spec(db))
-            }
+            Type::Recursive(recursive) => recursive.project_or_else(
+                db,
+                || None,
+                |unfolded| unfolded.exact_tuple_instance_spec(db),
+            ),
             _ => self
                 .as_nominal_instance()
                 .and_then(|instance| instance.own_tuple_spec(db)),
@@ -1892,8 +1894,8 @@ impl<'db> Type<'db> {
     /// unspecialized generic class literal.
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         match self {
-            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
-                recursive.map(db, |ty| ty.to_class_type(db))
+            Type::Recursive(recursive) => {
+                recursive.map_or_else(db, || None, |ty| ty.to_class_type(db))
             }
             Type::ClassLiteral(class_literal) => Some(class_literal.default_specialization(db)),
             Type::GenericAlias(alias) => Some(ClassType::Generic(alias)),
@@ -2271,7 +2273,7 @@ impl<'db> Type<'db> {
     ) -> Type<'db> {
         match self.resolve_type_alias(db) {
             Type::Union(union) => union.filter(db, f),
-            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
+            Type::Recursive(recursive) => {
                 recursive.map_type(db, |unfolded| unfolded.filter_union(db, f))
             }
             _ => self,
@@ -2947,12 +2949,11 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(Place::bound(self).into()),
 
-            Type::Recursive(recursive) if recursive.is_non_contractive(db) => {
-                Some(Place::bound(self).into())
-            }
-            Type::Recursive(recursive) => recursive.project(db, |unfolded| {
-                unfolded.find_name_in_mro_with_policy(db, name, policy)
-            }),
+            Type::Recursive(recursive) => recursive.project_or_else(
+                db,
+                || Some(Place::bound(self).into()),
+                |unfolded| unfolded.find_name_in_mro_with_policy(db, name, policy),
+            ),
 
             Type::ClassLiteral(class) if class.is_typed_dict(db) => {
                 Some(class.typed_dict_member(db, None, name, policy))
@@ -3260,12 +3261,11 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
 
-            Type::Recursive(recursive) if recursive.is_non_contractive(db) => {
-                Place::bound(self).into()
-            }
-            Type::Recursive(recursive) => {
-                recursive.project(db, |unfolded| unfolded.instance_member(db, name))
-            }
+            Type::Recursive(recursive) => recursive.project_or_else(
+                db,
+                || Place::bound(self).into(),
+                |unfolded| unfolded.instance_member(db, name),
+            ),
 
             Type::NominalInstance(instance) => instance.class(db).instance_member(db, name),
             Type::NewTypeInstance(newtype) => {
@@ -3990,12 +3990,13 @@ impl<'db> Type<'db> {
 
                 Type::Dynamic(..) | Type::Divergent(_) | Type::Never => Place::bound(this).into(),
 
-                Type::Recursive(recursive) if recursive.is_non_contractive(db) => {
-                    Place::bound(this).into()
-                }
-                Type::Recursive(recursive) => recursive.project(db, |unfolded| {
-                    unfolded.member_lookup_with_policy_and_receiver(db, name, policy, receiver)
-                }),
+                Type::Recursive(recursive) => recursive.project_or_else(
+                    db,
+                    || Place::bound(this).into(),
+                    |unfolded| {
+                        unfolded.member_lookup_with_policy_and_receiver(db, name, policy, receiver)
+                    },
+                ),
 
                 Type::FunctionLiteral(function) if name == "__get__" => Place::bound(
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)),
@@ -4907,10 +4908,11 @@ impl<'db> Type<'db> {
                 Binding::single(self, Signature::dynamic(self)).into()
             }
 
-            Type::Recursive(recursive) if recursive.is_non_contractive(db) => {
-                Binding::single(self, Signature::dynamic(self)).into()
-            }
-            Type::Recursive(recursive) => recursive.project(db, |unfolded| unfolded.bindings(db)),
+            Type::Recursive(recursive) => recursive.project_or_else(
+                db,
+                || Binding::single(self, Signature::dynamic(self)).into(),
+                |unfolded| unfolded.bindings(db),
+            ),
 
             // Note that this correctly returns `None` if none of the union elements are callable.
             Type::Union(union) => Bindings::from_union(
@@ -5856,8 +5858,8 @@ impl<'db> Type<'db> {
                 }
                 builder.build()
             }
-            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
-                recursive.map(db, |unfolded| unfolded.flatten_typevars(db))
+            Type::Recursive(recursive) => {
+                recursive.map_or_else(db, || self, |unfolded| unfolded.flatten_typevars(db))
             }
             // Don't descend into other types; only flatten top-level typevars.
             _ => self,
@@ -6017,16 +6019,17 @@ impl<'db> Type<'db> {
                 send_ty: Some(ty),
                 return_ty: Some(ty),
             }),
-            Type::Recursive(recursive) if recursive.is_non_contractive(db) => {
-                Some(GeneratorTypes {
-                    yield_ty: Some(self),
-                    send_ty: Some(self),
-                    return_ty: Some(self),
-                })
-            }
-            Type::Recursive(recursive) => {
-                recursive.map(db, |unfolded| unfolded.generator_types(db))
-            }
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                || {
+                    Some(GeneratorTypes {
+                        yield_ty: Some(self),
+                        send_ty: Some(self),
+                        return_ty: Some(self),
+                    })
+                },
+                |unfolded| unfolded.generator_types(db),
+            ),
             _ => None,
         }
     }
@@ -6045,8 +6048,9 @@ impl<'db> Type<'db> {
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(self),
-            Type::Recursive(recursive) if recursive.is_non_contractive(db) => Some(self),
-            Type::Recursive(recursive) => recursive.map(db, |unfolded| unfolded.to_instance(db)),
+            Type::Recursive(recursive) => {
+                recursive.map_or_else(db, || Some(self), |unfolded| unfolded.to_instance(db))
+            }
             Type::ClassLiteral(class) => Some(Type::instance(db, class.default_specialization(db))),
             Type::GenericAlias(alias) => Some(Type::instance(db, ClassType::from(alias))),
             Type::SubclassOf(subclass_of_ty) => Some(subclass_of_ty.to_instance(db)),
@@ -6297,10 +6301,18 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Divergent(_) => Ok(*self),
 
-            Type::Recursive(recursive) if recursive.is_non_contractive(db) => Ok(*self),
-            Type::Recursive(recursive) => recursive.map(db, |unfolded| {
-                unfolded.in_type_expression(db, scope_id, typevar_binding_context, inference_flags)
-            }),
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                || Ok(*self),
+                |unfolded| {
+                    unfolded.in_type_expression(
+                        db,
+                        scope_id,
+                        typevar_binding_context,
+                        inference_flags,
+                    )
+                },
+            ),
 
             Type::NominalInstance(instance) => match instance.known_class(db) {
                 Some(KnownClass::NoneType) => Ok(Type::none(db)),
@@ -6384,8 +6396,9 @@ impl<'db> Type<'db> {
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.to_meta_type(db),
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic)),
             Type::Divergent(_) => self,
-            Type::Recursive(recursive) if recursive.is_non_contractive(db) => self,
-            Type::Recursive(recursive) => recursive.map(db, |unfolded| unfolded.to_meta_type(db)),
+            Type::Recursive(recursive) => {
+                recursive.map_or_else(db, || self, |unfolded| unfolded.to_meta_type(db))
+            }
             // TODO intersections
             Type::Intersection(intersection) => {
                 if let Some(alternatives) = intersection.finite_alternative_union(db) {

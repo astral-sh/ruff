@@ -607,10 +607,6 @@ impl<'db> Type<'db> {
                 Some(value_ty.subscript(db, alias.value_type(db), expr_context))
             }
 
-            (Type::Recursive(recursive), _) if recursive.is_non_contractive(db) => {
-                Some(Ok(value_ty))
-            }
-
             (Type::Recursive(recursive), _) => {
                 Some(recursive.project_or_else(
                     db,

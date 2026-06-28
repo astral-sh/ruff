@@ -1845,10 +1845,11 @@ fn is_instance_truthiness<'db>(
         Type::ClassLiteral(..) => always_true_if(is_instance(&KnownClass::Type.to_instance(db))),
 
         Type::TypeAlias(alias) => is_instance_truthiness(db, alias.value_type(db), class),
-        Type::Recursive(recursive) if recursive.is_non_contractive(db) => Truthiness::Ambiguous,
-        Type::Recursive(recursive) => {
-            recursive.map(db, |unfolded| is_instance_truthiness(db, unfolded, class))
-        }
+        Type::Recursive(recursive) => recursive.map_or_else(
+            db,
+            || Truthiness::Ambiguous,
+            |unfolded| is_instance_truthiness(db, unfolded, class),
+        ),
 
         Type::TypeVar(bound_typevar) => match bound_typevar.typevar(db).bound_or_constraints(db) {
             None => is_instance_truthiness(db, Type::object(), class),

@@ -220,12 +220,18 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => alias
                 .value_type(db)
                 .try_upcast_to_callable_with_policy_and_context(db, policy, context),
-            Type::Recursive(recursive) if recursive.is_non_contractive(db) => Some(
-                CallableTypes::one(CallableType::function_like(db, Signature::dynamic(self))),
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                || {
+                    Some(CallableTypes::one(CallableType::function_like(
+                        db,
+                        Signature::dynamic(self),
+                    )))
+                },
+                |unfolded| {
+                    unfolded.try_upcast_to_callable_with_policy_and_context(db, policy, context)
+                },
             ),
-            Type::Recursive(recursive) => recursive.map(db, |unfolded| {
-                unfolded.try_upcast_to_callable_with_policy_and_context(db, policy, context)
-            }),
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function))
                 if context.is_recursive_reference(db, function) =>

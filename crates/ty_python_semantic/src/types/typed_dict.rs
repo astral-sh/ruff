@@ -1900,10 +1900,11 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
         Type::TypeAlias(alias) => {
             extract_unpacked_typed_dict_from_value_type(db, alias.value_type(db))
         }
-        Type::Recursive(recursive) if recursive.is_non_contractive(db) => None,
-        Type::Recursive(recursive) => recursive.map(db, |unfolded| {
-            extract_unpacked_typed_dict_from_value_type(db, unfolded)
-        }),
+        Type::Recursive(recursive) => recursive.map_or_else(
+            db,
+            || None,
+            |unfolded| extract_unpacked_typed_dict_from_value_type(db, unfolded),
+        ),
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)
         | Type::Divergent(_)
@@ -2003,10 +2004,11 @@ pub(super) fn unpacked_keyword_is_gradual<'db>(db: &'db dyn Db, ty: Type<'db>) -
             .elements(db)
             .iter()
             .any(|element| element.resolve_type_alias(db).is_dynamic()),
-        Type::Recursive(recursive) if recursive.is_non_contractive(db) => true,
-        Type::Recursive(recursive) => {
-            recursive.map(db, |unfolded| unpacked_keyword_is_gradual(db, unfolded))
-        }
+        Type::Recursive(recursive) => recursive.map_or_else(
+            db,
+            || true,
+            |unfolded| unpacked_keyword_is_gradual(db, unfolded),
+        ),
         _ => false,
     }
 }

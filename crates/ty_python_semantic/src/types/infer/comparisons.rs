@@ -297,23 +297,27 @@ pub(super) fn infer_binary_type_comparison<'db>(
             infer_binary_type_comparison(context, left, op, alias.value_type(db), range, visitor)
         })),
 
-        (recursive @ Type::Recursive(rec), _) if rec.is_non_contractive(db) => {
-            Some(Ok(recursive))
-        }
-        (_, recursive @ Type::Recursive(rec)) if rec.is_non_contractive(db) => {
-            Some(Ok(recursive))
-        }
-        (Type::Recursive(rec), right) => Some(visitor.visit((left, op, right), || {
-            rec.map(db, |unfolded| {
-                infer_binary_type_comparison(context, unfolded, op, right, range, visitor)
-            })
+        (recursive @ Type::Recursive(rec), right) => Some(visitor.visit((left, op, right), || {
+            rec.map_or_else(
+                db,
+                || Ok(recursive),
+                |unfolded| {
+                    infer_binary_type_comparison(context, unfolded, op, right, range, visitor)
+                },
+            )
         })),
 
-        (left, Type::Recursive(rec)) => Some(visitor.visit((left, op, right), || {
-            rec.map(db, |unfolded| {
-                infer_binary_type_comparison(context, left, op, unfolded, range, visitor)
-            })
-        })),
+        (left, recursive @ Type::Recursive(rec)) => {
+            Some(visitor.visit((left, op, right), || {
+                rec.map_or_else(
+                    db,
+                    || Ok(recursive),
+                    |unfolded| {
+                        infer_binary_type_comparison(context, left, op, unfolded, range, visitor)
+                    },
+                )
+            }))
+        }
 
         // `try_dunder` works for almost all `NewType`s, but not for `NewType`s of `float` and
         // `complex`, where the concrete base type is a union. In that case it turns out the

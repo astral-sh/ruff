@@ -2886,23 +2886,21 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
-            (Type::Recursive(recursive), _) if recursive.is_non_contractive(self.db) => {
-                return Ok(());
-            }
             (Type::Recursive(recursive), actual) => {
                 let db = self.db;
-                return recursive.map(db, |formal| {
-                    self.infer_map_impl(formal, actual, polarity, seen)
-                });
-            }
-            (_, Type::Recursive(recursive)) if recursive.is_non_contractive(self.db) => {
-                return Ok(());
+                return recursive.map_or_else(
+                    db,
+                    || Ok(()),
+                    |formal| self.infer_map_impl(formal, actual, polarity, seen),
+                );
             }
             (formal, Type::Recursive(recursive)) => {
                 let db = self.db;
-                return recursive.map(db, |actual| {
-                    self.infer_map_impl(formal, actual, polarity, seen)
-                });
+                return recursive.map_or_else(
+                    db,
+                    || Ok(()),
+                    |actual| self.infer_map_impl(formal, actual, polarity, seen),
+                );
             }
 
             (Type::Intersection(formal_intersection), _) => {

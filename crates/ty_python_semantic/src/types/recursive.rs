@@ -167,7 +167,8 @@ impl<'db> RecursiveType<'db> {
     /// Returns the body with recursive-position markers replaced by the source type when known.
     ///
     /// This is for finite views such as display. Structural type operations should use
-    /// [`map`](Self::map), which preserves recursive positions as this recursive type.
+    /// [`map_or_else`](Self::map_or_else), which preserves recursive positions as this recursive
+    /// type.
     pub fn body_with_origin_marker(self, db: &'db dyn Db) -> Type<'db> {
         let body = self.body(db);
         let Some(replacement) = self.origin(db).source_type() else {
@@ -207,13 +208,18 @@ impl<'db> RecursiveType<'db> {
         }
     }
 
-    /// Apply an operation to one unfolded layer, then fold the result back under this binder.
-    pub(crate) fn map<F: Foldable<'db>>(
+    /// Apply an operation only if one-step unfolding exposes a new outer structure.
+    pub(crate) fn map_if_unfolded<F: Foldable<'db>>(
         self,
         db: &'db dyn Db,
         operation: impl FnOnce(Type<'db>) -> F,
-    ) -> F {
-        operation(self.unfold(db)).fold(db, self)
+    ) -> Option<F> {
+        let unfolded = self.unfold(db);
+        if unfolded == Type::Recursive(self) {
+            None
+        } else {
+            Some(operation(unfolded).fold(db, self))
+        }
     }
 
     /// Apply an operation, or use a caller-provided fallback if unfolding makes no progress.
@@ -223,12 +229,7 @@ impl<'db> RecursiveType<'db> {
         fallback: impl FnOnce() -> F,
         operation: impl FnOnce(Type<'db>) -> F,
     ) -> F {
-        let unfolded = self.unfold(db);
-        if unfolded == Type::Recursive(self) {
-            fallback()
-        } else {
-            operation(unfolded).fold(db, self)
-        }
+        self.map_if_unfolded(db, operation).unwrap_or_else(fallback)
     }
 
     /// Apply a type-producing operation if one-step unfolding exposes a new outer structure.
@@ -238,14 +239,6 @@ impl<'db> RecursiveType<'db> {
         operation: impl FnOnce(Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
         self.map_or_else(db, || Type::Recursive(self), operation)
-    }
-
-    /// Inspect one unfolded layer without closing the result under this binder.
-    ///
-    /// This is for projections such as asking for the outer nominal class. Transformations that
-    /// produce a new type should use [`map`](Self::map) so recursive occurrences are re-bound.
-    pub(crate) fn project<F>(self, db: &'db dyn Db, operation: impl FnOnce(Type<'db>) -> F) -> F {
-        operation(self.unfold(db))
     }
 
     /// Inspect one unfolded layer, or use a caller-provided fallback if unfolding makes no progress.
@@ -293,11 +286,15 @@ mod tests {
             panic!("expected recursive type");
         };
 
-        let element = recursive.project(&db, |unfolded| {
-            unfolded
-                .subscript(&db, Type::int_literal(0), ast::ExprContext::Load)
-                .expect("tuple subscript should succeed")
-        });
+        let element = recursive.project_or_else(
+            &db,
+            || panic!("recursive type should unfold"),
+            |unfolded| {
+                unfolded
+                    .subscript(&db, Type::int_literal(0), ast::ExprContext::Load)
+                    .expect("tuple subscript should succeed")
+            },
+        );
 
         assert_eq!(element, recursive_ty);
     }
@@ -336,7 +333,7 @@ mod tests {
     }
 
     #[test]
-    fn map_identity_preserves_implicit_recursive_type() {
+    fn map_or_else_identity_preserves_implicit_recursive_type() {
         let db = setup_db();
         let binder_id = salsa::plumbing::Id::from_bits(1);
         let body = Type::homogeneous_tuple(&db, Type::divergent(binder_id));
@@ -345,7 +342,10 @@ mod tests {
             panic!("expected recursive type");
         };
 
-        assert_eq!(recursive.map(&db, |unfolded| unfolded), recursive_ty);
+        assert_eq!(
+            recursive.map_or_else(&db, || Type::Recursive(recursive), |unfolded| unfolded),
+            recursive_ty
+        );
     }
 
     #[test]
@@ -381,7 +381,7 @@ mod tests {
     }
 
     #[test]
-    fn map_identity_preserves_explicit_recursive_alias_type() {
+    fn map_or_else_identity_preserves_explicit_recursive_alias_type() {
         let mut db = setup_db();
         db.write_dedented("/src/a.py", "type RecursiveList = list[RecursiveList]")
             .unwrap();
@@ -400,7 +400,10 @@ mod tests {
             panic!("expected RecursiveList to resolve to a recursive type");
         };
 
-        assert_eq!(recursive.map(&db, |unfolded| unfolded), recursive_ty);
+        assert_eq!(
+            recursive.map_or_else(&db, || Type::Recursive(recursive), |unfolded| unfolded),
+            recursive_ty
+        );
     }
 
     #[test]

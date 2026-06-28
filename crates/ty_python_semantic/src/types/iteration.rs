@@ -156,12 +156,11 @@ impl<'db> Type<'db> {
                 Type::TypeAlias(alias) => {
                     non_async_special_case(db, alias.value_type(db))
                 }
-                Type::Recursive(recursive) if recursive.is_non_contractive(db) => {
-                    Some(Cow::Owned(TupleSpec::homogeneous(ty)))
-                }
-                Type::Recursive(recursive) => {
-                    recursive.project(db, |unfolded| non_async_special_case(db, unfolded))
-                }
+                Type::Recursive(recursive) => recursive.project_or_else(
+                    db,
+                    || Some(Cow::Owned(TupleSpec::homogeneous(ty))),
+                    |unfolded| non_async_special_case(db, unfolded),
+                ),
                 Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
                         non_async_special_case(db, bound)
@@ -257,9 +256,13 @@ impl<'db> Type<'db> {
         }
 
         if let Type::Recursive(recursive) = self
-            && !recursive.is_non_contractive(db)
+            && let Some(result) = recursive.project_or_else(
+                db,
+                || None,
+                |unfolded| Some(unfolded.try_iterate_with_mode(db, mode)),
+            )
         {
-            return recursive.project(db, |unfolded| unfolded.try_iterate_with_mode(db, mode));
+            return result;
         }
 
         if mode.is_async() {

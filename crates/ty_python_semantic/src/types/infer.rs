@@ -602,7 +602,9 @@ impl<'db> TypeContext<'db> {
         known_class: KnownClass,
     ) -> Option<Specialization<'db>> {
         let annotation = match self.annotation? {
-            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => recursive.body(db),
+            annotation @ Type::Recursive(recursive) => {
+                recursive.project_or_else(db, || annotation, |_| recursive.body(db))
+            }
             annotation => annotation,
         };
         annotation.known_specialization(db, known_class)

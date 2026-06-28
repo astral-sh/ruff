@@ -213,17 +213,18 @@ impl<'db> Type<'db> {
         };
 
         let truthiness = match self {
-            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
-                recursive.map(db, |unfolded| {
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                || Ok(Truthiness::Ambiguous),
+                |unfolded| {
                     visitor.visit(*self, || {
                         unfolded.try_bool_impl(db, allow_short_circuit, visitor)
                     })
-                })?
-            }
+                },
+            )?,
 
             Type::Dynamic(_)
             | Type::Divergent(_)
-            | Type::Recursive(_)
             | Type::Never
             | Type::Callable(_)
             | Type::TypeIs(_)

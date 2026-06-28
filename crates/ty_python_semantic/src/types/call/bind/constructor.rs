@@ -575,10 +575,11 @@ fn constructor_returns_instance<'db>(
         Type::Intersection(intersection) => intersection
             .iter_positive(db)
             .any(|element| constructor_returns_instance(db, class_literal, element)),
-        Type::Recursive(recursive) if !recursive.is_non_contractive(db) => recursive
-            .map(db, |unfolded| {
-                constructor_returns_instance(db, class_literal, unfolded)
-            }),
+        Type::Recursive(recursive) => recursive.map_or_else(
+            db,
+            || false,
+            |unfolded| constructor_returns_instance(db, class_literal, unfolded),
+        ),
         // Spec says an explicit `Any` return type should be considered non-instance.
         Type::Dynamic(DynamicType::Any) => false,
         // But a missing return annotation should be considered instance.

@@ -102,9 +102,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::TypeAlias(alias) => {
                     visitor.visit(ty, || imp(db, alias.value_type(db), visitor))
                 }
-                Type::Recursive(recursive) if recursive.is_non_contractive(db) => None,
                 Type::Recursive(recursive) => {
-                    recursive.map(db, |unfolded| imp(db, unfolded, visitor))
+                    recursive.map_or_else(db, || None, |unfolded| imp(db, unfolded, visitor))
                 }
                 _ => None,
             }
@@ -217,13 +216,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         match value_ty {
-            Type::Recursive(recursive) if recursive.is_non_contractive(db) => {}
             Type::Recursive(recursive) => {
-                return recursive.project_or_else(
+                if let Some(result) = recursive.project_or_else(
                     db,
-                    || Type::Recursive(recursive),
-                    |unfolded| self.infer_subscript_load_impl(unfolded, subscript),
-                );
+                    || None,
+                    |unfolded| Some(self.infer_subscript_load_impl(unfolded, subscript)),
+                ) {
+                    return result;
+                }
             }
             Type::ClassLiteral(class) => {
                 // HACK ALERT: If we are subscripting a generic class, short-circuit the rest of the

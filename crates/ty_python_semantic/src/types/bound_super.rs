@@ -786,11 +786,12 @@ impl<'db> BoundSuperType<'db> {
             Type::TypeAlias(alias) => {
                 return delegate_to(alias.value_type(db));
             }
-            Type::Recursive(recursive) if recursive.is_non_contractive(db) => {
-                return delegate_to(Type::divergent(recursive.binder_id(db)));
-            }
             Type::Recursive(recursive) => {
-                return recursive.map(db, delegate_to);
+                return recursive.map_or_else(
+                    db,
+                    || delegate_to(Type::divergent(recursive.binder_id(db))),
+                    |unfolded| delegate_to(unfolded),
+                );
             }
             Type::TypeVar(bound_typevar) => {
                 let typevar = bound_typevar.typevar(db);

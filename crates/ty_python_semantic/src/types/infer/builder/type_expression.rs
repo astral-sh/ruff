@@ -946,12 +946,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         value_ty: Type<'db>,
     ) -> Type<'db> {
         match value_ty {
-            Type::Recursive(recursive) if recursive.is_non_contractive(self.db()) => {
-                self.infer_subscript_type_expression(subscript, value_ty)
+            Type::Recursive(recursive) => {
+                if let Some(result) = recursive.map_if_unfolded(self.db(), |unfolded| {
+                    self.infer_subscript_type_expression_no_store(subscript, slice, unfolded)
+                }) {
+                    result
+                } else {
+                    self.infer_subscript_type_expression(subscript, value_ty)
+                }
             }
-            Type::Recursive(recursive) => recursive.map(self.db(), |unfolded| {
-                self.infer_subscript_type_expression_no_store(subscript, slice, unfolded)
-            }),
             Type::ClassLiteral(class_literal) => match class_literal.known(self.db()) {
                 Some(KnownClass::Tuple) => Type::tuple(self.infer_tuple_type_expression(subscript)),
                 Some(KnownClass::Type) => self.infer_subclass_of_type_expression(slice),
@@ -1303,18 +1306,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         match value_ty {
-            Type::Recursive(recursive) if recursive.is_non_contractive(self.db()) => {
-                self.infer_expression(parameters, TypeContext::default());
-                todo_type!("unsupported nested subscript in type[X]")
+            Type::Recursive(recursive) => {
+                if let Some(result) = recursive.map_if_unfolded(self.db(), |unfolded| {
+                    self.infer_nested_subclass_of_type_expression(
+                        outer_slice,
+                        subscript,
+                        parameters,
+                        unfolded,
+                    )
+                }) {
+                    result
+                } else {
+                    self.infer_expression(parameters, TypeContext::default());
+                    todo_type!("unsupported nested subscript in type[X]")
+                }
             }
-            Type::Recursive(recursive) => recursive.map(self.db(), |unfolded| {
-                self.infer_nested_subclass_of_type_expression(
-                    outer_slice,
-                    subscript,
-                    parameters,
-                    unfolded,
-                )
-            }),
             Type::SpecialForm(SpecialFormType::Union) => match parameters {
                 ast::Expr::Tuple(tuple) => {
                     let ty = UnionType::from_elements_leave_aliases(
@@ -1765,18 +1771,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Type::Dynamic(DynamicType::UnknownGeneric(_)) => {
                 self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
             }
-            Type::Recursive(recursive) if recursive.is_non_contractive(self.db()) => {
-                // Infer slice as a value expression to avoid false-positive
-                // `invalid-type-form` diagnostics, when we have e.g.
-                // `MyCallable[[int, str], None]` but `MyCallable` is dynamic.
-                if !self.in_string_annotation() {
-                    self.infer_expression(slice, TypeContext::default());
+            Type::Recursive(recursive) => {
+                if let Some(result) = recursive.map_if_unfolded(self.db(), |unfolded| {
+                    self.infer_subscript_type_expression(subscript, unfolded)
+                }) {
+                    result
+                } else {
+                    // Infer slice as a value expression to avoid false-positive
+                    // `invalid-type-form` diagnostics, when we have e.g.
+                    // `MyCallable[[int, str], None]` but `MyCallable` is dynamic.
+                    if !self.in_string_annotation() {
+                        self.infer_expression(slice, TypeContext::default());
+                    }
+                    value_ty
                 }
-                value_ty
             }
-            Type::Recursive(recursive) => recursive.map(self.db(), |unfolded| {
-                self.infer_subscript_type_expression(subscript, unfolded)
-            }),
             Type::Dynamic(_) | Type::Divergent(_) => {
                 // Infer slice as a value expression to avoid false-positive
                 // `invalid-type-form` diagnostics, when we have e.g.
