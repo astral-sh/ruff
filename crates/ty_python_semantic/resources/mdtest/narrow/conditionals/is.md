@@ -195,8 +195,8 @@ def narrow_generic_alias[T: (Generic[int], Specialized)](klass: type[T]) -> None
 ### Distinct `NewType`s with the same base
 
 Calling a `NewType` returns its argument unchanged, so values with statically disjoint `NewType`s
-can still be the same object at runtime. An identity comparison between distinct `NewType`s with
-the same base is therefore not always false. In the true branch, we preserve both nominal types,
+can still be the same object at runtime. An identity comparison between distinct `NewType`s with the
+same base is therefore not always false. In the true branch, we preserve both nominal types,
 including when they appear in unions or intersections.
 
 ```py
