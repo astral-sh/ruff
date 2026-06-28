@@ -1247,12 +1247,12 @@ pub(crate) fn enum_metadata<'db>(
     })
 }
 
-/// Returns whether an enum's metaclass can customize the namespace or completed class before the
+/// Returns whether an enum's metaclass can customize the namespace or completed class around the
 /// stdlib `EnumType`/`EnumMeta` implementation.
 ///
 /// `__prepare__` can return a namespace that rewrites assignments, and `__new__` can rewrite the
-/// completed class dictionary. Either method can therefore change member values before the stdlib
-/// enum constructor validates and forwards them to `__new__`/`__init__`.
+/// completed class dictionary. `__setattr__` can intercept methods that `EnumType` installs on the
+/// completed class, and `__init__` can rewrite the class after `EnumType.__new__` returns.
 fn enum_metaclass_may_transform_class<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
@@ -1268,7 +1268,7 @@ fn enum_metaclass_may_transform_class<'db>(
         .filter_map(|base| base.class_literal(db).as_static())
         .take_while(|base| base.known(db) != Some(KnownClass::EnumType))
         .any(|base| {
-            ["__prepare__", "__new__"]
+            ["__prepare__", "__new__", "__setattr__", "__init__"]
                 .into_iter()
                 .any(|name| custom_enum_method(db, base.body_scope(db), name).is_some())
         })

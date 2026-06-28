@@ -34,7 +34,7 @@ python-version = "3.13"
 ```
 
 ```py
-from enum import Enum, ReprEnum
+from enum import Enum, EnumType, ReprEnum
 from typing import Literal
 
 class StringMixin:
@@ -53,6 +53,29 @@ class ReprNumber(int, ReprEnum):
 reveal_type(Mixed.MEMBER.__str__)  # revealed: bound method Mixed.__str__() -> Literal["mixin"]
 reveal_type(Number.ONE.__str__)  # revealed: bound method Number.__str__() -> str
 reveal_type(ReprNumber.ONE.__str__)  # revealed: bound method ReprNumber.__repr__() -> str
+
+class Scalar(int):
+    def __str__(self) -> Literal["scalar"]:
+        return "scalar"
+
+class IgnoreStrAssignments(EnumType):
+    def __setattr__(cls, name: str, value: object) -> None:
+        if name != "__str__":
+            super().__setattr__(name, value)
+
+class AssignmentHookNumber(Scalar, Enum, metaclass=IgnoreStrAssignments):
+    ONE = 1
+
+reveal_type(AssignmentHookNumber.ONE.__str__())  # revealed: Literal["scalar"]
+
+class RestoreStrAfterCreation(EnumType):
+    def __init__(cls, *args, **kwargs):
+        type.__setattr__(cls, "__str__", Scalar.__str__)
+
+class InitializationHookNumber(Scalar, Enum, metaclass=RestoreStrAfterCreation):
+    ONE = 1
+
+reveal_type(InitializationHookNumber.ONE.__str__())  # revealed: Literal["scalar"]
 ```
 
 ## Python 3.8 enum data type selection
@@ -98,7 +121,6 @@ from typing import Literal
 
 class Root:
     def __new__(cls, value: int): ...
-
     def __str__(self) -> str:
         return "root"
 
