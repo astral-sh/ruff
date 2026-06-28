@@ -3060,18 +3060,19 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
         match op {
             ast::CmpOp::IsNot => {
-                // Keep a constrained `TypeVar` symbolic so that another occurrence refers to the
-                // same specialization. Other types use their runtime identity representation.
-                let rhs_constraint = match rhs_ty.resolve_type_alias(self.db) {
-                    Type::TypeVar(_) if rhs_ty.is_singleton(self.db) => rhs_ty,
-                    _ => rhs_ty.identity_comparison_type(self.db),
-                };
-                if rhs_constraint.is_singleton(self.db) {
-                    Some(rhs_constraint.negate(self.db))
+                let rhs_identity_ty = rhs_ty.identity_comparison_type(self.db);
+                // Prefer a singleton runtime representation when all constraints collapse to the
+                // same object. Otherwise, keep a singleton-constrained `TypeVar` symbolic so that
+                // another occurrence refers to the same specialization.
+                let rhs_constraint = if rhs_identity_ty.is_singleton(self.db) {
+                    rhs_identity_ty
                 } else {
-                    // Non-singletons cannot be safely narrowed using `is not`
-                    None
-                }
+                    match rhs_ty.resolve_type_alias(self.db) {
+                        Type::TypeVar(_) if rhs_ty.is_singleton(self.db) => rhs_ty,
+                        _ => return None,
+                    }
+                };
+                Some(rhs_constraint.negate(self.db))
             }
             ast::CmpOp::Is => {
                 // Preserve the nominal RHS constraint for ordinary overlaps. If a `NewType`
@@ -3277,13 +3278,12 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 .as_int_literal()
             && let Ok(index) = i32::try_from(index)
             && let rhs_ty = inference.expression_type(&comparators[0])
-            && let rhs_is_correlated_singleton =
-                (matches!(rhs_ty.resolve_type_alias(self.db), Type::TypeVar(_))
-                    && rhs_ty.is_singleton(self.db))
             && let rhs_identity_ty = rhs_ty.identity_comparison_type(self.db)
-            && (is_positive_check
-                || rhs_is_correlated_singleton
-                || rhs_identity_ty.is_singleton(self.db))
+            && let rhs_identity_is_singleton = rhs_identity_ty.is_singleton(self.db)
+            && let rhs_is_correlated_singleton = (!rhs_identity_is_singleton
+                && matches!(rhs_ty.resolve_type_alias(self.db), Type::TypeVar(_))
+                && rhs_ty.is_singleton(self.db))
+            && (is_positive_check || rhs_is_correlated_singleton || rhs_identity_is_singleton)
         {
             let filtered = union.filter(self.db, |elem| {
                 elem.tuple_instance_spec(self.db)

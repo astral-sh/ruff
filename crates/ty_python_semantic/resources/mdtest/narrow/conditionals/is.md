@@ -308,6 +308,32 @@ def constrained_typevars(left: ConstrainedT, right: ConstrainedU) -> None:
         reveal_type(left)  # revealed: ConstrainedT@constrained_typevars
 ```
 
+When every constraint is a `NewType` of the same singleton type, every specialization represents the
+same runtime object. An `is not` branch must therefore exclude other `NewType`s of that singleton,
+both directly and when narrowing a tuple.
+
+```py
+from types import EllipsisType
+from typing import NewType, TypeVar
+from typing_extensions import assert_never
+
+SingletonA = NewType("SingletonA", EllipsisType)
+SingletonB = NewType("SingletonB", EllipsisType)
+SingletonC = NewType("SingletonC", EllipsisType)
+
+SingletonT = TypeVar("SingletonT", SingletonA, SingletonB)
+
+def direct(value: SingletonC | int, other: SingletonT) -> None:
+    if value is not other:
+        if value is other:
+            assert_never(value)
+
+def tuple_parent(value: tuple[SingletonC] | tuple[int], other: SingletonT) -> None:
+    if value[0] is not other:
+        if value[0] is other:
+            assert_never(value)
+```
+
 ### Preserving a `NewType` in the true branch
 
 If an object is identical to a value with a `NewType`, the true branch preserves the `NewType`
