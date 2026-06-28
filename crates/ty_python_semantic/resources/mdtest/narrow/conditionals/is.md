@@ -313,8 +313,9 @@ def literals(
 
 ### `is not` with singleton `NewType`s
 
-Distinct `NewType`s of the same singleton type contain the same runtime object. In the true branch
-below, `value` can therefore only be the `int` alternative.
+Distinct `NewType`s of the same singleton type contain the same runtime object. These checks
+therefore remove the `NewType` alternative from the true branch, including when a check on a tuple
+element narrows the tuple union.
 
 ```py
 from types import EllipsisType
@@ -328,6 +329,12 @@ def singleton_is_not(value: SingletonA | int, other: SingletonB) -> None:
         reveal_type(value)  # revealed: int
     else:
         reveal_type(value)  # revealed: SingletonA
+
+def tuple_parent_is_not(value: tuple[SingletonA] | tuple[int], other: SingletonB) -> None:
+    if value[0] is not other:
+        reveal_type(value)  # revealed: tuple[int]
+    else:
+        reveal_type(value)  # revealed: tuple[SingletonA]
 ```
 
 ### Static exclusions

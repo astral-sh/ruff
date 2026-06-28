@@ -3254,7 +3254,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 .as_int_literal()
             && let Ok(index) = i32::try_from(index)
             && let rhs_ty = inference.expression_type(&comparators[0])
-            && rhs_ty.is_singleton(self.db)
+            && let rhs_identity_ty = rhs_ty.identity_comparison_type(self.db)
+            && rhs_identity_ty.is_singleton(self.db)
         {
             let is_positive_check = is_positive == (ops[0] == ast::CmpOp::Is);
             let filtered = union.filter(self.db, |elem| {
@@ -3266,7 +3267,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                             !el_ty.is_disjoint_from_for_identity(self.db, rhs_ty)
                         } else {
                             // `is not X` context: keep tuples where element is not always X
-                            !el_ty.is_subtype_of(self.db, rhs_ty)
+                            !el_ty
+                                .identity_comparison_type(self.db)
+                                .is_subtype_of(self.db, rhs_identity_ty)
                         }
                     })
             });
