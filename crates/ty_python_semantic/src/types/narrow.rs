@@ -2769,6 +2769,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         //         if t[0] is not None:
         //             reveal_type(t)  # tuple[int, int]
         if matches!(&**ops, [ast::CmpOp::Is | ast::CmpOp::IsNot])
+            && let is_positive_check = is_positive == (ops[0] == ast::CmpOp::Is)
             && let ast::Expr::Subscript(subscript) = left.expression_value()
             && let Type::Union(union) = inference
                 .expression_type(&*subscript.value)
@@ -2779,14 +2780,15 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 .as_int_literal()
             && let Ok(index) = i32::try_from(index)
             && let rhs_ty = inference.expression_type(&comparators[0])
-            && let rhs_is_correlated_singleton = matches!(
+            && let rhs_is_correlated_singleton = (matches!(
                 rhs_ty.resolve_type_alias(self.db),
                 Type::TypeVar(_)
-            ) && rhs_ty.is_singleton(self.db)
+            ) && rhs_ty.is_singleton(self.db))
             && let rhs_identity_ty = rhs_ty.identity_comparison_type(self.db)
-            && (rhs_is_correlated_singleton || rhs_identity_ty.is_singleton(self.db))
+            && (is_positive_check
+                || rhs_is_correlated_singleton
+                || rhs_identity_ty.is_singleton(self.db))
         {
-            let is_positive_check = is_positive == (ops[0] == ast::CmpOp::Is);
             let filtered = union.filter(self.db, |elem| {
                 elem.as_nominal_instance()
                     .and_then(|inst| inst.tuple_spec(self.db))
