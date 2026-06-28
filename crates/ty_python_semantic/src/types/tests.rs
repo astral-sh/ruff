@@ -97,7 +97,7 @@ fn recursive_type_cycle_recover<'db>(
     cycle_initial=|db, id| {
         let binder = Type::divergent(id)
             .as_divergent()
-            .expect("Type::divergent should create a divergent type");
+            .unwrap();
         RecursiveType::new(db, binder, RecursiveOrigin::Implicit, Type::Divergent(binder))
     },
     cycle_fn=recursive_type_cycle_recover,
@@ -113,7 +113,7 @@ fn recursive_type_cycle(db: &dyn Db) -> Type<'_> {
     cycle_initial=|db, id| {
         let binder = Type::divergent(id)
             .as_divergent()
-            .expect("Type::divergent should create a divergent type");
+            .unwrap();
         RecursiveType::new(db, binder, RecursiveOrigin::Implicit, Type::Divergent(binder))
     },
     cycle_fn=recursive_type_cycle_recover,
@@ -391,7 +391,7 @@ fn divergent_type() {
 fn divergent_marker(bits: u32) -> DivergentType {
     Type::divergent(salsa::plumbing::Id::from_bits(u64::from(bits)))
         .as_divergent()
-        .expect("Type::divergent should create a divergent type")
+        .unwrap()
 }
 
 fn recursive_list_type(db: &dyn Db, marker_bits: u32) -> (Type<'_>, RecursiveType<'_>, Type<'_>) {
@@ -566,7 +566,8 @@ type Alias = int
         body,
     );
 
-    assert!(alias_origin.display(&db).to_string().contains("Alias = "));
+    assert_eq!(alias_origin.display(&db).to_string(), "list[int | Alias]");
+    assert_eq!(implicit.display(&db).to_string(), "list[int | Divergent]");
     assert!(implicit.is_equivalent_to(&db, alias_origin));
     assert!(
         UnionType::from_elements(&db, [implicit, alias_origin]).is_equivalent_to(&db, implicit)
@@ -1671,13 +1672,13 @@ type H[T] = G[T]
     let rec_list = get_type_alias(&db, "RecursiveList");
     assert_eq!(
         rec_list.expand_eagerly(&db).display(&db).to_string(),
-        "list[Divergent]",
+        "list[Unknown | Divergent]",
     );
 
     let rec_int_list = get_type_alias(&db, "RecursiveIntList");
     assert_eq!(
         rec_int_list.expand_eagerly(&db).display(&db).to_string(),
-        "list[Divergent]",
+        "list[int | Divergent]",
     );
 
     let itself = get_type_alias(&db, "Itself");

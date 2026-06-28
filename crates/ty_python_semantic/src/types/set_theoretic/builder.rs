@@ -706,6 +706,21 @@ impl<'db> UnionBuilder<'db> {
                     }
                 }
             }
+            Type::Recursive(recursive)
+                if !self.cycle_recovery && matches!(recursive.body(self.db), Type::Union(_)) =>
+            {
+                if seen_aliases.contains(&ty) {
+                    // Union contains itself recursively via a recursive type.
+                } else {
+                    seen_aliases.push(ty);
+                    if let Some(unfolded) = recursive.map_if_unfolded(self.db, |unfolded| unfolded)
+                    {
+                        self.add_in_place_impl(unfolded, seen_aliases);
+                    } else {
+                        self.push_type(ty, seen_aliases);
+                    }
+                }
+            }
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
             Type::TypeAlias(alias) if self.unpack_aliases => {
@@ -1267,6 +1282,23 @@ impl<'db> IntersectionBuilder<'db> {
                         builder
                     })
             }
+            Type::Recursive(recursive) => {
+                if seen_aliases.contains(&ty) {
+                    for inner in &mut self.intersections {
+                        inner.positive.insert(ty);
+                    }
+                    return self;
+                }
+                seen_aliases.push(ty);
+                if let Some(unfolded) = recursive.map_if_unfolded(self.db, |unfolded| unfolded) {
+                    self.add_positive_impl(unfolded, seen_aliases)
+                } else {
+                    for inner in &mut self.intersections {
+                        inner.positive.insert(ty);
+                    }
+                    self
+                }
+            }
             // `(A & B & ~C) & (D & E & ~F)` -> `A & B & D & E & ~C & ~F`
             Type::Intersection(other) => {
                 let db = self.db;
@@ -1321,6 +1353,23 @@ impl<'db> IntersectionBuilder<'db> {
                     self = self.add_negative_impl(*elem, seen_aliases);
                 }
                 self
+            }
+            Type::Recursive(recursive) => {
+                if seen_aliases.contains(&ty) {
+                    for inner in &mut self.intersections {
+                        inner.negative.insert(ty);
+                    }
+                    return self;
+                }
+                seen_aliases.push(ty);
+                if let Some(unfolded) = recursive.map_if_unfolded(self.db, |unfolded| unfolded) {
+                    self.add_negative_impl(unfolded, seen_aliases)
+                } else {
+                    for inner in &mut self.intersections {
+                        inner.negative.insert(ty);
+                    }
+                    self
+                }
             }
             Type::Intersection(intersection) => {
                 // (A | B) & ~(C & ~D)

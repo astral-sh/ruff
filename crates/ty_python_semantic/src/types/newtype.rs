@@ -58,6 +58,34 @@ impl<'db> NewType<'db> {
         // `TypeInferenceBuilder` emits diagnostics for invalid `NewType` definitions that show up
         // in assignments, but invalid definitions still get here, and also `NewType` might show up
         // in places that aren't definitions at all. Fall back to `object` in all error cases.
+        fn base_ty<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            object_fallback: NewTypeBase<'db>,
+        ) -> NewTypeBase<'db> {
+            match ty {
+                Type::NominalInstance(nominal_instance_type) => {
+                    NewTypeBase::ClassType(nominal_instance_type.class(db))
+                }
+                Type::NewTypeInstance(newtype) => NewTypeBase::NewType(newtype),
+                // There are exactly two union types allowed as bases for NewType: `int | float` and
+                // `int | float | complex`. These are allowed because that's what `float` and `complex`
+                // expand into in type position. We don't currently ask whether the union was implicit
+                // or explicit, so the explicit version is also allowed.
+                Type::Union(union_type) => match union_type.known(db) {
+                    Some(KnownUnion::Float) => NewTypeBase::Float,
+                    Some(KnownUnion::Complex) => NewTypeBase::Complex,
+                    _ => object_fallback,
+                },
+                Type::Recursive(recursive) => recursive.map_or_else(
+                    db,
+                    || object_fallback,
+                    |unfolded| base_ty(db, unfolded, object_fallback),
+                ),
+                _ => object_fallback,
+            }
+        }
+
         let object_fallback = NewTypeBase::ClassType(ClassType::object(db));
         let definition = self.definition(db);
         let module = parsed_module(db, definition.file(db)).load(db);
@@ -70,22 +98,11 @@ impl<'db> NewType<'db> {
         let Some(second_arg) = call_expr.arguments.args.get(1) else {
             return object_fallback;
         };
-        match definition_expression_type(db, definition, second_arg) {
-            Type::NominalInstance(nominal_instance_type) => {
-                NewTypeBase::ClassType(nominal_instance_type.class(db))
-            }
-            Type::NewTypeInstance(newtype) => NewTypeBase::NewType(newtype),
-            // There are exactly two union types allowed as bases for NewType: `int | float` and
-            // `int | float | complex`. These are allowed because that's what `float` and `complex`
-            // expand into in type position. We don't currently ask whether the union was implicit
-            // or explicit, so the explicit version is also allowed.
-            Type::Union(union_type) => match union_type.known(db) {
-                Some(KnownUnion::Float) => NewTypeBase::Float,
-                Some(KnownUnion::Complex) => NewTypeBase::Complex,
-                _ => object_fallback,
-            },
-            _ => object_fallback,
-        }
+        base_ty(
+            db,
+            definition_expression_type(db, definition, second_arg),
+            object_fallback,
+        )
     }
 
     fn iter_bases(self, db: &'db dyn Db) -> NewTypeBaseIter<'db> {

@@ -681,6 +681,7 @@ impl<'db> GenericContext<'db> {
             fn finalize(
                 self,
                 db: &'db dyn Db,
+                generic_context: GenericContext<'db>,
                 function_definition: Definition<'db>,
             ) -> (
                 FxHashSet<BoundTypeVarInstance<'db>>,
@@ -697,6 +698,7 @@ impl<'db> GenericContext<'db> {
                         // disconnect them from class specialization.
                         bound_typevars.retain(|bound_typevar| {
                             !self.found_outside_callable_return.contains(bound_typevar)
+                                && generic_context.contains(db, bound_typevar.identity(db))
                                 && bound_typevar.binding_context(db).definition()
                                     == Some(function_definition)
                         });
@@ -837,7 +839,7 @@ impl<'db> GenericContext<'db> {
         let (found_only_inside_callable_return, replacements) = find_typevar_locations
             .locations
             .into_inner()
-            .finalize(db, function_definition);
+            .finalize(db, generic_context, function_definition);
         let type_mapping = TypeMapping::RescopeReturnCallables(&replacements);
         let return_type = return_type.apply_type_mapping(db, &type_mapping, TypeContext::default());
 
@@ -2385,6 +2387,20 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     resolving.remove(&ty);
                     result
                 }
+                Type::Recursive(recursive) => {
+                    if !resolving.insert(ty) {
+                        return false;
+                    }
+                    let result = recursive.map_or_else(
+                        db,
+                        || false,
+                        |unfolded| {
+                            collect_typed_dicts(db, unfolded, resolving, completed, typed_dicts)
+                        },
+                    );
+                    resolving.remove(&ty);
+                    result
+                }
                 _ => false,
             };
             completed.insert(ty, result);
@@ -2811,6 +2827,21 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     }
                     _ => self.add_type_mapping(bound_typevar, ty, polarity),
                 }
+            }
+
+            (Type::Recursive(recursive), actual) => {
+                return recursive.map_or_else(
+                    self.db,
+                    || Ok(()),
+                    |unfolded| self.infer_map_impl(unfolded, actual, polarity, seen),
+                );
+            }
+            (formal, Type::Recursive(recursive)) => {
+                return recursive.map_or_else(
+                    self.db,
+                    || Ok(()),
+                    |unfolded| self.infer_map_impl(formal, unfolded, polarity, seen),
+                );
             }
 
             (Type::Intersection(formal_intersection), _) => {

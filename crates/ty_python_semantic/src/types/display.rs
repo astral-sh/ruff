@@ -31,11 +31,11 @@ use crate::types::tuple::TupleSpec;
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
-    CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceType, Protocol,
-    ProtocolInstanceType, RecursiveOrigin, SpecialFormType, StringLiteralType, SubclassOfInner,
-    SubclassOfType, Type, TypeAliasType, TypeGuardLike, TypedDictModule, TypedDictType, UnionType,
-    WrapperDescriptorKind, visitor,
+    CallableType, DivergentType, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, MaterializationKind,
+    PropertyInstanceType, Protocol, ProtocolInstanceType, RecursiveOrigin, SpecialFormType,
+    StringLiteralType, SubclassOfInner, SubclassOfType, Type, TypeAliasType, TypeGuardLike,
+    TypedDictModule, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
@@ -104,7 +104,7 @@ impl SignatureNameDisplay {
 }
 
 /// Settings for displaying types and signatures
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct DisplaySettings<'db> {
     /// Whether rendering can be multiline
     pub multiline: bool,
@@ -128,6 +128,27 @@ pub struct DisplaySettings<'db> {
     /// Whether to hide the return type of the outermost signature.
     /// Return types of nested callable types inside parameters are still shown.
     pub hide_return_type: bool,
+    /// Recursive type binders currently displayed as named aliases.
+    recursive_type_aliases: Rc<FxHashMap<DivergentType, TypeAliasType<'db>>>,
+    /// Whether a named recursive type alias can be unfolded at the current display position.
+    unfold_recursive_type_aliases: bool,
+}
+
+impl Default for DisplaySettings<'_> {
+    fn default() -> Self {
+        Self {
+            multiline: bool::default(),
+            signature_name_display: SignatureNameDisplay::default(),
+            qualified: Rc::default(),
+            qualified_type_aliases: Rc::default(),
+            preserve_full_unions: bool::default(),
+            active_scopes: Rc::default(),
+            visited_function_types: Rc::default(),
+            hide_return_type: bool::default(),
+            recursive_type_aliases: Rc::default(),
+            unfold_recursive_type_aliases: true,
+        }
+    }
 }
 
 impl<'db> DisplaySettings<'db> {
@@ -204,6 +225,30 @@ impl<'db> DisplaySettings<'db> {
         } else {
             self.clone()
         }
+    }
+
+    #[must_use]
+    fn with_recursive_type_alias(&self, binder: DivergentType, alias: TypeAliasType<'db>) -> Self {
+        let mut recursive_type_aliases = (*self.recursive_type_aliases).clone();
+        recursive_type_aliases.insert(binder, alias);
+        Self {
+            recursive_type_aliases: Rc::new(recursive_type_aliases),
+            ..self.clone()
+        }
+    }
+
+    #[must_use]
+    fn without_recursive_type_alias_unfolding(&self) -> Self {
+        Self {
+            unfold_recursive_type_aliases: false,
+            ..self.clone()
+        }
+    }
+
+    fn is_recursive_type_alias_active(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) -> bool {
+        self.recursive_type_aliases
+            .values()
+            .any(|active_alias| active_alias.definition(db) == alias.definition(db))
     }
 
     #[must_use]
@@ -956,20 +1001,34 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 }
                 write!(f.with_type(self.ty), "{dynamic}")
             }
-            Type::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
-            Type::Recursive(recursive) => {
-                f.with_type(self.ty).write_str("Recursive[")?;
-                if let RecursiveOrigin::TypeAlias(alias) = recursive.origin(self.db) {
-                    alias
+            Type::Divergent(divergent) => {
+                if let Some(alias) = self.settings.recursive_type_aliases.get(&divergent) {
+                    Type::TypeAlias(*alias)
                         .display_with(self.db, self.settings.clone())
-                        .fmt_detailed(f)?;
-                    f.write_str(" = ")?;
+                        .fmt_detailed(f)
+                } else {
+                    f.with_type(self.ty).write_str("Divergent")
                 }
+            }
+            Type::Recursive(recursive) => {
+                let settings = match recursive.origin(self.db) {
+                    RecursiveOrigin::TypeAlias(alias) => {
+                        let binder = recursive.binder(self.db);
+                        if !self.settings.unfold_recursive_type_aliases
+                            || self.settings.is_recursive_type_alias_active(self.db, alias)
+                        {
+                            return Type::TypeAlias(alias)
+                                .display_with(self.db, self.settings.clone())
+                                .fmt_detailed(f);
+                        }
+                        self.settings.with_recursive_type_alias(binder, alias)
+                    }
+                    RecursiveOrigin::Implicit => self.settings.clone(),
+                };
                 recursive
                     .body(self.db)
-                    .display_with(self.db, self.settings.clone())
-                    .fmt_detailed(f)?;
-                f.write_char(']')
+                    .display_with(self.db, settings)
+                    .fmt_detailed(f)
             }
             Type::Never => f.with_type(self.ty).write_str("Never"),
             Type::NominalInstance(instance) => {
@@ -1966,8 +2025,11 @@ impl<'db> DisplaySpecialization<'db> {
             if idx > 0 {
                 f.write_str(", ")?;
             }
-            ty.display_with(self.db, self.settings.clone())
-                .fmt_detailed(f)?;
+            ty.display_with(
+                self.db,
+                self.settings.without_recursive_type_alias_unfolding(),
+            )
+            .fmt_detailed(f)?;
         }
         if self.tuple_specialization.is_yes() {
             f.write_str(", ...")?;
@@ -1989,8 +2051,11 @@ impl<'db> DisplaySpecialization<'db> {
             f.set_invalid_type_annotation();
             write!(f, "{}", bound_typevar.identity(self.db).display(self.db))?;
             f.write_str(" = ")?;
-            ty.display_with(self.db, self.settings.clone())
-                .fmt_detailed(f)?;
+            ty.display_with(
+                self.db,
+                self.settings.without_recursive_type_alias_unfolding(),
+            )
+            .fmt_detailed(f)?;
         }
         f.write_char(']')
     }
@@ -2969,7 +3034,10 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'db> {
             f.set_invalid_type_annotation();
             f.write_char('(')?;
             self.ty
-                .display_with(self.db, self.settings.clone())
+                .display_with(
+                    self.db,
+                    self.settings.without_recursive_type_alias_unfolding(),
+                )
                 .fmt_detailed(f)?;
             f.write_char(')')
         };
@@ -2984,7 +3052,10 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'db> {
             }
             _ => self
                 .ty
-                .display_with(self.db, self.settings.clone())
+                .display_with(
+                    self.db,
+                    self.settings.without_recursive_type_alias_unfolding(),
+                )
                 .fmt_detailed(f),
         }
     }
@@ -3055,11 +3126,14 @@ struct DisplayTypeArray<'b, 'db> {
 impl<'db> FmtDetailed<'db> for DisplayTypeArray<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         f.join(", ")
-            .entries(
-                self.types
-                    .iter()
-                    .map(|ty| ty.display_with(self.db, self.settings.singleline())),
-            )
+            .entries(self.types.iter().map(|ty| {
+                ty.display_with(
+                    self.db,
+                    self.settings
+                        .singleline()
+                        .without_recursive_type_alias_unfolding(),
+                )
+            }))
             .finish()
     }
 }

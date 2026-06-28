@@ -6,7 +6,7 @@ use crate::types::visitor;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableTypes, DivergentType, GeneratorTypes, PropertyInstanceType,
     TupleSpec, Type, TypeAliasType, TypeContext, TypeMapping,
-    generics::{Specialization, SpecializationError},
+    generics::{ApplySpecialization, Specialization, SpecializationError},
 };
 
 /// The source that introduced a recursive type.
@@ -48,6 +48,11 @@ impl<'db> RecursiveType<'db> {
         origin: RecursiveOrigin<'db>,
         body: Type<'db>,
     ) -> Type<'db> {
+        let body = body.apply_type_mapping(
+            db,
+            &TypeMapping::ReplaceRecursiveBinder(binder),
+            TypeContext::default(),
+        );
         if body.contains_divergent_marker(db, binder) {
             Type::Recursive(Self::new_internal(db, binder, origin, body))
         } else {
@@ -57,6 +62,10 @@ impl<'db> RecursiveType<'db> {
 
     pub(crate) fn has_same_binder(self, db: &'db dyn Db, other: Self) -> bool {
         Type::Divergent(self.binder(db)).same_divergent_marker(Type::Divergent(other.binder(db)))
+    }
+
+    pub(crate) fn has_same_binder_marker(self, db: &'db dyn Db, binder: DivergentType) -> bool {
+        Type::Divergent(self.binder(db)).same_divergent_marker(Type::Divergent(binder))
     }
 
     /// Return the recursive body with occurrences of the binder replaced by this recursive type.
@@ -74,7 +83,29 @@ impl<'db> RecursiveType<'db> {
         let body = self
             .body(db)
             .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        Self::new(db, self.binder(db), self.origin(db), body)
+        Self::new(db, self.binder(db), self.map_origin(db, type_mapping), body)
+    }
+
+    fn map_origin(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+    ) -> RecursiveOrigin<'db> {
+        let origin = self.origin(db);
+        let RecursiveOrigin::TypeAlias(alias) = origin else {
+            return origin;
+        };
+
+        let specialization = match type_mapping {
+            TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(specialization))
+            | TypeMapping::ApplySpecializationWithMaterialization {
+                specialization: ApplySpecialization::TypeAlias(specialization),
+                ..
+            } => *specialization,
+            _ => return origin,
+        };
+
+        RecursiveOrigin::TypeAlias(alias.apply_specialization(db, |_| specialization))
     }
 
     pub(crate) fn map_if_unfolded<T>(

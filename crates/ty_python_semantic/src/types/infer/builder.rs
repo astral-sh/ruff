@@ -1638,9 +1638,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             previous_check_unbound_typevars,
         );
 
-        // A type alias where a value type points to itself, i.e. the expanded type is `Divergent` is meaningless
-        // (but a type alias that expands to something like `list[Divergent]` may be a valid recursive type alias)
-        // and would lead to infinite recursion. Therefore, such type aliases should not be exposed.
+        // A type alias whose value is only the cycle marker is meaningless (but a type alias that
+        // expands to something like `list[Divergent]` may be a valid recursive type alias) and
+        // would lead to infinite recursion. Therefore, such type aliases should not be exposed.
         // ```python
         // type Itself = Itself  # error: "Cyclic definition of `Itself`"
         // type A = B  # error: "Cyclic definition of `A`"
@@ -1653,7 +1653,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // type StrOrInt = str | IntOrStr  # It's redundant, but OK
         // ```
         let expanded = value_ty.expand_eagerly(self.db());
-        if expanded.is_divergent() {
+        if expanded.is_divergent() || expanded.is_identity_recursive(self.db()) {
             if let Some(builder) = self
                 .context
                 .report_lint(&CYCLIC_TYPE_ALIAS_DEFINITION, type_alias)

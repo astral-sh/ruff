@@ -81,6 +81,9 @@ pub(crate) fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Typ
                 })
                 .collect(),
         ),
+        Type::Recursive(recursive) => recursive
+            .map_if_unfolded(db, |unfolded| expand_type(db, unfolded))
+            .flatten(),
         // For type aliases, expand the underlying value type.
         Type::TypeAlias(alias) => expand_type(db, alias.value_type(db)),
         // We don't handle `type[A | B]` here because it's already stored in the expanded form
@@ -93,7 +96,9 @@ pub(crate) fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Typ
 mod tests {
     use crate::db::tests::setup_db;
     use crate::types::tuple::TupleType;
-    use crate::types::{KnownClass, Type, UnionType};
+    use crate::types::{
+        DivergentType, KnownClass, RecursiveOrigin, RecursiveType, Type, UnionType,
+    };
 
     use super::expand_type;
 
@@ -109,6 +114,25 @@ mod tests {
         let expanded = expand_type(&db, union_type).unwrap();
         assert_eq!(expanded.len(), types.len());
         assert_eq!(expanded, types);
+    }
+
+    #[test]
+    fn expand_recursive_type() {
+        let db = setup_db();
+        let binder = divergent_marker(1);
+        let body = UnionType::from_elements(
+            &db,
+            [KnownClass::Int.to_instance(&db), Type::Divergent(binder)],
+        );
+        let recursive_ty = RecursiveType::new(&db, binder, RecursiveOrigin::Implicit, body);
+        let Type::Recursive(recursive) = recursive_ty else {
+            panic!("expected recursive union body to contain its binder");
+        };
+
+        assert_eq!(
+            expand_type(&db, recursive_ty),
+            expand_type(&db, recursive.unfolded(&db))
+        );
     }
 
     #[test]
@@ -189,5 +213,11 @@ mod tests {
         ));
         let expanded = expand_type(&db, variable_length_tuple);
         assert!(expanded.is_none());
+    }
+
+    fn divergent_marker(bits: u32) -> DivergentType {
+        Type::divergent(salsa::plumbing::Id::from_bits(u64::from(bits)))
+            .as_divergent()
+            .unwrap()
     }
 }

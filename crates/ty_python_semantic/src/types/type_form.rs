@@ -47,6 +47,11 @@ impl<'db> Type<'db> {
         ) -> Option<Type<'db>> {
             match ty {
                 Type::TypeForm(type_form) => Some(type_form.type_argument(db)),
+                Type::Recursive(recursive) => visitor.visit(ty, || {
+                    recursive
+                        .map_if_unfolded(db, |unfolded| project(db, unfolded, visitor))
+                        .flatten()
+                }),
                 Type::TypeAlias(alias) => {
                     visitor.visit(ty, || project(db, alias.value_type(db), visitor))
                 }

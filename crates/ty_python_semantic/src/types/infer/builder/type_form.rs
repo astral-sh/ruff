@@ -103,6 +103,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::Intersection(intersection) => intersection
                     .iter_positive(builder.db())
                     .any(|element| imp(builder, expression, element, visitor)),
+                Type::Recursive(recursive) => visitor.visit(ty, || {
+                    recursive
+                        .map_if_unfolded(builder.db(), |unfolded| {
+                            imp(builder, expression, unfolded, visitor)
+                        })
+                        .unwrap_or(false)
+                }),
                 Type::TypeAlias(alias) => visitor.visit(ty, || {
                     imp(builder, expression, alias.value_type(builder.db()), visitor)
                 }),

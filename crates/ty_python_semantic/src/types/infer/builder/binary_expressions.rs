@@ -321,34 +321,38 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         match (left_ty, right_ty, op) {
-            (Type::Recursive(recursive), rhs, _) => recursive.map_or_else_folded(
-                db,
-                || Some(left_ty),
-                |unfolded| {
-                    self.infer_binary_expression_type_impl(
-                        node,
-                        emitted_division_by_zero_diagnostic,
-                        unfolded,
-                        rhs,
-                        op,
-                        visitor,
-                    )
-                },
-            ),
-            (lhs, Type::Recursive(recursive), _) => recursive.map_or_else_folded(
-                db,
-                || Some(right_ty),
-                |unfolded| {
-                    self.infer_binary_expression_type_impl(
-                        node,
-                        emitted_division_by_zero_diagnostic,
-                        lhs,
-                        unfolded,
-                        op,
-                        visitor,
-                    )
-                },
-            ),
+            (Type::Recursive(recursive), rhs, _) => visitor.visit((left_ty, op, right_ty), || {
+                recursive.map_or_else_folded(
+                    db,
+                    || Some(left_ty),
+                    |unfolded| {
+                        self.infer_binary_expression_type_impl(
+                            node,
+                            emitted_division_by_zero_diagnostic,
+                            unfolded,
+                            rhs,
+                            op,
+                            visitor,
+                        )
+                    },
+                )
+            }),
+            (lhs, Type::Recursive(recursive), _) => visitor.visit((left_ty, op, right_ty), || {
+                recursive.map_or_else_folded(
+                    db,
+                    || Some(right_ty),
+                    |unfolded| {
+                        self.infer_binary_expression_type_impl(
+                            node,
+                            emitted_division_by_zero_diagnostic,
+                            lhs,
+                            unfolded,
+                            op,
+                            visitor,
+                        )
+                    },
+                )
+            }),
 
             (Type::Union(lhs_union), rhs, _) => lhs_union.try_map(db, |lhs_element| {
                 self.infer_binary_expression_type_impl(

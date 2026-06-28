@@ -434,7 +434,7 @@ d1: DivergentList[int] = []
 d2: DivergentList[int] = [1]
 # error: [invalid-assignment]
 d3: DivergentList[int] = ["a"]
-# error: [invalid-assignment] "Object of type `list[list[DivergentList[int]] | list[list[DivergentList[int]] | int]]` is not assignable to `DivergentList[int]`"
+# error: [invalid-assignment] "Object of type `list[DivergentList[int] | list[DivergentList[int] | int]]` is not assignable to `DivergentList[int]`"
 d4: DivergentList[int] = [[1]]
 
 def _(x: DivergentList[int]):

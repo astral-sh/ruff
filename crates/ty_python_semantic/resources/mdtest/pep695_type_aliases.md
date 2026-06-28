@@ -453,7 +453,7 @@ def f(x: A) -> None:
     reveal_type(x)  # revealed: str | list[A]
 
 def g(x: B) -> None:
-    reveal_type(x)  # revealed: list[A]
+    reveal_type(x)  # revealed: list[str | B]
 ```
 
 ## Cyclic aliases
@@ -497,7 +497,7 @@ def foo(
     Itself: Itself,
 ):
     x: Itself
-    reveal_type(Itself)  # revealed: Divergent
+    reveal_type(Itself)  # revealed: Itself
 
 # A type alias defined with invalid recursion behaves as a dynamic type.
 foo(42)
@@ -510,7 +510,7 @@ type B = A
 
 def bar(B: B):
     x: B
-    reveal_type(B)  # revealed: Divergent
+    reveal_type(B)  # revealed: B
 
 # error: [cyclic-type-alias-definition] "Cyclic definition of `G`"
 type G[T] = G[T]
@@ -558,18 +558,18 @@ type B = tuple[A] | None
 
 def f(x: A):
     if x is not None:
-        reveal_type(x)  # revealed: tuple[B]
+        reveal_type(x)  # revealed: tuple[tuple[A] | None]
         y = x[0]
         if y is not None:
             reveal_type(y)  # revealed: tuple[A]
 
 def g(x: A | B):
-    reveal_type(x)  # revealed: tuple[B] | None
+    reveal_type(x)  # revealed: tuple[tuple[A] | None] | None
 
 from ty_extensions import Intersection
 
 def h(x: Intersection[A, B]):
-    reveal_type(x)  # revealed: tuple[B] | None
+    reveal_type(x)  # revealed: tuple[tuple[A] | None] | None
 ```
 
 ### Self-recursive callable type
@@ -685,7 +685,7 @@ type A = list[Union["A", str]]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str]
     for item in x:
-        reveal_type(item)  # revealed: list[A | str] | str
+        reveal_type(item)  # revealed: A | str
 ```
 
 #### With new-style union
@@ -696,7 +696,7 @@ type A = list[A | str]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str]
     for item in x:
-        reveal_type(item)  # revealed: list[A | str] | str
+        reveal_type(item)  # revealed: A | str
 ```
 
 #### With Optional
@@ -709,7 +709,7 @@ type A = list[Optional[Union["A", str]]]
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str | None]
     for item in x:
-        reveal_type(item)  # revealed: list[A | str | None] | str | None
+        reveal_type(item)  # revealed: A | str | None
 ```
 
 ### Tuple comparison

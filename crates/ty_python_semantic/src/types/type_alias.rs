@@ -1,10 +1,12 @@
 use std::fmt::Write;
 
+use salsa::plumbing::AsId;
+
 use crate::{
     Db,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, GenericContext, Type, TypeContext,
-        TypeMapping, TypeVarVariance, definition_expression_type,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, GenericContext, RecursiveOrigin,
+        RecursiveType, Type, TypeContext, TypeMapping, TypeVarVariance, definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization},
         variance::VarianceInferable,
@@ -56,15 +58,33 @@ impl<'db> PEP695TypeAliasType<'db> {
     }
 
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.
-    /// Returns `Divergent` if the type alias is defined cyclically.
+    /// Returns a named recursive type if the type alias is defined cyclically.
     #[salsa::tracked(
-        cycle_initial=|_, id, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
-            value.cycle_normalized(db, *previous, cycle)
+        cycle_initial=|db, id, alias| {
+            let _ = id;
+            let alias = TypeAliasType::PEP695(alias);
+            let binder = alias.recursive_binder();
+            RecursiveType::new(
+                db,
+                binder,
+                RecursiveOrigin::TypeAlias(alias),
+                Type::Divergent(binder),
+            )
+        },
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, alias| {
+            type_alias_cycle_normalized(db, cycle, TypeAliasType::PEP695(alias), *previous, value)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(super) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
+        normalize_recursive_alias_value(
+            db,
+            TypeAliasType::PEP695(self),
+            self.raw_value_type_unexpanded(db),
+        )
+    }
+
+    pub(super) fn raw_value_type_unexpanded(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
         let module = parsed_module(db, scope.file(db)).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
@@ -174,15 +194,33 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     /// The value type of this manual type alias.
     ///
     /// Computed lazily from the definition to avoid including the value in the interned
-    /// struct's identity. Returns `Divergent` if the type alias is defined cyclically.
+    /// struct's identity. Returns a named recursive type if the type alias is defined cyclically.
     #[salsa::tracked(
-        cycle_initial=|_, id, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
-            value.cycle_normalized(db, *previous, cycle)
+        cycle_initial=|db, id, alias| {
+            let _ = id;
+            let alias = TypeAliasType::ManualPEP695(alias);
+            let binder = alias.recursive_binder();
+            RecursiveType::new(
+                db,
+                binder,
+                RecursiveOrigin::TypeAlias(alias),
+                Type::Divergent(binder),
+            )
+        },
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, alias| {
+            type_alias_cycle_normalized(db, cycle, TypeAliasType::ManualPEP695(alias), *previous, value)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+        normalize_recursive_alias_value(
+            db,
+            TypeAliasType::ManualPEP695(self),
+            self.raw_value_type_unexpanded(db),
+        )
+    }
+
+    pub(super) fn raw_value_type_unexpanded(self, db: &'db dyn Db) -> Type<'db> {
         let definition = self.definition(db);
         let file = definition.file(db);
         let module = parsed_module(db, file).load(db);
@@ -199,6 +237,45 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         };
         definition_expression_type(db, definition, value_arg)
     }
+}
+
+fn normalize_recursive_alias_value<'db>(
+    db: &'db dyn Db,
+    alias: TypeAliasType<'db>,
+    value_type: Type<'db>,
+) -> Type<'db> {
+    let binder = alias.recursive_binder();
+    let body = value_type.apply_type_mapping(
+        db,
+        &TypeMapping::ExpandRecursiveTypeAlias {
+            root: alias,
+            binder,
+        },
+        TypeContext::default(),
+    );
+    if body.contains_divergent_marker(db, binder) {
+        RecursiveType::new(db, binder, RecursiveOrigin::TypeAlias(alias), body)
+    } else {
+        value_type
+    }
+}
+
+fn type_alias_cycle_normalized<'db>(
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    alias: TypeAliasType<'db>,
+    previous: Type<'db>,
+    value: Type<'db>,
+) -> Type<'db> {
+    let cycle_value = match value {
+        Type::Recursive(recursive)
+            if recursive.has_same_binder_marker(db, alias.recursive_binder()) =>
+        {
+            recursive.unfolded(db)
+        }
+        _ => value,
+    };
+    cycle_value.cycle_normalized(db, previous, cycle)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
@@ -254,6 +331,22 @@ impl<'db> TypeAliasType<'db> {
             TypeAliasType::PEP695(type_alias) => type_alias.raw_value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
         }
+    }
+
+    pub(crate) fn raw_value_type_unexpanded(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            TypeAliasType::PEP695(type_alias) => type_alias.raw_value_type_unexpanded(db),
+            TypeAliasType::ManualPEP695(type_alias) => type_alias.raw_value_type_unexpanded(db),
+        }
+    }
+
+    fn recursive_binder(self) -> crate::types::DivergentType {
+        match self {
+            TypeAliasType::PEP695(type_alias) => Type::divergent(type_alias.as_id()),
+            TypeAliasType::ManualPEP695(type_alias) => Type::divergent(type_alias.as_id()),
+        }
+        .as_divergent()
+        .unwrap()
     }
 
     pub(crate) fn as_pep_695_type_alias(self) -> Option<PEP695TypeAliasType<'db>> {
