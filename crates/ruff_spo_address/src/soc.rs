@@ -31,8 +31,8 @@ pub const FIELD_MASK_CAP: usize = 64;
 /// The verdict for a class whose sibling set exceeds [`MAX_SIBLINGS_PER_TIER`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SocVerdict {
-    /// Data rows collapse to a representable number of distinct `field_type`s —
-    /// mask via a `ClassView`.
+    /// All data members are typed and collapse to `<= FIELD_MASK_CAP` distinct
+    /// `field_type`s — maskable by one `ClassView` (`FieldMask`).
     Duplication,
     /// `has_field` data + `has_function` behaviour conflated under one parent — split.
     Conflation,
@@ -109,7 +109,11 @@ pub fn soc_findings(triples: &[Triple]) -> Vec<SocFinding> {
         // the distinct types they collapse to.
         let typed = data_members.iter().filter_map(|m| field_type.get(m)).count();
         let duplicate_rows = typed.saturating_sub(distinct.len());
-        let is_dup = !distinct.is_empty() && distinct.len() <= MAX_SIBLINGS_PER_TIER;
+        // Duplication ⇒ the data collapses to a ClassView-maskable view: every
+        // data member is typed (untyped siblings are not proven collapsible) AND
+        // the distinct types fit one `u64` FieldMask (the mask, not the 255 tier
+        // rank, is the real collapse target).
+        let is_dup = data > 0 && typed == data && distinct.len() <= FIELD_MASK_CAP;
         let is_conflated = funcs > 0 && data > 0;
         let verdict = match (is_dup, is_conflated) {
             (true, true) => SocVerdict::DuplicationAndConflation,
@@ -209,6 +213,36 @@ mod tests {
         };
         assert!(soc_findings(&mk(255)).is_empty(), "255 siblings are representable");
         assert_eq!(soc_findings(&mk(256)).len(), 1, "256 overflows the u8 rank");
+    }
+
+    #[test]
+    fn wide_distinct_types_exceed_field_mask_is_counterexample() {
+        // 300 typed fields, every one a distinct type → cannot collapse into a
+        // single FieldMask (>64 distinct), so NOT maskable duplication.
+        let mut tr = Vec::new();
+        for i in 0..300 {
+            let m = format!("W.f{i}");
+            tr.push(t("W", "has_field", &m));
+            tr.push(t(&m, "field_type", &format!("T{i}")));
+        }
+        let f = soc_findings(&tr);
+        assert_eq!(f[0].distinct_field_types, 300);
+        assert_eq!(f[0].verdict, SocVerdict::Counterexample);
+        assert!(!law_holds(&tr));
+    }
+
+    #[test]
+    fn untyped_data_blocks_duplication_verdict() {
+        // 256 has_field: 1 typed + 255 untyped → cannot approve duplication on
+        // the strength of a single resolved type.
+        let mut tr = vec![t("M", "has_field", "M.typed"), t("M.typed", "field_type", "i32")];
+        for i in 0..255 {
+            tr.push(t("M", "has_field", &format!("M.u{i}")));
+        }
+        let f = soc_findings(&tr);
+        assert_eq!(f[0].data, 256);
+        assert_ne!(f[0].verdict, SocVerdict::Duplication);
+        assert_eq!(f[0].verdict, SocVerdict::Counterexample);
     }
 
     #[test]
