@@ -196,7 +196,7 @@ Distinct `NewType`s can describe the same runtime object even though they are st
 An identity comparison between them must not be considered always false or narrow either operand:
 
 ```py
-from typing import NewType, final
+from typing import NewType, TypeVar, final
 from ty_extensions import Intersection, Not, is_disjoint_from, static_assert
 
 class Foo: ...
@@ -212,6 +212,28 @@ def same_base(foo1: FooNewType1, foo2: FooNewType2) -> None:
     if foo1 is foo2:
         reveal_type(foo1)  # revealed: FooNewType1
         reveal_type(foo2)  # revealed: FooNewType2
+
+BoundedT = TypeVar("BoundedT", bound=FooNewType1)
+BoundedU = TypeVar("BoundedU", bound=FooNewType2)
+
+def bounded_typevars(left: BoundedT, right: BoundedU) -> None:
+    reveal_type(left is right)  # revealed: bool
+    reveal_type(left is not right)  # revealed: bool
+    if left is right:
+        reveal_type(left)  # revealed: BoundedT@bounded_typevars
+        reveal_type(right)  # revealed: BoundedU@bounded_typevars
+
+FooNewType3 = NewType("FooNewType3", Foo)
+FooNewType4 = NewType("FooNewType4", Foo)
+ConstrainedT = TypeVar("ConstrainedT", FooNewType1, FooNewType2)
+ConstrainedU = TypeVar("ConstrainedU", FooNewType3, FooNewType4)
+
+def constrained_typevars(left: ConstrainedT, right: ConstrainedU) -> None:
+    reveal_type(left is right)  # revealed: bool
+    reveal_type(left is not right)  # revealed: bool
+    if left is right:
+        reveal_type(left)  # revealed: ConstrainedT@constrained_typevars
+        reveal_type(right)  # revealed: ConstrainedU@constrained_typevars
 
 def unions(left: FooNewType1 | str, right: FooNewType2 | bytes) -> None:
     reveal_type(left is right)  # revealed: bool

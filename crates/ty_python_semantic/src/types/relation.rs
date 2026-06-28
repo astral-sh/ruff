@@ -699,6 +699,15 @@ impl<'db> Type<'db> {
     pub(crate) fn identity_comparison_type(self, db: &'db dyn Db) -> Type<'db> {
         match self.resolve_type_alias(db) {
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db),
+            Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    bound.identity_comparison_type(db)
+                }
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    constraints.as_type(db).identity_comparison_type(db)
+                }
+                None => Type::TypeVar(typevar),
+            },
             Type::Union(union) => union.map(db, |element| element.identity_comparison_type(db)),
             Type::Intersection(intersection) => {
                 intersection.map_positive(db, |element| element.identity_comparison_type(db))
