@@ -62,6 +62,8 @@
 //! — without this crate ever depending on the codebook (pure std + the SPO
 //! triplet vocab only).
 
+pub mod soc;
+
 use ruff_spo_triplet::Triple;
 use std::collections::{BTreeMap, BTreeSet};
 
