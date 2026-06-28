@@ -121,6 +121,19 @@ def f(value: Not[E]) -> None:
         value.missing
 ```
 
+Excluding an entire class also rules out identity with any instance of that class, even when the
+class has multiple possible instances. The branch below is therefore unreachable.
+
+```py
+class A: ...
+class B: ...
+
+def f(value: object, other_b: B) -> None:
+    if isinstance(value, A) and not isinstance(value, B):
+        if value is other_b:
+            value.missing
+```
+
 ## Diagnostics
 
 ### Unsupported operators for positive contributions
