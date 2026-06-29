@@ -242,6 +242,7 @@ pub struct PatternPredicate<'db> {
     pub guard: Option<Expression<'db>>,
 
     /// A reference to the pattern of the previous match case
+    #[returns(as_deref)]
     pub previous_predicate: Option<Box<PatternPredicate<'db>>>,
 }
 
