@@ -3911,6 +3911,11 @@ pub(super) fn report_invalid_method_override<'db>(
     }
 }
 
+/// Reports incompatible effective source-method contracts from two direct base branches.
+///
+/// `selected` is the method chosen by the MRO and `contract` is the method exposed by the competing
+/// branch. Both source definitions are annotated, and descriptor-kind differences are explained
+/// separately from callable-signature incompatibilities.
 pub(super) fn report_incompatible_base_method<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,

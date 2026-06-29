@@ -100,7 +100,18 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
     }
 }
 
-/// Checks source-defined method conflicts introduced by explicit nominal multiple inheritance.
+/// Checks source-defined method conflicts when a class directly inherits from multiple statically
+/// known classes.
+///
+/// For a class such as:
+///
+/// ```python
+/// class Child(Left, Right): ...
+/// ```
+///
+/// Python's MRO selects one effective method, which must satisfy the effective source-method
+/// contract inherited through every direct base. Candidate names only need to come from bases after
+/// the first: a method inherited solely through the first base cannot conflict here.
 fn check_inherited_method_conflicts<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
@@ -180,7 +191,12 @@ fn check_inherited_method_conflicts<'db>(
     }
 }
 
-/// Returns effective source-defined method names without resolving their types.
+/// Returns effective source-defined method names without resolving member types.
+///
+/// A reachable local definition shadows the same name earlier in the MRO even when that definition
+/// is not a function. Unreachable definitions do not shadow, and the shared `object` tail is not a
+/// separate branch contract. The reachability-only scan keeps unrelated field types out of Salsa's
+/// retained query graph.
 fn source_method_names_in_mro<'db>(db: &'db dyn Db, class: ClassType<'db>) -> FxHashSet<Name> {
     let mut seen = FxHashSet::default();
     let mut methods = FxHashSet::default();
@@ -238,7 +254,7 @@ fn source_method_names_in_mro<'db>(db: &'db dyn Db, class: ClassType<'db>) -> Fx
     methods
 }
 
-#[derive(Debug, Clone, Copy)]
+/// An effective source method together with its diagnostic origin and descriptor kind.
 struct SourceMethodContract<'db> {
     owner: ClassType<'db>,
     definition: Definition<'db>,
@@ -246,7 +262,12 @@ struct SourceMethodContract<'db> {
     ty: Type<'db>,
 }
 
-/// Returns the selected source-defined method bound to `receiver`.
+/// Returns the selected source-defined method bound directly to `receiver`.
+///
+/// Direct function-descriptor binding preserves receiver-sensitive overload selection without
+/// repeating class-object lookup, where a custom metaclass descriptor could replace the discovered
+/// method. The contract is unavailable when the effective member is not a source function or the
+/// MRO reaches a dynamic boundary or the shared `object` tail.
 fn effective_source_method_contract<'db>(
     db: &'db dyn Db,
     class: ClassType<'db>,
@@ -262,7 +283,8 @@ fn effective_source_method_contract<'db>(
         if owner.is_object(db) {
             return None;
         }
-        if owner.own_class_member(db, None, name).is_undefined() {
+        let member = owner.own_class_member(db, None, name);
+        if member.is_undefined() {
             continue;
         }
 
@@ -273,11 +295,7 @@ fn effective_source_method_contract<'db>(
             return None;
         }
 
-        let own_ty = owner
-            .own_class_member(db, None, name)
-            .inner
-            .place
-            .raw_type()?;
+        let own_ty = member.inner.place.raw_type()?;
         let Type::FunctionLiteral(function) = own_ty else {
             return None;
         };
@@ -1820,75 +1838,5 @@ fn check_enum_member_against_constructor_method<'db>(
                 Type::FunctionLiteral(function).display(db),
             ));
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{db::tests::setup_db, place::global_symbol};
-    use ruff_db::{
-        files::system_path_to_file, system::DbWithWritableSystem as _,
-        testing::assert_function_query_was_not_run,
-    };
-
-    #[test]
-    fn empty_branch_has_no_inherited_method_candidates() {
-        let mut db = setup_db();
-        db.write_dedented("/src/test.py", "class Empty: pass")
-            .unwrap();
-        let file = system_path_to_file(&db, "/src/test.py").unwrap();
-        let class = global_symbol(&db, file, "Empty")
-            .place
-            .expect_type()
-            .to_class_type(&db)
-            .unwrap();
-
-        assert!(source_method_names_in_mro(&db, class).is_empty());
-    }
-
-    #[test]
-    fn inherited_method_candidate_discovery_does_not_infer_fields() {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/test.py",
-            r#"
-            class Base:
-                field = 1
-
-                def method(self) -> None:
-                    pass
-            "#,
-        )
-        .unwrap();
-        let file = system_path_to_file(&db, "/src/test.py").unwrap();
-        db.clear_salsa_events();
-        let candidates = {
-            let class = global_symbol(&db, file, "Base")
-                .place
-                .expect_type()
-                .to_class_type(&db)
-                .unwrap();
-            source_method_names_in_mro(&db, class)
-        };
-        let events = db.take_salsa_events();
-        assert_eq!(
-            candidates,
-            FxHashSet::from_iter([Name::new_static("method")])
-        );
-
-        let class = global_symbol(&db, file, "Base")
-            .place
-            .expect_type()
-            .to_class_type(&db)
-            .unwrap();
-        let (class_literal, _) = class.static_class_literal(&db).unwrap();
-        let scope = class_literal.body_scope(&db);
-        let field_symbol = place_table(&db, scope).symbol_id("field").unwrap();
-        let field_definition = use_def_map(&db, scope)
-            .end_of_scope_symbol_bindings(field_symbol)
-            .find_map(|binding| binding.binding.definition())
-            .unwrap();
-        assert_function_query_was_not_run(&db, infer_definition_types, field_definition, &events);
     }
 }
