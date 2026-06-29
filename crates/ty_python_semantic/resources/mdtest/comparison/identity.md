@@ -43,6 +43,19 @@ reveal_type(list[int] is list[int])  # revealed: bool
 reveal_type(list[int] is not list[int])  # revealed: bool
 ```
 
+## Repeated identity comparisons after narrowing `Unknown`
+
+Once `value is None` has succeeded, the value can only be the `None` singleton even when its
+original type is `Unknown`.
+
+```py
+from ty_extensions import Unknown
+
+def f(value: Unknown) -> None:
+    if value is None:
+        reveal_type(value is not None)  # revealed: Literal[False]
+```
+
 ## Identity comparisons for the same constrained `TypeVar`
 
 All occurrences of the same constrained `TypeVar` use the same constraint. Here, each constraint
