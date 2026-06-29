@@ -117,13 +117,13 @@ fn check_inherited_method_conflicts<'db>(
 
     let mut direct_bases = Vec::new();
     for base in class.explicit_bases(db) {
-        let Some(base) = base.to_class_type(db) else {
-            return;
-        };
-        if base.static_class_literal(db).is_none() {
-            return;
+        match ClassBase::try_from_explicit_base(db, *base, Some(class.into())) {
+            Some(ClassBase::Class(base)) if base.static_class_literal(db).is_some() => {
+                direct_bases.push(base);
+            }
+            Some(ClassBase::Generic | ClassBase::Protocol) => {}
+            _ => return,
         }
-        direct_bases.push(base);
     }
     if direct_bases.len() < 2 || class.try_mro(db, None).is_err() {
         return;

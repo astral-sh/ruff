@@ -665,6 +665,7 @@ class GenericReturn(Generic[T]):
     def method(self) -> T: ...
 
 class GenericConflict(ReturnsStr, GenericReturn[int]): ...  # error: [invalid-method-override]
+class GenericPseudoBaseConflict(Generic[T], ReturnsStr, ReturnsInt): ...  # error: [invalid-method-override]
 
 class IteratesStr:
     def __iter__(self) -> Iterator[str]: ...
