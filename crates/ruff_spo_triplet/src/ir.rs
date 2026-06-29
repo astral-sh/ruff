@@ -216,6 +216,13 @@ pub struct Field {
     /// raw. Emitted as `(field, inverse_name, "<inverse>")` (Authoritative).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inverse_name: Option<String>,
+    /// For a relational field, the Odoo constructor lowercased (`many2one`
+    /// / `one2many` / `many2many`). Emitted as `(field, relation_kind,
+    /// "<kind>")` (Authoritative). Disambiguates a Many2one (scalar FK)
+    /// from a Many2many (join table) — both carry only a `target` and no
+    /// `inverse_name`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relation_kind: Option<String>,
 }
 
 /// One method / function.

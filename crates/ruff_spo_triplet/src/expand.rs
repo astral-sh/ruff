@@ -187,6 +187,14 @@ impl Expander {
                     Provenance::Authoritative,
                 );
             }
+            if let Some(relation_kind) = &field.relation_kind {
+                self.push(
+                    field_iri.clone(),
+                    Predicate::RelationKind,
+                    relation_kind.clone(),
+                    Provenance::Authoritative,
+                );
+            }
         }
 
         // 3 + 6 + 7 + 8. functions

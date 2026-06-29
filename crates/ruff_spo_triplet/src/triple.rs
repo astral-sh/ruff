@@ -409,6 +409,19 @@ pub enum Predicate {
     /// inverse Many2one field name (`move_id`), raw. Pairs with
     /// [`Self::Target`] for the One2many `(comodel, inverse)` shape.
     InverseName,
+    /// `(model.field, relation_kind, "<kind>")` — the Odoo relational field
+    /// constructor, lowercased: `many2one`, `one2many`, or `many2many`.
+    /// Sibling to [`Self::Target`] (which carries the comodel but drops the
+    /// cardinality).
+    ///
+    /// **Why this matters for the OGAR lift:** `target` + `inverse_name`
+    /// alone cannot tell a `Many2one` (scalar FK → `BelongsTo`) from a
+    /// `Many2many` (join table → `HasAndBelongsToMany`) — both carry a
+    /// comodel and no inverse. The kind triple lets `ogar-from-ruff` map
+    /// each relational field onto the right `ogar_vocab::AssociationKind`
+    /// instead of guessing from the `_id` / `_ids` name convention. Mirrors
+    /// the Rails-side [`Self::AssociationKind`] (`belongs_to` vs `has_many`).
+    RelationKind,
 }
 
 impl Predicate {
@@ -479,6 +492,7 @@ impl Predicate {
             // Odoo-relational extension
             Self::Target => "target",
             Self::InverseName => "inverse_name",
+            Self::RelationKind => "relation_kind",
         }
     }
 
@@ -555,6 +569,7 @@ impl Predicate {
             // Odoo-relational extension
             "target" => Self::Target,
             "inverse_name" => Self::InverseName,
+            "relation_kind" => Self::RelationKind,
             _ => return None,
         })
     }
@@ -563,8 +578,8 @@ impl Predicate {
     /// closed-vocab round-trip test and by any consumer that needs to
     /// enumerate the whole surface (e.g. the ndjson validator).
     ///
-    /// **Length invariant:** `ALL.len() == 59` (7 core + 32 AR-shape +
-    /// 18 C++ machine-plane + 2 Odoo-relational). A new variant added to
+    /// **Length invariant:** `ALL.len() == 60` (7 core + 32 AR-shape +
+    /// 18 C++ machine-plane + 3 Odoo-relational). A new variant added to
     /// [`Predicate`] **must** be appended here in the same order, or the
     /// closed-vocab round-trip test fails.
     pub const ALL: &'static [Predicate] = &[
@@ -631,6 +646,7 @@ impl Predicate {
         // Odoo-relational extension
         Self::Target,
         Self::InverseName,
+        Self::RelationKind,
     ];
 
     /// The default provenance tier for this predicate, per the Odoo
@@ -660,9 +676,12 @@ impl Predicate {
             | Self::ConcernIncludedBlock
             | Self::IsFriendOf => Provenance::Structural,
             // Body-authoritative (Odoo + Rails declared)
-            Self::EmittedBy | Self::DependsOn | Self::Raises | Self::Target | Self::InverseName => {
-                Provenance::Authoritative
-            }
+            Self::EmittedBy
+            | Self::DependsOn
+            | Self::Raises
+            | Self::Target
+            | Self::InverseName
+            | Self::RelationKind => Provenance::Authoritative,
             // Body-inferred (heuristic by definition) — including the two
             // C++ metaprogramming-residual predicates (macro provenance,
             // single-TU template instantiation visibility).
@@ -829,18 +848,18 @@ mod tests {
     }
 
     #[test]
-    fn predicate_count_locked_at_59() {
+    fn predicate_count_locked_at_60() {
         // The exact count is part of the schema contract: 7 core (Odoo
         // Python) + 32 OpenProject AR-shape (PR #15 added
         // `association_kind`; #18 added `class_name`; #21 added
-        // `validation_kind`; this PR adds `validation_param` so
-        // parametric Rails validators (`length: { maximum: N }`,
-        // `numericality: { greater_than: N }`, etc.) lift to richer
-        // SurrealQL clauses than the catch-all presence ASSERT)
-        // + 18 C++ machine-plane + 2 Odoo-relational (`target`,
-        // `inverse_name`) = 59. Council review of any new variant means
-        // this number changes — the test must change with the source.
-        assert_eq!(Predicate::ALL.len(), 59);
+        // `validation_kind`; #22 added `validation_param`)
+        // + 18 C++ machine-plane + 3 Odoo-relational (`target`,
+        // `inverse_name`, and `relation_kind` — the Odoo field cardinality
+        // `many2one`/`one2many`/`many2many` that lets the OGAR lift map a
+        // relational field onto the right `AssociationKind`) = 60. Council
+        // review of any new variant means this number changes — the test
+        // must change with the source.
+        assert_eq!(Predicate::ALL.len(), 60);
     }
 
     #[test]
@@ -905,6 +924,12 @@ mod tests {
         // Authoritative (Odoo)
         assert_eq!(
             Predicate::DependsOn.default_provenance(),
+            Provenance::Authoritative
+        );
+        // Odoo-relational extension is Authoritative (the field constructor
+        // is a machine-readable AST literal, read directly).
+        assert_eq!(
+            Predicate::RelationKind.default_provenance(),
             Provenance::Authoritative
         );
         // Inferred — including DefinesMethod (per-edge override possible
