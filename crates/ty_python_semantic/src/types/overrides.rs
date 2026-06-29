@@ -9,7 +9,7 @@ use ruff_db::{
     files::FileRange,
     parsed::ParsedModuleRef,
 };
-use ruff_python_ast::name::Name;
+use ruff_python_ast::{helpers::is_dunder, name::Name};
 use ruff_python_stdlib::identifiers::is_mangled_private;
 use rustc_hash::FxHashSet;
 
@@ -19,8 +19,9 @@ use crate::{
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     reachability::ReachabilityConstraintsExtension,
     types::{
-        CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass, Parameter,
-        Parameters, Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
+        CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass,
+        MemberLookupPolicy, Parameter, Parameters, Signature, StaticClassLiteral, Type,
+        TypeContext, TypeQualifiers,
         call::CallArguments,
         class::{CodeGeneratorKind, FieldKind},
         constraints::ConstraintSetBuilder,
@@ -29,10 +30,11 @@ use crate::{
             INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_OVERRIDE, INVALID_DATACLASS,
             INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE,
             INVALID_NAMED_TUPLE_OVERRIDE, MISSING_OVERRIDE_DECORATOR, OVERRIDE_OF_FINAL_METHOD,
-            OVERRIDE_OF_FINAL_VARIABLE, report_invalid_method_override,
-            report_overridden_final_method, report_overridden_final_variable,
+            OVERRIDE_OF_FINAL_VARIABLE, report_incompatible_base_method,
+            report_invalid_method_override, report_overridden_final_method,
+            report_overridden_final_variable,
         },
-        enums::{EnumMetadata, enum_metadata},
+        enums::{EnumMetadata, enum_metadata, is_enum_class_by_inheritance},
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
         infer::infer_definition_types,
         list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
@@ -75,6 +77,10 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
     }
 
     let class_specialized = class.identity_specialization(db);
+    if configuration.check_method_liskov_violations() {
+        check_inherited_method_conflicts(context, class, class_specialized);
+    }
+
     let scope = class.body_scope(db);
     let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
     let enum_info = enum_metadata(db, class.into());
@@ -93,6 +99,181 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
             &member,
         );
     }
+}
+
+/// Checks source-defined method conflicts introduced by explicit nominal multiple inheritance.
+fn check_inherited_method_conflicts<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    class_specialized: ClassType<'db>,
+) {
+    let db = context.db();
+    if matches!(
+        CodeGeneratorKind::from_class(db, class.into()),
+        Some(CodeGeneratorKind::NamedTuple | CodeGeneratorKind::TypedDict)
+    ) || is_enum_class_by_inheritance(db, class)
+    {
+        return;
+    }
+
+    let mut direct_bases = Vec::new();
+    for base in class.explicit_bases(db) {
+        let Some(base) = base.to_class_type(db) else {
+            return;
+        };
+        if base.static_class_literal(db).is_none() {
+            return;
+        }
+        direct_bases.push(base);
+    }
+    if direct_bases.len() < 2 || class.try_mro(db, None).is_err() {
+        return;
+    }
+
+    let constraints = ConstraintSetBuilder::new();
+    if direct_bases.iter().enumerate().any(|(index, left)| {
+        direct_bases[index + 1..]
+            .iter()
+            .any(|right| !left.could_coexist_in_mro_with(db, *right, &constraints))
+    }) {
+        return;
+    }
+
+    let receiver = Type::instance(db, class_specialized);
+    let mut candidates = FxHashSet::default();
+    for base in direct_bases.iter().copied().skip(1) {
+        candidates.extend(source_method_names_in_mro(db, base));
+    }
+    let mut candidates: Vec<_> = candidates.into_iter().collect();
+    candidates.sort_unstable();
+
+    'members: for name in candidates {
+        let Some(selected) =
+            effective_source_method_contract(db, class_specialized, receiver, &name)
+        else {
+            continue;
+        };
+        if selected.owner.class_literal(db) == ClassLiteral::Static(class) {
+            continue;
+        }
+
+        for base in direct_bases.iter().copied() {
+            let Some(contract) = effective_source_method_contract(db, base, receiver, &name) else {
+                continue;
+            };
+            if selected.owner.class_literal(db) == contract.owner.class_literal(db)
+                || selected.ty.is_assignable_to(db, contract.ty)
+            {
+                continue;
+            }
+
+            report_incompatible_base_method(
+                context,
+                class,
+                &name,
+                (selected.owner, selected.definition),
+                (contract.owner, contract.definition),
+                || selected.ty.assignability_error_context(db, contract.ty),
+            );
+            continue 'members;
+        }
+    }
+}
+
+/// Returns effective source-defined method names without resolving their types.
+fn source_method_names_in_mro<'db>(db: &'db dyn Db, class: ClassType<'db>) -> FxHashSet<Name> {
+    let mut seen = FxHashSet::default();
+    let mut methods = FxHashSet::default();
+
+    for owner in class.iter_mro(db).filter_map(ClassBase::into_class) {
+        let Some((owner_literal, _)) = owner.static_class_literal(db) else {
+            continue;
+        };
+        let scope = owner_literal.body_scope(db);
+        let table = place_table(db, scope);
+        for symbol in table.symbols().filter(|symbol| symbol.is_local()) {
+            let name = symbol.name();
+            if is_mangled_private(name.as_str())
+                || is_dunder(name.as_str())
+                || !seen.insert(name.clone())
+            {
+                continue;
+            }
+            if let Some(symbol_id) = table.symbol_id(name)
+                && is_function_definition(db, scope, symbol_id)
+            {
+                methods.insert(name.clone());
+            }
+        }
+    }
+
+    methods
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SourceMethodContract<'db> {
+    owner: ClassType<'db>,
+    definition: Definition<'db>,
+    ty: Type<'db>,
+}
+
+/// Returns the selected source-defined method bound to `receiver`.
+fn effective_source_method_contract<'db>(
+    db: &'db dyn Db,
+    class: ClassType<'db>,
+    receiver: Type<'db>,
+    name: &Name,
+) -> Option<SourceMethodContract<'db>> {
+    for base in class.iter_mro(db) {
+        let owner = match base {
+            ClassBase::Class(owner) => owner,
+            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => return None,
+            ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict(_) => continue,
+        };
+        if owner.own_class_member(db, None, name).is_undefined() {
+            continue;
+        }
+
+        let (owner_literal, _) = owner.static_class_literal(db)?;
+        let scope = owner_literal.body_scope(db);
+        let symbol = place_table(db, scope).symbol_id(name)?;
+        if !is_function_definition(db, scope, symbol) {
+            return None;
+        }
+
+        let own_ty = owner
+            .own_class_member(db, None, name)
+            .inner
+            .place
+            .raw_type()?;
+        let Type::FunctionLiteral(function) = own_ty else {
+            return None;
+        };
+        let (lookup_ty, receiver) = if function.is_classmethod(db) {
+            (Type::from(class), receiver.to_meta_type(db))
+        } else {
+            (Type::instance(db, class), receiver)
+        };
+
+        let ty = lookup_ty
+            .member_lookup_with_policy_and_receiver(
+                db,
+                name.clone(),
+                MemberLookupPolicy::default(),
+                Some(receiver),
+            )
+            .place
+            .ignore_possibly_undefined()?
+            .try_upcast_to_callable(db)?
+            .into_type(db);
+        return Some(SourceMethodContract {
+            owner,
+            definition: symbol_definition(db, scope, symbol)?,
+            ty,
+        });
+    }
+
+    None
 }
 
 /// Returns the first inherited `NamedTuple` field in the MRO for `field_name`.
