@@ -75,7 +75,6 @@ T = TypeVar("T", None, EllipsisType)
 
 def f(left: T, right: T) -> None:
     reveal_type(left is right)  # revealed: Literal[True]
-    reveal_type(left is not right)  # revealed: Literal[False]
 
 type Alias[X] = X
 

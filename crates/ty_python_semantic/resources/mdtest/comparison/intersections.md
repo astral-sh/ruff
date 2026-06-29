@@ -92,8 +92,8 @@ def _(x: int):
 
 ### Identity comparisons
 
-The type `~None` excludes the `None` object. A `NewType` based on `NoneType` is still a subtype of
-`NoneType`, so it cannot be passed where `~None` is expected.
+The type `~None` excludes the `None` object, so its identity comparisons with `None` have definite
+results.
 
 ```py
 def _(o: object):
