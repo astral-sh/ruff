@@ -223,3 +223,12 @@ pub(crate) fn is_top_level_expression_in_statement(checker: &Checker) -> bool {
     checker.semantic().current_expression_parent().is_none()
         && checker.semantic().current_statement().is_expr_stmt()
 }
+
+pub(crate) fn is_keyword_true(argument: &Arguments, name: &str) -> Option<bool> {
+    let kw = argument.find_keyword(name)?;
+
+    match &kw.value {
+        Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some(*value),
+        _ => None,
+    }
+}

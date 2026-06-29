@@ -315,7 +315,7 @@ help: Replace with `Path(...).readlink()`
 24 | os.stat(p)
    |
 
-PTH116 `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
+PTH116 [*] `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
   --> full_name.py:23:1
    |
 21 | bbbbb = os.path.islink(p)
@@ -324,6 +324,17 @@ PTH116 `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path
    | ^^^^^^^
 24 | os.path.isabs(p)
 25 | os.path.join(p, q)
+   |
+help: Replace with `Path(...).stat()`
+   |
+2  | import os.path
+3  + import pathlib
+4  |
+--------------------------------------------------------------------------------
+23 | os.readlink(p)
+   - os.stat(p)
+24 + pathlib.Path(p).stat()
+25 | os.path.isabs(p)
    |
 
 PTH117 [*] `os.path.isabs()` should be replaced by `Path.is_absolute()`
@@ -634,6 +645,87 @@ help: Replace with `Path.open()`
    - open(bytes_str_func())
 72 + pathlib.Path(bytes_str_func()).open()
 73 |
+   |
+
+PTH116 [*] `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
+  --> full_name.py:74:1
+   |
+73 | # https://github.com/astral-sh/ruff/issues/17693
+74 | os.stat(1)
+   | ^^^^^^^
+75 | os.stat(x)
+   |
+help: Replace with `Path(...).stat()`
+   |
+2  | import os.path
+3  + import pathlib
+4  |
+--------------------------------------------------------------------------------
+74 | # https://github.com/astral-sh/ruff/issues/17693
+   - os.stat(1)
+75 + pathlib.Path(1).stat()
+76 | os.stat(x)
+   |
+
+PTH116 [*] `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
+  --> full_name.py:75:1
+   |
+73 | # https://github.com/astral-sh/ruff/issues/17693
+74 | os.stat(1)
+75 | os.stat(x)
+   | ^^^^^^^
+   |
+help: Replace with `Path(...).stat()`
+   |
+2  | import os.path
+3  + import pathlib
+4  |
+--------------------------------------------------------------------------------
+75 | os.stat(1)
+   - os.stat(x)
+76 + pathlib.Path(x).stat()
+77 |
+   |
+
+PTH116 [*] `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
+  --> full_name.py:80:1
+   |
+78 | def func() -> int:
+79 |     return 2
+80 | os.stat(func())
+   | ^^^^^^^
+   |
+help: Replace with `Path(...).stat()`
+   |
+2  | import os.path
+3  + import pathlib
+4  |
+--------------------------------------------------------------------------------
+80 |     return 2
+   - os.stat(func())
+81 + pathlib.Path(func()).stat()
+82 |
+   |
+
+PTH116 [*] `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
+  --> full_name.py:84:5
+   |
+83 | def bar(x: int):
+84 |     os.stat(x)
+   |     ^^^^^^^
+85 |
+86 | # https://github.com/astral-sh/ruff/issues/17694
+   |
+help: Replace with `Path(...).stat()`
+   |
+2  | import os.path
+3  + import pathlib
+4  |
+--------------------------------------------------------------------------------
+84 | def bar(x: int):
+   -     os.stat(x)
+85 +     pathlib.Path(x).stat()
+86 |
    |
 
 PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
