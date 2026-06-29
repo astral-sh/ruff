@@ -3908,18 +3908,36 @@ pub(super) fn report_incompatible_base_method<'db>(
 
     let (selected_owner, selected_definition, selected_decorator) = selected;
     let (contract_owner, contract_definition, contract_decorator) = contract;
-    let selected_name = selected_owner.name(db);
-    let contract_name = contract_owner.name(db);
+    let ambiguous_owner_names = selected_owner.name(db) == contract_owner.name(db);
+    let display_settings = DisplaySettings::from_possibly_ambiguous_types(
+        db,
+        [
+            selected_owner.class_literal(db),
+            contract_owner.class_literal(db),
+        ],
+    );
+    let format_method = |owner: ClassType<'db>| {
+        let name = owner
+            .class_literal(db)
+            .display_with(db, display_settings.clone());
+        if ambiguous_owner_names {
+            format!("method from `{name}`")
+        } else {
+            format!("`{name}.{member}`")
+        }
+    };
+    let selected_method = format_method(selected_owner);
+    let contract_method = format_method(contract_owner);
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Base classes for class `{}` define method `{member}` incompatibly",
         class.name(db)
     ));
     diagnostic.set_primary_message(format_args!(
-        "`{selected_name}.{member}` is incompatible with `{contract_name}.{member}`"
+        "{selected_method} is incompatible with {contract_method}"
     ));
     if selected_decorator != contract_decorator {
         diagnostic.info(format_args!(
-            "`{selected_name}.{member}` is {} but `{contract_name}.{member}` is {}",
+            "{selected_method} is {} but {contract_method} is {}",
             selected_decorator.description(),
             contract_decorator.description(),
         ));
@@ -3927,14 +3945,14 @@ pub(super) fn report_incompatible_base_method<'db>(
     error_context().attach_to(db, &mut diagnostic);
     diagnostic.info("This violates the Liskov Substitution Principle");
 
-    for (definition, owner_name) in [
-        (selected_definition, selected_name),
-        (contract_definition, contract_name),
+    for (definition, method) in [
+        (selected_definition, selected_method),
+        (contract_definition, contract_method),
     ] {
         let module = parsed_module(db, definition.file(db)).load(db);
         diagnostic.annotate(
             Annotation::secondary(Span::from(definition.focus_range(db, &module)))
-                .message(format_args!("`{owner_name}.{member}` defined here")),
+                .message(format_args!("{method} defined here")),
         );
     }
 }
