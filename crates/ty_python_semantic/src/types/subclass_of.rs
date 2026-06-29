@@ -8,7 +8,7 @@ use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral, ClassType,
-    DynamicType, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, MaterializationKind,
+    DynamicType, FindLegacyTypeVarsVisitor, IntersectionBuilder, KnownClass, MaterializationKind,
     MemberLookupPolicy, ProtocolInstanceType, SpecialFormType, Type, TypeContext, TypeMapping,
     TypeQualifiers, TypeVarBoundOrConstraints, TypeVarVariance, TypedDictType, UnionType,
     todo_type,
@@ -112,14 +112,12 @@ impl<'db> SubclassOfType<'db> {
                     .map(|element| Self::try_from_instance(db, env, *element)),
             ),
             Type::Intersection(intersection) if intersection.iter_negative(db).next().is_none() => {
-                Some(IntersectionType::from_elements(
-                    db,
-                    env,
-                    intersection
-                        .iter_positive(db)
-                        .map(|element| Self::try_from_instance(db, env, element))
-                        .collect::<Option<Vec<_>>>()?,
-                ))
+                intersection
+                    .iter_positive(db)
+                    .try_fold(IntersectionBuilder::new(db, env), |builder, element| {
+                        Some(builder.add_positive(Self::try_from_instance(db, env, element)?))
+                    })
+                    .map(IntersectionBuilder::build)
             }
             Type::ProtocolInstance(protocol) => Some(protocol.to_meta_type(db, env)),
             _ => SubclassOfInner::try_from_instance(db, env, ty)
