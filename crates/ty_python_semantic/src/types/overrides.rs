@@ -194,6 +194,9 @@ fn source_method_names_in_mro<'db>(db: &'db dyn Db, class: ClassType<'db>) -> Fx
         };
         let scope = owner_literal.body_scope(db);
         let table = place_table(db, scope);
+        let use_def = use_def_map(db, scope);
+        let predicates = use_def.predicates();
+        let reachability_constraints = use_def.reachability_constraints();
         for symbol in table.symbols().filter(|symbol| symbol.is_local()) {
             let name = symbol.name();
             if is_mangled_private(name.as_str())
@@ -202,13 +205,31 @@ fn source_method_names_in_mro<'db>(db: &'db dyn Db, class: ClassType<'db>) -> Fx
             {
                 continue;
             }
-            if owner.own_class_member(db, None, name).is_undefined() {
+            let Some(symbol_id) = table.symbol_id(name) else {
+                continue;
+            };
+            let has_reachable_definition =
+                use_def
+                    .end_of_scope_symbol_bindings(symbol_id)
+                    .any(|binding| {
+                        binding.binding.definition().is_some()
+                            && !reachability_constraints
+                                .evaluate(db, predicates, binding.reachability_constraint)
+                                .is_always_false()
+                    })
+                    || use_def
+                        .end_of_scope_symbol_declarations(symbol_id)
+                        .any(|declaration| {
+                            declaration.declaration.definition().is_some()
+                                && !reachability_constraints
+                                    .evaluate(db, predicates, declaration.reachability_constraint)
+                                    .is_always_false()
+                        });
+            if !has_reachable_definition {
                 continue;
             }
             seen.insert(name.clone());
-            if let Some(symbol_id) = table.symbol_id(name)
-                && is_function_definition(db, scope, symbol_id)
-            {
+            if is_function_definition(db, scope, symbol_id) {
                 methods.insert(name.clone());
             }
         }
@@ -1806,7 +1827,10 @@ fn check_enum_member_against_constructor_method<'db>(
 mod tests {
     use super::*;
     use crate::{db::tests::setup_db, place::global_symbol};
-    use ruff_db::{files::system_path_to_file, system::DbWithWritableSystem as _};
+    use ruff_db::{
+        files::system_path_to_file, system::DbWithWritableSystem as _,
+        testing::assert_function_query_was_not_run,
+    };
 
     #[test]
     fn empty_branch_has_no_inherited_method_candidates() {
@@ -1821,5 +1845,50 @@ mod tests {
             .unwrap();
 
         assert!(source_method_names_in_mro(&db, class).is_empty());
+    }
+
+    #[test]
+    fn inherited_method_candidate_discovery_does_not_infer_fields() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/test.py",
+            r#"
+            class Base:
+                field = 1
+
+                def method(self) -> None:
+                    pass
+            "#,
+        )
+        .unwrap();
+        let file = system_path_to_file(&db, "/src/test.py").unwrap();
+        db.clear_salsa_events();
+        let candidates = {
+            let class = global_symbol(&db, file, "Base")
+                .place
+                .expect_type()
+                .to_class_type(&db)
+                .unwrap();
+            source_method_names_in_mro(&db, class)
+        };
+        let events = db.take_salsa_events();
+        assert_eq!(
+            candidates,
+            FxHashSet::from_iter([Name::new_static("method")])
+        );
+
+        let class = global_symbol(&db, file, "Base")
+            .place
+            .expect_type()
+            .to_class_type(&db)
+            .unwrap();
+        let (class_literal, _) = class.static_class_literal(&db).unwrap();
+        let scope = class_literal.body_scope(&db);
+        let field_symbol = place_table(&db, scope).symbol_id("field").unwrap();
+        let field_definition = use_def_map(&db, scope)
+            .end_of_scope_symbol_bindings(field_symbol)
+            .find_map(|binding| binding.binding.definition())
+            .unwrap();
+        assert_function_query_was_not_run(&db, infer_definition_types, field_definition, &events);
     }
 }
