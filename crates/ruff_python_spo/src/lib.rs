@@ -309,6 +309,17 @@ class AccountCashRounding(models.Model):
                 ),
                 "missing Property for field {f}"
             );
+            // Every field (scalar AND relational) carries the model→field
+            // ownership edge, so soc_findings counts it as a data member.
+            assert!(
+                has(
+                    &t,
+                    "odoo:account_cash_rounding",
+                    "has_field",
+                    &format!("odoo:account_cash_rounding.{f}")
+                ),
+                "missing has_field ownership edge for field {f}"
+            );
         }
 
         // Every method is a Function and belongs to the model.

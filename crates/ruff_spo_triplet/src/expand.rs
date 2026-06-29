@@ -21,7 +21,11 @@ use crate::triple::{EntityKind, Predicate, Provenance, Triple};
 /// # Emission rules — core 7 (per model)
 ///
 /// 1. `(ns:model, rdf:type, ogit:ObjectType)` — Structural.
-/// 2. For each field: `(ns:model.field, rdf:type, ogit:Property)` — Structural.
+/// 2. For each field:
+///    - `(ns:model.field, rdf:type, ogit:Property)` — Structural.
+///    - `(ns:model, has_field, ns:model.field)` — Structural (the ownership
+///      edge, mirroring `has_function`; lets `soc` count core-7 fields as
+///      data members, same shape the C++ `cpp_field` path emits).
 /// 3. For each function:
 ///    - `(ns:model.fn, rdf:type, ogit:Function)` — Structural.
 ///    - `(ns:model, has_function, ns:model.fn)` — Structural.
@@ -153,6 +157,17 @@ impl Expander {
                 field_iri.clone(),
                 Predicate::RdfType,
                 EntityKind::Property.iri().to_string(),
+                Provenance::Structural,
+            );
+            // Ownership edge (model, has_field, field) — mirrors the methods'
+            // `has_function` below and the C++ `cpp_field` path. Without it,
+            // `soc_findings` (which buckets data members from `has_field`) never
+            // sees core-7 (Odoo/Rails) fields, so the per-field `field_type`
+            // would be emitted but the model would have zero SoC data members.
+            self.push(
+                model_iri.clone(),
+                Predicate::HasField,
+                field_iri.clone(),
                 Provenance::Structural,
             );
             if let Some(fn_name) = &field.emitted_by {
@@ -1139,6 +1154,12 @@ mod tests {
             "odoo:account_move.amount_total",
             "rdf:type",
             "ogit:Property"
+        ));
+        // Ownership edge so soc_findings counts the field as a data member.
+        assert!(has(
+            "odoo:account_move",
+            "has_field",
+            "odoo:account_move.amount_total"
         ));
         assert!(has(
             "odoo:account_move._compute_amount",
@@ -2465,16 +2486,16 @@ mod tests {
     /// The Python/Ruby fixtures must emit ZERO C++ predicates — the C++
     /// sibling Vecs default empty, so no cross-language leakage occurs.
     ///
-    /// Note: `inherits_from` is intentionally cross-frontend — both
-    /// C++ class inheritance and Rails STI emit it (wire shape is
-    /// identical; the predicate is in the C++ machine-plane block
-    /// historically because that's where it landed first). It's
-    /// excluded from the guard list below since Rails STI fixtures
-    /// legitimately emit it.
+    /// Note: `inherits_from` and `has_field` are intentionally
+    /// cross-frontend, so both are excluded from the guard list below.
+    /// `inherits_from` — both C++ class inheritance and Rails STI emit it.
+    /// `has_field` — the model→field ownership edge is now emitted by the
+    /// core-7 field loop (Odoo/Rails) as well as the C++ `cpp_field` path,
+    /// so `soc` can count core-7 fields as data members (it landed in the
+    /// C++ machine-plane block first, hence the historical naming).
     #[test]
     fn non_cpp_fixtures_emit_no_cpp_only_predicates() {
         let cpp_only_predicates = [
-            "has_field",
             "template_specialises",
             "template_instantiates",
             "virtually_overrides",
