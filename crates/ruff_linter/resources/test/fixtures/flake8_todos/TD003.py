@@ -41,3 +41,27 @@ def foo(x):
 # TODO: A todo with a random number, 5431
 
 # TODO: here's a TODO on the last line with no link
+
+# Valid Jira-style patterns (should pass)
+# TODO: Move this part to the other place RFFU-6877
+# TODO: Fix this (AIRFLOW-123)
+# TODO: Update config (SUPERSET-456)
+# TODO: PROJ-123: Another Jira-style example with colon
+# TODO: ABC-456: Fix bug with colon
+
+# Invalid patterns that should still trigger TD003 (should fail)
+# TODO: PROJ-123 Another Jira-style example
+# TODO: Fix bug ABC-123
+# TODO: Implement feature XYZ-456
+# TODO: Update documentation DEF-789
+# TODO: Refactor code GHI-101112
+# TODO: Single letter project key A-1
+# TODO: No hyphen pattern ABC123
+# TODO: Lowercase project key abc-123
+# TODO: Mixed case project key AbC-123
+# TODO: Just a random word with hyphen and number random-123
+# TODO: Number before letters 123-ABC
+# TODO: Multiple hyphens ABC-123-456
+# TODO: Empty project key -123
+# TODO: This is about PROJ-123 server config (ID in middle of sentence)
+# TODO: Working on PROJ-123 and PROJ-456 (multiple IDs)
