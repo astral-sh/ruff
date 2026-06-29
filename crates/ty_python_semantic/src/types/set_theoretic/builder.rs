@@ -1577,7 +1577,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 }
 
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
-                let mut dynamic_merge = None;
+                struct Replacement<'db> {
+                    index: usize,
+                    value: Type<'db>,
+                }
+                let mut replacement = None;
                 for (index, existing_positive) in self.positive.iter().enumerate() {
                     if let Some(merged) =
                         generic_gradual_intersection(db, new_positive, *existing_positive)
@@ -1585,7 +1589,10 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         if merged == *existing_positive {
                             return;
                         }
-                        dynamic_merge = Some((index, merged));
+                        replacement = Some(Replacement {
+                            index,
+                            value: merged,
+                        });
                         break;
                     }
                     // S & T = S if S <: T.
@@ -1603,9 +1610,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         return;
                     }
                 }
-                if let Some((index, merged)) = dynamic_merge {
+                if let Some(Replacement { index, value }) = replacement {
                     self.positive.swap_remove_index(index);
-                    self.add_positive(db, merged);
+                    self.add_positive(db, value);
                     return;
                 }
                 for index in to_remove.into_iter().rev() {
@@ -1616,7 +1623,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let mut replacement_negatives = SmallVec::<[Type<'db>; 1]>::new();
                 for (index, existing_negative) in self.negative.iter().enumerate() {
                     // S & ~G = S & ~Bottom[G] & Any if G is a dynamic generalization of the
-                    // fully-static specialization S. This follows because S <: Top[G].
+                    // fully-static specialization S.
                     if let Some(bottom) =
                         negated_generalization_bottom(db, *existing_negative, new_positive)
                     {
@@ -1638,6 +1645,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 for index in to_remove.into_iter().rev() {
                     self.negative.swap_remove_index(index);
                 }
+                // For example, if we add `Co[P]` to an intersection containing `~Co[Any]`,
+                // replace that negative with `~Bottom[Co[Any]]` and add `Any`, producing
+                // `Co[P] & ~Bottom[Co[Any]] & Any`. See `generics/set_theoretic.md` for details.
                 if !replacement_negatives.is_empty() {
                     for bottom in replacement_negatives {
                         self.add_negative(db, bottom);
@@ -1727,6 +1737,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 self.add_negative(db, Type::string_literal(db, ""));
             }
             _ => {
+                // For example, if we add `~Co[Any]` to an intersection containing `Co[P]`,
+                // replace that negative with `~Bottom[Co[Any]]` and add `Any`, producing
+                // `Co[P] & ~Bottom[Co[Any]] & Any`. See `generics/set_theoretic.md` for details.
                 if let Some(bottom) = self.positive.iter().find_map(|existing_positive| {
                     negated_generalization_bottom(db, new_negative, *existing_positive)
                 }) {
