@@ -66,8 +66,7 @@ impl FormatNodeRule<PatternArguments> for FormatPatternArguments {
 
         write!(
             f,
-            [parenthesized("(", &group(&all_arguments), ")")
-                .with_dangling_comments(dangling_comments)]
+            [parenthesized("(", &all_arguments, ")").with_dangling_comments(dangling_comments)]
         )
     }
 }
