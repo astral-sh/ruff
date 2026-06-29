@@ -82,6 +82,7 @@ impl<'db> SubclassOfType<'db> {
         // `type[A | B]` -> `type[A] | type[B]`
         // `type[A & B]` -> `type[A] & type[B]`
         match ty {
+            Type::Never => Some(Type::Never),
             Type::Union(union) => UnionType::try_from_elements(
                 db,
                 union
