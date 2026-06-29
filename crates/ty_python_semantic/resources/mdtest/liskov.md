@@ -643,7 +643,7 @@ effective source-defined method contract exposed by every direct branch.
 `multiple_inheritance.pyi`:
 
 ```pyi
-from typing import Generic, TypeVar, overload
+from typing import Generic, Iterator, TypeVar, overload
 
 T = TypeVar("T")
 
@@ -665,6 +665,14 @@ class GenericReturn(Generic[T]):
     def method(self) -> T: ...
 
 class GenericConflict(ReturnsStr, GenericReturn[int]): ...  # error: [invalid-method-override]
+
+class IteratesStr:
+    def __iter__(self) -> Iterator[str]: ...
+
+class IteratesInt:
+    def __iter__(self) -> Iterator[int]: ...
+
+class IteratorConflict(IteratesStr, IteratesInt): ...  # error: [invalid-method-override]
 
 class ReceiverBase:
     @overload
