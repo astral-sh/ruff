@@ -161,6 +161,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if value_ty.is_generic_alias() {
             return self.infer_explicit_type_alias_specialization(subscript, value_ty, false);
         }
+        if let Type::KnownInstance(KnownInstanceType::ImplicitTypeAlias(instance)) = value_ty {
+            let runtime_value_ty = instance.runtime_value_type(self.db());
+            if runtime_value_ty.is_generic_alias() {
+                return self.infer_explicit_type_alias_specialization(
+                    subscript,
+                    runtime_value_ty,
+                    false,
+                );
+            }
+            return self.infer_subscript_load_impl(runtime_value_ty, subscript);
+        }
 
         self.infer_subscript_load_impl(value_ty, subscript)
     }

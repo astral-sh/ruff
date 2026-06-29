@@ -176,11 +176,9 @@ def _(
     single_none: Literal[SingleNone],
     single_enum: Literal[SingleEnum],
     union_literals: Literal[UnionLiterals],
-    # Could also not error
-    an_enum1: Literal[AnEnum1],  # error: [invalid-type-form]
+    an_enum1: Literal[AnEnum1],
     an_enum2: Literal[AnEnum2],
-    # Could also not error
-    bool1: Literal[Bool1],  # error: [invalid-type-form]
+    bool1: Literal[Bool1],
     bool2: Literal[Bool2],
     multiple: Literal[SingleInt, SingleStr, SingleEnum],
 ):
@@ -191,11 +189,9 @@ def _(
     reveal_type(single_none)  # revealed: None
     reveal_type(single_enum)  # revealed: Literal[E.A]
     reveal_type(union_literals)  # revealed: Literal[1, "foo", b"bar", True, E.A] | None
-    # Could also be `E`
-    reveal_type(an_enum1)  # revealed: Unknown
+    reveal_type(an_enum1)  # revealed: E
     reveal_type(an_enum2)  # revealed: E
-    # Could also be `bool`
-    reveal_type(bool1)  # revealed: Unknown
+    reveal_type(bool1)  # revealed: bool
     reveal_type(bool2)  # revealed: bool
     reveal_type(multiple)  # revealed: Literal[1, "foo", E.A]
 ```

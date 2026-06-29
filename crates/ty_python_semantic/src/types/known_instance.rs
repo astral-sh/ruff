@@ -5,9 +5,9 @@ use crate::{
     Db, DisplaySettings,
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassType, GenericContext,
-        InferenceFlags, InvalidTypeExpressionError, KnownClass, PromotionKind, PromotionMode,
-        StringLiteralType, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarNonce,
-        TypeVarVariance, UnionBuilder,
+        ImplicitTypeAliasType, InferenceFlags, InvalidTypeExpressionError, KnownClass,
+        PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
+        TypeMapping, TypeVarNonce, TypeVarVariance, UnionBuilder,
         class::NamedTupleSpec,
         constraints::OwnedConstraintSet,
         generics::{Specialization, walk_generic_context},
@@ -85,6 +85,9 @@ pub enum KnownInstanceType<'db> {
     /// A single instance of `typing.TypeAliasType` (PEP 695 type alias)
     TypeAliasType(TypeAliasType<'db>),
 
+    /// A runtime value created by an implicit type alias assignment.
+    ImplicitTypeAlias(ImplicitTypeAliasInstance<'db>),
+
     /// A single instance of `warnings.deprecated` or `typing_extensions.deprecated`
     Deprecated(DeprecatedInstance<'db>),
 
@@ -155,6 +158,9 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         }
         KnownInstanceType::TypeAliasType(type_alias) => {
             visitor.visit_type_alias_type(db, type_alias);
+        }
+        KnownInstanceType::ImplicitTypeAlias(instance) => {
+            visitor.visit_type_alias_type(db, TypeAliasType::Implicit(instance.alias(db)));
         }
         KnownInstanceType::Deprecated(_)
         | KnownInstanceType::Range { .. }
@@ -230,6 +236,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::ConstraintSet(set) => Some(Self::ConstraintSet(set)),
             Self::TypeVar(typevar) => Some(Self::TypeVar(typevar)),
             Self::TypeAliasType(type_alias) => Some(Self::TypeAliasType(type_alias)),
+            Self::ImplicitTypeAlias(instance) => Some(Self::ImplicitTypeAlias(instance)),
             Self::Field(field) => field
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Self::Field),
@@ -279,6 +286,7 @@ impl<'db> KnownInstanceType<'db> {
                 KnownClass::GenericAlias
             }
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
+            Self::ImplicitTypeAlias(instance) => instance.runtime_class(db),
             Self::Deprecated(_) => KnownClass::Deprecated,
             Self::Field(_) => KnownClass::Field,
             Self::ConstraintSet(_) => KnownClass::ConstraintSet,
@@ -318,6 +326,9 @@ impl<'db> KnownInstanceType<'db> {
     pub(crate) fn type_form_argument(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Self::TypeAliasType(alias) => Some(Type::TypeAlias(alias)),
+            Self::ImplicitTypeAlias(instance) => {
+                Some(Type::TypeAlias(TypeAliasType::Implicit(instance.alias(db))))
+            }
             Self::UnionType(instance) => instance.union_type(db).as_ref().ok().copied(),
             Self::Literal(ty) | Self::Annotated(ty) | Self::LiteralStringAlias(ty) => {
                 Some(ty.inner(db))
@@ -337,6 +348,7 @@ impl<'db> KnownInstanceType<'db> {
         matches!(
             self,
             Self::TypeAliasType(_)
+                | Self::ImplicitTypeAlias(_)
                 | Self::UnionType(_)
                 | Self::Literal(_)
                 | Self::Annotated(_)
@@ -426,6 +438,7 @@ impl<'db> KnownInstanceType<'db> {
             KnownInstanceType::SubscriptedProtocol(_)
             | KnownInstanceType::SubscriptedGeneric(_)
             | KnownInstanceType::TypeAliasType(_)
+            | KnownInstanceType::ImplicitTypeAlias(_)
             | KnownInstanceType::Deprecated(_)
             | KnownInstanceType::Field(_)
             | KnownInstanceType::ConstraintSet(_)
@@ -440,6 +453,20 @@ impl<'db> KnownInstanceType<'db> {
                 Type::KnownInstance(self)
             }
         }
+    }
+}
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct ImplicitTypeAliasInstance<'db> {
+    pub alias: ImplicitTypeAliasType<'db>,
+    pub runtime_class: KnownClass,
+}
+
+impl get_size2::GetSize for ImplicitTypeAliasInstance<'_> {}
+
+impl<'db> ImplicitTypeAliasInstance<'db> {
+    pub(crate) fn runtime_value_type(self, db: &'db dyn Db) -> Type<'db> {
+        self.alias(db).runtime_value_type(db)
     }
 }
 

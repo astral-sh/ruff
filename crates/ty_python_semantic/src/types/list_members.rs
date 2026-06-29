@@ -404,6 +404,7 @@ impl<'db> AllMembers<'db> {
                             Type::KnownInstance(
                                 KnownInstanceType::TypeVar(_)
                                 | KnownInstanceType::TypeAliasType(_)
+                                | KnownInstanceType::ImplicitTypeAlias(_)
                                 | KnownInstanceType::UnionType(_)
                                 | KnownInstanceType::Literal(_)
                                 | KnownInstanceType::Annotated(_),

@@ -1656,13 +1656,12 @@ fn report_invalid_union_type_elements<'db>(
         ty: Type<'db>,
         invalid_elements: &mut Vec<Type<'db>>,
     ) {
+        let allow_any = function == KnownFunction::IsSubclass;
+        if ty.is_valid_isinstance_target(db, allow_any) {
+            return;
+        }
+
         match ty {
-            Type::ClassLiteral(_) => {}
-            Type::NominalInstance(instance)
-                if instance.has_known_class(db, KnownClass::NoneType) => {}
-            Type::SpecialForm(special_form) if special_form.is_valid_isinstance_target() => {}
-            // `Any` can be used in `issubclass()` calls but not `isinstance()` calls
-            Type::SpecialForm(SpecialFormType::Any) if function == KnownFunction::IsSubclass => {}
             Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
                 match instance.value_expression_types(db) {
                     Ok(value_expression_types) => {

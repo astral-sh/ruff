@@ -364,6 +364,32 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
             }),
 
+            (Type::KnownInstance(KnownInstanceType::ImplicitTypeAlias(instance)), rhs, _) => {
+                visitor.visit((left_ty, op, right_ty), || {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        emitted_division_by_zero_diagnostic,
+                        instance.runtime_value_type(db),
+                        rhs,
+                        op,
+                        visitor,
+                    )
+                })
+            }
+
+            (lhs, Type::KnownInstance(KnownInstanceType::ImplicitTypeAlias(instance)), _) => {
+                visitor.visit((left_ty, op, right_ty), || {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        emitted_division_by_zero_diagnostic,
+                        lhs,
+                        instance.runtime_value_type(db),
+                        op,
+                        visitor,
+                    )
+                })
+            }
+
             (Type::TypedDict(left_typed_dict), rhs, ast::Operator::BitOr)
                 if rhs.is_assignable_to(db, Type::TypedDict(left_typed_dict)) =>
             {

@@ -451,6 +451,103 @@ fn infer_expression_type_impl<'db>(db: &'db dyn Db, input: InferExpression<'db>)
     inference.expression_type(expression.node_ref(db))
 }
 
+#[salsa::tracked(
+    cycle_initial=|_, id, _| ImplicitTypeAliasValueInference {
+        ty: Type::divergent(id),
+        is_valid: true,
+    },
+    cycle_fn=|db, cycle, previous: &ImplicitTypeAliasValueInference<'db>, result: ImplicitTypeAliasValueInference<'db>, _| {
+        ImplicitTypeAliasValueInference {
+            ty: result.ty.cycle_normalized(db, previous.ty, cycle),
+            is_valid: result.is_valid,
+        }
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(crate) fn infer_implicit_type_alias_value<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> ImplicitTypeAliasValueInference<'db> {
+    let file = definition.file(db);
+    let module = parsed_module(db, file).load(db);
+    let value = match definition.kind(db) {
+        DefinitionKind::Assignment(assignment) => assignment.value(&module),
+        DefinitionKind::AnnotatedAssignment(assignment) => {
+            let Some(value) = assignment.value(&module) else {
+                return ImplicitTypeAliasValueInference::invalid();
+            };
+            value
+        }
+        _ => return ImplicitTypeAliasValueInference::invalid(),
+    };
+
+    let index = semantic_index(db, file);
+    let (ty, is_valid) =
+        TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index, &module)
+            .finish_implicit_type_alias_value_type(definition, value);
+
+    ImplicitTypeAliasValueInference { ty, is_valid }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
+pub(crate) struct ImplicitTypeAliasValueInference<'db> {
+    ty: Type<'db>,
+    is_valid: bool,
+}
+
+impl<'db> ImplicitTypeAliasValueInference<'db> {
+    fn invalid() -> Self {
+        Self {
+            ty: Type::unknown(),
+            is_valid: false,
+        }
+    }
+
+    pub(crate) fn ty(self) -> Type<'db> {
+        self.ty
+    }
+
+    pub(crate) const fn is_valid(self) -> bool {
+        self.is_valid
+    }
+}
+
+pub(crate) fn infer_implicit_type_alias_value_type<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Type<'db> {
+    infer_implicit_type_alias_value(db, definition).ty()
+}
+
+#[salsa::tracked(
+    cycle_initial=|_, id, _| Type::divergent(id),
+    cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _| {
+        result.cycle_normalized(db, *previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(crate) fn infer_implicit_type_alias_runtime_value_type<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Type<'db> {
+    let file = definition.file(db);
+    let module = parsed_module(db, file).load(db);
+    let value = match definition.kind(db) {
+        DefinitionKind::Assignment(assignment) => assignment.value(&module),
+        DefinitionKind::AnnotatedAssignment(assignment) => {
+            let Some(value) = assignment.value(&module) else {
+                return Type::unknown();
+            };
+            value
+        }
+        _ => return Type::unknown(),
+    };
+
+    let index = semantic_index(db, file);
+    TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index, &module)
+        .finish_implicit_type_alias_runtime_value_type(definition, value)
+}
+
 /// Infer all types for a [`Statement`].
 ///
 /// This is useful when you want to infer a sub-expression with its natural type context, as

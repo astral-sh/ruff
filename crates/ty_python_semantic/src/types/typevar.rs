@@ -444,6 +444,13 @@ impl<'db> TypeVarInstance<'db> {
                 Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => {
                     type_alias_is_self_referential(state, alias, self_identity)
                 }
+                Type::KnownInstance(KnownInstanceType::ImplicitTypeAlias(instance)) => {
+                    type_alias_is_self_referential(
+                        state,
+                        TypeAliasType::Implicit(instance.alias(state.db)),
+                        self_identity,
+                    )
+                }
                 _ => false,
             })
         }

@@ -590,7 +590,7 @@ def build(distributions: Sequence[Distribution]) -> None:
 
 p = partial(build, distributions=["wheel"])  # error: [invalid-argument-type]
 # TODO: should accept this keyword literal without a construction-time error.
-reveal_type(p)  # revealed: partial[(*, distributions: Sequence[Literal["sdist", "wheel", "editable"]] = ...) -> None]
+reveal_type(p)  # revealed: partial[(*, distributions: Sequence[Distribution] = ...) -> None]
 reveal_type(p())  # revealed: None
 ```
 
@@ -609,7 +609,7 @@ def build(distributions: Sequence[Distribution]) -> None:
     pass
 
 p = partial(build, distributions=[])
-reveal_type(p)  # revealed: partial[(*, distributions: Sequence[Literal["sdist", "wheel", "editable"]] = ...) -> None]
+reveal_type(p)  # revealed: partial[(*, distributions: Sequence[Distribution] = ...) -> None]
 reveal_type(p())  # revealed: None
 ```
 

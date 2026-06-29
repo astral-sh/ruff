@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use itertools::Itertools;
 use ruff_db::files::File;
-use ruff_db::parsed::ParsedModuleRef;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::source_text;
 use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::name::Name;
@@ -95,19 +95,24 @@ use crate::types::special_form::TypeQualifier;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpecBuilder, TupleType};
-use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
+use crate::types::type_alias::{
+    ImplicitTypeAliasType, ManualPEP695TypeAliasType, PEP695TypeAliasType,
+};
 use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
+use crate::types::typevar::{
+    BindingContext, BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity,
+};
 use crate::types::unpacker::UnpackResult;
 use crate::types::{
     BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType,
-    DynamicType, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind,
-    MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters, SentinelInstance, Signature,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictModule,
-    TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
-    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
+    DynamicType, ImplicitTypeAliasInstance, InferenceFlags, InternedConstraintSet, InternedType,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
+    LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters,
+    SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeMapping, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarKind, TypeVarVariance, TypedDictModule, TypedDictType, UnionAccumulator, UnionBuilder,
+    UnionType, any_over_type, binding_type, extract_fixed_length_iterable_element_types,
+    infer_complete_scope_types, infer_implicit_type_alias_value, infer_scope_types,
     is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
@@ -436,6 +441,70 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | InferenceRegion::FunctionDecorators(_)
             | InferenceRegion::Scope(_, _) => None,
         })
+    }
+
+    fn implicit_type_alias_for_name(
+        &self,
+        name: &ast::ExprName,
+    ) -> Option<ImplicitTypeAliasType<'db>> {
+        let definition = self.typevar_binding_context?;
+        let module = parsed_module(self.db(), definition.file(self.db())).load(self.db());
+        let target_name = match definition.kind(self.db()) {
+            DefinitionKind::Assignment(assignment) => assignment
+                .target(&module)
+                .as_name_expr()
+                .map(|target| target.id.as_str()),
+            DefinitionKind::AnnotatedAssignment(assignment) => assignment
+                .target(&module)
+                .as_name_expr()
+                .map(|target| target.id.as_str()),
+            _ => return None,
+        };
+        if target_name != Some(name.id.as_str()) {
+            return None;
+        }
+
+        // Guard against creating directly self-referential aliases, e.g. `A = A`.
+        if self.type_alias_value_is_bare_name(definition, name) {
+            return None;
+        }
+
+        // Guard against creating shadowed self-referential aliases, e.g. `A = int; A = tuple[A]` (later `A` should mean `tuple[int]`).
+        let name_ref = ast::ExprRef::Name(name);
+        if let Some(file_scope_id) = self.index.try_expression_scope_id(&name_ref) {
+            let use_id = name_ref.scoped_use_id(self.db(), self.file());
+            let use_def = self.index.use_def_map(file_scope_id);
+            if use_def.bindings_at_use(use_id).any(|binding| {
+                binding
+                    .binding
+                    .definition()
+                    .is_some_and(|bound_definition| bound_definition != definition)
+            }) {
+                return None;
+            }
+        }
+
+        Some(ImplicitTypeAliasType::new(
+            self.db(),
+            &name.id,
+            definition,
+            None,
+        ))
+    }
+
+    fn type_alias_value_is_bare_name(
+        &self,
+        definition: Definition<'db>,
+        name: &ast::ExprName,
+    ) -> bool {
+        let module = parsed_module(self.db(), definition.file(self.db())).load(self.db());
+        definition
+            .kind(self.db())
+            .value(&module)
+            .and_then(ast::Expr::as_name_expr)
+            .is_some_and(|value_name| {
+                value_name.id == name.id && value_name.range() == name.range()
+            })
     }
 
     fn extend_cycle_recovery(&mut self, other: Option<Type<'db>>) {
@@ -3872,103 +3941,118 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 unpacked.expression_type(target)
             }
             None => {
-                // This could be an implicit type alias (OptionalList = list[T] | None). Use the definition
-                // of `OptionalList` as the binding context while inferring the RHS (`list[T] | None`), in
-                // order to bind `T` to `OptionalList`.
-                let previous_typevar_binding_context =
-                    self.typevar_binding_context.replace(definition);
-
-                let value_ty = if let Some(standalone_expression) = self.index.try_expression(value)
+                let value_ty = if let Some(alias) =
+                    self.implicit_type_alias_value(target, value, definition, false)
                 {
-                    self.infer_standalone_expression_impl(value, standalone_expression, tcx)
-                } else if let ast::Expr::Call(call_expr) = value {
-                    // If the RHS is not a standalone expression, this is a simple assignment
-                    // (single target, no unpackings). That means it's a valid syntactic form
-                    // for a legacy TypeVar creation; check for that.
-                    let callable_type = self.infer_maybe_standalone_expression(
-                        call_expr.func.as_ref(),
-                        TypeContext::default(),
-                    );
+                    alias
+                } else {
+                    // This could be an implicit type alias (OptionalList = list[T] | None). Use the definition
+                    // of `OptionalList` as the binding context while inferring the RHS (`list[T] | None`), in
+                    // order to bind `T` to `OptionalList`.
+                    let previous_typevar_binding_context =
+                        self.typevar_binding_context.replace(definition);
 
-                    let ty = if let Some(namedtuple_kind) =
-                        NamedTupleKind::from_type(self.db(), callable_type)
+                    let value_ty = if let Some(standalone_expression) =
+                        self.index.try_expression(value)
                     {
-                        self.infer_namedtuple_call_expression(
-                            call_expr,
-                            Some(definition),
-                            namedtuple_kind,
-                        )
-                    } else if let Some(typed_dict_module) =
-                        TypedDictModule::from_type(self.db(), callable_type)
-                    {
-                        self.infer_typeddict_call_expression(
-                            call_expr,
-                            Some(definition),
-                            typed_dict_module,
-                        )
-                    } else if let Some(function) = callable_type.as_function_literal()
-                        && function.is_known(self.db(), KnownFunction::NewClass)
-                    {
-                        self.infer_new_class_call(call_expr, Some(definition))
-                    } else if let Some(base_class) =
-                        enum_call::enum_functional_call_base(self.db(), callable_type)
-                        && let Some(ty) =
-                            self.infer_enum_call_expression(call_expr, Some(definition), base_class)
-                    {
+                        self.infer_standalone_expression_impl(value, standalone_expression, tcx)
+                    } else if let ast::Expr::Call(call_expr) = value {
+                        // If the RHS is not a standalone expression, this is a simple assignment
+                        // (single target, no unpackings). That means it's a valid syntactic form
+                        // for a legacy TypeVar creation; check for that.
+                        let callable_type = self.infer_maybe_standalone_expression(
+                            call_expr.func.as_ref(),
+                            TypeContext::default(),
+                        );
+
+                        let ty = if let Some(namedtuple_kind) =
+                            NamedTupleKind::from_type(self.db(), callable_type)
+                        {
+                            self.infer_namedtuple_call_expression(
+                                call_expr,
+                                Some(definition),
+                                namedtuple_kind,
+                            )
+                        } else if let Some(typed_dict_module) =
+                            TypedDictModule::from_type(self.db(), callable_type)
+                        {
+                            self.infer_typeddict_call_expression(
+                                call_expr,
+                                Some(definition),
+                                typed_dict_module,
+                            )
+                        } else if let Some(function) = callable_type.as_function_literal()
+                            && function.is_known(self.db(), KnownFunction::NewClass)
+                        {
+                            self.infer_new_class_call(call_expr, Some(definition))
+                        } else if let Some(base_class) =
+                            enum_call::enum_functional_call_base(self.db(), callable_type)
+                            && let Some(ty) = self.infer_enum_call_expression(
+                                call_expr,
+                                Some(definition),
+                                base_class,
+                            )
+                        {
+                            ty
+                        } else {
+                            match callable_type
+                                .as_class_literal()
+                                .and_then(|cls| cls.known(self.db()))
+                            {
+                                Some(
+                                    typevar_class @ (KnownClass::TypeVar
+                                    | KnownClass::ExtensionsTypeVar),
+                                ) => self.infer_legacy_typevar(
+                                    target,
+                                    call_expr,
+                                    definition,
+                                    typevar_class,
+                                ),
+                                Some(
+                                    paramspec_class @ (KnownClass::ParamSpec
+                                    | KnownClass::ExtensionsParamSpec),
+                                ) => self.infer_legacy_paramspec(
+                                    target,
+                                    call_expr,
+                                    definition,
+                                    paramspec_class,
+                                ),
+                                Some(KnownClass::NewType) => {
+                                    self.infer_newtype_expression(target, call_expr, definition)
+                                }
+                                Some(KnownClass::Type) => {
+                                    // Try to extract the dynamic class with definition.
+                                    // This returns `None` if it's not a three-arg call to `type()`,
+                                    // signalling that we must fall back to normal call inference.
+                                    self.infer_builtins_type_call(call_expr, Some(definition))
+                                }
+                                Some(KnownClass::TypeAliasType) => {
+                                    self.infer_typealiastype_call(target, call_expr, definition)
+                                }
+                                Some(KnownClass::Sentinel) => self
+                                    .infer_sentinel_expression(target, call_expr, definition)
+                                    .unwrap_or_else(|| {
+                                        self.infer_call_expression_impl(
+                                            call_expr,
+                                            callable_type,
+                                            tcx,
+                                        )
+                                    }),
+                                Some(_) | None => {
+                                    self.infer_call_expression_impl(call_expr, callable_type, tcx)
+                                }
+                            }
+                        };
+
+                        self.store_expression_type(value, ty);
                         ty
                     } else {
-                        match callable_type
-                            .as_class_literal()
-                            .and_then(|cls| cls.known(self.db()))
-                        {
-                            Some(
-                                typevar_class @ (KnownClass::TypeVar
-                                | KnownClass::ExtensionsTypeVar),
-                            ) => self.infer_legacy_typevar(
-                                target,
-                                call_expr,
-                                definition,
-                                typevar_class,
-                            ),
-                            Some(
-                                paramspec_class @ (KnownClass::ParamSpec
-                                | KnownClass::ExtensionsParamSpec),
-                            ) => self.infer_legacy_paramspec(
-                                target,
-                                call_expr,
-                                definition,
-                                paramspec_class,
-                            ),
-                            Some(KnownClass::NewType) => {
-                                self.infer_newtype_expression(target, call_expr, definition)
-                            }
-                            Some(KnownClass::Type) => {
-                                // Try to extract the dynamic class with definition.
-                                // This returns `None` if it's not a three-arg call to `type()`,
-                                // signalling that we must fall back to normal call inference.
-                                self.infer_builtins_type_call(call_expr, Some(definition))
-                            }
-                            Some(KnownClass::TypeAliasType) => {
-                                self.infer_typealiastype_call(target, call_expr, definition)
-                            }
-                            Some(KnownClass::Sentinel) => self
-                                .infer_sentinel_expression(target, call_expr, definition)
-                                .unwrap_or_else(|| {
-                                    self.infer_call_expression_impl(call_expr, callable_type, tcx)
-                                }),
-                            Some(_) | None => {
-                                self.infer_call_expression_impl(call_expr, callable_type, tcx)
-                            }
-                        }
+                        self.infer_expression(value, tcx)
                     };
 
-                    self.store_expression_type(value, ty);
-                    ty
-                } else {
-                    self.infer_expression(value, tcx)
+                    self.typevar_binding_context = previous_typevar_binding_context;
+                    value_ty
                 };
-
-                self.typevar_binding_context = previous_typevar_binding_context;
 
                 // `TYPE_CHECKING` is a special variable that should only be assigned `False`
                 // at runtime, but is always considered `True` in type checking.
@@ -3995,6 +4079,99 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         target_ty
+    }
+
+    fn implicit_type_alias_value(
+        &mut self,
+        target: &ast::Expr,
+        value: &ast::Expr,
+        definition: Definition<'db>,
+        explicit_pep_613: bool,
+    ) -> Option<Type<'db>> {
+        let name = target.as_name_expr()?;
+        if !explicit_pep_613 {
+            let current_scope_id = self.scope().file_scope_id(self.db());
+            let current_scope = self.index.scope(current_scope_id);
+            if current_scope.kind() == ScopeKind::Class
+                && let Some(class) = nearest_enclosing_class(self.db(), self.index, self.scope())
+                && is_enum_class_by_inheritance(self.db(), class)
+            {
+                return None;
+            }
+        }
+
+        let runtime_class = self.implicit_type_alias_runtime_class(value, explicit_pep_613)?;
+
+        let value_inference = infer_implicit_type_alias_value(self.db(), definition);
+        if !value_inference.is_valid() || value_inference.ty().is_unknown() {
+            return None;
+        }
+
+        let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
+        let _ = self.infer_expression(value, TypeContext::default());
+        self.typevar_binding_context = previous_typevar_binding_context;
+
+        let alias = ImplicitTypeAliasType::new(self.db(), &name.id, definition, None);
+        Some(Type::KnownInstance(KnownInstanceType::ImplicitTypeAlias(
+            ImplicitTypeAliasInstance::new(self.db(), alias, runtime_class),
+        )))
+    }
+
+    /// e.g.
+    /// ```python
+    /// # Valid implicit type aliases:
+    /// OptionalInt = int | None
+    /// IntList = list[int]
+    /// MyInt: TypeAlias = "int"
+    /// FooBar: TypeAlias = Foo.Bar
+    /// # Invalid implicit type aliases:
+    /// MyInt = "int"
+    /// FooBar = Foo.Bar
+    /// FirstChar = "int"[0]
+    /// InvalidList = list[0]
+    /// ```
+    fn implicit_type_alias_runtime_class(
+        &mut self,
+        value: &ast::Expr,
+        explicit_pep_613: bool,
+    ) -> Option<KnownClass> {
+        match value {
+            ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
+                Some(KnownClass::UnionType)
+            }
+            ast::Expr::Subscript(subscript) => {
+                let mut speculative_builder = self.speculate_without_diagnostics();
+                let value_ty =
+                    speculative_builder.infer_expression(&subscript.value, TypeContext::default());
+                if !self.is_implicit_type_alias_subscript_base(value_ty) {
+                    return None;
+                }
+                Some(KnownClass::GenericAlias)
+            }
+            ast::Expr::StringLiteral(_) if explicit_pep_613 => Some(KnownClass::Str),
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) if explicit_pep_613 => {
+                Some(KnownClass::Type)
+            }
+            _ => None,
+        }
+    }
+
+    fn is_implicit_type_alias_subscript_base(&self, value_ty: Type<'db>) -> bool {
+        match value_ty {
+            Type::ClassLiteral(class) => class.generic_context(self.db()).is_some(),
+            Type::SpecialForm(_) | Type::Dynamic(_) => true,
+            Type::TypeAlias(alias) => alias.generic_context(self.db()).is_some(),
+            Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => {
+                alias.generic_context(self.db()).is_some()
+            }
+            Type::KnownInstance(KnownInstanceType::ImplicitTypeAlias(instance)) => {
+                TypeAliasType::Implicit(instance.alias(self.db()))
+                    .generic_context(self.db())
+                    .is_some()
+            }
+            Type::KnownInstance(KnownInstanceType::TypeVar(_)) => true,
+            _ => false,
+        }
     }
 
     fn infer_newtype_expression(
@@ -4291,7 +4468,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     // Infer the deferred base type of a NewType.
     fn infer_newtype_assignment_deferred(&mut self, arguments: &ast::Arguments) {
-        let inferred = self.infer_type_expression(&arguments.args[1]);
+        let inferred = self
+            .infer_type_expression(&arguments.args[1])
+            .resolve_type_alias(self.db());
 
         if inferred.has_typevar_or_typevar_instance(self.db()) {
             if let Some(builder) = self
@@ -4900,10 +5079,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // RHS (`list[T] | None`), in order to bind `T` to `OptionalList`.
             let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
 
-            let inferred_ty = self.infer_maybe_standalone_expression(
-                value,
-                TypeContext::new(Some(declared.inner_type())),
-            );
+            let inferred_ty = if is_pep_613_type_alias && target.is_name_expr() {
+                self.implicit_type_alias_value(target, value, definition, true)
+                    .unwrap_or_else(|| {
+                        self.infer_maybe_standalone_expression(
+                            value,
+                            TypeContext::new(Some(declared.inner_type())),
+                        )
+                    })
+            } else {
+                self.infer_maybe_standalone_expression(
+                    value,
+                    TypeContext::new(Some(declared.inner_type())),
+                )
+            };
             let inferred_ty = if is_pep_613_type_alias && target.is_name_expr() {
                 // The post-inference pass emits the diagnostic, but this first-pass value is
                 // retained as the alias binding.
@@ -8166,6 +8355,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // in the union/intersection.
             && let Some(callable) = tcx
                 .filter_union(self.db(), Type::is_callable_type)
+                .resolve_type_alias(self.db())
                 .as_callable()
         {
             match callable.signatures(self.db()).overloads.as_slice() {
@@ -8569,7 +8759,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_call_expression_impl(
         &mut self,
         call_expression: &ast::ExprCall,
-        callable_type: Type<'db>,
+        mut callable_type: Type<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Type<'db> {
         fn report_missing_implicit_constructor_call<'db>(
@@ -8608,6 +8798,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             func,
             arguments,
         } = call_expression;
+
+        if let Type::KnownInstance(KnownInstanceType::ImplicitTypeAlias(instance)) = callable_type {
+            callable_type = instance.runtime_value_type(self.db());
+        }
 
         // Semantic indexing recognizes only bare empty constructor calls. Confirm that the name
         // still resolves to the corresponding builtin before using later collection constraints.
@@ -11042,6 +11236,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             #[cfg(debug_assertions)]
             scope,
         }
+    }
+
+    pub(super) fn finish_implicit_type_alias_value_type(
+        mut self,
+        definition: Definition<'db>,
+        value: &ast::Expr,
+    ) -> (Type<'db>, bool) {
+        self.typevar_binding_context = Some(definition);
+        self.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
+        self.setup_dataclass_field_specifiers();
+        let ty = self.infer_type_expression(value);
+        let diagnostics = self.context.finish();
+        (ty, diagnostics.is_empty())
+    }
+
+    pub(super) fn finish_implicit_type_alias_runtime_value_type(
+        mut self,
+        definition: Definition<'db>,
+        value: &ast::Expr,
+    ) -> Type<'db> {
+        self.typevar_binding_context = Some(definition);
+        self.setup_dataclass_field_specifiers();
+        let ty = self.infer_expression(value, TypeContext::default());
+        let ty = ty.apply_type_mapping(
+            self.db(),
+            &TypeMapping::BindLegacyTypevars(BindingContext::Definition(definition)),
+            TypeContext::default(),
+        );
+        let _diagnostics = self.context.finish();
+        ty
     }
 
     pub(super) fn finish_statement(mut self) -> StatementInferenceInner<'db> {

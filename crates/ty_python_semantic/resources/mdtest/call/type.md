@@ -1232,6 +1232,8 @@ def make_named_tuple_chain(depth: int) -> type[object]:
     current: type[object] = object
     for _ in range(depth):
         current = type("Level", (), {"child": NamedTuple("N", [("value", current)])})
+        child = current.child(object)
+        reveal_type(child.value)  # revealed: object
     return current
 
 def make_typed_dict_chain(depth: int) -> type[object]:

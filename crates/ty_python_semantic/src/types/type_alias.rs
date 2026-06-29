@@ -1,25 +1,30 @@
 use std::fmt::Write;
 
 use crate::{
-    Db,
+    Db, FxOrderSet,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, GenericContext, Type, TypeContext,
-        TypeMapping, TypeVarVariance, definition_expression_type,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, GenericContext, KnownInstanceType, Type,
+        TypeContext, TypeMapping, TypeVarKind, TypeVarVariance, binding_type,
+        definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization},
+        infer_implicit_type_alias_runtime_value_type, infer_implicit_type_alias_value_type,
         variance::VarianceInferable,
         visitor,
     },
 };
 use ty_python_core::{
-    definition::{Definition, DefinitionKind},
-    scope::ScopeId,
+    ast_ids::HasScopedUseId,
+    definition::{Definition, DefinitionKind, DefinitionState},
+    scope::{FileScopeId, ScopeId},
     semantic_index,
 };
 
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{parsed_module, parsed_string_annotation};
+use ruff_db::source::source_text;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::visitor::{self as ast_visitor, Visitor};
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PEP695TypeAliasType<'db> {
@@ -201,12 +206,203 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     }
 }
 
+/// A type alias defined implicitly by assigning a type expression to a name.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct ImplicitTypeAliasType<'db> {
+    #[returns(ref)]
+    pub name: Name,
+    pub definition: Definition<'db>,
+    pub(super) specialization: Option<Specialization<'db>>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ImplicitTypeAliasType<'_> {}
+
+pub(super) fn walk_implicit_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    type_alias: ImplicitTypeAliasType<'db>,
+    visitor: &V,
+) {
+    visitor.visit_type(db, type_alias.value_type(db));
+}
+
+struct ImplicitAliasLegacyTypeVarCollector<'a, 'db> {
+    db: &'db dyn Db,
+    alias_definition: Definition<'db>,
+    index: &'a ty_python_core::SemanticIndex<'db>,
+    string_annotation_scope: Option<FileScopeId>,
+    variables: FxOrderSet<BoundTypeVarInstance<'db>>,
+}
+
+impl<'db> ImplicitAliasLegacyTypeVarCollector<'_, 'db> {
+    fn collect_name_from_scope(&mut self, name: &str, scope: FileScopeId) {
+        for (visible_scope_id, _) in self.index.visible_ancestor_scopes(scope) {
+            let place_table = self.index.place_table(visible_scope_id);
+            let Some(symbol_id) = place_table.symbol_id(name) else {
+                continue;
+            };
+
+            let use_def = self.index.use_def_map(visible_scope_id);
+            for binding in use_def.end_of_scope_symbol_bindings(symbol_id) {
+                self.collect_definition_state(binding.binding);
+            }
+
+            return;
+        }
+    }
+
+    fn collect_definition_state(&mut self, definition_state: DefinitionState<'db>) {
+        let Some(definition) = definition_state.definition() else {
+            return;
+        };
+        let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
+            binding_type(self.db, definition)
+        else {
+            return;
+        };
+        if matches!(
+            typevar.kind(self.db),
+            TypeVarKind::LegacyTypeVar
+                | TypeVarKind::LegacyParamSpec
+                | TypeVarKind::Pep613Alias
+                | TypeVarKind::TypingSelf
+        ) {
+            self.variables
+                .insert(typevar.with_binding_context(self.db, self.alias_definition));
+        }
+    }
+}
+
+impl<'ast> Visitor<'ast> for ImplicitAliasLegacyTypeVarCollector<'_, '_> {
+    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+        if let ast::Expr::StringLiteral(string) = expr
+            && let Some(string_literal) = string.as_single_part_string()
+        {
+            let file = self.alias_definition.file(self.db);
+            let source = source_text(self.db, file);
+            if let Ok(parsed) = parsed_string_annotation(source.as_str(), string_literal) {
+                let string_scope = self
+                    .string_annotation_scope
+                    .unwrap_or_else(|| self.index.expression_scope_id(expr));
+                let previous_scope = self.string_annotation_scope.replace(string_scope);
+                self.visit_expr(parsed.expr());
+                self.string_annotation_scope = previous_scope;
+                return;
+            }
+        }
+
+        if let ast::Expr::Name(name) = expr
+            && name.ctx.is_load()
+        {
+            if let Some(scope) = self.string_annotation_scope {
+                self.collect_name_from_scope(&name.id, scope);
+            } else {
+                let file = self.alias_definition.file(self.db);
+                let use_id = name.scoped_use_id(self.db, file);
+                let use_def = self.index.use_def_map(self.index.expression_scope_id(expr));
+
+                for binding in use_def.bindings_at_use(use_id) {
+                    self.collect_definition_state(binding.binding);
+                }
+            }
+        }
+
+        ast_visitor::walk_expr(self, expr);
+    }
+}
+
+#[salsa::tracked]
+impl<'db> ImplicitTypeAliasType<'db> {
+    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+        self.apply_function_specialization(db, self.raw_value_type(db))
+    }
+
+    pub(super) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
+        infer_implicit_type_alias_value_type(db, self.definition(db))
+    }
+
+    pub(crate) fn runtime_value_type(self, db: &'db dyn Db) -> Type<'db> {
+        // The runtime alias object represents the original RHS expression; specialization is
+        // handled when the alias is used as a type expression.
+        infer_implicit_type_alias_runtime_value_type(db, self.definition(db))
+    }
+
+    fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        if let Some(generic_context) = self.generic_context(db) {
+            let specialization = self
+                .specialization(db)
+                .unwrap_or_else(|| generic_context.default_specialization(db, None));
+            let type_mapping = match specialization.materialization_kind(db) {
+                None => {
+                    TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(specialization))
+                }
+                Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
+                    specialization: ApplySpecialization::TypeAlias(specialization),
+                    materialization_kind,
+                },
+            };
+
+            ty.apply_type_mapping_impl(
+                db,
+                &type_mapping,
+                TypeContext::default(),
+                &ApplyTypeMappingVisitor::default(),
+            )
+        } else {
+            ty
+        }
+    }
+
+    pub(crate) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
+    ) -> Self {
+        match self.generic_context(db) {
+            None => self,
+            Some(generic_context) => {
+                let specialization = f(generic_context);
+                Self::new(db, self.name(db), self.definition(db), Some(specialization))
+            }
+        }
+    }
+
+    pub(crate) fn is_specialized(self, db: &'db dyn Db) -> bool {
+        self.specialization(db).is_some()
+    }
+
+    #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        let definition = self.definition(db);
+        let file = definition.file(db);
+        let parsed = parsed_module(db, file).load(db);
+        let value = definition.kind(db).value(&parsed)?;
+        let index = semantic_index(db, file);
+        let mut collector = ImplicitAliasLegacyTypeVarCollector {
+            db,
+            alias_definition: definition,
+            index,
+            string_annotation_scope: None,
+            variables: FxOrderSet::default(),
+        };
+        collector.visit_expr(value);
+
+        let mut variables = FxOrderSet::default();
+        variables.extend(collector.variables);
+        self.raw_value_type(db)
+            .find_legacy_typevars(db, Some(definition), &mut variables);
+        (!variables.is_empty()).then(|| GenericContext::from_typevar_instances(db, variables))
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub enum TypeAliasType<'db> {
     /// A type alias defined using the PEP 695 `type` statement.
     PEP695(PEP695TypeAliasType<'db>),
     /// A type alias defined by manually instantiating the PEP 695 `types.TypeAliasType`.
     ManualPEP695(ManualPEP695TypeAliasType<'db>),
+    /// A type alias defined implicitly by assigning a type expression to a name.
+    Implicit(ImplicitTypeAliasType<'db>),
 }
 
 pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -224,6 +420,9 @@ pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         TypeAliasType::ManualPEP695(type_alias) => {
             walk_manual_pep_695_type_alias(db, type_alias, visitor);
         }
+        TypeAliasType::Implicit(type_alias) => {
+            walk_implicit_type_alias(db, type_alias, visitor);
+        }
     }
 }
 
@@ -232,6 +431,7 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.name(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.name(db),
+            TypeAliasType::Implicit(type_alias) => type_alias.name(db),
         }
     }
 
@@ -239,6 +439,7 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.definition(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.definition(db),
+            TypeAliasType::Implicit(type_alias) => type_alias.definition(db),
         }
     }
 
@@ -246,6 +447,7 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
+            TypeAliasType::Implicit(type_alias) => type_alias.value_type(db),
         }
     }
 
@@ -253,21 +455,22 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.raw_value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
+            TypeAliasType::Implicit(type_alias) => type_alias.raw_value_type(db),
         }
     }
 
     pub(crate) fn as_pep_695_type_alias(self) -> Option<PEP695TypeAliasType<'db>> {
         match self {
             TypeAliasType::PEP695(type_alias) => Some(type_alias),
-            TypeAliasType::ManualPEP695(_) => None,
+            TypeAliasType::ManualPEP695(_) | TypeAliasType::Implicit(_) => None,
         }
     }
 
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
-        // TODO: Add support for generic non-PEP695 type aliases.
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.generic_context(db),
             TypeAliasType::ManualPEP695(_) => None,
+            TypeAliasType::Implicit(type_alias) => type_alias.generic_context(db),
         }
     }
 
@@ -275,6 +478,7 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.specialization(db),
             TypeAliasType::ManualPEP695(_) => None,
+            TypeAliasType::Implicit(type_alias) => type_alias.specialization(db),
         }
     }
 
@@ -282,6 +486,7 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.apply_function_specialization(db, ty),
             TypeAliasType::ManualPEP695(_) => ty,
+            TypeAliasType::Implicit(type_alias) => type_alias.apply_function_specialization(db, ty),
         }
     }
 
@@ -295,6 +500,17 @@ impl<'db> TypeAliasType<'db> {
                 TypeAliasType::PEP695(type_alias.apply_specialization(db, f))
             }
             TypeAliasType::ManualPEP695(_) => self,
+            TypeAliasType::Implicit(type_alias) => {
+                TypeAliasType::Implicit(type_alias.apply_specialization(db, f))
+            }
+        }
+    }
+
+    pub(crate) fn is_specialized(self, db: &'db dyn Db) -> bool {
+        match self {
+            TypeAliasType::PEP695(type_alias) => type_alias.is_specialized(db),
+            TypeAliasType::ManualPEP695(_) => false,
+            TypeAliasType::Implicit(type_alias) => type_alias.is_specialized(db),
         }
     }
 

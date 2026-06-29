@@ -94,7 +94,7 @@ from typing import cast
 RecursiveAlias = list["RecursiveAlias | None"]
 
 def f(x: RecursiveAlias):
-    cast(RecursiveAlias, x)
+    cast(RecursiveAlias, x)  # error: [redundant-cast] "Value is already of type `RecursiveAlias`"
 ```
 
 ## Diagnostic snapshots

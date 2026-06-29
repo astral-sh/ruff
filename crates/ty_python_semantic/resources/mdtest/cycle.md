@@ -155,16 +155,14 @@ from typing import Union, TypeAliasType, Sequence, Mapping
 A = list["A | None"]
 
 def f(x: A):
-    # TODO: should be `list[A | None]`?
-    reveal_type(x)  # revealed: list[Divergent]
-    # TODO: should be `A | None`?
-    reveal_type(x[0])  # revealed: Divergent
+    reveal_type(x)  # revealed: list[A | None]
+    reveal_type(x[0])  # revealed: list[A | None] | None
 
 JSONPrimitive = Union[str, int, float, bool, None]
 JSONValue = TypeAliasType("JSONValue", 'Union[JSONPrimitive, Sequence["JSONValue"], Mapping[str, "JSONValue"]]')
 
 def _(x: JSONValue):
-    reveal_type(x)  # revealed: Sequence[JSONValue] | int | float | None | Mapping[str, JSONValue]
+    reveal_type(x)  # revealed: str | int | float | None | Sequence[JSONValue] | Mapping[str, JSONValue]
 ```
 
 ## Self-referential legacy type variables
@@ -313,7 +311,7 @@ g()
 
 from typing import NamedTuple, NewType
 
-X = NamedTuple("X", [("x", "X")]), None  # error: [invalid-type-form]
+X = NamedTuple("X", [("x", "X")]), None
 
 list(X)
 min(X)
@@ -335,7 +333,7 @@ g()
 from typing import NamedTuple, NewType
 
 X = NewType("X", C)
-Y = NamedTuple("Y", [("a", "Y")]), X  # error: [invalid-type-form]
+Y = NamedTuple("Y", [("a", "Y")]), X
 min(Y)
 T = f()
 ```

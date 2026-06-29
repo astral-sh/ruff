@@ -226,6 +226,9 @@ impl<'db> ClassBase<'db> {
             | Type::TypedDict(_) => None,
 
             Type::KnownInstance(known_instance) => match known_instance {
+                KnownInstanceType::ImplicitTypeAlias(instance) => {
+                    Self::try_from_type(db, instance.runtime_value_type(db), subclass)
+                }
                 KnownInstanceType::SubscriptedGeneric(_) => Some(Self::Generic),
                 KnownInstanceType::SubscriptedProtocol(_) => Some(Self::Protocol),
                 KnownInstanceType::TypeAliasType(_)

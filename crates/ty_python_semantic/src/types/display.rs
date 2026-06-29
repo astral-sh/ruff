@@ -3147,6 +3147,10 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                     f.with_type(ty).write_str("TypeAliasType")
                 }
             }
+            KnownInstanceType::ImplicitTypeAlias(instance) => instance
+                .runtime_value_type(self.db)
+                .display(self.db)
+                .fmt_detailed(f),
             // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
             // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
             // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.

@@ -62,9 +62,9 @@ use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType,
-    TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, TypeAliasType, TypeContext,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder,
+    UnionType, WrapperDescriptorKind, enums, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -7116,17 +7116,20 @@ impl<'db> BindingError<'db> {
                 // This is implemented as a special case in call-binding machinery because overriding
                 // typeshed's signatures for `isinstance()` and `issubclass()` would be complex and
                 // error-prone, due to the fact that they are annotated with recursive type aliases.
+                let known_function = callable_ty
+                    .as_function_literal()
+                    .and_then(|function| function.known(context.db()));
+
                 if parameter.index == 1
                     && *argument_index == Some(1)
                     && matches!(
-                        callable_ty
-                            .as_function_literal()
-                            .and_then(|function| function.known(context.db())),
+                        known_function,
                         Some(KnownFunction::IsInstance | KnownFunction::IsSubclass)
                     )
-                    && provided_ty
-                        .as_special_form()
-                        .is_some_and(SpecialFormType::is_valid_isinstance_target)
+                    && provided_ty.is_valid_isinstance_target(
+                        context.db(),
+                        known_function == Some(KnownFunction::IsSubclass),
+                    )
                 {
                     return;
                 }

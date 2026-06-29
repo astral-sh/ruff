@@ -36,7 +36,7 @@ error[invalid-argument-type]: Argument to bound method `bytes.split` is incorrec
  --> src/mdtest_snippet.py:4:13
   |
 4 |     x.split(" ")
-  |             ^^^ Expected `Buffer | None`, found `Literal[" "]`
+  |             ^^^ Expected `ReadableBuffer | None`, found `Literal[" "]`
   |
 info: type `Literal[" "]` is not assignable to any element of the union `Buffer | None`
 info: ├── type `Literal[" "]` is not assignable to protocol `Buffer`
@@ -48,7 +48,7 @@ info: Method defined here
 1843 |     def split(self, sep: ReadableBuffer | None = None, maxsplit: SupportsIndex = -1) -> list[bytes]:
      |         ^^^^^       --------------------------------- Parameter declared here
      |
-info: Union variant `bound method bytes.split(sep: Buffer | None = None, maxsplit: SupportsIndex = -1) -> list[bytes]` is incompatible with this call site
-info: Attempted to call union type `(bound method bytes.split(sep: Buffer | None = None, maxsplit: SupportsIndex = -1) -> list[bytes]) | (bound method str.split(sep: str | None = None, maxsplit: SupportsIndex = -1) -> list[str])`
+info: Union variant `bound method bytes.split(sep: ReadableBuffer | None = None, maxsplit: SupportsIndex = -1) -> list[bytes]` is incompatible with this call site
+info: Attempted to call union type `(bound method bytes.split(sep: ReadableBuffer | None = None, maxsplit: SupportsIndex = -1) -> list[bytes]) | (bound method str.split(sep: str | None = None, maxsplit: SupportsIndex = -1) -> list[str])`
 
 ```

@@ -546,6 +546,9 @@ impl ClassInfoConstraintFunction {
                     }),
                 )
             }
+            Type::KnownInstance(KnownInstanceType::ImplicitTypeAlias(instance)) => {
+                self.generate_constraint(db, instance.runtime_value_type(db), is_positive)
+            }
 
             Type::SpecialForm(form) => match form {
                 SpecialFormType::LegacyStdlibAlias(alias) => self.generate_constraint(

@@ -1323,8 +1323,8 @@ UnionAlias2 = Union[C, D]
 SubclassOfUnionAlias1 = type[UnionAlias1]
 SubclassOfUnionAlias2 = type[UnionAlias2]
 
-reveal_type(SubclassOfUnionAlias1)  # revealed: <special-form 'type[C | D]'>
-reveal_type(SubclassOfUnionAlias2)  # revealed: <special-form 'type[C | D]'>
+reveal_type(SubclassOfUnionAlias1)  # revealed: <special-form 'type[UnionAlias1]'>
+reveal_type(SubclassOfUnionAlias2)  # revealed: <special-form 'type[UnionAlias2]'>
 
 def _(
     subclass_of_union_alias1: SubclassOfUnionAlias1,
@@ -1727,7 +1727,7 @@ from typing import Union
 Recursive = list[Union["Recursive", None]]
 
 def _(r: Recursive):
-    reveal_type(r)  # revealed: list[Divergent]
+    reveal_type(r)  # revealed: list[Recursive | None]
 ```
 
 ### New union syntax
@@ -1755,12 +1755,12 @@ def _(
     recursive_dict3: RecursiveDict3,
     recursive_dict4: RecursiveDict4,
 ):
-    reveal_type(recursive_list1)  # revealed: list[Divergent]
-    reveal_type(recursive_list2)  # revealed: list[Divergent]
-    reveal_type(recursive_dict1)  # revealed: dict[str, Divergent]
-    reveal_type(recursive_dict2)  # revealed: dict[str, Divergent]
-    reveal_type(recursive_dict3)  # revealed: dict[Divergent, int]
-    reveal_type(recursive_dict4)  # revealed: dict[Divergent, int]
+    reveal_type(recursive_list1)  # revealed: list[RecursiveList1 | None]
+    reveal_type(recursive_list2)  # revealed: list[RecursiveList2 | None]
+    reveal_type(recursive_dict1)  # revealed: dict[str, RecursiveDict1 | None]
+    reveal_type(recursive_dict2)  # revealed: dict[str, RecursiveDict2 | None]
+    reveal_type(recursive_dict3)  # revealed: dict[RecursiveDict3, int]
+    reveal_type(recursive_dict4)  # revealed: dict[RecursiveDict4, int]
 ```
 
 ### Self-referential generic implicit type aliases
@@ -1777,8 +1777,79 @@ def _(
     nested_dict_int: NestedDict[int],
     nested_list_str: NestedList[str],
 ):
-    reveal_type(nested_dict_int)  # revealed: dict[str, Divergent]
-    reveal_type(nested_list_str)  # revealed: list[Divergent]
+    reveal_type(nested_dict_int)  # revealed: dict[str, NestedDict[int] | int]
+    reveal_type(nested_dict_int["key"])  # revealed: dict[str, NestedDict[int] | int] | int
+    reveal_type(nested_list_str)  # revealed: list[NestedList[str] | None]
+    reveal_type(nested_list_str[0])  # revealed: list[NestedList[str] | None] | None
+```
+
+Implicit recursive aliases should not be detected by searching the RHS source text for the alias
+name:
+
+```py
+from typing import Literal
+
+Alias = Literal["Alias"]
+OtherAlias = Literal["Other"]
+OtherAlias2 = Literal["OtherAlias"]
+
+def _(
+    alias: Alias,
+    other_alias: OtherAlias,
+    other_alias2: OtherAlias2,
+):
+    reveal_type(alias)  # revealed: Literal["Alias"]
+    reveal_type(other_alias)  # revealed: Literal["Other"]
+    reveal_type(other_alias2)  # revealed: Literal["OtherAlias"]
+
+class NS:
+    Alias = int
+    Other = int
+
+AttrAlias = list[NS.Alias]
+OtherAttrAlias = list[NS.Other]
+
+reveal_type(Alias)  # revealed: <special-form 'Literal["Alias"]'>
+reveal_type(OtherAlias)  # revealed: <special-form 'Literal["Other"]'>
+reveal_type(AttrAlias)  # revealed: <class 'list[int]'>
+reveal_type(OtherAttrAlias)  # revealed: <class 'list[int]'>
+```
+
+Mutually recursive implicit aliases should preserve alias boundaries when used as types:
+
+```py
+A = list["B"]
+B = list["A"]
+
+reveal_type(A)  # revealed: <class 'list[B]'>
+reveal_type(B)  # revealed: <class 'list[A]'>
+
+def _(a: A, b: B):
+    reveal_type(a)  # revealed: list[B]
+    reveal_type(b)  # revealed: list[A]
+```
+
+Implicit alias values preserve the runtime behavior of their right-hand side:
+
+```py
+ListAlias = list[int]
+
+reveal_type(ListAlias.mro)  # revealed: bound method <class 'list[int]'>.mro() -> list[type]
+reveal_type(ListAlias())  # revealed: list[int]
+reveal_type(ListAlias == list[int])  # revealed: Literal[True]
+reveal_type(list[int] == ListAlias)  # revealed: Literal[True]
+```
+
+### Recursive classinfo
+
+```py
+from types import UnionType
+
+ClassInfo = type | UnionType | tuple["ClassInfo", ...]
+
+def my_isinstance(obj: object, classinfo: ClassInfo) -> bool:
+    reveal_type(classinfo)  # revealed: type | UnionType | tuple[ClassInfo, ...]
+    return isinstance(obj, classinfo)
 ```
 
 ### Materialization of self-referential generic implicit type aliases

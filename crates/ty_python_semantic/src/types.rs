@@ -30,7 +30,9 @@ pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_RE
 pub(crate) use self::infer::{
     InferredDeclaration, TypeContext, infer_complete_scope_types, infer_deferred_types,
     infer_definition_types, infer_expression_type, infer_expression_types,
-    infer_same_file_expression_type, infer_scope_types, is_discarded_dict_key_assignment,
+    infer_implicit_type_alias_runtime_value_type, infer_implicit_type_alias_value,
+    infer_implicit_type_alias_value_type, infer_same_file_expression_type, infer_scope_types,
+    is_discarded_dict_key_assignment,
 };
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
@@ -80,7 +82,8 @@ use crate::types::generics::{
 };
 use crate::types::infer::InferenceFlags;
 use crate::types::known_instance::{
-    InternedConstraintSet, InternedType, SentinelInstance, UnionTypeInstance,
+    ImplicitTypeAliasInstance, InternedConstraintSet, InternedType, SentinelInstance,
+    UnionTypeInstance,
 };
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
 use crate::types::mro::{MroIterator, StaticMroError};
@@ -90,6 +93,7 @@ use crate::types::signatures::walk_signature;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::TupleSpec;
+pub(crate) use crate::types::type_alias::ImplicitTypeAliasType;
 pub use crate::types::type_alias::TypeAliasType;
 pub use crate::types::type_form::TypeFormType;
 pub(crate) use crate::types::typed_dict::TypedDictType;
@@ -292,9 +296,12 @@ struct ApplyDefaultTypeMapping;
 struct ApplyTopMaterialization;
 struct ApplyBottomMaterialization;
 struct ApplyMaterializationEquivalence;
+struct IsValidIsinstanceTarget;
 
 type MaterializationEquivalenceVisitor<'db> =
     Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
+type IsValidIsinstanceTargetVisitor<'db> =
+    CycleDetector<IsValidIsinstanceTarget, Type<'db>, bool, 3>;
 
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
@@ -1520,11 +1527,102 @@ impl<'db> Type<'db> {
         any_over_type(db, self, false, |ty| ty.is_dynamic())
     }
 
-    pub(crate) const fn as_special_form(self) -> Option<SpecialFormType> {
-        match self {
-            Type::SpecialForm(special_form) => Some(special_form),
-            _ => None,
-        }
+    /// Return `true` if this type can be used as the `classinfo` argument to
+    /// `isinstance` or `issubclass` at runtime.
+    ///
+    /// `typing.Any` is accepted by `issubclass`, but not by `isinstance`.
+    pub(crate) fn is_valid_isinstance_target(self, db: &'db dyn Db, allow_any: bool) -> bool {
+        self.is_valid_isinstance_target_impl(
+            db,
+            allow_any,
+            &IsValidIsinstanceTargetVisitor::new(true),
+        )
+    }
+
+    fn is_valid_isinstance_target_impl(
+        self,
+        db: &'db dyn Db,
+        allow_any: bool,
+        visitor: &IsValidIsinstanceTargetVisitor<'db>,
+    ) -> bool {
+        visitor.visit(self, || match self {
+            Type::TypeAlias(alias) => alias
+                .value_type(db)
+                .is_valid_isinstance_target_impl(db, allow_any, visitor),
+            Type::ClassLiteral(_) => true,
+            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
+                SubclassOfInner::Class(ClassType::NonGeneric(_)) => true,
+                SubclassOfInner::Class(ClassType::Generic(_)) => false,
+                SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => true,
+            },
+            Type::Dynamic(_) | Type::Divergent(_) => true,
+            Type::Intersection(intersection) => {
+                intersection.negative(db).is_empty()
+                    && intersection.positive(db).iter().all(|element| {
+                        element.is_valid_isinstance_target_impl(db, allow_any, visitor)
+                    })
+            }
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|element| element.is_valid_isinstance_target_impl(db, allow_any, visitor)),
+            Type::TypeVar(bound_typevar) => {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        bound.is_valid_isinstance_target_impl(db, allow_any, visitor)
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                        .as_type(db)
+                        .is_valid_isinstance_target_impl(db, allow_any, visitor),
+                    None => false,
+                }
+            }
+            Type::GenericAlias(_) => false,
+            Type::NominalInstance(nominal) => nominal.tuple_spec(db).is_some_and(|tuple| {
+                tuple
+                    .iter_all_elements()
+                    .all(|element| element.is_valid_isinstance_target_impl(db, allow_any, visitor))
+            }),
+            Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
+                let Ok(mut value_expression_types) = instance.value_expression_types(db) else {
+                    return false;
+                };
+
+                value_expression_types.all(|element| {
+                    element.is_none(db)
+                        || element.is_valid_isinstance_target_impl(db, allow_any, visitor)
+                })
+            }
+            Type::KnownInstance(KnownInstanceType::ImplicitTypeAlias(instance)) => instance
+                .runtime_value_type(db)
+                .is_valid_isinstance_target_impl(db, allow_any, visitor),
+            Type::SpecialForm(special_form) => {
+                special_form.is_valid_isinstance_target()
+                    || (allow_any && special_form == SpecialFormType::Any)
+            }
+            Type::AlwaysFalsy
+            | Type::AlwaysTruthy
+            | Type::EnumComplement(_)
+            | Type::LiteralValue(_)
+            | Type::BoundMethod(_)
+            | Type::BoundSuper(_)
+            | Type::Callable(_)
+            | Type::DataclassDecorator(_)
+            | Type::Never
+            | Type::KnownBoundMethod(_)
+            | Type::ModuleLiteral(_)
+            | Type::FunctionLiteral(_)
+            | Type::ProtocolInstance(_)
+            | Type::PropertyInstance(_)
+            | Type::KnownInstance(_)
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_)
+            | Type::TypeForm(_)
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassTransformer(_)
+            | Type::TypedDict(_)
+            | Type::NewTypeInstance(_) => false,
+        })
     }
 
     pub const fn as_property_instance(self) -> Option<PropertyInstanceType<'db>> {
@@ -3875,6 +3973,10 @@ impl<'db> Type<'db> {
                     .value_type(db)
                     .member_lookup_with_policy_and_receiver(db, name, policy, receiver),
 
+                Type::KnownInstance(KnownInstanceType::ImplicitTypeAlias(instance)) => instance
+                    .runtime_value_type(db)
+                    .member_lookup_with_policy_and_receiver(db, name, policy, receiver),
+
                 _ if policy.no_instance_fallback() => this.invoke_descriptor_protocol(
                     db,
                     receiver.unwrap_or(this),
@@ -5685,6 +5787,9 @@ impl<'db> Type<'db> {
             // mapped through `to_instance`.
             Type::TypeVar(bound_typevar) => Some(Type::TypeVar(bound_typevar.to_instance(db)?)),
             Type::TypeAlias(alias) => alias.value_type(db).to_instance(db),
+            Type::KnownInstance(KnownInstanceType::ImplicitTypeAlias(instance)) => {
+                instance.runtime_value_type(db).to_instance(db)
+            }
             Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance")),
             // An instance of class `C` may itself have instances if `C` is a subclass of `type`.
             Type::NominalInstance(instance)
@@ -5782,6 +5887,31 @@ impl<'db> Type<'db> {
 
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeAliasType(alias) => Ok(Type::TypeAlias(*alias)),
+                KnownInstanceType::ImplicitTypeAlias(instance) => {
+                    let alias = Type::TypeAlias(TypeAliasType::Implicit(instance.alias(db)));
+                    let runtime_value_type = instance.runtime_value_type(db);
+
+                    // `typing.Type[...]` is represented as a runtime `GenericAlias` object
+                    // in value context. Preserve that value-level information when a retained
+                    // implicit alias object is used as a type expression.
+                    if matches!(
+                        runtime_value_type,
+                        Type::KnownInstance(KnownInstanceType::TypeGenericAlias(_))
+                    ) {
+                        return Ok(runtime_value_type
+                            .in_type_expression(
+                                db,
+                                scope_id,
+                                typevar_binding_context,
+                                inference_flags,
+                            )
+                            .ok()
+                            .filter(|runtime_type| !runtime_type.is_unknown())
+                            .unwrap_or(alias));
+                    }
+
+                    Ok(alias)
+                }
                 KnownInstanceType::NewType(newtype) => Ok(Type::NewTypeInstance(*newtype)),
                 KnownInstanceType::TypeVar(typevar) => {
                     if !inference_flags.contains(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR)
@@ -6700,6 +6830,7 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::SubscriptedGeneric(_)
                 | KnownInstanceType::TypeVar(_)
                 | KnownInstanceType::TypeAliasType(_)
+                | KnownInstanceType::ImplicitTypeAlias(_)
                 | KnownInstanceType::Deprecated(_)
                 | KnownInstanceType::Field(_)
                 | KnownInstanceType::ConstraintSet(_)

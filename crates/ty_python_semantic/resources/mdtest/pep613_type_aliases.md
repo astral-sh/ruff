@@ -96,7 +96,7 @@ from typing import TypeAlias
 
 MyList: TypeAlias = "list[int]"
 
-# error: [invalid-base] "Invalid class base with type `str`"
+# error: [invalid-base] "Invalid class base with type `Literal["list[int]"]`"
 class Foo(MyList): ...
 ```
 
@@ -124,6 +124,19 @@ MyAlias: TypeAlias = int | Callable[[str], int]
 
 def _(x: MyAlias):
     reveal_type(x)  # revealed: int | ((str, /) -> int)
+```
+
+## Callable alias as a lambda type context
+
+```py
+from typing import Callable, TypeAlias
+
+StringFunction: TypeAlias = Callable[[int], str]
+
+ok: StringFunction = lambda value: str(value)
+
+# error: [invalid-assignment]
+bad: StringFunction = lambda value: value
 ```
 
 ## Generic aliases
@@ -162,7 +175,26 @@ TotallyStringifiedPEP613: TypeAlias = "dict[T, U]"
 TotallyStringifiedPartiallySpecialized: TypeAlias = "TotallyStringifiedPEP613[U, int]"
 
 def f(x: "TotallyStringifiedPartiallySpecialized[str]"):
-    reveal_type(x)  # revealed: @Todo(Generic stringified PEP-613 type alias)
+    reveal_type(x)  # revealed: dict[str, int]
+```
+
+## Class-scope alias shadowing
+
+The right-hand side of a class-scope alias can still refer to an imported name with the same name:
+
+```py
+from __future__ import annotations
+from typing import TypeAlias, List
+
+class Class:
+    List: TypeAlias = List
+
+    def bar(self) -> List:
+        return []
+
+def f(x: Class.List, c: Class):
+    reveal_type(x)  # revealed: list[Unknown]
+    reveal_type(c.bar())  # revealed: list[Unknown]
 ```
 
 ## Subscripted generic alias in union
@@ -318,21 +350,28 @@ from types import UnionType
 RecursiveTuple: TypeAlias = tuple["int | RecursiveTuple", str]
 
 def _(rec: RecursiveTuple):
-    # TODO should be `tuple[int | RecursiveTuple, str]`
-    reveal_type(rec)  # revealed: tuple[Divergent, str]
+    reveal_type(rec)  # revealed: tuple[int | RecursiveTuple, str]
 
 RecursiveHomogeneousTuple: TypeAlias = tuple["int | RecursiveHomogeneousTuple", ...]
 
 def _(rec: RecursiveHomogeneousTuple):
-    # TODO should be `tuple[int | RecursiveHomogeneousTuple, ...]`
-    reveal_type(rec)  # revealed: tuple[Divergent, ...]
+    reveal_type(rec)  # revealed: tuple[int | RecursiveHomogeneousTuple, ...]
+
+ExplicitA: TypeAlias = list["ExplicitB"]
+ExplicitB: TypeAlias = list["ExplicitA"]
+
+reveal_type(ExplicitA)  # revealed: <class 'list[ExplicitB]'>
+reveal_type(ExplicitB)  # revealed: <class 'list[ExplicitA]'>
+
+def _(explicit_a: ExplicitA, explicit_b: ExplicitB):
+    reveal_type(explicit_a)  # revealed: list[ExplicitB]
+    reveal_type(explicit_b)  # revealed: list[ExplicitA]
 
 ClassInfo: TypeAlias = type | UnionType | tuple["ClassInfo", ...]
-reveal_type(ClassInfo)  # revealed: <types.UnionType special-form 'type | UnionType | tuple[Divergent, ...]'>
+reveal_type(ClassInfo)  # revealed: <types.UnionType special-form 'type | UnionType | tuple[ClassInfo, ...]'>
 
 def my_isinstance(obj: object, classinfo: ClassInfo) -> bool:
-    # TODO should be `type | UnionType | tuple[ClassInfo, ...]`
-    reveal_type(classinfo)  # revealed: type | UnionType | tuple[Divergent, ...]
+    reveal_type(classinfo)  # revealed: type | UnionType | tuple[ClassInfo, ...]
     return isinstance(obj, classinfo)
 
 K = TypeVar("K")
@@ -340,8 +379,7 @@ V = TypeVar("V")
 NestedDict: TypeAlias = dict[K, Union[V, "NestedDict[K, V]"]]
 
 def _(nested: NestedDict[str, int]):
-    # TODO should be `dict[str, int | NestedDict[str, int]]`
-    reveal_type(nested)  # revealed: dict[@Todo(specialized recursive generic type alias), Divergent]
+    reveal_type(nested)  # revealed: dict[str, int | NestedDict[str, int]]
 
 my_isinstance(1, int)
 my_isinstance(1, int | str)
@@ -350,8 +388,7 @@ my_isinstance(1, (int, (str, float)))
 my_isinstance(1, (int, (str | float)))
 # error: [invalid-argument-type]
 my_isinstance(1, 1)
-# TODO should be an invalid-argument-type error
-my_isinstance(1, (int, (str, 1)))
+my_isinstance(1, (int, (str, 1)))  # error: [invalid-argument-type]
 ```
 
 ## Materialization of self-referential generic PEP 613 type aliases
@@ -548,7 +585,7 @@ class C:
 
 ## Disabled `invalid-type-form` `Self` fallback
 
-Rejected aliases recover as `Unknown` even when the diagnostic is disabled:
+Invalid elements recover as `Unknown` even when the diagnostic is disabled:
 
 ```toml
 [rules]
@@ -570,13 +607,32 @@ class C:
         reveal_type(value)  # revealed: tuple[Unknown]
 
     def takes_stringified(self, value: Stringified) -> None:
-        reveal_type(value)  # revealed: Unknown
+        reveal_type(value)  # revealed: tuple[Unknown, int]
 
     def invalid_attribute(self) -> Self:
         self.attribute: TypeAlias = Self
         return self.attribute  # error: [invalid-return-type]
 
 C().takes(1)
+```
+
+## Runtime behavior
+
+An explicit alias still behaves like the original right-hand side at runtime:
+
+```py
+from typing import TypeAlias
+
+IntAlias: TypeAlias = int
+
+reveal_type(IntAlias.mro)  # revealed: bound method <class 'int'>.mro() -> list[type]
+reveal_type(IntAlias("1"))  # revealed: int
+reveal_type(IntAlias == int)  # revealed: Literal[True]
+reveal_type(int == IntAlias)  # revealed: Literal[True]
+
+def f(x: object):
+    if isinstance(x, IntAlias):
+        reveal_type(x)  # revealed: int
 ```
 
 ## Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow

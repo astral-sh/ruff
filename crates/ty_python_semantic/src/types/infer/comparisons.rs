@@ -287,6 +287,32 @@ pub(super) fn infer_binary_type_comparison<'db>(
             infer_binary_type_comparison(context, left, op, alias.value_type(db), range, visitor)
         })),
 
+        (Type::KnownInstance(KnownInstanceType::ImplicitTypeAlias(instance)), right) => {
+            Some(visitor.visit((left, op, right), || {
+                infer_binary_type_comparison(
+                    context,
+                    instance.runtime_value_type(db),
+                    op,
+                    right,
+                    range,
+                    visitor,
+                )
+            }))
+        }
+
+        (left, Type::KnownInstance(KnownInstanceType::ImplicitTypeAlias(instance))) => {
+            Some(visitor.visit((left, op, right), || {
+                infer_binary_type_comparison(
+                    context,
+                    left,
+                    op,
+                    instance.runtime_value_type(db),
+                    range,
+                    visitor,
+                )
+            }))
+        }
+
         // `try_dunder` works for almost all `NewType`s, but not for `NewType`s of `float` and
         // `complex`, where the concrete base type is a union. In that case it turns out the
         // `self` types of the dunder methods in typeshed don't match, because they don't get

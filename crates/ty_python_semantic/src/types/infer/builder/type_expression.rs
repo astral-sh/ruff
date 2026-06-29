@@ -145,6 +145,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         match expression {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => {
+                    if let Some(alias) = self.implicit_type_alias_for_name(name) {
+                        return Type::TypeAlias(TypeAliasType::Implicit(alias));
+                    }
                     let ty = self.infer_name_expression(name);
                     self.infer_name_or_attribute_type_expression(ty, expression)
                 }
@@ -196,7 +199,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     node_index: _,
                 } = subscript;
 
-                let value_ty = self.infer_expression(value, TypeContext::default());
+                let value_ty = value
+                    .as_name_expr()
+                    .and_then(|name| self.implicit_type_alias_for_name(name))
+                    .map(|alias| {
+                        Type::KnownInstance(KnownInstanceType::TypeAliasType(
+                            TypeAliasType::Implicit(alias),
+                        ))
+                    })
+                    .unwrap_or_else(|| self.infer_expression(value, TypeContext::default()));
 
                 if is_dotted_name(value) {
                     self.infer_subscript_type_expression_no_store(subscript, slice, value_ty)
@@ -1548,8 +1559,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
-                KnownInstanceType::TypeAliasType(type_alias @ TypeAliasType::PEP695(_)) => {
-                    if type_alias.specialization(self.db()).is_some() {
+                KnownInstanceType::TypeAliasType(
+                    type_alias @ (TypeAliasType::PEP695(_) | TypeAliasType::Implicit(_)),
+                ) => {
+                    if type_alias.is_specialized(self.db()) {
                         if !self.in_string_annotation() {
                             self.infer_expression(slice, TypeContext::default());
                         }
@@ -1623,6 +1636,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     let generic_context =
                         GenericContext::from_typevar_instances(self.db(), variables);
                     Type::Dynamic(DynamicType::UnknownGeneric(generic_context))
+                }
+                KnownInstanceType::ImplicitTypeAlias(instance) => {
+                    let type_alias = TypeAliasType::Implicit(instance.alias(self.db()));
+                    match type_alias.generic_context(self.db()) {
+                        Some(generic_context) => {
+                            let specialized = self.infer_explicit_type_alias_type_specialization(
+                                subscript,
+                                value_ty,
+                                type_alias,
+                                generic_context,
+                            );
+                            match specialized {
+                                Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => {
+                                    alias.value_type(self.db())
+                                }
+                                _ => specialized,
+                            }
+                        }
+                        None => self.infer_subscript_type_expression(
+                            subscript,
+                            instance.runtime_value_type(self.db()),
+                        ),
+                    }
                 }
                 KnownInstanceType::LiteralStringAlias(_) => {
                     self.infer_expression(slice, TypeContext::default());
@@ -2628,6 +2664,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // type aliases to literal types
                     Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => {
                         let value_ty = type_alias.value_type(self.db());
+                        if value_ty.is_literal_or_union_of_literals(self.db()) {
+                            return Ok(value_ty);
+                        }
+                    }
+                    Type::KnownInstance(KnownInstanceType::ImplicitTypeAlias(instance)) => {
+                        let value_ty = instance.alias(self.db()).value_type(self.db());
                         if value_ty.is_literal_or_union_of_literals(self.db()) {
                             return Ok(value_ty);
                         }
