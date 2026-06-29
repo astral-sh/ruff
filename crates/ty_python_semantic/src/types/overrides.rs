@@ -23,7 +23,7 @@ use crate::{
         MemberLookupPolicy, Parameter, Parameters, Signature, StaticClassLiteral, Type,
         TypeContext, TypeQualifiers,
         call::CallArguments,
-        class::{CodeGeneratorKind, FieldKind},
+        class::{CodeGeneratorKind, FieldKind, MethodDecorator},
         constraints::ConstraintSetBuilder,
         context::InferContext,
         diagnostic::{
@@ -162,7 +162,8 @@ fn check_inherited_method_conflicts<'db>(
                 continue;
             };
             if selected.owner.class_literal(db) == contract.owner.class_literal(db)
-                || selected.ty.is_assignable_to(db, contract.ty)
+                || (selected.decorator == contract.decorator
+                    && selected.ty.is_assignable_to(db, contract.ty))
             {
                 continue;
             }
@@ -217,6 +218,7 @@ fn source_method_names_in_mro<'db>(db: &'db dyn Db, class: ClassType<'db>) -> Fx
 struct SourceMethodContract<'db> {
     owner: ClassType<'db>,
     definition: Definition<'db>,
+    decorator: MethodDecorator,
     ty: Type<'db>,
 }
 
@@ -272,6 +274,7 @@ fn effective_source_method_contract<'db>(
         return Some(SourceMethodContract {
             owner,
             definition: symbol_definition(db, scope, symbol)?,
+            decorator: MethodDecorator::try_from_fn_type(db, function)?,
             ty,
         });
     }

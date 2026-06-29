@@ -690,6 +690,24 @@ class Right(ReceiverBase):
     def selected(cls) -> str: ...
 
 class FinalReceiver(Left, Right): ...  # error: [invalid-method-override]
+
+class InstanceMethod:
+    def kind(self, value: int) -> int: ...
+
+class StaticMethod:
+    @staticmethod
+    def kind(value: int) -> int: ...
+
+class ClassMethod:
+    @classmethod
+    def kind(cls, value: int) -> int: ...
+
+class InstanceStaticConflict(InstanceMethod, StaticMethod): ...  # error: [invalid-method-override]
+class StaticInstanceConflict(StaticMethod, InstanceMethod): ...  # error: [invalid-method-override]
+class InstanceClassConflict(InstanceMethod, ClassMethod): ...  # error: [invalid-method-override]
+class ClassInstanceConflict(ClassMethod, InstanceMethod): ...  # error: [invalid-method-override]
+class StaticClassConflict(StaticMethod, ClassMethod): ...  # error: [invalid-method-override]
+class ClassStaticConflict(ClassMethod, StaticMethod): ...  # error: [invalid-method-override]
 ```
 
 ```snapshot
