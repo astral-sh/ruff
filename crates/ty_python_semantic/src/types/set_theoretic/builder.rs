@@ -706,21 +706,6 @@ impl<'db> UnionBuilder<'db> {
                     }
                 }
             }
-            Type::Recursive(recursive)
-                if !self.cycle_recovery && matches!(recursive.body(self.db), Type::Union(_)) =>
-            {
-                if seen_aliases.contains(&ty) {
-                    // Union contains itself recursively via a recursive type.
-                } else {
-                    seen_aliases.push(ty);
-                    if let Some(unfolded) = recursive.map_if_unfolded(self.db, |unfolded| unfolded)
-                    {
-                        self.add_in_place_impl(unfolded, seen_aliases);
-                    } else {
-                        self.push_type(ty, seen_aliases);
-                    }
-                }
-            }
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
             Type::TypeAlias(alias) if self.unpack_aliases => {

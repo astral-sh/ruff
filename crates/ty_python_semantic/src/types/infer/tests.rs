@@ -2,7 +2,7 @@ use super::builder::TypeInferenceBuilder;
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, global_symbol};
-use crate::types::{KnownClass, KnownInstanceType, check_types};
+use crate::types::{KnownClass, KnownInstanceType, Type, UnionType, check_types};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
@@ -523,6 +523,51 @@ class Form(Ui):
     ])?;
 
     assert_revealed_type(&db, "/src/package/consumer.py", "int");
+
+    Ok(())
+}
+
+#[test]
+fn recursive_implicit_attribute_reveal_uses_folded_type() -> anyhow::Result<()> {
+    let mut db = setup_db();
+
+    db.write_dedented(
+        "/src/a.py",
+        r#"
+from typing_extensions import reveal_type
+
+class Foo:
+    def __init__(self):
+        self.x = 0
+
+    def nest(self):
+        self.x = [self.x]
+
+reveal_type(Foo().x)
+"#,
+    )?;
+
+    assert_revealed_type(&db, "/src/a.py", "int | list[Divergent]");
+    let file = system_path_to_file(&db, "/src/a.py").unwrap();
+    let foo_instance = global_symbol(&db, file, "Foo")
+        .place
+        .expect_type()
+        .to_instance(&db)
+        .expect("Foo should be instantiable");
+    let x_ty = foo_instance.member(&db, "x").place.expect_type();
+    let Type::Recursive(recursive) = x_ty else {
+        panic!("expected implicit attribute type to be recursive, got {x_ty:?}");
+    };
+    let binder = recursive.binder(&db);
+    let expected_body = UnionType::from_elements_cycle_recovery(
+        &db,
+        [
+            KnownClass::Int.to_instance(&db),
+            KnownClass::List.to_specialized_instance(&db, &[Type::Divergent(binder)]),
+        ],
+    );
+
+    assert_eq!(recursive.body(&db), expected_body);
 
     Ok(())
 }

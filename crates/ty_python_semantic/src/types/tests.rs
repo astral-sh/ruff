@@ -1,5 +1,6 @@
 use super::constraints::ConstraintSetBuilder;
 use super::generics::SpecializationError;
+use super::set_theoretic::RecursivelyDefined;
 use super::typevar::TypeVarInstance;
 use super::*;
 use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
@@ -68,7 +69,7 @@ fn oscillating_generic_alias_cycle_recover<'db>(
 }
 
 #[salsa::tracked(
-    cycle_initial=|_, id| Type::divergent(id),
+    cycle_initial=Type::identity_recursive,
     cycle_fn=oscillating_generic_alias_cycle_recover,
 )]
 fn oscillating_generic_alias(db: &dyn Db) -> Type<'_> {
@@ -94,12 +95,7 @@ fn recursive_type_cycle_recover<'db>(
 }
 
 #[salsa::tracked(
-    cycle_initial=|db, id| {
-        let binder = Type::divergent(id)
-            .as_divergent()
-            .unwrap();
-        RecursiveType::new(db, binder, RecursiveOrigin::Implicit, Type::Divergent(binder))
-    },
+    cycle_initial=Type::identity_recursive,
     cycle_fn=recursive_type_cycle_recover,
 )]
 fn recursive_type_cycle(db: &dyn Db) -> Type<'_> {
@@ -110,12 +106,7 @@ fn recursive_type_cycle(db: &dyn Db) -> Type<'_> {
 }
 
 #[salsa::tracked(
-    cycle_initial=|db, id| {
-        let binder = Type::divergent(id)
-            .as_divergent()
-            .unwrap();
-        RecursiveType::new(db, binder, RecursiveOrigin::Implicit, Type::Divergent(binder))
-    },
+    cycle_initial=Type::identity_recursive,
     cycle_fn=recursive_type_cycle_recover,
 )]
 fn recursive_type_bottom_cycle(db: &dyn Db) -> Type<'_> {
@@ -403,7 +394,7 @@ fn recursive_list_type(db: &dyn Db, marker_bits: u32) -> (Type<'_>, RecursiveTyp
             [KnownClass::Int.to_instance(db), Type::Divergent(binder)],
         )],
     );
-    let recursive_ty = RecursiveType::new(db, binder, RecursiveOrigin::Implicit, body);
+    let recursive_ty = RecursiveType::build(db, binder, RecursiveOrigin::Implicit, body);
     let Type::Recursive(recursive) = recursive_ty else {
         panic!("expected recursive list body to contain its binder");
     };
@@ -423,7 +414,7 @@ fn recursive_list_type_expression(db: &dyn Db, marker_bits: u32) -> (Type<'_>, R
             [KnownClass::Int.to_instance(db), Type::Divergent(binder)],
         ),
     ));
-    let recursive_ty = RecursiveType::new(db, binder, RecursiveOrigin::Implicit, body);
+    let recursive_ty = RecursiveType::build(db, binder, RecursiveOrigin::Implicit, body);
     let Type::Recursive(recursive) = recursive_ty else {
         panic!("expected recursive list type expression body to contain its binder");
     };
@@ -534,9 +525,41 @@ fn recursive_type_constructor_elides_unused_binder() {
     let int = KnownClass::Int.to_instance(&db);
 
     assert_eq!(
-        RecursiveType::new(&db, binder, RecursiveOrigin::Implicit, int),
+        RecursiveType::build(&db, binder, RecursiveOrigin::Implicit, int),
         int
     );
+}
+
+#[test]
+fn recursive_type_constructor_preserves_identity_from_binder_only_union() {
+    let db = setup_db();
+    let binder = divergent_marker(15);
+    let elements: Box<[Type<'_>]> = [Type::Divergent(binder), Type::Divergent(binder)].into();
+    let body = Type::Union(UnionType::new(&db, elements, RecursivelyDefined::No));
+
+    let recursive_ty = RecursiveType::build(&db, binder, RecursiveOrigin::Implicit, body);
+    let Type::Recursive(recursive) = recursive_ty else {
+        panic!("expected binder-only body to remain recursive");
+    };
+
+    assert_eq!(recursive.body(&db), Type::Divergent(binder));
+}
+
+#[test]
+fn recursive_type_constructor_marks_literals_from_top_level_binder_union_recursively_defined() {
+    let db = setup_db();
+    let binder = divergent_marker(17);
+    let body = UnionType::from_elements_cycle_recovery(
+        &db,
+        [Type::int_literal(1), Type::Divergent(binder)],
+    );
+
+    let recursive_ty = RecursiveType::build(&db, binder, RecursiveOrigin::Implicit, body);
+    let Type::LiteralValue(literal) = recursive_ty else {
+        panic!("expected recursive literal union to simplify to a literal");
+    };
+
+    assert_eq!(literal.recursively_defined(), RecursivelyDefined::Yes);
 }
 
 #[test]
@@ -558,8 +581,8 @@ type Alias = int
             [KnownClass::Int.to_instance(&db), Type::Divergent(binder)],
         )],
     );
-    let implicit = RecursiveType::new(&db, binder, RecursiveOrigin::Implicit, body);
-    let alias_origin = RecursiveType::new(
+    let implicit = RecursiveType::build(&db, binder, RecursiveOrigin::Implicit, body);
+    let alias_origin = RecursiveType::build(
         &db,
         binder,
         RecursiveOrigin::TypeAlias(TypeAliasType::PEP695(alias)),
@@ -611,7 +634,7 @@ fn recursive_type_fold_and_unfold() {
 fn recursive_type_identity_meta_type_preserves_marker() {
     let db = setup_db();
     let binder = divergent_marker(35);
-    let recursive_ty = RecursiveType::new(
+    let recursive_ty = RecursiveType::build(
         &db,
         binder,
         RecursiveOrigin::Implicit,
@@ -756,11 +779,8 @@ fn recursive_type_cycle_recovery_constructs_recursive_fixed_point() {
 fn recursive_type_cycle_recovery_uses_previous_approximation() {
     let db = setup_db();
     let recursive_ty = recursive_type_bottom_cycle(&db);
-    let Type::Recursive(recursive) = recursive_ty else {
-        panic!("cycle recovery should preserve the previous recursive approximation");
-    };
 
-    assert_eq!(recursive.body(&db), Type::Divergent(recursive.binder(&db)));
+    assert_eq!(recursive_ty, Type::Never);
 }
 
 #[test]
@@ -774,7 +794,7 @@ fn recursive_type_cycle_fold_uses_previous_recursive_type() {
             KnownClass::List.to_specialized_instance(&db, &[Type::Divergent(binder)]),
         ],
     );
-    let previous = RecursiveType::new(&db, binder, RecursiveOrigin::Implicit, previous_body);
+    let previous = RecursiveType::build(&db, binder, RecursiveOrigin::Implicit, previous_body);
     let current = UnionType::from_elements_cycle_recovery(
         &db,
         [
@@ -784,7 +804,141 @@ fn recursive_type_cycle_fold_uses_previous_recursive_type() {
     );
     let merged = UnionType::from_elements_cycle_recovery(&db, [previous, current]);
 
-    assert_eq!(merged.cycle_fold_recursive(&db, previous), Some(previous));
+    assert_eq!(
+        merged.cycle_fold_with_previous(&db, previous),
+        Some(previous)
+    );
+}
+
+#[test]
+fn recursive_type_cycle_fold_collapses_unfolded_previous_before_binding() {
+    let db = setup_db();
+    let binder = divergent_marker(25);
+    let previous_body = UnionType::from_elements_cycle_recovery(
+        &db,
+        [
+            KnownClass::Int.to_instance(&db),
+            KnownClass::List.to_specialized_instance(&db, &[Type::Divergent(binder)]),
+        ],
+    );
+    let previous = RecursiveType::build(&db, binder, RecursiveOrigin::Implicit, previous_body);
+    let Type::Recursive(previous_recursive) = previous else {
+        panic!("expected previous approximation to be recursive");
+    };
+    let current = UnionType::from_elements_cycle_recovery(
+        &db,
+        [
+            KnownClass::Int.to_instance(&db),
+            KnownClass::List.to_specialized_instance(&db, &[previous_recursive.unfolded(&db)]),
+        ],
+    );
+    assert_eq!(
+        current.cycle_fold_with_previous(&db, previous),
+        Some(previous)
+    );
+}
+
+#[test]
+fn recursive_type_cycle_fold_collapses_rebuilt_unfolded_previous_before_binding() {
+    let db = setup_db();
+    let binder = divergent_marker(28);
+    let previous_body = UnionType::from_elements_cycle_recovery(
+        &db,
+        [
+            KnownClass::Int.to_instance(&db),
+            KnownClass::List.to_specialized_instance(&db, &[Type::Divergent(binder)]),
+        ],
+    );
+    let previous = RecursiveType::build(&db, binder, RecursiveOrigin::Implicit, previous_body);
+    let rebuilt_unfolded = UnionType::from_elements_cycle_recovery(
+        &db,
+        [
+            KnownClass::Int.to_instance(&db),
+            KnownClass::List.to_specialized_instance(&db, &[previous]),
+        ],
+    );
+    let current = UnionType::from_elements_cycle_recovery(
+        &db,
+        [
+            KnownClass::Int.to_instance(&db),
+            KnownClass::List.to_specialized_instance(&db, &[rebuilt_unfolded]),
+        ],
+    );
+    assert_eq!(
+        current.cycle_fold_with_previous(&db, previous),
+        Some(previous)
+    );
+}
+
+#[test]
+fn recursive_type_cycle_fold_preserves_materialized_binder_history() {
+    let db = setup_db();
+    let binder = divergent_marker(29);
+    let materialized_binder = Type::Divergent(binder).bottom_materialization(&db);
+    let previous_body = UnionType::from_elements_cycle_recovery(
+        &db,
+        [
+            KnownClass::Int.to_instance(&db),
+            KnownClass::List.to_specialized_instance(&db, &[materialized_binder]),
+        ],
+    );
+    let previous = RecursiveType::build(&db, binder, RecursiveOrigin::Implicit, previous_body);
+    let Type::Recursive(previous_recursive) = previous else {
+        panic!("expected previous approximation to be recursive");
+    };
+    let current = UnionType::from_elements_cycle_recovery(
+        &db,
+        [
+            KnownClass::Int.to_instance(&db),
+            KnownClass::List.to_specialized_instance(&db, &[previous_recursive.unfolded(&db)]),
+        ],
+    );
+    let expected_body = UnionType::from_elements_cycle_recovery(
+        &db,
+        [
+            KnownClass::Int.to_instance(&db),
+            KnownClass::List.to_specialized_instance(&db, &[materialized_binder]),
+            KnownClass::List.to_specialized_instance(&db, &[Type::Divergent(binder)]),
+        ],
+    );
+    let expected = RecursiveType::build(&db, binder, RecursiveOrigin::Implicit, expected_body);
+
+    assert_eq!(
+        current.cycle_fold_with_previous(&db, previous),
+        Some(expected)
+    );
+}
+
+#[test]
+fn recursive_type_fold_recursive_unfolded_bodies() {
+    let db = setup_db();
+    let binder = divergent_marker(30);
+    let previous_body = UnionType::from_elements_cycle_recovery(
+        &db,
+        [
+            KnownClass::Int.to_instance(&db),
+            KnownClass::List.to_specialized_instance(&db, &[Type::Divergent(binder)]),
+        ],
+    );
+    let previous = RecursiveType::build(&db, binder, RecursiveOrigin::Implicit, previous_body);
+    let current_body = UnionType::from_elements(
+        &db,
+        [
+            KnownClass::Int.to_instance(&db),
+            KnownClass::List.to_specialized_instance(&db, &[previous]),
+        ],
+    );
+
+    let Type::Recursive(previous_recursive) = previous else {
+        panic!("previous should be recursive");
+    };
+
+    assert_eq!(
+        current_body.fold_recursive(&db, previous_recursive),
+        previous
+    );
+    assert_eq!(previous.promote_class_literals(&db), previous);
+    assert_eq!(UnionBuilder::new(&db).add(previous).build(), previous);
 }
 
 #[test]
@@ -792,7 +946,7 @@ fn recursive_type_cycle_fold_replaces_previous_inside_other_structures() {
     let db = setup_db();
     let binder = divergent_marker(23);
     let previous_body = KnownClass::List.to_specialized_instance(&db, &[Type::Divergent(binder)]);
-    let previous = RecursiveType::new(&db, binder, RecursiveOrigin::Implicit, previous_body);
+    let previous = RecursiveType::build(&db, binder, RecursiveOrigin::Implicit, previous_body);
     let current = Type::heterogeneous_tuple(
         &db,
         [
@@ -800,23 +954,26 @@ fn recursive_type_cycle_fold_replaces_previous_inside_other_structures() {
             KnownClass::List.to_specialized_instance(&db, &[previous]),
         ],
     );
-    let expected_body = Type::heterogeneous_tuple(
+    let expected_body = UnionType::from_elements_cycle_recovery(
         &db,
         [
-            Type::Divergent(binder),
-            KnownClass::List.to_specialized_instance(&db, &[Type::Divergent(binder)]),
+            previous_body,
+            Type::heterogeneous_tuple(&db, [Type::Divergent(binder), Type::Divergent(binder)]),
         ],
     );
-    let expected = RecursiveType::new(&db, binder, RecursiveOrigin::Implicit, expected_body);
+    let expected = RecursiveType::build(&db, binder, RecursiveOrigin::Implicit, expected_body);
 
-    assert_eq!(current.cycle_fold_recursive(&db, previous), Some(expected));
+    assert_eq!(
+        current.cycle_fold_with_previous(&db, previous),
+        Some(expected)
+    );
 }
 
 #[test]
 fn recursive_type_cycle_fold_removes_identity_previous_from_top_level_union() {
     let db = setup_db();
     let binder = divergent_marker(21);
-    let previous = RecursiveType::new(
+    let previous = RecursiveType::build(
         &db,
         binder,
         RecursiveOrigin::Implicit,
@@ -837,9 +994,12 @@ fn recursive_type_cycle_fold_removes_identity_previous_from_top_level_union() {
             KnownClass::List.to_specialized_instance(&db, &[Type::Divergent(binder)]),
         ],
     );
-    let expected = RecursiveType::new(&db, binder, RecursiveOrigin::Implicit, expected_body);
+    let expected = RecursiveType::build(&db, binder, RecursiveOrigin::Implicit, expected_body);
 
-    assert_eq!(merged.cycle_fold_recursive(&db, previous), Some(expected));
+    assert_eq!(
+        merged.cycle_fold_with_previous(&db, previous),
+        Some(expected)
+    );
 }
 
 #[test]
@@ -1210,7 +1370,7 @@ fn recursive_type_iteration_preserves_unfolded_element_shape() {
 fn recursive_type_identity_subscript_preserves_recursive_marker() {
     let db = setup_db();
     let binder = divergent_marker(27);
-    let recursive_ty = RecursiveType::new(
+    let recursive_ty = RecursiveType::build(
         &db,
         binder,
         RecursiveOrigin::Implicit,
@@ -1235,7 +1395,7 @@ fn recursive_type_identity_subscript_preserves_recursive_marker() {
 fn recursive_type_does_not_unfold_identity_forever() {
     let db = setup_db();
     let binder = divergent_marker(12);
-    let recursive_ty = RecursiveType::new(
+    let recursive_ty = RecursiveType::build(
         &db,
         binder,
         RecursiveOrigin::Implicit,
@@ -1352,7 +1512,7 @@ def f(x: int) -> int:
             [Type::Divergent(binder), function_ty],
         )],
     );
-    let recursive_ty = RecursiveType::new(&db, binder, RecursiveOrigin::Implicit, body);
+    let recursive_ty = RecursiveType::build(&db, binder, RecursiveOrigin::Implicit, body);
     let Type::Recursive(recursive) = recursive_ty else {
         panic!("expected recursive body to contain its binder");
     };
@@ -1430,7 +1590,7 @@ def f(x: int) -> int:
     };
     let function_id = function.as_id();
     let binder = divergent_marker(22);
-    let previous = RecursiveType::new(
+    let previous = RecursiveType::build(
         &db,
         binder,
         RecursiveOrigin::Implicit,
@@ -1446,7 +1606,7 @@ def f(x: int) -> int:
     );
 
     db.clear_salsa_events();
-    let _ = current.cycle_fold_recursive(&db, previous);
+    let _ = current.cycle_fold_with_previous(&db, previous);
 
     let events = db.take_salsa_events();
     assert_no_type_inference_queries_were_run(&db, &events);

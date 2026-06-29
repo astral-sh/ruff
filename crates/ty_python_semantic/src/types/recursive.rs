@@ -5,8 +5,9 @@ use crate::place::{Place, PlaceAndQualifiers};
 use crate::types::visitor;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableTypes, DivergentType, GeneratorTypes, PropertyInstanceType,
-    TupleSpec, Type, TypeAliasType, TypeContext, TypeMapping,
-    generics::{ApplySpecialization, Specialization, SpecializationError},
+    TupleSpec, Type, TypeAliasType, TypeContext, TypeMapping, UnionBuilder,
+    generics::{Specialization, SpecializationError},
+    set_theoretic::RecursivelyDefined,
 };
 
 /// The source that introduced a recursive type.
@@ -38,21 +39,56 @@ pub(crate) fn walk_recursive_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> RecursiveType<'db> {
-    #[expect(
-        clippy::new_ret_no_self,
-        reason = "The constructor canonicalizes away unused binders."
-    )]
-    pub(crate) fn new(
+    /// Creates recursive or normal types according to the following rules:
+    /// * `μa. T = T` (if T does not contain a)
+    /// * `μa. T | a = μa. T` (T | a = T | T = T)
+    pub(crate) fn build(
         db: &'db dyn Db,
         binder: DivergentType,
         origin: RecursiveOrigin<'db>,
         body: Type<'db>,
     ) -> Type<'db> {
+        fn remove_top_level_binder_from_union<'db>(
+            db: &'db dyn Db,
+            body: Type<'db>,
+            binder: DivergentType,
+        ) -> Type<'db> {
+            let Type::Union(union) = body else {
+                return body;
+            };
+
+            let binder_type = Type::Divergent(binder);
+            let mut builder = UnionBuilder::new(db)
+                .cycle_recovery(true)
+                .recursively_defined(union.recursively_defined(db));
+            let mut removed_binder = false;
+            let mut kept_contains_binder = false;
+
+            for element in union.elements(db) {
+                if element.same_divergent_marker(binder_type) {
+                    removed_binder = true;
+                } else {
+                    kept_contains_binder |= element.contains_divergent_marker(db, binder);
+                    builder = builder.add(*element);
+                }
+            }
+
+            if removed_binder {
+                if !kept_contains_binder {
+                    builder = builder.recursively_defined(RecursivelyDefined::Yes);
+                }
+                builder.try_build().unwrap_or(binder_type)
+            } else {
+                Type::Union(union)
+            }
+        }
+
         let body = body.apply_type_mapping(
             db,
             &TypeMapping::ReplaceRecursiveBinder(binder),
             TypeContext::default(),
         );
+        let body = remove_top_level_binder_from_union(db, body, binder);
         if body.contains_divergent_marker(db, binder) {
             Type::Recursive(Self::new_internal(db, binder, origin, body))
         } else {
@@ -80,32 +116,11 @@ impl<'db> RecursiveType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
-        let body = self
-            .body(db)
-            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        Self::new(db, self.binder(db), self.map_origin(db, type_mapping), body)
-    }
-
-    fn map_origin(
-        self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'_, 'db>,
-    ) -> RecursiveOrigin<'db> {
-        let origin = self.origin(db);
-        let RecursiveOrigin::TypeAlias(alias) = origin else {
-            return origin;
-        };
-
-        let specialization = match type_mapping {
-            TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(specialization))
-            | TypeMapping::ApplySpecializationWithMaterialization {
-                specialization: ApplySpecialization::TypeAlias(specialization),
-                ..
-            } => *specialization,
-            _ => return origin,
-        };
-
-        RecursiveOrigin::TypeAlias(alias.apply_specialization(db, |_| specialization))
+        self.map_or_else_folded(
+            db,
+            || Type::Recursive(self),
+            |unfolded| unfolded.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+        )
     }
 
     pub(crate) fn map_if_unfolded<T>(

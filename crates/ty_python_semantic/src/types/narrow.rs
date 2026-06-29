@@ -392,7 +392,7 @@ struct PatternSuccessAnalyzer<'db> {
 /// ```
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, _| PatternSuccessTypes::cycle_initial(Type::divergent(id)),
+    cycle_initial=|db, id, _| PatternSuccessTypes::cycle_initial(Type::identity_recursive(db, id)),
     cycle_fn=|db, cycle, previous: &PatternSuccessTypes<'db>, result: PatternSuccessTypes<'db>, _| {
         result.cycle_normalized(db, previous, cycle)
     },

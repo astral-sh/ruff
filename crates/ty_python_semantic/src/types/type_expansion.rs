@@ -122,9 +122,12 @@ mod tests {
         let binder = divergent_marker(1);
         let body = UnionType::from_elements(
             &db,
-            [KnownClass::Int.to_instance(&db), Type::Divergent(binder)],
+            [
+                KnownClass::Int.to_instance(&db),
+                KnownClass::List.to_specialized_instance(&db, &[Type::Divergent(binder)]),
+            ],
         );
-        let recursive_ty = RecursiveType::new(&db, binder, RecursiveOrigin::Implicit, body);
+        let recursive_ty = RecursiveType::build(&db, binder, RecursiveOrigin::Implicit, body);
         let Type::Recursive(recursive) = recursive_ty else {
             panic!("expected recursive union body to contain its binder");
         };

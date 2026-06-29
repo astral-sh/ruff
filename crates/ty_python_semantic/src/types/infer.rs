@@ -120,7 +120,7 @@ fn extend_collection_use_constraints<'db>(
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+        DefinitionInference::cycle_initial(db, definition, Type::identity_recursive(db, id))
     },
     cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition| {
         inference.cycle_normalized(db, previous, cycle, definition)
@@ -255,7 +255,7 @@ impl<'db> FunctionDecoratorInference<'db> {
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+        DefinitionInference::cycle_initial(db, definition, Type::identity_recursive(db, id))
     },
     cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition| {
         inference.cycle_normalized(db, previous, cycle, definition)
@@ -326,7 +326,7 @@ pub(crate) fn infer_scope_types<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, _| ScopeInference::cycle_initial(Type::divergent(id)),
+    cycle_initial=|db, id, _| ScopeInference::cycle_initial(Type::identity_recursive(db, id)),
     cycle_fn=|db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
     },
@@ -402,7 +402,7 @@ fn expression_cycle_initial<'db>(
     input: InferExpression<'db>,
 ) -> ExpressionInference<'db> {
     let (expression, _) = input.into_inner(db);
-    let cycle_recovery = Type::divergent(id);
+    let cycle_recovery = Type::identity_recursive(db, id);
     ExpressionInference::cycle_initial(expression.scope(db), cycle_recovery)
 }
 
@@ -436,7 +436,7 @@ pub(crate) fn infer_expression_type<'db>(
 }
 
 #[salsa::tracked(
-    cycle_initial=|_, id, _| Type::divergent(id),
+    cycle_initial=|db, id, _| Type::identity_recursive(db, id),
     cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _| {
         result.cycle_normalized(db, *previous, cycle)
     },
@@ -474,9 +474,7 @@ pub(super) fn infer_statement_types<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, statement: StatementInner<'db>| {
-        StatementInferenceInner::cycle_initial(statement.scope(db), Type::divergent(id))
-    },
+    cycle_initial=statement_cycle_initial,
     cycle_fn=|db, cycle, previous: &StatementInferenceInner<'db>, inference: StatementInferenceInner<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
     },
@@ -500,6 +498,14 @@ fn infer_statement_types_impl<'db>(
 
     TypeInferenceBuilder::new(db, InferenceRegion::Statement(statement), index, &module)
         .finish_statement()
+}
+
+fn statement_cycle_initial<'db>(
+    db: &'db dyn Db,
+    id: salsa::Id,
+    statement: StatementInner<'db>,
+) -> StatementInferenceInner<'db> {
+    StatementInferenceInner::cycle_initial(statement.scope(db), Type::identity_recursive(db, id))
 }
 
 /// An `Expression` with an optional `TypeContext`.
@@ -651,7 +657,7 @@ impl<'db> From<Type<'db>> for TypeContext<'db> {
 /// during this unpacking.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, _| UnpackResult::cycle_initial(Type::divergent(id)),
+    cycle_initial=|db, id, _| UnpackResult::cycle_initial(Type::identity_recursive(db, id)),
     cycle_fn=|db, cycle, previous: &UnpackResult<'db>, result: UnpackResult<'db>, _| {
         result.cycle_normalized(db, previous, cycle)
     },

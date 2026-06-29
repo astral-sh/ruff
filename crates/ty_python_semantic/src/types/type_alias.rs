@@ -64,7 +64,7 @@ impl<'db> PEP695TypeAliasType<'db> {
             let _ = id;
             let alias = TypeAliasType::PEP695(alias);
             let binder = alias.recursive_binder();
-            RecursiveType::new(
+            RecursiveType::build(
                 db,
                 binder,
                 RecursiveOrigin::TypeAlias(alias),
@@ -200,7 +200,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
             let _ = id;
             let alias = TypeAliasType::ManualPEP695(alias);
             let binder = alias.recursive_binder();
-            RecursiveType::new(
+            RecursiveType::build(
                 db,
                 binder,
                 RecursiveOrigin::TypeAlias(alias),
@@ -254,7 +254,7 @@ fn normalize_recursive_alias_value<'db>(
         TypeContext::default(),
     );
     if body.contains_divergent_marker(db, binder) {
-        RecursiveType::new(db, binder, RecursiveOrigin::TypeAlias(alias), body)
+        RecursiveType::build(db, binder, RecursiveOrigin::TypeAlias(alias), body)
     } else {
         value_type
     }

@@ -1055,6 +1055,17 @@ impl<'db> Type<'db> {
         Self::Divergent(DivergentType::new(id))
     }
 
+    /// Create a recursive type that is equivalent to `μa.a`, i.e. an identity recursive type.
+    pub(crate) fn identity_recursive(db: &'db dyn Db, id: salsa::Id) -> Self {
+        let binder = DivergentType::new(id);
+        RecursiveType::build(
+            db,
+            binder,
+            RecursiveOrigin::Implicit,
+            Type::Divergent(binder),
+        )
+    }
+
     pub(crate) const fn is_divergent(&self) -> bool {
         matches!(self, Type::Divergent(_))
     }
@@ -1205,7 +1216,12 @@ impl<'db> Type<'db> {
         // So we avoid unioning in the first couple iterations, and just use the later iteration's
         // result directly. We still ensure monotonicity after the first couple iterations, which
         // still ensures convergence in cases that are prone to oscillation.
-        let recovered = if cycle.iteration() <= crate::TAINTED_CYCLES {
+        let preserve_cycle_history = cycle.iteration() > crate::TAINTED_CYCLES;
+        let recovered = if let Some(folded) =
+            self.cycle_fold_with_previous_impl(db, previous, preserve_cycle_history)
+        {
+            folded
+        } else if cycle.iteration() <= crate::TAINTED_CYCLES {
             let self_degraded_by_overload =
                 any_over_type(db, self, false, |ty| {
                     matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
@@ -1231,64 +1247,75 @@ impl<'db> Type<'db> {
             // this cycle, if any.
             UnionType::from_elements_cycle_recovery(db, [previous, self])
         };
-        let fold_input = if matches!(previous, Type::Recursive(_)) {
-            UnionType::from_elements_cycle_recovery(db, [previous, recovered])
-        } else {
-            recovered
-        };
-
-        fold_input
-            .cycle_fold_recursive(db, previous)
+        recovered
+            .cycle_fold_with_identity(db, cycle)
             .unwrap_or_else(|| recovered.recursive_type_normalized(db, cycle))
     }
 
-    fn cycle_fold_recursive(self, db: &'db dyn Db, previous: Self) -> Option<Self> {
-        let Type::Recursive(recursive) = previous else {
+    fn cycle_fold_with_previous(self, db: &'db dyn Db, previous: Type<'db>) -> Option<Self> {
+        self.cycle_fold_with_previous_impl(db, previous, true)
+    }
+
+    fn cycle_fold_with_previous_impl(
+        self,
+        db: &'db dyn Db,
+        previous: Type<'db>,
+        preserve_cycle_history: bool,
+    ) -> Option<Self> {
+        let Type::Recursive(previous_rec) = previous else {
             return None;
         };
-        let binder = recursive.binder(db);
-        let origin = recursive.origin(db);
+        if let Type::Recursive(current_rec) = self
+            && current_rec.has_same_binder(db, previous_rec)
+        {
+            return Some(self);
+        }
 
-        // Cycle recovery folds the previous approximation itself, not arbitrary unfolded bodies.
-        let folded = self.apply_type_mapping_impl(
+        Some(self.cycle_fold_recursive(db, previous_rec, preserve_cycle_history))
+    }
+
+    fn cycle_fold_with_identity(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Option<Self> {
+        let preserve_cycle_history = cycle.iteration() > crate::TAINTED_CYCLES;
+        cycle.head_ids().try_fold(self, |ty, id| {
+            ty.cycle_fold_with_previous_impl(
+                db,
+                Type::identity_recursive(db, id),
+                preserve_cycle_history,
+            )
+        })
+    }
+
+    fn cycle_fold_recursive(
+        self,
+        db: &'db dyn Db,
+        previous: RecursiveType<'db>,
+        preserve_cycle_history: bool,
+    ) -> Self {
+        let binder = previous.binder(db);
+        let origin = previous.origin(db);
+
+        let folded_to_previous = self.apply_type_mapping_impl(
             db,
-            &TypeMapping::CycleFoldRecursive { previous, binder },
+            &TypeMapping::FoldRecursive(previous),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
         );
-        let body = folded.without_top_level_divergent_marker(db, binder);
-
-        Some(RecursiveType::new(db, binder, origin, body))
-    }
-
-    fn without_top_level_divergent_marker(self, db: &'db dyn Db, marker: DivergentType) -> Self {
-        let Type::Union(union) = self else {
-            return self;
+        let folded = folded_to_previous.apply_type_mapping_impl(
+            db,
+            &TypeMapping::CycleFoldRecursive {
+                previous: Type::Recursive(previous),
+                binder,
+            },
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        );
+        let body = if preserve_cycle_history {
+            UnionType::from_elements_cycle_recovery(db, [previous.body(db), folded])
+        } else {
+            folded
         };
 
-        let div = Type::Divergent(marker);
-        let mut builder = UnionBuilder::new(db)
-            .cycle_recovery(true)
-            .recursively_defined(union.recursively_defined(db));
-        let mut removed_marker = false;
-        let mut kept_element = false;
-
-        for element in union.elements(db) {
-            if element.same_divergent_marker(div) {
-                removed_marker = true;
-            } else {
-                builder = builder.add(*element);
-                kept_element = true;
-            }
-        }
-
-        if removed_marker && !kept_element {
-            div
-        } else if removed_marker {
-            builder.build()
-        } else {
-            Type::Union(union)
-        }
+        RecursiveType::build(db, binder, origin, body)
     }
 
     pub fn is_none(&self, db: &'db dyn Db) -> bool {
@@ -2229,8 +2256,16 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn recursive_type_normalized(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
         cycle.head_ids().fold(self, |ty, id| {
-            ty.recursive_type_normalized_impl(db, Type::divergent(id), false)
-                .unwrap_or(Type::divergent(id))
+            let folded = ty
+                .cycle_fold_with_previous(db, Type::identity_recursive(db, id))
+                .unwrap_or(ty);
+            if folded != ty {
+                folded
+            } else {
+                let div = Type::Divergent(DivergentType::new(id));
+                ty.recursive_type_normalized_impl(db, div, false)
+                    .unwrap_or(div)
+            }
         })
     }
 
@@ -2825,7 +2860,7 @@ impl<'db> Type<'db> {
     }
 
     #[salsa::tracked(
-        cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
+        cycle_initial=|db, id, _, _, _| Place::bound(Type::identity_recursive(db, id)).into(),
         cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
             member.cycle_normalized(db, *previous, cycle)
         },
@@ -3645,7 +3680,7 @@ impl<'db> Type<'db> {
         receiver: Option<Type<'db>>,
     ) -> PlaceAndQualifiers<'db> {
         #[salsa::tracked(
-            cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
+            cycle_initial=|db, id, _, _, _, _| Place::bound(Type::identity_recursive(db, id)).into(),
             cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _, _| {
                 member.cycle_normalized(db, *previous, cycle)
             },
@@ -6302,7 +6337,7 @@ impl<'db> Type<'db> {
     }
 
     #[salsa::tracked(
-        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_initial=|db, id, _, _| Type::identity_recursive(db, id),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, _| {
             value.cycle_normalized(db, *previous, cycle)
         },
@@ -6567,6 +6602,14 @@ impl<'db> Type<'db> {
                 TypeMapping::UnfoldRecursive(target) if recursive.has_same_binder(db, *target) => {
                     recursive.unfolded(db)
                 }
+                TypeMapping::CycleFoldRecursive {
+                    previous: Type::Recursive(previous),
+                    binder,
+                } if recursive.has_same_binder(db, *previous) => Type::Divergent(*binder),
+                TypeMapping::FoldRecursive(_) | TypeMapping::ReplaceRecursiveBinder(_) => self,
+                TypeMapping::CycleFoldRecursive { .. } => visitor.visit(db, self, type_mapping, || {
+                    recursive.map_type(db, type_mapping, tcx, visitor)
+                }),
                 TypeMapping::EagerExpansion => visitor.visit(db, self, type_mapping, || {
                     recursive
                         .body(db)
@@ -7050,7 +7093,7 @@ impl<'db> Type<'db> {
 
     #[allow(clippy::used_underscore_binding)]
     #[salsa::tracked(
-        cycle_initial=|_, id, _, ()| Type::divergent(id),
+        cycle_initial=|db, id, _, ()| Type::identity_recursive(db, id),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, ()| {
             value.cycle_normalized(db, *previous, cycle)
         },
