@@ -199,10 +199,14 @@ fn source_method_names_in_mro<'db>(db: &'db dyn Db, class: ClassType<'db>) -> Fx
             let name = symbol.name();
             if is_mangled_private(name.as_str())
                 || is_constructor_like_method(name.as_str())
-                || !seen.insert(name.clone())
+                || seen.contains(name)
             {
                 continue;
             }
+            if owner.own_class_member(db, None, name).is_undefined() {
+                continue;
+            }
+            seen.insert(name.clone());
             if let Some(symbol_id) = table.symbol_id(name)
                 && is_function_definition(db, scope, symbol_id)
             {

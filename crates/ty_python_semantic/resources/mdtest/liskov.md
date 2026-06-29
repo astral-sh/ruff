@@ -661,6 +661,12 @@ class CompatibleReturns(ReturnsBool, ReturnsInt): ...
 class IntermediateReturnsStr(ReturnsStr): ...
 class IndirectConflict(IntermediateReturnsStr, ReturnsInt): ...  # error: [invalid-method-override]
 
+class UnreachableShadow(ReturnsStr):
+    if False:
+        method = 0
+
+class UnreachableShadowConflict(ReturnsInt, UnreachableShadow): ...  # error: [invalid-method-override]
+
 class GenericReturn(Generic[T]):
     def method(self) -> T: ...
 
@@ -732,20 +738,20 @@ info: This violates the Liskov Substitution Principle
 
 
 error[invalid-method-override]: Base classes for class `ClassInstanceConflict` define method `kind` incompatibly
-  --> src/multiple_inheritance.pyi:58:9
+  --> src/multiple_inheritance.pyi:64:9
    |
-58 |     def kind(cls, value: int) -> int: ...
+64 |     def kind(cls, value: int) -> int: ...
    |         ---- `ClassMethod.kind` defined here
-59 |
-60 | class InstanceStaticConflict(InstanceMethod, StaticMethod): ...  # error: [invalid-method-override]
-61 | class StaticInstanceConflict(StaticMethod, InstanceMethod): ...  # error: [invalid-method-override]
-62 | class InstanceClassConflict(InstanceMethod, ClassMethod): ...  # error: [invalid-method-override]
-63 | class ClassInstanceConflict(ClassMethod, InstanceMethod): ...  # snapshot: invalid-method-override
+65 |
+66 | class InstanceStaticConflict(InstanceMethod, StaticMethod): ...  # error: [invalid-method-override]
+67 | class StaticInstanceConflict(StaticMethod, InstanceMethod): ...  # error: [invalid-method-override]
+68 | class InstanceClassConflict(InstanceMethod, ClassMethod): ...  # error: [invalid-method-override]
+69 | class ClassInstanceConflict(ClassMethod, InstanceMethod): ...  # snapshot: invalid-method-override
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ClassMethod.kind` is incompatible with `InstanceMethod.kind`
    |
-  ::: src/multiple_inheritance.pyi:50:9
+  ::: src/multiple_inheritance.pyi:56:9
    |
-50 |     def kind(self, value: int) -> int: ...
+56 |     def kind(self, value: int) -> int: ...
    |         ---- `InstanceMethod.kind` defined here
    |
 info: `ClassMethod.kind` is a classmethod but `InstanceMethod.kind` is an instance method
