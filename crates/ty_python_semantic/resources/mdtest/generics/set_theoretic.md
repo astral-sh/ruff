@@ -401,7 +401,7 @@ static_assert(is_equivalent_to(tuple[int, str] & ~tuple[int, str, Any], tuple[in
 `type[..]` can also be seen as a covariant type constructor, so the results also hold here:
 
 ```pyi
-from typing import Any, Never
+from typing import Any
 from ty_extensions import static_assert, is_equivalent_to
 
 class P: ...
@@ -410,8 +410,9 @@ class Q: ...
 static_assert(is_equivalent_to(type[P] & type[Any], type[P & Any]))
 static_assert(is_equivalent_to(type[Any] & type[P], type[P & Any]))
 
-static_assert(is_equivalent_to(type[P] & ~type[Any], type[P] & ~type[Never] & Any))
-static_assert(is_equivalent_to(~type[Any] & type[P], type[P] & ~type[Never] & Any))
+# type[Never] = Never, so ~type[Never] = object simplifies out of the intersection.
+static_assert(is_equivalent_to(type[P] & ~type[Any], type[P] & Any))
+static_assert(is_equivalent_to(~type[Any] & type[P], type[P] & Any))
 ```
 
 ### Type var bounds and `NewTypes`
