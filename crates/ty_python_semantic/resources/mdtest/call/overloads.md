@@ -2108,6 +2108,21 @@ reveal_type(x)  # revealed: int | str
 f([{"y": 1}], int_or_str())
 ```
 
+An expected return type can specialize a generic overload and provide context for its arguments.
+Overload filtering should preserve that context:
+
+```py
+from typing import Any, overload
+
+@overload
+def f[T](value: T) -> T: ...
+@overload
+def f(value: Any) -> Any: ...
+def f(value: Any) -> Any: ...
+
+values: list[int] = reveal_type(f([]))  # revealed: list[int]
+```
+
 Non-matching overloads do not produce diagnostics:
 
 ```py
