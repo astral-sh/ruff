@@ -714,6 +714,13 @@ class InstanceClassConflict(InstanceMethod, ClassMethod): ...  # error: [invalid
 class ClassInstanceConflict(ClassMethod, InstanceMethod): ...  # snapshot: invalid-method-override
 class StaticClassConflict(StaticMethod, ClassMethod): ...  # error: [invalid-method-override]
 class ClassStaticConflict(ClassMethod, StaticMethod): ...  # error: [invalid-method-override]
+class Empty: ...
+
+class InvalidStr:
+    def __str__(self) -> int: ...  # error: [invalid-method-override]
+
+# The implicit `object` tail of `Empty` is not a competing explicit branch contract.
+class DoesNotRepeatObjectConflict(Empty, InvalidStr): ...
 ```
 
 ```snapshot
