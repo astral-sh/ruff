@@ -31,6 +31,8 @@ o: Not[()]
 p: Not[(int,)]
 
 def static_truthiness(not_one: Not[Literal[1]]) -> None:
+    # A `NewType` over `int` is distinct from `Literal[1]` but can refer to the same runtime object,
+    # so neither identity comparison has a definite result.
     reveal_type(not_one is not 1)  # revealed: bool
     reveal_type(not_one is 1)  # revealed: bool
 
