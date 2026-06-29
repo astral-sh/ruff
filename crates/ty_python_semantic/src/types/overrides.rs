@@ -172,8 +172,8 @@ fn check_inherited_method_conflicts<'db>(
                 context,
                 class,
                 &name,
-                (selected.owner, selected.definition),
-                (contract.owner, contract.definition),
+                (selected.owner, selected.definition, selected.decorator),
+                (contract.owner, contract.definition, contract.decorator),
                 || selected.ty.assignability_error_context(db, contract.ty),
             );
             continue 'members;
