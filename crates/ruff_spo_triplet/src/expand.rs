@@ -195,6 +195,18 @@ impl Expander {
                     Provenance::Authoritative,
                 );
             }
+            // Scalar fields carry their Odoo constructor here (mutually
+            // exclusive with `relation_kind`). Reuses the `field_type`
+            // predicate the Rails AttrDecl path already emits, so the
+            // closed vocab is unchanged.
+            if let Some(field_type) = &field.field_type {
+                self.push(
+                    field_iri.clone(),
+                    Predicate::FieldType,
+                    field_type.clone(),
+                    Provenance::Authoritative,
+                );
+            }
         }
 
         // 3 + 6 + 7 + 8. functions

@@ -71,6 +71,10 @@ pub(crate) struct RawField {
     /// Relational cardinality, lowercased (`many2one` / `one2many` /
     /// `many2many`), if relational.
     pub relation_kind: Option<String>,
+    /// Scalar field constructor, lowercased (`char` / `integer` / `float`
+    /// / `monetary` / `boolean` / `date` / `datetime` / `selection` / …).
+    /// `None` for relational fields (their kind rides `relation_kind`).
+    pub field_type: Option<String>,
 }
 
 /// One `def ...` declaration with its extracted body facts.
@@ -188,6 +192,7 @@ fn build_graph(classes: &[RawClass], namespace: &str) -> ModelGraph {
                         target: f.target.clone(),
                         inverse_name: f.inverse_name.clone(),
                         relation_kind: f.relation_kind.clone(),
+                        field_type: f.field_type.clone(),
                     })
                     .collect(),
                 functions: methods
@@ -335,6 +340,33 @@ class AccountCashRounding(models.Model):
             "raises",
             "exc:ValidationError"
         ));
+
+        // Scalar fields carry their Odoo constructor as `field_type`, so a
+        // downstream lift can upgrade an untyped scalar into a concrete
+        // typed wrapper (Char→str, Float→float, Selection→selection).
+        assert!(has(
+            &t,
+            "odoo:account_cash_rounding.name",
+            "field_type",
+            "char"
+        ));
+        assert!(has(
+            &t,
+            "odoo:account_cash_rounding.rounding",
+            "field_type",
+            "float"
+        ));
+        assert!(has(
+            &t,
+            "odoo:account_cash_rounding.strategy",
+            "field_type",
+            "selection"
+        ));
+        // …but relational fields do NOT — their kind rides `relation_kind`,
+        // so the two predicates never double-emit for one field.
+        assert!(!t.iter().any(|tr| tr.s
+            == "odoo:account_cash_rounding.profit_account_id"
+            && tr.p == "field_type"));
 
         // Many2one comodels surface as `target` (raw dotted, not an IRI).
         assert!(has(
