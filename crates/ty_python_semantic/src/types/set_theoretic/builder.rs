@@ -37,14 +37,15 @@
 //! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
 use super::RecursivelyDefined;
+use super::generic_gradual_intersections::{
+    generic_gradual_intersection, negated_generalization_bottom,
+};
 use crate::types::enums::EnumComplement;
-use crate::types::generics::{Specialization, specialization_variance};
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
-    StaticClassLiteral, StringLiteralType, SubclassOfType, Type, TypeVarBoundOrConstraints,
-    TypeVarVariance, UnionType,
+    StringLiteralType, SubclassOfType, Type, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 use rustc_hash::FxHashSet;
@@ -91,193 +92,6 @@ fn split_truthiness_guarded_intersection<'db>(
         core = core.add_negative(*negative);
     }
     Some((core.build(), guard))
-}
-
-struct DynamicGeneralization<'db> {
-    class: StaticClassLiteral<'db>,
-    general: Specialization<'db>,
-    specific: Specialization<'db>,
-    specific_type: Type<'db>,
-    has_variant_replacement: bool,
-}
-
-impl<'db> DynamicGeneralization<'db> {
-    fn intersection(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        if !self.has_variant_replacement {
-            return Some(self.specific_type);
-        }
-
-        // Rebuilding the generic specialization would lose type-variable correlation or NewType
-        // identity.
-        if matches!(
-            self.specific_type,
-            Type::TypeVar(_) | Type::NewTypeInstance(_)
-        ) {
-            return None;
-        }
-
-        // Variance-based merges require the specific specialization to be fully static.
-        if self.specific_type.has_dynamic(db) {
-            return None;
-        }
-
-        if self.class.known(db) == Some(KnownClass::Tuple) {
-            let general = self.general.tuple(db)?.as_fixed_length()?;
-            let specific = self.specific.tuple(db)?.as_fixed_length()?;
-            return Some(Type::heterogeneous_tuple(
-                db,
-                specific
-                    .iter_all_elements()
-                    .zip(general.iter_all_elements())
-                    .map(|(specific, general)| {
-                        IntersectionType::from_two_elements(db, specific, general)
-                    }),
-            ));
-        }
-
-        let generic_context = self.general.generic_context(db);
-        let types: Vec<_> = generic_context
-            .variables(db)
-            .zip(self.general.types(db))
-            .zip(self.specific.types(db))
-            .map(|((typevar, general), specific)| {
-                if general == specific {
-                    return *specific;
-                }
-                match specialization_variance(db, typevar) {
-                    TypeVarVariance::Covariant => {
-                        IntersectionType::from_two_elements(db, *specific, *general)
-                    }
-                    TypeVarVariance::Contravariant => {
-                        UnionType::from_two_elements(db, *specific, *general)
-                    }
-                    TypeVarVariance::Invariant | TypeVarVariance::Bivariant => *specific,
-                }
-            })
-            .collect();
-        let specialization = generic_context.specialize(db, types);
-
-        Some(Type::instance(
-            db,
-            self.class
-                .apply_optional_specialization(db, Some(specialization)),
-        ))
-    }
-}
-
-/// Return the relationship between two specializations of the same generic class if `general`
-/// only differs from `specific` by using dynamic types.
-fn dynamic_generalization_of<'db>(
-    db: &'db dyn Db,
-    general: Type<'db>,
-    specific: Type<'db>,
-) -> Option<DynamicGeneralization<'db>> {
-    // Fast path to avoid performance regressions.
-    if !general.has_dynamic(db) || matches!(general, Type::TypeVar(_) | Type::NewTypeInstance(_)) {
-        return None;
-    }
-
-    let (
-        Some((general_class, general_specialization)),
-        Some((specific_class, specific_specialization)),
-    ) = (
-        general.class_specialization(db),
-        specific.class_specialization(db),
-    )
-    else {
-        return None;
-    };
-
-    // Top and bottom materializations are not gradual types.
-    if general_class != specific_class
-        || general_specialization.materialization_kind(db).is_some()
-        || specific_specialization.materialization_kind(db).is_some()
-    {
-        return None;
-    }
-
-    let (has_dynamic_replacement, has_variant_replacement) =
-        if general_class.known(db) == Some(KnownClass::Tuple) {
-            let general_tuple = general_specialization.tuple(db)?.as_fixed_length()?;
-            let specific_tuple = specific_specialization.tuple(db)?.as_fixed_length()?;
-            if general_tuple.len() != specific_tuple.len() {
-                return None;
-            }
-
-            let mut has_dynamic_replacement = false;
-            for (general_type, specific_type) in general_tuple
-                .iter_all_elements()
-                .zip(specific_tuple.iter_all_elements())
-            {
-                if general_type == specific_type {
-                    continue;
-                }
-                if general_type.is_non_divergent_dynamic() {
-                    has_dynamic_replacement = true;
-                    continue;
-                }
-                return None;
-            }
-            (has_dynamic_replacement, has_dynamic_replacement)
-        } else {
-            let mut has_dynamic_replacement = false;
-            let mut has_variant_replacement = false;
-            for ((typevar, general_type), specific_type) in general_specialization
-                .generic_context(db)
-                .variables(db)
-                .zip(general_specialization.types(db))
-                .zip(specific_specialization.types(db))
-            {
-                if general_type == specific_type {
-                    continue;
-                }
-                if general_type.is_non_divergent_dynamic() {
-                    has_dynamic_replacement = true;
-                    has_variant_replacement |= matches!(
-                        specialization_variance(db, typevar),
-                        TypeVarVariance::Covariant | TypeVarVariance::Contravariant
-                    );
-                    continue;
-                }
-                return None;
-            }
-            (has_dynamic_replacement, has_variant_replacement)
-        };
-    has_dynamic_replacement.then_some(DynamicGeneralization {
-        class: general_class,
-        general: general_specialization,
-        specific: specific_specialization,
-        specific_type: specific,
-        has_variant_replacement,
-    })
-}
-
-fn dynamic_intersection<'db>(
-    db: &'db dyn Db,
-    left: Type<'db>,
-    right: Type<'db>,
-) -> Option<Type<'db>> {
-    dynamic_generalization_of(db, left, right)
-        .or_else(|| dynamic_generalization_of(db, right, left))
-        .and_then(|generalization| generalization.intersection(db))
-}
-
-/// If `general` is a dynamic generalization of the fully-static `specific`, return the bottom
-/// materialization that should replace `general` in `specific & ~general`.
-fn negated_generalization_bottom<'db>(
-    db: &'db dyn Db,
-    general: Type<'db>,
-    specific: Type<'db>,
-) -> Option<Type<'db>> {
-    if let (Type::SubclassOf(general_subclass), Type::SubclassOf(_)) = (general, specific)
-        && general_subclass.is_dynamic()
-        && !specific.has_dynamic(db)
-    {
-        return Some(general.bottom_materialization(db));
-    }
-
-    dynamic_generalization_of(db, general, specific)?;
-    (!specific.has_dynamic(db)).then(|| general.bottom_materialization(db))
 }
 
 /// Try to merge a complementary guarded pair into an unguarded core.
@@ -1765,7 +1579,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 let mut dynamic_merge = None;
                 for (index, existing_positive) in self.positive.iter().enumerate() {
-                    if let Some(merged) = dynamic_intersection(db, new_positive, *existing_positive)
+                    if let Some(merged) =
+                        generic_gradual_intersection(db, new_positive, *existing_positive)
                     {
                         if merged == *existing_positive {
                             return;
