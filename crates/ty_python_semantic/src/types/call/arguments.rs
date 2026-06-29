@@ -49,7 +49,7 @@ struct CallArgument<'a, 'db> {
 ///
 /// Note that a single argument may produce multiple distinct inferred types when inferred
 /// with type context across multiple bindings.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct CallArgumentTypes<'db> {
     fallback_type: Option<Type<'db>>,
     types: FxHashMap<Type<'db>, Type<'db>>,
@@ -195,6 +195,12 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         self.items.len()
     }
 
+    pub(crate) fn is_variadic(&self, index: usize) -> bool {
+        self.items.get(index).is_some_and(|argument| {
+            matches!(argument.argument, Argument::Variadic | Argument::Keywords)
+        })
+    }
+
     pub(crate) fn argument_types(&self, index: usize) -> Option<&CallArgumentTypes<'db>> {
         self.items.get(index).map(|item| &item.types)
     }
@@ -212,8 +218,23 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             .insert(tcx, ty);
     }
 
+    pub(crate) fn clear_types(&mut self, index: usize) {
+        self.items
+            .get_mut(index)
+            .expect("argument index should be valid")
+            .types = CallArgumentTypes::default();
+    }
+
     pub(crate) fn iter_types(&self) -> impl Iterator<Item = &CallArgumentTypes<'db>> + '_ {
         self.items.iter().map(|item| &item.types)
+    }
+
+    /// Returns `true` if the inferred types at each given argument index are equal.
+    pub(crate) fn inferred_types_equal_at(&self, other: &Self, argument_indices: &[usize]) -> bool {
+        argument_indices.iter().all(|&index| {
+            self.items.get(index).map(|item| &item.types)
+                == other.items.get(index).map(|item| &item.types)
+        })
     }
 
     /// Prepend an optional extra synthetic argument (for a `self` or `cls` parameter) to the front
