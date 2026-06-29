@@ -9,7 +9,7 @@ use ruff_db::{
     files::FileRange,
     parsed::ParsedModuleRef,
 };
-use ruff_python_ast::{helpers::is_dunder, name::Name};
+use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_mangled_private;
 use rustc_hash::FxHashSet;
 
@@ -194,7 +194,7 @@ fn source_method_names_in_mro<'db>(db: &'db dyn Db, class: ClassType<'db>) -> Fx
         for symbol in table.symbols().filter(|symbol| symbol.is_local()) {
             let name = symbol.name();
             if is_mangled_private(name.as_str())
-                || is_dunder(name.as_str())
+                || is_constructor_like_method(name.as_str())
                 || !seen.insert(name.clone())
             {
                 continue;
