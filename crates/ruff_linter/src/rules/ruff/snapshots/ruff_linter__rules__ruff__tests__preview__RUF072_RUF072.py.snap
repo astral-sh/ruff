@@ -13,14 +13,12 @@ RUF072 [*] Empty `finally` clause
 11 |   # try/except/finally with ellipsis
    |
 help: Remove the `finally` clause
-5  |     foo()
-6  | except Exception:
-7  |     bar()
-   - finally:
-   -     pass
-8  |
-9  | # try/except/finally with ellipsis
-10 | try:
+  |
+7 |     bar()
+  - finally:
+  -     pass
+8 |
+  |
 
 RUF072 [*] Empty `finally` clause
   --> RUF072.py:16:1
@@ -34,14 +32,12 @@ RUF072 [*] Empty `finally` clause
 19 |   # try/except/else/finally with pass
    |
 help: Remove the `finally` clause
-13 |     foo()
-14 | except Exception:
+   |
 15 |     bar()
    - finally:
    -     ...
 16 |
-17 | # try/except/else/finally with pass
-18 | try:
+   |
 
 RUF072 [*] Empty `finally` clause
   --> RUF072.py:26:1
@@ -55,14 +51,12 @@ RUF072 [*] Empty `finally` clause
 29 |   # bare try/finally with pass
    |
 help: Remove the `finally` clause
-23 |     bar()
-24 | else:
+   |
 25 |     baz()
    - finally:
    -     pass
 26 |
-27 | # bare try/finally with pass
-28 | try:
+   |
 
 RUF072 [*] Empty `finally` clause
   --> RUF072.py:32:1
@@ -76,8 +70,7 @@ RUF072 [*] Empty `finally` clause
 35 |   # bare try/finally with ellipsis
    |
 help: Remove the `finally` clause
-27 |     pass
-28 |
+   |
 29 | # bare try/finally with pass
    - try:
    -     foo()
@@ -85,8 +78,7 @@ help: Remove the `finally` clause
    -     pass
 30 + foo()
 31 |
-32 | # bare try/finally with ellipsis
-33 | try:
+   |
 
 RUF072 [*] Empty `finally` clause
   --> RUF072.py:38:1
@@ -100,8 +92,7 @@ RUF072 [*] Empty `finally` clause
 41 |   # bare try/finally with multi-line body
    |
 help: Remove the `finally` clause
-33 |     pass
-34 |
+   |
 35 | # bare try/finally with ellipsis
    - try:
    -     foo()
@@ -109,8 +100,7 @@ help: Remove the `finally` clause
    -     ...
 36 + foo()
 37 |
-38 | # bare try/finally with multi-line body
-39 | try:
+   |
 
 RUF072 [*] Empty `finally` clause
   --> RUF072.py:46:1
@@ -124,8 +114,7 @@ RUF072 [*] Empty `finally` clause
 49 |   # Nested try with useless finally
    |
 help: Remove the `finally` clause
-39 |     ...
-40 |
+   |
 41 | # bare try/finally with multi-line body
    - try:
    -     foo()
@@ -137,8 +126,7 @@ help: Remove the `finally` clause
 43 + bar()
 44 + baz()
 45 |
-46 | # Nested try with useless finally
-47 | try:
+   |
 
 RUF072 [*] Empty `finally` clause
   --> RUF072.py:53:5
@@ -152,8 +140,7 @@ RUF072 [*] Empty `finally` clause
 56 |       bar()
    |
 help: Remove the `finally` clause
-48 |
-49 | # Nested try with useless finally
+   |
 50 | try:
    -     try:
    -         foo()
@@ -161,8 +148,7 @@ help: Remove the `finally` clause
    -         pass
 51 +     foo()
 52 | except Exception:
-53 |     bar()
-54 |
+   |
 
 RUF072 [*] Empty `finally` clause
   --> RUF072.py:63:1
@@ -177,15 +163,13 @@ RUF072 [*] Empty `finally` clause
 67 |   # bare try/finally with pass and ellipsis
    |
 help: Remove the `finally` clause
-60 |     foo()
-61 | except Exception:
+   |
 62 |     bar()
    - finally:
    -     pass
    -     pass
 63 |
-64 | # bare try/finally with pass and ellipsis
-65 | try:
+   |
 
 RUF072 [*] Empty `finally` clause
   --> RUF072.py:70:1
@@ -200,8 +184,7 @@ RUF072 [*] Empty `finally` clause
 74 |   # OK
    |
 help: Remove the `finally` clause
-65 |     pass
-66 |
+   |
 67 | # bare try/finally with pass and ellipsis
    - try:
    -     foo()
@@ -210,8 +193,7 @@ help: Remove the `finally` clause
    -     ...
 68 + foo()
 69 |
-70 | # OK
-71 |
+   |
 
 RUF072 Empty `finally` clause
    --> RUF072.py:102:1
@@ -339,8 +321,7 @@ RUF072 [*] Empty `finally` clause
     | |________^
     |
 help: Remove the `finally` clause
-172 |     pass
-173 |
+    |
 174 | # Bare try finally with line starting with a formfeed
     - try:
     -     1
@@ -350,8 +331,7 @@ help: Remove the `finally` clause
 175 + 1
 176 + 2
 177 |
-178 |
-179 | # Regression test for https://github.com/astral-sh/ruff/issues/24373
+    |
 
 RUF072 [*] Empty `finally` clause
    --> RUF072.py:186:1
@@ -363,11 +343,11 @@ RUF072 [*] Empty `finally` clause
     | |________^
     |
 help: Remove the `finally` clause
-181 |
-182 | # Regression test for https://github.com/astral-sh/ruff/issues/24373
+    |
 183 | # (`try` is preceded by a form feed below)
     - try:
     -     1
     - finally:
     -     pass
 184 + 1
+    |

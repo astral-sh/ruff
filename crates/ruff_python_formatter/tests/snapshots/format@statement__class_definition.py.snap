@@ -250,7 +250,7 @@ class Foo4: ...
 
 @decorator
 # comment
-@decorato2
+@decorator2
 class Foo5: ...
 ```
 
@@ -535,6 +535,6 @@ class Foo4: ...
 
 @decorator
 # comment
-@decorato2
+@decorator2
 class Foo5: ...
 ```

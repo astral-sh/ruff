@@ -1,9 +1,9 @@
 use lsp_types::{
     self as types, ClientCapabilities, CodeActionKind, CodeActionOptions, CompletionOptions,
     DiagnosticOptions, DiagnosticProvider, InlayHintOptions, MarkupKind, NotebookCellLanguage,
-    NotebookDocumentFilterWithCells, NotebookSelector, RenameOptions, SemanticTokensLegend,
-    SemanticTokensOptions, ServerCapabilities, SignatureHelpOptions, TextDocumentSyncKind,
-    TextDocumentSyncOptions, WorkDoneProgressOptions,
+    NotebookDocumentFilterWithCells, NotebookSelector, RenameOptions, Save, SaveOptions,
+    SemanticTokensLegend, SemanticTokensOptions, ServerCapabilities, SignatureHelpOptions,
+    TextDocumentSyncKind, TextDocumentSyncOptions, WorkDoneProgressOptions,
 };
 use std::str::FromStr;
 
@@ -35,6 +35,7 @@ bitflags::bitflags! {
         const DIAGNOSTIC_RELATED_INFORMATION = 1 << 17;
         const PREFER_MARKDOWN_IN_COMPLETION = 1 << 18;
         const COMPLETION_ITEM_SNIPPET_SUPPORT = 1 << 19;
+        const FULL_DIAGNOSTIC_OUTPUT = 1 << 20;
     }
 }
 
@@ -76,6 +77,13 @@ impl FromStr for SupportedCommand {
             _ => return Err(anyhow::anyhow!("Invalid command `{name}`")),
         })
     }
+}
+
+/// Returns the preferred markup kind, derived from preference list.
+fn preferred_markup_kind(formats: &[MarkupKind]) -> Option<&MarkupKind> {
+    formats
+        .iter()
+        .find(|markup_kind| matches!(markup_kind, MarkupKind::Markdown | MarkupKind::PlainText))
 }
 
 impl ResolvedClientCapabilities {
@@ -167,6 +175,11 @@ impl ResolvedClientCapabilities {
         self.contains(Self::DIAGNOSTIC_RELATED_INFORMATION)
     }
 
+    /// Returns `true` if the client supports opening fully rendered diagnostics.
+    pub(crate) const fn supports_full_diagnostic_output(self) -> bool {
+        self.contains(Self::FULL_DIAGNOSTIC_OUTPUT)
+    }
+
     /// Returns `true` if the client supports "label details" in completion items.
     pub(crate) const fn supports_completion_item_label_details(self) -> bool {
         self.contains(Self::COMPLETION_ITEM_LABEL_DETAILS_SUPPORT)
@@ -242,6 +255,17 @@ impl ResolvedClientCapabilities {
             }
         }
 
+        if client_capabilities
+            .experimental
+            .as_ref()
+            // Protocol: https://docs.astral.sh/ty/features/language-server/#full-diagnostic-output
+            .and_then(|experimental| experimental.get("fullDiagnosticOutput"))
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or_default()
+        {
+            flags |= Self::FULL_DIAGNOSTIC_OUTPUT;
+        }
+
         if text_document
             .and_then(|text_document| text_document.type_definition?.link_support)
             .unwrap_or_default()
@@ -264,35 +288,20 @@ impl ResolvedClientCapabilities {
         }
 
         if text_document
-            .and_then(|text_document| {
-                Some(
-                    text_document
-                        .hover
-                        .as_ref()?
-                        .content_format
-                        .as_ref()?
-                        .contains(&MarkupKind::Markdown),
-                )
-            })
-            .unwrap_or_default()
+            .and_then(|document| document.hover.as_ref())
+            .and_then(|hover| preferred_markup_kind(hover.content_format.as_deref()?))
+            == Some(&MarkupKind::Markdown)
         {
             flags |= Self::PREFER_MARKDOWN_IN_HOVER;
         }
 
         if text_document
-            .and_then(|text_document| {
-                Some(
-                    text_document
-                        .completion
-                        .as_ref()?
-                        .completion_item
-                        .as_ref()?
-                        .documentation_format
-                        .as_ref()?
-                        .contains(&MarkupKind::Markdown),
-                )
+            .and_then(|document| document.completion.as_ref())
+            .and_then(|completion| completion.completion_item.as_ref())
+            .and_then(|completion_item| {
+                preferred_markup_kind(completion_item.documentation_format.as_deref()?)
             })
-            .unwrap_or_default()
+            == Some(&MarkupKind::Markdown)
         {
             flags |= Self::PREFER_MARKDOWN_IN_COMPLETION;
         }
@@ -424,6 +433,9 @@ pub(crate) fn server_capabilities(
             TextDocumentSyncOptions {
                 open_close: Some(true),
                 change: Some(TextDocumentSyncKind::Incremental),
+                save: Some(Save::SaveOptions(SaveOptions {
+                    include_text: Some(false),
+                })),
                 ..Default::default()
             }
             .into(),

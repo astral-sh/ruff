@@ -183,5 +183,6 @@ def getbusywaitinterval() -> int:
 def setbusywaitinterval(new_val: int, /) -> None:
     """Set the busy-wait interval in milliseconds between successive calls to Tcl_DoOneEvent in a threaded Python interpreter.
 
-    It should be set to a divisor of the maximum time between frames in an animation.
+    It should be set to a divisor of the maximum time between frames in
+    an animation.
     """

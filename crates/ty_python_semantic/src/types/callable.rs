@@ -125,6 +125,9 @@ impl<'db> Type<'db> {
                     place
                         .ty
                         .try_upcast_to_callable_with_policy_and_context(db, policy, context)
+                        // The callable instance itself doesn't inherit the descriptor behavior of
+                        // its `__call__` method.
+                        .map(|callables| callables.map(|callable| callable.into_regular(db)))
                 } else {
                     None
                 }
@@ -393,9 +396,7 @@ impl From<TypeRelation> for UpcastPolicy {
             TypeRelation::Subtyping
             | TypeRelation::Redundancy { .. }
             | TypeRelation::SubtypingAssuming => UpcastPolicy::Sound,
-            TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
-                UpcastPolicy::Unsound
-            }
+            TypeRelation::Assignability => UpcastPolicy::Unsound,
         }
     }
 }
@@ -487,6 +488,16 @@ impl<'db> CallableType<'db> {
 
     pub(crate) fn is_staticmethod_like(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::StaticMethodLike)
+    }
+
+    /// Returns `true` if this callable represents a function used as a class member.
+    pub fn is_method_like(self, db: &'db dyn Db) -> bool {
+        matches!(
+            self.kind(db),
+            CallableTypeKind::FunctionLike
+                | CallableTypeKind::StaticMethodLike
+                | CallableTypeKind::ClassMethodLike
+        )
     }
 
     pub(crate) fn into_regular(self, db: &'db dyn Db) -> CallableType<'db> {

@@ -556,7 +556,7 @@ def foo():
 We don't need to think about this ordering in normal execution, since the body of a function doesn't
 get to cause any side effects until the function is called. But we do need to think about it in
 inference, because of the (generally unsound) rule mentioned above about considering nested bindings
-visible after we encounter them. That can matter in unusual sitautions like this one:
+visible after we encounter them. That can matter in unusual situations like this one:
 
 ```py
 x = 1

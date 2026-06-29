@@ -16,7 +16,7 @@ I001 [*] Import block is un-sorted or un-formatted
   | |__________^
   |
 help: Organize imports
-1 | from __future__ import annotations
+  |
 2 |
   - import os
 3 | import django.settings
@@ -27,3 +27,4 @@ help: Organize imports
 8 |
 9 | from . import local
   - import sys
+  |

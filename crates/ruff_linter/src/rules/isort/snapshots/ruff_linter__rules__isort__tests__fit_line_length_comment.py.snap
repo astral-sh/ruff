@@ -15,6 +15,7 @@ I001 [*] Import block is un-sorted or un-formatted
   | |_______________^
   |
 help: Organize imports
+   |
 1  | import a
 2  +
 3  | # Don't take this comment into account when determining whether the next import can fit on one line.
@@ -32,3 +33,4 @@ help: Organize imports
 13 + from h import (
 14 +     i,  # 012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9
 15 + )
+   |

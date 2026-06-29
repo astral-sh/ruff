@@ -1,10 +1,11 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_trivia::is_python_whitespace;
+use ruff_source_file::LineRanges;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
-use crate::{AlwaysFixableViolation, Edit, Fix};
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for whitespace before a shebang directive.
@@ -27,6 +28,11 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```python
 /// #!/usr/bin/env python3
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe when the whitespace before the shebang
+/// contains a newline. Deleting the newline can activate an encoding declaration
+/// and change how the file is decoded.
 ///
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
@@ -69,6 +75,14 @@ pub(crate) fn shebang_leading_whitespace(
     if let Some(mut diagnostic) =
         context.report_diagnostic_if_enabled(ShebangLeadingWhitespace, prefix)
     {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(prefix)));
+        let applicability = if locator.contains_line_break(prefix) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+        diagnostic.set_fix(Fix::applicable_edit(
+            Edit::range_deletion(prefix),
+            applicability,
+        ));
     }
 }

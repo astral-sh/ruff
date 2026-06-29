@@ -81,7 +81,7 @@ if x != "abc":
 ```py
 def _(x: int):
     if x != 1:
-        reveal_type(x)  # revealed: int & ~Literal[1]
+        reveal_type(x)  # revealed: int & ~Literal[1] & ~Literal[True]
 
         reveal_type(x != 1)  # revealed: bool
         reveal_type(x != 2)  # revealed: bool

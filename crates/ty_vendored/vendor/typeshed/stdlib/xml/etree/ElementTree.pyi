@@ -8,8 +8,8 @@ represent it is with a tree.  This module has two classes for this purpose:
    2. Element represents a single node in this tree.
 
 Interactions with the whole document (reading and writing to/from files) are
-usually done on the ElementTree level.  Interactions with a single XML element
-and its sub-elements are done on the Element level.
+usually done on the ElementTree level.  Interactions with a single XML
+element and its sub-elements are done on the Element level.
 
 Element is a flexible container object designed to store hierarchical data
 structures in memory. It can be described as a cross between a list and a
@@ -102,10 +102,11 @@ def canonicalize(
 ) -> str:
     """Convert XML to its C14N 2.0 serialised form.
 
-    If *out* is provided, it must be a file or file-like object that receives
-    the serialised canonical XML output (text, not bytes) through its ``.write()``
-    method.  To write to a file, open it in text mode with encoding "utf-8".
-    If *out* is not provided, this function returns the output as text string.
+    If *out* is provided, it must be a file or file-like object that
+    receives the serialised canonical XML output (text, not bytes) through
+    its ``.write()`` method.  To write to a file, open it in text mode with
+    encoding "utf-8".  If *out* is not provided, this function returns the
+    output as text string.
 
     Either *xml_data* (an XML string) or *from_file* (a file path or
     file-like object) must be provided as input.
@@ -285,8 +286,8 @@ class ElementTree(Generic[_Root]):
     def parse(self, source: _FileRead, parser: XMLParser | None = None) -> Element:
         """Load external XML document into element tree.
 
-        *source* is a file name or file object, *parser* is an optional parser
-        instance that defaults to XMLParser.
+        *source* is a file name or file object, *parser* is an optional
+        parser instance that defaults to XMLParser.
 
         ParseError is raised if the parser fails to parse the document.
 
@@ -297,7 +298,8 @@ class ElementTree(Generic[_Root]):
     def iter(self, tag: str | None = None) -> Generator[Element]:
         """Create and return tree iterator for the root element.
 
-        The iterator loops over all elements in this tree, in document order.
+        The iterator loops over all elements in this tree, in document
+        order.
 
         *tag* is a string with the tag name to iterate over
         (default is to return all elements).
@@ -310,7 +312,8 @@ class ElementTree(Generic[_Root]):
         Same as getroot().find(path), which is Element.find()
 
         *path* is a string having either an element tag or an XPath,
-        *namespaces* is an optional mapping from namespace prefix to full name.
+        *namespaces* is an optional mapping from namespace prefix to full
+        name.
 
         Return the first matching element, or None if no element was found.
 
@@ -323,7 +326,8 @@ class ElementTree(Generic[_Root]):
         Same as getroot().findtext(path),  which is Element.findtext()
 
         *path* is a string having either an element tag or an XPath,
-        *namespaces* is an optional mapping from namespace prefix to full name.
+        *namespaces* is an optional mapping from namespace prefix to full
+        name.
 
         Return the first matching element, or None if no element was found.
 
@@ -337,7 +341,8 @@ class ElementTree(Generic[_Root]):
         Same as getroot().findall(path), which is Element.findall().
 
         *path* is a string having either an element tag or an XPath,
-        *namespaces* is an optional mapping from namespace prefix to full name.
+        *namespaces* is an optional mapping from namespace prefix to full
+        name.
 
         Return list containing all matching elements in document order.
 
@@ -371,24 +376,26 @@ class ElementTree(Generic[_Root]):
         """Write element tree to a file as XML.
 
         Arguments:
-          *file_or_filename* -- file name or a file object opened for writing
+          *file_or_filename* -- file name or a file object opened for
+                                writing
 
           *encoding* -- the output encoding (default: US-ASCII)
 
-          *xml_declaration* -- bool indicating if an XML declaration should be
-                               added to the output. If None, an XML declaration
-                               is added if encoding IS NOT either of:
-                               US-ASCII, UTF-8, or Unicode
+          *xml_declaration* -- bool indicating if an XML declaration should
+                               be added to the output. If None, an XML
+                               declaration is added if encoding IS NOT
+                               either of: US-ASCII, UTF-8, or Unicode
 
-          *default_namespace* -- sets the default XML namespace (for "xmlns")
+          *default_namespace* -- sets the default XML namespace (for
+                                 "xmlns")
 
           *method* -- either "xml" (default), "html, "text", or "c14n"
 
           *short_empty_elements* -- controls the formatting of elements
-                                    that contain no content. If True (default)
-                                    they are emitted as a single self-closed
-                                    tag, otherwise they are emitted as a pair
-                                    of start/end tags
+                                    that contain no content.  If True
+                                    (default) they are emitted as a single
+                                    self-closed tag, otherwise they are
+                                    emitted as a pair of start/end tags
 
         """
 
@@ -425,9 +432,9 @@ def tostring(
     is returned. Otherwise a bytestring is returned.
 
     *element* is an Element instance, *encoding* is an optional output
-    encoding defaulting to US-ASCII, *method* is an optional output which can
-    be one of "xml" (default), "html", "text" or "c14n", *default_namespace*
-    sets the default XML namespace (for "xmlns").
+    encoding defaulting to US-ASCII, *method* is an optional output which
+    can be one of "xml" (default), "html", "text" or "c14n",
+    *default_namespace* sets the default XML namespace (for "xmlns").
 
     Returns an (optionally) encoded string containing the XML data.
 
@@ -550,7 +557,8 @@ def iterparse(source: _FileRead, events: Iterable[_EventType]) -> _IterParseIter
     "end" events are reported.
 
     *source* is a filename or file object containing XML data, *events* is
-    a list of events to report back, *parser* is an optional parser instance.
+    a list of events to report back, *parser* is an optional parser
+    instance.
 
     Returns an iterator providing (event, elem) pairs.
 
@@ -666,19 +674,22 @@ class C14NWriterTarget:
     Serialises parse events to XML C14N 2.0.
 
     The *write* function is used for writing out the resulting data stream
-    as text (not bytes).  To write to a file, open it in text mode with encoding
-    "utf-8" and pass its ``.write`` method.
+    as text (not bytes).  To write to a file, open it in text mode with
+    encoding "utf-8" and pass its ``.write`` method.
 
     Configuration options:
 
     - *with_comments*: set to true to include comments
-    - *strip_text*: set to true to strip whitespace before and after text content
-    - *rewrite_prefixes*: set to true to replace namespace prefixes by "n{number}"
+    - *strip_text*: set to true to strip whitespace before and after text
+                    content
+    - *rewrite_prefixes*: set to true to replace namespace prefixes by
+                          "n{number}"
     - *qname_aware_tags*: a set of qname aware tag names in which prefixes
                           should be replaced in text content
-    - *qname_aware_attrs*: a set of qname aware attribute names in which prefixes
-                           should be replaced in text content
-    - *exclude_attrs*: a set of attribute names that should not be serialised
+    - *qname_aware_attrs*: a set of qname aware attribute names in which
+                           prefixes should be replaced in text content
+    - *exclude_attrs*: a set of attribute names that should not be
+                       serialised
     - *exclude_tags*: a set of tag names that should not be serialised
     """
 

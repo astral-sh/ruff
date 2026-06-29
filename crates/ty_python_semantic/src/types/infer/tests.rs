@@ -3,7 +3,7 @@ use crate::db::tests::{TestDb, setup_db};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, global_symbol};
 use crate::types::{KnownClass, KnownInstanceType, check_types};
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
@@ -53,6 +53,66 @@ fn assert_file_diagnostics(db: &TestDb, filename: &str, expected: &[&str]) {
     let diagnostics = check_types(db, file);
 
     assert_diagnostic_messages(&diagnostics, expected);
+}
+
+#[track_caller]
+fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
+    let file = system_path_to_file(db, filename).unwrap();
+    let diagnostics = check_types(db, file);
+    assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+
+    let diagnostic = &diagnostics[0];
+    assert_eq!(diagnostic.id(), DiagnosticId::RevealedType);
+    let expected = format!("`{expected}`");
+    assert_eq!(
+        diagnostic
+            .primary_annotation()
+            .and_then(|annotation| annotation.get_message()),
+        Some(expected.as_str())
+    );
+}
+
+#[test]
+fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
+    assert!(
+        std::mem::size_of::<DefinitionTypes>()
+            <= std::mem::size_of::<TypeAndQualifiers>() + std::mem::size_of::<usize>()
+    );
+
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/definitions.py",
+        r#"
+        first = 1
+        second = 2
+        "#,
+    )?;
+
+    let file = system_path_to_file(&db, "/src/definitions.py").unwrap();
+    let module = parsed_module(&db, file).load(&db);
+    let first_assignment = module.syntax().body[0].as_assign_stmt().unwrap();
+    let second_assignment = module.syntax().body[1].as_assign_stmt().unwrap();
+    let first = semantic_index(&db, file)
+        .expect_single_definition(first_assignment.targets[0].as_name_expr().unwrap());
+    let second = semantic_index(&db, file)
+        .expect_single_definition(second_assignment.targets[0].as_name_expr().unwrap());
+
+    let owner_type = Type::unknown();
+    let owner = DefinitionTypes::from_parts(first, vec![(first, owner_type)], vec![]);
+    assert!(matches!(owner, DefinitionTypes::Binding(ty) if ty == owner_type));
+    assert_eq!(
+        owner.bindings(first).collect::<Vec<_>>(),
+        [(first, owner_type)]
+    );
+
+    let non_owner = DefinitionTypes::from_parts(first, vec![(second, owner_type)], vec![]);
+    assert!(matches!(non_owner, DefinitionTypes::Other(_)));
+    assert_eq!(
+        non_owner.bindings(first).collect::<Vec<_>>(),
+        [(second, owner_type)]
+    );
+
+    Ok(())
 }
 
 #[test]
@@ -282,6 +342,189 @@ fn unbound_symbol_no_reachability_constraint_check() {
     });
     let expected: Vec<String> = vec![];
     assert_eq!(cycles, expected);
+}
+
+const MANY_WIDGETS: usize = 400;
+const MANY_NON_TERMINAL_CALLS: usize = 1_100;
+const FEW_NON_TERMINAL_CALLS: usize = 80;
+
+#[test]
+fn implicit_attribute_after_many_non_terminal_calls() -> anyhow::Result<()> {
+    let handle = std::thread::Builder::new()
+        .name("implicit-attribute-stack-test".into())
+        // Match the stack size used by ty's production worker threads.
+        .stack_size(ruff_db::STACK_SIZE)
+        .spawn(|| {
+            let mut db = setup_db();
+            let mut ui = String::from(
+                r#"from widgets import Widget
+
+class Ui:
+    def setup(self):
+"#,
+            );
+
+            for index in 0..MANY_WIDGETS {
+                ui.push_str(&format!(
+                    concat!(
+                        "        self.widget_{index} = Widget()\n",
+                        "        self.widget_{index}.configure()\n",
+                        "        self.widget_{index}.configure()\n",
+                        "        self.widget_{index}.configure()\n",
+                    ),
+                    index = index,
+                ));
+            }
+            ui.push_str("        self.target = Widget()\n");
+
+            db.write_files([
+                (
+                    "/src/widgets.py",
+                    r#"class Widget:
+    def configure(self) -> None: ...
+"#,
+                ),
+                ("/src/ui.py", &ui),
+                (
+                    "/src/consumer.py",
+                    r#"from typing_extensions import reveal_type
+from ui import Ui
+from widgets import Widget
+
+class Form(Ui):
+    def target_widget(self) -> Widget:
+        reveal_type(self.target)
+        return self.target
+"#,
+                ),
+            ])?;
+
+            assert_revealed_type(&db, "/src/consumer.py", "Widget");
+
+            Ok(())
+        })?;
+
+    handle.join().expect("regression test thread panicked")
+}
+
+#[test]
+fn nested_implicit_attribute_graphs_do_not_overflow_stack() -> anyhow::Result<()> {
+    let handle = std::thread::Builder::new()
+        .name("nested-implicit-attribute-stack-test".into())
+        .stack_size(ruff_db::STACK_SIZE)
+        .spawn(|| {
+            let mut db = setup_db();
+            let mut inner = String::from(
+                r#"from widgets import Widget
+
+class Inner:
+    def setup(self):
+"#,
+            );
+            for index in 0..MANY_WIDGETS {
+                inner.push_str(&format!(
+                    concat!(
+                        "        self.widget_{index} = Widget()\n",
+                        "        self.widget_{index}.configure()\n",
+                        "        self.widget_{index}.configure()\n",
+                        "        self.widget_{index}.configure()\n",
+                    ),
+                    index = index,
+                ));
+            }
+            inner.push_str("        self.target = Widget()\n");
+
+            let mut outer = String::from(
+                r#"from inner import Inner
+
+def noop() -> None: ...
+
+class Outer:
+    def setup(self, inner: Inner, flag: bool):
+"#,
+            );
+            for _ in 0..FEW_NON_TERMINAL_CALLS {
+                outer.push_str("        noop()\n");
+            }
+            outer.push_str(
+                r#"        if flag:
+            inner.target.configure()
+        self.target = inner
+"#,
+            );
+
+            db.write_files([
+                (
+                    "/src/widgets.py",
+                    r#"class Widget:
+    def configure(self) -> None: ...
+"#,
+                ),
+                ("/src/inner.py", &inner),
+                ("/src/outer.py", &outer),
+                (
+                    "/src/consumer.py",
+                    r#"from typing_extensions import reveal_type
+from inner import Inner
+from outer import Outer
+
+class Form(Outer):
+    def target_inner(self) -> Inner:
+        reveal_type(self.target)
+        return self.target
+"#,
+                ),
+            ])?;
+
+            assert_revealed_type(&db, "/src/consumer.py", "Inner");
+
+            Ok(())
+        })?;
+
+    handle.join().expect("regression test thread panicked")
+}
+
+#[test]
+fn implicit_attribute_preserves_terminal_narrowing_after_many_calls() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let mut ui = String::from(
+        r#"import sys
+
+def noop() -> None: ...
+
+class Ui:
+    def setup(self, value: int | None):
+"#,
+    );
+    for _ in 0..MANY_NON_TERMINAL_CALLS {
+        ui.push_str("        noop()\n");
+    }
+    ui.push_str(
+        r#"        if value is None:
+            sys.exit()
+        self.target = value
+"#,
+    );
+
+    db.write_files([
+        ("/src/package/__init__.py", ""),
+        ("/src/package/ui.py", &ui),
+        (
+            "/src/package/consumer.py",
+            r#"from typing_extensions import reveal_type
+from .ui import Ui
+
+class Form(Ui):
+    def target_value(self) -> int:
+        reveal_type(self.target)
+        return self.target
+"#,
+        ),
+    ])?;
+
+    assert_revealed_type(&db, "/src/package/consumer.py", "int");
+
+    Ok(())
 }
 
 // Incremental inference tests

@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast};
 
 use super::TypeInferenceBuilder;
 use crate::types::diagnostic::INVALID_TYPE_FORM;
-use crate::types::{DynamicType, KnownClass, Type, TypeContext, TypeFormType};
+use crate::types::{CycleDetector, DynamicType, KnownClass, Type, TypeContext, TypeFormType};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// In a `TypeForm` context, keep the ordinary value interpretation if it is
@@ -35,7 +35,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Suppress contextual `TypeForm` evaluation only if ordinary inference already
         // produces a type-form value or satisfies the non-`TypeForm` arm of the union.
         let value_ty = self
-            .speculate()
+            .speculate_without_diagnostics()
             .infer_maybe_standalone_expression(expression, TypeContext::default());
         if matches!(value_ty.resolve_type_alias(self.db()), Type::Never)
             || self.contains_type_form_value(expression, value_ty)
@@ -49,12 +49,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // try ordinary contextual inference. This lets existing bidirectional
         // inference propagate `TypeForm` through conditionals, calls, and `await`.
         if self
-            .speculate()
+            .speculate_without_diagnostics()
             .infer_type_expression_no_store(expression)
             .is_unknown()
         {
             let contextual_ty = self
-                .speculate()
+                .speculate_without_diagnostics()
                 .infer_value_expression_impl(expression, TypeContext::new(Some(target)));
             // TODO: Remove this exception once `Unpack` produces a precise type instead of a
             // dynamic placeholder in ordinary expression inference.
@@ -72,26 +72,63 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     fn contains_type_form_value(&self, expression: &ast::Expr, ty: Type<'db>) -> bool {
-        match ty.resolve_type_alias(self.db()) {
-            Type::TypeForm(_) | Type::SubclassOf(_) => true,
-            // A bare class object is valid type-expression syntax and should still be
-            // interpreted as a `TypeForm`. Preserve its ordinary value type only when
-            // it was produced by an expression that is not itself a type expression.
-            Type::ClassLiteral(_) => self
-                .speculate()
-                .infer_type_expression_no_store(expression)
-                .is_unknown(),
-            Type::NominalInstance(instance)
-                if instance.has_known_class(self.db(), KnownClass::Type) =>
-            {
-                true
+        struct ContainsTypeFormValue;
+        type ContainsTypeFormValueVisitor<'db> =
+            CycleDetector<ContainsTypeFormValue, Type<'db>, bool, 3>;
+
+        fn imp<'db>(
+            builder: &TypeInferenceBuilder<'db, '_>,
+            expression: &ast::Expr,
+            ty: Type<'db>,
+            visitor: &ContainsTypeFormValueVisitor<'db>,
+        ) -> bool {
+            match ty {
+                Type::TypeForm(_) | Type::SubclassOf(_) => true,
+                // A bare class object is valid type-expression syntax and should still be
+                // interpreted as a `TypeForm`. Preserve its ordinary value type only when
+                // it was produced by an expression that is not itself a type expression.
+                Type::ClassLiteral(_) => builder
+                    .speculate_without_diagnostics()
+                    .infer_type_expression_no_store(expression)
+                    .is_unknown(),
+                Type::NominalInstance(instance)
+                    if instance.has_known_class(builder.db(), KnownClass::Type) =>
+                {
+                    true
+                }
+                Type::Union(union) => union
+                    .elements(builder.db())
+                    .iter()
+                    .any(|element| imp(builder, expression, *element, visitor)),
+                Type::Intersection(intersection) => intersection
+                    .iter_positive(builder.db())
+                    .any(|element| imp(builder, expression, element, visitor)),
+                Type::TypeAlias(alias) => visitor.visit(ty, || {
+                    imp(builder, expression, alias.value_type(builder.db()), visitor)
+                }),
+                Type::TypeVar(typevar) => visitor.visit(ty, || {
+                    typevar
+                        .typevar(builder.db())
+                        .bound_or_constraints(builder.db())
+                        .is_some_and(|bound_or_constraints| {
+                            imp(
+                                builder,
+                                expression,
+                                bound_or_constraints.as_type(builder.db()),
+                                visitor,
+                            )
+                        })
+                }),
+                _ => false,
             }
-            Type::Union(union) => union
-                .elements(self.db())
-                .iter()
-                .any(|element| self.contains_type_form_value(expression, *element)),
-            _ => false,
         }
+
+        imp(
+            self,
+            expression,
+            ty,
+            &ContainsTypeFormValueVisitor::default(),
+        )
     }
 
     pub(super) fn infer_type_form_call_expression(

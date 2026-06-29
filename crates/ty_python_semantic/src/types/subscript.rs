@@ -21,7 +21,6 @@ use super::diagnostic::{
 use super::infer::TypeContext;
 use super::instance::SliceLiteral;
 use super::special_form::SpecialFormType;
-use super::tuple::TupleSpec;
 use super::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
     TypedDictType, UnionBuilder, UnionType, todo_type,
@@ -465,9 +464,9 @@ where
     ))
 }
 
-// `TypedDict` subscripts need custom handling because invalid keys should still
-// recover with `Unknown` while emitting `invalid-key`, which is not naturally
-// representable via synthesized `__getitem__` overloads alone.
+// `TypedDict` subscripts need custom handling because invalid keys should emit `invalid-key` while
+// recovering with the union of value types for non-literal string keys on closed `TypedDict`s and
+// `Unknown` otherwise. This is not naturally representable via synthesized `__getitem__` overloads.
 fn typed_dict_subscript<'db>(
     db: &'db dyn Db,
     typed_dict: TypedDictType<'db>,
@@ -485,8 +484,20 @@ fn typed_dict_subscript<'db>(
         .as_string_literal()
         .map(|literal| literal.value(db))
     else {
+        if typed_dict.explicit_extra_items(db).is_some()
+            && slice_ty.is_assignable_to(db, KnownClass::Str.to_instance(db))
+        {
+            return Ok(typed_dict.value_type(db));
+        }
+        let result_ty = if typed_dict.openness(db).is_closed()
+            && slice_ty.is_assignable_to(db, KnownClass::Str.to_instance(db))
+        {
+            typed_dict.value_type(db)
+        } else {
+            Type::unknown()
+        };
         return Err(SubscriptError::new(
-            Type::unknown(),
+            result_ty,
             SubscriptErrorKind::InvalidTypedDictKey {
                 typed_dict,
                 slice_ty,
@@ -495,7 +506,7 @@ fn typed_dict_subscript<'db>(
         ));
     };
 
-    typed_dict.items(db).get(key).map_or_else(
+    typed_dict.item(db, key).map_or_else(
         || {
             Err(SubscriptError::new(
                 Type::unknown(),
@@ -571,6 +582,31 @@ impl<'db> Type<'db> {
                 Some(typed_dict_subscript(db, typed_dict, slice_ty))
             }
 
+            (
+                Type::NominalInstance(maybe_sequence_nominal),
+                Type::NominalInstance(maybe_slice_nominal),
+            ) if matches!(
+                maybe_sequence_nominal.known_class(db),
+                Some(
+                    KnownClass::List
+                        | KnownClass::Tuple
+                        | KnownClass::Str
+                        | KnownClass::Bytes
+                        | KnownClass::Bytearray
+                        | KnownClass::Range
+                        | KnownClass::Memoryview
+                )
+            )
+                && maybe_slice_nominal
+                    .slice_literal(db)
+                    .is_some_and(|slice| slice.step == Some(0)) =>
+            {
+                Some(Err(SubscriptError::new(
+                    value_ty,
+                    SubscriptErrorKind::SliceStepSizeZero,
+                )))
+            }
+
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::NominalInstance(nominal), Type::LiteralValue(literal)) if literal.is_int() => {
                 let i64_int = literal.as_int().unwrap();
@@ -599,19 +635,10 @@ impl<'db> Type<'db> {
                 .tuple_spec(db)
                 .as_deref()
                 .and_then(|tuple_spec| Some((tuple_spec, maybe_slice_nominal.slice_literal(db)?)))
-                .map(|(tuple, SliceLiteral { start, stop, step })| match tuple {
-                    TupleSpec::Fixed(tuple) => match tuple.py_slice(db, start, stop, step) {
-                        Ok(new_elements) => {
-                            Ok(Type::heterogeneous_tuple(db, new_elements))
-                        }
-                        Err(_) => Err(SubscriptError::new(
-                            Type::unknown(),
-                            SubscriptErrorKind::SliceStepSizeZero,
-                        )),
-                    },
-                    TupleSpec::Variable(_) => {
-                        Ok(todo_type!("slice into variable-length tuple"))
-                    }
+                .map(|(tuple, SliceLiteral { start, stop, step })| {
+                    tuple.py_slice_type(db, start, stop, step).map_err(|_| {
+                        SubscriptError::new(Type::unknown(), SubscriptErrorKind::SliceStepSizeZero)
+                    })
                 }),
 
             // Ex) Given `"value"[1]`, return `"a"`
@@ -821,7 +848,7 @@ impl<'db> Type<'db> {
                     },
                 ));
             }
-            Err(CallDunderError::CallError(call_error_kind, bindings)) => {
+            Err(CallDunderError::CallError(call_error_kind, bindings, _)) => {
                 return Err(SubscriptError::new(
                     bindings.return_type(db),
                     SubscriptErrorKind::DunderCallError {
@@ -867,7 +894,7 @@ impl<'db> Type<'db> {
                         },
                     ));
                 }
-                Err(CallDunderError::CallError(call_error_kind, bindings)) => {
+                Err(CallDunderError::CallError(call_error_kind, bindings, _)) => {
                     return Err(SubscriptError::new(
                         bindings.return_type(db),
                         SubscriptErrorKind::DunderCallError {

@@ -141,6 +141,9 @@ Running `ruff check --select F401` would result in Ruff enforcing `F401`, and no
 Running `ruff check --extend-select B` would result in Ruff enforcing the `E`, `F`, and `B` rules,
 with the exception of `F401`.
 
+When [preview mode](preview.md) is enabled, rule selectors also accept the human-readable name of a
+rule (e.g., `unused-import`).
+
 ## Fixes
 
 Ruff supports automatic fixes for a variety of lint errors. For example, Ruff can remove unused
@@ -347,14 +350,14 @@ To cover an entire "logical" line (a multi-line statement or suite header),
 an "ignore" comment may be placed above the first line:
 
 ```python
-# ruff: ignore[ARG001]  # Covers the entire function signature
+# ruff: ignore[unused-function-argument]  # Covers the entire function signature
 def foo(
     arg1,
     arg2,
 ):
     pass
 
-# ruff: ignore[E501]  # Covers the entire list literal
+# ruff: ignore[line-too-long]  # Covers the entire list literal
 things = [
     "really long string literal ...",
     "really long string literal ...",
@@ -368,13 +371,13 @@ of the multi-line statement or header uncovered:
 ```python
 def foo(
     arg1,
-    # ruff: ignore[ARG001]  # Only covers `arg2`
+    # ruff: ignore[unused-function-argument]  # Only covers `arg2`
     arg2,
 ):
     pass
 
 things = [
-    "really long string literal ...",  # ruff: ignore[E501]  # Only covers this line
+    "really long string literal ...",  # ruff: ignore[line-too-long]  # Only covers this line
     "really long string literal ...",
 ]
 ```
@@ -383,8 +386,8 @@ Ignore comments can also be "stacked" with other comments or pragmas, and will
 still cover the next logical line:
 
 ```python
-# ruff: ignore[E741]
-# ruff: ignore[F841]
+# ruff: ignore[ambiguous-variable-name]
+# ruff: ignore[unused-variable]
 # I definitely know what I'm doing.
 i = 1
 ```
@@ -393,10 +396,10 @@ The full line-level suppression comment specification is as follows:
 
 - An own-line or trailing comment starting with case sensitive `#ruff:`, with
   optional whitespace after the `#` symbol and `:` symbol, followed by `ignore[`,
-  any codes to be suppressed, and ending with `]`.
-- Codes to be suppressed must be separated by commas, with optional whitespace
-  before or after each code, and may be followed by an optional trailing comma
-  after the last code.
+  any rules to be suppressed, and ending with `]`.
+- Rules to be suppressed must be separated by commas, with optional whitespace
+  before or after each rule name, and may be followed by an optional trailing comma
+  after the last rule name.
 
 
 #### Block-level
@@ -451,6 +454,9 @@ be used to terminate a preceding "disable" comment with identical codes.
 Unlike `noqa` suppressions, range suppressions do not support "blanket" suppression
 of all violations. At least one violation code must be listed.
 
+In [`preview`](preview.md) mode, rule names (e.g. `unused-import`) can be used in these comments
+instead of rule codes (e.g. `F401`).
+
 The full range suppression comment specification is as follows:
 
 - An own-line comment starting with case sensitive `#ruff:`, with optional whitespace
@@ -495,17 +501,17 @@ entire file with a `file-ignore` comment on its own line, at global module scope
 and preferably near the top of the file:
 
 ```python
-# ruff: file-ignore[F401, ARG001]
+# ruff: file-ignore[unused-import, unused-function-argument]
 ```
 
 The full-level suppression comment specification is as follows:
 
 - An own-line comment starting with case sensitive `#ruff:`, with optional whitespace
-  after the `#` symbol and `:` symbol, followed by `file-ignore[`, any codes to
+  after the `#` symbol and `:` symbol, followed by `file-ignore[`, any rules to
   be suppressed, and ending with `]`.
-- Codes to be suppressed must be separated by commas, with optional whitespace
-  before or after each code, and may be followed by an optional trailing comma
-  after the last code.
+- Rules to be suppressed must be separated by commas, with optional whitespace
+  before or after each rule name, and may be followed by an optional trailing comma
+  after the last rule name.
 
 ### Detecting unused suppressions
 

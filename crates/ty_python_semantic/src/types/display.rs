@@ -32,9 +32,10 @@ use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
     CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueType, LiteralValueTypeKind, MaterializationKind, Protocol, ProtocolInstanceType,
-    SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType, Type, TypeAliasType,
-    TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
+    LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceType, Protocol,
+    ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
+    Type, TypeAliasType, TypeGuardLike, TypedDictModule, TypedDictType, UnionType,
+    WrapperDescriptorKind, visitor,
 };
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
@@ -932,6 +933,14 @@ struct DisplayRepresentation<'db> {
     settings: DisplaySettings<'db>,
 }
 
+fn property_display_name(db: &dyn Db, property: PropertyInstanceType<'_>) -> &'static str {
+    if property.instance_class(db) == KnownClass::EnumProperty {
+        "enum.property"
+    } else {
+        "property"
+    }
+}
+
 impl Display for DisplayRepresentation<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
@@ -995,7 +1004,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     f.write_char('>')
                 }
             },
-            Type::PropertyInstance(_) => f.with_type(self.ty).write_str("property"),
+            Type::PropertyInstance(property) => f
+                .with_type(self.ty)
+                .write_str(property_display_name(self.db, property)),
             Type::ModuleLiteral(module) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
@@ -1094,9 +1105,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         };
                         f.set_invalid_type_annotation();
                         f.write_str("bound method ")?;
-                        self_ty
-                            .display_with(self.db, self.settings.singleline())
-                            .fmt_detailed(f)?;
+                        DisplayMaybeParenthesizedType {
+                            ty: self_ty,
+                            db: self.db,
+                            settings: self.settings.singleline(),
+                        }
+                        .fmt_detailed(f)?;
                         f.write_char('.')?;
                         f.with_type(self.ty).write_str(function.name(self.db))?;
                         type_parameters.fmt_detailed(f)?;
@@ -1143,9 +1157,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         Some(&**function.name(self.db)),
                     ),
                     KnownBoundMethodType::PropertyDunderGet(property) => (
-                        KnownClass::Property,
+                        property.instance_class(self.db),
                         "__get__",
-                        "property",
+                        property_display_name(self.db, property),
                         Type::PropertyInstance(property),
                         property
                             .getter(self.db)
@@ -1153,9 +1167,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                             .map(|getter| &**getter.name(self.db)),
                     ),
                     KnownBoundMethodType::PropertyDunderSet(property) => (
-                        KnownClass::Property,
+                        property.instance_class(self.db),
                         "__set__",
-                        "property",
+                        property_display_name(self.db, property),
                         Type::PropertyInstance(property),
                         property
                             .setter(self.db)
@@ -1163,9 +1177,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                             .map(|setter| &**setter.name(self.db)),
                     ),
                     KnownBoundMethodType::PropertyDunderDelete(property) => (
-                        KnownClass::Property,
+                        property.instance_class(self.db),
                         "__delete__",
-                        "property",
+                        property_display_name(self.db, property),
                         Type::PropertyInstance(property),
                         property
                             .deleter(self.db)
@@ -1298,9 +1312,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     )
                 }
                 // We used to return `str` as the type here because that feels generally more useful.
-                // However, the inoncistency between the type shown in the inlay hint and its hover, and the
+                // However, the inconsistency between the type shown in the inlay hint and its hover, and the
                 // inconsistency to what's shown when hovering the backed inlay hint of a `LiteralString`
-                // convinvced us that we should change the type to `LiteralString`.
+                // convinced us that we should change the type to `LiteralString`.
                 LiteralValueTypeKind::LiteralString => f
                     .with_type(Type::SpecialForm(SpecialFormType::LiteralString))
                     .write_str("LiteralString"),
@@ -1378,8 +1392,10 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::TypedDict(TypedDictType::Synthesized(synthesized)) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
-                f.with_type(Type::SpecialForm(SpecialFormType::TypedDict))
-                    .write_str("TypedDict")?;
+                f.with_type(Type::SpecialForm(SpecialFormType::TypedDict(
+                    TypedDictModule::Typing,
+                )))
+                .write_str("TypedDict")?;
                 f.write_str(" with items ")?;
                 let items = synthesized.items(self.db);
                 for (i, name) in items.keys().enumerate() {
@@ -3253,6 +3269,9 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                     .fmt_detailed(f)?;
                 f.write_str("]")
             }
+            KnownInstanceType::Range { .. } => f
+                .with_type(KnownClass::Range.to_class_literal(self.db))
+                .write_str("range"),
         }
     }
 }

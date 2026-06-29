@@ -5,65 +5,19 @@ expression: lex_jupyter_source(source)
 ## Tokens
 ```
 [
-    (
-        Match,
-        0..5,
-    ),
-    (
-        Name(
-            Name("foo"),
-        ),
-        6..9,
-    ),
-    (
-        Colon,
-        9..10,
-    ),
-    (
-        Newline,
-        10..11,
-    ),
-    (
-        Indent,
-        11..15,
-    ),
-    (
-        Case,
-        15..19,
-    ),
-    (
-        Name(
-            Name("bar"),
-        ),
-        20..23,
-    ),
-    (
-        Colon,
-        23..24,
-    ),
-    (
-        Newline,
-        24..25,
-    ),
-    (
-        Indent,
-        25..33,
-    ),
-    (
-        Pass,
-        33..37,
-    ),
-    (
-        Newline,
-        37..37,
-    ),
-    (
-        Dedent,
-        37..37,
-    ),
-    (
-        Dedent,
-        37..37,
-    ),
+    Match 0..5,
+    Name 6..9,
+    Colon 9..10,
+    Newline 10..11,
+    Indent 11..15,
+    Case 15..19,
+    Name 20..23,
+    Colon 23..24,
+    Newline 24..25,
+    Indent 25..33,
+    Pass 33..37,
+    Newline 37..37,
+    Dedent 37..37,
+    Dedent 37..37,
 ]
 ```

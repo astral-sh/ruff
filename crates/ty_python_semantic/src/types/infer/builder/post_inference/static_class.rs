@@ -729,6 +729,19 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // If the class is generic, verify that its generic context does not violate any of
     // the typevar scoping rules.
+    if class.has_pep_695_type_params(db)
+        && let Some(generic_context) = class.inherited_legacy_generic_context(db)
+        && let Some(typevar) = generic_context
+            .variables(db)
+            .find(|typevar| !typevar.typevar(db).is_self(db))
+        && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class_node)
+    {
+        builder.into_diagnostic(format_args!(
+            "Legacy type variable `{}` cannot be used in a PEP 695 class base",
+            typevar.name(db),
+        ));
+    }
+
     if let (Some(legacy), Some(inherited)) = (
         class.legacy_generic_context(db),
         class.inherited_legacy_generic_context(db),
@@ -848,6 +861,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                                 "class",
                                 &class_node.name.id,
                                 class.header_range(db),
+                                self_typevar.kind(db),
                                 other_typevar,
                             );
                         }
@@ -867,6 +881,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                             "class",
                             &class_node.name.id,
                             class.header_range(db),
+                            base_typevar.kind(db),
                             other_typevar,
                         );
                     }
@@ -1063,6 +1078,10 @@ fn check_class_namespace_against_metaclass_members<'db>(
         }
     }
 
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "each metaclass member is checked independently"
+    )]
     for name in metaclass_instance_members {
         let Some(symbol_id) = table.symbol_id(name.as_str()) else {
             continue;

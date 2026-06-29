@@ -47,6 +47,11 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
             diagnostic.source.as_deref() == Some(DIAGNOSTIC_NAME)
                 && range_intersect(&diagnostic.range, &params.range)
         }) {
+            let mut diagnostic_id = match &diagnostic.code {
+                Some(Code::String(diagnostic_id)) => Some(Cow::Borrowed(diagnostic_id)),
+                _ => None,
+            };
+
             // If the diagnostic includes fixes, offer those up as options.
             if let Some(data) = diagnostic.data.take() {
                 let data: DiagnosticData = match serde_json::from_value(data) {
@@ -57,21 +62,31 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
                     }
                 };
 
-                actions.push(CodeActionResponse::CodeAction(lsp_types::CodeAction {
-                    title: data.fix_title,
-                    kind: Some(CodeActionKind::QuickFix),
-                    diagnostics: Some(vec![diagnostic.clone()]),
-                    edit: Some(lsp_types::WorkspaceEdit {
-                        changes: Some(data.edits),
-                        document_changes: None,
-                        change_annotations: None,
-                    }),
-                    is_preferred: Some(true),
-                    command: None,
-                    disabled: None,
-                    data: None,
-                    tags: None,
-                }));
+                let fix = match data {
+                    DiagnosticData::Full(full_diagnostic) => {
+                        diagnostic_id = Some(Cow::Owned(full_diagnostic.diagnostic_id));
+                        full_diagnostic.fix
+                    }
+                    DiagnosticData::Fix(fix) => Some(fix),
+                };
+
+                if let Some(fix) = fix {
+                    actions.push(CodeActionResponse::CodeAction(lsp_types::CodeAction {
+                        title: fix.fix_title,
+                        kind: Some(CodeActionKind::QuickFix),
+                        diagnostics: Some(vec![diagnostic.clone()]),
+                        edit: Some(lsp_types::WorkspaceEdit {
+                            changes: Some(fix.edits),
+                            document_changes: None,
+                            change_annotations: None,
+                        }),
+                        is_preferred: Some(true),
+                        command: None,
+                        disabled: None,
+                        data: None,
+                        tags: None,
+                    }));
+                }
             }
 
             // Try to find other applicable actions.
@@ -81,10 +96,10 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
             // which is dubious when you're in the middle of resolving symbols.
             let uri = snapshot.uri();
             let encoding = snapshot.encoding();
-            if let Some(Code::String(diagnostic_id)) = &diagnostic.code
+            if let Some(diagnostic_id) = diagnostic_id
                 && let Some(range) = diagnostic.range.to_text_range(db, file, uri, encoding)
             {
-                for action in code_actions(db, file, range, diagnostic_id) {
+                for action in code_actions(db, file, range, &diagnostic_id) {
                     actions.push(CodeActionResponse::CodeAction(lsp_types::CodeAction {
                         title: action.title,
                         kind: Some(CodeActionKind::QuickFix),

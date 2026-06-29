@@ -157,8 +157,8 @@ pub(crate) fn check_tokens(
         pyupgrade::rules::extraneous_parentheses(context, tokens, locator);
     }
 
-    if source_type.is_stub() && context.is_rule_enabled(Rule::TypeCommentInStub) {
-        flake8_pyi::rules::type_comment_in_stub(context, locator, comment_ranges);
+    if context.is_rule_enabled(Rule::LegacyTypeComment) {
+        flake8_pyi::rules::legacy_type_comment(context, locator, comment_ranges, source_type);
     }
 
     if context.any_rule_enabled(&[

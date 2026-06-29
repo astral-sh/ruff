@@ -276,7 +276,7 @@ import secrets
 static_assert(1 < 2)
 ```
 
-When the argument evalutes to `False`:
+When the argument evaluates to `False`:
 
 ```py
 # snapshot: static-assert-error
@@ -491,6 +491,21 @@ from ty_extensions import TypeOf
 
 def foo(x: "TypeOf[foo]"):
     reveal_type(x)  # revealed: def foo(x: def foo(...)) -> Unknown
+```
+
+A direct self-reference in a variable annotation is resolved from the later assignment:
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from ty_extensions import TypeOf
+
+direct: TypeOf[direct]
+direct = 1
+reveal_type(direct)  # revealed: Literal[1]
 ```
 
 ## Recursive `TypeOf` in returned callables
@@ -733,6 +748,41 @@ def _(
     reveal_type(c6)  # revealed: (x: int) -> Foo
     reveal_type(c7)  # revealed: (x: int) -> Foo
     reveal_type(c8)  # revealed: (x: int) -> str
+```
+
+A callable instance upcast to a callable type is still a regular callable when stored as a class
+attribute, even if its `__call__` method is function-like. Explicit descriptor behavior is still
+respected:
+
+```py
+from functools import partial
+from typing import Callable
+from ty_extensions import into_callable
+
+class CallableInstance:
+    def __call__(self, value: int, /) -> str:
+        return str(value)
+
+instance = CallableInstance()
+
+class Owner:
+    callback = into_callable(instance)
+
+Owner().callback(1)
+Owner().callback()  # error: [missing-argument]
+
+class DescriptorCallableInstance:
+    def __call__(self, value: int, /) -> str:
+        return str(value)
+
+    def __get__(self, owner, instance) -> Callable[[], str]:
+        return partial(self, 42)
+
+class DescriptorOwner:
+    callback = DescriptorCallableInstance()
+
+DescriptorOwner().callback(1)  # error: [too-many-positional-arguments]
+DescriptorOwner().callback()
 ```
 
 Narrowed callable enum values can still be used with callable type extraction:

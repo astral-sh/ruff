@@ -10,11 +10,12 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use smallvec::SmallVec;
 
 use crate::Db;
-use crate::LoopToken;
+use crate::LoopHeaderId;
 use crate::ast_node_ref::AstNodeRef;
 use crate::member::ScopedMemberId;
 use crate::node_key::NodeKey;
 use crate::place::ScopedPlaceId;
+use crate::predicate::PatternPredicate;
 use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
 use crate::unpack::{Unpack, UnpackPosition};
@@ -347,12 +348,12 @@ pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     Parameter(ParameterDefinitionNodeRef<'ast>),
     LambdaParameter(LambdaParameterDefinitionNodeRef<'ast>),
     WithItem(WithItemDefinitionNodeRef<'ast, 'db>),
-    MatchPattern(MatchPatternDefinitionNodeRef<'ast>),
+    MatchPattern(MatchPatternDefinitionNodeRef<'ast, 'db>),
     ExceptHandler(ExceptHandlerDefinitionNodeRef<'ast>),
     TypeVar(&'ast ast::TypeParamTypeVar),
     ParamSpec(&'ast ast::TypeParamParamSpec),
     TypeVarTuple(&'ast ast::TypeParamTypeVarTuple),
-    LoopHeader(LoopHeaderDefinitionNodeRef<'ast, 'db>),
+    LoopHeader(LoopHeaderDefinitionNodeRef<'ast>),
 }
 
 impl<'ast> From<&'ast ast::StmtFunctionDef> for DefinitionNodeRef<'ast, '_> {
@@ -403,8 +404,8 @@ impl<'ast> From<&'ast ast::TypeParamTypeVarTuple> for DefinitionNodeRef<'ast, '_
     }
 }
 
-impl<'ast, 'db> From<LoopHeaderDefinitionNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
-    fn from(value: LoopHeaderDefinitionNodeRef<'ast, 'db>) -> Self {
+impl<'ast> From<LoopHeaderDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
+    fn from(value: LoopHeaderDefinitionNodeRef<'ast>) -> Self {
         Self::LoopHeader(value)
     }
 }
@@ -475,8 +476,8 @@ impl<'ast> From<LambdaParameterDefinitionNodeRef<'ast>> for DefinitionNodeRef<'a
     }
 }
 
-impl<'ast> From<MatchPatternDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
-    fn from(node: MatchPatternDefinitionNodeRef<'ast>) -> Self {
+impl<'ast, 'db> From<MatchPatternDefinitionNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
+    fn from(node: MatchPatternDefinitionNodeRef<'ast, 'db>) -> Self {
         Self::MatchPattern(node)
     }
 }
@@ -515,7 +516,7 @@ pub(crate) struct ImportFromSubmoduleDefinitionNodeRef<'ast> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct AssignmentDefinitionNodeRef<'ast, 'db> {
-    pub(crate) unpack: Option<(UnpackPosition, Unpack<'db>)>,
+    pub(crate) unpack: Option<Unpack<'db>>,
     pub(crate) value: &'ast ast::Expr,
     pub(crate) target: &'ast ast::Expr,
 }
@@ -554,10 +555,10 @@ pub(crate) struct ExceptHandlerDefinitionNodeRef<'ast> {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct LoopHeaderDefinitionNodeRef<'ast, 'db> {
+pub(crate) struct LoopHeaderDefinitionNodeRef<'ast> {
     pub(crate) loop_stmt: LoopStmtRef<'ast>,
     pub(crate) place: ScopedPlaceId,
-    pub(crate) loop_token: LoopToken<'db>,
+    pub(crate) loop_header_id: LoopHeaderId,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -617,14 +618,13 @@ pub(crate) struct LambdaParameterDefinitionNodeRef<'ast> {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct MatchPatternDefinitionNodeRef<'ast> {
+pub(crate) struct MatchPatternDefinitionNodeRef<'ast, 'db> {
     /// The outermost pattern node in which the identifier being defined occurs.
     pub(crate) pattern: &'ast ast::Pattern,
     /// The identifier being defined.
     pub(crate) identifier: &'ast ast::Identifier,
-    /// The index of the identifier in the pattern when visiting the `pattern` node in evaluation
-    /// order.
-    pub(crate) index: u32,
+    /// The predicate for the complete match case containing this binding.
+    pub(crate) predicate: PatternPredicate<'db>,
 }
 
 impl<'db> DefinitionNodeRef<'_, 'db> {
@@ -685,7 +685,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 value,
                 target,
             }) => DefinitionKind::Assignment(AssignmentDefinitionKind {
-                target_kind: TargetKind::from(unpack),
+                unpack,
                 value: AstNodeRef::new(parsed, value),
                 target: AstNodeRef::new(parsed, target),
             }),
@@ -759,11 +759,11 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             DefinitionNodeRef::MatchPattern(MatchPatternDefinitionNodeRef {
                 pattern,
                 identifier,
-                index,
+                predicate,
             }) => DefinitionKind::MatchPattern(MatchPatternDefinitionKind {
                 pattern: AstNodeRef::new(parsed, pattern),
                 identifier: AstNodeRef::new(parsed, identifier),
-                index,
+                predicate,
             }),
             DefinitionNodeRef::ExceptHandler(ExceptHandlerDefinitionNodeRef {
                 handler,
@@ -784,9 +784,9 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             DefinitionNodeRef::LoopHeader(LoopHeaderDefinitionNodeRef {
                 loop_stmt,
                 place,
-                loop_token,
+                loop_header_id,
             }) => DefinitionKind::LoopHeader(LoopHeaderDefinitionKind {
-                loop_token,
+                loop_header_id,
                 loop_stmt: match loop_stmt {
                     LoopStmtRef::While(stmt) => LoopStmtKind::While(AstNodeRef::new(parsed, stmt)),
                     LoopStmtRef::For(stmt) => LoopStmtKind::For(AstNodeRef::new(parsed, stmt)),
@@ -929,12 +929,12 @@ pub enum DefinitionKind<'db> {
     Parameter(ParameterDefinitionNodeKind),
     LambdaParameter(LambdaParameterDefinitionNodeKind),
     WithItem(WithItemDefinitionKind<'db>),
-    MatchPattern(MatchPatternDefinitionKind),
+    MatchPattern(MatchPatternDefinitionKind<'db>),
     ExceptHandler(ExceptHandlerDefinitionKind),
     TypeVar(AstNodeRef<ast::TypeParamTypeVar>),
     ParamSpec(AstNodeRef<ast::TypeParamParamSpec>),
     TypeVarTuple(AstNodeRef<ast::TypeParamTypeVarTuple>),
-    LoopHeader(LoopHeaderDefinitionKind<'db>),
+    LoopHeader(LoopHeaderDefinitionKind),
     // Boxing here helps avoid growing the memory footprint of this enum.
     NestedBindings(Box<NestedBindingsDefinitionKind>),
 }
@@ -1175,15 +1175,6 @@ pub enum TargetKind<'db> {
     Single,
 }
 
-impl<'db> From<Option<(UnpackPosition, Unpack<'db>)>> for TargetKind<'db> {
-    fn from(value: Option<(UnpackPosition, Unpack<'db>)>) -> Self {
-        match value {
-            Some((unpack_position, unpack)) => TargetKind::Sequence(unpack_position, unpack),
-            None => TargetKind::Single,
-        }
-    }
-}
-
 impl<'db> TargetKind<'db> {
     fn from_unpack(unpack: Option<Unpack<'db>>, unpack_position: UnpackPosition) -> Self {
         match unpack {
@@ -1224,19 +1215,19 @@ impl StarImportDefinitionKind {
 }
 
 #[derive(Clone, Debug, get_size2::GetSize)]
-pub struct MatchPatternDefinitionKind {
+pub struct MatchPatternDefinitionKind<'db> {
     pattern: AstNodeRef<ast::Pattern>,
     identifier: AstNodeRef<ast::Identifier>,
-    index: u32,
+    predicate: PatternPredicate<'db>,
 }
 
-impl MatchPatternDefinitionKind {
+impl<'db> MatchPatternDefinitionKind<'db> {
     pub fn pattern<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Pattern {
         self.pattern.node(module)
     }
 
-    pub fn index(&self) -> u32 {
-        self.index
+    pub fn predicate(&self) -> PatternPredicate<'db> {
+        self.predicate
     }
 }
 
@@ -1423,14 +1414,14 @@ impl ImportFromSubmoduleDefinitionKind {
 
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct AssignmentDefinitionKind<'db> {
-    target_kind: TargetKind<'db>,
+    unpack: Option<Unpack<'db>>,
     value: AstNodeRef<ast::Expr>,
     target: AstNodeRef<ast::Expr>,
 }
 
 impl<'db> AssignmentDefinitionKind<'db> {
-    pub fn target_kind(&self) -> TargetKind<'db> {
-        self.target_kind
+    pub fn unpack(&self) -> Option<Unpack<'db>> {
+        self.unpack
     }
 
     pub fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
@@ -1568,10 +1559,9 @@ impl ExceptHandlerDefinitionKind {
 
 /// Definition kind for a loop header entry.
 #[derive(Clone, Debug, get_size2::GetSize)]
-pub struct LoopHeaderDefinitionKind<'db> {
-    /// The `LoopHeader` struct isn't ready when this type of definition is created. Instead we
-    /// look it up later by passing this token to `get_loop_header`.
-    loop_token: LoopToken<'db>,
+pub struct LoopHeaderDefinitionKind {
+    /// The `LoopHeader` is reserved before walking the loop and populated afterward.
+    loop_header_id: LoopHeaderId,
     loop_stmt: LoopStmtKind,
     place: ScopedPlaceId,
 }
@@ -1582,9 +1572,9 @@ pub(crate) enum LoopStmtKind {
     For(AstNodeRef<ast::StmtFor>),
 }
 
-impl<'db> LoopHeaderDefinitionKind<'db> {
-    pub fn loop_token(&self) -> LoopToken<'db> {
-        self.loop_token
+impl LoopHeaderDefinitionKind {
+    pub fn loop_header_id(&self) -> LoopHeaderId {
+        self.loop_header_id
     }
 
     pub fn place(&self) -> ScopedPlaceId {
@@ -1608,7 +1598,9 @@ pub struct NestedBindingsDefinitionKind {
     pub nested_declarations: SmallVec<[crate::builder::NestedDeclaration; 1]>,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
+#[derive(
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, salsa::Update, get_size2::GetSize,
+)]
 pub struct DefinitionNodeKey(NodeKey);
 
 impl DefinitionNodeKey {

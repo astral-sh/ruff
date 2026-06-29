@@ -144,14 +144,14 @@ impl<'db> NewType<'db> {
                     for inner_newtype in inner_newtype_stack.into_iter().rev() {
                         mapped_base = NewTypeBase::NewType(NewType::new(
                             db,
-                            inner_newtype.name(db).clone(),
+                            inner_newtype.name(db),
                             inner_newtype.definition(db),
                             Some(mapped_base),
                         ));
                     }
                     return Some(NewType::new(
                         db,
-                        self.name(db).clone(),
+                        self.name(db),
                         self.definition(db),
                         Some(mapped_base),
                     ));
@@ -189,7 +189,7 @@ impl<'db> NewType<'db> {
 
         Some(NewType::new(
             db,
-            self.name(db).clone(),
+            self.name(db),
             self.definition(db),
             eager_base,
         ))
@@ -245,7 +245,14 @@ pub(crate) fn walk_newtype_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Si
     newtype: NewType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, newtype.base(db).instance_type(db));
+    let base = if visitor.should_visit_lazy_type_attributes() {
+        Some(newtype.base(db))
+    } else {
+        newtype.eager_base(db)
+    };
+    if let Some(base) = base {
+        visitor.visit_type(db, base.instance_type(db));
+    }
 }
 
 /// `typing.NewType` typically wraps a class type, but it can also wrap another newtype.

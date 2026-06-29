@@ -35,6 +35,30 @@ def return_value[T](x: T) -> T:
     return x
 ```
 
+## Compatibility with legacy type variables
+
+A function with its own PEP 695 type parameter list cannot also introduce a legacy type variable.
+Functions without a PEP 695 list can still use the traditional implicit generic-function syntax.
+
+```py
+from typing import TypeVar
+
+K = TypeVar("K")
+L = TypeVar("L")
+
+def identity(value: K) -> K:
+    return value
+
+class C[V]:
+    def legacy(self, value: V, other: K) -> V | K:
+        raise NotImplementedError
+
+    # error: [unbound-type-variable] "Legacy type variable `K` cannot be used in a function with PEP 695 type parameters"
+    # error: [unbound-type-variable] "Legacy type variable `L` cannot be used in a function with PEP 695 type parameters"
+    def mixed[M](self, value: M, other: K, another: L) -> M | K | L:
+        raise NotImplementedError
+```
+
 Each typevar must also appear _somewhere_ in the parameter list:
 
 ```py
@@ -776,6 +800,33 @@ def specialized(box: Box[Callable[..., Any]]) -> None:
     box.cls.whatever
 ```
 
+## Attribute access on TypeVars bounded by `type[...]`
+
+Regression test for <https://github.com/astral-sh/ty/issues/3782>.
+
+```py
+from typing import ClassVar, Self
+
+class A:
+    attr: ClassVar[str]
+    current: ClassVar[Self]
+
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+class B:
+    attr: ClassVar[int]
+
+def single_bound[T: type[A]](cls: T) -> None:
+    reveal_type(cls.attr)  # revealed: str
+    reveal_type(cls.current)  # revealed: T'instance@single_bound
+    reveal_type(cls.create())  # revealed: T'instance@single_bound
+
+def union_bound[T: type[A] | type[B]](cls: T) -> None:
+    reveal_type(cls.attr)  # revealed: str | int
+```
+
 ## Solving TypeVars with upper bounds in unions
 
 ```py
@@ -1239,7 +1290,7 @@ def g[S: (bool, str)](x: S) -> S:
 ## Display ordering
 
 Where possible, we want the types that appear in inferred specializations to line up with the types
-that are listed in the source code. We don't want arbitarily reorder e.g. union elements as part of
+that are listed in the source code. We don't want arbitrarily reorder e.g. union elements as part of
 finding a solution.
 
 ```py

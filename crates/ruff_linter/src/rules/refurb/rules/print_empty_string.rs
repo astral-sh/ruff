@@ -55,7 +55,7 @@ enum Reason {
 }
 
 impl Violation for PrintEmptyString {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -269,8 +269,7 @@ impl EmptyStringFix {
                     false
                 })
                 .cloned()
-                .collect::<Vec<_>>()
-                .into_boxed_slice();
+                .collect();
         }
 
         let contents = generator.expr(&call.into());

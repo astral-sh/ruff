@@ -628,6 +628,17 @@ def f() -> JSON_OBJECT:
     return {"hello": 23}
 ```
 
+### Aliased union in a self-recursive type alias
+
+Regression test for <https://github.com/astral-sh/ty/issues/3835>.
+
+```py
+from collections.abc import Sequence
+
+type JSONScalar = str | int
+type JSONValue = JSONScalar | Sequence[JSONValue] | dict[str, JSONValue]
+```
+
 ### Recursive dict alias in method return
 
 ```py

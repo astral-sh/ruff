@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::anyhow;
 use camino::Utf8Path;
 
@@ -10,6 +12,7 @@ use ruff_db::source::source_text;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::test::test_contents;
+use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::options::Options;
 
@@ -130,17 +133,21 @@ fn run_test(
             };
             normalize_diagnostics(test_file.file, &mut diagnostics);
 
-            let failure = match matcher::match_file(db, test_file.file, &diagnostics).and_then(
-                |inline_diagnostics| {
-                    mdtest::validate_inline_snapshot(
-                        db,
-                        "ruff",
-                        test_file,
-                        &inline_diagnostics,
-                        &mut markdown_edits,
-                    )
-                },
-            ) {
+            let failure = match matcher::match_file(
+                db,
+                test_file.file,
+                &diagnostics,
+                mdtest::RunOptions::default(),
+            )
+            .and_then(|inline_diagnostics| {
+                mdtest::validate_inline_snapshot(
+                    db,
+                    "ruff",
+                    test_file,
+                    &inline_diagnostics,
+                    &mut markdown_edits,
+                )
+            }) {
                 Ok(()) => None,
                 Err(line_failures) => Some(FileFailures {
                     backtick_offsets: test_file.to_code_block_backtick_offsets(),
@@ -195,5 +202,9 @@ fn parse<'s>(
     short_title: &'s str,
     source: &'s str,
 ) -> anyhow::Result<parser::MarkdownTestSuite<'s, Options>> {
+    let _guard = ValueSourceGuard::new(
+        ValueSource::File(Arc::new(SystemPathBuf::from(short_title))),
+        false,
+    );
     parser::parse::<Options>(short_title, source, |_| Ok(()))
 }

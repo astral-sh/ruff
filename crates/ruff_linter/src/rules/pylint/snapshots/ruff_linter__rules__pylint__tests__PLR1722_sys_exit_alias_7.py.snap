@@ -9,11 +9,11 @@ PLR1722 [*] Use `sys.exit()` instead of `exit`
   |     ^^^^
   |
 help: Replace `exit` with `sys.exit()`
+  |
 1 + import sys
 2 | def main():
   -     exit(0)
 3 +     sys.exit(0)
 4 |
-5 |
-6 | import functools
+  |
 note: This is an unsafe fix and may change runtime behavior

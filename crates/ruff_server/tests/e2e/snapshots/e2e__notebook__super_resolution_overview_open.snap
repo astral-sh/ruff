@@ -21,7 +21,7 @@ expression: diagnostics
         "href": "https://docs.astral.sh/ruff/rules/missing-required-import"
       },
       "source": "Ruff",
-      "message": "Missing required import: `from __future__ import annotations`",
+      "message": "Missing required import: `from __future__ import annotations`\n\nhelp: Insert required import: `from __future__ import annotations`",
       "tags": [],
       "data": {
         "code": "I002",
@@ -294,7 +294,7 @@ expression: diagnostics
         "href": "https://docs.astral.sh/ruff/rules/unsorted-imports"
       },
       "source": "Ruff",
-      "message": "Import block is un-sorted or un-formatted",
+      "message": "Import block is un-sorted or un-formatted\n\nhelp: Organize imports",
       "tags": [],
       "data": {
         "code": "I001",
@@ -348,7 +348,7 @@ expression: diagnostics
         "href": "https://docs.astral.sh/ruff/rules/useless-semicolon"
       },
       "source": "Ruff",
-      "message": "Statement ends with an unnecessary semicolon",
+      "message": "Statement ends with an unnecessary semicolon\n\nhelp: Remove unnecessary semicolon",
       "tags": [],
       "data": {
         "code": "E703",
@@ -404,7 +404,7 @@ expression: diagnostics
         "href": "https://docs.astral.sh/ruff/rules/useless-semicolon"
       },
       "source": "Ruff",
-      "message": "Statement ends with an unnecessary semicolon",
+      "message": "Statement ends with an unnecessary semicolon\n\nhelp: Remove unnecessary semicolon",
       "tags": [],
       "data": {
         "code": "E703",
@@ -456,7 +456,7 @@ expression: diagnostics
         "href": "https://docs.astral.sh/ruff/rules/useless-semicolon"
       },
       "source": "Ruff",
-      "message": "Statement ends with an unnecessary semicolon",
+      "message": "Statement ends with an unnecessary semicolon\n\nhelp: Remove unnecessary semicolon",
       "tags": [],
       "data": {
         "code": "E703",
@@ -508,7 +508,7 @@ expression: diagnostics
         "href": "https://docs.astral.sh/ruff/rules/f-string-missing-placeholders"
       },
       "source": "Ruff",
-      "message": "f-string without any placeholders",
+      "message": "f-string without any placeholders\n\nhelp: Remove extraneous `f` prefix",
       "tags": [],
       "data": {
         "code": "F541",

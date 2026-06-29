@@ -1,5 +1,198 @@
 # Changelog
 
+## 0.15.20
+
+Released on 2026-06-25.
+
+### Preview features
+
+- Allow human-readable names in rule selectors ([#25887](https://github.com/astral-sh/ruff/pull/25887))
+- Emit a warning instead of an error for unknown rule selectors ([#26113](https://github.com/astral-sh/ruff/pull/26113))
+- Match `noqa` shebang handling in `ruff:ignore` comments ([#26286](https://github.com/astral-sh/ruff/pull/26286))
+- \[`ruff`\] Remove `pytest-fixture-autouse` (`RUF076`) ([#26240](https://github.com/astral-sh/ruff/pull/26240), [#26371](https://github.com/astral-sh/ruff/pull/26371))
+
+### Documentation
+
+- Add versioning sections to custom crate READMEs ([#26317](https://github.com/astral-sh/ruff/pull/26317))
+- Update `ruff_python_parser` README for crates.io ([#26315](https://github.com/astral-sh/ruff/pull/26315))
+- \[`perflint`\] Clarify that `PERF402` applies to any iterable ([#26242](https://github.com/astral-sh/ruff/pull/26242))
+
+### Contributors
+
+- [@dhruvmanila](https://github.com/dhruvmanila)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@ntBre](https://github.com/ntBre)
+- [@trilamsr](https://github.com/trilamsr)
+
+## 0.15.19
+
+Released on 2026-06-23.
+
+### Preview features
+
+- Support human-readable names when hovering suppression comments and in code actions ([#26114](https://github.com/astral-sh/ruff/pull/26114))
+
+### Bug fixes
+
+- Fall back to default settings when editor-only settings are invalid ([#26244](https://github.com/astral-sh/ruff/pull/26244))
+- Fix panic when inserting text at a notebook cell boundary ([#26111](https://github.com/astral-sh/ruff/pull/26111))
+
+### Rule changes
+
+- \[`pylint`\] Update fix suggestions for `__floor__`, `__trunc__`, `__length_hint__`, and `__matmul__` variants (`PLC2801`) ([#26239](https://github.com/astral-sh/ruff/pull/26239))
+
+### Performance
+
+- Avoid allocating when parsing single string literals ([#26200](https://github.com/astral-sh/ruff/pull/26200))
+- Avoid reallocating singleton call arguments ([#26223](https://github.com/astral-sh/ruff/pull/26223))
+- Lazily create source files for lint diagnostics ([#26226](https://github.com/astral-sh/ruff/pull/26226))
+- Optimize formatter text width and indentation ([#26236](https://github.com/astral-sh/ruff/pull/26236))
+- Reserve capacity for builtin bindings ([#26229](https://github.com/astral-sh/ruff/pull/26229))
+- Skip repeated-key checks for singleton dictionaries ([#26228](https://github.com/astral-sh/ruff/pull/26228))
+- Use ArrayVec for qualified name segments ([#26224](https://github.com/astral-sh/ruff/pull/26224))
+
+### Documentation
+
+- \[`flake8-pyi`\] Note that `PYI051` is an opinionated stylistic rule ([#26179](https://github.com/astral-sh/ruff/pull/26179))
+- \[`pyupgrade`\] Clarify `UP029` as a Python 2 compatibility rule ([#26243](https://github.com/astral-sh/ruff/pull/26243))
+
+### Other changes
+
+- Publish Ruff crates to crates.io ([#26271](https://github.com/astral-sh/ruff/pull/26271))
+
+### Contributors
+
+- [@MakenRosa](https://github.com/MakenRosa)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@trilamsr](https://github.com/trilamsr)
+- [@ntBre](https://github.com/ntBre)
+- [@sanjibani](https://github.com/sanjibani)
+- [@charliermarsh](https://github.com/charliermarsh)
+
+## 0.15.18
+
+Released on 2026-06-18.
+
+### Preview features
+
+- Handle nested `ruff:ignore` comments ([#25791](https://github.com/astral-sh/ruff/pull/25791))
+- Stop displaying severity in output ([#26050](https://github.com/astral-sh/ruff/pull/26050))
+- Use human-readable names in CLI output ([#25937](https://github.com/astral-sh/ruff/pull/25937))
+- Use human-readable names in LSP and playground diagnostics ([#26058](https://github.com/astral-sh/ruff/pull/26058))
+- \[`pydocstyle`\] Prevent property docstrings starting with verbs (`D421`) ([#23775](https://github.com/astral-sh/ruff/pull/23775))
+- \[`flake8-pyi`\] Extend `PYI033` to Python files ([#26129](https://github.com/astral-sh/ruff/pull/26129))
+
+### Bug fixes
+
+- Detect equivalent numeric mapping keys ([#26009](https://github.com/astral-sh/ruff/pull/26009))
+- Detect mapping keys equivalent to booleans ([#25982](https://github.com/astral-sh/ruff/pull/25982))
+- Detect repeated signed and complex dictionary keys ([#26007](https://github.com/astral-sh/ruff/pull/26007))
+
+### Rule changes
+
+- \[`flake8-pyi`\] Rename `PYI033` to `legacy-type-comment` ([#26131](https://github.com/astral-sh/ruff/pull/26131))
+
+### Performance
+
+- Use `ThinVec` for call keywords ([#25999](https://github.com/astral-sh/ruff/pull/25999))
+- Inline parser recovery context checks ([#26038](https://github.com/astral-sh/ruff/pull/26038))
+- Match parser keywords as bytes ([#26037](https://github.com/astral-sh/ruff/pull/26037))
+- Move value parsing out of lexing ([#25360](https://github.com/astral-sh/ruff/pull/25360))
+
+### Server
+
+- Render subdiagnostics and secondary annotations as related information ([#26011](https://github.com/astral-sh/ruff/pull/26011))
+
+### Documentation
+
+- Update fix availability for always-fixable rules ([#26091](https://github.com/astral-sh/ruff/pull/26091))
+- \[`flake8-tidy-imports`\] Add fix safety section (`TID252`) ([#17491](https://github.com/astral-sh/ruff/pull/17491))
+
+### Parser
+
+- Reject `__debug__` lambda parameters ([#26022](https://github.com/astral-sh/ruff/pull/26022))
+- Reject `_` as a match-pattern target ([#25977](https://github.com/astral-sh/ruff/pull/25977))
+- Reject multiple starred names in sequence patterns ([#25976](https://github.com/astral-sh/ruff/pull/25976))
+- Reject parenthesized star imports ([#26021](https://github.com/astral-sh/ruff/pull/26021))
+- Reject starred comprehension targets ([#26023](https://github.com/astral-sh/ruff/pull/26023))
+- Reject unparenthesized generator expressions in class bases ([#25978](https://github.com/astral-sh/ruff/pull/25978))
+- Reject `yield` expressions after commas ([#26024](https://github.com/astral-sh/ruff/pull/26024))
+- Validate function type parameter default order ([#25981](https://github.com/astral-sh/ruff/pull/25981))
+
+### Playground
+
+- Make diagnostic links clickable ([#26104](https://github.com/astral-sh/ruff/pull/26104))
+- Use diagnostic tags ([#26105](https://github.com/astral-sh/ruff/pull/26105))
+
+### Contributors
+
+- [@AlexWaygood](https://github.com/AlexWaygood)
+- [@ntBre](https://github.com/ntBre)
+- [@gtkacz](https://github.com/gtkacz)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@Kalmaegi](https://github.com/Kalmaegi)
+
+## 0.15.17
+
+Released on 2026-06-11.
+
+### Preview features
+
+- Allow human-readable names in suppression comments ([#25614](https://github.com/astral-sh/ruff/pull/25614))
+- Fix handling of `ignore` comments within a `disable`/`enable` pair ([#25845](https://github.com/astral-sh/ruff/pull/25845))
+- Prioritize human-readable names in CLI output ([#25869](https://github.com/astral-sh/ruff/pull/25869))
+- Respect diagnostic start and parent ranges and trailing comments in `ruff:ignore` suppressions ([#25673](https://github.com/astral-sh/ruff/pull/25673))
+- \[`flake8-async`\] Add `trio.as_safe_channel` to safe decorators (`ASYNC119`) ([#25775](https://github.com/astral-sh/ruff/pull/25775))
+- \[`flake8-pytest-style`\] Also check `pytest_asyncio` fixtures ([#25375](https://github.com/astral-sh/ruff/pull/25375))
+- \[`ruff`\] Ban `pytest` autouse fixtures (`RUF076`) ([#25477](https://github.com/astral-sh/ruff/pull/25477))
+- \[`pyupgrade`\] Add `from __future__ import annotations` automatically (`UP007`, `UP045`) ([#23259](https://github.com/astral-sh/ruff/pull/23259))
+
+### Bug fixes
+
+- Fix diagnostic when `ruff:enable` or `ruff:disable` appears where `ruff:ignore` is expected ([#25700](https://github.com/astral-sh/ruff/pull/25700))
+- \[`pyupgrade`\] Preserve leading empty literals to avoid syntax errors (`UP032`) ([#25491](https://github.com/astral-sh/ruff/pull/25491))
+
+### Rule changes
+
+- \[`flake8-pytest-style`\] Clarify diagnostic message for single parameters (`PT007`) ([#25592](https://github.com/astral-sh/ruff/pull/25592))
+- \[`numpy`\] Drop autofix for `np.in1d` (`NPY201`) ([#25612](https://github.com/astral-sh/ruff/pull/25612))
+- \[`pylint`\] Exempt Python version comparisons (`PLR2004`) ([#25743](https://github.com/astral-sh/ruff/pull/25743))
+
+### Performance
+
+- Reserve AST `Vec`s with correct capacity for common cases ([#25451](https://github.com/astral-sh/ruff/pull/25451))
+
+### Formatter
+
+- Preserve whitespace for Quarto cell option comments ([#25641](https://github.com/astral-sh/ruff/pull/25641))
+
+### CLI
+
+- Allow rule names in `ruff rule` ([#25640](https://github.com/astral-sh/ruff/pull/25640))
+
+### Other changes
+
+- Fix playground diagnostics scrollbars ([#25642](https://github.com/astral-sh/ruff/pull/25642))
+
+### Contributors
+
+- [@SuryanshSS1011](https://github.com/SuryanshSS1011)
+- [@anishgirianish](https://github.com/anishgirianish)
+- [@romero-deshaw](https://github.com/romero-deshaw)
+- [@karlhillx](https://github.com/karlhillx)
+- [@carljm](https://github.com/carljm)
+- [@ntBre](https://github.com/ntBre)
+- [@11happy](https://github.com/11happy)
+- [@Kilo59](https://github.com/Kilo59)
+- [@oconnor663](https://github.com/oconnor663)
+- [@LeonidasZhak](https://github.com/LeonidasZhak)
+- [@DavisVaughan](https://github.com/DavisVaughan)
+- [@MeGaGiGaGon](https://github.com/MeGaGiGaGon)
+- [@jonathandung](https://github.com/jonathandung)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@brianmego](https://github.com/brianmego)
+
 ## 0.15.16
 
 Released on 2026-06-04.

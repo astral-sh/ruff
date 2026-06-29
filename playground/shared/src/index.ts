@@ -8,6 +8,12 @@ export { HorizontalResizeHandle, VerticalResizeHandle } from "./ResizeHandle";
 export { setupMonaco } from "./setupMonaco";
 export { downloadZip } from "./downloadZip";
 export {
+  type DiagnosticDetail,
+  type DiagnosticDetailLocation,
+  DiagnosticDetailItem,
+} from "./DiagnosticDetail";
+export { secondaryAnnotationsWithMessages } from "./diagnostics";
+export {
   default as SideBar,
   SideBarEntry,
   type SideBarEntryProps,

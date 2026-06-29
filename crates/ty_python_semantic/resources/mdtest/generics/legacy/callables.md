@@ -26,6 +26,13 @@ def identity2(c: Callable[P, T]) -> Callable[P, T]:
 reveal_type(generic_context(identity2))
 # revealed: [T](t: T) -> T
 reveal_type(identity2(identity))
+
+class CallableInstance:
+    def __call__(self, value: int, /) -> str:
+        return str(value)
+
+# revealed: (value: int, /) -> str
+reveal_type(identity2(CallableInstance()))
 ```
 
 Generic classes are another example, since you invoke the class to instantiate it:
@@ -273,6 +280,8 @@ def f(val: str | bytes) -> None:
 reveal_type(accepts_callable(f))  # revealed: str | bytes
 ```
 
+## Overloaded callable with a constrained type variable
+
 When `T` is constrained to a union by other arguments, the overloaded callable must still be treated
 as a whole to satisfy `Callable[[T], T]`.
 
@@ -298,6 +307,8 @@ result = apply_twice(f, x, y)
 # revealed: tuple[int | str, int | str]
 reveal_type(result)
 ```
+
+## Overloaded callable returned by a generic factory
 
 An overloaded callable returned from a generic callable factory should still be assignable to the
 declared generic callable return type.

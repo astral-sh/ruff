@@ -43,7 +43,7 @@ pub fn completion<'db>(
     };
     let model = SemanticModel::new(db, file);
 
-    if context.cursor.is_in_string() {
+    if !matches!(context.kind, ContextKind::Keywords(_)) && context.cursor.is_in_string() {
         let Some(string_expr) = context.cursor.enclosing_string_literal_expr() else {
             return vec![];
         };
@@ -68,6 +68,12 @@ pub fn completion<'db>(
         query,
     );
     match context.kind {
+        ContextKind::Keywords(keywords) => {
+            for &keyword in keywords {
+                completions
+                    .add(CompletionBuilder::keyword(keyword.as_str()).context_specific(true));
+            }
+        }
         ContextKind::Import(ref import) => {
             import.add_completions(db, file, &mut completions);
         }
@@ -459,7 +465,7 @@ impl<'db> CompletionBuilder<'db> {
                         Type::SpecialForm(
                             SpecialFormType::Protocol
                                 | SpecialFormType::Generic
-                                | SpecialFormType::TypedDict
+                                | SpecialFormType::TypedDict(_)
                                 | SpecialFormType::NamedTuple
                         )
                     );
@@ -654,8 +660,42 @@ struct Context<'m> {
 
 #[derive(Debug)]
 enum ContextKind<'m> {
+    Keywords(&'static [ContextualKeyword]),
     Import(ImportStatement<'m>),
     NonImport(ContextNonImport<'m>),
+}
+
+/// A Python keyword offered only when it is valid in the incomplete syntax at the cursor.
+///
+/// ```python
+/// for item <CURSOR>          # `in`
+/// with resource <CURSOR>     # `as`
+/// match value:
+///     case pattern <CURSOR>  # `as` or `if`
+/// ```
+#[derive(Clone, Copy, Debug)]
+enum ContextualKeyword {
+    As,
+    If,
+    In,
+}
+
+impl ContextualKeyword {
+    const fn as_str(self) -> &'static str {
+        match self {
+            ContextualKeyword::As => "as",
+            ContextualKeyword::If => "if",
+            ContextualKeyword::In => "in",
+        }
+    }
+
+    const fn token_kind(self) -> TokenKind {
+        match self {
+            ContextualKeyword::As => TokenKind::As,
+            ContextualKeyword::If => TokenKind::If,
+            ContextualKeyword::In => TokenKind::In,
+        }
+    }
 }
 
 /// Context for non-import completions.
@@ -675,11 +715,15 @@ impl<'m> Context<'m> {
         offset: TextSize,
     ) -> Option<Context<'m>> {
         let cursor = ContextCursor::new(parsed, source, offset);
-        if cursor.is_in_no_completions_place() {
+        if cursor.is_in_comment() {
             return None;
         }
 
-        let kind = if let Some(import) = ImportStatement::detect(db, file, &cursor) {
+        let kind = if let Some(keywords) = cursor.incomplete_keywords() {
+            ContextKind::Keywords(keywords)
+        } else if cursor.is_in_definition_place() {
+            return None;
+        } else if let Some(import) = ImportStatement::detect(db, file, &cursor) {
             ContextKind::Import(import)
         } else {
             let target_token = CompletionTargetTokens::find(&cursor)?;
@@ -699,7 +743,7 @@ impl<'m> Context<'m> {
         capabilities: CompletionCapabilities,
     ) -> CollectionContext<'db> {
         match self.kind {
-            ContextKind::Import(_) => CollectionContext::none(),
+            ContextKind::Keywords(_) | ContextKind::Import(_) => CollectionContext::none(),
             ContextKind::NonImport(_) => {
                 let exception_ty = self.cursor.exception_ty(db);
                 let complete_callable_parentheses = settings.complete_function_parentheses
@@ -758,6 +802,36 @@ struct ContextCursor<'m> {
     tokens_before: &'m [Token],
     /// The covering node based on `parsed` and `range`.
     covering_node: CoveringNode<'m>,
+}
+
+/// The cursor position relative to an AST range and its surrounding parentheses.
+enum RangeEndPosition {
+    /// The cursor follows the complete range, including any surrounding parentheses.
+    After,
+    /// The cursor follows the AST range but precedes a surrounding closing parenthesis.
+    InsideParentheses,
+}
+
+impl RangeEndPosition {
+    /// Selects the keywords valid at this position.
+    ///
+    /// `after` applies after the complete, possibly parenthesized range, while
+    /// `inside_parentheses` applies before its closing parenthesis. For example:
+    ///
+    /// ```python
+    /// case (400 <CURSOR>)  # `as`
+    /// case (400) <CURSOR>  # `as` or `if`
+    /// ```
+    fn select_keywords(
+        self,
+        after: &'static [ContextualKeyword],
+        inside_parentheses: &'static [ContextualKeyword],
+    ) -> &'static [ContextualKeyword] {
+        match self {
+            RangeEndPosition::After => after,
+            RangeEndPosition::InsideParentheses => inside_parentheses,
+        }
+    }
 }
 
 impl<'m> ContextCursor<'m> {
@@ -834,11 +908,6 @@ impl<'m> ContextCursor<'m> {
         covering_node(self.parsed.syntax().into(), range)
     }
 
-    /// Whether the last token is in a place where we should not provide completions.
-    fn is_in_no_completions_place(&self) -> bool {
-        self.is_in_comment() || self.is_in_definition_place()
-    }
-
     /// Whether the last token is within a comment or not.
     fn is_in_comment(&self) -> bool {
         self.tokens_before
@@ -904,10 +973,7 @@ impl<'m> ContextCursor<'m> {
             ast::AnyNodeRef::StmtAnnAssign(stmt) => {
                 contains(&stmt.annotation)
                     || (stmt.value.as_deref().is_some_and(contains)
-                        && matches!(
-                            stmt.annotation.inferred_type(model),
-                            Some(Type::SpecialForm(SpecialFormType::TypeAlias))
-                        ))
+                        && model.is_type_alias_annotation(&stmt.annotation))
             }
             ast::AnyNodeRef::StmtFunctionDef(stmt) => stmt.returns.as_deref().is_some_and(contains),
             ast::AnyNodeRef::StmtTypeAlias(stmt) => contains(&stmt.value),
@@ -982,7 +1048,7 @@ impl<'m> ContextCursor<'m> {
             // invalid we extract the token under the self and check if it makes
             // up that "empty space" inside the Parameters Node. If it does, we know
             // that we are still binding variables, just that the current state is
-            // syntactically invalid. Hence we suppress autocomplete suggestons
+            // syntactically invalid. Hence we suppress autocomplete suggestions
             // also in those cases.
             ast::AnyNodeRef::Parameters(params) => {
                 if !params.range.contains_range(self.range) {
@@ -995,6 +1061,218 @@ impl<'m> ContextCursor<'m> {
             }
             _ => false,
         })
+    }
+
+    /// Returns the paired closing parentheses surrounding `range`, from innermost to outermost.
+    fn closing_parentheses(
+        &self,
+        range: TextRange,
+        parent: AnyNodeRef,
+    ) -> impl Iterator<Item = &Token> {
+        let right_parentheses = self
+            .parsed
+            .tokens()
+            .in_range(TextRange::new(range.end(), parent.end()))
+            .iter()
+            .filter(|token| !token.kind().is_trivia())
+            .take_while(|token| token.kind() == TokenKind::Rpar);
+        let left_parentheses = self
+            .parsed
+            .tokens()
+            .before(range.start())
+            .iter()
+            .rev()
+            .filter(|token| !token.kind().is_trivia())
+            .take_while(|token| token.kind() == TokenKind::Lpar);
+
+        right_parentheses
+            .zip(left_parentheses)
+            .map(|(right, _)| right)
+    }
+
+    /// Returns the cursor position after `range`, accounting for surrounding parentheses.
+    fn range_end_position(
+        &self,
+        range: TextRange,
+        parent: AnyNodeRef,
+        token: &Token,
+    ) -> Option<RangeEndPosition> {
+        let range_ends_at_token = range.contains_range(token.range()) && range.end() == token.end();
+        let mut closing_parentheses = self.closing_parentheses(range, parent).peekable();
+        let position = |inside_parentheses| {
+            if inside_parentheses {
+                RangeEndPosition::InsideParentheses
+            } else {
+                RangeEndPosition::After
+            }
+        };
+
+        if range_ends_at_token {
+            return Some(position(closing_parentheses.peek().is_some()));
+        }
+
+        while let Some(right) = closing_parentheses.next() {
+            if right.range() == token.range() {
+                return Some(position(closing_parentheses.peek().is_some()));
+            }
+        }
+
+        None
+    }
+
+    /// Returns only the candidates that can precede an already present contextual keyword.
+    ///
+    /// `candidates` must be ordered as the keywords can appear in source.
+    fn before_already_present(
+        &self,
+        candidates: &'static [ContextualKeyword],
+    ) -> &'static [ContextualKeyword] {
+        if self
+            .tokens_before
+            .last()
+            .is_some_and(|token| token.end() > self.offset)
+        {
+            return candidates;
+        }
+
+        let Some(next) = self
+            .parsed
+            .tokens()
+            .after(self.offset)
+            .iter()
+            .find(|token| !token.kind().is_trivia())
+        else {
+            return candidates;
+        };
+        candidates
+            .iter()
+            .position(|keyword| keyword.token_kind() == next.kind())
+            .map_or(candidates, |position| &candidates[..position])
+    }
+
+    /// Returns keywords when the cursor follows syntax that can only be
+    /// continued by those keywords.
+    ///
+    /// This first identifies keywords compatible with the typed prefix, then finds the
+    /// complete token immediately before the cursor, and finally checks its enclosing syntax.
+    fn incomplete_keywords(&self) -> Option<&'static [ContextualKeyword]> {
+        const IN: &[ContextualKeyword] = std::slice::from_ref(&ContextualKeyword::In);
+        const AS: &[ContextualKeyword] = std::slice::from_ref(&ContextualKeyword::As);
+        const IF: &[ContextualKeyword] = std::slice::from_ref(&ContextualKeyword::If);
+        const MATCH: &[ContextualKeyword] = &[ContextualKeyword::As, ContextualKeyword::If];
+        const NONE: &[ContextualKeyword] = &[];
+
+        // Phase 1: Identify the keyword groups compatible with the typed prefix.
+        let typed_matches = |keywords: &[ContextualKeyword]| {
+            self.typed.is_none_or(|typed| {
+                keywords
+                    .iter()
+                    .any(|keyword| keyword.as_str().starts_with(typed))
+            })
+        };
+        let matches_in = typed_matches(IN);
+        let matches_as = typed_matches(AS);
+        let matches_if = typed_matches(IF);
+        if !matches_in && !matches_as && !matches_if {
+            return None;
+        }
+
+        // Phase 2: Find the complete token immediately preceding the completion target.
+        let (tokens, start) = match self.typed {
+            Some(_) => (
+                self.tokens_before.get(..self.tokens_before.len() - 1)?,
+                self.range.start(),
+            ),
+            None => (self.tokens_before, self.offset),
+        };
+        let token = tokens
+            .iter()
+            .rev()
+            .find(|token| !token.kind().is_trivia())?;
+        if token.kind() == TokenKind::Newline
+            || token.end() >= start
+            || self
+                .parsed
+                .tokens()
+                .in_range(TextRange::new(token.end(), start))
+                .iter()
+                .any(|token| !token.kind().is_trivia())
+        {
+            return None;
+        }
+        let covering_node = self.covering_node(token.range());
+
+        // Phase 3: Determine which contextual keywords can follow that token from its
+        // enclosing syntax.
+
+        // Loop and comprehension targets can only be followed by `in`.
+        if matches_in
+            && let Some(keywords) = covering_node.ancestors().find_map(|node| match node {
+                ast::AnyNodeRef::StmtFor(stmt) => self
+                    .range_end_position(stmt.target.range(), node, token)
+                    .map(|position| position.select_keywords(IN, NONE)),
+                ast::AnyNodeRef::Comprehension(comprehension) => self
+                    .range_end_position(comprehension.target.range(), node, token)
+                    .map(|position| position.select_keywords(IN, NONE)),
+                _ => None,
+            })
+        {
+            return Some(self.before_already_present(keywords));
+        }
+
+        // Context managers and exception types can be followed by `as`.
+        if matches_as
+            && let Some(keywords) = covering_node.ancestors().find_map(|node| match node {
+                ast::AnyNodeRef::StmtWith(stmt) => stmt.items.iter().find_map(|item| {
+                    let range = item.context_expr.range();
+                    self.range_end_position(range, item.into(), token)
+                        .map(|position| position.select_keywords(AS, NONE))
+                        .or_else(|| self.range_end_position(range, node, token).map(|_| AS))
+                }),
+                ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => handler
+                    .type_
+                    .as_deref()
+                    .and_then(|type_| self.range_end_position(type_.range(), node, token))
+                    .map(|position| position.select_keywords(AS, NONE)),
+                _ => None,
+            })
+        {
+            return Some(self.before_already_present(keywords));
+        }
+
+        // Match patterns can be followed by `as` or `if`; an existing alias can only be
+        // followed by `if`.
+        if (matches_as || matches_if)
+            && let Some(keywords) = covering_node.ancestors().find_map(|node| {
+                let ast::AnyNodeRef::MatchCase(case) = node else {
+                    return None;
+                };
+                match &case.pattern {
+                    ast::Pattern::MatchAs(ast::PatternMatchAs {
+                        pattern: Some(pattern),
+                        name: Some(name),
+                        ..
+                    }) => {
+                        if name.is_valid()
+                            && let Some(position) =
+                                self.range_end_position(case.pattern.range(), node, token)
+                        {
+                            Some(position.select_keywords(IF, NONE))
+                        } else {
+                            self.range_end_position(pattern.range(), node, token)
+                                .map(|position| position.select_keywords(MATCH, AS))
+                        }
+                    }
+                    pattern => self
+                        .range_end_position(pattern.range(), node, token)
+                        .map(|position| position.select_keywords(MATCH, AS)),
+                }
+            })
+        {
+            return Some(self.before_already_present(keywords));
+        }
+
+        None
     }
 
     /// Returns the expected type when the cursor sits inside
@@ -2805,7 +3083,7 @@ fn is_name_like_token(token: &Token) -> bool {
 /// on `CompletionBuilder`.
 fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<CompletionKind> {
     type CompletionKindVisitor<'db> =
-        CycleDetector<CompletionKind, Type<'db>, Option<CompletionKind>>;
+        CycleDetector<CompletionKind, Type<'db>, Option<CompletionKind>, 3>;
 
     fn imp<'db>(
         db: &'db dyn Db,
@@ -4668,8 +4946,8 @@ Answer.<CURSOR>
                 NO :: Literal[Answer.NO]
                 YES :: Literal[Answer.YES]
                 mro :: bound method <class 'Answer'>.mro() -> list[type]
-                name :: property
-                value :: property
+                name :: enum.property
+                value :: enum.property
                 __annotations__ :: dict[str, Any]
                 __base__ :: type | None
                 __bases__ :: tuple[type, ...]
@@ -4780,6 +5058,7 @@ quux.<CURSOR>
         __le__ :: bound method Quux.__le__(value: tuple[int | str, ...], /) -> bool
         __len__ :: () -> Literal[2]
         __lt__ :: bound method Quux.__lt__(value: tuple[int | str, ...], /) -> bool
+        __match_args__ :: tuple[str, ...]
         __module__ :: str
         __mul__ :: bound method Quux.__mul__(value: SupportsIndex, /) -> tuple[int | str, ...]
         __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
@@ -4843,6 +5122,39 @@ bar(o<CURSOR>
         foo
         "
         );
+    }
+
+    // Regression test for https://github.com/astral-sh/ty/issues/3803
+    #[test]
+    fn call_keyword_only_argument_between_variadic_parameters() {
+        completion_test_builder(
+            "\
+def func(*args, special, **kw): ...
+
+func(sp<CURSOR>
+",
+        )
+        .skip_keywords()
+        .skip_builtins()
+        .skip_auto_import()
+        .build()
+        .contains("special");
+    }
+
+    #[test]
+    fn call_keyword_only_argument_between_variadic_parameters_after_positional_argument() {
+        completion_test_builder(
+            "\
+def func(arg1, *arg2, special, **kw): ...
+
+func(sp<CURSOR>
+",
+        )
+        .skip_keywords()
+        .skip_builtins()
+        .skip_auto_import()
+        .build()
+        .contains("special");
     }
 
     #[test]
@@ -7928,6 +8240,20 @@ with open('bar') as f<CURSOR>
     }
 
     #[test]
+    fn with_item_suggests_as() {
+        for source in [
+            "with open('bar') <CURSOR>",
+            "with open('bar') a<CURSOR>",
+            "with (open('bar')) <CURSOR>",
+            "with (open('bar') <CURSOR>)",
+            "with (\n    open('bar')  # comment\n    <CURSOR>\n)",
+            "with open('bar') \\\n    <CURSOR>",
+        ] {
+            assert_eq!(completion_test_builder(source).build().snapshot(), "as");
+        }
+    }
+
+    #[test]
     fn no_completions_in_except_alias() {
         let builder = completion_test_builder(
             "\
@@ -7941,6 +8267,31 @@ except IndexError as f<CURSOR>
             builder.build().snapshot(),
             @"<No completions found>",
         );
+    }
+
+    #[test]
+    fn except_handler_suggests_as() {
+        for source in [
+            "\
+try:
+    pass
+except ValueError <CURSOR>",
+            "\
+try:
+    pass
+except ValueError a<CURSOR>",
+            "\
+try:
+    pass
+except (ValueError) <CURSOR>",
+            "\
+try:
+    pass
+except ValueError \\
+    <CURSOR>",
+        ] {
+            assert_eq!(completion_test_builder(source).build().snapshot(), "as");
+        }
     }
 
     #[test]
@@ -7977,6 +8328,98 @@ match status:
     }
 
     #[test]
+    fn match_pattern_suggests_keywords() {
+        for (source, expected) in [
+            (
+                "\
+match status:
+    case 400 <CURSOR>",
+                "as\nif",
+            ),
+            (
+                "\
+match status:
+    case 400 a<CURSOR>",
+                "as",
+            ),
+            (
+                "\
+match status:
+    case 400 i<CURSOR>",
+                "if",
+            ),
+            (
+                "\
+match status:
+    case 400 <CURSOR> if guard",
+                "as",
+            ),
+            (
+                "\
+match status:
+    case (400) <CURSOR>",
+                "as\nif",
+            ),
+            (
+                "\
+match status:
+    case (400 <CURSOR>)",
+                "as",
+            ),
+            (
+                "\
+match status:
+    case ((400) <CURSOR>)",
+                "as",
+            ),
+            (
+                "\
+match status:
+    case (
+        400  # comment
+        <CURSOR>
+    )",
+                "as",
+            ),
+            (
+                "\
+match status:
+    case 400 as value <CURSOR>",
+                "if",
+            ),
+        ] {
+            assert_eq!(completion_test_builder(source).build().snapshot(), expected);
+        }
+    }
+
+    #[test]
+    fn no_contextual_keywords_inside_parentheses() {
+        for (source, unexpected) in [
+            ("for (foo <CURSOR>) in items: pass", "in"),
+            ("with ((open() <CURSOR>)): pass", "as"),
+            (
+                "try:\n    pass\nexcept (ValueError <CURSOR>) as error: pass",
+                "as",
+            ),
+            ("match status:\n    case (400 <CURSOR>): pass", "if"),
+            (
+                "match status:\n    case (400 as value <CURSOR>): pass",
+                "if",
+            ),
+        ] {
+            let builder = completion_test_builder(source);
+            assert!(
+                builder
+                    .build()
+                    .completions()
+                    .iter()
+                    .all(|completion| completion.name != unexpected),
+                "Expected completions for `{source}` to not include `{unexpected}`",
+            );
+        }
+    }
+
+    #[test]
     fn no_completions_in_empty_for_variable_binding() {
         let builder = completion_test_builder(
             "\
@@ -8000,6 +8443,48 @@ for foo<CURSOR>
             builder.build().snapshot(),
             @"<No completions found>",
         );
+    }
+
+    #[test]
+    fn for_target_suggests_in() {
+        for source in [
+            "for foo <CURSOR>",
+            "for foo i<CURSOR>",
+            "for foo in<CURSOR>",
+            "for (foo) <CURSOR>",
+            "for foo \\\n    <CURSOR>",
+        ] {
+            assert_eq!(completion_test_builder(source).build().snapshot(), "in");
+        }
+    }
+
+    #[test]
+    fn comprehension_target_suggests_in() {
+        for source in [
+            "[x for x <CURSOR>]",
+            "(x for x <CURSOR>)",
+            "{x for x <CURSOR>}",
+            "{x: x for x <CURSOR>}",
+            "[x async for x <CURSOR>]",
+        ] {
+            assert_eq!(completion_test_builder(source).build().snapshot(), "in");
+        }
+    }
+
+    #[test]
+    fn no_completions_before_existing_contextual_keyword() {
+        for source in [
+            "for foo <CURSOR>in items: pass",
+            "[foo for foo <CURSOR>in items]",
+            "with open('bar') <CURSOR>as file: pass",
+            "try:\n    pass\nexcept ValueError <CURSOR>as error: pass",
+            "match status:\n    case 400 <CURSOR>as value: pass",
+        ] {
+            assert_eq!(
+                completion_test_builder(source).build().snapshot(),
+                "<No completions found>"
+            );
+        }
     }
 
     #[test]

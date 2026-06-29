@@ -12,6 +12,7 @@ I001 [*] Import block is un-sorted or un-formatted
   | |_____________^
   |
 help: Organize imports
+  |
 1 + # Future imports
 2 | from __future__ import annotations
 3 +
@@ -22,3 +23,4 @@ help: Organize imports
 7 + # Third party imports
 8 | import pandas
 9 + import requests
+  |

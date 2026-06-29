@@ -33,6 +33,7 @@ mod commands;
 mod completions;
 mod configuration;
 mod folding_range;
+mod hover;
 mod initialize;
 mod inlay_hints;
 mod notebook;
@@ -62,19 +63,19 @@ use lsp_types::{
     DidChangeWatchedFilesClientCapabilities, DidChangeWatchedFilesNotification,
     DidChangeWatchedFilesParams, DidChangeWorkspaceFoldersNotification,
     DidChangeWorkspaceFoldersParams, DidCloseTextDocumentNotification, DidCloseTextDocumentParams,
-    DidOpenTextDocumentNotification, DidOpenTextDocumentParams, DocumentDiagnosticParams,
-    DocumentDiagnosticReport, DocumentDiagnosticRequest, ExitNotification, FileEvent, FoldingRange,
-    FoldingRangeParams, Hover, HoverParams, HoverRequest, InitializeParams, InitializeRequest,
-    InitializeResult, InitializedNotification, InitializedParams, InlayHint,
-    InlayHintClientCapabilities, InlayHintParams, InlayHintRequest, LanguageKind, Notification,
-    PartialResultParams, Position, PrepareRenameRequest, PreviousResultId,
-    PublishDiagnosticsClientCapabilities, Range, Request, SemanticTokens, ShutdownRequest,
-    SignatureHelp, SignatureHelpParams, SignatureHelpRequest, SignatureHelpTriggerKind,
-    TextDocumentClientCapabilities, TextDocumentContentChangeEvent, TextDocumentIdentifier,
-    TextDocumentItem, TextDocumentPositionParams, Uri, VersionedTextDocumentIdentifier,
-    WorkDoneProgressParams, WorkspaceClientCapabilities, WorkspaceDiagnosticParams,
-    WorkspaceDiagnosticReport, WorkspaceDiagnosticRequest, WorkspaceEdit, WorkspaceFolder,
-    WorkspaceFoldersChangeEvent, WorkspaceFoldersInitializeParams,
+    DidOpenTextDocumentNotification, DidOpenTextDocumentParams, DidSaveTextDocumentNotification,
+    DidSaveTextDocumentParams, DocumentDiagnosticParams, DocumentDiagnosticReport,
+    DocumentDiagnosticRequest, ExitNotification, FileEvent, FoldingRange, FoldingRangeParams,
+    Hover, HoverParams, HoverRequest, InitializeParams, InitializeRequest, InitializeResult,
+    InitializedNotification, InitializedParams, InlayHint, InlayHintClientCapabilities,
+    InlayHintParams, InlayHintRequest, LanguageKind, Notification, PartialResultParams, Position,
+    PrepareRenameRequest, PreviousResultId, PublishDiagnosticsClientCapabilities, Range, Request,
+    SemanticTokens, ShutdownRequest, SignatureHelp, SignatureHelpParams, SignatureHelpRequest,
+    SignatureHelpTriggerKind, TextDocumentClientCapabilities, TextDocumentContentChangeEvent,
+    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Uri,
+    VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
+    WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticRequest,
+    WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceFoldersInitializeParams,
 };
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashMap;
@@ -840,6 +841,17 @@ impl TestServer {
         self.send_notification::<DidChangeTextDocumentNotification>(params);
     }
 
+    /// Send a `textDocument/didSave` notification
+    pub(crate) fn save_text_document(&mut self, path: impl AsRef<SystemPath>) {
+        let params = DidSaveTextDocumentParams {
+            text_document: TextDocumentIdentifier {
+                uri: self.file_uri(path),
+            },
+            text: None,
+        };
+        self.send_notification::<DidSaveTextDocumentNotification>(params);
+    }
+
     /// Send a `textDocument/didClose` notification
     pub(crate) fn close_text_document(&mut self, path: impl AsRef<SystemPath>) {
         let params = DidCloseTextDocumentParams {
@@ -1350,6 +1362,41 @@ impl TestServerBuilder {
         self
     }
 
+    /// Set the hover content format preference for the client
+    pub(crate) fn with_hover_content_format(mut self, formats: Vec<lsp_types::MarkupKind>) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .hover
+            .get_or_insert_default()
+            .content_format = Some(formats);
+        self
+    }
+
+    /// Set the completion documentation format preference for the client
+    pub(crate) fn with_completion_documentation_format(
+        mut self,
+        formats: Vec<lsp_types::MarkupKind>,
+    ) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .completion
+            .get_or_insert_default()
+            .completion_item
+            .get_or_insert_default()
+            .documentation_format = Some(formats);
+        self
+    }
+
+    /// Advertise support for ty's fully rendered diagnostic output.
+    pub(crate) fn with_full_diagnostic_output(mut self) -> Self {
+        self.client_capabilities.experimental = Some(serde_json::json!({
+            "fullDiagnosticOutput": true,
+        }));
+        self
+    }
+
     /// Set custom client capabilities (overrides any previously set capabilities)
     #[expect(dead_code)]
     pub(crate) fn with_client_capabilities(mut self, capabilities: ClientCapabilities) -> Self {
@@ -1447,6 +1494,7 @@ impl TestContext {
             .map_err(|()| anyhow!("Failed to convert root directory to uri"))?;
         settings.add_filter(&tempdir_filter(project_dir.as_str()), "<temp_dir>/");
         settings.add_filter(&tempdir_filter(project_dir_uri.path()), "<temp_dir>/");
+        settings.add_filter(r#"\\\\"#, "/");
         settings.add_filter(
             r#"The system cannot find the file specified."#,
             "No such file or directory",

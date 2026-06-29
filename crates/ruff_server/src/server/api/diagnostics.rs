@@ -12,6 +12,9 @@ pub(super) fn generate_diagnostics(snapshot: &DocumentSnapshot) -> DiagnosticsMa
             document,
             snapshot.encoding(),
             snapshot.client_settings().show_syntax_errors(),
+            snapshot
+                .resolved_client_capabilities()
+                .diagnostic_related_information,
         )
     } else {
         DiagnosticsMap::default()
@@ -22,6 +25,10 @@ pub(super) fn publish_diagnostics_for_document(
     snapshot: &DocumentSnapshot,
     client: &Client,
 ) -> crate::server::Result<()> {
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "diagnostic notifications for distinct document URIs are independent"
+    )]
     for (uri, diagnostics) in generate_diagnostics(snapshot) {
         client
             .send_notification::<lsp_types::PublishDiagnosticsNotification>(

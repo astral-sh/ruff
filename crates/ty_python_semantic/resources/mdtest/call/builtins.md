@@ -38,6 +38,20 @@ str(encoding="utf-8", object=b"M\xc3\xbcsli")
 str(b"", errors="replace")
 ```
 
+### `range` as an ordinary `range` value
+
+```py
+reveal_type(list(range(3)))  # revealed: list[int]
+reveal_type([range(0)])  # revealed: list[range]
+
+class Uop:
+    replicated = range(0)
+
+def _(uop: Uop) -> None:
+    uop.replicated = range(1, 3)
+    reveal_type(uop.replicated)  # revealed: range
+```
+
 ### Invalid calls
 
 ```py
@@ -211,6 +225,30 @@ def _(xs: Unknown):
     # TODO: should not emit an error and should reveal `str`
     # error: [no-matching-overload]
     reveal_type("".join(map("{}".format, xs)))  # revealed: Unknown
+```
+
+## Mapping methods accept arbitrary object types
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from collections.abc import Mapping
+
+def _(mapping: Mapping[str, int], dictionary: dict[str, int], key: object) -> None:
+    mapping.get(key)
+    mapping.get(key, 0)
+    mapping.get(key, "default")
+    dictionary.get(key)
+    dictionary.get(key, 0)
+    dictionary.get(key, "default")
+    dictionary.pop(key)  # error: [invalid-argument-type]
+    dictionary.pop(key, 0)
+    dictionary.pop(key, None)
+    dictionary.keys().isdisjoint(key)
+    dictionary.items().isdisjoint(key)
 ```
 
 ## The builtin `NotImplemented` constant is not callable

@@ -16,9 +16,6 @@ pub struct LintMetadata {
     pub summary: &'static str,
 
     /// An in depth explanation of the lint in markdown. Covers what the lint does, why it's bad and possible fixes.
-    ///
-    /// The documentation may require post-processing to be rendered correctly. For example, lines
-    /// might have leading or trailing whitespace that should be removed.
     pub raw_documentation: &'static str,
 
     /// The default level of the lint if the user doesn't specify one.
@@ -102,13 +99,23 @@ impl LintMetadata {
         self.summary
     }
 
-    /// Returns the documentation line by line with one leading space and all trailing whitespace removed.
+    /// Returns the documentation line by line with Rust doc-comment prefixes and trailing
+    /// whitespace removed.
     pub fn documentation_lines(&self) -> impl Iterator<Item = &str> {
-        self.raw_documentation.lines().map(|line| {
-            line.strip_prefix(char::is_whitespace)
-                .unwrap_or(line)
-                .trim_end()
-        })
+        let has_doc_comment_prefix = self.raw_documentation.starts_with(' ');
+
+        self.raw_documentation
+            .strip_suffix('\n')
+            .unwrap_or(self.raw_documentation)
+            .lines()
+            .map(move |line| {
+                let line = if has_doc_comment_prefix {
+                    line.strip_prefix(' ').unwrap_or(line)
+                } else {
+                    line
+                };
+                line.trim_end()
+            })
     }
 
     /// Returns the documentation as a single string.
@@ -142,13 +149,13 @@ pub fn lint_documentation_url(lint_name: LintName) -> String {
 }
 
 #[doc(hidden)]
-pub const fn lint_metadata_defaults() -> LintMetadata {
+pub const fn lint_metadata_defaults(status: LintStatus) -> LintMetadata {
     LintMetadata {
         name: LintName::of(""),
         summary: "",
         raw_documentation: "",
         default_level: Level::Error,
-        status: LintStatus::preview("0.0.0"),
+        status,
         file: "",
         line: 1,
     }
@@ -161,15 +168,9 @@ pub const fn lint_metadata_defaults() -> LintMetadata {
     serde(tag = "type", rename_all = "lowercase")
 )]
 pub enum LintStatus {
-    /// The lint has been added to the linter, but is not yet stable.
-    Preview {
-        /// The version in which the lint was added.
-        since: &'static str,
-    },
-
     /// The lint is stable.
     Stable {
-        /// The version in which the lint was stabilized.
+        /// The version in which the lint was added.
         since: &'static str,
     },
 
@@ -196,10 +197,6 @@ pub enum LintStatus {
 }
 
 impl LintStatus {
-    pub const fn preview(since: &'static str) -> Self {
-        LintStatus::Preview { since }
-    }
-
     pub const fn stable(since: &'static str) -> Self {
         LintStatus::Stable { since }
     }
@@ -241,7 +238,7 @@ impl LintStatus {
 ///     /// ```
 ///     pub(crate) static UNRESOLVED_REFERENCE = {
 ///         summary: "detects references to names that are not defined",
-///         status: LintStatus::preview("1.0.0"),
+///         status: LintStatus::stable("1.0.0"),
 ///         default_level: Level::Warn,
 ///     }
 /// }
@@ -249,7 +246,8 @@ impl LintStatus {
 #[macro_export]
 macro_rules! declare_lint {
     (
-        $(#[doc = $doc:literal])+
+        $(#[expect($($expect:tt)*)])?
+        $(#[doc = $doc:expr])+
         $vis: vis static $name: ident = {
             summary: $summary: literal,
             status: $status: expr,
@@ -257,19 +255,58 @@ macro_rules! declare_lint {
             $( $key:ident: $value:expr, )*
         }
     ) => {
+        $(#[expect($($expect)*)])?
         $( #[doc = $doc] )+
-        #[expect(clippy::needless_update)]
         $vis static $name: $crate::lint::LintMetadata = $crate::lint::LintMetadata {
             name: ruff_db::diagnostic::LintName::of(ruff_macros::kebab_case!($name)),
             summary: $summary,
             raw_documentation: concat!($($doc, '\n',)+),
-            status: $status,
             file: file!(),
             line: line!(),
             $( $key: $value, )*
-            ..$crate::lint::lint_metadata_defaults()
+            ..$crate::lint::lint_metadata_defaults($status)
         };
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Level, LintStatus};
+
+    crate::declare_lint! {
+        /// First line.
+        ///
+        ///     indented
+        static INLINE_DOCUMENTATION = {
+            summary: "inline documentation",
+            status: LintStatus::stable("0.0.0"),
+            default_level: Level::Error,
+        }
+    }
+
+    crate::declare_lint! {
+        #[doc = include_str!("../resources/lint_docs/invalid-attribute-access.md")]
+        static INCLUDED_DOCUMENTATION = {
+            summary: "included documentation",
+            status: LintStatus::stable("0.0.0"),
+            default_level: Level::Error,
+        }
+    }
+
+    #[test]
+    fn inline_documentation_strips_doc_comment_prefixes() {
+        assert_eq!(
+            INLINE_DOCUMENTATION.documentation(),
+            "First line.\n\n    indented"
+        );
+    }
+
+    #[test]
+    fn included_documentation_preserves_indentation() {
+        let documentation = INCLUDED_DOCUMENTATION.documentation();
+        assert!(documentation.starts_with("## What it does"));
+        assert!(documentation.contains("\n    class_var: ClassVar[int] = 1\n"));
+    }
 }
 
 /// A unique identifier for a lint rule.
@@ -475,7 +512,7 @@ impl std::fmt::Display for GetLintError {
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum LintEntry {
-    /// An existing lint rule. Can be in preview, stable or deprecated.
+    /// An existing lint rule. Can be stable or deprecated.
     Lint(LintId),
     /// A lint rule that has been removed.
     Removed(LintId),

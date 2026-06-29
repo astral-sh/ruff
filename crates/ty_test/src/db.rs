@@ -4,8 +4,8 @@ use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_db::files::{File, Files};
 use ruff_db::system::{
-    CaseSensitivity, DbWithWritableSystem, InMemorySystem, OsSystem, System, SystemPath,
-    SystemPathBuf, WhichResult, WritableSystem,
+    DbWithWritableSystem, InMemorySystem, OsSystem, System, SystemPath, SystemPathBuf, WhichResult,
+    WritableSystem,
 };
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_notebook::{Notebook, NotebookError};
@@ -110,8 +110,12 @@ impl Db {
         }
     }
 
-    pub(crate) fn update_mdtest_rule_selection(&mut self, rules: Option<&Rules>) {
-        let rule_selection = mdtest_rule_selection(rules);
+    pub(crate) fn update_mdtest_rule_selection(
+        &mut self,
+        rules: Option<&Rules>,
+        required_rule: Option<&str>,
+    ) {
+        let rule_selection = mdtest_rule_selection(rules, required_rule);
 
         let settings = self.settings();
         if settings.rule_selection(self) != &rule_selection {
@@ -227,7 +231,7 @@ struct MdtestRuleSelection(RuleSelection);
 
 impl Default for MdtestRuleSelection {
     fn default() -> Self {
-        Self(mdtest_rule_selection(None))
+        Self(mdtest_rule_selection(None, None))
     }
 }
 
@@ -239,7 +243,7 @@ impl std::ops::Deref for MdtestRuleSelection {
     }
 }
 
-fn mdtest_rule_selection(rules: Option<&Rules>) -> RuleSelection {
+fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> RuleSelection {
     let registry = default_lint_registry();
     let mut selection = RuleSelection::all(registry, Severity::Info);
 
@@ -253,6 +257,13 @@ fn mdtest_rule_selection(rules: Option<&Rules>) -> RuleSelection {
         .get("missing-override-decorator")
         .expect("missing-override-decorator is a known lint rule");
     selection.disable(missing_override_decorator);
+
+    // `experimental-syntax` is also an exception: we make use of `&` and `~` for intersection and
+    // negation types in our tests for better readability.
+    let experimental_syntax = registry
+        .get("experimental-syntax")
+        .expect("experimental-syntax is a known lint rule");
+    selection.disable(experimental_syntax);
 
     if let Some(rules) = rules {
         let set_lint_level =
@@ -281,6 +292,17 @@ fn mdtest_rule_selection(rules: Option<&Rules>) -> RuleSelection {
                 .unwrap_or_else(|error| panic!("Unknown lint rule `{rule_name}`: {error}"));
             set_lint_level(&mut selection, lint, *level);
         }
+    }
+
+    if let Some(required_rule) = required_rule {
+        let lint = registry
+            .get(required_rule)
+            .unwrap_or_else(|error| panic!("Unknown lint rule `{required_rule}`: {error}"));
+        selection.enable(
+            lint,
+            Severity::Info,
+            ty_python_semantic::lint::LintSource::File,
+        );
     }
 
     selection
@@ -372,6 +394,15 @@ impl System for MdtestSystem {
         }
     }
 
+    fn is_same_file(
+        &self,
+        first: &SystemPath,
+        second: &SystemPath,
+    ) -> ruff_db::system::Result<bool> {
+        self.as_system()
+            .is_same_file(&self.normalize_path(first), &self.normalize_path(second))
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> ruff_db::system::Result<String> {
         self.as_system().read_to_string(&self.normalize_path(path))
     }
@@ -393,15 +424,6 @@ impl System for MdtestSystem {
         path: &ruff_db::system::SystemVirtualPath,
     ) -> Result<Notebook, NotebookError> {
         self.as_system().read_virtual_path_to_notebook(path)
-    }
-
-    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
-        self.as_system()
-            .path_exists_case_sensitive(&self.normalize_path(path), &self.normalize_path(prefix))
-    }
-
-    fn case_sensitivity(&self) -> CaseSensitivity {
-        self.as_system().case_sensitivity()
     }
 
     fn which(&self, name: &str) -> WhichResult {

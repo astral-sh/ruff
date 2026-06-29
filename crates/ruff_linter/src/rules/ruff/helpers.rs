@@ -44,7 +44,7 @@ fn is_attrs_field(func: &Expr, semantic: &SemanticModel) -> bool {
 /// I.e., if `DataclassKind::Attrs` is passed in,
 /// return `true` if `func` represents a call to `attr.ib()` or `attrs.field()`;
 /// if `DataclassKind::Stdlib` is passed in,
-/// return `true` if `func` represents a call to `dataclasse.field()`.
+/// return `true` if `func` represents a call to `dataclasses.field()`.
 pub(super) fn is_dataclass_field(
     func: &Expr,
     semantic: &SemanticModel,

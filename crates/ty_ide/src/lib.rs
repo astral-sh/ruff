@@ -398,7 +398,9 @@ mod tests {
     use insta::internals::SettingsBindDropGuard;
 
     use ruff_db::Db;
-    use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
+    use ruff_db::diagnostic::{
+        Annotation, Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, UnifiedFile,
+    };
     use ruff_db::files::{File, FileRootKind, system_path_to_file};
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
     use ruff_db::source::{SourceText, source_text};
@@ -455,11 +457,34 @@ mod tests {
                 .format(DiagnosticFormat::Full);
             for diagnostic in diagnostics {
                 let diag = diagnostic.into_diagnostic();
+                let config = config
+                    .clone()
+                    .anonymized_line_numbers(diagnostic_touches_vendored_file(&self.db, &diag));
                 write!(buf, "{}", diag.display(&self.db, &config)).unwrap();
             }
 
             buf
         }
+    }
+
+    pub(super) fn diagnostic_touches_vendored_file(db: &dyn Db, diagnostic: &Diagnostic) -> bool {
+        fn annotation_is_vendored(db: &dyn Db, annotation: &Annotation) -> bool {
+            matches!(
+                annotation.get_span().file(),
+                UnifiedFile::Ty(file) if file.path(db).is_vendored_path()
+            )
+        }
+
+        diagnostic
+            .primary_annotation()
+            .into_iter()
+            .chain(diagnostic.secondary_annotations())
+            .chain(diagnostic.sub_diagnostics().iter().flat_map(|sub| {
+                sub.primary_annotation()
+                    .into_iter()
+                    .chain(sub.secondary_annotations())
+            }))
+            .any(|annotation| annotation_is_vendored(db, annotation))
     }
 
     /// The file and offset into that file where a `<CURSOR>` marker

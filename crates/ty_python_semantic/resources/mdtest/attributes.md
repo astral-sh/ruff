@@ -335,7 +335,6 @@ reveal_type(c_instance.d2)  # revealed: str
 ```py
 class C:
     def __init__(self) -> None:
-        # error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to attribute `b` of type `list[Literal[2, 3]]`"
         self.a, *self.b = (1, 2, 3)
 
 c_instance = C()
@@ -1015,6 +1014,70 @@ reveal_type(Derived().pure_overwritten_in_subclass_method)  # revealed: str
 reveal_type(Derived.undeclared)  # revealed: str
 reveal_type(Derived().undeclared)  # revealed: str
 reveal_type(Derived().pure_undeclared)  # revealed: str
+```
+
+## Allow replacing ordinary methods with compatible functions
+
+An ordinary method can be replaced directly on a class by another function with a compatible
+signature. The replacement remains an ordinary function, so Python binds it to instances in the same
+way as the original method.
+
+A function-literal type identifies a specific function, not just its signature. This makes
+identity-sensitive code unsound: after the assignment below, `Foo.add is original_add` is inferred
+as `Literal[True]`, even though it evaluates to `False` at runtime and the assertion fails. Calls to
+the method itself remain safe because both functions have compatible signatures and the same
+instance-binding behavior.
+
+```py
+from typing import Literal
+
+class Foo:
+    def add(self, x: int, y: int, /) -> int:
+        return x + y
+
+def add_replacement(self: Foo, x: int, y: int, /) -> int:
+    return x * y
+
+original_add = Foo.add
+
+def requires_true(value: Literal[True]) -> None:
+    assert value
+
+Foo.add = add_replacement
+requires_true(Foo.add is original_add)  # accepted; assertion fails at runtime
+
+def incompatible_replacement(self: Foo, x: str, y: str, /) -> str:
+    return x + y
+
+Foo.add = incompatible_replacement  # error: [invalid-assignment]
+```
+
+`staticmethod` and `classmethod` attributes cannot yet be replaced this way. If `static` were
+replaced with a plain function, `DescriptorMethods.static(1)` would pass only `1`, as before, but
+`DescriptorMethods().static(1)` would also pass the instance as the first argument. If `class_` were
+replaced, `DescriptorMethods.class_(1)` would stop passing `DescriptorMethods` as the first
+argument, while `DescriptorMethods().class_(1)` would pass the instance instead of the class.
+Supporting these assignments requires replacements with the corresponding decorator (for example,
+`staticmethod(static_replacement)` or `classmethod(class_replacement)`).
+
+```py
+class DescriptorMethods:
+    @staticmethod
+    def static(x: int) -> str:
+        return str(x)
+
+    @classmethod
+    def class_(cls, x: int) -> str:
+        return str(x)
+
+def static_replacement(x: int) -> str:
+    return str(x)
+
+def class_replacement(cls: type[DescriptorMethods], x: int) -> str:
+    return str(x)
+
+DescriptorMethods.static = static_replacement  # error: [invalid-assignment]
+DescriptorMethods.class_ = class_replacement  # error: [invalid-assignment]
 ```
 
 ## Accessing attributes on class objects
@@ -1863,10 +1926,10 @@ def _(a_and_b: Intersection[type[A], type[B]]):
     a_and_b.x = R()
 ```
 
-For `Intersection[A, B]`, member lookup searches `A` and `B` separately to find the attribute. Once
-found, however, descriptors and `Self` must be bound using the full `A & B` receiver.
-
 ### Method binding uses the full intersection type
+
+For `Intersection[A, B]`, member lookup searches `A` and `B` separately to find the method. Once
+found, however, `Self` must be bound using the full `A & B` receiver.
 
 ```py
 from typing_extensions import Self
@@ -1884,19 +1947,18 @@ def _(a_and_b: Intersection[A, B]):
 
 ### Descriptor binding uses the full intersection type
 
+Descriptors found while searching the individual elements of an intersection must also be bound
+using the full intersection as the receiver.
+
 ```py
-from typing import Any, TypeVar, overload
-from typing_extensions import Self
+from typing import TypeVar
 from ty_extensions import Intersection
 
-T = TypeVar("T")
+T = TypeVar(name="T")
 
 class Descriptor:
-    @overload
-    def __get__(self, instance: None, owner: type, /) -> Self: ...
-    @overload
-    def __get__(self, instance: T, owner: type | None = None, /) -> T: ...
-    def __get__(self, instance: object, owner: type | None = None, /) -> Any: ...
+    def __get__(self, instance: T, owner: type | None = None, /) -> T:
+        return instance
 
 class A:
     desc = Descriptor()
@@ -2618,8 +2680,11 @@ mod.global_symbol = 1
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `global_symbol` of type `str`"
 _, mod.global_symbol = (..., 1)
 
-# TODO: this should be an error, but we do not understand list unpackings yet.
-[_, mod.global_symbol] = [1, 2]
+# error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to attribute `global_symbol` of type `str`"
+[_, mod.global_symbol] = [
+    1,
+    2,
+]
 
 # error: [invalid-assignment] "Object of type `int` is not assignable to attribute `global_symbol` of type `str`"
 for mod.global_symbol in range(3):

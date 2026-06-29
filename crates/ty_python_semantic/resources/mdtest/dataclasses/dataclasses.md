@@ -328,6 +328,22 @@ reveal_type(repr(alice))  # revealed: str
 reveal_type(alice == alice)  # revealed: bool
 ```
 
+A class is still treated as a dataclass when arguments are unpacked into the decorator:
+
+```py
+from dataclasses import dataclass
+
+SLOTS = {"slots": True}
+
+@dataclass(frozen=True, **SLOTS)
+class C:
+    x: int
+
+reveal_type(C.__init__)  # revealed: (self: C, x: int) -> None
+reveal_type(C.__slots__)  # revealed: tuple[Literal["x"]]
+C(1)
+```
+
 If `init` is set to `False`, no `__init__` method is generated:
 
 ```py
@@ -409,6 +425,22 @@ WithOrder(1) < WithOrder(2)
 WithOrder(1) <= WithOrder(2)
 WithOrder(1) > WithOrder(2)
 WithOrder(1) >= WithOrder(2)
+```
+
+`order=True` requires `eq=True`:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(order=True, eq=False)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
+class InvalidOrder: ...
+
+@dataclass
+@dataclass(order=True, eq=False)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
+class InvalidStackedOrder: ...
+
+@dataclass(order=True, eq=False, unexpected=True)  # error: [no-matching-overload]
+class InvalidArguments: ...
 ```
 
 Comparisons are only allowed for `WithOrder` instances:
@@ -1250,6 +1282,39 @@ class C:
 reveal_type(C.__weakref__)  # revealed: Any | None
 ```
 
+`weakref_slot=True` requires `slots=True`:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(weakref_slot=True)  # error: [invalid-dataclass] "`weakref_slot=True` requires `slots=True`"
+class InvalidWeakrefSlot: ...
+```
+
+When `slots` is a non-literal `bool`, the combination might be valid at runtime, so we don't report
+an error:
+
+```py
+from dataclasses import dataclass
+
+def dynamic_slots(slots: bool):
+    @dataclass(weakref_slot=True, slots=slots)
+    class PossiblyValidWeakrefSlot: ...
+```
+
+An invalid combination is reported when the decorator factory is called, even if the decorator is
+applied later:
+
+```py
+from dataclasses import dataclass
+
+invalid_weakref_slot = dataclass(weakref_slot=True)  # error: [invalid-dataclass] "`weakref_slot=True` requires `slots=True`"
+
+class AppliedWeakrefSlotLater: ...
+
+invalid_weakref_slot(AppliedWeakrefSlotLater)
+```
+
 The `__weakref__` attribute is correctly not modeled as existing on instances of slotted dataclasses
 where the class definition was not marked with `weakref=True`:
 
@@ -1920,23 +1985,55 @@ class C:
     x: int
 
 C(1) < C(2)  # ok
+
+invalid_order = dataclass(order=True, eq=False)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
+
+@invalid_order
+class IndirectDecorator: ...
 ```
 
 ### Using `dataclass` as a function
 
+Calling `dataclass` with a class returns a class with a generated constructor:
+
 ```py
 from dataclasses import dataclass
 
-class B:
+class Point:
     x: int
 
-# error: [missing-argument]
-dataclass(B)()
+dataclass(Point)()  # error: [missing-argument]
+dataclass(Point)("one")  # error: [invalid-argument-type]
 
-# error: [invalid-argument-type]
-dataclass(B)("a")
+reveal_type(dataclass(Point)(1).x)  # revealed: int
+```
 
-reveal_type(dataclass(B)(3).x)  # revealed: int
+Options can be passed in the same call:
+
+```py
+class Ordered:
+    x: int
+
+ordered = dataclass(Ordered, order=True)
+
+ordered(1) < ordered(2)
+ordered("one")  # error: [invalid-argument-type]
+
+class InvalidDirectApplication: ...
+
+dataclass(InvalidDirectApplication, order=True, eq=False)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
+```
+
+Passing `None` explicitly returns a decorator that uses the supplied options:
+
+```py
+class Item:
+    x: int
+
+ordered_item = dataclass(None, order=True)(Item)
+
+reveal_type(ordered_item)  # revealed: <class 'Item'>
+ordered_item(1) < ordered_item(2)
 ```
 
 ## Internals

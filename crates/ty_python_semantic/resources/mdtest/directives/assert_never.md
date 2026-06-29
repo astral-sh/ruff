@@ -213,6 +213,16 @@ def if_else_singletons_error(obj: Literal[1, "a"] | None):
     else:
         # error: [type-assertion-failure] "Type `Literal["a"]` is not equivalent to `Never`"
         assert_never(obj)
+```
+
+## Match statement exhaustiveness
+
+The final `_ as obj` pattern binds anything not handled by an earlier case. If the earlier cases are
+exhaustive, `obj` is `Never`. In the second example, the misspelled string pattern leaves
+`Literal["a"]` uncovered.
+
+```py
+from typing_extensions import Literal, assert_never
 
 def match_singletons_success(obj: Literal[1, "a"] | None):
     match obj:
@@ -234,10 +244,6 @@ def match_singletons_error(obj: Literal[1, "a"] | None):
         case None:
             pass
         case _ as obj:
-            # TODO: We should emit an error here, but the message should
-            # show the type `Literal["a"]` instead of `@Todo(…)`. We only
-            # assert on the first part of the message because the `@Todo`
-            # message is not available in release mode builds.
-            # error: [type-assertion-failure] "Type `@Todo"
+            # error: [type-assertion-failure] "Type `Literal["a"]` is not equivalent to `Never`"
             assert_never(obj)
 ```

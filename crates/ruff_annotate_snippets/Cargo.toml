@@ -1,7 +1,7 @@
 [package]
 name = "ruff_annotate_snippets"
-version = "0.1.0"
-publish = false
+version = "0.0.3"
+description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -16,7 +16,7 @@ memchr = { workspace = true }
 unicode-width = { workspace = true }
 
 [dev-dependencies]
-ruff_annotate_snippets = { workspace = true, features = ["testing-colors"] }
+ruff_annotate_snippets = { path = ".", features = ["testing-colors"] }
 
 anstream = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

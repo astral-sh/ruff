@@ -12,8 +12,10 @@ use crate::{
         ClassType, StaticClassLiteral, Type, TypedDictType,
         class::CodeGeneratorKind,
         context::InferContext,
-        diagnostic::{INVALID_TYPED_DICT_FIELD, INVALID_TYPED_DICT_STATEMENT},
-        typed_dict::TypedDictField,
+        diagnostic::{
+            INVALID_TYPED_DICT_FIELD, INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT,
+        },
+        typed_dict::{TypedDictField, TypedDictOpenness},
     },
 };
 use ty_python_core::definition::Definition;
@@ -26,6 +28,7 @@ pub(super) fn validate_typed_dict_class<'db>(
 ) {
     validate_typed_dict_class_body(context, class_node);
     validate_typed_dict_field_overrides(context, class, direct_bases);
+    validate_typed_dict_openness(context, class, class_node, direct_bases);
 }
 
 fn validate_typed_dict_class_body(context: &InferContext<'_, '_>, class_node: &ast::StmtClassDef) {
@@ -138,6 +141,189 @@ fn validate_typed_dict_field_overrides<'db>(
                 inherited_field_definition,
             );
         }
+    }
+}
+
+fn validate_typed_dict_openness<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    class_node: &ast::StmtClassDef,
+    direct_bases: &[ClassType<'db>],
+) {
+    let db = context.db();
+    let child = TypedDictType::new(class.identity_specialization(db));
+    let child_openness = child.openness(db);
+    let child_items = child.items(db);
+
+    if let Some(arguments) = class_node.arguments.as_deref()
+        && arguments.find_keyword("closed").is_some()
+        && arguments.find_keyword("extra_items").is_some()
+    {
+        report_invalid_typed_dict_openness(
+            context,
+            class,
+            "`closed` and `extra_items` cannot both be specified",
+        );
+    }
+
+    for base in direct_bases {
+        let base_typed_dict = TypedDictType::new(*base);
+        let base_openness = base_typed_dict.openness(db);
+        let base_items = base_typed_dict.items(db);
+
+        match base_openness {
+            TypedDictOpenness::ImplicitlyOpen => {}
+            TypedDictOpenness::Closed => {
+                if !child_openness.is_closed() {
+                    report_invalid_typed_dict_openness(
+                        context,
+                        class,
+                        format_args!(
+                            "TypedDict `{}` must remain closed because base `{}` is closed",
+                            class.name(db),
+                            base.name(db),
+                        ),
+                    );
+                    continue;
+                }
+
+                if let Some((field_name, _)) = child_items
+                    .iter()
+                    .find(|(field_name, _)| !base_items.contains_key(*field_name))
+                {
+                    report_invalid_typed_dict_openness(
+                        context,
+                        class,
+                        format_args!(
+                            "Cannot add item `{field_name}` to closed TypedDict base `{}`",
+                            base.name(db),
+                        ),
+                    );
+                }
+            }
+            TypedDictOpenness::Extra(base_extra_items) if base_extra_items.is_read_only() => {
+                match child_openness {
+                    TypedDictOpenness::ImplicitlyOpen => {
+                        report_invalid_typed_dict_openness(
+                            context,
+                            class,
+                            format_args!(
+                                "TypedDict `{}` cannot be open because base `{}` has extra items",
+                                class.name(db),
+                                base.name(db),
+                            ),
+                        );
+                        continue;
+                    }
+                    TypedDictOpenness::Closed => {}
+                    TypedDictOpenness::Extra(child_extra_items) => {
+                        if !child_extra_items
+                            .declared_ty
+                            .is_assignable_to(db, base_extra_items.declared_ty)
+                        {
+                            report_invalid_typed_dict_openness(
+                                context,
+                                class,
+                                format_args!(
+                                    "Extra items type `{}` is not assignable to `{}` from base `{}`",
+                                    child_extra_items.declared_ty.display(db),
+                                    base_extra_items.declared_ty.display(db),
+                                    base.name(db),
+                                ),
+                            );
+                            continue;
+                        }
+                    }
+                }
+
+                if let Some((field_name, field)) = child_items.iter().find(|(field_name, field)| {
+                    !base_items.contains_key(*field_name)
+                        && !field
+                            .declared_ty
+                            .is_assignable_to(db, base_extra_items.declared_ty)
+                }) {
+                    report_invalid_typed_dict_openness(
+                        context,
+                        class,
+                        format_args!(
+                            "Item `{field_name}` of type `{}` is not assignable to extra items type `{}` from base `{}`",
+                            field.declared_ty.display(db),
+                            base_extra_items.declared_ty.display(db),
+                            base.name(db),
+                        ),
+                    );
+                }
+            }
+            TypedDictOpenness::Extra(base_extra_items) => {
+                let Some(child_extra_items) = child_openness.explicit_extra_items() else {
+                    report_invalid_typed_dict_openness(
+                        context,
+                        class,
+                        format_args!(
+                            "TypedDict `{}` must preserve mutable extra items from base `{}`",
+                            class.name(db),
+                            base.name(db),
+                        ),
+                    );
+                    continue;
+                };
+
+                if child_extra_items.is_read_only()
+                    || !child_extra_items
+                        .declared_ty
+                        .is_assignable_to(db, base_extra_items.declared_ty)
+                    || !base_extra_items
+                        .declared_ty
+                        .is_assignable_to(db, child_extra_items.declared_ty)
+                {
+                    report_invalid_typed_dict_openness(
+                        context,
+                        class,
+                        format_args!(
+                            "TypedDict `{}` must preserve mutable extra items type `{}` from base `{}`",
+                            class.name(db),
+                            base_extra_items.declared_ty.display(db),
+                            base.name(db),
+                        ),
+                    );
+                    continue;
+                }
+
+                if let Some((field_name, _)) = child_items.iter().find(|(field_name, field)| {
+                    !base_items.contains_key(*field_name)
+                        && (field.is_required()
+                            || field.is_read_only()
+                            || !field
+                                .declared_ty
+                                .is_assignable_to(db, base_extra_items.declared_ty)
+                            || !base_extra_items
+                                .declared_ty
+                                .is_assignable_to(db, field.declared_ty))
+                }) {
+                    report_invalid_typed_dict_openness(
+                        context,
+                        class,
+                        format_args!(
+                            "Item `{field_name}` must be mutable, not required, and consistent with extra items type `{}` from base `{}`",
+                            base_extra_items.declared_ty.display(db),
+                            base.name(db),
+                        ),
+                    );
+                }
+            }
+        }
+    }
+}
+
+fn report_invalid_typed_dict_openness(
+    context: &InferContext<'_, '_>,
+    class: StaticClassLiteral<'_>,
+    message: impl std::fmt::Display,
+) {
+    if let Some(builder) =
+        context.report_lint(&INVALID_TYPED_DICT_HEADER, class.header_range(context.db()))
+    {
+        builder.into_diagnostic(message);
     }
 }
 

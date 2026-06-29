@@ -3460,7 +3460,7 @@ pub struct Arguments {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
     pub args: Box<[Expr]>,
-    pub keywords: Box<[Keyword]>,
+    pub keywords: ThinVec<Keyword>,
 }
 
 /// An entry in the argument list of a function call.
@@ -3891,7 +3891,7 @@ impl From<bool> for Singleton {
 #[cfg(test)]
 mod tests {
     use crate::generated::*;
-    use crate::{Mod, Parameters};
+    use crate::{Arguments, Mod, Parameters};
 
     #[test]
     #[cfg(target_pointer_width = "64")]
@@ -3903,14 +3903,15 @@ mod tests {
         assert_eq!(std::mem::size_of::<Mod>(), 32);
         assert_eq!(std::mem::size_of::<Pattern>(), 80);
         assert_eq!(std::mem::size_of::<Parameters>(), 56);
-        assert_eq!(std::mem::size_of::<Expr>(), 80);
+        assert_eq!(std::mem::size_of::<Arguments>(), 40);
+        assert_eq!(std::mem::size_of::<Expr>(), 72);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 64);
         assert_eq!(std::mem::size_of::<ExprAwait>(), 24);
         assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
         assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
         assert_eq!(std::mem::size_of::<ExprBooleanLiteral>(), 16);
         assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 48);
-        assert_eq!(std::mem::size_of::<ExprCall>(), 72);
+        assert_eq!(std::mem::size_of::<ExprCall>(), 64);
         assert_eq!(std::mem::size_of::<ExprCompare>(), 56);
         assert_eq!(std::mem::size_of::<ExprDict>(), 40);
         assert_eq!(std::mem::size_of::<ExprDictComp>(), 56);

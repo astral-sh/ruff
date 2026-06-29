@@ -11,13 +11,13 @@ FURB118 [*] Use `operator.invert` instead of defining a lambda
 4 | op_pos = lambda x: +x
   |
 help: Replace with `operator.invert`
+  |
 1 | # Errors.
   - op_bitnot = lambda x: ~x
 2 + import operator
 3 + op_bitnot = operator.invert
 4 | op_not = lambda x: not x
-5 | op_pos = lambda x: +x
-6 | op_neg = lambda x: -x
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.not_` instead of defining a lambda
@@ -31,14 +31,14 @@ FURB118 [*] Use `operator.not_` instead of defining a lambda
 5 | op_neg = lambda x: -x
   |
 help: Replace with `operator.not_`
+  |
 1 | # Errors.
 2 + import operator
 3 | op_bitnot = lambda x: ~x
   - op_not = lambda x: not x
 4 + op_not = operator.not_
 5 | op_pos = lambda x: +x
-6 | op_neg = lambda x: -x
-7 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.pos` instead of defining a lambda
@@ -51,6 +51,7 @@ FURB118 [*] Use `operator.pos` instead of defining a lambda
 5 | op_neg = lambda x: -x
   |
 help: Replace with `operator.pos`
+  |
 1 | # Errors.
 2 + import operator
 3 | op_bitnot = lambda x: ~x
@@ -58,8 +59,7 @@ help: Replace with `operator.pos`
   - op_pos = lambda x: +x
 5 + op_pos = operator.pos
 6 | op_neg = lambda x: -x
-7 |
-8 | op_add = lambda x, y: x + y
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.neg` instead of defining a lambda
@@ -73,6 +73,7 @@ FURB118 [*] Use `operator.neg` instead of defining a lambda
 7 | op_add = lambda x, y: x + y
   |
 help: Replace with `operator.neg`
+  |
 1 | # Errors.
 2 + import operator
 3 | op_bitnot = lambda x: ~x
@@ -81,8 +82,7 @@ help: Replace with `operator.neg`
   - op_neg = lambda x: -x
 6 + op_neg = operator.neg
 7 |
-8 | op_add = lambda x, y: x + y
-9 | op_sub = lambda x, y: x - y
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.add` instead of defining a lambda
@@ -96,18 +96,16 @@ FURB118 [*] Use `operator.add` instead of defining a lambda
 9 | op_mult = lambda x, y: x * y
   |
 help: Replace with `operator.add`
-1  | # Errors.
-2  + import operator
-3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
-6  | op_neg = lambda x: -x
-7  |
-   - op_add = lambda x, y: x + y
-8  + op_add = operator.add
-9  | op_sub = lambda x, y: x - y
-10 | op_mult = lambda x, y: x * y
-11 | op_matmutl = lambda x, y: x @ y
+  |
+1 | # Errors.
+2 + import operator
+3 | op_bitnot = lambda x: ~x
+--------------------------------------------------------------------------------
+7 |
+  - op_add = lambda x, y: x + y
+8 + op_add = operator.add
+9 | op_sub = lambda x, y: x - y
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.sub` instead of defining a lambda
@@ -120,19 +118,16 @@ FURB118 [*] Use `operator.sub` instead of defining a lambda
 10 | op_matmutl = lambda x, y: x @ y
    |
 help: Replace with `operator.sub`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
-6  | op_neg = lambda x: -x
-7  |
+--------------------------------------------------------------------------------
 8  | op_add = lambda x, y: x + y
    - op_sub = lambda x, y: x - y
 9  + op_sub = operator.sub
 10 | op_mult = lambda x, y: x * y
-11 | op_matmutl = lambda x, y: x @ y
-12 | op_truediv = lambda x, y: x / y
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.mul` instead of defining a lambda
@@ -146,20 +141,16 @@ FURB118 [*] Use `operator.mul` instead of defining a lambda
 11 | op_truediv = lambda x, y: x / y
    |
 help: Replace with `operator.mul`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-7  |
-8  | op_add = lambda x, y: x + y
 9  | op_sub = lambda x, y: x - y
    - op_mult = lambda x, y: x * y
 10 + op_mult = operator.mul
 11 | op_matmutl = lambda x, y: x @ y
-12 | op_truediv = lambda x, y: x / y
-13 | op_mod = lambda x, y: x % y
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.matmul` instead of defining a lambda
@@ -173,20 +164,16 @@ FURB118 [*] Use `operator.matmul` instead of defining a lambda
 12 | op_mod = lambda x, y: x % y
    |
 help: Replace with `operator.matmul`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-8  | op_add = lambda x, y: x + y
-9  | op_sub = lambda x, y: x - y
 10 | op_mult = lambda x, y: x * y
    - op_matmutl = lambda x, y: x @ y
 11 + op_matmutl = operator.matmul
 12 | op_truediv = lambda x, y: x / y
-13 | op_mod = lambda x, y: x % y
-14 | op_pow = lambda x, y: x ** y
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.truediv` instead of defining a lambda
@@ -200,20 +187,16 @@ FURB118 [*] Use `operator.truediv` instead of defining a lambda
 13 | op_pow = lambda x, y: x ** y
    |
 help: Replace with `operator.truediv`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-9  | op_sub = lambda x, y: x - y
-10 | op_mult = lambda x, y: x * y
 11 | op_matmutl = lambda x, y: x @ y
    - op_truediv = lambda x, y: x / y
 12 + op_truediv = operator.truediv
 13 | op_mod = lambda x, y: x % y
-14 | op_pow = lambda x, y: x ** y
-15 | op_lshift = lambda x, y: x << y
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.mod` instead of defining a lambda
@@ -227,20 +210,16 @@ FURB118 [*] Use `operator.mod` instead of defining a lambda
 14 | op_lshift = lambda x, y: x << y
    |
 help: Replace with `operator.mod`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-10 | op_mult = lambda x, y: x * y
-11 | op_matmutl = lambda x, y: x @ y
 12 | op_truediv = lambda x, y: x / y
    - op_mod = lambda x, y: x % y
 13 + op_mod = operator.mod
 14 | op_pow = lambda x, y: x ** y
-15 | op_lshift = lambda x, y: x << y
-16 | op_rshift = lambda x, y: x >> y
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.pow` instead of defining a lambda
@@ -254,20 +233,16 @@ FURB118 [*] Use `operator.pow` instead of defining a lambda
 15 | op_rshift = lambda x, y: x >> y
    |
 help: Replace with `operator.pow`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-11 | op_matmutl = lambda x, y: x @ y
-12 | op_truediv = lambda x, y: x / y
 13 | op_mod = lambda x, y: x % y
    - op_pow = lambda x, y: x ** y
 14 + op_pow = operator.pow
 15 | op_lshift = lambda x, y: x << y
-16 | op_rshift = lambda x, y: x >> y
-17 | op_bitor = lambda x, y: x | y
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.lshift` instead of defining a lambda
@@ -281,20 +256,16 @@ FURB118 [*] Use `operator.lshift` instead of defining a lambda
 16 | op_bitor = lambda x, y: x | y
    |
 help: Replace with `operator.lshift`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-12 | op_truediv = lambda x, y: x / y
-13 | op_mod = lambda x, y: x % y
 14 | op_pow = lambda x, y: x ** y
    - op_lshift = lambda x, y: x << y
 15 + op_lshift = operator.lshift
 16 | op_rshift = lambda x, y: x >> y
-17 | op_bitor = lambda x, y: x | y
-18 | op_xor = lambda x, y: x ^ y
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.rshift` instead of defining a lambda
@@ -308,20 +279,16 @@ FURB118 [*] Use `operator.rshift` instead of defining a lambda
 17 | op_xor = lambda x, y: x ^ y
    |
 help: Replace with `operator.rshift`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-13 | op_mod = lambda x, y: x % y
-14 | op_pow = lambda x, y: x ** y
 15 | op_lshift = lambda x, y: x << y
    - op_rshift = lambda x, y: x >> y
 16 + op_rshift = operator.rshift
 17 | op_bitor = lambda x, y: x | y
-18 | op_xor = lambda x, y: x ^ y
-19 | op_bitand = lambda x, y: x & y
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.or_` instead of defining a lambda
@@ -335,20 +302,16 @@ FURB118 [*] Use `operator.or_` instead of defining a lambda
 18 | op_bitand = lambda x, y: x & y
    |
 help: Replace with `operator.or_`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-14 | op_pow = lambda x, y: x ** y
-15 | op_lshift = lambda x, y: x << y
 16 | op_rshift = lambda x, y: x >> y
    - op_bitor = lambda x, y: x | y
 17 + op_bitor = operator.or_
 18 | op_xor = lambda x, y: x ^ y
-19 | op_bitand = lambda x, y: x & y
-20 | op_floordiv = lambda x, y: x // y
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.xor` instead of defining a lambda
@@ -362,20 +325,16 @@ FURB118 [*] Use `operator.xor` instead of defining a lambda
 19 | op_floordiv = lambda x, y: x // y
    |
 help: Replace with `operator.xor`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-15 | op_lshift = lambda x, y: x << y
-16 | op_rshift = lambda x, y: x >> y
 17 | op_bitor = lambda x, y: x | y
    - op_xor = lambda x, y: x ^ y
 18 + op_xor = operator.xor
 19 | op_bitand = lambda x, y: x & y
-20 | op_floordiv = lambda x, y: x // y
-21 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.and_` instead of defining a lambda
@@ -388,20 +347,16 @@ FURB118 [*] Use `operator.and_` instead of defining a lambda
 19 | op_floordiv = lambda x, y: x // y
    |
 help: Replace with `operator.and_`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-16 | op_rshift = lambda x, y: x >> y
-17 | op_bitor = lambda x, y: x | y
 18 | op_xor = lambda x, y: x ^ y
    - op_bitand = lambda x, y: x & y
 19 + op_bitand = operator.and_
 20 | op_floordiv = lambda x, y: x // y
-21 |
-22 | op_eq = lambda x, y: x == y
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.floordiv` instead of defining a lambda
@@ -415,20 +370,16 @@ FURB118 [*] Use `operator.floordiv` instead of defining a lambda
 21 | op_eq = lambda x, y: x == y
    |
 help: Replace with `operator.floordiv`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-17 | op_bitor = lambda x, y: x | y
-18 | op_xor = lambda x, y: x ^ y
 19 | op_bitand = lambda x, y: x & y
    - op_floordiv = lambda x, y: x // y
 20 + op_floordiv = operator.floordiv
 21 |
-22 | op_eq = lambda x, y: x == y
-23 | op_ne = lambda x, y: x != y
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.eq` instead of defining a lambda
@@ -442,20 +393,16 @@ FURB118 [*] Use `operator.eq` instead of defining a lambda
 23 | op_lt = lambda x, y: x < y
    |
 help: Replace with `operator.eq`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-19 | op_bitand = lambda x, y: x & y
-20 | op_floordiv = lambda x, y: x // y
 21 |
    - op_eq = lambda x, y: x == y
 22 + op_eq = operator.eq
 23 | op_ne = lambda x, y: x != y
-24 | op_lt = lambda x, y: x < y
-25 | op_lte = lambda x, y: x <= y
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.ne` instead of defining a lambda
@@ -468,20 +415,16 @@ FURB118 [*] Use `operator.ne` instead of defining a lambda
 24 | op_lte = lambda x, y: x <= y
    |
 help: Replace with `operator.ne`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-20 | op_floordiv = lambda x, y: x // y
-21 |
 22 | op_eq = lambda x, y: x == y
    - op_ne = lambda x, y: x != y
 23 + op_ne = operator.ne
 24 | op_lt = lambda x, y: x < y
-25 | op_lte = lambda x, y: x <= y
-26 | op_gt = lambda x, y: x > y
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.lt` instead of defining a lambda
@@ -495,20 +438,16 @@ FURB118 [*] Use `operator.lt` instead of defining a lambda
 25 | op_gt = lambda x, y: x > y
    |
 help: Replace with `operator.lt`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-21 |
-22 | op_eq = lambda x, y: x == y
 23 | op_ne = lambda x, y: x != y
    - op_lt = lambda x, y: x < y
 24 + op_lt = operator.lt
 25 | op_lte = lambda x, y: x <= y
-26 | op_gt = lambda x, y: x > y
-27 | op_gte = lambda x, y: x >= y
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.le` instead of defining a lambda
@@ -522,20 +461,16 @@ FURB118 [*] Use `operator.le` instead of defining a lambda
 26 | op_gte = lambda x, y: x >= y
    |
 help: Replace with `operator.le`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-22 | op_eq = lambda x, y: x == y
-23 | op_ne = lambda x, y: x != y
 24 | op_lt = lambda x, y: x < y
    - op_lte = lambda x, y: x <= y
 25 + op_lte = operator.le
 26 | op_gt = lambda x, y: x > y
-27 | op_gte = lambda x, y: x >= y
-28 | op_is = lambda x, y: x is y
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.gt` instead of defining a lambda
@@ -549,20 +484,16 @@ FURB118 [*] Use `operator.gt` instead of defining a lambda
 27 | op_is = lambda x, y: x is y
    |
 help: Replace with `operator.gt`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-23 | op_ne = lambda x, y: x != y
-24 | op_lt = lambda x, y: x < y
 25 | op_lte = lambda x, y: x <= y
    - op_gt = lambda x, y: x > y
 26 + op_gt = operator.gt
 27 | op_gte = lambda x, y: x >= y
-28 | op_is = lambda x, y: x is y
-29 | op_isnot = lambda x, y: x is not y
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.ge` instead of defining a lambda
@@ -576,20 +507,16 @@ FURB118 [*] Use `operator.ge` instead of defining a lambda
 28 | op_isnot = lambda x, y: x is not y
    |
 help: Replace with `operator.ge`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-24 | op_lt = lambda x, y: x < y
-25 | op_lte = lambda x, y: x <= y
 26 | op_gt = lambda x, y: x > y
    - op_gte = lambda x, y: x >= y
 27 + op_gte = operator.ge
 28 | op_is = lambda x, y: x is y
-29 | op_isnot = lambda x, y: x is not y
-30 | op_in = lambda x, y: y in x
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.is_` instead of defining a lambda
@@ -603,20 +530,16 @@ FURB118 [*] Use `operator.is_` instead of defining a lambda
 29 | op_in = lambda x, y: y in x
    |
 help: Replace with `operator.is_`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-25 | op_lte = lambda x, y: x <= y
-26 | op_gt = lambda x, y: x > y
 27 | op_gte = lambda x, y: x >= y
    - op_is = lambda x, y: x is y
 28 + op_is = operator.is_
 29 | op_isnot = lambda x, y: x is not y
-30 | op_in = lambda x, y: y in x
-31 | op_itemgetter = lambda x: x[0]
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.is_not` instead of defining a lambda
@@ -630,20 +553,16 @@ FURB118 [*] Use `operator.is_not` instead of defining a lambda
 30 | op_itemgetter = lambda x: x[0]
    |
 help: Replace with `operator.is_not`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-26 | op_gt = lambda x, y: x > y
-27 | op_gte = lambda x, y: x >= y
 28 | op_is = lambda x, y: x is y
    - op_isnot = lambda x, y: x is not y
 29 + op_isnot = operator.is_not
 30 | op_in = lambda x, y: y in x
-31 | op_itemgetter = lambda x: x[0]
-32 | op_itemgetter = lambda x: (x[0], x[1], x[2])
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.contains` instead of defining a lambda
@@ -657,20 +576,16 @@ FURB118 [*] Use `operator.contains` instead of defining a lambda
 31 | op_itemgetter = lambda x: (x[0], x[1], x[2])
    |
 help: Replace with `operator.contains`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-27 | op_gte = lambda x, y: x >= y
-28 | op_is = lambda x, y: x is y
 29 | op_isnot = lambda x, y: x is not y
    - op_in = lambda x, y: y in x
 30 + op_in = operator.contains
 31 | op_itemgetter = lambda x: x[0]
-32 | op_itemgetter = lambda x: (x[0], x[1], x[2])
-33 | op_itemgetter = lambda x: (x[1:], x[2])
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter(0)` instead of defining a lambda
@@ -684,20 +599,16 @@ FURB118 [*] Use `operator.itemgetter(0)` instead of defining a lambda
 32 | op_itemgetter = lambda x: (x[1:], x[2])
    |
 help: Replace with `operator.itemgetter(0)`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-28 | op_is = lambda x, y: x is y
-29 | op_isnot = lambda x, y: x is not y
 30 | op_in = lambda x, y: y in x
    - op_itemgetter = lambda x: x[0]
 31 + op_itemgetter = operator.itemgetter(0)
 32 | op_itemgetter = lambda x: (x[0], x[1], x[2])
-33 | op_itemgetter = lambda x: (x[1:], x[2])
-34 | op_itemgetter = lambda x: x[:]
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter(0, 1, 2)` instead of defining a lambda
@@ -711,20 +622,16 @@ FURB118 [*] Use `operator.itemgetter(0, 1, 2)` instead of defining a lambda
 33 | op_itemgetter = lambda x: x[:]
    |
 help: Replace with `operator.itemgetter(0, 1, 2)`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-29 | op_isnot = lambda x, y: x is not y
-30 | op_in = lambda x, y: y in x
 31 | op_itemgetter = lambda x: x[0]
    - op_itemgetter = lambda x: (x[0], x[1], x[2])
 32 + op_itemgetter = operator.itemgetter(0, 1, 2)
 33 | op_itemgetter = lambda x: (x[1:], x[2])
-34 | op_itemgetter = lambda x: x[:]
-35 | op_itemgetter = lambda x: x[0, 1]
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter(slice(1, None), 2)` instead of defining a lambda
@@ -738,20 +645,16 @@ FURB118 [*] Use `operator.itemgetter(slice(1, None), 2)` instead of defining a l
 34 | op_itemgetter = lambda x: x[0, 1]
    |
 help: Replace with `operator.itemgetter(slice(1, None), 2)`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-30 | op_in = lambda x, y: y in x
-31 | op_itemgetter = lambda x: x[0]
 32 | op_itemgetter = lambda x: (x[0], x[1], x[2])
    - op_itemgetter = lambda x: (x[1:], x[2])
 33 + op_itemgetter = operator.itemgetter(slice(1, None), 2)
 34 | op_itemgetter = lambda x: x[:]
-35 | op_itemgetter = lambda x: x[0, 1]
-36 | op_itemgetter = lambda x: x[(0, 1)]
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter(slice(None))` instead of defining a lambda
@@ -765,20 +668,16 @@ FURB118 [*] Use `operator.itemgetter(slice(None))` instead of defining a lambda
 35 | op_itemgetter = lambda x: x[(0, 1)]
    |
 help: Replace with `operator.itemgetter(slice(None))`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-31 | op_itemgetter = lambda x: x[0]
-32 | op_itemgetter = lambda x: (x[0], x[1], x[2])
 33 | op_itemgetter = lambda x: (x[1:], x[2])
    - op_itemgetter = lambda x: x[:]
 34 + op_itemgetter = operator.itemgetter(slice(None))
 35 | op_itemgetter = lambda x: x[0, 1]
-36 | op_itemgetter = lambda x: x[(0, 1)]
-37 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter((0, 1))` instead of defining a lambda
@@ -791,20 +690,16 @@ FURB118 [*] Use `operator.itemgetter((0, 1))` instead of defining a lambda
 35 | op_itemgetter = lambda x: x[(0, 1)]
    |
 help: Replace with `operator.itemgetter((0, 1))`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-32 | op_itemgetter = lambda x: (x[0], x[1], x[2])
-33 | op_itemgetter = lambda x: (x[1:], x[2])
 34 | op_itemgetter = lambda x: x[:]
    - op_itemgetter = lambda x: x[0, 1]
 35 + op_itemgetter = operator.itemgetter((0, 1))
 36 | op_itemgetter = lambda x: x[(0, 1)]
-37 |
-38 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter((0, 1))` instead of defining a lambda
@@ -816,20 +711,16 @@ FURB118 [*] Use `operator.itemgetter((0, 1))` instead of defining a lambda
    |                 ^^^^^^^^^^^^^^^^^^^
    |
 help: Replace with `operator.itemgetter((0, 1))`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-33 | op_itemgetter = lambda x: (x[1:], x[2])
-34 | op_itemgetter = lambda x: x[:]
 35 | op_itemgetter = lambda x: x[0, 1]
    - op_itemgetter = lambda x: x[(0, 1)]
 36 + op_itemgetter = operator.itemgetter((0, 1))
 37 |
-38 |
-39 | def op_not2(x):
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 Use `operator.not_` instead of defining a function
@@ -859,20 +750,16 @@ FURB118 [*] Use `operator.itemgetter((slice(None), 1))` instead of defining a la
 89 | op_itemgetter = lambda x: x[1, :]
    |
 help: Replace with `operator.itemgetter((slice(None), 1))`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-86 |         return x + y
-87 |
 88 | # See https://github.com/astral-sh/ruff/issues/13508
    - op_itemgetter = lambda x: x[:, 1]
 89 + op_itemgetter = operator.itemgetter((slice(None), 1))
 90 | op_itemgetter = lambda x: x[1, :]
-91 |
-92 | # With a slice, trivia is dropped
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter((1, slice(None)))` instead of defining a lambda
@@ -886,20 +773,16 @@ FURB118 [*] Use `operator.itemgetter((1, slice(None)))` instead of defining a la
 91 | # With a slice, trivia is dropped
    |
 help: Replace with `operator.itemgetter((1, slice(None)))`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-87 |
-88 | # See https://github.com/astral-sh/ruff/issues/13508
 89 | op_itemgetter = lambda x: x[:, 1]
    - op_itemgetter = lambda x: x[1, :]
 90 + op_itemgetter = operator.itemgetter((1, slice(None)))
 91 |
-92 | # With a slice, trivia is dropped
-93 | op_itemgetter = lambda x: x[1,          :]
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter((1, slice(None)))` instead of defining a lambda
@@ -912,20 +795,16 @@ FURB118 [*] Use `operator.itemgetter((1, slice(None)))` instead of defining a la
 94 | # Without a slice, trivia is retained
    |
 help: Replace with `operator.itemgetter((1, slice(None)))`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-90 | op_itemgetter = lambda x: x[1, :]
-91 |
 92 | # With a slice, trivia is dropped
    - op_itemgetter = lambda x: x[1,          :]
 93 + op_itemgetter = operator.itemgetter((1, slice(None)))
 94 |
-95 | # Without a slice, trivia is retained
-96 | op_itemgetter = lambda x: x[1,          2]
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter((1,          2))` instead of defining a lambda
@@ -936,20 +815,16 @@ FURB118 [*] Use `operator.itemgetter((1,          2))` instead of defining a lam
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Replace with `operator.itemgetter((1,          2))`
+   |
 1  | # Errors.
 2  + import operator
 3  | op_bitnot = lambda x: ~x
-4  | op_not = lambda x: not x
-5  | op_pos = lambda x: +x
 --------------------------------------------------------------------------------
-93 | op_itemgetter = lambda x: x[1,          :]
-94 |
 95 | # Without a slice, trivia is retained
    - op_itemgetter = lambda x: x[1,          2]
 96 + op_itemgetter = operator.itemgetter((1,          2))
 97 |
-98 |
-99 | # All methods in classes are ignored, even those defined using lambdas:
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter(slice(-2, None))` instead of defining a lambda
@@ -963,22 +838,16 @@ FURB118 [*] Use `operator.itemgetter(slice(-2, None))` instead of defining a lam
 131 |         ],
     |
 help: Replace with `operator.itemgetter(slice(-2, None))`
-111 | # Lambdas wrapped in function calls could also still be method definitions!
-112 | # To avoid false positives, we shouldn't flag any of these either:
+    |
 113 | from typing import final, override, no_type_check
 114 + import operator
 115 |
-116 |
-117 | class Foo:
 --------------------------------------------------------------------------------
-127 |     @pytest.mark.parametrize(
-128 |         "slicer, expected",
 129 |         [
     -             (lambda x: x[-2:], "foo"),
 130 +             (operator.itemgetter(slice(-2, None)), "foo"),
 131 |             (lambda x: x[-5:-3], "bar"),
-132 |         ],
-133 |     )
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 FURB118 [*] Use `operator.itemgetter(slice(-5, -3))` instead of defining a lambda
@@ -992,20 +861,14 @@ FURB118 [*] Use `operator.itemgetter(slice(-5, -3))` instead of defining a lambd
 132 |     )
     |
 help: Replace with `operator.itemgetter(slice(-5, -3))`
-111 | # Lambdas wrapped in function calls could also still be method definitions!
-112 | # To avoid false positives, we shouldn't flag any of these either:
+    |
 113 | from typing import final, override, no_type_check
 114 + import operator
 115 |
-116 |
-117 | class Foo:
 --------------------------------------------------------------------------------
-128 |         "slicer, expected",
-129 |         [
 130 |             (lambda x: x[-2:], "foo"),
     -             (lambda x: x[-5:-3], "bar"),
 131 +             (operator.itemgetter(slice(-5, -3)), "bar"),
 132 |         ],
-133 |     )
-134 |     def test_inlet_asset_alias_extra_slice(self, slicer, expected):
+    |
 note: This is an unsafe fix and may change runtime behavior

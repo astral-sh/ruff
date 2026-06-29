@@ -9,11 +9,14 @@ use lsp_types::{
 };
 use ruff_diagnostics::Applicability;
 use ruff_text_size::Ranged;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use ty_ide::{Hint, hints};
 
-use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
+use ruff_db::diagnostic::{
+    Annotation, DisplayDiagnosticConfig, HyperlinkMode, Severity, SubDiagnostic,
+};
 use ruff_db::files::{File, FileRange};
+use ruff_db::source::source_text;
 use ruff_db::system::SystemPathBuf;
 use serde::{Deserialize, Serialize};
 use ty_project::{Db as _, ProjectDatabase};
@@ -37,29 +40,65 @@ pub(super) struct Diagnostics {
 impl Diagnostics {
     /// Computes the result ID for `diagnostics`.
     ///
-    /// Returns `None` if there are no diagnostics.
+    /// The result ID is `None` if there are no diagnostics or hints.
     pub(super) fn result_id_from_hash(
+        db: &dyn Db,
         diagnostics: &[ruff_db::diagnostic::Diagnostic],
         unnecessary_hints: &[Hint],
+        client_capabilities: ResolvedClientCapabilities,
     ) -> Option<String> {
         if diagnostics.is_empty() && unnecessary_hints.is_empty() {
             return None;
         }
 
-        // Generate result ID based on raw diagnostic content only.
+        // Generate the base result ID from raw diagnostic content.
         let mut hasher = DefaultHasher::new();
 
         diagnostics.hash(&mut hasher);
         unnecessary_hints.hash(&mut hasher);
+
+        if client_capabilities.supports_full_diagnostic_output() {
+            // The rendered output includes source snippets that aren't part of the raw diagnostic.
+            // Hash each referenced file's source once so that source-only changes invalidate the
+            // result without eagerly rendering every diagnostic.
+            // TODO: Hash only the source snippets used by the rendered output. Hashing the entire
+            // file is deliberately conservative: an edit outside the rendered context can cause a
+            // full report, but an edit inside it can never leave stale rendered output on the client.
+            let mut hashed_files = FxHashSet::default();
+
+            for diagnostic in diagnostics {
+                let annotations = diagnostic
+                    .sub_diagnostics()
+                    .iter()
+                    .flat_map(SubDiagnostic::annotations)
+                    .chain(diagnostic.annotations());
+
+                for annotation in annotations {
+                    let file = annotation.get_span().expect_ty_file();
+                    if hashed_files.insert(file) {
+                        source_text(db, file).as_str().hash(&mut hasher);
+                    }
+                }
+            }
+        }
 
         Some(format!("{:016x}", hasher.finish()))
     }
 
     /// Computes the result ID for the diagnostics.
     ///
-    /// Returns `None` if there are no diagnostics.
-    pub(super) fn result_id(&self) -> Option<String> {
-        Self::result_id_from_hash(&self.items, &self.unnecessary_hints)
+    /// The result ID is `None` if there are no diagnostics or hints.
+    pub(super) fn result_id(
+        &self,
+        db: &dyn Db,
+        client_capabilities: ResolvedClientCapabilities,
+    ) -> Option<String> {
+        Self::result_id_from_hash(
+            db,
+            &self.items,
+            &self.unnecessary_hints,
+            client_capabilities,
+        )
     }
 
     pub(super) fn to_lsp_diagnostics(
@@ -77,7 +116,7 @@ impl Diagnostics {
                 cell_diagnostics.entry(cell_uri.clone()).or_default();
             }
 
-            for diagnostic in &*self.items {
+            for diagnostic in &self.items {
                 let Some((uri, lsp_diagnostic)) = to_lsp_diagnostic(
                     db,
                     diagnostic,
@@ -208,13 +247,14 @@ pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, 
     };
 
     // Sends a notification to the client with the diagnostics for the document.
-    let publish_diagnostics_notification = |uri: Uri, diagnostics: Vec<Diagnostic>| {
-        client.send_notification::<PublishDiagnosticsNotification>(PublishDiagnosticsParams {
-            uri,
-            diagnostics,
-            version: Some(document.version()),
-        });
-    };
+    let publish_diagnostics_notification =
+        |uri: Uri, version: Option<i32>, diagnostics: Vec<Diagnostic>| {
+            client.send_notification::<PublishDiagnosticsNotification>(PublishDiagnosticsParams {
+                uri,
+                diagnostics,
+                version,
+            });
+        };
 
     match diagnostics.to_lsp_diagnostics(
         db,
@@ -222,11 +262,23 @@ pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, 
         session.global_settings(),
     ) {
         LspDiagnostics::TextDocument(diagnostics) => {
-            publish_diagnostics_notification(document.uri().clone(), diagnostics);
+            publish_diagnostics_notification(
+                document.uri().clone(),
+                Some(document.version()),
+                diagnostics,
+            );
         }
         LspDiagnostics::NotebookDocument(cell_diagnostics) => {
+            #[expect(
+                clippy::iter_over_hash_type,
+                reason = "diagnostic notifications for distinct cell URIs are independent"
+            )]
             for (cell_uri, diagnostics) in cell_diagnostics {
-                publish_diagnostics_notification(cell_uri, diagnostics);
+                let version = session
+                    .document_handle(&cell_uri)
+                    .map(|document| document.version())
+                    .ok();
+                publish_diagnostics_notification(cell_uri, version, diagnostics);
             }
         }
     }
@@ -305,6 +357,10 @@ pub(crate) fn publish_settings_diagnostics(
     let global_settings = session.global_settings();
 
     // Send the settings diagnostics!
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "diagnostic notifications for distinct document URIs are independent"
+    )]
     for (uri, file_diagnostics) in diagnostics_by_uri {
         // Convert diagnostics to LSP format
         let lsp_diagnostics = file_diagnostics
@@ -460,15 +516,9 @@ pub(super) fn to_lsp_diagnostic(
                     encoding,
                 ));
 
-                related_information.extend(
-                    sub_diagnostic
-                        .annotations()
-                        .iter()
-                        .filter(|annotation| !annotation.is_primary())
-                        .filter_map(|annotation| {
-                            annotation_to_related_information(db, annotation, encoding)
-                        }),
-                );
+                related_information.extend(sub_diagnostic.secondary_annotations().filter_map(
+                    |annotation| annotation_to_related_information(db, annotation, encoding),
+                ));
             }
 
             Some(related_information)
@@ -476,7 +526,12 @@ pub(super) fn to_lsp_diagnostic(
             None
         };
 
-    let data = DiagnosticData::try_from_diagnostic(db, diagnostic, encoding);
+    let data = DiagnosticData::try_from_diagnostic(
+        db,
+        diagnostic,
+        encoding,
+        FullDiagnosticOutput::from_client_capabilities(client_capabilities),
+    );
 
     let mut message = if supports_related_information {
         // Show both the primary and annotation messages if available,
@@ -564,10 +619,41 @@ fn sub_diagnostic_to_related_information(
     })
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FullDiagnosticOutput {
+    Enabled,
+    Disabled,
+}
+
+impl FullDiagnosticOutput {
+    fn from_client_capabilities(client_capabilities: ResolvedClientCapabilities) -> Self {
+        if client_capabilities.supports_full_diagnostic_output() {
+            Self::Enabled
+        } else {
+            Self::Disabled
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
-pub(crate) struct DiagnosticData {
+pub(crate) struct FullDiagnosticData {
+    rendered: String,
+    pub(crate) diagnostic_id: String,
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    pub(crate) fix: Option<DiagnosticFixData>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub(crate) struct DiagnosticFixData {
     pub(crate) fix_title: String,
     pub(crate) edits: HashMap<Uri, Vec<lsp_types::TextEdit>>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+pub(crate) enum DiagnosticData {
+    Full(FullDiagnosticData),
+    Fix(DiagnosticFixData),
 }
 
 impl DiagnosticData {
@@ -575,7 +661,37 @@ impl DiagnosticData {
         db: &dyn Db,
         diagnostic: &ruff_db::diagnostic::Diagnostic,
         encoding: PositionEncoding,
+        full_diagnostic_output: FullDiagnosticOutput,
     ) -> Option<Self> {
+        let fix = Self::try_fix_from_diagnostic(db, diagnostic, encoding);
+
+        match full_diagnostic_output {
+            FullDiagnosticOutput::Enabled => Some(Self::Full(FullDiagnosticData {
+                rendered: diagnostic
+                    .display(
+                        &(db as &dyn ruff_db::Db),
+                        &DisplayDiagnosticConfig::new("ty")
+                            .color(true)
+                            // The styled renderer can enable OSC-8 hyperlinks based on the process
+                            // environment, even though this output is sent over LSP rather than to a
+                            // terminal. The ANSI parser used by ty-vscode does not strip OSC-8
+                            // sequences, so their escape codes would appear in the virtual diagnostic
+                            // document.
+                            .hyperlinks(HyperlinkMode::Never),
+                    )
+                    .to_string(),
+                diagnostic_id: diagnostic.id().to_string(),
+                fix,
+            })),
+            FullDiagnosticOutput::Disabled => fix.map(Self::Fix),
+        }
+    }
+
+    fn try_fix_from_diagnostic(
+        db: &dyn Db,
+        diagnostic: &ruff_db::diagnostic::Diagnostic,
+        encoding: PositionEncoding,
+    ) -> Option<DiagnosticFixData> {
         let fix = diagnostic
             .fix()
             .filter(|fix| fix.applies(Applicability::Unsafe))?;
@@ -600,7 +716,7 @@ impl DiagnosticData {
                 });
         }
 
-        Some(Self {
+        Some(DiagnosticFixData {
             fix_title: diagnostic
                 .first_help_text()
                 .map(ToString::to_string)

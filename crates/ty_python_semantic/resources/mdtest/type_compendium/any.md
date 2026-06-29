@@ -1,5 +1,10 @@
 # `Any`
 
+```toml
+[environment]
+python-version = "3.14"
+```
+
 ## Introduction
 
 The type `Any` is the dynamic type in Python's gradual type system. It represents an unknown static
@@ -72,33 +77,33 @@ The intersection `Any & T` of `Any` with a fully static type `T` describes an un
 that is *no larger than* the set of values described by `T`. It represents an unknown fully-static
 type with *upper bound* `T`:
 
-```py
-from ty_extensions import static_assert, is_assignable_to, Intersection, is_equivalent_to
+```pyi
+from ty_extensions import static_assert, is_assignable_to, is_equivalent_to
 from typing import Any
 
 class Big: ...
 class Medium(Big): ...
 class Small(Medium): ...
 
-static_assert(is_assignable_to(Small, Intersection[Any, Medium]))
-static_assert(is_assignable_to(Medium, Intersection[Any, Medium]))
+static_assert(is_assignable_to(Small, Any & Medium))
+static_assert(is_assignable_to(Medium, Any & Medium))
 ```
 
 `Any & Medium` is no larger than `Medium`, so we cannot assign `Big` to it. There is no possible
 materialization of `Any & Medium` that would make it as big as `Big`:
 
-```py
-static_assert(not is_assignable_to(Big, Intersection[Any, Medium]))
+```pyi
+static_assert(not is_assignable_to(Big, Any & Medium))
 ```
 
 `Any & Never` represents an "unknown" fully-static type which is no larger than `Never`. There is no
 such fully-static type, except for `Never` itself. So `Any & Never` is equivalent to `Never`:
 
-```py
+```pyi
 from typing_extensions import Never
 
-static_assert(is_equivalent_to(Intersection[Any, Never], Never))
-static_assert(is_equivalent_to(Intersection[Never, Any], Never))
+static_assert(is_equivalent_to(Any & Never, Never))
+static_assert(is_equivalent_to(Never & Any, Never))
 ```
 
 ## Tuples with `Any`

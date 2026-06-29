@@ -17,18 +17,24 @@ import {
   Uri,
 } from "monaco-editor";
 import { useCallback, useEffect, useRef } from "react";
-import { Theme } from "shared";
+import {
+  type DiagnosticDetailLocation,
+  secondaryAnnotationsWithMessages,
+  Theme,
+} from "shared";
 import {
   Hint,
   Position as TyPosition,
   Range as TyRange,
   SemanticToken,
   Severity,
+  type DiagnosticAnnotation,
   type Workspace,
   CompletionKind,
   type FileHandle,
   DocumentHighlight,
   DocumentHighlightKind,
+  DiagnosticTag,
   InlayHintKind,
   LocationLink,
   TextEdit,
@@ -42,6 +48,11 @@ import {
 } from "./Diagnostics";
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 import CompletionItemKind = languages.CompletionItemKind;
+
+const markerTagByDiagnosticTag = {
+  [DiagnosticTag.Unnecessary]: MarkerTag.Unnecessary,
+  [DiagnosticTag.Deprecated]: MarkerTag.Deprecated,
+} satisfies Record<DiagnosticTag, MarkerTag>;
 
 type Props = {
   visible: boolean;
@@ -61,7 +72,7 @@ type Props = {
 export type EditorHandle = {
   editor: IStandaloneCodeEditor;
   monaco: Monaco;
-  goToLocation(location: DiagnosticLocation): void;
+  goToLocation(location: DiagnosticDetailLocation): void;
 };
 
 export default function Editor({
@@ -598,7 +609,7 @@ class PlaygroundServer
           message: diagnosticDisplayMessage(diagnostic),
           relatedInformation: this.diagnosticRelatedInformation(diagnostic),
           severity: mapSeverity(diagnostic.severity),
-          tags: [],
+          tags: diagnostic.tags.map((tag) => markerTagByDiagnosticTag[tag]),
         };
       }),
       ...hints.map((hint) => ({
@@ -925,12 +936,8 @@ class PlaygroundServer
     return { edits };
   }
 
-  goToLocation(location: DiagnosticLocation): void {
-    this.openCodeEditor(
-      this.editor,
-      this.uriForPath(location.path),
-      tyRangeToMonacoRange(location.range),
-    );
+  goToLocation(location: DiagnosticDetailLocation): void {
+    this.openCodeEditor(this.editor, this.uriForPath(location.path), location);
   }
 
   private mapNavigationTarget(link: LocationLink): languages.LocationLink {
@@ -983,22 +990,38 @@ class PlaygroundServer
   private diagnosticRelatedInformation(
     diagnostic: Diagnostic,
   ): editor.IRelatedInformation[] {
-    return diagnostic.subDiagnostics.flatMap((subDiagnostic) => {
-      return subDiagnostic.annotations.flatMap((annotation) => {
-        const location = annotation.location;
+    const secondaryAnnotations = secondaryAnnotationsWithMessages(
+      diagnostic.annotations,
+    ).flatMap((annotation) =>
+      this.diagnosticAnnotationRelatedInformation(
+        annotation,
+        annotation.message,
+      ),
+    );
 
-        if (location == null) {
-          return [];
-        }
+    const subDiagnosticAnnotations = diagnostic.subDiagnostics.flatMap(
+      (subDiagnostic) =>
+        subDiagnostic.annotations.flatMap((annotation) =>
+          this.diagnosticAnnotationRelatedInformation(
+            annotation,
+            formatSubDiagnosticAnnotation(subDiagnostic, annotation),
+          ),
+        ),
+    );
 
-        return [
-          {
-            message: formatSubDiagnosticAnnotation(subDiagnostic, annotation),
-            ...this.mapLocation(location),
-          },
-        ];
-      });
-    });
+    return secondaryAnnotations.concat(subDiagnosticAnnotations);
+  }
+
+  private diagnosticAnnotationRelatedInformation(
+    annotation: DiagnosticAnnotation,
+    message: string,
+  ): editor.IRelatedInformation[] {
+    const location = annotation.location;
+    if (location == null || message.length === 0) {
+      return [];
+    }
+
+    return [{ message, ...this.mapLocation(location) }];
   }
 
   private mapNavigationTargets(

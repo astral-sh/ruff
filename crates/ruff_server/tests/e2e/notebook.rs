@@ -25,6 +25,101 @@ struct NotebookChange {
 }
 
 #[test]
+fn related_information() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_file(
+            "pyproject.toml",
+            r#"
+[tool.ruff.lint]
+select = ["F811"]
+"#,
+        )?
+        .enable_diagnostic_related_information(true)
+        .build();
+
+    let notebook_path = server.file_path("test.ipynb");
+    let cell_uris = [
+        make_cell_uri(&notebook_path, 0),
+        make_cell_uri(&notebook_path, 1),
+    ];
+    let cells = cell_uris
+        .iter()
+        .cloned()
+        .map(|uri| lsp_types::NotebookCell {
+            kind: lsp_types::NotebookCellKind::Code,
+            document: uri,
+            metadata: None,
+            execution_summary: None,
+        })
+        .collect();
+    let cell_text_documents = cell_uris
+        .iter()
+        .cloned()
+        .zip(["import os\n", "import os\n"])
+        .map(|(uri, source)| {
+            TextDocumentItem::new(uri, lsp_types::LanguageKind::Python, 0, source.to_string())
+        })
+        .collect();
+
+    server.send_notification::<DidOpenNotebookDocumentNotification>(
+        DidOpenNotebookDocumentParams {
+            notebook_document: NotebookDocument {
+                uri: server.file_uri("test.ipynb"),
+                notebook_type: "jupyter-notebook".to_string(),
+                version: 0,
+                metadata: None,
+                cells,
+            },
+            cell_text_documents,
+        },
+    );
+
+    let diagnostics = server.collect_publish_diagnostic_notifications(cell_uris.len());
+    assert!(
+        diagnostics
+            .get(&cell_uris[0])
+            .expect("first cell to have diagnostics published")
+            .is_empty()
+    );
+    let [diagnostic] = diagnostics
+        .get(&cell_uris[1])
+        .expect("second cell to have diagnostics published")
+        .as_slice()
+    else {
+        panic!("second cell to have one diagnostic");
+    };
+    let [related_information] = diagnostic
+        .related_information
+        .as_deref()
+        .expect("client supports diagnostic related information")
+    else {
+        panic!("diagnostic to have one related information entry");
+    };
+
+    assert_eq!(related_information.location.uri, cell_uris[0]);
+    assert_eq!(
+        related_information.location.range,
+        Range {
+            start: Position {
+                line: 0,
+                character: 7,
+            },
+            end: Position {
+                line: 0,
+                character: 9,
+            },
+        }
+    );
+    assert_eq!(
+        related_information.message,
+        "previous definition of `os` here"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn super_resolution_overview() -> Result<()> {
     let fixture_path = fixture_path(NOTEBOOK_FIXTURE_PATH)?;
     let workspace_dir = fixture_path

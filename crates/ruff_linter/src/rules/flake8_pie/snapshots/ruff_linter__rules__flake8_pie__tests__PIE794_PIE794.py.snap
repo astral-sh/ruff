@@ -12,13 +12,11 @@ PIE794 [*] Class field `name` is defined multiple times
 6 |     def remove(self) -> None:
   |
 help: Remove duplicate field definition for `name`
-1 | class Foo(BaseModel):
-2 |     name = StringField()
+  |
 3 |     # ....
   -     name = StringField()  # PIE794
 4 |
-5 |     def remove(self) -> None:
-6 |         ...
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 PIE794 [*] Class field `name` is defined multiple times
@@ -32,13 +30,11 @@ PIE794 [*] Class field `name` is defined multiple times
 15 |     def foo(self) -> None:
    |
 help: Remove duplicate field definition for `name`
-10 | class Foo(BaseModel):
-11 |     name: str = StringField()
+   |
 12 |     # ....
    -     name = StringField()  # PIE794
 13 |
-14 |     def foo(self) -> None:
-15 |         ...
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PIE794 [*] Class field `bar` is defined multiple times
@@ -50,13 +46,11 @@ PIE794 [*] Class field `bar` is defined multiple times
    |     ^^^^^^^^^^^^^^^^^^^
    |
 help: Remove duplicate field definition for `bar`
-20 |     bar: str = StringField()
-21 |     foo: bool = BooleanField()
+   |
 22 |     # ...
    -     bar = StringField()  # PIE794
 23 |
-24 |
-25 | class User(BaseModel):
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PIE794 [*] Class field `bar` is defined multiple times
@@ -68,13 +62,11 @@ PIE794 [*] Class field `bar` is defined multiple times
    |     ^^^^^^^^^^^^^^^^^^^
    |
 help: Remove duplicate field definition for `bar`
-37 |     bar: str = StringField()
-38 |     foo: bool = BooleanField()
+   |
 39 |     # ...
    -     bar = StringField()  # PIE794
 40 |
-41 |
-42 | class Person:
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PIE794 [*] Class field `name` is defined multiple times
@@ -86,13 +78,11 @@ PIE794 [*] Class field `name` is defined multiple times
    |     ^^^^^^^^^^^^
    |
 help: Remove duplicate field definition for `name`
-43 | class Person:
-44 |     name = "Foo"
+   |
 45 |     name = name + " Bar"
    -     name = "Bar"  # PIE794
 46 |
-47 |
-48 | class Person:
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PIE794 [*] Class field `name` is defined multiple times
@@ -104,13 +94,11 @@ PIE794 [*] Class field `name` is defined multiple times
    |     ^^^^^^^^^^^^^^^^^
    |
 help: Remove duplicate field definition for `name`
-49 | class Person:
-50 |     name: str = "Foo"
+   |
 51 |     name: str = name + " Bar"
    -     name: str = "Bar"  # PIE794
 52 |
-53 |
-54 | class TextEdit:
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 PIE794 [*] Class field `start_line` is defined multiple times
@@ -122,8 +110,8 @@ PIE794 [*] Class field `start_line` is defined multiple times
    |     ^^^^^^^^^^^^^^^
    |
 help: Remove duplicate field definition for `start_line`
-54 |
-55 | class TextEdit:
+   |
 56 |     start_line: int
    -     start_line: int  # PIE794
+   |
 note: This is an unsafe fix and may change runtime behavior

@@ -10,7 +10,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::{Linter, Rule};
-    use crate::test::{test_path, test_snippet};
+    use crate::test::{assert_notebook_path, test_path, test_resource_path, test_snippet};
     use crate::{assert_diagnostics, settings};
 
     #[test_case(
@@ -386,6 +386,21 @@ mod tests {
             &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn pd002_fix_at_notebook_cell_start() -> Result<()> {
+        let actual = test_resource_path("fixtures").join("pandas_vet/PD002_cell_start.ipynb");
+        let expected =
+            test_resource_path("fixtures").join("pandas_vet/PD002_cell_start_expected.ipynb");
+
+        assert_notebook_path(
+            actual,
+            expected,
+            &settings::LinterSettings::for_rule(Rule::PandasUseOfInplaceArgument),
+        )?;
+
         Ok(())
     }
 }

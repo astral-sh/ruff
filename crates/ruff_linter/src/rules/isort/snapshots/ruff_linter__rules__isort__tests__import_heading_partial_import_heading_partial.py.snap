@@ -12,6 +12,7 @@ I001 [*] Import block is un-sorted or un-formatted
   | |_____________^
   |
 help: Organize imports
+  |
 1 + # Standard library imports
 2 | import os
 3 | import sys
@@ -20,3 +21,4 @@ help: Organize imports
 6 + import pandas
 7 | import requests
   - import pandas
+  |

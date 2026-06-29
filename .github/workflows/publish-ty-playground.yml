@@ -31,7 +31,7 @@ jobs:
     env:
       CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
       - name: "Install Rust toolchain"
@@ -52,7 +52,7 @@ jobs:
         working-directory: playground
       - name: "Verify Pyodide assets"
         run: |
-          test -f ty/dist/assets/pyodide.asm.js
+          test -f ty/dist/assets/pyodide.asm.mjs
           test -f ty/dist/assets/pyodide.asm.wasm
           test -f ty/dist/assets/pyodide-lock.json
           test -f ty/dist/assets/python_stdlib.zip
