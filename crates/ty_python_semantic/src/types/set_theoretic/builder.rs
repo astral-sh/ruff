@@ -1337,6 +1337,11 @@ impl<'db> IntersectionBuilder<'db> {
     }
 }
 
+struct Replacement<'db> {
+    index: usize,
+    value: Type<'db>,
+}
+
 #[derive(Debug, Clone, Default)]
 struct InnerIntersectionBuilder<'db> {
     positive: FxOrderSet<Type<'db>>,
@@ -1577,10 +1582,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 }
 
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
-                struct Replacement<'db> {
-                    index: usize,
-                    value: Type<'db>,
-                }
                 let mut replacement = None;
                 for (index, existing_positive) in self.positive.iter().enumerate() {
                     if let Some(merged) =
