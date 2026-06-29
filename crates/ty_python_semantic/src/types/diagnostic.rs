@@ -3891,8 +3891,8 @@ pub(super) fn report_incompatible_base_method<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
     member: &str,
-    selected: (ClassType<'db>, Definition<'db>),
-    contract: (ClassType<'db>, Definition<'db>),
+    selected: (ClassType<'db>, Definition<'db>, MethodDecorator),
+    contract: (ClassType<'db>, Definition<'db>, MethodDecorator),
     error_context: impl FnOnce() -> ErrorContextTree<'db>,
 ) {
     let db = context.db();
@@ -3901,8 +3901,8 @@ pub(super) fn report_incompatible_base_method<'db>(
         return;
     };
 
-    let (selected_owner, selected_definition) = selected;
-    let (contract_owner, contract_definition) = contract;
+    let (selected_owner, selected_definition, selected_decorator) = selected;
+    let (contract_owner, contract_definition, contract_decorator) = contract;
     let selected_name = selected_owner.name(db);
     let contract_name = contract_owner.name(db);
     let mut diagnostic = builder.into_diagnostic(format_args!(
@@ -3912,6 +3912,13 @@ pub(super) fn report_incompatible_base_method<'db>(
     diagnostic.set_primary_message(format_args!(
         "`{selected_name}.{member}` is incompatible with `{contract_name}.{member}`"
     ));
+    if selected_decorator != contract_decorator {
+        diagnostic.info(format_args!(
+            "`{selected_name}.{member}` is {} but `{contract_name}.{member}` is {}",
+            selected_decorator.description(),
+            contract_decorator.description(),
+        ));
+    }
     error_context().attach_to(db, &mut diagnostic);
     diagnostic.info("This violates the Liskov Substitution Principle");
 

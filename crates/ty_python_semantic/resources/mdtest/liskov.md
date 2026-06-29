@@ -705,7 +705,7 @@ class ClassMethod:
 class InstanceStaticConflict(InstanceMethod, StaticMethod): ...  # error: [invalid-method-override]
 class StaticInstanceConflict(StaticMethod, InstanceMethod): ...  # error: [invalid-method-override]
 class InstanceClassConflict(InstanceMethod, ClassMethod): ...  # error: [invalid-method-override]
-class ClassInstanceConflict(ClassMethod, InstanceMethod): ...  # error: [invalid-method-override]
+class ClassInstanceConflict(ClassMethod, InstanceMethod): ...  # snapshot: invalid-method-override
 class StaticClassConflict(StaticMethod, ClassMethod): ...  # error: [invalid-method-override]
 class ClassStaticConflict(ClassMethod, StaticMethod): ...  # error: [invalid-method-override]
 ```
@@ -728,6 +728,27 @@ error[invalid-method-override]: Base classes for class `IncompatibleReturns` def
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ReturnsStr.method` is incompatible with `ReturnsInt.method`
    |
 info: incompatible return types: `str` is not assignable to `int`
+info: This violates the Liskov Substitution Principle
+
+
+error[invalid-method-override]: Base classes for class `ClassInstanceConflict` define method `kind` incompatibly
+  --> src/multiple_inheritance.pyi:58:9
+   |
+58 |     def kind(cls, value: int) -> int: ...
+   |         ---- `ClassMethod.kind` defined here
+59 |
+60 | class InstanceStaticConflict(InstanceMethod, StaticMethod): ...  # error: [invalid-method-override]
+61 | class StaticInstanceConflict(StaticMethod, InstanceMethod): ...  # error: [invalid-method-override]
+62 | class InstanceClassConflict(InstanceMethod, ClassMethod): ...  # error: [invalid-method-override]
+63 | class ClassInstanceConflict(ClassMethod, InstanceMethod): ...  # snapshot: invalid-method-override
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ClassMethod.kind` is incompatible with `InstanceMethod.kind`
+   |
+  ::: src/multiple_inheritance.pyi:50:9
+   |
+50 |     def kind(self, value: int) -> int: ...
+   |         ---- `InstanceMethod.kind` defined here
+   |
+info: `ClassMethod.kind` is a classmethod but `InstanceMethod.kind` is an instance method
 info: This violates the Liskov Substitution Principle
 ```
 
