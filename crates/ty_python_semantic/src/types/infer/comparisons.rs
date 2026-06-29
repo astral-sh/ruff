@@ -116,38 +116,6 @@ pub(crate) struct UnsupportedComparisonError<'db> {
     pub(crate) right_ty: Type<'db>,
 }
 
-/// Return the truthiness of `left is right` when it is known for every represented runtime value.
-///
-/// Projecting the complete types before the comparison dispatch below accounts for `NewType`'s
-/// runtime behavior. Distinct `NewType`s are statically disjoint, but their constructors can return
-/// the same object unchanged:
-///
-/// ```python
-/// from typing import NewType
-///
-/// UserId = NewType("UserId", int)
-/// OrderId = NewType("OrderId", int)
-///
-/// def same_object(user_id: UserId, order_id: OrderId) -> None:
-///     reveal_type(user_id is order_id)  # bool
-/// ```
-fn identity_comparison_truthiness<'db>(
-    db: &'db dyn Db,
-    left: Type<'db>,
-    right: Type<'db>,
-) -> Truthiness {
-    let left = left.identity_comparison_type(db);
-    let right = right.identity_comparison_type(db);
-
-    if left.is_disjoint_from(db, right) {
-        Truthiness::AlwaysFalse
-    } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
-        Truthiness::AlwaysTrue
-    } else {
-        Truthiness::Ambiguous
-    }
-}
-
 /// Infers the type of a binary comparison (e.g. 'left == right'). See
 /// `TypeInferenceBuilder::infer_compare_expression` for the higher level logic dealing with
 /// multi-comparison expressions.
@@ -181,8 +149,24 @@ pub(super) fn infer_binary_type_comparison<'db>(
             ast::CmpOp::NotIn => {
                 membership_test_comparison(MembershipTestCompareOperator::NotIn, range)
             }
-            // Identity results are returned by `identity_comparison_truthiness` below.
-            ast::CmpOp::Is | ast::CmpOp::IsNot => Ok(KnownClass::Bool.to_instance(db)),
+            ast::CmpOp::Is => {
+                if left.is_disjoint_from(db, right) {
+                    Ok(Type::bool_literal(false))
+                } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
+                    Ok(Type::bool_literal(true))
+                } else {
+                    Ok(KnownClass::Bool.to_instance(db))
+                }
+            }
+            ast::CmpOp::IsNot => {
+                if left.is_disjoint_from(db, right) {
+                    Ok(Type::bool_literal(true))
+                } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
+                    Ok(Type::bool_literal(false))
+                } else {
+                    Ok(KnownClass::Bool.to_instance(db))
+                }
+            }
         }
     };
 
@@ -194,15 +178,29 @@ pub(super) fn infer_binary_type_comparison<'db>(
         (Type::TypeVar(left), Type::TypeVar(right)) if left.is_same_typevar_as(db, right)
     );
     if !same_typevar && matches!(op, ast::CmpOp::Is | ast::CmpOp::IsNot) {
-        let truthiness = identity_comparison_truthiness(db, left, right);
-        return Ok(Type::from_truthiness(
-            db,
-            if op == ast::CmpOp::Is {
-                truthiness
-            } else {
-                truthiness.negate()
-            },
-        ));
+        // `NewType` is an identity function at runtime, so distinct NewTypes can still contain the
+        // same object:
+        //
+        // UserId = NewType("UserId", int)
+        // OrderId = NewType("OrderId", int)
+        // user_id is order_id  # possibly true
+        //
+        // Project both operands before using the ordinary comparison logic. Keeping the usual
+        // recursive dispatch preserves facts carried by unions and intersections after projection.
+        let left_identity = left.identity_comparison_type(db);
+        let right_identity = right.identity_comparison_type(db);
+        if left_identity != left || right_identity != right {
+            return visitor.visit((left, op, right), || {
+                infer_binary_type_comparison(
+                    context,
+                    left_identity,
+                    op,
+                    right_identity,
+                    range,
+                    visitor,
+                )
+            });
+        }
     }
 
     let soundness_policy =
