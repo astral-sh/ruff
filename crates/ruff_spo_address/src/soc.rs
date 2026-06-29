@@ -25,14 +25,40 @@ use std::collections::{BTreeMap, BTreeSet};
 /// "256-cap": 256 is the byte's cardinality; 255 is the representable count.)
 pub const MAX_SIBLINGS_PER_TIER: usize = u8::MAX as usize;
 
-/// A class's field set must fit one `u64` `FieldMask`.
-pub const FIELD_MASK_CAP: usize = 64;
+/// One `u64` `FieldMask` **bucket** holds 64 field positions — the unit the
+/// Redmine-ERB ClassView bitmask iterates
+/// (`OGAR/docs/CLASSVIEW-FIELDVIEW-ASKAMA-BITMASK.md`).
+pub const FIELD_MASK_BUCKET_BITS: usize = 64;
+
+/// A clean `ClassView` chains up to 4 buckets — the **quadruplet** `[u64; 4]` —
+/// so its distinct-field set fits 256 positions (operator 2026-06-29: expand the
+/// single-`u64` cap 64 → 256; an Odoo model with ~109 fields is then clean in
+/// one quadruplet ClassView, no split needed).
+pub const FIELD_MASK_MAX_BUCKETS: usize = 4;
+
+/// A class's distinct-field set must fit a chained-bucket `FieldMask`:
+/// `FIELD_MASK_BUCKET_BITS * FIELD_MASK_MAX_BUCKETS` = **256**. At/below this it
+/// is maskable by one ClassView; *beyond* it the class is a **god object** — the
+/// SoC signal to **split** (chain a second ClassView), never to widen a single
+/// mask past the quadruplet.
+pub const FIELD_MASK_CAP: usize = FIELD_MASK_BUCKET_BITS * FIELD_MASK_MAX_BUCKETS;
+
+/// How many `u64` buckets a field set of `n` distinct positions needs — the
+/// **clean separation overflow automation**: each run of 64 positions chains the
+/// next bucket. `<= FIELD_MASK_MAX_BUCKETS` (4) fits one ClassView (the
+/// quadruplet); more buckets is the god-object SoC signal to split into
+/// sub-ClassViews, each its own ≤4-bucket clean concern.
+#[must_use]
+pub const fn field_mask_buckets(n: usize) -> usize {
+    n.div_ceil(FIELD_MASK_BUCKET_BITS)
+}
 
 /// The verdict for a class whose sibling set exceeds [`MAX_SIBLINGS_PER_TIER`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SocVerdict {
-    /// All data members are typed and collapse to `<= FIELD_MASK_CAP` distinct
-    /// `field_type`s — maskable by one `ClassView` (`FieldMask`).
+    /// All data members are typed and collapse to `<= FIELD_MASK_CAP` (256)
+    /// distinct `field_type`s — maskable by one `ClassView` (a chained-bucket
+    /// `FieldMask`, up to the `[u64; 4]` quadruplet).
     Duplication,
     /// `has_field` data + `has_function` behaviour conflated under one parent — split.
     Conflation,
@@ -107,12 +133,15 @@ pub fn soc_findings(triples: &[Triple]) -> Vec<SocFinding> {
             .collect();
         // Typed data rows reclaimable by a masked ClassView = typed members minus
         // the distinct types they collapse to.
-        let typed = data_members.iter().filter_map(|m| field_type.get(m)).count();
+        let typed = data_members
+            .iter()
+            .filter_map(|m| field_type.get(m))
+            .count();
         let duplicate_rows = typed.saturating_sub(distinct.len());
         // Duplication ⇒ the data collapses to a ClassView-maskable view: every
         // data member is typed (untyped siblings are not proven collapsible) AND
-        // the distinct types fit one `u64` FieldMask (the mask, not the 255 tier
-        // rank, is the real collapse target).
+        // the distinct types fit a chained-bucket FieldMask (≤ 256, the [u64; 4]
+        // quadruplet — not the 255 tier rank — is the real collapse target).
         let is_dup = data > 0 && typed == data && distinct.len() <= FIELD_MASK_CAP;
         let is_conflated = funcs > 0 && data > 0;
         let verdict = match (is_dup, is_conflated) {
@@ -147,7 +176,13 @@ mod tests {
     use super::*;
 
     fn t(s: &str, p: &str, o: &str) -> Triple {
-        Triple { s: s.into(), p: p.into(), o: o.into(), f: 1.0, c: 1.0 }
+        Triple {
+            s: s.into(),
+            p: p.into(),
+            o: o.into(),
+            f: 1.0,
+            c: 1.0,
+        }
     }
 
     #[test]
@@ -176,7 +211,10 @@ mod tests {
             tr.push(t("U", "has_field", &format!("U.f{i}")));
         }
         let f = soc_findings(&tr);
-        assert_eq!(f[0].funcs, 0, "has_field with no field_type must not be a function");
+        assert_eq!(
+            f[0].funcs, 0,
+            "has_field with no field_type must not be a function"
+        );
         assert_eq!(f[0].data, 300);
         // No types resolved and no functions -> not provably dup/conflation.
         assert_eq!(f[0].verdict, SocVerdict::Counterexample);
@@ -211,14 +249,18 @@ mod tests {
             }
             tr
         };
-        assert!(soc_findings(&mk(255)).is_empty(), "255 siblings are representable");
+        assert!(
+            soc_findings(&mk(255)).is_empty(),
+            "255 siblings are representable"
+        );
         assert_eq!(soc_findings(&mk(256)).len(), 1, "256 overflows the u8 rank");
     }
 
     #[test]
     fn wide_distinct_types_exceed_field_mask_is_counterexample() {
-        // 300 typed fields, every one a distinct type → cannot collapse into a
-        // single FieldMask (>64 distinct), so NOT maskable duplication.
+        // 300 typed fields, every one a distinct type → cannot collapse even into
+        // the [u64; 4] quadruplet FieldMask (300 > 256 distinct), so NOT maskable
+        // duplication — a genuine god object.
         let mut tr = Vec::new();
         for i in 0..300 {
             let m = format!("W.f{i}");
@@ -227,15 +269,92 @@ mod tests {
         }
         let f = soc_findings(&tr);
         assert_eq!(f[0].distinct_field_types, 300);
+        assert!(f[0].distinct_field_types > FIELD_MASK_CAP);
         assert_eq!(f[0].verdict, SocVerdict::Counterexample);
         assert!(!law_holds(&tr));
+    }
+
+    #[test]
+    fn field_mask_buckets_chain_at_64() {
+        // Clean separation overflow automation: each run of 64 chains the next bucket.
+        assert_eq!(field_mask_buckets(0), 0);
+        assert_eq!(field_mask_buckets(1), 1);
+        assert_eq!(field_mask_buckets(64), 1);
+        assert_eq!(field_mask_buckets(65), 2);
+        assert_eq!(field_mask_buckets(109), 2); // the Odoo case: 2 buckets, still one ClassView
+        assert_eq!(field_mask_buckets(192), 3);
+        assert_eq!(field_mask_buckets(193), 4);
+        assert_eq!(field_mask_buckets(256), 4); // the full quadruplet
+        assert_eq!(field_mask_buckets(257), 5); // god object — beyond the quadruplet
+        // FIELD_MASK_CAP is exactly the 4-bucket quadruplet (the 64 → 256 expansion).
+        assert_eq!(FIELD_MASK_BUCKET_BITS, 64);
+        assert_eq!(FIELD_MASK_MAX_BUCKETS, 4);
+        assert_eq!(FIELD_MASK_CAP, 256);
+        assert_eq!(field_mask_buckets(FIELD_MASK_CAP), FIELD_MASK_MAX_BUCKETS);
+    }
+
+    #[test]
+    fn odoo_109_distinct_fields_fit_a_quadruplet_classview() {
+        // An Odoo-shaped over-cap class: >255 members so the lint fires, with 109
+        // DISTINCT field types — too wide for the old single-u64 cap (64) but clean
+        // in a 2-bucket quadruplet ClassView (109 <= 256). The epiphany, tested:
+        // expanding the cap 64 → 256 turns this from a Counterexample into
+        // Duplication — "if odoo has 109 in classview and it's clean we're fine".
+        let mut tr = Vec::new();
+        for i in 0..300 {
+            let m = format!("account_move.f{i}");
+            tr.push(t("account_move", "has_field", &m));
+            tr.push(t(&m, "field_type", &format!("T{}", i % 109))); // 109 distinct types
+        }
+        let f = soc_findings(&tr);
+        assert_eq!(f.len(), 1);
+        assert_eq!(f[0].distinct_field_types, 109);
+        assert!(f[0].distinct_field_types <= FIELD_MASK_CAP);
+        assert_eq!(
+            field_mask_buckets(f[0].distinct_field_types),
+            2,
+            "109 fields = 2 buckets"
+        );
+        assert_eq!(
+            f[0].verdict,
+            SocVerdict::Duplication,
+            "clean in a quadruplet ClassView, not a god object"
+        );
+        assert!(law_holds(&tr));
+    }
+
+    #[test]
+    fn quadruplet_boundary_256_clean_257_is_god_object() {
+        let mk = |distinct: usize| {
+            let mut tr = Vec::new();
+            for i in 0..300 {
+                let m = format!("B.f{i}");
+                tr.push(t("B", "has_field", &m));
+                tr.push(t(&m, "field_type", &format!("T{}", i % distinct)));
+            }
+            tr
+        };
+        // 256 distinct = exactly the quadruplet → Duplication (clean, 4 buckets).
+        let f256 = soc_findings(&mk(256));
+        assert_eq!(f256[0].distinct_field_types, 256);
+        assert_eq!(field_mask_buckets(256), FIELD_MASK_MAX_BUCKETS);
+        assert_eq!(f256[0].verdict, SocVerdict::Duplication);
+        // 257 distinct → overflows the quadruplet → god-object Counterexample
+        // (the SoC signal: split into chained sub-ClassViews, don't widen).
+        let f257 = soc_findings(&mk(257));
+        assert_eq!(f257[0].distinct_field_types, 257);
+        assert!(f257[0].distinct_field_types > FIELD_MASK_CAP);
+        assert_eq!(f257[0].verdict, SocVerdict::Counterexample);
     }
 
     #[test]
     fn untyped_data_blocks_duplication_verdict() {
         // 256 has_field: 1 typed + 255 untyped → cannot approve duplication on
         // the strength of a single resolved type.
-        let mut tr = vec![t("M", "has_field", "M.typed"), t("M.typed", "field_type", "i32")];
+        let mut tr = vec![
+            t("M", "has_field", "M.typed"),
+            t("M.typed", "field_type", "i32"),
+        ];
         for i in 0..255 {
             tr.push(t("M", "has_field", &format!("M.u{i}")));
         }
