@@ -192,6 +192,11 @@ pub(crate) const fn is_fix_os_makedirs_enabled(settings: &LinterSettings) -> boo
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/
+pub(crate) const fn is_fix_os_stat_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/20009
 pub(crate) const fn is_fix_os_symlink_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()

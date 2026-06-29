@@ -3,62 +3,6 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use crate::Violation;
 
 /// ## What it does
-/// Checks for uses of `os.stat`.
-///
-/// ## Why is this bad?
-/// `pathlib` offers a high-level API for path manipulation, as compared to
-/// the lower-level API offered by `os`. When possible, using `Path` object
-/// methods such as `Path.stat()` can improve readability over the `os`
-/// module's counterparts (e.g., `os.path.stat()`).
-///
-/// ## Examples
-/// ```python
-/// import os
-/// from pwd import getpwuid
-/// from grp import getgrgid
-///
-/// stat = os.stat(file_name)
-/// owner_name = getpwuid(stat.st_uid).pw_name
-/// group_name = getgrgid(stat.st_gid).gr_name
-/// ```
-///
-/// Use instead:
-/// ```python
-/// from pathlib import Path
-///
-/// file_path = Path(file_name)
-/// stat = file_path.stat()
-/// owner_name = file_path.owner()
-/// group_name = file_path.group()
-/// ```
-///
-/// ## Known issues
-/// While using `pathlib` can improve the readability and type safety of your code,
-/// it can be less performant than the lower-level alternatives that work directly with strings,
-/// especially on older versions of Python.
-///
-/// ## References
-/// - [Python documentation: `Path.stat`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.stat)
-/// - [Python documentation: `Path.group`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.group)
-/// - [Python documentation: `Path.owner`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.owner)
-/// - [Python documentation: `os.stat`](https://docs.python.org/3/library/os.html#os.stat)
-/// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
-/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#corresponding-tools)
-/// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
-/// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
-#[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.231")]
-pub(crate) struct OsStat;
-
-impl Violation for OsStat {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        "`os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`"
-            .to_string()
-    }
-}
-
-/// ## What it does
 /// Checks for uses of `os.path.join`.
 ///
 /// ## Why is this bad?

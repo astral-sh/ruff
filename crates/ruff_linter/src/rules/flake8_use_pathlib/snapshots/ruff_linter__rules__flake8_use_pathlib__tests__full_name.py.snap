@@ -202,6 +202,7 @@ PTH116 `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path
 24 | os.path.isabs(p)
 25 | os.path.join(p, q)
    |
+help: Replace with `Path(...).stat()`
 
 PTH117 `os.path.isabs()` should be replaced by `Path.is_absolute()`
   --> full_name.py:24:1
@@ -410,6 +411,47 @@ PTH123 `open()` should be replaced by `Path.open()`
 73 | # https://github.com/astral-sh/ruff/issues/17693
    |
 help: Replace with `Path.open()`
+
+PTH116 `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
+  --> full_name.py:74:1
+   |
+73 | # https://github.com/astral-sh/ruff/issues/17693
+74 | os.stat(1)
+   | ^^^^^^^
+75 | os.stat(x)
+   |
+help: Replace with `Path(...).stat()`
+
+PTH116 `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
+  --> full_name.py:75:1
+   |
+73 | # https://github.com/astral-sh/ruff/issues/17693
+74 | os.stat(1)
+75 | os.stat(x)
+   | ^^^^^^^
+   |
+help: Replace with `Path(...).stat()`
+
+PTH116 `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
+  --> full_name.py:80:1
+   |
+78 | def func() -> int:
+79 |     return 2
+80 | os.stat(func())
+   | ^^^^^^^
+   |
+help: Replace with `Path(...).stat()`
+
+PTH116 `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
+  --> full_name.py:84:5
+   |
+83 | def bar(x: int):
+84 |     os.stat(x)
+   |     ^^^^^^^
+85 |
+86 | # https://github.com/astral-sh/ruff/issues/17694
+   |
+help: Replace with `Path(...).stat()`
 
 PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
    --> full_name.py:108:1
