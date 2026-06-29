@@ -186,6 +186,9 @@ fn source_method_names_in_mro<'db>(db: &'db dyn Db, class: ClassType<'db>) -> Fx
     let mut methods = FxHashSet::default();
 
     for owner in class.iter_mro(db).filter_map(ClassBase::into_class) {
+        if owner.is_object(db) {
+            break;
+        }
         let Some((owner_literal, _)) = owner.static_class_literal(db) else {
             continue;
         };
@@ -1799,5 +1802,27 @@ fn check_enum_member_against_constructor_method<'db>(
                 Type::FunctionLiteral(function).display(db),
             ));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{db::tests::setup_db, place::global_symbol};
+    use ruff_db::{files::system_path_to_file, system::DbWithWritableSystem as _};
+
+    #[test]
+    fn empty_branch_has_no_inherited_method_candidates() {
+        let mut db = setup_db();
+        db.write_dedented("/src/test.py", "class Empty: pass")
+            .unwrap();
+        let file = system_path_to_file(&db, "/src/test.py").unwrap();
+        let class = global_symbol(&db, file, "Empty")
+            .place
+            .expect_type()
+            .to_class_type(&db)
+            .unwrap();
+
+        assert!(source_method_names_in_mro(&db, class).is_empty());
     }
 }
