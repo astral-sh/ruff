@@ -838,8 +838,9 @@ mod tests {
 
     #[test]
     fn test_notebook_cell_boundary_no_spurious_diagnostics() -> Result<(), NotebookError> {
-        // Per-cell parsing injects synthetic boundary tokens (trailing `Newline`/`Dedent`)
-        // Ensuring they don't trigger spurious blank-line or whitespace diagnostics on a valid notebook.
+        // `valid_multicell.ipynb` ends a cell with an indented `def` block right before the next
+        // cell, so per-cell parsing emits a trailing `Dedent` at that boundary. Ensure those
+        // synthetic boundary tokens don't trigger spurious blank-line or whitespace diagnostics.
         let path = notebook_path("valid_multicell.ipynb");
         let source_kind = SourceKind::ipy_notebook(Notebook::from_path(&path)?);
         let settings = LinterSettings::for_rules([
