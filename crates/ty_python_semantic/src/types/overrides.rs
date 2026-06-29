@@ -239,6 +239,9 @@ fn effective_source_method_contract<'db>(
             ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => return None,
             ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict(_) => continue,
         };
+        if owner.is_object(db) {
+            return None;
+        }
         if owner.own_class_member(db, None, name).is_undefined() {
             continue;
         }
