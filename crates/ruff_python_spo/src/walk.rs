@@ -105,8 +105,12 @@ fn field_from_assign(name: &str, value: &Expr) -> Option<RawField> {
     if name_id(&func.value) != Some("fields") {
         return None;
     }
-    let (target, inverse_name, relation_kind) =
-        relation_target_inverse(func.attr.id.as_str(), &call.arguments);
+    let kind = func.attr.id.as_str();
+    let (target, inverse_name, relation_kind) = relation_target_inverse(kind, &call.arguments);
+    // Scalar fields record their constructor as `field_type`; relational
+    // fields carry it on `relation_kind` instead (mutually exclusive, so a
+    // field never emits both — see `ruff_spo_triplet::Field::field_type`).
+    let field_type = relation_kind.is_none().then(|| kind.to_lowercase());
     Some(RawField {
         name: name.to_string(),
         compute: call
@@ -116,6 +120,7 @@ fn field_from_assign(name: &str, value: &Expr) -> Option<RawField> {
         target,
         inverse_name,
         relation_kind,
+        field_type,
     })
 }
 

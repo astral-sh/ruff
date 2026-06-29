@@ -223,6 +223,17 @@ pub struct Field {
     /// `inverse_name`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub relation_kind: Option<String>,
+    /// For a **non-relational** field, the Odoo constructor lowercased
+    /// (`char` / `text` / `html` / `integer` / `float` / `monetary` /
+    /// `boolean` / `date` / `datetime` / `binary` / `selection` / `json` /
+    /// …). Emitted as `(field, field_type, "<kind>")` (Authoritative) —
+    /// the same `field_type` predicate the Rails `AttrDecl` path uses. Lets
+    /// a downstream lift upgrade an untyped scalar (`OgScalar`) into a
+    /// concrete typed wrapper. Mutually exclusive with [`Self::relation_kind`]:
+    /// relational fields carry their cardinality there, scalars carry their
+    /// constructor here, so the two predicates never double-emit for one field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field_type: Option<String>,
 }
 
 /// One method / function.
