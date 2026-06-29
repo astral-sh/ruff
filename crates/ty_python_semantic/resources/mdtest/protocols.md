@@ -2848,7 +2848,7 @@ def f(arg: object, arg2: type):
 ```
 
 A protocol class decorated with `@typing(_extensions).runtime_checkable` *can* be used as the second
-argument to `isisinstance()` at runtime:
+argument to `isinstance()` at runtime:
 
 ```py
 from typing import runtime_checkable
