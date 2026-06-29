@@ -3570,13 +3570,16 @@ impl<'db> CallableBinding<'db> {
                         matched_argument.iter().map(move |matched_parameter| {
                             // TODO: For an unannotated `self` / `cls` parameter, the type should be
                             // `typing.Self` / `type[typing.Self]`
-                            let parameter_type = overload.signature.parameters()
+                            let raw_parameter_type = overload.signature.parameters()
                                 [matched_parameter.index]
-                                .annotated_type()
+                                .annotated_type();
+                            let parameter_type = raw_parameter_type
                                 .apply_optional_specialization(db, overload.specialization);
                             OverloadFilterSlot {
                                 parameter: parameter_type,
-                                argument: argument_types.get_for_declared_type(parameter_type),
+                                // Argument types are cached by the raw parameter type, even when
+                                // they were inferred using a return-context specialization.
+                                argument: argument_types.get_for_declared_type(raw_parameter_type),
                                 variadic_argument: matched_parameter.argument_type,
                             }
                         })
