@@ -19,10 +19,14 @@
 //! | `self.attr` / `record.attr`             | [`Function::reads`]  | `reads_field`        |
 //! | `for r in self.line_ids:`               | [`Function::traverses`]| `traverses_relation`|
 //!
-//! Odoo relations (`target`/`inverse_name`), Selection enums
-//! (`selection_value`), and `_inherit` edges (`inherits_from`) need predicate
-//! variants the closed [`ruff_spo_triplet::Predicate`] enum does not yet carry;
-//! they are a follow-up that extends the enum + IR carriers together.
+//! Odoo relations carry their cardinality too: `target` (comodel),
+//! `inverse_name` (One2many inverse), and `relation_kind`
+//! (`many2one`/`one2many`/`many2many`) — the last separates a Many2one
+//! (scalar FK) from a Many2many (join table), which `target`/`inverse_name`
+//! alone cannot. Selection enums (`selection_value`) and `_inherit` edges
+//! (`inherits_from`) still need predicate variants the closed
+//! [`ruff_spo_triplet::Predicate`] enum does not yet carry; they are a
+//! follow-up that extends the enum + IR carriers together.
 //!
 //! Model names are normalised dot→underscore (`account.move` → `account_move`)
 //! so the IRI dot is unambiguously the model↔member separator.
@@ -64,6 +68,9 @@ pub(crate) struct RawField {
     pub target: Option<String>,
     /// One2many inverse field name, if applicable.
     pub inverse_name: Option<String>,
+    /// Relational cardinality, lowercased (`many2one` / `one2many` /
+    /// `many2many`), if relational.
+    pub relation_kind: Option<String>,
 }
 
 /// One `def ...` declaration with its extracted body facts.
@@ -180,6 +187,7 @@ fn build_graph(classes: &[RawClass], namespace: &str) -> ModelGraph {
                             .unwrap_or_default(),
                         target: f.target.clone(),
                         inverse_name: f.inverse_name.clone(),
+                        relation_kind: f.relation_kind.clone(),
                     })
                     .collect(),
                 functions: methods
@@ -341,6 +349,14 @@ class AccountCashRounding(models.Model):
             "target",
             "account.account"
         ));
+        // …and carry their cardinality so a Many2one can't be mistaken for a
+        // Many2many (both are target-only, no inverse).
+        assert!(has(
+            &t,
+            "odoo:account_cash_rounding.profit_account_id",
+            "relation_kind",
+            "many2one"
+        ));
 
         // `for record in self: record.rounding` → a read on the loop-bound record.
         assert!(has(
@@ -406,9 +422,11 @@ class Foo(models.Model):
             "odoo:x_foo.line_ids"
         ));
 
-        // One2many relation: target (raw dotted comodel) + inverse_name.
+        // One2many relation: target (raw dotted comodel) + inverse_name +
+        // cardinality.
         assert!(has(&t, "odoo:x_foo.line_ids", "target", "x.line"));
         assert!(has(&t, "odoo:x_foo.line_ids", "inverse_name", "foo_id"));
+        assert!(has(&t, "odoo:x_foo.line_ids", "relation_kind", "one2many"));
 
         // Codex P2: `line.amount` keeps its relation hop (line ← self.line_ids).
         assert!(has(
@@ -476,5 +494,73 @@ class FooExt(models.Model):
     fn non_model_class_is_skipped() {
         let graph = extract_from_source("class Plain:\n    x = 1\n");
         assert!(graph.models.is_empty());
+    }
+
+    // Many2one vs Many2many are byte-identical on (target, inverse_name) —
+    // both carry a comodel and no inverse. `relation_kind` is the only
+    // signal that separates them, so the OGAR lift can map M2O → BelongsTo
+    // and M2M → HasAndBelongsToMany rather than guessing from the `_id`/
+    // `_ids` name convention.
+    const RELATION_KINDS: &str = r#"
+from odoo import models, fields
+
+
+class ResUsers(models.Model):
+    _name = 'res.users'
+    partner_id = fields.Many2one('res.partner')
+    group_ids = fields.Many2many('res.groups')
+    log_ids = fields.One2many('res.users.log', 'user_id')
+"#;
+
+    #[test]
+    fn relation_kind_separates_many2one_from_many2many() {
+        let graph = extract_from_source(RELATION_KINDS);
+        let t = expand(&graph);
+
+        // All three carry their comodel as `target`.
+        assert!(has(&t, "odoo:res_users.partner_id", "target", "res.partner"));
+        assert!(has(&t, "odoo:res_users.group_ids", "target", "res.groups"));
+        assert!(has(
+            &t,
+            "odoo:res_users.log_ids",
+            "target",
+            "res.users.log"
+        ));
+
+        // …but only `relation_kind` tells the cardinality apart.
+        assert!(has(
+            &t,
+            "odoo:res_users.partner_id",
+            "relation_kind",
+            "many2one"
+        ));
+        assert!(has(
+            &t,
+            "odoo:res_users.group_ids",
+            "relation_kind",
+            "many2many"
+        ));
+        assert!(has(
+            &t,
+            "odoo:res_users.log_ids",
+            "relation_kind",
+            "one2many"
+        ));
+
+        // Many2many has no inverse field (its inverse is a join table);
+        // only the One2many carries `inverse_name`.
+        assert!(!has(
+            &t,
+            "odoo:res_users.group_ids",
+            "inverse_name",
+            "user_id"
+        ));
+        assert!(has(&t, "odoo:res_users.log_ids", "inverse_name", "user_id"));
+
+        // The ndjson round-trips through the closed-vocab parser (relation_kind
+        // is now a recognised predicate).
+        let nd = to_ndjson(&graph);
+        let parsed = ruff_spo_triplet::from_ndjson(&nd).expect("ndjson round-trips");
+        assert_eq!(parsed, t);
     }
 }
