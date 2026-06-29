@@ -643,7 +643,7 @@ effective source-defined method contract exposed by every direct branch.
 `multiple_inheritance.pyi`:
 
 ```pyi
-from typing import Generic, Iterator, TypeVar, overload
+from typing import Any, Generic, Iterator, TypeVar, overload
 
 T = TypeVar("T")
 
@@ -721,6 +721,22 @@ class InvalidStr:
 
 # The implicit `object` tail of `Empty` is not a competing explicit branch contract.
 class DoesNotRepeatObjectConflict(Empty, InvalidStr): ...
+
+class Meta(type):
+    @property
+    def class_method(cls) -> Any: ...
+
+class MetaIntBase(metaclass=Meta):
+    @classmethod
+    def class_method(cls) -> int: ...
+
+class MetaStrBase:
+    @classmethod
+    def class_method(cls) -> str: ...
+
+# The metaclass descriptor affects class-object lookup, but it does not replace the method exposed
+# by instances of `MetaIntBase`.
+class MetaclassDescriptorConflict(MetaIntBase, MetaStrBase): ...  # error: [invalid-method-override]
 ```
 
 ```snapshot

@@ -19,9 +19,8 @@ use crate::{
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     reachability::ReachabilityConstraintsExtension,
     types::{
-        CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass,
-        MemberLookupPolicy, Parameter, Parameters, Signature, StaticClassLiteral, Type,
-        TypeContext, TypeQualifiers,
+        CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass, Parameter,
+        Parameters, Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
         call::CallArguments,
         class::{CodeGeneratorKind, FieldKind, MethodDecorator},
         constraints::ConstraintSetBuilder,
@@ -261,21 +260,9 @@ fn effective_source_method_contract<'db>(
         let Type::FunctionLiteral(function) = own_ty else {
             return None;
         };
-        let (lookup_ty, receiver) = if function.is_classmethod(db) {
-            (Type::from(class), receiver.to_meta_type(db))
-        } else {
-            (Type::instance(db, class), receiver)
-        };
-
-        let ty = lookup_ty
-            .member_lookup_with_policy_and_receiver(
-                db,
-                name.clone(),
-                MemberLookupPolicy::default(),
-                Some(receiver),
-            )
-            .place
-            .ignore_possibly_undefined()?
+        let ty = Type::FunctionLiteral(function)
+            .try_call_dunder_get(db, Some(receiver), receiver.to_meta_type(db))?
+            .0
             .try_upcast_to_callable(db)?
             .into_type(db);
         return Some(SourceMethodContract {
