@@ -2,8 +2,8 @@ use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, ModModule,
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::{
-    Mode, ParseErrorType, ParseOptions, Parsed, parse, parse_expression, parse_module,
-    parse_unchecked_module_ranges,
+    Mode, ParseErrorType, ParseOptions, Parsed, parse, parse_cells_unchecked, parse_expression,
+    parse_module,
 };
 
 #[test]
@@ -562,7 +562,7 @@ fn parse_ipy_cells(cells: &[&str]) -> Parsed<ModModule> {
         source.push_str(cell);
         ranges.push(TextRange::new(start, TextSize::of(&source)));
     }
-    parse_unchecked_module_ranges(&source, ranges, ParseOptions::from(Mode::Ipython))
+    parse_cells_unchecked(&source, ranges, ParseOptions::from(Mode::Ipython))
 }
 
 #[test]
@@ -610,7 +610,7 @@ fn notebook_cells_resolve_across_boundaries() {
 #[test]
 fn notebook_empty_ranges_falls_back_to_whole_source() {
     // No cell ranges e.g a notebook with only magic/markdown cells, parses the whole source once.
-    let parsed = parse_unchecked_module_ranges("x = 1\n", [], ParseOptions::from(Mode::Ipython));
+    let parsed = parse_cells_unchecked("x = 1\n", [], ParseOptions::from(Mode::Ipython));
     assert!(parsed.has_valid_syntax());
     assert_eq!(parsed.syntax().body.len(), 1);
 }

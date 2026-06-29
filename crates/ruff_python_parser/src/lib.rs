@@ -305,7 +305,7 @@ pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed
 /// This validates sources such as Jupyter notebooks, where each cell must be syntactically valid on
 /// its own while later cells can still reference earlier definitions.
 /// The `ranges` must be ordered and non-overlapping. An empty `ranges` falls back to [`parse_unchecked`].
-pub fn parse_unchecked_module_ranges(
+pub fn parse_cells_unchecked(
     source: &str,
     ranges: impl IntoIterator<Item = TextRange>,
     options: ParseOptions,

@@ -773,7 +773,7 @@ impl ParseSource {
 /// Jupyter notebooks are parsed cell by cell so that a syntax error confined to one cell isn't
 /// masked by the source of a following cell
 /// Definitions still resolve across cells because the per-cell modules are concatenated into a single module
-pub(crate) fn parse_unchecked_source(
+pub fn parse_unchecked_source(
     source_kind: &SourceKind,
     source_type: PySourceType,
     target_version: PythonVersion,
@@ -783,7 +783,7 @@ pub(crate) fn parse_unchecked_source(
     // `ruff_python_parser::parse_unchecked_source`. We use `parse_unchecked` (and thus
     // have to unwrap) in order to pass the `PythonVersion` via `ParseOptions`.
     match source_kind.as_ipy_notebook() {
-        Some(notebook) => ruff_python_parser::parse_unchecked_module_ranges(
+        Some(notebook) => ruff_python_parser::parse_cells_unchecked(
             source_kind.source_code(),
             notebook.cell_offsets().ranges(),
             options,
@@ -856,6 +856,26 @@ mod tests {
         assert!(
             diagnostics.is_empty(),
             "per-cell parsing introduced spurious diagnostics: {diagnostics:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_notebook_cell_boundary_suppression() -> Result<(), NotebookError> {
+        // A cell that closes an indented block emits a trailing `Dedent` at the cell boundary,
+        // which shares its offset with a `# ruff: disable` comment opening the next cell. Range
+        // suppression handling used to get stuck on that dedent and loop forever; it must finish
+        // and apply the suppression so the following `import os` isn't reported as F401.
+        let path = notebook_path("cell_boundary_suppression.ipynb");
+        let source_kind = SourceKind::ipy_notebook(Notebook::from_path(&path)?);
+        let diagnostics = test_contents_syntax_errors(
+            &source_kind,
+            &path,
+            &LinterSettings::for_rule(Rule::UnusedImport),
+        );
+        assert!(
+            diagnostics.is_empty(),
+            "expected the cell-boundary `# ruff: disable` to suppress F401, got: {diagnostics:?}"
         );
         Ok(())
     }
