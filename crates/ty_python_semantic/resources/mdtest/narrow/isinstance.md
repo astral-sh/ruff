@@ -874,12 +874,11 @@ class Item: ...
 
 def _(xs: Item | Sequence[Item]):
     if isinstance(xs, Sequence):
-        # TODO: we might want to simplify this to `Sequence[Item & Unknown]`
-        reveal_type(xs)  # revealed: Sequence[Item] & Sequence[Unknown]
+        reveal_type(xs)  # revealed: Sequence[Item & Unknown]
         for x in xs:
             reveal_type(x)  # revealed: Item & Unknown
     else:
-        reveal_type(xs)  # revealed: Item | (Sequence[Item] & ~Sequence[Unknown])
+        reveal_type(xs)  # revealed: Item | (Sequence[Item] & Any & ~Sequence[Never])
 ```
 
 Narrowing from (non-final) `OpenItem | Sequence[OpenItem]` via `isinstance(.., Sequence)`:
@@ -889,11 +888,11 @@ class OpenItem: ...
 
 def _(xs: OpenItem | Sequence[OpenItem]):
     if isinstance(xs, Sequence):
-        reveal_type(xs)  # revealed: (OpenItem & Sequence[Unknown]) | (Sequence[OpenItem] & Sequence[Unknown])
+        reveal_type(xs)  # revealed: (OpenItem & Sequence[Unknown]) | Sequence[OpenItem & Unknown]
         for x in xs:
             reveal_type(x)  # revealed: Unknown
     else:
-        reveal_type(xs)  # revealed: (OpenItem & ~Sequence[Unknown]) | (Sequence[OpenItem] & ~Sequence[Unknown])
+        reveal_type(xs)  # revealed: (OpenItem & ~Sequence[Unknown]) | (Sequence[OpenItem] & Any & ~Sequence[Never])
 ```
 
 #### Invariance
@@ -928,7 +927,7 @@ def _(xs: Item | list[Item]):
         for x in xs:
             reveal_type(x)  # revealed: Item
     else:
-        reveal_type(xs)  # revealed: Item | (list[Item] & ~list[Unknown])
+        reveal_type(xs)  # revealed: Item | (list[Item] & Any & ~Bottom[list[Unknown]])
 ```
 
 Narrowing from (non-final) `OpenItem | list[OpenItem]` via `isinstance(.., list)`:
@@ -942,7 +941,7 @@ def _(xs: OpenItem | list[OpenItem]):
         for x in xs:
             reveal_type(x)  # revealed: Unknown | OpenItem
     else:
-        reveal_type(xs)  # revealed: (OpenItem & ~list[Unknown]) | (list[OpenItem] & ~list[Unknown])
+        reveal_type(xs)  # revealed: (OpenItem & ~list[Unknown]) | (list[OpenItem] & Any & ~Bottom[list[Unknown]])
 ```
 
 #### Exhaustiveness checking
