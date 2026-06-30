@@ -449,58 +449,6 @@ def _(x: object):
         x.append(1)
 ```
 
-## Generic `TypeIs` narrowing in strict mode
-
-Strict generic narrowing instead uses fully static bounds:
-
-```toml
-[environment]
-python-version = "3.12"
-
-[analysis]
-generic-narrowing = "strict"
-```
-
-```py
-from typing import Any
-from typing_extensions import TypeIs
-
-class Unrelated: ...
-
-class Covariant[T]:
-    def get(self) -> T:
-        raise NotImplementedError
-
-def is_instance_of_covariant(arg: object) -> TypeIs[Covariant[Any]]:
-    return isinstance(arg, Covariant)
-
-def _(x: Unrelated | Covariant[int]):
-    if is_instance_of_covariant(x):
-        raise RuntimeError("oh no")
-
-    reveal_type(x)  # revealed: Unrelated & ~Covariant[object]
-
-def _(x: object):
-    if is_instance_of_covariant(x):
-        reveal_type(x)  # revealed: Covariant[object]
-        value = x.get()
-        reveal_type(value)  # revealed: object
-        value.some_method()  # error: [unresolved-attribute]
-        integer: int = value  # error: [invalid-assignment]
-
-def is_list(arg: object) -> TypeIs[list[Any]]:
-    return isinstance(arg, list)
-
-def _(x: object):
-    if is_list(x):
-        reveal_type(x)  # revealed: Top[list[Any]]
-        value = x[0]
-        reveal_type(value)  # revealed: object
-        value.some_method()  # error: [unresolved-attribute]
-        integer: int = value  # error: [invalid-assignment]
-        x.append(1)  # error: [invalid-argument-type]
-```
-
 ## `TypeGuard` special cases
 
 ```py

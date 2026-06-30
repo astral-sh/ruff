@@ -440,9 +440,6 @@ def match_exhaustive_generic[T](obj: GenericClass[T]) -> GenericClass[T]:
 ```toml
 [environment]
 python-version = "3.12"
-
-[analysis]
-generic-narrowing = "strict"
 ```
 
 ```py

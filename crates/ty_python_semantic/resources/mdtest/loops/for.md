@@ -697,11 +697,6 @@ for x in Test():
 When we have an intersection type via `isinstance` narrowing, we should be able to infer the
 iterable element type precisely:
 
-```toml
-[analysis]
-generic-narrowing = "strict"
-```
-
 ```py
 from typing import Sequence
 
@@ -713,12 +708,12 @@ def _(x: Sequence[int], y: object):
     if isinstance(y, list):
         reveal_type(y)  # revealed: Top[list[Unknown]]
         for item in y:
-            reveal_type(item)  # revealed: object
+            reveal_type(item)  # revealed: object*
 
     if isinstance(x, list):
         reveal_type(x)  # revealed: Sequence[int] & Top[list[Unknown]]
         for item in x:
-            # int & object simplifies to int
+            # int & object* simplifies to int
             reveal_type(item)  # revealed: int
 ```
 
@@ -1576,9 +1571,6 @@ iteration.
 ```toml
 [environment]
 python-version = "3.12"
-
-[analysis]
-generic-narrowing = "strict"
 ```
 
 ### TypeVar bound with non-iterable elements
@@ -1589,10 +1581,10 @@ simplify to `Never`, leaving only the iterable parts.
 ```py
 def f[T: tuple[int, ...] | int](x: T):
     if isinstance(x, tuple):
-        reveal_type(x)  # revealed: T@f & tuple[object, ...]
+        reveal_type(x)  # revealed: T@f & tuple[object*, ...]
         for item in x:
-            # The intersection `(tuple[int, ...] | int) & tuple[object, ...]` distributes to:
-            # `(tuple[int, ...] & tuple[object, ...]) | (int & tuple[object, ...])`
+            # The intersection `(tuple[int, ...] | int) & tuple[object*, ...]` distributes to:
+            # `(tuple[int, ...] & tuple[object*, ...]) | (int & tuple[object*, ...])`
             # which simplifies to `tuple[int, ...] | Never` = `tuple[int, ...]`
             # so iterating gives `int`.
             reveal_type(item)  # revealed: int
@@ -1606,11 +1598,11 @@ constraint, those parts should also simplify to `Never`.
 ```py
 def g[T: tuple[int, ...] | list[str]](x: T):
     if isinstance(x, tuple):
-        reveal_type(x)  # revealed: T@g & tuple[object, ...]
+        reveal_type(x)  # revealed: T@g & tuple[object*, ...]
         for item in x:
-            # The intersection `(tuple[int, ...] | list[str]) & tuple[object, ...]` distributes to:
-            # `(tuple[int, ...] & tuple[object, ...]) | (list[str] & tuple[object, ...])`
-            # Since `list[str]` is disjoint from `tuple[object, ...]`, this simplifies to:
+            # The intersection `(tuple[int, ...] | list[str]) & tuple[object*, ...]` distributes to:
+            # `(tuple[int, ...] & tuple[object*, ...]) | (list[str] & tuple[object*, ...])`
+            # Since `list[str]` is disjoint from `tuple[object*, ...]`, this simplifies to:
             # `tuple[int, ...] | Never` = `tuple[int, ...]`
             # so iterating gives `int`, NOT `int | str`.
             reveal_type(item)  # revealed: int

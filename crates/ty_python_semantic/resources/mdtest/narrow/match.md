@@ -140,20 +140,15 @@ def f(x: Covariant[int]):
 
 ## Mapping patterns
 
-```toml
-[analysis]
-generic-narrowing = "strict"
-```
-
 ```py
 from collections.abc import Mapping
 from typing import Any
 
 def test_isinstance(x: dict[Any, Any] | int) -> None:
     if isinstance(x, Mapping):
-        reveal_type(x)  # revealed: dict[Any, Any] | (int & Top[Mapping[Unknown, object]])
+        reveal_type(x)  # revealed: dict[Any, Any] | (int & Top[Mapping[Unknown, object*]])
     else:
-        reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
+        reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object*]]
 
 def test_match(x: dict[Any, Any] | int) -> None:
     match x:

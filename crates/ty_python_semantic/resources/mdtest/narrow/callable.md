@@ -1,10 +1,5 @@
 # Narrowing for `callable()`
 
-```toml
-[analysis]
-generic-narrowing = "strict"
-```
-
 ## Basic narrowing
 
 The `callable()` builtin returns `TypeIs[Callable[..., object]]`, which narrows the type to the
@@ -59,18 +54,18 @@ def f(x: object):
 
 ## Calling narrowed callables
 
-The narrowed type `Top[Callable[..., object]]` represents the set of all possible callable types
-(including, e.g., functions that take no arguments and functions that require arguments). While such
-objects *are* callable (they pass `callable()`), no specific set of arguments can be guaranteed to
-be valid.
+The gradual top materialization produced by `isinstance(..., Callable)` remains callable with
+arbitrary arguments, and its return type retains gradual behavior:
 
 ```py
 import typing as t
 
 def call_with_args(y: object, a: int, b: str) -> object:
     if isinstance(y, t.Callable):
-        # error: [call-top-callable]
-        return y(a, b)
+        reveal_type(y)  # revealed: Top[(...) -> object*]
+        result = y(a, b)
+        reveal_type(result)  # revealed: object*
+        return result
     return None
 ```
 
@@ -143,9 +138,9 @@ import collections.abc
 
 def f(x: object):
     if isinstance(x, typing.Callable):
-        reveal_type(x)  # revealed: Top[(...) -> object]
+        reveal_type(x)  # revealed: Top[(...) -> object*]
     if isinstance(x, collections.abc.Callable):
-        reveal_type(x)  # revealed: Top[(...) -> object]
+        reveal_type(x)  # revealed: Top[(...) -> object*]
 ```
 
 ## `Callable` special-form identity

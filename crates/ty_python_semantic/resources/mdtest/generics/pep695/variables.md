@@ -3,9 +3,6 @@
 ```toml
 [environment]
 python-version = "3.13"
-
-[analysis]
-generic-narrowing = "strict"
 ```
 
 [PEP 695] and Python 3.12 introduced new, more ergonomic syntax for type variables.
@@ -878,9 +875,9 @@ class SomeClass[T: int | str]:
 
 def lenient_issubclass[T: type | tuple[type, ...]](class_or_tuple: T) -> T:
     if not isinstance(class_or_tuple, tuple):
-        reveal_type(class_or_tuple)  # revealed: T@lenient_issubclass & ~tuple[object, ...]
-        # `T@lenient_issubclass & ~tuple[object, ...]` is assignable to `type`,
-        # because `(type | tuple[type, ...]) & ~tuple[object, ...]` simplifies to `type`
+        reveal_type(class_or_tuple)  # revealed: T@lenient_issubclass & ~tuple[object*, ...]
+        # `T@lenient_issubclass & ~tuple[object*, ...]` is assignable to `type`,
+        # because `(type | tuple[type, ...]) & ~tuple[object*, ...]` simplifies to `type`
         return check(class_or_tuple)
     return class_or_tuple
 
