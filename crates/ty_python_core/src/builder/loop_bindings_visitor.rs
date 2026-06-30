@@ -25,33 +25,39 @@ pub(crate) fn collect_for_loop_bindings(for_stmt: &ast::StmtFor) -> Vec<PlaceExp
     collector.bound_places
 }
 
-/// Collects assignment-expression targets from the implicit loops in a comprehension.
+/// Collects assignment-expression targets from each implicit loop in a comprehension.
 ///
 /// The first iterable is evaluated outside the comprehension scope, so it is intentionally not
-/// visited. Later iterables, filters, and the result expressions all execute inside the repeated
-/// portion of the comprehension. Generator targets are excluded because each one is freshly
-/// assigned before its uses on an iteration; only assignment expressions can carry a value from a
-/// previous iteration.
-pub(crate) fn collect_comprehension_named_expression_bindings<'ast>(
+/// visited. Each entry contains the bindings that are visible to that generator's back edge:
+/// bindings in its filters, later generators, and the result expressions. Generator targets are
+/// excluded because each one is freshly assigned before its uses on an iteration; only assignment
+/// expressions can carry a value from a previous iteration.
+pub(crate) fn collect_comprehension_named_expression_bindings_by_generator<'ast>(
     generators: &'ast [ast::Comprehension],
     result_expressions: impl IntoIterator<Item = &'ast ast::Expr>,
-) -> Vec<PlaceExpr> {
-    let mut collector = LoopBindingsVisitor::default();
+) -> Vec<Vec<PlaceExpr>> {
+    let result_expressions = result_expressions.into_iter().collect::<Vec<_>>();
 
-    for (index, generator) in generators.iter().enumerate() {
-        if index > 0 {
-            collector.visit_expr(&generator.iter);
-        }
-        for if_expr in &generator.ifs {
-            collector.visit_expr(if_expr);
-        }
-    }
-
-    for expression in result_expressions {
-        collector.visit_expr(expression);
-    }
-
-    collector.bound_places
+    generators
+        .iter()
+        .enumerate()
+        .map(|(index, generator)| {
+            let mut collector = LoopBindingsVisitor::default();
+            for if_expr in &generator.ifs {
+                collector.visit_expr(if_expr);
+            }
+            for later_generator in &generators[index + 1..] {
+                collector.visit_expr(&later_generator.iter);
+                for if_expr in &later_generator.ifs {
+                    collector.visit_expr(if_expr);
+                }
+            }
+            for expression in &result_expressions {
+                collector.visit_expr(expression);
+            }
+            collector.bound_places
+        })
+        .collect()
 }
 
 /// The visitor that collects bindings from explicit loops and assignment-expression bindings from

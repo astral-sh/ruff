@@ -2583,15 +2583,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         result_expressions: impl IntoIterator<Item = &'ast ast::Expr>,
         visit_outer_elt: impl FnOnce(&mut Self),
     ) {
-        let mut generators_iter = generators.iter();
-
-        let Some(generator) = generators_iter.next() else {
+        let Some(generator) = generators.first() else {
             unreachable!("Expression must contain at least one generator");
         };
 
         // The `iter` of the first generator is evaluated in the outer scope, while all subsequent
         // nodes are evaluated in the inner scope.
-        let value = self.add_standalone_expression(&generator.iter);
+        let first_value = self.add_standalone_expression(&generator.iter);
         self.visit_expr(&generator.iter);
 
         // Clear the assignment stack before entering the comprehension scope.
@@ -2602,58 +2600,61 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         self.push_scope(scope);
 
-        let bound_places = loop_bindings_visitor::collect_comprehension_named_expression_bindings(
-            generators,
-            result_expressions,
-        );
-        // An assignment expression can read the value written by a previous iteration. Use the
-        // same loop-header definitions as explicit loops so inference iterates those types to a
-        // fixed point.
-        let maybe_loop_header_info = (!bound_places.is_empty()).then(|| {
-            self.synthesize_loop_header_definitions(
-                LoopNodeRef::Comprehension(generator),
-                bound_places,
-            )
-        });
+        let bound_places_by_generator =
+            loop_bindings_visitor::collect_comprehension_named_expression_bindings_by_generator(
+                generators,
+                result_expressions,
+            );
 
-        self.add_unpackable_assignment(
-            &Unpackable::Comprehension {
-                node: generator,
-                first: true,
-            },
-            &generator.target,
-            value,
-        );
+        let mut loop_infos = Vec::with_capacity(generators.len());
+        let mut first_value = Some(first_value);
+        for (index, (generator, bound_places)) in
+            generators.iter().zip(bound_places_by_generator).enumerate()
+        {
+            let value = if let Some(value) = first_value.take() {
+                value
+            } else {
+                let value = self.add_standalone_expression(&generator.iter);
+                self.visit_expr(&generator.iter);
+                value
+            };
 
-        let mut filtered_out_paths = Vec::new();
-        for if_expr in &generator.ifs {
-            filtered_out_paths.push(self.visit_comprehension_filter(if_expr));
-        }
-
-        for generator in generators_iter {
-            let value = self.add_standalone_expression(&generator.iter);
-            self.visit_expr(&generator.iter);
+            // An assignment expression can read the value written by a previous iteration. Use
+            // the same loop-header definitions as explicit loops so inference iterates those types
+            // to a fixed point.
+            let maybe_loop_header_info = (!bound_places.is_empty()).then(|| {
+                self.synthesize_loop_header_definitions(
+                    LoopNodeRef::Comprehension(generator),
+                    bound_places,
+                )
+            });
 
             self.add_unpackable_assignment(
                 &Unpackable::Comprehension {
                     node: generator,
-                    first: false,
+                    first: index == 0,
                 },
                 &generator.target,
                 value,
             );
 
+            let mut filtered_out_paths = Vec::new();
             for if_expr in &generator.ifs {
                 filtered_out_paths.push(self.visit_comprehension_filter(if_expr));
             }
+            loop_infos.push((maybe_loop_header_info, filtered_out_paths));
         }
 
         visit_outer_elt(self);
-        for filtered_out_path in filtered_out_paths {
-            self.flow_merge(filtered_out_path);
-        }
-        if let Some((header_id, bound_place_ids, loop_min_definition_id)) = maybe_loop_header_info {
-            self.populate_loop_header(&bound_place_ids, header_id, loop_min_definition_id);
+        for (maybe_loop_header_info, filtered_out_paths) in loop_infos.into_iter().rev() {
+            for filtered_out_path in filtered_out_paths {
+                self.flow_merge(filtered_out_path);
+            }
+            if let Some((header_id, bound_place_ids, loop_min_definition_id)) =
+                maybe_loop_header_info
+            {
+                self.populate_loop_header(&bound_place_ids, header_id, loop_min_definition_id);
+            }
         }
         let nested_bindings = self.pop_scope();
         self.synthesize_comprehension_binding_definitions(nested_bindings);

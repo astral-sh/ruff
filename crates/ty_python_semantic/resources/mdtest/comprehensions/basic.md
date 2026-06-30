@@ -220,6 +220,23 @@ def loop_carried_guard():
     reveal_type(value)  # revealed: int
 ```
 
+Each generator has its own loop back edge. Assignments from an inner generator's previous iteration
+must not restart the outer generator and reapply its filters:
+
+```py
+def inner_generator_loop_back_edge():
+    value = 0
+    [
+        (
+            value.upper(),  # error: [unresolved-attribute]
+            (value := 1),
+        )
+        for _ in [0]
+        if (value := "x")
+        for _ in [0, 1]
+    ]
+```
+
 ### Function-local targets
 
 Even if the assignment is in a branch known not to run, its target belongs to the containing
