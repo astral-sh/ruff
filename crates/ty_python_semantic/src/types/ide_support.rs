@@ -96,12 +96,12 @@ pub fn definitions_for_name<'db>(
                 use_def_map
                     .reachable_symbol_bindings(symbol_id)
                     .filter_map(|binding| binding.binding.definition())
-                    .filter(|definition| {
-                        matches!(
-                            definition.kind(db),
-                            DefinitionKind::NestedBindings(nested)
-                                if nested.execution == NestedBindingExecution::Eager
-                        )
+                    .filter(|definition| match definition.kind(db) {
+                        DefinitionKind::NamedExpression(_) => true,
+                        DefinitionKind::NestedBindings(nested) => {
+                            nested.execution == NestedBindingExecution::Eager
+                        }
+                        _ => false,
                     }),
             ));
         }
@@ -448,16 +448,18 @@ fn user_visible_definitions<'db>(
         }
 
         match definition.kind(db) {
-            DefinitionKind::NestedBindings(nested)
-                if nested.execution == NestedBindingExecution::Eager =>
-            {
+            DefinitionKind::NestedBindings(nested) => {
                 let index = semantic_index(db, definition.file(db));
-                pending.extend(
-                    nested
-                        .binding_sources(index)
-                        .flat_map(|(_, bindings)| bindings)
-                        .filter_map(|binding| binding.binding.definition()),
-                );
+                let sources = nested
+                    .binding_sources(index)
+                    .flat_map(|(_, bindings)| bindings)
+                    .filter_map(|binding| binding.binding.definition());
+                // A lazy function proxy can lead to an eager comprehension proxy. Follow that
+                // proxy-only chain without exposing ordinary lazy nested assignments.
+                pending.extend(sources.filter(|source| {
+                    nested.execution == NestedBindingExecution::Eager
+                        || matches!(source.kind(db), DefinitionKind::NestedBindings(_))
+                }));
             }
             kind if kind.is_user_visible() => {
                 result.insert(definition);
