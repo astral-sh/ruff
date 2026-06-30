@@ -31,6 +31,49 @@ class Table:
 [[reveal_type((x, y)) for x in range(3)] for y in range(3)]
 ```
 
+## Named expressions bind in the containing scope
+
+PEP 572 specifies that assignment-expression targets in comprehensions bind in the scope containing
+the outermost comprehension, rather than in the comprehension's own scope.
+
+This uses ty's existing eager approximation for comprehension scopes. We intentionally do not model
+zero iterations or whether a generator expression is consumed.
+
+```py
+class Iterator:
+    def __next__(self) -> int:
+        return 42
+
+class Iterable:
+    def __iter__(self) -> Iterator:
+        return Iterator()
+
+[(a := b * 2) for b in Iterable()]
+[c for d in Iterable() if (c := d - 10) > 0]
+{(e := f * 2): (g := f * 3) for f in Iterable()}
+list(((h := i * 2) for i in Iterable()))
+
+reveal_type(a)  # revealed: int
+reveal_type(c)  # revealed: int
+reveal_type(e)  # revealed: int
+reveal_type(g)  # revealed: int
+reveal_type(h)  # revealed: int
+
+def local_scope():
+    [(local_target := value) for value in Iterable()]
+    reveal_type(local_target)  # revealed: int
+
+def find_comment(lines: list[str]):
+    if any((comment := line).startswith("#") for line in lines):
+        reveal_type(comment)  # revealed: str
+
+def find_nonblank(lines: list[str]):
+    if all((nonblank := line).strip() == "" for line in lines):
+        pass
+    else:
+        reveal_type(nonblank)  # revealed: str
+```
+
 ## Comprehension referencing outer comprehension
 
 ```py
