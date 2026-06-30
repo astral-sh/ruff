@@ -1774,37 +1774,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self,
         nested_bindings: NestedGlobalOrNonlocalDeclarations,
     ) {
-        self.synthesize_nested_binding_definitions_impl(
-            nested_bindings,
-            NestedBindingExecution::Lazy,
-        );
-    }
-
-    /// Records assignment-expression bindings from a comprehension in its containing scope.
-    ///
-    /// The value expression still belongs to the comprehension scope, so the real definition
-    /// stays there. The synthetic definition lets the containing scope observe that binding while
-    /// retaining the comprehension's scope for type inference.
-    ///
-    /// This follows ty's existing eager model for comprehension scopes: it does not represent the
-    /// zero-iteration path or distinguish a consumed generator expression from an unconsumed one.
-    /// Modeling those cases requires cross-scope reachability that is intentionally out of scope
-    /// here.
-    fn synthesize_comprehension_binding_definitions(
-        &mut self,
-        nested_bindings: NestedGlobalOrNonlocalDeclarations,
-    ) {
-        self.synthesize_nested_binding_definitions_impl(
-            nested_bindings,
-            NestedBindingExecution::Eager,
-        );
-    }
-
-    fn synthesize_nested_binding_definitions_impl(
-        &mut self,
-        nested_bindings: NestedGlobalOrNonlocalDeclarations,
-        execution: NestedBindingExecution,
-    ) {
         let mut nested_bindings = nested_bindings.into_iter().collect::<Vec<_>>();
         nested_bindings.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
 
@@ -1815,83 +1784,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             // invalid `nonlocal`s, and those don't necessarily need a binding.)
             declarations.retain(|d| d.is_bound);
             declarations.shrink_to_fit();
-            let Some(first_declaration) = declarations.first() else {
+            if declarations.is_empty() {
                 continue;
-            };
-
-            let eager_binding_status = if execution == NestedBindingExecution::Eager {
-                let mut status = LiveBindingStatus::Unbound;
-                for declaration in &declarations {
-                    let scope_id = declaration.file_scope_id;
-                    let Some(symbol) = self.place_tables[scope_id].symbol_id(&name) else {
-                        continue;
-                    };
-                    match self.use_def_maps[scope_id].symbol_live_binding_status(symbol) {
-                        LiveBindingStatus::Bound => {
-                            status = LiveBindingStatus::Bound;
-                            break;
-                        }
-                        LiveBindingStatus::PossiblyBound => {
-                            status = LiveBindingStatus::PossiblyBound;
-                        }
-                        LiveBindingStatus::Unbound => {}
-                    }
-                }
-                Some(status)
-            } else {
-                None
-            };
-
-            let symbol = self.add_symbol(name.clone());
-
-            // Nested comprehensions share the scope containing the outermost comprehension. Keep
-            // forwarding the binding until that scope is reached.
-            if execution == NestedBindingExecution::Eager
-                && self.scopes[self.current_scope()].kind() == ScopeKind::Comprehension
-            {
-                // The synthetic binding captures the inner declarations through this scope's
-                // flow state. Forward only that proxy so inner writes cannot bypass reachability
-                // or shadowing in an enclosing comprehension.
-                self.current_scope_info_mut()
-                    .nested_global_or_nonlocal_declarations
-                    .remove(&name);
-                let is_global = first_declaration.is_global();
-                let range = first_declaration.range;
-                debug_assert!(
-                    declarations
-                        .iter()
-                        .all(|declaration| declaration.is_global() == is_global)
-                );
-                if is_global {
-                    self.current_place_table_mut()
-                        .symbol_mut(symbol)
-                        .mark_global();
-                } else {
-                    self.current_place_table_mut()
-                        .symbol_mut(symbol)
-                        .mark_nonlocal();
-                }
-                self.current_scope_info_mut()
-                    .this_scope_global_or_nonlocal_declarations
-                    .entry(name.clone())
-                    .or_insert(range);
             }
 
-            let place: ScopedPlaceId = symbol.into();
-            if execution == NestedBindingExecution::Eager {
-                self.mark_place_bound(place);
-                if eager_binding_status == Some(LiveBindingStatus::Unbound) {
-                    continue;
-                }
-            }
-
+            let place: ScopedPlaceId = self.add_symbol(name.clone()).into();
             let definition = Definition::new(
                 self.db,
                 self.current_scope_id(),
                 place,
                 DefinitionKind::NestedBindings(Box::new(NestedBindingsDefinitionKind {
                     name,
-                    execution,
+                    execution: NestedBindingExecution::Lazy,
                     nested_declarations: declarations,
                 })),
                 false,
@@ -1919,37 +1823,148 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             // TODO: We could be more precise here by delaying invalidation until inference time.
             self.invalidate_narrowing_aliases_for(place);
 
+            self.current_use_def_map_mut().record_binding(
+                place,
+                definition,
+                // Nested bindings definitions are like loop headers in that they don't shadow
+                // prior bindings, but they're different in that they *also* don't get shadowed by
+                // bindings that come later. The idea is that nested functions can be called at any
+                // time, so these bindings are effectively always visible after their function
+                // definitions.
+                PreviousDefinitions::AreKept,
+                FutureDefinitions::DontShadowThisOne,
+            );
+        }
+    }
+
+    /// Records assignment-expression bindings from a comprehension in its containing scope.
+    ///
+    /// The value expression still belongs to the comprehension scope, so the real definition
+    /// stays there. The synthetic definition lets the containing scope observe that binding while
+    /// retaining the comprehension's scope for type inference.
+    ///
+    /// This follows ty's existing eager model for comprehension scopes: it does not represent the
+    /// zero-iteration path or distinguish a consumed generator expression from an unconsumed one.
+    /// Modeling those cases requires cross-scope reachability that is intentionally out of scope
+    /// here.
+    fn synthesize_comprehension_binding_definitions(
+        &mut self,
+        nested_bindings: NestedGlobalOrNonlocalDeclarations,
+    ) {
+        let mut nested_bindings = nested_bindings.into_iter().collect::<Vec<_>>();
+        nested_bindings.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
+
+        for (name, mut declarations) in nested_bindings {
+            // Filter down to only the declarations with `is_bound: true`. If there are none left,
+            // skip synthesizing a definition for this symbol. (The reason we track these at all is
+            // that we reuse some of the same machinery to report semantic syntax errors for
+            // invalid `nonlocal`s, and those don't necessarily need a binding.)
+            declarations.retain(|d| d.is_bound);
+            declarations.shrink_to_fit();
+            let Some(first_declaration) = declarations.first().copied() else {
+                continue;
+            };
+
+            let binding_status = self.comprehension_binding_status(&name, &declarations);
+
+            let symbol = self.add_symbol(name.clone());
+            debug_assert!(
+                declarations.iter().all(
+                    |declaration| declaration.is_global() == first_declaration.is_global()
+                )
+            );
+            self.forward_comprehension_binding(&name, first_declaration, symbol);
+
+            let place: ScopedPlaceId = symbol.into();
+            self.mark_place_bound(place);
+            if binding_status == LiveBindingStatus::Unbound {
+                continue;
+            }
+
+            let definition = Definition::new(
+                self.db,
+                self.current_scope_id(),
+                place,
+                DefinitionKind::NestedBindings(Box::new(NestedBindingsDefinitionKind {
+                    name,
+                    execution: NestedBindingExecution::Eager,
+                    nested_declarations: declarations,
+                })),
+                false,
+            );
+            self.invalidate_narrowing_aliases_for(place);
+
             let definition_id = self.current_use_def_map().next_definition_id();
-            let (previous, future) = match execution {
-                NestedBindingExecution::Lazy => (
-                    // Bindings from nested functions can become visible at any time, so they
-                    // neither shadow earlier bindings nor get shadowed by later ones.
-                    PreviousDefinitions::AreKept,
-                    FutureDefinitions::DontShadowThisOne,
-                ),
-                NestedBindingExecution::Eager => {
-                    let previous = if eager_binding_status == Some(LiveBindingStatus::Bound) {
-                        PreviousDefinitions::AreShadowed
-                    } else {
-                        PreviousDefinitions::AreKept
-                    };
-                    (previous, FutureDefinitions::ShadowThisOne)
-                }
+            let previous = if binding_status == LiveBindingStatus::Bound {
+                PreviousDefinitions::AreShadowed
+            } else {
+                PreviousDefinitions::AreKept
             };
             self.current_use_def_map_mut()
-                .record_binding(place, definition, previous, future);
+                .record_binding(place, definition, previous, FutureDefinitions::ShadowThisOne);
 
-            if execution == NestedBindingExecution::Eager {
-                self.delete_associated_bindings(place);
-                self.record_pending_capture_binding(symbol, definition_id);
-                self.update_lazy_snapshots(symbol);
+            self.delete_associated_bindings(place);
+            self.record_pending_capture_binding(symbol, definition_id);
+            self.update_lazy_snapshots(symbol);
 
-                let mut try_node_stack_manager =
-                    std::mem::take(&mut self.try_node_context_stack_manager);
-                try_node_stack_manager.record_definition(self);
-                self.try_node_context_stack_manager = try_node_stack_manager;
+            let mut try_node_stack_manager =
+                std::mem::take(&mut self.try_node_context_stack_manager);
+            try_node_stack_manager.record_definition(self);
+            self.try_node_context_stack_manager = try_node_stack_manager;
+        }
+    }
+
+    fn comprehension_binding_status(
+        &mut self,
+        name: &str,
+        declarations: &[NestedDeclaration],
+    ) -> LiveBindingStatus {
+        let mut status = LiveBindingStatus::Unbound;
+        for declaration in declarations {
+            let scope_id = declaration.file_scope_id;
+            let Some(symbol) = self.place_tables[scope_id].symbol_id(name) else {
+                continue;
+            };
+            match self.use_def_maps[scope_id].symbol_live_binding_status(symbol) {
+                LiveBindingStatus::Bound => return LiveBindingStatus::Bound,
+                LiveBindingStatus::PossiblyBound => status = LiveBindingStatus::PossiblyBound,
+                LiveBindingStatus::Unbound => {}
             }
         }
+        status
+    }
+
+    fn forward_comprehension_binding(
+        &mut self,
+        name: &Name,
+        first_declaration: NestedDeclaration,
+        symbol: ScopedSymbolId,
+    ) {
+        if self.scopes[self.current_scope()].kind() != ScopeKind::Comprehension {
+            return;
+        }
+
+        // The synthetic binding captures the inner declarations through this scope's flow state.
+        // Forward only that proxy so inner writes cannot bypass reachability or shadowing in an
+        // enclosing comprehension.
+        self.current_scope_info_mut()
+            .nested_global_or_nonlocal_declarations
+            .remove(name);
+
+        let is_global = first_declaration.is_global();
+        if is_global {
+            self.current_place_table_mut()
+                .symbol_mut(symbol)
+                .mark_global();
+        } else {
+            self.current_place_table_mut()
+                .symbol_mut(symbol)
+                .mark_nonlocal();
+        }
+        self.current_scope_info_mut()
+            .this_scope_global_or_nonlocal_declarations
+            .entry(name.clone())
+            .or_insert(first_declaration.range);
     }
 
     fn mark_comprehension_named_target(&mut self, place: ScopedPlaceId, range: TextRange) {
