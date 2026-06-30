@@ -10,7 +10,7 @@ use crate::{
     preview::is_fix_os_stat_enabled,
     rules::flake8_use_pathlib::helpers::{
         has_unknown_keywords_or_starred_expr, is_keyword_only_argument_non_default,
-        is_keyword_true, is_pathlib_path_call,
+        is_keyword_true_or_default, is_pathlib_path_call,
     },
 };
 
@@ -107,7 +107,7 @@ pub(crate) fn os_stat(checker: &Checker, call: &ExprCall, segment: &[&str]) {
     let method = if checker.target_version() >= PythonVersion::PY310 {
         "stat"
     } else {
-        match is_keyword_true(&call.arguments, "follow_symlinks") {
+        match is_keyword_true_or_default(&call.arguments, "follow_symlinks") {
             Some(true) => "stat",
             Some(false) => "lstat",
             None => return,
