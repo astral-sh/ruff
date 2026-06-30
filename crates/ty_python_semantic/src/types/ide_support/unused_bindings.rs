@@ -42,7 +42,7 @@ fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
         | DefinitionKind::ParamSpec(_)
         | DefinitionKind::TypeVarTuple(_)
         | DefinitionKind::LoopHeader(_) => false,
-        DefinitionKind::NestedBindings(nested) => nested.execution == NestedBindingExecution::Eager,
+        DefinitionKind::NestedBindings(_) => false,
     }
 }
 
@@ -79,6 +79,25 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
     let is_stub_file = file.is_stub(db);
     let index = semantic_index(db, file);
     let mut unused = Vec::new();
+    let mut used_proxy_targets = FxHashSet::default();
+
+    for scope_id in index.scope_ids() {
+        let use_def_map = index.use_def_map(scope_id.file_scope_id(db));
+        for (_, state, is_used) in use_def_map.all_definitions_with_usage() {
+            let DefinitionState::Defined(definition) = state else {
+                continue;
+            };
+            if is_used
+                && matches!(
+                    definition.kind(db),
+                    DefinitionKind::NestedBindings(nested)
+                        if nested.execution == NestedBindingExecution::Eager
+                )
+            {
+                used_proxy_targets.extend(super::reachable_definitions(db, [definition]));
+            }
+        }
+    }
 
     for scope_id in index.scope_ids() {
         let file_scope_id = scope_id.file_scope_id(db);
@@ -109,6 +128,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
             let DefinitionState::Defined(definition) = state else {
                 continue;
             };
+            let is_used = is_used || used_proxy_targets.contains(&definition);
 
             if is_used {
                 let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
@@ -160,7 +180,9 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
 
             // Global and nonlocal assignments target bindings from outer scopes.
             // Treat them as externally managed to avoid false positives here.
-            if symbol.is_global() || symbol.is_nonlocal() {
+            let is_comprehension_named_expression = scope_kind == ScopeKind::Comprehension
+                && matches!(kind, DefinitionKind::NamedExpression(_));
+            if (symbol.is_global() || symbol.is_nonlocal()) && !is_comprehension_named_expression {
                 continue;
             }
 
@@ -284,17 +306,25 @@ mod tests {
                 [(used := item) for item in items]
                 print(used)
                 [(used_in_comprehension := item, used_in_comprehension) for item in items]
+                [(shadowed := 1, shadowed := 2, print(shadowed)) for _ in items]
             ",
         );
 
         let bindings = collect_unused_bindings(&source)?;
         let dead_start = TextSize::try_from(source.find("dead := item").unwrap()).unwrap();
+        let shadowed_start = TextSize::try_from(source.find("shadowed := 1").unwrap()).unwrap();
         assert_eq!(
             bindings,
-            vec![UnusedBinding {
-                range: TextRange::new(dead_start, dead_start + TextSize::new(4)),
-                name: Name::new("dead"),
-            }]
+            vec![
+                UnusedBinding {
+                    range: TextRange::new(dead_start, dead_start + TextSize::new(4)),
+                    name: Name::new("dead"),
+                },
+                UnusedBinding {
+                    range: TextRange::new(shadowed_start, shadowed_start + TextSize::new(8)),
+                    name: Name::new("shadowed"),
+                },
+            ]
         );
         Ok(())
     }

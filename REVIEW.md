@@ -10,3 +10,4 @@
 - Fixed — Keep statically unreachable function walruses locally owned while leaving their value unbound.
 - Rejected — Cross-target loop dependency cycles are outside Issue 162's realistic partial-sum case; modeling them requires a new dependency graph, and Pyright also leaves this case literal-precise.
 - Rejected — Nested same-name binders only cause safe over-widening in a contrived case; precise handling requires nested-scope name resolution, while mypy likewise widens to `str`.
+- Fixed — Preserve unused-binding usage and target ranges per comprehension walrus definition.
