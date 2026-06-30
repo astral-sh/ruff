@@ -105,13 +105,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     /// Report a runtime error for an invalid PEP 604 union operation.
-    fn report_pep_604_runtime_error(&mut self, binary: &ast::ExprBinOp) {
-        let mut speculative_builder = self.speculate_without_diagnostics();
-        let left_type_value =
-            speculative_builder.infer_expression(&binary.left, TypeContext::default());
-        let right_type_value =
-            speculative_builder.infer_expression(&binary.right, TypeContext::default());
-
+    fn report_pep_604_runtime_error(
+        &self,
+        binary: &ast::ExprBinOp,
+        left_type_value: Type<'db>,
+        right_type_value: Type<'db>,
+    ) {
         let dunder_fails = Type::try_call_bin_op(
             self.db(),
             left_type_value,
@@ -211,13 +210,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
-    fn report_intersection_runtime_error(&mut self, binary: &ast::ExprBinOp) {
-        // Infer the operands as values so that the diagnostic reports their runtime types rather
-        // than their interpretation as type expressions.
-        let mut speculative_builder = self.speculate_without_diagnostics();
-        let left_value = speculative_builder.infer_expression(&binary.left, TypeContext::default());
-        let right_value =
-            speculative_builder.infer_expression(&binary.right, TypeContext::default());
+    fn report_intersection_runtime_error(
+        &self,
+        binary: &ast::ExprBinOp,
+        left_value: Type<'db>,
+        right_value: Type<'db>,
+    ) {
         if Type::try_call_bin_op(self.db(), left_value, ast::Operator::BitAnd, right_value).is_err()
         {
             report_unsupported_binary_operation(
@@ -228,6 +226,46 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ast::Operator::BitAnd,
             );
         }
+    }
+
+    fn infer_runtime_binary_expression(
+        &self,
+        builder: &mut Self,
+        left_value: &mut Option<Type<'db>>,
+        leftmost: &ast::Expr,
+        expression: &ast::Expr,
+        binary: &ast::ExprBinOp,
+    ) {
+        let left_value = left_value
+            .get_or_insert_with(|| builder.infer_expression(leftmost, TypeContext::default()));
+        let right_value = builder.infer_expression(&binary.right, TypeContext::default());
+
+        match binary.op {
+            ast::Operator::BitOr => {
+                self.report_pep_604_runtime_error(binary, *left_value, right_value);
+            }
+            ast::Operator::BitAnd => {
+                self.report_intersection_runtime_error(binary, *left_value, right_value);
+            }
+            _ => {}
+        }
+
+        // Preserve the TypedDict-aware inference used for PEP 584 dictionary unions.
+        *left_value = if binary.op == ast::Operator::BitOr
+            && (binary.left.is_dict_expr() || binary.right.is_dict_expr())
+        {
+            builder.infer_expression(expression, TypeContext::default())
+        } else {
+            builder
+                .infer_binary_expression_type(
+                    binary.into(),
+                    false,
+                    *left_value,
+                    right_value,
+                    binary.op,
+                )
+                .unwrap_or(Type::unknown())
+        };
     }
 
     pub(super) fn infer_name_or_attribute_type_expression(
@@ -355,6 +393,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             left = &left_binary.left;
                         }
 
+                        let mut runtime = (!ignore_runtime_errors(self, expression))
+                            .then(|| (self.speculate_without_diagnostics(), None));
+
                         let left_ty = self.infer_type_expression(left);
                         let mut union = UnionBuilder::new(self.db())
                             .unpack_aliases(false)
@@ -366,8 +407,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 .inference_flags
                                 .replace(InferenceFlags::IN_NESTED_TYPE_EXPRESSION, true);
                             let right_ty = self.infer_type_expression(&nested_binary.right);
-                            if !ignore_runtime_errors(self, union_expression) {
-                                self.report_pep_604_runtime_error(nested_binary);
+                            if let Some((runtime_builder, left_value)) = &mut runtime {
+                                self.infer_runtime_binary_expression(
+                                    runtime_builder,
+                                    left_value,
+                                    left,
+                                    union_expression,
+                                    nested_binary,
+                                );
                             }
                             union.add_in_place(right_ty);
                             let prefix_ty = union.clone().build();
@@ -378,8 +425,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         }
 
                         let right_ty = self.infer_type_expression(&binary.right);
-                        if !ignore_runtime_errors(self, expression) {
-                            self.report_pep_604_runtime_error(binary);
+                        if let Some((runtime_builder, left_value)) = &mut runtime {
+                            self.infer_runtime_binary_expression(
+                                runtime_builder,
+                                left_value,
+                                left,
+                                expression,
+                                binary,
+                            );
                         }
                         union.add_in_place(right_ty);
                         union.build()
@@ -398,6 +451,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             left = &left_binary.left;
                         }
 
+                        let mut runtime = (!ignore_runtime_errors(self, expression))
+                            .then(|| (self.speculate_without_diagnostics(), None));
+
                         let left_ty = self.infer_type_expression(left);
                         let mut intersection =
                             IntersectionBuilder::new(self.db()).add_positive(left_ty);
@@ -410,8 +466,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 .inference_flags
                                 .replace(InferenceFlags::IN_NESTED_TYPE_EXPRESSION, true);
                             let right_ty = self.infer_type_expression(&nested_binary.right);
-                            if !ignore_runtime_errors(self, intersection_expression) {
-                                self.report_intersection_runtime_error(nested_binary);
+                            if let Some((runtime_builder, left_value)) = &mut runtime {
+                                self.infer_runtime_binary_expression(
+                                    runtime_builder,
+                                    left_value,
+                                    left,
+                                    intersection_expression,
+                                    nested_binary,
+                                );
                             }
                             intersection = intersection.add_positive(right_ty);
                             let prefix_ty = intersection.clone().build();
@@ -422,8 +484,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         }
 
                         let right_ty = self.infer_type_expression(&binary.right);
-                        if !ignore_runtime_errors(self, expression) {
-                            self.report_intersection_runtime_error(binary);
+                        if let Some((runtime_builder, left_value)) = &mut runtime {
+                            self.infer_runtime_binary_expression(
+                                runtime_builder,
+                                left_value,
+                                left,
+                                expression,
+                                binary,
+                            );
                         }
                         intersection.add_positive(right_ty).build()
                     }
