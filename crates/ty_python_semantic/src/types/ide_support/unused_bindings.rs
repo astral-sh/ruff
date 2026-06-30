@@ -7,9 +7,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
-use ty_python_core::definition::{
-    DefinitionCategory, DefinitionKind, DefinitionState, NestedBindingExecution,
-};
+use ty_python_core::definition::{DefinitionCategory, DefinitionKind, DefinitionState};
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
 use ty_python_core::{SemanticIndex, semantic_index};
@@ -79,25 +77,17 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
     let is_stub_file = file.is_stub(db);
     let index = semantic_index(db, file);
     let mut unused = Vec::new();
-    let mut used_proxy_targets = FxHashSet::default();
-
-    for scope_id in index.scope_ids() {
-        let use_def_map = index.use_def_map(scope_id.file_scope_id(db));
-        for (_, state, is_used) in use_def_map.all_definitions_with_usage() {
-            let DefinitionState::Defined(definition) = state else {
-                continue;
-            };
-            if is_used
-                && matches!(
-                    definition.kind(db),
-                    DefinitionKind::NestedBindings(nested)
-                        if nested.execution == NestedBindingExecution::Eager
-                )
-            {
-                used_proxy_targets.extend(super::user_visible_definitions(db, [definition]));
-            }
-        }
-    }
+    // A used synthetic definition counts as a use of the user-visible definitions it represents.
+    let used_user_visible_definitions = index
+        .scope_ids()
+        .flat_map(|scope_id| {
+            index
+                .use_def_map(scope_id.file_scope_id(db))
+                .all_definitions_with_usage()
+        })
+        .filter_map(|(_, state, is_used)| is_used.then_some(state.definition()).flatten())
+        .flat_map(|definition| super::user_visible_definitions(db, [definition]))
+        .collect::<FxHashSet<_>>();
 
     for scope_id in index.scope_ids() {
         let file_scope_id = scope_id.file_scope_id(db);
@@ -128,7 +118,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
             let DefinitionState::Defined(definition) = state else {
                 continue;
             };
-            let is_used = is_used || used_proxy_targets.contains(&definition);
+            let is_used = is_used || used_user_visible_definitions.contains(&definition);
 
             if is_used {
                 let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
