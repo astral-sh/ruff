@@ -2695,7 +2695,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         } else {
             fallback
         };
-        let _ = self.record_expression_narrowing_constraint(if_expr);
+
+        let (predicate, narrowing_id) = self.record_expression_narrowing_constraint(if_expr);
+        let reachability_constraint = self.record_reachability_constraint(predicate);
+        let included_path = self.flow_snapshot();
+
+        self.flow_restore(filtered_out);
+        self.record_negated_narrowing_constraint(predicate, narrowing_id);
+        self.record_negated_reachability_constraint(reachability_constraint);
+        let filtered_out = self.flow_snapshot();
+
+        self.flow_restore(included_path);
         filtered_out
     }
 
