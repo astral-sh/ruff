@@ -20,8 +20,9 @@ uv run --script "$project_root/scripts/bump-workspace-crate-versions.py"
 echo "Updating crate READMEs..."
 uv run --script "$project_root/scripts/generate-crate-readmes.py"
 
-echo "Updating lockfile..."
+echo "Updating lockfiles..."
 cargo update -p ruff
+uv lock --no-config
 
 echo "Checking crates.io publish setup..."
 uv run --no-config --script "$project_root/scripts/setup-crates-io-publish.py" --quiet
