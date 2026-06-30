@@ -14,3 +14,4 @@
 - Fixed — Preserve walrus writes and conditional boundness from rejected comprehension-filter paths.
 - Fixed — Forward only the flow-aware proxy across nested comprehensions so inner writes cannot bypass outer reachability or ordering.
 - Rejected — Outer conditional expressions can still lose walrus boundness, but the same flow bug affects ordinary walruses on `main`; fixing it is outside Issue 162.
+- Fixed — Separate eager comprehension proxy synthesis from the existing lazy nested-function binding path.
