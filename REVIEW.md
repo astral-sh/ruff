@@ -13,7 +13,7 @@
 - Fixed — Preserve unused-binding usage and target ranges per comprehension walrus definition.
 - Fixed — Preserve walrus writes and conditional boundness from rejected comprehension-filter paths.
 - Fixed — Forward only the flow-aware proxy across nested comprehensions so inner writes cannot bypass outer reachability or ordering.
-- Rejected — Outer conditional expressions can still lose walrus boundness, but the same flow bug affects ordinary walruses on `main`; fixing it is outside Issue 162.
+- Rejected — No outer conditional-expression bug: with `possibly-unresolved-reference` enabled, both ordinary and comprehension walruses preserve conditional boundness.
 - Fixed — Separate eager comprehension proxy synthesis from the existing lazy nested-function binding path.
 - Fixed — Name and document IDE proxy expansion in terms of the user-visible walrus definitions it returns.
 - Fixed — Route unused-binding usage through the shared user-visible-definition provenance mapping instead of special-casing eager proxies.
