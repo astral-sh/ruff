@@ -36,3 +36,4 @@
 - Fixed — Resolve current-scope eager proxies before forwarding global and nonlocal IDE lookups.
 - Rejected — Keep inference-unreachable eager sources conservatively because distinguishing invariant and loop-carried guards requires the iteration dependency modeling intentionally excluded from Issue 162.
 - Fixed — Preserve global comprehension-walrus targets by retaining current-scope named expressions and following lazy proxy chains only when they lead to another nested-binding proxy.
+- Rejected — Repeated type-changing walrus dependencies require comprehension fixed-point modeling; the current single-pass result remains an explicitly unsupported case documented by a TODO mdtest and the PR summary.

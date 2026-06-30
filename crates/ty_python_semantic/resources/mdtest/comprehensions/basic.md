@@ -156,6 +156,14 @@ def partial_sum():
     total = 0
     [total := total + value for value in [1, 2]]
     reveal_type(total)  # revealed: int
+
+# TODO: Model repeated comprehension iterations with a fixed point. The second iteration assigns
+# `int`, so the final type should be `str | int` and `value.upper()` should report an error.
+def type_changes_across_iterations():
+    value = 0
+    [value := "" if isinstance(value, int) else 0 for _ in [0, 1]]
+    reveal_type(value)  # revealed: str
+    value.upper()
 ```
 
 The same applies when two targets depend on values from earlier iterations:
