@@ -88,11 +88,19 @@ resolves a read can promote `reads_field` to `Authoritative`).
 pub struct ModelGraph { pub namespace: String, pub models: Vec<Model> }
 pub struct Model    { pub name: String, pub fields: Vec<Field>, pub functions: Vec<Function> }
 pub struct Field    { pub name: String, pub depends_on: Vec<String>, pub emitted_by: Option<String> }
-pub struct Function { pub name: String, pub reads: Vec<String>, pub raises: Vec<String>, pub traverses: Vec<String> }
+pub struct Function { pub name: String, pub reads: Vec<String>, pub raises: Vec<String>, pub traverses: Vec<String>,
+                      pub writes: Vec<String>, pub calls: Vec<String> }
 ```
 
 That's the entire contract. Plain owned data, no behaviour. Fill it from
 your AST, hand it to `expand()`.
+
+`Function::writes` (self-field assignments → `writes_field`) and
+`Function::calls` (lifecycle-mutator dispatches → `calls`) are the
+**command-shape** facts — the write-side counterpart of `reads`/`traverses`.
+Both are `skip_serializing_if`-empty, so a frontend that doesn't fill them
+leaves the ndjson byte-identical. They let the body-pass triage split a
+method into query (read-only) vs command (mutates state).
 
 ### Naming rule
 

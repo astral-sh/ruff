@@ -130,14 +130,14 @@ pub fn extract(source_tree: &Path) -> ModelGraph {
 /// Walk a Rails `app/models/` tree and produce the IR, tagging the
 /// resulting [`ModelGraph`] with the caller-supplied `namespace`. The
 /// namespace becomes the IRI prefix on every produced triple's subject /
-/// object, so the same parser handles any Rails curator (OpenProject,
+/// object, so the same parser handles any Rails curator (`OpenProject`,
 /// Redmine, Spree, Solidus, Open-Source-Billing, …) by simply passing the
 /// curator's namespace string.
 ///
 /// The unpacking is mechanical: each [`Declaration`] variant lands in
 /// its corresponding `Model::*` Vec field. Same-named [`RubyClass`]
 /// entries (Ruby's `class X` reopen idiom across multiple files —
-/// e.g. OpenProject's `WorkPackage` reopened from
+/// e.g. `OpenProject`'s `WorkPackage` reopened from
 /// `app/models/work_package/inexistent_work_package.rb` etc.) are
 /// merged into a single [`Model`] in source-file order: Vec fields
 /// concatenate; `sti` is first-non-`None`-wins.
@@ -153,7 +153,7 @@ pub fn extract_with(source_tree: &Path, namespace: &str) -> ModelGraph {
 /// core `app/models` **plus every mounted engine's `app/models`**
 /// (`modules/*/app/models`, `engines/*/app/models`).
 ///
-/// OpenProject keeps a large share of its domain in `modules/*` engines
+/// `OpenProject` keeps a large share of its domain in `modules/*` engines
 /// (e.g. `TimeEntry` lives in `modules/costs/app/models`), invisible to
 /// the core-only [`extract`]. All roots feed one `build_models` pass, so a
 /// class reopened across engines still merges into a single [`Model`].
@@ -310,6 +310,7 @@ mod tests {
                 reads: vec!["status".to_string()],
                 raises: vec!["ActiveRecord::RecordInvalid".to_string()],
                 traverses: vec!["time_entries".to_string()],
+                ..Default::default()
             }],
             ..Default::default()
         });
@@ -850,7 +851,7 @@ end
         let _ = fs::remove_dir_all(&base);
     }
 
-    /// Real-corpus engine gate: on OpenProject, [`extract_app`] (core +
+    /// Real-corpus engine gate: on `OpenProject`, [`extract_app`] (core +
     /// engines) harvests strictly more than core-only [`extract`], and
     /// surfaces an engine-only model (`TimeEntry` lives in
     /// `modules/costs/app/models`). Env-gated like the coverage gate.
@@ -1074,7 +1075,7 @@ end
     }
 
     /// **D-AR-5.2** — `attribute :age, :integer` puts `:integer` as a
-    /// Sym at args[1]. The walker now lifts it into the AttrDecl
+    /// Sym at args[1]. The walker now lifts it into the `AttrDecl`
     /// `options` as `("type", "integer")` so the expander can emit a
     /// `field_type` triple.
     #[test]
@@ -1124,7 +1125,7 @@ end
 
     /// Two `class WorkPackage` declarations across files must produce ONE
     /// `Model` whose Vec fields concatenate, not two duplicate entries.
-    /// Repro for the OpenProject case: an empty reopener (from
+    /// Repro for the `OpenProject` case: an empty reopener (from
     /// `app/models/work_package/inexistent_work_package.rb` etc.) was
     /// being emitted as a separate `Model { name: "WorkPackage", … }`
     /// alongside the rich one — and a naïve `.find(|c| c.name == "WorkPackage")`
