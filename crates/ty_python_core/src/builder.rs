@@ -61,8 +61,8 @@ use crate::statement::StatementInner;
 use crate::symbol::{ScopedSymbolId, Symbol};
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::use_def::{
-    EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, LiveBinding, PreviousDefinitions,
-    ScopedDefinitionId, ScopedEnclosingSnapshotId, UseDefMapBuilder,
+    EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, LiveBinding, LiveBindingStatus,
+    PreviousDefinitions, ScopedDefinitionId, ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
 use crate::{Db, Statement, StatementNodeKey};
 use crate::{
@@ -1819,22 +1819,31 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 continue;
             };
 
-            if execution == NestedBindingExecution::Eager {
-                let mut has_reachable_binding = false;
+            let eager_binding_status = if execution == NestedBindingExecution::Eager {
+                let mut status = LiveBindingStatus::Unbound;
                 for declaration in &declarations {
                     let scope_id = declaration.file_scope_id;
                     let Some(symbol) = self.place_tables[scope_id].symbol_id(&name) else {
                         continue;
                     };
-                    if self.use_def_maps[scope_id].symbol_has_reachable_binding(symbol) {
-                        has_reachable_binding = true;
-                        break;
+                    match self.use_def_maps[scope_id].symbol_live_binding_status(symbol) {
+                        LiveBindingStatus::Bound => {
+                            status = LiveBindingStatus::Bound;
+                            break;
+                        }
+                        LiveBindingStatus::PossiblyBound => {
+                            status = LiveBindingStatus::PossiblyBound;
+                        }
+                        LiveBindingStatus::Unbound => {}
                     }
                 }
-                if !has_reachable_binding {
+                if status == LiveBindingStatus::Unbound {
                     continue;
                 }
-            }
+                Some(status)
+            } else {
+                None
+            };
 
             let symbol = self.add_symbol(name.clone());
 
@@ -1912,10 +1921,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     PreviousDefinitions::AreKept,
                     FutureDefinitions::DontShadowThisOne,
                 ),
-                NestedBindingExecution::Eager => (
-                    PreviousDefinitions::AreShadowed,
-                    FutureDefinitions::ShadowThisOne,
-                ),
+                NestedBindingExecution::Eager => {
+                    let previous = if eager_binding_status == Some(LiveBindingStatus::Bound) {
+                        PreviousDefinitions::AreShadowed
+                    } else {
+                        PreviousDefinitions::AreKept
+                    };
+                    (previous, FutureDefinitions::ShadowThisOne)
+                }
             };
             self.current_use_def_map_mut()
                 .record_binding(place, definition, previous, future);

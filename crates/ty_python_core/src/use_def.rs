@@ -278,6 +278,13 @@ pub use place_state::LiveBinding;
 pub use place_state::ScopedDefinitionId;
 pub(super) use place_state::{FutureDefinitions, PreviousDefinitions};
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(super) enum LiveBindingStatus {
+    Unbound,
+    PossiblyBound,
+    Bound,
+}
+
 /// Identifies a [`LoopHeader`] within a single scope's [`UseDefMap`].
 #[newtype_index]
 #[derive(get_size2::GetSize)]
@@ -2284,7 +2291,10 @@ impl<'db> UseDefMapBuilder<'db> {
             .map(LiveBinding::binding)
     }
 
-    pub(super) fn symbol_has_reachable_binding(&mut self, symbol: ScopedSymbolId) -> bool {
+    pub(super) fn symbol_live_binding_status(
+        &mut self,
+        symbol: ScopedSymbolId,
+    ) -> LiveBindingStatus {
         let pending = self.pending_reachability.current;
         let bindings = self
             .pending_reachability
@@ -2296,13 +2306,23 @@ impl<'db> UseDefMapBuilder<'db> {
             .bindings()
             .clone();
 
-        bindings.iter().any(|binding| {
-            binding.reachability_constraint() != ScopedReachabilityConstraintId::ALWAYS_FALSE
-                && matches!(
-                    self.definition(binding.binding()),
-                    DefinitionState::Defined(_)
-                )
-        })
+        let mut has_binding = false;
+        let mut has_unbound = false;
+        for binding in bindings.iter() {
+            if binding.reachability_constraint() == ScopedReachabilityConstraintId::ALWAYS_FALSE {
+                continue;
+            }
+            match self.definition(binding.binding()) {
+                DefinitionState::Defined(_) => has_binding = true,
+                DefinitionState::Undefined | DefinitionState::Deleted => has_unbound = true,
+            }
+        }
+
+        match (has_binding, has_unbound) {
+            (true, true) => LiveBindingStatus::PossiblyBound,
+            (true, false) => LiveBindingStatus::Bound,
+            (false, _) => LiveBindingStatus::Unbound,
+        }
     }
 
     pub(super) fn mark_binding_definitions_used(

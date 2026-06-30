@@ -83,6 +83,16 @@ def find_nonblank(lines: list[str]):
         pass
     else:
         reveal_type(nonblank)  # revealed: str
+
+def conditional_binding(flag: bool):
+    x = "old"
+    [(x := 1) if flag else 0 for _ in [0]]
+    reveal_type(x)  # revealed: Literal["old", 1]
+
+def possibly_unbound_binding(flag: bool):
+    [(maybe := 1) if flag else 0 for _ in [0]]
+    # error: [possibly-unresolved-reference] "Name `maybe` used when possibly not defined"
+    reveal_type(maybe)  # revealed: Literal[1]
 ```
 
 ## Comprehension referencing outer comprehension
