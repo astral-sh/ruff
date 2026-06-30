@@ -283,6 +283,7 @@ mod tests {
                 [(dead := item) for item in items]
                 [(used := item) for item in items]
                 print(used)
+                [(used_in_comprehension := item, used_in_comprehension) for item in items]
             ",
         );
 
