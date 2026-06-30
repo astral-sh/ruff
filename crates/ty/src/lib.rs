@@ -223,6 +223,10 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     std::mem::forget(db);
 
+    if matches!(exit_status, ExitStatus::Interrupted) {
+        return Ok(ExitStatus::Interrupted);
+    }
+
     if exit_zero {
         Ok(ExitStatus::Success)
     } else {
@@ -244,6 +248,9 @@ pub enum ExitStatus {
     /// Internal ty error (panic, or any other error that isn't due to the user using the
     /// program incorrectly or transient environment errors).
     InternalError = 101,
+
+    /// Checking was interrupted by Ctrl+C.
+    Interrupted = 130,
 }
 
 impl ExitStatus {
@@ -317,9 +324,7 @@ impl MainLoop {
         })?;
 
         self.watcher = Some(ProjectWatcher::new(watcher, db));
-        self.run(db)?;
-
-        Ok(ExitStatus::Success)
+        self.run(db)
     }
 
     fn run(self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
@@ -450,7 +455,7 @@ impl MainLoop {
                             let terminal_settings = db.project().settings(db).terminal();
                             exit_status_from_diagnostics(diagnostics, terminal_settings)
                         }
-                        Err(Canceled) => ExitStatus::Success,
+                        Err(Canceled) => ExitStatus::Interrupted,
                     };
 
                     if exit_status.is_internal_error() {
@@ -481,7 +486,7 @@ impl MainLoop {
                 MainLoopMessage::Exit => {
                     // Cancel any pending queries and wait for them to complete.
                     db.trigger_cancellation();
-                    return Ok(ExitStatus::Success);
+                    return Ok(ExitStatus::Interrupted);
                 }
             }
 
