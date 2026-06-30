@@ -446,13 +446,17 @@ impl ClassInfoConstraintFunction {
         isinstance_narrowing: IsInstanceNarrowing,
     ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
-            ClassInfoConstraintFunction::IsInstance => Type::instance(
-                db,
-                match isinstance_narrowing {
-                    IsInstanceNarrowing::Strict => class.top_materialization(db),
-                    IsInstanceNarrowing::Relaxed => class.default_specialization(db),
-                },
-            ),
+            ClassInfoConstraintFunction::IsInstance => {
+                let default_specialization = Type::instance(db, class.default_specialization(db));
+                match (isinstance_narrowing, is_positive) {
+                    (IsInstanceNarrowing::Relaxed, true) => default_specialization,
+                    // A negative `isinstance` result excludes every specialization of the class,
+                    // even though the positive branch uses the gradual default specialization.
+                    (IsInstanceNarrowing::Strict, _) | (IsInstanceNarrowing::Relaxed, false) => {
+                        default_specialization.top_materialization(db)
+                    }
+                }
+            }
             ClassInfoConstraintFunction::IsSubclass => {
                 SubclassOfType::from(db, class.top_materialization(db))
             }

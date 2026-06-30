@@ -842,8 +842,10 @@ def _(xs: OpenItem | list[OpenItem]):
 
 ### Relaxed mode
 
-The `semantics.isinstance-narrowing` option can be set to `relaxed` to narrow to the default
-specialization of a generic class without top-materializing it:
+The `semantics.isinstance-narrowing` option can be set to `relaxed` to narrow the positive branch to
+the default specialization of a generic class without top-materializing it. The negative branch
+still excludes the top materialization because a negative `isinstance` result excludes every
+specialization of the class:
 
 ```toml
 [semantics]
@@ -863,7 +865,7 @@ def _(xs: object):
         for x in xs:
             reveal_type(x)  # revealed: Unknown
     else:
-        reveal_type(xs)  # revealed: ~Sequence[Unknown]
+        reveal_type(xs)  # revealed: ~Sequence[object]
 ```
 
 Narrowing from `Item | Sequence[Item]` via `isinstance(.., Sequence)`:
@@ -878,7 +880,7 @@ def _(xs: Item | Sequence[Item]):
         for x in xs:
             reveal_type(x)  # revealed: Item & Unknown
     else:
-        reveal_type(xs)  # revealed: Item | (Sequence[Item] & Any & ~Sequence[Never])
+        reveal_type(xs)  # revealed: Item
 ```
 
 Narrowing from (non-final) `OpenItem | Sequence[OpenItem]` via `isinstance(.., Sequence)`:
@@ -892,7 +894,7 @@ def _(xs: OpenItem | Sequence[OpenItem]):
         for x in xs:
             reveal_type(x)  # revealed: Unknown
     else:
-        reveal_type(xs)  # revealed: (OpenItem & ~Sequence[Unknown]) | (Sequence[OpenItem] & Any & ~Sequence[Never])
+        reveal_type(xs)  # revealed: OpenItem & ~Sequence[object]
 ```
 
 #### Invariance
@@ -910,7 +912,7 @@ def _(xs: object):
         xs.append(1)
 
     else:
-        reveal_type(xs)  # revealed: ~list[Unknown]
+        reveal_type(xs)  # revealed: ~Top[list[Unknown]]
 ```
 
 Narrowing from `Item | list[Item]` via `isinstance(.., list)`:
@@ -927,7 +929,7 @@ def _(xs: Item | list[Item]):
         for x in xs:
             reveal_type(x)  # revealed: Item
     else:
-        reveal_type(xs)  # revealed: Item | (list[Item] & Any & ~Bottom[list[Unknown]])
+        reveal_type(xs)  # revealed: Item
 ```
 
 Narrowing from (non-final) `OpenItem | list[OpenItem]` via `isinstance(.., list)`:
@@ -941,21 +943,39 @@ def _(xs: OpenItem | list[OpenItem]):
         for x in xs:
             reveal_type(x)  # revealed: Unknown | OpenItem
     else:
-        reveal_type(xs)  # revealed: (OpenItem & ~list[Unknown]) | (list[OpenItem] & Any & ~Bottom[list[Unknown]])
+        reveal_type(xs)  # revealed: OpenItem & ~Top[list[Unknown]]
 ```
 
 #### Exhaustiveness checking
 
-In relaxed mode, exhaustiveness checking is harder to achieve:
+The top-materialized negative branch preserves exhaustiveness checking:
 
 ```py
-# TODO
-# error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `str`"
 def _(xs: list[str] | set[str]) -> str:
     if isinstance(xs, list):
         return "it's a list!"
     elif isinstance(xs, set):
         return "it's a set!"
+```
+
+The negative branch also removes a concrete specialization after the positive branch handles and
+reassigns it:
+
+```py
+from typing import Awaitable, Callable, cast
+
+class Task:
+    def __init__(
+        self,
+        fn: Callable[[], Awaitable[None]] | classmethod[object, [], Awaitable[None]],
+    ) -> None:
+        if isinstance(fn, classmethod):
+            fn = cast(Callable[[], Awaitable[None]], fn.__func__)
+        assert callable(fn)
+        self.fn = fn
+
+async def run() -> None:
+    await Task(run).fn()
 ```
 
 ## Narrowing generic defaults in Python 3.13
