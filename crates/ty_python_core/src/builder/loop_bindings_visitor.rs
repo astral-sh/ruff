@@ -1,5 +1,6 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
+use std::collections::VecDeque;
 
 use crate::place::PlaceExpr;
 use crate::symbol::Symbol;
@@ -37,29 +38,73 @@ pub(crate) fn collect_comprehension_named_expression_bindings_by_generator<'ast>
     generators: &'ast [ast::Comprehension],
     result_expressions: impl IntoIterator<Item = &'ast ast::Expr>,
 ) -> Vec<Vec<PlaceExpr>> {
-    let result_expressions = result_expressions.into_iter().collect::<Vec<_>>();
+    struct GeneratorBindings {
+        entry: Vec<PlaceExpr>,
+        filters: Vec<PlaceExpr>,
+        has_named_expression: bool,
+    }
 
-    generators
+    let bindings_by_generator = generators
         .iter()
         .enumerate()
         .map(|(index, generator)| {
-            let mut collector = LoopBindingsVisitor::default();
+            let mut entry_collector = LoopBindingsVisitor::default();
+            if index > 0 {
+                entry_collector.visit_expr(&generator.iter);
+            }
+            let mut has_named_expression = !entry_collector.bound_places.is_empty();
+            if index > 0 {
+                entry_collector.add_place_from_target(&generator.target);
+            }
+
+            let mut filter_collector = LoopBindingsVisitor::default();
             for if_expr in &generator.ifs {
-                collector.visit_expr(if_expr);
+                filter_collector.visit_expr(if_expr);
             }
-            for later_generator in &generators[index + 1..] {
-                collector.visit_expr(&later_generator.iter);
-                collector.add_place_from_target(&later_generator.target);
-                for if_expr in &later_generator.ifs {
-                    collector.visit_expr(if_expr);
-                }
+            has_named_expression |= !filter_collector.bound_places.is_empty();
+
+            GeneratorBindings {
+                entry: entry_collector.bound_places,
+                filters: filter_collector.bound_places,
+                has_named_expression,
             }
-            for expression in &result_expressions {
-                collector.visit_expr(expression);
-            }
-            collector.bound_places
         })
-        .collect()
+        .collect::<Vec<_>>();
+
+    let mut result_collector = LoopBindingsVisitor::default();
+    for expression in result_expressions {
+        result_collector.visit_expr(expression);
+    }
+
+    let mut suffix_bindings = VecDeque::from(result_collector.bound_places);
+    let mut suffix_has_named_expression = !suffix_bindings.is_empty();
+    let mut loop_bindings = Vec::with_capacity(generators.len());
+
+    for generator_bindings in bindings_by_generator.into_iter().rev() {
+        let own_has_named_expression = !generator_bindings.filters.is_empty();
+        let header_bindings = if own_has_named_expression || suffix_has_named_expression {
+            generator_bindings
+                .filters
+                .iter()
+                .chain(&suffix_bindings)
+                .cloned()
+                .collect()
+        } else {
+            Vec::new()
+        };
+        loop_bindings.push(header_bindings);
+
+        suffix_has_named_expression |= generator_bindings.has_named_expression;
+        for binding in generator_bindings.filters.into_iter().rev() {
+            suffix_bindings.push_front(binding);
+        }
+        for binding in generator_bindings.entry.into_iter().rev() {
+            suffix_bindings.push_front(binding);
+        }
+    }
+
+    loop_bindings.reverse();
+    loop_bindings
 }
 
 /// The visitor that collects bindings from explicit loops and assignment-expression bindings from
@@ -246,6 +291,41 @@ mod tests {
     use super::*;
     use ruff_python_parser::parse_module;
     use ruff_python_trivia::textwrap::dedent;
+
+    fn collect_comprehension_place_names(code: &str) -> Vec<Vec<String>> {
+        let parsed = parse_module(code).expect("valid Python code");
+        let ast::Stmt::Expr(expression_statement) = &parsed.suite()[0] else {
+            panic!("Expected an expression statement");
+        };
+        let ast::Expr::ListComp(comprehension) = expression_statement.value.as_ref() else {
+            panic!("Expected a list comprehension");
+        };
+
+        collect_comprehension_named_expression_bindings_by_generator(
+            &comprehension.generators,
+            [comprehension.elt.as_ref()],
+        )
+        .into_iter()
+        .map(|bindings| {
+            bindings
+                .into_iter()
+                .map(|place| match place {
+                    PlaceExpr::Symbol(symbol) => symbol.name().to_string(),
+                    PlaceExpr::Member(member) => member.to_string(),
+                })
+                .collect()
+        })
+        .collect()
+    }
+
+    #[test]
+    fn comprehension_without_named_expressions_has_no_loop_bindings() {
+        let bindings = collect_comprehension_place_names(
+            "[item for first in firsts for second in seconds for item in items]",
+        );
+
+        assert_eq!(bindings, vec![Vec::<String>::new(); 3]);
+    }
 
     // Test collecting `while` loop bindings.
 

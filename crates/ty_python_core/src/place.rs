@@ -36,7 +36,7 @@ pub(crate) fn match_subject_place_expressions(subject: &ast::Expr) -> SmallVec<[
 }
 
 /// An expression that can be the target of a `Definition`.
-#[derive(Eq, PartialEq, Debug, get_size2::GetSize)]
+#[derive(Clone, Eq, PartialEq, Debug, get_size2::GetSize)]
 pub enum PlaceExpr {
     /// A simple symbol, e.g. `x`.
     Symbol(Symbol),
