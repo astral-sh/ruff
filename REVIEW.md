@@ -17,3 +17,4 @@
 - Fixed — Separate eager comprehension proxy synthesis from the existing lazy nested-function binding path.
 - Fixed — Name and document IDE proxy expansion in terms of the user-visible walrus definitions it returns.
 - Fixed — Route unused-binding usage through the shared user-visible-definition provenance mapping instead of special-casing eager proxies.
+- Fixed — Expand the complete used-definition stream in one provenance traversal instead of allocating per definition.

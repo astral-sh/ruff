@@ -78,16 +78,14 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
     let index = semantic_index(db, file);
     let mut unused = Vec::new();
     // A used synthetic definition counts as a use of the user-visible definitions it represents.
-    let used_user_visible_definitions = index
-        .scope_ids()
-        .flat_map(|scope_id| {
-            index
-                .use_def_map(scope_id.file_scope_id(db))
-                .all_definitions_with_usage()
-        })
-        .filter_map(|(_, state, is_used)| is_used.then_some(state.definition()).flatten())
-        .flat_map(|definition| super::user_visible_definitions(db, [definition]))
-        .collect::<FxHashSet<_>>();
+    let used_definitions = index.scope_ids().flat_map(|scope_id| {
+        index
+            .use_def_map(scope_id.file_scope_id(db))
+            .all_definitions_with_usage()
+            .filter_map(|(_, state, is_used)| is_used.then_some(state.definition()).flatten())
+    });
+    let used_user_visible_definitions =
+        super::user_visible_definitions(db, used_definitions);
 
     for scope_id in index.scope_ids() {
         let file_scope_id = scope_id.file_scope_id(db);
