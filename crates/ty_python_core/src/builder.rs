@@ -1843,6 +1843,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// stays there. The synthetic definition lets the containing scope observe that binding while
     /// retaining the comprehension's scope for type inference.
     ///
+    /// ```python
+    /// [(last := item) for item in items]
+    /// print(last)  # `last` is owned by this containing scope.
+    /// ```
+    ///
     /// This follows ty's existing eager model for comprehension scopes: it does not represent the
     /// zero-iteration path or distinguish a consumed generator expression from an unconsumed one.
     /// Modeling those cases requires cross-scope reachability that is intentionally out of scope
@@ -1914,6 +1919,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
+    /// Summarizes whether the comprehension's live exit paths bind `name`.
+    ///
+    /// For example, `value` is only possibly bound after this comprehension because the walrus is
+    /// skipped when `flag` is false:
+    ///
+    /// ```python
+    /// [(value := item) if flag else None for item in items]
+    /// ```
     fn comprehension_binding_status(
         &mut self,
         name: &str,
@@ -1934,6 +1947,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         status
     }
 
+    /// Forwards a nested-comprehension proxy toward the scope containing the outermost comprehension.
+    ///
+    /// ```python
+    /// [[(last := item) for item in row] for row in rows]
+    /// print(last)  # `last` belongs to the scope outside both comprehensions.
+    /// ```
+    ///
+    /// Only the immediate proxy is forwarded. It captures the inner definitions through this
+    /// comprehension's flow state, so inner writes cannot bypass outer reachability or ordering.
     fn forward_comprehension_binding(
         &mut self,
         name: &Name,
@@ -1967,6 +1989,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .or_insert(first_declaration.range);
     }
 
+    /// Marks a comprehension walrus target as a write to the containing Python scope.
+    ///
+    /// The iteration variable remains local to the comprehension, while the walrus target does
+    /// not:
+    ///
+    /// ```python
+    /// [(result := item) for item in items]
+    /// print(result)  # valid
+    /// print(item)    # `item` is not defined here
+    /// ```
     fn mark_comprehension_named_target(&mut self, place: ScopedPlaceId, range: TextRange) {
         if self.scopes[self.current_scope()].kind() != ScopeKind::Comprehension {
             return;
@@ -2650,6 +2682,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         comprehension_scope
     }
 
+    /// Visits a comprehension filter on its truthy path and returns the filtered-out path.
+    ///
+    /// A false filter skips the rest of the current iteration, but assignments performed while
+    /// evaluating the filter remain observable:
+    ///
+    /// ```python
+    /// [item for item in items if (last := item)]
+    /// print(last)
+    /// ```
     fn visit_comprehension_filter(&mut self, if_expr: &'ast ast::Expr) -> FlowSnapshot {
         self.visit_expr(if_expr);
         let fallback = self.flow_snapshot();

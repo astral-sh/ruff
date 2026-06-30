@@ -1601,9 +1601,12 @@ pub struct NestedBindingsDefinitionKind {
     pub nested_declarations: SmallVec<[crate::builder::NestedDeclaration; 1]>,
 }
 
+/// Describes when writes from a nested scope can affect its containing scope.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub enum NestedBindingExecution {
+    /// The nested scope can run later or repeatedly, as with a function body.
     Lazy,
+    /// The nested scope is modeled as running while evaluating the containing expression.
     Eager,
 }
 

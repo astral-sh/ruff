@@ -278,10 +278,14 @@ pub use place_state::LiveBinding;
 pub use place_state::ScopedDefinitionId;
 pub(super) use place_state::{FutureDefinitions, PreviousDefinitions};
 
+/// Summarizes whether the live control-flow paths leave a symbol bound.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(super) enum LiveBindingStatus {
+    /// No live path contains a binding.
     Unbound,
+    /// Some live paths contain a binding and others leave the symbol unbound.
     PossiblyBound,
+    /// Every live path contains a binding.
     Bound,
 }
 
@@ -2291,6 +2295,11 @@ impl<'db> UseDefMapBuilder<'db> {
             .map(LiveBinding::binding)
     }
 
+    /// Returns the current boundness of `symbol` after applying pending reachability constraints.
+    ///
+    /// Bindings on statically unreachable paths do not contribute to the result. This is stricter
+    /// than [`Symbol::is_bound`](crate::symbol::Symbol::is_bound), which records whether the symbol
+    /// is bound anywhere in the scope without considering control flow.
     pub(super) fn symbol_live_binding_status(
         &mut self,
         symbol: ScopedSymbolId,
