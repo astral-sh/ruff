@@ -63,6 +63,13 @@ reveal_type(h)  # revealed: int
 [(ordered := item, ordered := "") for item in Iterable()]
 reveal_type(ordered)  # revealed: Literal[""]
 
+# Targets in statically unreachable branches remain unbound.
+[(dead := 1) if False else (live := 2) for _ in [0]]
+# error: [unresolved-reference] "Name `dead` used when not defined"
+# revealed: Unknown
+reveal_type(dead)
+reveal_type(live)  # revealed: Literal[2]
+
 def local_scope():
     [(local_target := value) for value in Iterable()]
     reveal_type(local_target)  # revealed: int

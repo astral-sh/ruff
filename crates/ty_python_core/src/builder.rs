@@ -1819,6 +1819,23 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 continue;
             };
 
+            if execution == NestedBindingExecution::Eager {
+                let mut has_reachable_binding = false;
+                for declaration in &declarations {
+                    let scope_id = declaration.file_scope_id;
+                    let Some(symbol) = self.place_tables[scope_id].symbol_id(&name) else {
+                        continue;
+                    };
+                    if self.use_def_maps[scope_id].symbol_has_reachable_binding(symbol) {
+                        has_reachable_binding = true;
+                        break;
+                    }
+                }
+                if !has_reachable_binding {
+                    continue;
+                }
+            }
+
             let symbol = self.add_symbol(name.clone());
 
             // Nested comprehensions share the scope containing the outermost comprehension. Keep

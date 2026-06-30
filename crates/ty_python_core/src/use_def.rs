@@ -2284,6 +2284,27 @@ impl<'db> UseDefMapBuilder<'db> {
             .map(LiveBinding::binding)
     }
 
+    pub(super) fn symbol_has_reachable_binding(&mut self, symbol: ScopedSymbolId) -> bool {
+        let pending = self.pending_reachability.current;
+        let bindings = self
+            .pending_reachability
+            .materialize_ref(
+                &mut self.symbol_states[symbol],
+                pending,
+                &mut self.reachability_constraints,
+            )
+            .bindings()
+            .clone();
+
+        bindings.iter().any(|binding| {
+            binding.reachability_constraint() != ScopedReachabilityConstraintId::ALWAYS_FALSE
+                && matches!(
+                    self.definition(binding.binding()),
+                    DefinitionState::Defined(_)
+                )
+        })
+    }
+
     pub(super) fn mark_binding_definitions_used(
         &mut self,
         binding_definition_ids: impl IntoIterator<Item = ScopedDefinitionId>,

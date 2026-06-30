@@ -2510,7 +2510,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
+        let recursively_defined = match nested_bindings_kind.execution {
+            NestedBindingExecution::Lazy => RecursivelyDefined::Yes,
+            NestedBindingExecution::Eager => RecursivelyDefined::No,
+        };
+        let mut union = UnionBuilder::new(db).recursively_defined(recursively_defined);
         for declaration in visible_nested_declarations {
             assert!(
                 declaration.is_bound,
