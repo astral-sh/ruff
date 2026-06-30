@@ -479,7 +479,7 @@ def test_select_subset_isel_multiple_idxs():
     assert selds["Foo"].shape == (100, 2, 30)
 
 
-def test_decribe(ds1):
+def test_describe(ds1):
     df = ds1.describe()
     assert df.columns[0] == "Foo"
     assert df.loc["mean"][1] == pytest.approx(0.2)

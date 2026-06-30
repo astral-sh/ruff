@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
 use itertools::Itertools;
-use ruff_python_ast::helpers::{any_over_expr, is_dotted_name};
+use ruff_python_ast::helpers::{Truthiness, any_over_expr, is_dotted_name};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
@@ -43,9 +43,10 @@ use crate::place::{
     match_subject_place_expressions,
 };
 use crate::predicate::{
-    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode, PredicateOrLiteral, ScopedPredicateId, SequencePatternPredicateKind,
-    StarImportPlaceholderPredicate, SubjectElementPatternPredicate,
+    CallableAndCallExpr, ClassPatternKeywordPredicateKind, ClassPatternPredicateKind,
+    MappingPatternEntryPredicateKind, MappingPatternPredicateKind, PatternPredicate,
+    PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral, ScopedPredicateId,
+    SequencePatternPredicateKind, StarImportPlaceholderPredicate, SubjectElementPatternPredicate,
 };
 use crate::program::Program;
 use crate::re_exports::exported_names;
@@ -276,9 +277,9 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     seen_submodule_imports: FxHashSet<String>,
     // A map from a lambda expression to its enclosing statement.
     enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
-    // A map from a constraining use of a collection literal to its definition.
+    // A map from a constraining use of a collection initializer to its definition.
     collections_by_use: FxHashMap<ExpressionNodeKey, Definition<'db>>,
-    // A map from a collection literal definition to statements containing a constraining use.
+    // A map from a collection initializer definition to statements containing a constraining use.
     uses_by_collection: FxHashMap<Definition<'db>, Vec<(Statement<'db>, ExpressionNodeKey)>>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
     ///
@@ -1092,9 +1093,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self.ast_ids[scope_id]
     }
 
-    /// If the given expression is a use of an unannotated collection literal, returns
-    /// the definition of the collection literal.
-    fn unannotated_collection_literal_binding(
+    /// If the given expression is a use of an unannotated collection initializer, returns
+    /// the definition of the initializer.
+    fn unannotated_collection_initializer_binding(
         &self,
         collection_use: &ast::Expr,
     ) -> Option<Definition<'db>> {
@@ -1108,12 +1109,26 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 definition
                     .kind(self.db)
                     .as_unannotated_assignment()
-                    .is_some_and(|assignment| is_collection_literal(assignment.value(self.module)))
+                    .is_some_and(|assignment| {
+                        is_collection_initializer(assignment.value(self.module))
+                    })
             })
             // TODO: Support uses that refer to multiple definitions. This currently seems to lead to
             // cycle-related panics.
             .exactly_one()
             .ok()
+    }
+
+    fn unannotated_collection_literal_binding(
+        &self,
+        collection_use: &ast::Expr,
+    ) -> Option<Definition<'db>> {
+        let definition = self.unannotated_collection_initializer_binding(collection_use)?;
+        definition
+            .kind(self.db)
+            .as_unannotated_assignment()
+            .is_some_and(|assignment| is_collection_literal(assignment.value(self.module)))
+            .then_some(definition)
     }
 
     /// Try to register a narrowing alias for a simple name assignment.
@@ -2041,37 +2056,38 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Pattern::MatchClass(pattern) => {
                 let cls = self.add_standalone_expression(&pattern.cls);
 
-                // TODO: A class pattern with only irrefutable subpatterns can still fail if
-                // extracting an attribute named by `__match_args__` or a keyword fails. We retain
-                // this existing approximation because treating all class patterns with arguments
-                // as refutable caused a large ecosystem change. Follow-up work should determine
-                // irrefutability by analyzing the class's attributes and `__match_args__`.
-                PatternPredicateKind::Class(
-                    cls,
-                    if pattern
+                PatternPredicateKind::Class(ClassPatternPredicateKind {
+                    class: cls,
+                    positional: pattern
                         .arguments
                         .patterns
                         .iter()
-                        .all(ast::Pattern::is_irrefutable)
-                        && pattern
-                            .arguments
-                            .keywords
-                            .iter()
-                            .all(|kw| kw.pattern.is_irrefutable())
-                    {
-                        ClassPatternKind::Irrefutable
-                    } else {
-                        ClassPatternKind::Refutable
-                    },
-                )
+                        .map(|pattern| self.predicate_kind(pattern))
+                        .collect(),
+                    keywords: pattern
+                        .arguments
+                        .keywords
+                        .iter()
+                        .map(|keyword| ClassPatternKeywordPredicateKind {
+                            attr: keyword.attr.id.clone(),
+                            pattern: self.predicate_kind(&keyword.pattern),
+                        })
+                        .collect(),
+                })
             }
             ast::Pattern::MatchMapping(pattern) => {
-                // `case {}` and `case {**rest}` match every mapping, while keyed mapping
-                // patterns are refutable (`case {"x": _}` may fail for some mappings).
-                PatternPredicateKind::Mapping(if pattern.keys.is_empty() {
-                    ClassPatternKind::Irrefutable
-                } else {
-                    ClassPatternKind::Refutable
+                // Retain keyed entries for subject-aware exhaustiveness analysis.
+                PatternPredicateKind::Mapping(MappingPatternPredicateKind {
+                    entries: pattern
+                        .keys
+                        .iter()
+                        .zip(&pattern.patterns)
+                        .map(|(key, pattern)| MappingPatternEntryPredicateKind {
+                            key: self.add_standalone_expression(key),
+                            pattern: self.predicate_kind(pattern),
+                        })
+                        .collect(),
+                    rest: pattern.rest.as_ref().map(|name| name.id.clone()),
                 })
             }
             ast::Pattern::MatchSequence(pattern) => {
@@ -2605,24 +2621,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         assert_eq!(&self.current_assignments, &[]);
 
-        let mut place_tables: IndexVec<_, _> = self
-            .place_tables
-            .into_iter()
-            .map(|builder| Arc::new(builder.finish()))
-            .collect();
-
-        let mut use_def_maps: IndexVec<_, _> = self
-            .use_def_maps
-            .into_iter()
-            .map(|builder| Arc::new(builder.finish()))
-            .collect();
-
         let ast_ids = super::ast_ids::AstIds::from_builders(self.ast_ids);
 
-        self.scopes.shrink_to_fit();
-        place_tables.shrink_to_fit();
-        use_def_maps.shrink_to_fit();
-        self.scope_ids_by_scope.shrink_to_fit();
         let mut semantic_syntax_errors = self.semantic_syntax_errors.into_inner();
         semantic_syntax_errors.shrink_to_fit();
         let uses_by_collection = FrozenMap::from_entries(
@@ -2633,7 +2633,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         );
 
         SemanticIndex {
-            place_tables: place_tables.into(),
+            place_tables: self
+                .place_tables
+                .into_iter()
+                .map(|builder| Arc::new(builder.finish()))
+                .collect(),
             scopes: self.scopes.into(),
             definitions_by_node: DefinitionsByNode::from_map(self.definitions_by_node),
             expressions_by_node: self.expressions_by_node,
@@ -2643,7 +2647,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast_ids,
             scopes_by_expression: self.scopes_by_expression.build(),
             scopes_by_node: self.scopes_by_node,
-            use_def_maps: use_def_maps.into(),
+            use_def_maps: self
+                .use_def_maps
+                .into_iter()
+                .map(|builder| Arc::new(builder.finish()))
+                .collect(),
             enclosing_lambda_statements: FrozenMap::from(self.enclosing_lambda_statements),
             collections_by_use: FrozenMap::from(self.collections_by_use),
             uses_by_collection,
@@ -2909,22 +2917,33 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.seen_submodule_imports
                             .insert(direct_submodule.to_owned());
 
-                        let direct_submodule_name = Name::new(direct_submodule);
-                        let symbol = self.add_symbol(direct_submodule_name);
+                        let is_immediately_shadowed = node.names.iter().any(|alias| {
+                            if &alias.name == "*" {
+                                return false;
+                            }
 
-                        let module_index = if node.level == 0 {
-                            // "whatever.thispackage.x.y" we want `x`
-                            thispackage.components().count()
-                        } else {
-                            // ".x.y" we want `x` (level 1 => index 0)
-                            // "..x.y" we want `y` (level 2 => index 1)
-                            // (The Identifier doesn't include the prefix dots)
-                            node.level as usize - 1
-                        };
-                        self.add_definition(
-                            symbol.into(),
-                            ImportFromSubmoduleDefinitionNodeRef { node, module_index },
-                        );
+                            let bound_name = alias.asname.as_ref().unwrap_or(&alias.name);
+                            bound_name.id.as_str() == direct_submodule
+                        });
+
+                        if !is_immediately_shadowed {
+                            let direct_submodule_name = Name::new(direct_submodule);
+                            let symbol = self.add_symbol(direct_submodule_name);
+
+                            let module_index = if node.level == 0 {
+                                // "whatever.thispackage.x.y" we want `x`
+                                thispackage.components().count()
+                            } else {
+                                // ".x.y" we want `x` (level 1 => index 0)
+                                // "..x.y" we want `y` (level 2 => index 1)
+                                // (The Identifier doesn't include the prefix dots)
+                                node.level as usize - 1
+                            };
+                            self.add_definition(
+                                symbol.into(),
+                                ImportFromSubmoduleDefinitionNodeRef { node, module_index },
+                            );
+                        }
                     }
                 }
 
@@ -3126,9 +3145,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 self.visit_expr(&node.value);
 
-                // Unannotated collection literals must be standalone expressions to participate
+                // Unannotated collection initializers must be standalone expressions to participate
                 // in full-scope bidirectional inference.
-                if node.targets.len() == 1 && is_collection_literal(&node.value) {
+                if node.targets.len() == 1 && is_collection_initializer(&node.value) {
                     self.add_standalone_assigned_expression(&node.value, node);
                 }
 
@@ -3470,7 +3489,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 for_stmt @ ast::StmtFor {
                     range: _,
                     node_index: _,
-                    is_async: _,
+                    is_async,
                     target,
                     iter,
                     body,
@@ -3482,20 +3501,34 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
 
-                let non_empty_range_constraint = if is_direct_range_call(iter) {
-                    let after_iter = self.flow_snapshot();
-                    let constraint = self.record_reachability_constraint(
-                        PredicateOrLiteral::Predicate(Predicate {
-                            node: PredicateNode::IsNonEmptyIterable(iter_expr),
-                            is_positive: true,
-                        }),
-                    );
+                let literal_iterable_is_non_empty = (!*is_async)
+                    .then(|| literal_iterable_truthiness(iter))
+                    .and_then(Truthiness::into_bool);
 
-                    Some((after_iter, constraint))
-                } else {
-                    self.record_ambiguous_reachability();
-                    None
-                };
+                let (after_empty_iter, non_empty_range_constraint) =
+                    match literal_iterable_is_non_empty {
+                        Some(false) => {
+                            let after_iter = self.flow_snapshot();
+                            self.mark_unreachable();
+                            (Some(after_iter), None)
+                        }
+                        Some(true) => (None, None),
+                        None if is_direct_range_call(iter) => {
+                            let after_iter = self.flow_snapshot();
+                            let constraint = self.record_reachability_constraint(
+                                PredicateOrLiteral::Predicate(Predicate {
+                                    node: PredicateNode::IsNonEmptyIterable(iter_expr),
+                                    is_positive: true,
+                                }),
+                            );
+
+                            (None, Some((after_iter, constraint)))
+                        }
+                        None => {
+                            self.record_ambiguous_reachability();
+                            (None, None)
+                        }
+                    };
 
                 let pre_loop = self.flow_snapshot();
 
@@ -3534,17 +3567,23 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.populate_loop_header(&bound_place_ids, header_id, loop_min_definition_id);
                 }
 
-                // We may execute the `else` clause without ever executing the body, so merge in a
-                // zero-iteration state before visiting `else`.
-                if let Some((after_iter, non_empty_range_constraint)) = non_empty_range_constraint {
-                    let post_loop_body = self.flow_snapshot();
+                if let Some(after_iter) = after_empty_iter {
                     self.flow_restore(after_iter);
-                    self.record_negated_reachability_constraint(non_empty_range_constraint);
-                    let no_iteration = self.flow_snapshot();
-                    self.flow_restore(post_loop_body);
-                    self.flow_merge(no_iteration);
-                } else {
-                    self.flow_merge(pre_loop);
+                } else if literal_iterable_is_non_empty.is_none() {
+                    // We may execute the `else` clause without ever executing the body, so merge
+                    // in a zero-iteration state before visiting `else`.
+                    if let Some((after_iter, non_empty_range_constraint)) =
+                        non_empty_range_constraint
+                    {
+                        let post_loop_body = self.flow_snapshot();
+                        self.flow_restore(after_iter);
+                        self.record_negated_reachability_constraint(non_empty_range_constraint);
+                        let no_iteration = self.flow_snapshot();
+                        self.flow_restore(post_loop_body);
+                        self.flow_merge(no_iteration);
+                    } else {
+                        self.flow_merge(pre_loop);
+                    }
                 }
                 self.visit_body(orelse);
 
@@ -4093,7 +4132,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // significant performance regressions.
                     //
                     // Note that built-in collection types do not have methods that explicitly
-                    // return `Never`, so does not have a meaningful semantic impact, except in
+                    // return `Never`, so this does not have a meaningful semantic impact, except in
                     // the rare case where a collection is explicitly marked as having elements
                     // of type `Never`.
                     if !self.source_type.is_stub()
@@ -4158,7 +4197,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         let mut current_statement = self.pop_statement();
 
         // We currently only consider certain types of statements to introduce constraints
-        // on collection literals. This restriction is mostly for performance reasons, as we
+        // on collection initializers. This restriction is mostly for performance reasons, as we
         // want to avoid "reads" of a collection contributing to the complexity of the cycles
         // created by full-scope collection inference.
         current_statement
@@ -4218,7 +4257,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 .map(|lambda| (lambda.into(), standalone_statement)),
         );
 
-        // The inferred element type of collection literal depends on uses of
+        // The inferred element type of a collection initializer depends on uses of
         // the collection in its containing scope, and so each use must be part
         // of an standalone inferable statement to avoid large scope-level cycles.
         let mut collection_defs = FxHashSet::default();
@@ -4346,9 +4385,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     if is_use {
                         self.record_place_use(place_id, expr);
 
-                        // Keep track of any uses of unannotated collection literals.
+                        // Keep track of any uses of unannotated collection initializers.
                         if let Some(collection_def) =
-                            self.unannotated_collection_literal_binding(expr)
+                            self.unannotated_collection_initializer_binding(expr)
                             && let Some(current_statement) = self.current_statements.last_mut()
                         {
                             current_statement
@@ -5054,6 +5093,22 @@ impl ExpressionsScopeMapBuilder {
     }
 }
 
+/// Returns the static truthiness of a literal iterable.
+///
+/// Returns [`Truthiness::Unknown`] for other expressions and when starred elements or dictionary
+/// unpacking make the literal's emptiness ambiguous.
+fn literal_iterable_truthiness(expr: &ast::Expr) -> Truthiness {
+    match expr {
+        ast::Expr::Tuple(_)
+        | ast::Expr::List(_)
+        | ast::Expr::Set(_)
+        | ast::Expr::Dict(_)
+        | ast::Expr::StringLiteral(_)
+        | ast::Expr::BytesLiteral(_) => Truthiness::from_expr(expr, |_| false),
+        _ => Truthiness::Unknown,
+    }
+}
+
 /// Returns if the expression is a `TYPE_CHECKING` expression.
 fn is_if_type_checking(expr: &ast::Expr) -> bool {
     match expr {
@@ -5075,6 +5130,24 @@ fn is_if_not_type_checking(expr: &ast::Expr) -> bool {
             ..
         }) if is_if_type_checking(operand)
     )
+}
+
+fn is_empty_collection_constructor_call(expr: &ast::Expr) -> bool {
+    let ast::Expr::Call(ast::ExprCall {
+        func, arguments, ..
+    }) = expr
+    else {
+        return false;
+    };
+
+    arguments.is_empty()
+        && func
+            .as_name_expr()
+            .is_some_and(|name| matches!(name.id.as_str(), "list" | "set" | "dict"))
+}
+
+fn is_collection_initializer(expr: &ast::Expr) -> bool {
+    is_collection_literal(expr) || is_empty_collection_constructor_call(expr)
 }
 
 pub(crate) fn is_collection_literal(expr: &ast::Expr) -> bool {

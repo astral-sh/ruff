@@ -3937,10 +3937,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        Unknown
+        str
         ---------------------------------------------
         ```python
-        Unknown
+        str
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -6963,7 +6963,7 @@ type U<CURSOR> = MyType
     }
 
     #[test]
-    fn hover_type_dosctring_correct_order() {
+    fn hover_type_docstring_correct_order() {
         let test = CursorTest::builder()
             .source(
                 "library.py",

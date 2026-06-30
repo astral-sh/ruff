@@ -718,7 +718,7 @@ def _(ab: A | B, ac: A | C, cd: C | D):
 Argument type expansion could lead to exponential growth of the number of argument lists that needs
 to be evaluated, so ty deploys some heuristics to prevent this from happening.
 
-Heuristic: If an argument type that cannot be expanded and cannot be assighned to any of the
+Heuristic: If an argument type that cannot be expanded and cannot be assigned to any of the
 remaining overloads before argument type expansion, then even with argument type expansion, it won't
 lead to a successful evaluation of the call.
 
@@ -804,7 +804,7 @@ def _(ab: A | B, a: int | Any):
     )
 
     # Here, the heuristics won't come into play because all arguments can be expanded but expanding
-    # the first argument resutls in a successful evaluation of the call, so there's no exponential
+    # the first argument results in a successful evaluation of the call, so there's no exponential
     # growth of the number of argument lists.
     reveal_type(
         # revealed: A | B
@@ -2106,6 +2106,21 @@ reveal_type(x)  # revealed: int | str
 
 # error: [no-matching-overload] "No overload of function `f` matches arguments"
 f([{"y": 1}], int_or_str())
+```
+
+An expected return type can specialize a generic overload and provide context for its arguments.
+Overload filtering should preserve that context:
+
+```py
+from typing import Any, overload
+
+@overload
+def f[T](value: T) -> T: ...
+@overload
+def f(value: Any) -> Any: ...
+def f(value: Any) -> Any: ...
+
+values: list[int] = reveal_type(f([]))  # revealed: list[int]
 ```
 
 Non-matching overloads do not produce diagnostics:

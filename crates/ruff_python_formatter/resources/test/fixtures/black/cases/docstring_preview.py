@@ -8,14 +8,14 @@ def docstring_almost_at_line_limit_with_prefix():
     """
 
 
-def mulitline_docstring_almost_at_line_limit():
+def multiline_docstring_almost_at_line_limit():
     """long docstring.................................................................
 
     ..................................................................................
     """
 
 
-def mulitline_docstring_almost_at_line_limit_with_prefix():
+def multiline_docstring_almost_at_line_limit_with_prefix():
     f"""long docstring................................................................
 
     ..................................................................................

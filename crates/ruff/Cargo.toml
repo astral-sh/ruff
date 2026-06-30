@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.15.19"
+version = "0.15.20"
 description = "An extremely fast Python linter and code formatter"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -40,7 +40,7 @@ ruff_workspace = { workspace = true }
 
 anyhow = { workspace = true }
 argfile = { workspace = true }
-bincode = { workspace = true, features = ["serde"] }
+rkyv = { workspace = true }
 bitflags = { workspace = true }
 cachedir = { workspace = true }
 clap = { workspace = true, features = ["derive", "env", "wrap_help"] }
@@ -89,7 +89,6 @@ indoc = { workspace = true }
 insta = { workspace = true, features = ["filters", "json"] }
 insta-cmd = { workspace = true }
 ruff_python_trivia = { workspace = true }
-tempfile = { workspace = true }
 test-case = { workspace = true }
 
 [lints]

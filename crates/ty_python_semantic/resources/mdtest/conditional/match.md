@@ -209,7 +209,8 @@ def _(target: FooSub | str):
 
 ### Dynamic class
 
-A dynamically typed class pattern is not known to match every subject, so later cases remain
+A dynamically typed class expression may match any value, but we cannot prove which values it does
+not match. The failed branch therefore keeps the original subject type, and later cases remain
 reachable.
 
 ```py
@@ -219,11 +220,12 @@ DynamicClass: Any = int
 
 def _(target: int | str):
     match target:
-        case DynamicClass():
+        case DynamicClass() as whole:
             reveal_type(target)  # revealed: (int & Any) | (str & Any)
+            reveal_type(whole)  # revealed: (int & Any) | (str & Any)
             y = 1
         case _:
-            reveal_type(target)  # revealed: (int & Any) | (str & Any)
+            reveal_type(target)  # revealed: int | str
             y = 2
 
     reveal_type(y)  # revealed: Literal[1, 2]
@@ -334,6 +336,15 @@ def _(target: Point | Other):
             reveal_type(target)  # revealed: Point
         case Other():
             reveal_type(target)  # revealed: Other
+
+def missing_attribute_does_not_make_or_pattern_exhaustive(target: Point):
+    y = 1
+
+    match target:
+        case Point(missing=_) | Other():
+            y = 2
+
+    reveal_type(y)  # revealed: Literal[1, 2]
 ```
 
 ## Singleton match

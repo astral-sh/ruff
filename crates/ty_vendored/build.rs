@@ -30,16 +30,12 @@ fn write_zipped_typeshed_to(writer: File) -> ZipResult<File> {
     // [source](https://github.com/gyscos/zstd-rs/wiki/Compile-for-WASM) which complicates the build
     // by a lot. Deflated compression is slower but it shouldn't matter much for the WASM use case
     // (WASM itself is already slower than a native build for a specific platform).
-    // We can't use `#[cfg(...)]` here because the target-arch in a build script is the
-    // architecture of the system running the build script and not the architecture of the build-target.
-    // That's why we use the `TARGET` environment variable here.
-    let method = if cfg!(feature = "zstd") {
-        CompressionMethod::Zstd
-    } else if cfg!(feature = "deflate") {
-        CompressionMethod::Deflated
-    } else {
-        CompressionMethod::Stored
-    };
+    #[cfg(feature = "zstd")]
+    let method = CompressionMethod::Zstd;
+    #[cfg(all(not(feature = "zstd"), feature = "deflate"))]
+    let method = CompressionMethod::Deflated;
+    #[cfg(not(any(feature = "zstd", feature = "deflate")))]
+    let method = CompressionMethod::Stored;
 
     let options = SimpleFileOptions::default()
         .compression_method(method)

@@ -932,6 +932,62 @@ x1_sorted.sort()
 reveal_type(x1_sorted)  # revealed: list[str]
 ```
 
+Bare empty `list()`, `set()`, and `dict()` calls also participate in full-scope inference. Calls
+through aliases and shadowed names are deliberately not refined.
+
+```py
+list_result = list()
+list_result.append(1)
+list_result.append("2")
+reveal_type(list_result)  # revealed: list[int | str]
+
+set_result = set()
+set_result.add(1)
+set_result.add("2")
+reveal_type(set_result)  # revealed: set[int | str]
+
+dict_result = dict()
+dict_result["a"] = 1
+dict_result["b"] = "2"
+reveal_type(dict_result)  # revealed: dict[str, int | str]
+
+def make_list() -> list[str]:
+    result = list()
+    result.append(1)
+    reveal_type(result)  # revealed: list[int | str]
+    return result  # error: [invalid-return-type]
+
+def make_set() -> set[str]:
+    result = set()
+    result.add(1)
+    reveal_type(result)  # revealed: set[int | str]
+    return result  # error: [invalid-return-type]
+
+def make_dict() -> dict[str, str]:
+    result = dict()
+    result["x"] = 1
+    reveal_type(result)  # revealed: dict[str, int | str]
+    return result  # error: [invalid-return-type]
+
+set_alias = set
+aliased_result = set_alias()
+aliased_result.add(1)
+reveal_type(aliased_result)  # revealed: set[Unknown]
+
+from typing import Never
+
+class Result:
+    def abort(self) -> Never:
+        raise RuntimeError
+
+def shadowed_constructor() -> int:
+    set = Result
+    result = set()
+    reveal_type(result)  # revealed: Result
+    result.abort()
+    return "unreachable"
+```
+
 ```py
 class X:
     def __init__(self):

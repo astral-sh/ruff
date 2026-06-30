@@ -446,6 +446,7 @@ impl<'db> KnownInstanceType<'db> {
 /// Contains information about a sentinel object created with `typing_extensions.Sentinel`.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct SentinelInstance<'db> {
+    #[returns(ref)]
     pub name: Name,
     pub definition: Definition<'db>,
 }

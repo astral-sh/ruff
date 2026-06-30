@@ -976,11 +976,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source_subclass: SubclassOfType<'db>,
         target: Type<'db>,
     ) -> bool {
-        let is_exact_upper_bound = source_subclass.into_type_var().is_some_and(|source_i| {
-            source_i.typevar(db).upper_bound(db).and_then(|bound| {
-                SubclassOfType::try_from_instance(db, bound.resolve_type_alias(db))
-            }) == Some(target)
-        });
+        let is_exact_upper_bound = source_subclass.exact_typevar_upper_bound(db) == Some(target);
 
         (!matches!(target, Type::ClassLiteral(_) | Type::GenericAlias(_)) || is_exact_upper_bound)
             && (Self::is_metaclass_instance(db, target) || target.to_instance(db).is_some())
@@ -2697,7 +2693,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             }
 
             (Type::LiteralValue(left), Type::LiteralValue(right)) => {
-                ConstraintSet::from_bool(self.constraints, left.kind() != right.kind())
+                if let (Some(left), Some(right)) = (left.as_enum(), right.as_enum())
+                    && left.enum_class_literal(db) == right.enum_class_literal(db)
+                    && !left.enum_class_literal(db).aliases_are_known(db)
+                {
+                    self.never()
+                } else {
+                    ConstraintSet::from_bool(self.constraints, left.kind() != right.kind())
+                }
             }
 
             (Type::PropertyInstance(left), Type::PropertyInstance(right)) => {

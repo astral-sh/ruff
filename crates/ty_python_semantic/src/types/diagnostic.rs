@@ -968,7 +968,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/call-abstract-method.md")]
     pub(crate) static CALL_ABSTRACT_METHOD = {
         summary: "detects calls to abstract methods with trivial bodies on class objects",
-        status: LintStatus::preview("0.0.16"),
+        status: LintStatus::stable("0.0.16"),
         default_level: Level::Error,
     }
 }
@@ -986,7 +986,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/missing-override-decorator.md")]
     pub(crate) static MISSING_OVERRIDE_DECORATOR = {
         summary: "detects methods that override a superclass member without an `@override` annotation",
-        status: LintStatus::preview("0.0.41"),
+        status: LintStatus::stable("0.0.41"),
         default_level: Level::Ignore,
     }
 }
@@ -1103,7 +1103,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/unused-awaitable.md")]
     pub(crate) static UNUSED_AWAITABLE = {
         summary: "detects awaitable objects that are used as expression statements without being awaited",
-        status: LintStatus::preview("0.0.21"),
+        status: LintStatus::stable("0.0.21"),
         default_level: Level::Warn,
     }
 }
@@ -2490,18 +2490,36 @@ pub(crate) fn report_invalid_class_match_pattern<T: Ranged>(
     diagnostic.set_primary_message("This will raise `TypeError` at runtime");
 }
 
-pub(crate) fn report_too_many_positional_patterns_for_callable_class_pattern<T: Ranged>(
+pub(crate) fn report_too_many_positional_patterns_for_class_pattern<T: Ranged>(
     context: &InferContext,
     first_excess_pattern: T,
+    positional_limit: usize,
     positional_count: usize,
+    class_display: impl std::fmt::Display,
 ) {
     let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, first_excess_pattern) else {
         return;
     };
-    let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Too many positional subpatterns for `collections.abc.Callable`: expected 0, got {positional_count}"
+    builder.into_diagnostic(format_args!(
+        "Too many positional subpatterns for `{class_display}`: expected {positional_limit}, got {positional_count}"
     ));
-    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
+}
+
+pub(crate) fn report_invalid_match_args_type<T: Ranged>(
+    context: &InferContext,
+    pattern: T,
+    match_args_ty: Type,
+    cls_ty: Type,
+) {
+    let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, pattern) else {
+        return;
+    };
+    let db = context.db();
+    let class_display = cls_ty.display(db);
+    let match_args_display = match_args_ty.display(db);
+    builder.into_diagnostic(format_args!(
+        "`__match_args__` for `{class_display}` must be an exact tuple, not `{match_args_display}`"
+    ));
 }
 
 pub(crate) fn add_type_expression_reference_link<'db, 'ctx>(

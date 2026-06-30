@@ -2006,7 +2006,17 @@ impl<'db> StaticClassLiteral<'db> {
 
         let use_def = use_def_map(db, class_body_scope);
 
-        let typed_dict_params = self.typed_dict_params(db);
+        // `own_fields(..., NamedTuple)` is called while constructing the class's MRO because the
+        // field types determine the synthesized tuple base. `typed_dict_params` also queries the
+        // class's MRO, so only read the `total` default when collecting `TypedDict` fields.
+        let typed_dict_fields_are_required_by_default =
+            if field_policy == CodeGeneratorKind::TypedDict {
+                self.typed_dict_params(db)
+                    .expect("TypedDictParams should be available for CodeGeneratorKind::TypedDict")
+                    .contains(TypedDictParams::TOTAL)
+            } else {
+                false
+            };
         let dataclass_kw_only_default = matches!(field_policy, CodeGeneratorKind::DataclassLike(_))
             .then(|| self.has_dataclass_param(db, field_policy, DataclassFlags::KW_ONLY));
         let mut kw_only_sentinel_field_seen = false;
@@ -2064,10 +2074,14 @@ impl<'db> StaticClassLiteral<'db> {
             }
 
             if let Some(attr_ty) = attr.place.ignore_possibly_undefined() {
-                let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                let mut default_ty = place_from_bindings(db, bindings)
-                    .place
-                    .ignore_possibly_undefined();
+                let mut default_ty = if field_policy == CodeGeneratorKind::TypedDict {
+                    None
+                } else {
+                    let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
+                    place_from_bindings(db, bindings)
+                        .place
+                        .ignore_possibly_undefined()
+                };
 
                 default_ty =
                     default_ty.map(|ty| ty.apply_optional_specialization(db, specialization));
@@ -2103,9 +2117,7 @@ impl<'db> StaticClassLiteral<'db> {
                             false
                         } else {
                             // No explicit qualifier - use class default (`total` parameter)
-                            typed_dict_params
-                                .expect("TypedDictParams should be available for CodeGeneratorKind::TypedDict")
-                                .contains(TypedDictParams::TOTAL)
+                            typed_dict_fields_are_required_by_default
                         };
 
                         FieldKind::TypedDict {
@@ -2122,7 +2134,9 @@ impl<'db> StaticClassLiteral<'db> {
                 };
 
                 // Check if this is a KW_ONLY sentinel and mark subsequent fields as keyword-only
-                if field.is_kw_only_sentinel(db) {
+                if matches!(field_policy, CodeGeneratorKind::DataclassLike(_))
+                    && field.is_kw_only_sentinel(db)
+                {
                     kw_only_sentinel_field_seen = true;
                 }
 

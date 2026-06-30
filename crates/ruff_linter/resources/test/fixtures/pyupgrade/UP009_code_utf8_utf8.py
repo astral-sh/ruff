@@ -1,3 +1,3 @@
-print('No coding coments here')
+print('No coding comments here')
 # -*- coding: utf-8 -*-
 # -*- coding: utf-8 -*-

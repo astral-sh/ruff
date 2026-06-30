@@ -1,13 +1,11 @@
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprUnaryOp;
 use ruff_python_ast::UnaryOp;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_text_size::Ranged;
 
 use crate::comments::trailing_comments;
-use crate::expression::parentheses::{
-    NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized,
-};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -90,11 +88,7 @@ impl NeedsParentheses for ExprUnaryOp {
             return OptionalParentheses::Always;
         }
 
-        if is_expression_parenthesized(
-            self.operand.as_ref().into(),
-            context.comments().ranges(),
-            context.source(),
-        ) {
+        if context.is_expression_parenthesized(self.operand.as_ref().into()) {
             return OptionalParentheses::Never;
         }
 
@@ -110,12 +104,8 @@ impl NeedsParentheses for ExprUnaryOp {
 /// operand and thus requires parentheses.
 fn needs_line_break(item: &ExprUnaryOp, context: &PyFormatContext) -> bool {
     let comments = context.comments();
-    let parenthesized_operand_range = parenthesized_range(
-        item.operand.as_ref().into(),
-        item.into(),
-        comments.ranges(),
-        context.source(),
-    );
+    let parenthesized_operand_range =
+        parenthesized_range(item.operand.as_ref().into(), item.into(), context.tokens());
     let leading_operand_comments = comments.leading(item.operand.as_ref());
     let has_leading_comments_before_parens = parenthesized_operand_range.is_some_and(|range| {
         leading_operand_comments
@@ -124,10 +114,6 @@ fn needs_line_break(item: &ExprUnaryOp, context: &PyFormatContext) -> bool {
     });
 
     !leading_operand_comments.is_empty()
-        && !is_expression_parenthesized(
-            item.operand.as_ref().into(),
-            context.comments().ranges(),
-            context.source(),
-        )
+        && !context.is_expression_parenthesized(item.operand.as_ref().into())
         || has_leading_comments_before_parens
 }

@@ -1290,7 +1290,7 @@ def g[S: (bool, str)](x: S) -> S:
 ## Display ordering
 
 Where possible, we want the types that appear in inferred specializations to line up with the types
-that are listed in the source code. We don't want arbitarily reorder e.g. union elements as part of
+that are listed in the source code. We don't want arbitrarily reorder e.g. union elements as part of
 finding a solution.
 
 ```py

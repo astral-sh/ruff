@@ -37,6 +37,52 @@ pub(super) enum ResolvedEnumMethod<'db> {
     Opaque,
 }
 
+/// A built-in enum data-type mixin whose runtime value normalization ty models.
+///
+/// ```python
+/// from enum import Enum
+///
+/// class Number(int, Enum):
+///     FALSE = False
+///     ZERO = 0  # Alias of `FALSE` after `int(False)` produces `0`.
+/// ```
+///
+/// User-defined data types are excluded because their construction, attribute access, equality, and
+/// hashing semantics can differ from the built-in scalar later in their MRO.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::Update)]
+enum KnownEnumDataTypeMixin {
+    Int,
+    Str,
+}
+
+impl KnownEnumDataTypeMixin {
+    /// Returns the scalar payload type after applying the built-in mixin's constructor.
+    ///
+    /// Literal conversions are preserved precisely, unions are normalized element-wise, and values
+    /// whose conversion cannot be modeled precisely fall back to the mixin's instance type.
+    fn normalize_value<'db>(self, db: &'db dyn Db, value: Type<'db>) -> Type<'db> {
+        if let Type::Union(union) = value {
+            return union.map(db, |element| self.normalize_value(db, *element));
+        }
+
+        match (self, value.as_literal_value_kind()) {
+            (Self::Int, Some(LiteralValueTypeKind::Int(_)))
+            | (Self::Str, Some(LiteralValueTypeKind::String(_))) => value,
+            (Self::Int, Some(LiteralValueTypeKind::Bool(value))) => {
+                Type::int_literal(i64::from(value))
+            }
+            (Self::Str, Some(LiteralValueTypeKind::Int(value))) => {
+                Type::string_literal(db, &value.to_string())
+            }
+            (Self::Str, Some(LiteralValueTypeKind::Bool(value))) => {
+                Type::string_literal(db, if value { "True" } else { "False" })
+            }
+            (Self::Int, _) => KnownClass::Int.to_instance(db),
+            (Self::Str, _) => KnownClass::Str.to_instance(db),
+        }
+    }
+}
+
 impl<'db> ResolvedEnumMethod<'db> {
     pub(super) const fn function(self) -> Option<FunctionType<'db>> {
         match self {
@@ -61,13 +107,14 @@ impl<'db> ResolvedEnumMethod<'db> {
 /// Describes the runtime steps that may transform a declared enum member value.
 ///
 /// Different consumers require different levels of conservatism. Value inference trusts known
-/// standard-library constructors but treats user-defined constructors as possible transformations,
-/// while alias detection follows the value captured before `__init__`.
+/// standard-library data types but treats user-defined data types and constructors as possible
+/// transformations, while alias detection follows the value captured before `__init__`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, salsa::Update)]
 pub(super) struct EnumValueConstruction<'db> {
     pub(super) init: ResolvedEnumMethod<'db>,
     pub(super) new: ResolvedEnumMethod<'db>,
     generate_next_value: ResolvedEnumMethod<'db>,
+    data_type: InheritedEnumDataType,
     pub(super) metaclass_may_transform_values: bool,
 }
 
@@ -75,22 +122,25 @@ impl<'db> EnumValueConstruction<'db> {
     /// Returns whether a member value can be checked directly against an explicit `_value_`
     /// annotation.
     ///
-    /// Constructor methods have their own call signatures and may replace `_value_`; a custom
-    /// metaclass may rewrite the member value before construction.
+    /// User-defined data types and constructor methods may replace `_value_`; a custom metaclass may
+    /// rewrite the member value before construction.
     pub(crate) const fn can_validate_with_value_annotation(self) -> bool {
         matches!(self.init, ResolvedEnumMethod::Absent)
             && matches!(self.new, ResolvedEnumMethod::Absent)
+            && !matches!(self.data_type, InheritedEnumDataType::Opaque)
             && !self.metaclass_may_transform_values
     }
 
     /// Returns whether the declared value cannot be used as the precise type of `.value`.
     ///
-    /// Standard-library constructors are trusted because their value normalization is reflected in
-    /// the inherited `_value_` annotation. A resolvable `_generate_next_value_` is excluded because
-    /// its return type can be used for an `auto()` member instead.
+    /// Standard-library data types are trusted because their value normalization is either modeled
+    /// directly or reflected in the inherited `_value_` annotation. A resolvable
+    /// `_generate_next_value_` is excluded because its return type can be used for an `auto()` member
+    /// instead.
     const fn member_value_may_be_transformed(self, is_auto: bool) -> bool {
         self.init.is_user_defined()
             || self.new.is_user_defined()
+            || matches!(self.data_type, InheritedEnumDataType::Opaque)
             || self.metaclass_may_transform_values
             || (is_auto && self.generate_next_value.is_opaque())
     }
@@ -101,7 +151,23 @@ impl<'db> EnumValueConstruction<'db> {
     /// `_generate_next_value_` is excluded because `value_type` incorporates its return type for
     /// each `auto()` member before the values are combined.
     const fn instance_value_may_be_transformed(self) -> bool {
-        self.init.is_present() || self.new.is_present() || self.metaclass_may_transform_values
+        self.init.is_present()
+            || self.new.is_present()
+            || matches!(self.data_type, InheritedEnumDataType::Opaque)
+            || self.metaclass_may_transform_values
+    }
+
+    /// Returns the payload after known built-in data-type construction, or `None` when the
+    /// constructor may coerce it in a way that ty does not model.
+    fn normalize_value(self, db: &'db dyn Db, value: Type<'db>) -> Option<Type<'db>> {
+        match self.data_type {
+            InheritedEnumDataType::None => Some(value),
+            InheritedEnumDataType::DeclaredValue(data_type) => {
+                value_has_exact_known_class(db, value, data_type).then_some(value)
+            }
+            InheritedEnumDataType::Known(mixin) => Some(mixin.normalize_value(db, value)),
+            InheritedEnumDataType::Opaque => None,
+        }
     }
 
     /// Returns the value to use when checking whether an enum member is an alias.
@@ -118,17 +184,23 @@ impl<'db> EnumValueConstruction<'db> {
         value_ty: Type<'db>,
         is_auto: bool,
     ) -> Option<Type<'db>> {
-        if self.new.is_user_defined() || self.metaclass_may_transform_values {
-            None
-        } else if !is_auto {
-            Some(value_ty)
-        } else if self.generate_next_value.is_opaque() {
-            None
-        } else if let Some(function) = self.generate_next_value.function() {
-            Some(function.signature(db).overload_return_type_or_unknown(db))
-        } else {
-            Some(value_ty)
+        if self.new.is_user_defined()
+            || matches!(self.data_type, InheritedEnumDataType::Opaque)
+            || self.metaclass_may_transform_values
+        {
+            return None;
         }
+
+        let value = if !is_auto {
+            value_ty
+        } else if self.generate_next_value.is_opaque() {
+            return None;
+        } else if let Some(function) = self.generate_next_value.function() {
+            function.signature(db).overload_return_type_or_unknown(db)
+        } else {
+            value_ty
+        };
+        self.normalize_value(db, value)
     }
 }
 
@@ -152,6 +224,9 @@ impl<'db> EnumValueAnnotation<'db> {
 pub(crate) struct EnumMetadata<'db> {
     pub(crate) members: FxIndexMap<Name, Type<'db>>,
     pub(crate) aliases: FxHashMap<Name, Name>,
+
+    /// Whether alias detection was precise for every member declaration.
+    pub(super) aliases_are_known: bool,
 
     /// Members whose values were defined using `auto()`.
     pub(crate) auto_members: FxHashSet<Name>,
@@ -209,6 +284,8 @@ pub struct EnumClassLiteral<'db> {
     pub(crate) members: Box<[(Name, Type<'db>)]>,
     #[returns(ref)]
     pub(crate) aliases: Box<[(Name, Name)]>,
+    /// Whether the canonical member and alias sets are known exactly.
+    pub(super) aliases_are_known: bool,
     /// Whether the canonical members exhaust the runtime values of this enum class.
     ///
     /// `Flag` classes, transforming metaclasses, and enums with a custom `_missing_` method can
@@ -252,6 +329,7 @@ fn enum_class_literal<'db>(
         class,
         members,
         aliases.into_boxed_slice(),
+        metadata.aliases_are_known,
         members_are_exhaustive,
     ))
 }
@@ -300,8 +378,12 @@ impl<'db> EnumClassLiteral<'db> {
 
     /// Returns the type of `.name`/`._name_` for a given enum member.
     ///
-    /// This is always a string literal of the member name.
+    /// This is the canonical member name when alias detection is precise, or `str` when the
+    /// declaration may be an alias of another member.
     pub(crate) fn name_type(self, db: &'db dyn Db, name: &Name) -> Option<Type<'db>> {
+        if !self.aliases_are_known(db) {
+            return Some(KnownClass::Str.to_instance(db));
+        }
         self.resolve_member(db, name)
             .map(|name| Type::string_literal(db, name.as_str()))
     }
@@ -391,11 +473,34 @@ fn known_constructor_preserves_value_type<'db>(
     }
 }
 
+/// Return whether constructing `data_type` from `value` preserves the value's inferred runtime
+/// class. This deliberately requires an exact known class rather than accepting subclasses whose
+/// constructor may return an instance of the built-in base.
+fn value_has_exact_known_class<'db>(
+    db: &'db dyn Db,
+    value: Type<'db>,
+    data_type: KnownClass,
+) -> bool {
+    match value.resolve_type_alias(db) {
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| value_has_exact_known_class(db, *element, data_type)),
+        Type::LiteralValue(literal) => match literal.fallback_instance(db) {
+            Type::NominalInstance(instance) => instance.has_known_class(db, data_type),
+            _ => false,
+        },
+        Type::NominalInstance(instance) => instance.has_known_class(db, data_type),
+        _ => false,
+    }
+}
+
 impl<'db> EnumMetadata<'db> {
     fn empty() -> Self {
         EnumMetadata {
             members: FxIndexMap::default(),
             aliases: FxHashMap::default(),
+            aliases_are_known: false,
             auto_members: FxHashSet::default(),
             value_annotation: None,
             value_construction: EnumValueConstruction::default(),
@@ -405,29 +510,20 @@ impl<'db> EnumMetadata<'db> {
     /// Returns the type of `.value`/`._value_` for a given enum member.
     ///
     /// A user-defined `_value_` annotation takes priority. Otherwise, values transformed by
-    /// user-defined construction methods or metaclasses become `Any`. For standard-library
-    /// constructors, a literal is preserved when its runtime class matches the inherited `_value_`
-    /// annotation; otherwise, the annotation describes the normalized value.
+    /// user-defined data types, construction methods, or metaclasses become `Any`. Known built-in
+    /// data types normalize the value directly. A literal is preserved when its runtime class
+    /// matches an inherited `_value_` annotation; otherwise, the annotation describes the
+    /// normalized value.
     pub(crate) fn value_type(&self, db: &'db dyn Db, member_name: &Name) -> Option<Type<'db>> {
-        let declared_value = self.members.get(member_name).copied()?;
+        if !self.members.contains_key(member_name) {
+            return None;
+        }
 
         if let Some(EnumValueAnnotation::UserDefined(annotation)) = self.value_annotation {
             return Some(annotation);
         }
-        if self.member_value_may_be_transformed(member_name) {
+        let Some(value) = self.concrete_value_type(db, member_name) else {
             return Some(Type::Dynamic(DynamicType::Any));
-        }
-
-        let value = if self.auto_members.contains(member_name)
-            && self
-                .value_construction
-                .generate_next_value
-                .is_user_defined()
-            && let Some(func_ty) = self.value_construction.generate_next_value.function()
-        {
-            func_ty.signature(db).overload_return_type_or_unknown(db)
-        } else {
-            declared_value
         };
 
         if let Some(EnumValueAnnotation::StandardLibrary(annotation)) = self.value_annotation
@@ -439,10 +535,37 @@ impl<'db> EnumMetadata<'db> {
         }
     }
 
+    /// Returns the normalized member payload when construction is known not to transform it.
+    ///
+    /// Unlike [`Self::value_type`], this does not substitute a `_value_` annotation for the
+    /// concrete payload.
+    pub(super) fn concrete_value_type(
+        &self,
+        db: &'db dyn Db,
+        member_name: &Name,
+    ) -> Option<Type<'db>> {
+        let declared_value = self.members.get(member_name).copied()?;
+        if self.member_value_may_be_transformed(member_name) {
+            return None;
+        }
+        let value = if self.auto_members.contains(member_name)
+            && self
+                .value_construction
+                .generate_next_value
+                .is_user_defined()
+            && let Some(func_ty) = self.value_construction.generate_next_value.function()
+        {
+            func_ty.signature(db).overload_return_type_or_unknown(db)
+        } else {
+            declared_value
+        };
+        self.value_construction.normalize_value(db, value)
+    }
+
     /// Return whether enum construction may replace the value declared for `member_name`.
     ///
     /// An opaque `_generate_next_value_` only affects members declared with `auto()`.
-    pub(crate) fn member_value_may_be_transformed(&self, member_name: &Name) -> bool {
+    fn member_value_may_be_transformed(&self, member_name: &Name) -> bool {
         self.value_construction
             .member_value_may_be_transformed(self.auto_members.contains(member_name))
     }
@@ -451,8 +574,8 @@ impl<'db> EnumMetadata<'db> {
     /// narrowed to a specific member (e.g. `x: MyEnum` where `MyEnum` has multiple members).
     ///
     /// If there is an explicit `_value_` annotation, returns that.
-    /// If there is a custom `__init__` or `__new__` or a custom enum
-    /// metaclass may transform member values, returns `Any`.
+    /// If there is a user-defined data type, a custom `__init__` or `__new__`, or a custom enum
+    /// metaclass that may transform member values, returns `Any`.
     /// Otherwise, returns the union of each member's `value_type`, which
     /// applies `_generate_next_value_`'s return type to `auto()` members.
     pub(crate) fn instance_value_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
@@ -620,19 +743,6 @@ impl<'db> EnumComplementType<'db> {
                 .overrides_equality(db)
     }
 
-    /// Return `true` when this complement can be losslessly split into single-valued literals.
-    ///
-    /// This permits finite-union narrowing over large complements without materializing the
-    /// alternatives for complements that still carry positive rest components.
-    pub(crate) fn has_finite_single_valued_alternatives(self, db: &'db dyn Db) -> bool {
-        self.rest(db).is_empty()
-            && self.remaining_member_count(db) > 0
-            && !self
-                .enum_class(db)
-                .to_non_generic_instance(db)
-                .overrides_equality(db)
-    }
-
     /// Expand this complement to the enum literals that remain possible.
     pub fn remaining_literal_types(self, db: &'db dyn Db) -> Vec<Type<'db>> {
         self.remaining_member_names(db)
@@ -778,31 +888,32 @@ pub(crate) fn enum_ignored_names<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -
     }
 }
 
-/// If `value_ty` is a hashable literal and already exists in `enum_values`,
-/// record it as an alias and return `true`. Otherwise track it as canonical.
+/// If `value_ty` has a supported literal value, record it as canonical or as an alias of an existing
+/// value. Returns `None` when the value is not precise enough for alias detection. Literal metadata
+/// does not affect enum aliasing at runtime, so the map is keyed by [`LiteralValueTypeKind`] rather
+/// than [`Type`].
 fn try_register_alias<'db>(
     value_ty: Type<'db>,
     name: &Name,
-    enum_values: &mut FxHashMap<Type<'db>, Name>,
+    enum_values: &mut FxHashMap<LiteralValueTypeKind<'db>, Name>,
     aliases: &mut FxHashMap<Name, Name>,
-) -> bool {
+) -> Option<bool> {
+    let value = value_ty.as_literal_value_kind()?;
     if !matches!(
-        value_ty.as_literal_value_kind(),
-        Some(
-            LiteralValueTypeKind::Bool(_)
-                | LiteralValueTypeKind::Int(_)
-                | LiteralValueTypeKind::String(_)
-                | LiteralValueTypeKind::Bytes(_)
-        )
+        value,
+        LiteralValueTypeKind::Bool(_)
+            | LiteralValueTypeKind::Int(_)
+            | LiteralValueTypeKind::String(_)
+            | LiteralValueTypeKind::Bytes(_)
     ) {
-        return false;
+        return None;
     }
-    if let Some(canonical) = enum_values.get(&value_ty) {
+    if let Some(canonical) = enum_values.get(&value) {
         aliases.insert(name.clone(), canonical.clone());
-        return true;
+        return Some(true);
     }
-    enum_values.insert(value_ty, name.clone());
-    false
+    enum_values.insert(value, name.clone());
+    Some(false)
 }
 
 /// List all members of an enum.
@@ -831,11 +942,25 @@ pub(crate) fn enum_metadata<'db>(
             if !spec.has_known_members(db) {
                 return None;
             }
+            let value_construction = EnumValueConstruction {
+                data_type: inherited_enum_data_type(db, ClassLiteral::DynamicEnum(enum_lit)),
+                ..EnumValueConstruction::default()
+            };
             let mut members = FxIndexMap::default();
             let mut aliases = FxHashMap::default();
-            let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
+            let mut enum_values: FxHashMap<LiteralValueTypeKind<'db>, Name> = FxHashMap::default();
             for (name, ty) in spec.members(db) {
-                if try_register_alias(*ty, name, &mut enum_values, &mut aliases) {
+                if value_construction
+                    .alias_detection_value(db, *ty, false)
+                    .and_then(|alias_value_ty| {
+                        try_register_alias(alias_value_ty, name, &mut enum_values, &mut aliases)
+                            // Identical raw literals remain aliases even when normalization widens.
+                            .or_else(|| {
+                                try_register_alias(*ty, name, &mut enum_values, &mut aliases)
+                            })
+                    })
+                    == Some(true)
+                {
                     continue;
                 }
                 members.insert(name.clone(), *ty);
@@ -845,9 +970,10 @@ pub(crate) fn enum_metadata<'db>(
             return Some(EnumMetadata {
                 members,
                 aliases,
+                aliases_are_known: true,
                 auto_members: FxHashSet::default(),
                 value_annotation: None,
-                value_construction: EnumValueConstruction::default(),
+                value_construction,
             });
         }
     };
@@ -868,22 +994,27 @@ pub(crate) fn enum_metadata<'db>(
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
-    let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
+    let mut enum_values: FxHashMap<LiteralValueTypeKind<'db>, Name> = FxHashMap::default();
     let mut auto_counter = 0;
     let mut auto_members = FxHashSet::default();
+    let mut aliases_are_known = true;
     let mut prev_value_was_non_literal_int = false;
     let mut prev_bool_literal = None;
     let ignored_names = enum_ignored_names(db, scope_id);
 
     // Look up custom construction methods, falling back to parent enum classes. An opaque binding
     // still shadows methods from classes later in the MRO.
+    let data_type = inherited_enum_data_type(db, ClassLiteral::Static(class));
     let user_defined_init = custom_enum_method(db, scope_id, "__init__")
         .or_else(|| inherited_user_defined_enum_method(db, class, "__init__"));
     let init = resolve_enum_method(user_defined_init, || {
         inherited_known_enum_method(db, class, "__init__")
     });
+    // CPython checks `__new_member__` and then `__new__` on each enum base before continuing
+    // through the MRO or falling back to the data-type constructor.
     let user_defined_new = custom_enum_method(db, scope_id, "__new__")
-        .or_else(|| inherited_user_defined_enum_method(db, class, "__new__"));
+        .or_else(|| inherited_user_defined_enum_new(db, class))
+        .or_else(|| inherited_user_defined_mixin_new(db, class));
     let new = resolve_enum_method(user_defined_new, || {
         inherited_known_enum_method(db, class, "__new__")
     });
@@ -898,6 +1029,7 @@ pub(crate) fn enum_metadata<'db>(
         init,
         new,
         generate_next_value,
+        data_type,
         metaclass_may_transform_values,
     };
 
@@ -1038,18 +1170,10 @@ pub(crate) fn enum_metadata<'db>(
                 }
             };
 
-            let alias_value_ty =
-                value_construction.alias_detection_value(db, value_ty, auto_members.contains(name));
-            if let Some(alias_value_ty) = alias_value_ty
-                && try_register_alias(alias_value_ty, name, &mut enum_values, &mut aliases)
-            {
-                return None;
-            }
-
             let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
 
             if !explicit_member_wrapper
-                && declarations.clone().any_reachable(db, |declaration| {
+                && declarations.any_reachable(db, |declaration| {
                     declaration.is_defined_and(|declaration| {
                         !matches!(
                             declaration.kind(db),
@@ -1076,6 +1200,19 @@ pub(crate) fn enum_metadata<'db>(
                         _ => None,
                     });
 
+            match value_construction
+                .alias_detection_value(db, value_ty, auto_members.contains(name))
+                .and_then(|alias_value_ty| {
+                    try_register_alias(alias_value_ty, name, &mut enum_values, &mut aliases)
+                }) {
+                Some(true) => return None,
+                Some(false) => {}
+                None if value_construction.data_type != InheritedEnumDataType::None => {
+                    aliases_are_known = false;
+                }
+                None => {}
+            }
+
             Some((name.clone(), value_ty))
         })
         .collect::<FxIndexMap<_, _>>();
@@ -1100,6 +1237,7 @@ pub(crate) fn enum_metadata<'db>(
     Some(EnumMetadata {
         members,
         aliases,
+        aliases_are_known,
         auto_members,
         value_annotation,
         value_construction,
@@ -1184,6 +1322,71 @@ fn inherited_user_defined_value_annotation<'db>(
         .find_map(|base| custom_value_annotation(db, base.body_scope(db)))
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, salsa::Update)]
+enum InheritedEnumDataType {
+    #[default]
+    None,
+    DeclaredValue(KnownClass),
+    Known(KnownEnumDataTypeMixin),
+    Opaque,
+}
+
+/// Find the data type selected for this enum.
+///
+/// CPython searches each direct base independently. We only model a selected built-in data type
+/// precisely when no user-defined non-enum base can affect member construction or attribute access.
+fn inherited_enum_data_type<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+) -> InheritedEnumDataType {
+    let mut selected = InheritedEnumDataType::None;
+
+    for explicit_base in class.explicit_bases(db) {
+        let Some(explicit_base) = explicit_base.to_class_type(db) else {
+            return InheritedEnumDataType::Opaque;
+        };
+        let mut candidate = None;
+
+        for base in explicit_base.iter_mro(db) {
+            let Some(base) = base.into_class() else {
+                return InheritedEnumDataType::Opaque;
+            };
+            let base = base.class_literal(db);
+            if matches!(base, ClassLiteral::DynamicEnum(_)) {
+                continue;
+            }
+            let Some(base) = base.as_static() else {
+                return InheritedEnumDataType::Opaque;
+            };
+
+            if base.known(db) == Some(KnownClass::Object) || is_enum_class_by_inheritance(db, base)
+            {
+                continue;
+            }
+
+            let data_type = match base.known(db) {
+                Some(KnownClass::Int) => InheritedEnumDataType::Known(KnownEnumDataTypeMixin::Int),
+                Some(KnownClass::Str) => InheritedEnumDataType::Known(KnownEnumDataTypeMixin::Str),
+                Some(known) => InheritedEnumDataType::DeclaredValue(known),
+                None => return InheritedEnumDataType::Opaque,
+            };
+            candidate = Some(data_type);
+            break;
+        }
+
+        let Some(candidate) = candidate else {
+            continue;
+        };
+        selected = match (selected, candidate) {
+            (InheritedEnumDataType::None, candidate) => candidate,
+            (selected, candidate) if selected == candidate => selected,
+            _ => return InheritedEnumDataType::Opaque,
+        };
+    }
+
+    selected
+}
+
 #[derive(Clone, Copy)]
 enum EnumMethodBinding<'db> {
     Function(FunctionType<'db>),
@@ -1223,6 +1426,38 @@ fn inherited_user_defined_enum_method<'db>(
     iter_parent_enum_classes(db, class)
         .filter(|base| base.known(db).is_none())
         .find_map(|base| custom_enum_method(db, base.body_scope(db), name))
+}
+
+/// Looks up the first user-defined enum member constructor in the MRO.
+fn inherited_user_defined_enum_new<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<EnumMethodBinding<'db>> {
+    iter_parent_enum_classes(db, class)
+        .filter(|base| base.known(db).is_none())
+        .find_map(|base| {
+            let scope = base.body_scope(db);
+            custom_enum_method(db, scope, "__new_member__")
+                .or_else(|| custom_enum_method(db, scope, "__new__"))
+        })
+}
+
+/// Looks up a user-defined `__new__` on a data-type mixin anywhere in the MRO, including through an
+/// enum base.
+///
+/// When no enum class provides a member constructor, `EnumType` uses this method to construct the
+/// scalar payload stored by the enum member.
+fn inherited_user_defined_mixin_new<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<EnumMethodBinding<'db>> {
+    class
+        .iter_mro(db, None)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+        .filter_map(|class| class.class_literal(db).as_static())
+        .filter(|base| base.known(db).is_none())
+        .find_map(|base| custom_enum_method(db, base.body_scope(db), "__new__"))
 }
 
 /// Looks up a resolvable method inherited from a known enum class.

@@ -23,7 +23,7 @@ use ruff_cache::cache_dir;
 use ruff_formatter::IndentStyle;
 use ruff_graph::{AnalyzeSettings, Direction, StringImports};
 use ruff_linter::line_width::{IndentWidth, LineLength};
-use ruff_linter::registry::{INCOMPATIBLE_CODES, Rule, RuleNamespace, RuleSet};
+use ruff_linter::registry::{INCOMPATIBLE_CODES, Rule, RuleSet};
 use ruff_linter::rule_selector::{PreviewOptions, RuleResolutionError, Specificity};
 use ruff_linter::rules::{flake8_import_conventions, isort, pycodestyle};
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
@@ -1109,15 +1109,15 @@ impl LintConfiguration {
 
                 // Redirected rules
                 if let RuleSelector::Prefix {
-                    prefix,
                     redirected_from: Some(redirect_from),
+                    ..
                 }
                 | RuleSelector::Rule {
-                    prefix,
                     redirected_from: Some(redirect_from),
+                    ..
                 } = selector
                 {
-                    redirects.insert(redirect_from, prefix);
+                    redirects.insert(*redirect_from, selector);
                 }
             }
         }
@@ -1160,13 +1160,9 @@ impl LintConfiguration {
         }
 
         for (from, target) in redirects.iter().sorted_by_key(|item| item.0) {
+            let (prefix, code) = target.prefix_and_code();
             // TODO(martin): This belongs into the ruff crate.
-            warn_user_once_by_id!(
-                from,
-                "`{from}` has been remapped to `{}{}`.",
-                target.linter().common_prefix(),
-                target.short_code()
-            );
+            warn_user_once_by_id!(from, "`{from}` has been remapped to `{prefix}{code}`.");
         }
 
         if preview.mode.is_disabled() {

@@ -9,7 +9,6 @@ use serde::Serialize;
 use strum_macros::EnumIter;
 
 use crate::registry::Linter;
-use crate::rule_selector::is_single_rule_selector;
 use crate::rules;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -24,6 +23,10 @@ impl NoqaCode {
     /// Return the suffix for the [`NoqaCode`], e.g., `101` for `SIM101`.
     pub fn suffix(&self) -> &str {
         self.1
+    }
+
+    pub(crate) const fn into_parts(self) -> (&'static str, &'static str) {
+        (self.0, self.1)
     }
 }
 

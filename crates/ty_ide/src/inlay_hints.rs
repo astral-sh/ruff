@@ -589,7 +589,7 @@ fn name_matches_parameter(argument_name: &str, parameter_name: &str) -> bool {
 /// Given a function call, check if the expression is the "same name"
 /// as the function being called.
 ///
-/// This allows us to filter out reptitive inlay hints like `x: T = T(...)`.
+/// This allows us to filter out repetitive inlay hints like `x: T = T(...)`.
 /// While still allowing non-trivial ones like `x: T[U] = T()`.
 fn call_matches_name(expr: &Expr, name: &str) -> bool {
     // Only care about function calls
@@ -2301,32 +2301,29 @@ Source with applied edits:
         def my_func(event: Click):
             match event:
                 case Click(x, button=ab):
-                    x[: Unknown] = ab
+                    x[: str] = ab
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/builtins.pyi:LL:7
            |
-        LL | Unknown: _SpecialForm
-           | ^^^^^^^
+        LL | class str(Sequence[str]):
+           |       ^^^
            |
         info: Source
           --> main2.py:LL:17
            |
-        LL |             x[: Unknown] = ab
-           |                 ^^^^^^^
+        LL |             x[: str] = ab
+           |                 ^^^
            |
 
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
            |
-        1  + from ty_extensions import Unknown
-        2  |
-        --------------------------------------------------------------------------------
-        11 |         case Click(x, button=ab):
+        10 |         case Click(x, button=ab):
            -             x = ab
-        12 +             x: Unknown = ab
+        11 +             x: str = ab
            |
         "#);
     }
@@ -7099,10 +7096,10 @@ Source with applied edits:
         Ts = TypeVarTuple([name=]'Ts')
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/typing.pyi:LL:30
+          --> stdlib/typing_extensions.pyi:LL:17
            |
-        LL |             def __new__(cls, name: str, *, default: Any = ...) -> Self: ...  # AnnotationForm
-           |                              ^^^^
+        LL |                 name: str,
+           |                 ^^^^
            |
         info: Source
           --> main2.py:LL:20

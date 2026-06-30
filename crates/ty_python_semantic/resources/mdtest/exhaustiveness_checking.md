@@ -255,11 +255,11 @@ from enum import Enum, Flag
 class Permission(Flag):
     READ = 1
 
-class OpenEnum(Enum):
+class MissingValueEnum(Enum):
     ONLY = 1
 
     @classmethod
-    def _missing_(cls, value: object) -> "OpenEnum":
+    def _missing_(cls, value: object) -> "MissingValueEnum":
         return object.__new__(cls)
 
 def match_flag(value: Permission) -> int:  # error: [invalid-return-type]
@@ -267,9 +267,9 @@ def match_flag(value: Permission) -> int:  # error: [invalid-return-type]
         case Permission.READ:
             return 1
 
-def match_open_enum(value: OpenEnum) -> int:  # error: [invalid-return-type]
+def match_open_enum(value: MissingValueEnum) -> int:  # error: [invalid-return-type]
     match value:
-        case OpenEnum.ONLY:
+        case MissingValueEnum.ONLY:
             return 1
 ```
 
@@ -430,7 +430,7 @@ def match_exhaustive_generic[T](obj: GenericClass[T]) -> GenericClass[T]:
             reveal_type(obj)  # revealed: GenericClass[T@match_exhaustive_generic]
             return obj
         case GenericClass(x=x):
-            reveal_type(x)  # revealed: Unknown
+            reveal_type(x)  # revealed: T@match_exhaustive_generic
             reveal_type(obj)  # revealed: GenericClass[T@match_exhaustive_generic]
             return obj
 ```

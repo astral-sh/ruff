@@ -75,6 +75,21 @@ impl ProjectDatabase {
         db
     }
 
+    /// Permanently freezes the most heavily read inputs that are immutable during a one-shot check.
+    ///
+    /// This is intentionally not exhaustive. It includes every [`Program`] input, the most heavily
+    /// read immutable [`Project`] inputs, and every field on files created after this call. Existing
+    /// files retain their durability. This must not be used by incremental consumers or checks that
+    /// apply fixes.
+    pub fn freeze(&mut self) {
+        let program = Program::try_get(self).expect("the program should be initialized");
+        let project = self.project();
+
+        program.freeze(self);
+        project.freeze(self);
+        self.files.freeze();
+    }
+
     fn new<S, Strategy: MisconfigurationStrategy>(
         project_metadata: ProjectMetadata,
         system: S,
@@ -795,6 +810,23 @@ mod tests {
     use ty_module_resolver::list_modules;
 
     use crate::{ProjectDatabase, ProjectMetadata};
+
+    #[test]
+    fn frozen_inputs_support_a_one_shot_check() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let project = SystemPathBuf::from("/project");
+        system
+            .memory_file_system()
+            .write_file_all(project.join("main.py"), "x: int = 'not an int'")?;
+
+        let metadata = ProjectMetadata::discover(&project, &system)?;
+        let mut db = ProjectDatabase::fallible(metadata, system)?;
+        db.freeze();
+
+        assert_eq!(db.check().len(), 1);
+
+        Ok(())
+    }
 
     #[test]
     fn search_root_registration() -> anyhow::Result<()> {

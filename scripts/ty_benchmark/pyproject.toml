@@ -9,7 +9,7 @@ dependencies = [
     # Pyright is missing because we install it with `npm` to avoid measuring the overhead
     # of the Python wrapper script (that lazily installs Pyright).
     "mslex>=1.3.0",
-    "pyrefly==1.1.0",
+    "pyrefly==1.1.1",
     "pytest-benchmark>=4.0.0",
     "pytest>=8.0.0",
     "pygls>=2.0.0",

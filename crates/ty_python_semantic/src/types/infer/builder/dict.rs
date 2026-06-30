@@ -14,6 +14,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         func: &ast::Expr,
         arguments: &ast::Arguments,
+        collection_expr: Option<ast::ExprRef<'_>>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
         if !arguments.args.is_empty() {
@@ -109,7 +110,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         self.infer_collection_literal(
             KnownClass::Dict,
-            None,
+            collection_expr,
             &items,
             &mut infer_elt_ty,
             call_expression_tcx,
