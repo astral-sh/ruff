@@ -681,6 +681,93 @@ info: incompatible return types: `str` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 ```
 
+### Identically named bases
+
+If two base classes from different modules have the same name, the diagnostic uses their fully
+qualified names.
+
+`left.pyi`:
+
+```pyi
+class Base:
+    def method(self) -> str: ...
+```
+
+`right.pyi`:
+
+```pyi
+class Base:
+    def method(self) -> int: ...
+```
+
+`main.pyi`:
+
+```pyi
+from left import Base as LeftBase
+from right import Base as RightBase
+
+class Child(LeftBase, RightBase): ...  # snapshot: invalid-method-override
+```
+
+```snapshot
+error[invalid-method-override]: Base classes for class `Child` define method `method` incompatibly
+ --> src/main.pyi:4:7
+  |
+4 | class Child(LeftBase, RightBase): ...  # snapshot: invalid-method-override
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^^ method from `left.Base` is incompatible with method from `right.Base`
+  |
+ ::: src/left.pyi:2:9
+  |
+2 |     def method(self) -> str: ...
+  |         ------ method from `left.Base` defined here
+  |
+ ::: src/right.pyi:2:9
+  |
+2 |     def method(self) -> int: ...
+  |         ------ method from `right.Base` defined here
+  |
+info: incompatible return types: `str` is not assignable to `int`
+info: This violates the Liskov Substitution Principle
+```
+
+If the fully qualified names still collide because a module-level name was rebound, the diagnostic
+also includes source locations.
+
+```py
+class Base:
+    def method(self) -> str:
+        return ""
+
+FirstBase = Base
+
+class Base:
+    def method(self) -> int:
+        return 0
+
+class Child(FirstBase, Base):  # snapshot: invalid-method-override
+    pass
+```
+
+```snapshot
+error[invalid-method-override]: Base classes for class `Child` define method `method` incompatibly
+  --> src/mdtest_snippet.py:8:9
+   |
+ 8 |     def method(self) -> int:
+   |         ------ method from `mdtest_snippet.Base @ src/mdtest_snippet.py:7:7` defined here
+ 9 |         return 0
+10 |
+11 | class Child(FirstBase, Base):  # snapshot: invalid-method-override
+   |       ^^^^^^^^^^^^^^^^^^^^^^ method from `mdtest_snippet.Base @ src/mdtest_snippet.py:1:7` is incompatible with method from `mdtest_snippet.Base @ src/mdtest_snippet.py:7:7`
+   |
+  ::: src/mdtest_snippet.py:2:9
+   |
+ 2 |     def method(self) -> str:
+   |         ------ method from `mdtest_snippet.Base @ src/mdtest_snippet.py:1:7` defined here
+   |
+info: incompatible return types: `str` is not assignable to `int`
+info: This violates the Liskov Substitution Principle
+```
+
 ### Methods inherited by a direct base
 
 A direct base does not need to define the method itself. Its effective method can come from an
