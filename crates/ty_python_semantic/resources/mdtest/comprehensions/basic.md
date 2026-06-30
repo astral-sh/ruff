@@ -156,14 +156,46 @@ def partial_sum():
     total = 0
     [total := total + value for value in [1, 2]]
     reveal_type(total)  # revealed: int
+```
 
-# TODO: Model repeated comprehension iterations with a fixed point. The second iteration assigns
-# `int`, so the final type should be `str | int` and `value.upper()` should report an error.
+Comprehensions use the same loop-header fixed point as explicit loops. The type exported after the
+comprehension therefore includes values that become possible only after feeding one iteration's
+assignment back into the next iteration:
+
+```py
 def type_changes_across_iterations():
     value = 0
     [value := "" if isinstance(value, int) else 0 for _ in [0, 1]]
-    reveal_type(value)  # revealed: str
-    value.upper()
+    reveal_type(value)  # revealed: str | int
+    value.upper()  # error: [unresolved-attribute]
+```
+
+This requires more than unioning the pre-comprehension type with the first modeled result. The
+second iteration adds `bytes`, which is neither the initial `int` nor the first result `str`:
+
+```py
+def multiple_type_changes_across_iterations():
+    value = 0
+    results = [value := ("" if isinstance(value, int) else b"" if isinstance(value, str) else 0) for _ in [0, 1]]
+    reveal_type(value)  # revealed: str | bytes | int
+    reveal_type(results)  # revealed: list[str | bytes | int]
+```
+
+The loop-back value does not hide that the name is unbound on the first iteration:
+
+```py
+def missing_initial_value():
+    [value := value + 1 for _ in [0, 1]]  # error: [possibly-unresolved-reference]
+```
+
+Filter assignments also feed into later iterations, even when the first assigned value causes that
+iteration's element to be skipped:
+
+```py
+def type_changes_in_filter():
+    value = 0
+    [None for _ in [0, 1] if (value := "" if isinstance(value, int) else 1)]
+    reveal_type(value)  # revealed: str | int
 ```
 
 The same applies when two targets depend on values from earlier iterations:

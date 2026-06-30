@@ -25,9 +25,40 @@ pub(crate) fn collect_for_loop_bindings(for_stmt: &ast::StmtFor) -> Vec<PlaceExp
     collector.bound_places
 }
 
-/// The visitor that powers `collect_while_loop_bindings` and `collect_for_loop_bindings`.
+/// Collects assignment-expression targets from the implicit loops in a comprehension.
 ///
-/// This visitor doesn't walk nested function/class definitions since those are different scopes.
+/// The first iterable is evaluated outside the comprehension scope, so it is intentionally not
+/// visited. Later iterables, filters, and the result expressions all execute inside the repeated
+/// portion of the comprehension. Generator targets are excluded because each one is freshly
+/// assigned before its uses on an iteration; only assignment expressions can carry a value from a
+/// previous iteration.
+pub(crate) fn collect_comprehension_named_expression_bindings<'ast>(
+    generators: &'ast [ast::Comprehension],
+    result_expressions: impl IntoIterator<Item = &'ast ast::Expr>,
+) -> Vec<PlaceExpr> {
+    let mut collector = LoopBindingsVisitor::default();
+
+    for (index, generator) in generators.iter().enumerate() {
+        if index > 0 {
+            collector.visit_expr(&generator.iter);
+        }
+        for if_expr in &generator.ifs {
+            collector.visit_expr(if_expr);
+        }
+    }
+
+    for expression in result_expressions {
+        collector.visit_expr(expression);
+    }
+
+    collector.bound_places
+}
+
+/// The visitor that collects bindings from explicit loops and assignment-expression bindings from
+/// comprehensions.
+///
+/// This visitor doesn't walk nested function, class, or lambda bodies since those are different
+/// scopes.
 #[derive(Debug, Default)]
 pub(crate) struct LoopBindingsVisitor {
     bound_places: Vec<PlaceExpr>,
@@ -161,9 +192,17 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
     }
 
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
-        // the walrus operator
-        if let ast::Expr::Named(node) = expr {
-            self.add_place_from_target(&node.target);
+        match expr {
+            // The walrus operator.
+            ast::Expr::Named(node) => self.add_place_from_target(&node.target),
+            // Parameter defaults execute in the current scope, but the lambda body does not.
+            ast::Expr::Lambda(ast::ExprLambda { parameters, .. }) => {
+                if let Some(parameters) = parameters {
+                    self.visit_parameters(parameters);
+                }
+                return;
+            }
+            _ => {}
         }
         walk_expr(self, expr);
     }

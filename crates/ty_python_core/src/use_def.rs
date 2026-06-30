@@ -269,7 +269,8 @@ use crate::use_def::place_state::{
     LiveDeclarationsIterator, PlaceState,
 };
 use crate::{
-    BoundnessAnalysis, EnclosingSnapshotResult, LoopHeader, PossiblyNarrowedPlaces, SemanticIndex,
+    BoundnessAnalysis, Db, EnclosingSnapshotResult, LoopHeader, PossiblyNarrowedPlaces,
+    SemanticIndex,
 };
 
 mod place_state;
@@ -2274,13 +2275,16 @@ impl<'db> UseDefMapBuilder<'db> {
             .map(LiveBinding::binding)
     }
 
-    /// Returns the current boundness of `symbol` after applying pending reachability constraints.
+    /// Returns the current boundness of `symbol` from non-loop bindings after applying pending
+    /// reachability constraints.
     ///
     /// Bindings on statically unreachable paths do not contribute to the result. This is stricter
     /// than [`Symbol::is_bound`](crate::symbol::Symbol::is_bound), which records whether the symbol
-    /// is bound anywhere in the scope without considering control flow.
-    pub(super) fn symbol_live_binding_status(
+    /// is bound anywhere in the scope without considering control flow. Synthetic loop headers do
+    /// not bind the symbol themselves, so they do not contribute either.
+    pub(super) fn symbol_live_non_loop_binding_status(
         &mut self,
+        db: &dyn Db,
         symbol: ScopedSymbolId,
     ) -> LiveBindingStatus {
         let pending = self.pending_reachability.current;
@@ -2301,6 +2305,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 continue;
             }
             match self.definition(binding.binding()) {
+                DefinitionState::Defined(definition) if definition.kind(db).is_loop_header() => {}
                 DefinitionState::Defined(_) => has_binding = true,
                 DefinitionState::Undefined | DefinitionState::Deleted => has_unbound = true,
             }

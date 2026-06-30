@@ -31,7 +31,7 @@ use crate::definition::{
     DefinitionNodeKey, DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef,
     ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef, ImportDefinitionNodeRef,
     ImportFromDefinitionNodeRef, ImportFromSubmoduleDefinitionNodeRef,
-    LambdaParameterDefinitionNodeRef, LoopHeaderDefinitionNodeRef, LoopStmtRef,
+    LambdaParameterDefinitionNodeRef, LoopHeaderDefinitionNodeRef, LoopNodeRef,
     MatchPatternDefinitionNodeRef, NestedBindingExecution, NestedBindingsDefinitionKind,
     ParameterDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
@@ -1697,7 +1697,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// bound `ScopedDefinitionId` for definitions created within the loop.
     fn synthesize_loop_header_definitions(
         &mut self,
-        loop_stmt: LoopStmtRef<'ast>,
+        loop_node: LoopNodeRef<'ast>,
         bound_places: Vec<PlaceExpr>,
     ) -> (LoopHeaderId, FxHashSet<ScopedPlaceId>, ScopedDefinitionId) {
         let loop_header_id = self.current_use_def_map_mut().reserve_loop_header();
@@ -1706,7 +1706,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let place_id = self.add_place(place_expr);
             if bound_place_ids.insert(place_id) {
                 let loop_header_ref = LoopHeaderDefinitionNodeRef {
-                    loop_stmt,
+                    loop_node,
                     place: place_id,
                     loop_header_id,
                 };
@@ -1910,7 +1910,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let Some(symbol) = self.place_tables[scope_id].symbol_id(name) else {
                 continue;
             };
-            match self.use_def_maps[scope_id].symbol_live_binding_status(symbol) {
+            match self.use_def_maps[scope_id].symbol_live_non_loop_binding_status(self.db, symbol) {
                 LiveBindingStatus::Bound => return LiveBindingStatus::Bound,
                 LiveBindingStatus::PossiblyBound => status = LiveBindingStatus::PossiblyBound,
                 LiveBindingStatus::Unbound => {}
@@ -2580,6 +2580,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self,
         scope: NodeWithScopeRef,
         generators: &'ast [ast::Comprehension],
+        result_expressions: impl IntoIterator<Item = &'ast ast::Expr>,
         visit_outer_elt: impl FnOnce(&mut Self),
     ) {
         let mut generators_iter = generators.iter();
@@ -2600,6 +2601,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let saved_assignments = std::mem::take(&mut self.current_assignments);
 
         self.push_scope(scope);
+
+        let bound_places = loop_bindings_visitor::collect_comprehension_named_expression_bindings(
+            generators,
+            result_expressions,
+        );
+        // An assignment expression can read the value written by a previous iteration. Use the
+        // same loop-header definitions as explicit loops so inference iterates those types to a
+        // fixed point.
+        let maybe_loop_header_info = (!bound_places.is_empty()).then(|| {
+            self.synthesize_loop_header_definitions(
+                LoopNodeRef::Comprehension(generator),
+                bound_places,
+            )
+        });
 
         self.add_unpackable_assignment(
             &Unpackable::Comprehension {
@@ -2636,6 +2651,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         visit_outer_elt(self);
         for filtered_out_path in filtered_out_paths {
             self.flow_merge(filtered_out_path);
+        }
+        if let Some((header_id, bound_place_ids, loop_min_definition_id)) = maybe_loop_header_info {
+            self.populate_loop_header(&bound_place_ids, header_id, loop_min_definition_id);
         }
         let nested_bindings = self.pop_scope();
         self.synthesize_comprehension_binding_definitions(nested_bindings);
@@ -3628,7 +3646,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // Avoid allocating a `LoopHeader` if there are no bound places in this loop.
                 if !bound_places.is_empty() {
                     maybe_loop_header_info = Some(self.synthesize_loop_header_definitions(
-                        LoopStmtRef::While(while_stmt),
+                        LoopNodeRef::While(while_stmt),
                         bound_places,
                     ));
                 }
@@ -3779,7 +3797,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // Avoid allocating a `LoopHeader` if there are no bound places in this loop.
                 if !bound_places.is_empty() {
                     maybe_loop_header_info = Some(self.synthesize_loop_header_definitions(
-                        LoopStmtRef::For(for_stmt),
+                        LoopNodeRef::For(for_stmt),
                         bound_places,
                     ));
                 }
@@ -4721,6 +4739,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.with_generators_scope(
                     NodeWithScopeRef::ListComprehension(list_comprehension),
                     generators,
+                    [elt.as_ref()],
                     |builder| builder.visit_expr(elt),
                 );
             }
@@ -4732,6 +4751,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.with_generators_scope(
                     NodeWithScopeRef::SetComprehension(set_comprehension),
                     generators,
+                    [elt.as_ref()],
                     |builder| builder.visit_expr(elt),
                 );
             }
@@ -4743,6 +4763,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.with_generators_scope(
                     NodeWithScopeRef::GeneratorExpression(generator),
                     generators,
+                    [elt.as_ref()],
                     |builder| builder.visit_expr(elt),
                 );
             }
@@ -4757,6 +4778,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.with_generators_scope(
                     NodeWithScopeRef::DictComprehension(dict_comprehension),
                     generators,
+                    key.iter()
+                        .map(std::convert::AsRef::as_ref)
+                        .chain(std::iter::once(value.as_ref())),
                     |builder| {
                         if let Some(key) = key {
                             builder.visit_expr(key);

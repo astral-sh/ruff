@@ -557,15 +557,16 @@ pub(crate) struct ExceptHandlerDefinitionNodeRef<'ast> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct LoopHeaderDefinitionNodeRef<'ast> {
-    pub(crate) loop_stmt: LoopStmtRef<'ast>,
+    pub(crate) loop_node: LoopNodeRef<'ast>,
     pub(crate) place: ScopedPlaceId,
     pub(crate) loop_header_id: LoopHeaderId,
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) enum LoopStmtRef<'ast> {
+pub(crate) enum LoopNodeRef<'ast> {
     While(&'ast ast::StmtWhile),
     For(&'ast ast::StmtFor),
+    Comprehension(&'ast ast::Comprehension),
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -783,14 +784,17 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 DefinitionKind::TypeVarTuple(AstNodeRef::new(parsed, node))
             }
             DefinitionNodeRef::LoopHeader(LoopHeaderDefinitionNodeRef {
-                loop_stmt,
+                loop_node,
                 place,
                 loop_header_id,
             }) => DefinitionKind::LoopHeader(LoopHeaderDefinitionKind {
                 loop_header_id,
-                loop_stmt: match loop_stmt {
-                    LoopStmtRef::While(stmt) => LoopStmtKind::While(AstNodeRef::new(parsed, stmt)),
-                    LoopStmtRef::For(stmt) => LoopStmtKind::For(AstNodeRef::new(parsed, stmt)),
+                loop_node: match loop_node {
+                    LoopNodeRef::While(stmt) => LoopNodeKind::While(AstNodeRef::new(parsed, stmt)),
+                    LoopNodeRef::For(stmt) => LoopNodeKind::For(AstNodeRef::new(parsed, stmt)),
+                    LoopNodeRef::Comprehension(comprehension) => {
+                        LoopNodeKind::Comprehension(AstNodeRef::new(parsed, comprehension))
+                    }
                 },
                 place,
             }),
@@ -861,9 +865,12 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             Self::TypeVar(node) => node.into(),
             Self::ParamSpec(node) => node.into(),
             Self::TypeVarTuple(node) => node.into(),
-            Self::LoopHeader(LoopHeaderDefinitionNodeRef { loop_stmt, .. }) => match loop_stmt {
-                LoopStmtRef::While(stmt) => stmt.into(),
-                LoopStmtRef::For(stmt) => stmt.into(),
+            Self::LoopHeader(LoopHeaderDefinitionNodeRef { loop_node, .. }) => match loop_node {
+                LoopNodeRef::While(stmt) => stmt.into(),
+                LoopNodeRef::For(stmt) => stmt.into(),
+                LoopNodeRef::Comprehension(comprehension) => {
+                    DefinitionNodeKey(NodeKey::from_node(comprehension))
+                }
             },
         }
     }
@@ -1563,14 +1570,15 @@ impl ExceptHandlerDefinitionKind {
 pub struct LoopHeaderDefinitionKind {
     /// The `LoopHeader` is reserved before walking the loop and populated afterward.
     loop_header_id: LoopHeaderId,
-    loop_stmt: LoopStmtKind,
+    loop_node: LoopNodeKind,
     place: ScopedPlaceId,
 }
 
 #[derive(Clone, Debug, get_size2::GetSize)]
-pub(crate) enum LoopStmtKind {
+pub(crate) enum LoopNodeKind {
     While(AstNodeRef<ast::StmtWhile>),
     For(AstNodeRef<ast::StmtFor>),
+    Comprehension(AstNodeRef<ast::Comprehension>),
 }
 
 impl LoopHeaderDefinitionKind {
@@ -1583,9 +1591,10 @@ impl LoopHeaderDefinitionKind {
     }
 
     pub fn range(&self, module: &ParsedModuleRef) -> TextRange {
-        match &self.loop_stmt {
-            LoopStmtKind::While(stmt) => stmt.node(module).range(),
-            LoopStmtKind::For(stmt) => stmt.node(module).range(),
+        match &self.loop_node {
+            LoopNodeKind::While(stmt) => stmt.node(module).range(),
+            LoopNodeKind::For(stmt) => stmt.node(module).range(),
+            LoopNodeKind::Comprehension(comprehension) => comprehension.node(module).range(),
         }
     }
 }
