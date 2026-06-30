@@ -20,7 +20,7 @@ use ruff_python_ast::{
     visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
 use ruff_text_size::Ranged;
-use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
+use ty_python_core::definition::{Definition, DefinitionState};
 use ty_python_core::scope::ScopeKind;
 use ty_python_semantic::{ImportAliasResolution, ResolvedDefinition, SemanticModel};
 
@@ -262,14 +262,10 @@ pub(crate) fn has_any_external_visible_definitions(
     definitions.iter().any(|definition| match definition {
         ResolvedDefinition::Definition(definition) => match definition.scope(db).scope(db).kind() {
             ScopeKind::Module | ScopeKind::Class => true,
-            // A comprehension walrus binds in its containing scope. Conservatively search other
-            // files even when that containing scope is local; references are matched semantically.
-            ScopeKind::Comprehension => {
-                matches!(definition.kind(db), DefinitionKind::NamedExpression(_))
-            }
             ScopeKind::TypeParams
             | ScopeKind::Function
             | ScopeKind::Lambda
+            | ScopeKind::Comprehension
             | ScopeKind::TypeAlias => false,
         },
         ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => true,

@@ -77,14 +77,6 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
     let is_stub_file = file.is_stub(db);
     let index = semantic_index(db, file);
     let mut unused = Vec::new();
-    // A used synthetic definition counts as a use of the user-visible definitions it represents.
-    let used_definitions = index.scope_ids().flat_map(|scope_id| {
-        index
-            .use_def_map(scope_id.file_scope_id(db))
-            .all_definitions_with_usage()
-            .filter_map(|(_, state, is_used)| is_used.then_some(state.definition()).flatten())
-    });
-    let used_user_visible_definitions = super::user_visible_definitions(db, used_definitions);
 
     for scope_id in index.scope_ids() {
         let file_scope_id = scope_id.file_scope_id(db);
@@ -115,7 +107,6 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
             let DefinitionState::Defined(definition) = state else {
                 continue;
             };
-            let is_used = is_used || used_user_visible_definitions.contains(&definition);
 
             if is_used {
                 let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
@@ -167,9 +158,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
 
             // Global and nonlocal assignments target bindings from outer scopes.
             // Treat them as externally managed to avoid false positives here.
-            let is_comprehension_named_expression = scope_kind == ScopeKind::Comprehension
-                && matches!(kind, DefinitionKind::NamedExpression(_));
-            if (symbol.is_global() || symbol.is_nonlocal()) && !is_comprehension_named_expression {
+            if symbol.is_global() || symbol.is_nonlocal() {
                 continue;
             }
 
