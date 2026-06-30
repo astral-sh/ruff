@@ -288,7 +288,7 @@ pub enum Predicate {
     ///
     /// The schema-quality consumer reads these alongside
     /// `validation_kind` to lift Rails parametric validators into
-    /// richer SurrealQL clauses than the catch-all
+    /// richer `SurrealQL` clauses than the catch-all
     /// `$value != NONE` fallback — e.g. `length:maximum=255` lowers
     /// to `string::len($value) <= 255`,
     /// `numericality:greater_than=0` to `$value > 0`.
@@ -422,6 +422,26 @@ pub enum Predicate {
     /// instead of guessing from the `_id` / `_ids` name convention. Mirrors
     /// the Rails-side [`Self::AssociationKind`] (`belongs_to` vs `has_many`).
     RelationKind,
+
+    // ───── Body-mutation extension (cross-frontend command-shape) ─────
+    //
+    // The write-side counterpart of the core-7 query facts (`reads_field` /
+    // `traverses_relation`). Subject is the *function* IRI (like the core
+    // body facts). Added so the body-pass triage can split a method into
+    // query (read-only) vs command (mutates state) — the
+    // accidentally-imperative-vs-essentially-foreign cut
+    // (E-ACCIDENTAL-IMPERATIVE / OGAR F17).
+    /// `(model.fn, writes_field, model.field)` — body assigns the field via a
+    /// `self.<field> = …` setter. Authoritative: the assignment names its
+    /// target unambiguously (machine-readable lvalue), the same certainty
+    /// tier as [`Self::EmittedBy`].
+    WritesField,
+    /// `(model.fn, calls, "<receiver>.<method>")` — body dispatches an
+    /// `ActiveRecord` lifecycle mutator (`save`, `update`, `destroy`, …) on
+    /// some receiver. Object is the raw `"receiver.method"` string (NOT an
+    /// IRI), emitted verbatim like [`Self::Target`]: the receiver is
+    /// heuristically resolved, so the default tier is `Inferred`.
+    Calls,
 }
 
 impl Predicate {
@@ -493,6 +513,9 @@ impl Predicate {
             Self::Target => "target",
             Self::InverseName => "inverse_name",
             Self::RelationKind => "relation_kind",
+            // Body-mutation extension
+            Self::WritesField => "writes_field",
+            Self::Calls => "calls",
         }
     }
 
@@ -570,6 +593,9 @@ impl Predicate {
             "target" => Self::Target,
             "inverse_name" => Self::InverseName,
             "relation_kind" => Self::RelationKind,
+            // Body-mutation extension
+            "writes_field" => Self::WritesField,
+            "calls" => Self::Calls,
             _ => return None,
         })
     }
@@ -578,10 +604,10 @@ impl Predicate {
     /// closed-vocab round-trip test and by any consumer that needs to
     /// enumerate the whole surface (e.g. the ndjson validator).
     ///
-    /// **Length invariant:** `ALL.len() == 60` (7 core + 32 AR-shape +
-    /// 18 C++ machine-plane + 3 Odoo-relational). A new variant added to
-    /// [`Predicate`] **must** be appended here in the same order, or the
-    /// closed-vocab round-trip test fails.
+    /// **Length invariant:** `ALL.len() == 62` (7 core + 32 AR-shape +
+    /// 18 C++ machine-plane + 3 Odoo-relational + 2 body-mutation). A new
+    /// variant added to [`Predicate`] **must** be appended here in the same
+    /// order, or the closed-vocab round-trip test fails.
     pub const ALL: &'static [Predicate] = &[
         // Core 7
         Self::RdfType,
@@ -647,6 +673,9 @@ impl Predicate {
         Self::Target,
         Self::InverseName,
         Self::RelationKind,
+        // Body-mutation extension
+        Self::WritesField,
+        Self::Calls,
     ];
 
     /// The default provenance tier for this predicate, per the Odoo
@@ -675,21 +704,25 @@ impl Predicate {
             | Self::ConcernClassMethods
             | Self::ConcernIncludedBlock
             | Self::IsFriendOf => Provenance::Structural,
-            // Body-authoritative (Odoo + Rails declared)
+            // Body-authoritative (Odoo + Rails declared) — including the
+            // body-mutation write whose lvalue is a machine-readable target.
             Self::EmittedBy
             | Self::DependsOn
             | Self::Raises
             | Self::Target
             | Self::InverseName
-            | Self::RelationKind => Provenance::Authoritative,
+            | Self::RelationKind
+            | Self::WritesField => Provenance::Authoritative,
             // Body-inferred (heuristic by definition) — including the two
             // C++ metaprogramming-residual predicates (macro provenance,
-            // single-TU template instantiation visibility).
+            // single-TU template instantiation visibility) and the
+            // body-mutation call whose receiver is heuristically resolved.
             Self::ReadsField
             | Self::TraversesRelation
             | Self::DefinesMethod
             | Self::UsesMacroExpansion
-            | Self::TemplateInstantiates => Provenance::Inferred,
+            | Self::TemplateInstantiates
+            | Self::Calls => Provenance::Inferred,
             // C++ machine-plane declarative surface (the 10 remaining of 13)
             Self::InheritsFrom
             | Self::HasField
@@ -848,7 +881,7 @@ mod tests {
     }
 
     #[test]
-    fn predicate_count_locked_at_60() {
+    fn predicate_count_locked_at_62() {
         // The exact count is part of the schema contract: 7 core (Odoo
         // Python) + 32 OpenProject AR-shape (PR #15 added
         // `association_kind`; #18 added `class_name`; #21 added
@@ -856,10 +889,14 @@ mod tests {
         // + 18 C++ machine-plane + 3 Odoo-relational (`target`,
         // `inverse_name`, and `relation_kind` — the Odoo field cardinality
         // `many2one`/`one2many`/`many2many` that lets the OGAR lift map a
-        // relational field onto the right `AssociationKind`) = 60. Council
-        // review of any new variant means this number changes — the test
-        // must change with the source.
-        assert_eq!(Predicate::ALL.len(), 60);
+        // relational field onto the right `AssociationKind`)
+        // + 2 body-mutation (`writes_field` / `calls` — the command-shape
+        // counterpart of `reads_field` / `traverses_relation`, capturing
+        // self-field writes and lifecycle-mutator dispatches so the body-pass
+        // triage can split query from command) = 62. Council review of any
+        // new variant means this number changes — the test must change with
+        // the source.
+        assert_eq!(Predicate::ALL.len(), 62);
     }
 
     #[test]
@@ -932,6 +969,13 @@ mod tests {
             Predicate::RelationKind.default_provenance(),
             Provenance::Authoritative
         );
+        // Body-mutation extension: the write lvalue is machine-readable
+        // (Authoritative), the call receiver is heuristic (Inferred).
+        assert_eq!(
+            Predicate::WritesField.default_provenance(),
+            Provenance::Authoritative
+        );
+        assert_eq!(Predicate::Calls.default_provenance(), Provenance::Inferred);
         // Inferred — including DefinesMethod (per-edge override possible
         // but the default tier is heuristic)
         assert_eq!(

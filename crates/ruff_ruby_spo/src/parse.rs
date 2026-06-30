@@ -43,7 +43,7 @@ pub(crate) fn parse_models(source_tree: &Path) -> Vec<RubyClass> {
 
 /// Walk a Rails application **including mounted engines** — the core
 /// `<source_tree>/app/models` plus every engine's `app/models`
-/// (OpenProject keeps ~half its domain in `modules/*/app/models`; generic
+/// (`OpenProject` keeps ~half its domain in `modules/*/app/models`; generic
 /// Rails engines live in `engines/*/app/models`). All files feed one
 /// [`super::build_models`] pass, so the reopen-merge works across roots too.
 ///

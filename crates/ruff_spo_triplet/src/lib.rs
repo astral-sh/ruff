@@ -92,6 +92,7 @@ mod integration_tests {
                 reads: vec!["status".to_string()],
                 raises: vec!["ActiveRecord::RecordInvalid".to_string()],
                 traverses: vec!["time_entries".to_string()],
+                ..Default::default()
             }],
             ..Default::default()
         });

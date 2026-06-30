@@ -263,6 +263,27 @@ impl Expander {
                     Provenance::Inferred,
                 );
             }
+            // Command-shape facts (E-ACCIDENTAL-IMPERATIVE / OGAR F17): the
+            // write-side counterpart of `reads_field` / `traverses_relation`.
+            for write in &func.writes {
+                self.push(
+                    fn_iri.clone(),
+                    Predicate::WritesField,
+                    format!("{model_iri}.{write}"),
+                    Provenance::Authoritative,
+                );
+            }
+            // `calls` objects are raw `"receiver.method"` strings (NOT IRIs):
+            // the receiver may be a local / relation / const / self, so the
+            // object is emitted verbatim like `target` / `field_type`.
+            for call in &func.calls {
+                self.push(
+                    fn_iri.clone(),
+                    Predicate::Calls,
+                    call.clone(),
+                    Provenance::Inferred,
+                );
+            }
         }
 
         // ───── OpenProject AR-shape ─────
@@ -1137,6 +1158,7 @@ mod tests {
                     reads: vec!["currency_id".to_string()],
                     raises: vec!["UserError".to_string()],
                     traverses: vec!["line_ids".to_string()],
+                    ..Default::default()
                 }],
                 ..Default::default()
             }],
@@ -1206,6 +1228,44 @@ mod tests {
         for w in a.windows(2) {
             assert!(w[0].key() <= w[1].key(), "triples not sorted by (s,p,o)");
         }
+    }
+
+    #[test]
+    fn body_mutation_facts_expand() {
+        // A command-shape method: writes a field, dispatches lifecycle
+        // mutators on self and on a relation. The body-pass triage (F17)
+        // needs these as `writes_field` (IRI object, Authoritative) and
+        // `calls` (raw "receiver.method" object, Inferred).
+        let mut g = fixture();
+        g.models[0].functions.push(Function {
+            name: "post".to_string(),
+            writes: vec!["state".to_string()],
+            calls: vec!["self.save".to_string(), "line_ids.update_all".to_string()],
+            ..Default::default()
+        });
+        let triples = expand(&g);
+        let has =
+            |s: &str, p: &str, o: &str| triples.iter().any(|t| t.s == s && t.p == p && t.o == o);
+        let truth = |p: &str, o: &str| {
+            triples
+                .iter()
+                .find(|t| t.p == p && t.o == o)
+                .map(|t| (t.f, t.c))
+        };
+
+        // writes_field: object IS an IRI into the model; Authoritative.
+        assert!(has(
+            "odoo:account_move.post",
+            "writes_field",
+            "odoo:account_move.state"
+        ));
+        assert_eq!(truth("writes_field", "odoo:account_move.state"), Some((0.95, 0.90)));
+
+        // calls: object is the raw "receiver.method" string (NOT an IRI);
+        // Inferred.
+        assert!(has("odoo:account_move.post", "calls", "self.save"));
+        assert!(has("odoo:account_move.post", "calls", "line_ids.update_all"));
+        assert_eq!(truth("calls", "self.save"), Some((0.85, 0.75)));
     }
 
     #[test]
@@ -1812,7 +1872,7 @@ mod tests {
 
     /// **D-AR-5.8 — additional Rails kinds (codex P2 on #21)** —
     /// the recognised set now includes `absence` (inverse of
-    /// presence) and `comparison` (greater_than / less_than family).
+    /// presence) and `comparison` (`greater_than` / `less_than` family).
     /// Both lift to `validation_kind` triples the downstream
     /// consumer can act on.
     #[test]

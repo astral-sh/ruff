@@ -202,6 +202,13 @@ fn build_graph(classes: &[RawClass], namespace: &str) -> ModelGraph {
                         reads: m.reads.clone(),
                         raises: m.raises.clone(),
                         traverses: m.traverses.clone(),
+                        // Command-shape facts (writes / calls) are not yet
+                        // harvested on the Python side — the Odoo compute
+                        // path already carries its write target declaratively
+                        // via `Field::emitted_by`, so body-write capture is a
+                        // follow-up. Left empty (additive, byte-identical
+                        // ndjson) until a Python body-pass lands.
+                        ..Default::default()
                     })
                     .collect(),
                 name,

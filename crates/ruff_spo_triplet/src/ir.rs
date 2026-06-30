@@ -237,6 +237,15 @@ pub struct Field {
 }
 
 /// One method / function.
+///
+/// The first four fields are the original query-shape facts (what the body
+/// *reads*). The last two — [`Self::writes`] and [`Self::calls`] — are the
+/// **command-shape** facts (what the body *mutates* / *dispatches*), added so
+/// the body-pass triage can split a method into query (read-only) vs command
+/// (writes state) — the accidentally-imperative-vs-essentially-foreign cut
+/// (E-ACCIDENTAL-IMPERATIVE / OGAR F17). Both are `skip_serializing_if`-empty,
+/// so a frontend that doesn't populate them (Odoo Python today) leaves the
+/// ndjson byte-identical.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Function {
     /// Function name (e.g. `_compute_amount`).
@@ -250,6 +259,24 @@ pub struct Function {
     /// Relation names this function traverses (loop targets). Emitted as
     /// `traverses_relation` (Inferred).
     pub traverses: Vec<String>,
+    /// Field names this function WRITES via a `self.<field> = …` setter call
+    /// in its body. Emitted as `writes_field` (Authoritative — the assignment
+    /// names its target unambiguously; only the value is uncertain). The
+    /// command-side counterpart of [`Self::reads`]; together they let the
+    /// triage classify a method as read-only vs mutating. Plain instance-var
+    /// assignment (`@x = …`, local memoization) is deliberately NOT a write.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub writes: Vec<String>,
+    /// Lifecycle-mutator calls the body dispatches, as `"<receiver>.<method>"`
+    /// (e.g. `self.save`, `order.update`, `line_ids.destroy_all`). Only the
+    /// closed `ActiveRecord` mutator set is captured (create/update/save/
+    /// destroy/…) — not every call — because the signal the body-pass triage
+    /// needs is "this method calls a writer", i.e. it dispatches a lifecycle
+    /// verb on some target. Emitted as `calls` (Inferred — receiver
+    /// resolution is heuristic at static-AST time; the verb itself is a
+    /// literal).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub calls: Vec<String>,
 }
 
 impl Model {
