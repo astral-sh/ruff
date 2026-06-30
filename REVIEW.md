@@ -11,7 +11,7 @@
 - Fixed — Conservatively promote every eager export, covering direct and cross-target loop-carried values without a dependency graph.
 - Rejected — Eager exports intentionally use promoted base types, so preserving literals through nested same-name binders is outside Issue 162; mypy likewise widens to `str`.
 - Fixed — Preserve unused-binding usage and target ranges per comprehension walrus definition.
-- Fixed — Preserve walrus writes and conditional boundness from rejected comprehension-filter paths.
+- Fixed — Preserve walrus writes and conditional boundness from filtered-out comprehension paths.
 - Fixed — Forward only the flow-aware proxy across nested comprehensions so inner writes cannot bypass outer reachability or ordering.
 - Rejected — No outer conditional-expression bug: with `possibly-unresolved-reference` enabled, both ordinary and comprehension walruses preserve conditional boundness.
 - Fixed — Separate eager comprehension proxy synthesis from the existing lazy nested-function binding path.
