@@ -1844,9 +1844,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         LiveBindingStatus::Unbound => {}
                     }
                 }
-                if status == LiveBindingStatus::Unbound {
-                    continue;
-                }
                 Some(status)
             } else {
                 None
@@ -1918,6 +1915,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
 
             let place: ScopedPlaceId = symbol.into();
+            if execution == NestedBindingExecution::Eager {
+                self.mark_place_bound(place);
+                if eager_binding_status == Some(LiveBindingStatus::Unbound) {
+                    continue;
+                }
+            }
+
             let definition = Definition::new(
                 self.db,
                 self.current_scope_id(),
@@ -1930,10 +1934,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 })),
                 false,
             );
-
-            if execution == NestedBindingExecution::Eager {
-                self.mark_place_bound(place);
-            }
 
             // Adding a binding typically invalidates narrowing aliases like
             // `is_int = isinstance(x, int)`. However, for the same reason that we retain both

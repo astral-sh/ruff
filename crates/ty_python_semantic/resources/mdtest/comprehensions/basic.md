@@ -98,6 +98,13 @@ def partial_sum():
     total = 0
     [total := total + value for value in [1, 2]]
     reveal_type(total)  # revealed: int
+
+unreachable_local = "global"
+
+def unreachable_local_owner():
+    [(unreachable_local := 1) if False else 0 for _ in [0]]
+    # error: [unresolved-reference] "Name `unreachable_local` used when not defined"
+    reveal_type(unreachable_local)  # revealed: Unknown
 ```
 
 ## Comprehension referencing outer comprehension
