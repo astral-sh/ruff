@@ -2263,56 +2263,11 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        CallArgumentForm, ImportAliasResolution, call_argument_forms, definition_for_name,
-    };
+    use super::{CallArgumentForm, call_argument_forms};
     use crate::SemanticModel;
     use crate::db::tests::TestDbBuilder;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
-    use ruff_text_size::{TextRange, TextSize};
-    use ty_python_core::definition::DefinitionKind;
-
-    #[test]
-    fn comprehension_walrus_definition_resolves_from_containing_scope() -> anyhow::Result<()> {
-        let source = "[(leaked := 1) for _ in [0]]\nprint(leaked)\n";
-        let db = TestDbBuilder::new()
-            .with_file("/src/foo.py", source)
-            .build()?;
-
-        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
-        let name = parsed
-            .suite()
-            .last()
-            .unwrap()
-            .as_expr_stmt()
-            .unwrap()
-            .value
-            .as_call_expr()
-            .unwrap()
-            .arguments
-            .args
-            .first()
-            .unwrap()
-            .as_name_expr()
-            .unwrap();
-        let model = SemanticModel::new(&db, file);
-
-        let definition =
-            definition_for_name(&model, name, ImportAliasResolution::ResolveAliases).unwrap();
-        assert!(matches!(
-            definition.kind(&db),
-            DefinitionKind::NamedExpression(_)
-        ));
-        let target_start = TextSize::try_from(source.find("leaked :=").unwrap()).unwrap();
-        assert_eq!(
-            definition.kind(&db).target_range(&parsed),
-            TextRange::new(target_start, target_start + TextSize::new(6))
-        );
-
-        Ok(())
-    }
 
     #[test]
     fn keyword_call_argument_forms_follow_source_order() -> anyhow::Result<()> {

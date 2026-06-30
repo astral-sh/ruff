@@ -1778,7 +1778,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         nested_bindings.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
 
         for (name, mut declarations) in nested_bindings {
-            // Ignore declarations used only to validate `nonlocal` syntax.
+            // Filter down to only the declarations with `is_bound: true`. If there are none left,
+            // skip synthesizing a definition for this symbol. (The reason we track these at all is
+            // that we reuse some of the same machinery to report semantic syntax errors for
+            // invalid `nonlocal`s, and those don't necessarily need a binding.)
             declarations.retain(|d| d.is_bound);
             declarations.shrink_to_fit();
             if declarations.is_empty() {
@@ -1844,11 +1847,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// [(last := item) for item in items]
     /// print(last)  # `last` is owned by this containing scope.
     /// ```
-    ///
-    /// This follows ty's existing eager model for comprehension scopes: it does not represent the
-    /// zero-iteration path or distinguish a consumed generator expression from an unconsumed one.
-    /// Modeling those cases requires cross-scope reachability that is intentionally out of scope
-    /// here.
     fn synthesize_comprehension_binding_definitions(
         &mut self,
         nested_bindings: NestedGlobalOrNonlocalDeclarations,
@@ -1945,15 +1943,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         status
     }
 
-    /// Forwards a nested-comprehension proxy toward the scope containing the outermost comprehension.
+    /// Passes a walrus binding out through nested comprehensions.
     ///
     /// ```python
     /// [[(last := item) for item in row] for row in rows]
     /// print(last)  # `last` belongs to the scope outside both comprehensions.
     /// ```
     ///
-    /// Only the immediate proxy is forwarded. It captures the inner definitions through this
-    /// comprehension's flow state, so inner writes cannot bypass outer reachability or ordering.
+    /// Each comprehension passes the binding out one level. This preserves the order and
+    /// conditions under which the assignment is evaluated.
     fn forward_comprehension_binding(
         &mut self,
         name: &Name,

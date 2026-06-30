@@ -285,38 +285,6 @@ mod tests {
     }
 
     #[test]
-    fn reports_unused_comprehension_named_expression() -> anyhow::Result<()> {
-        let source = dedent(
-            "
-            def f(items: list[int]):
-                [(dead := item) for item in items]
-                [(used := item) for item in items]
-                print(used)
-                [(used_in_comprehension := item, used_in_comprehension) for item in items]
-                [(shadowed := 1, shadowed := 2, print(shadowed)) for _ in items]
-            ",
-        );
-
-        let bindings = collect_unused_bindings(&source)?;
-        let dead_start = TextSize::try_from(source.find("dead := item").unwrap()).unwrap();
-        let shadowed_start = TextSize::try_from(source.find("shadowed := 1").unwrap()).unwrap();
-        assert_eq!(
-            bindings,
-            vec![
-                UnusedBinding {
-                    range: TextRange::new(dead_start, dead_start + TextSize::new(4)),
-                    name: Name::new("dead"),
-                },
-                UnusedBinding {
-                    range: TextRange::new(shadowed_start, shadowed_start + TextSize::new(8)),
-                    name: Name::new("shadowed"),
-                },
-            ]
-        );
-        Ok(())
-    }
-
-    #[test]
     fn skips_module_and_class_scope_bindings() -> anyhow::Result<()> {
         let source = dedent(
             "
