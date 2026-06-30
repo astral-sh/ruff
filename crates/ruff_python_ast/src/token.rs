@@ -210,10 +210,19 @@ impl Token {
         }
     }
 
+    #[expect(
+        unsafe_code,
+        reason = "decoding a compact contiguous TokenKind discriminant requires a transmute"
+    )]
     const fn kind_and_flags(&self) -> (TokenKind, TokenFlags) {
         let encoded = self.kind_and_flags;
-        if let Some(kind) = TokenKind::from_repr(encoded) {
-            return (kind, TokenFlags::empty());
+        if encoded <= TokenKind::Unknown as u8 {
+            // SAFETY: The compile-time assertion below proves that every value in this range is
+            // a valid `TokenKind` discriminant.
+            return (
+                unsafe { std::mem::transmute::<u8, TokenKind>(encoded) },
+                TokenFlags::empty(),
+            );
         }
         if encoded == Self::NON_ASCII_NAME {
             return (TokenKind::Name, TokenFlags::NON_ASCII_NAME);
