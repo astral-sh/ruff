@@ -1894,6 +1894,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             if execution == NestedBindingExecution::Eager
                 && self.scopes[self.current_scope()].kind() == ScopeKind::Comprehension
             {
+                // The synthetic binding captures the inner declarations through this scope's
+                // flow state. Forward only that proxy so inner writes cannot bypass reachability
+                // or shadowing in an enclosing comprehension.
+                self.current_scope_info_mut()
+                    .nested_global_or_nonlocal_declarations
+                    .remove(&name);
                 let is_global = first_declaration.is_global();
                 let range = first_declaration.range;
                 debug_assert!(

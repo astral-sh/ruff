@@ -113,6 +113,18 @@ def unreachable_local_owner():
     [(unreachable_local := 1) if False else 0 for _ in [0]]
     # error: [unresolved-reference] "Name `unreachable_local` used when not defined"
     reveal_type(unreachable_local)  # revealed: Unknown
+
+def nested_comprehension_flow():
+    nested_target = "old"
+    [[nested_target := 1 for _ in [0]] if False else [] for _ in [0]]
+    reveal_type(nested_target)  # revealed: Literal["old"]
+
+    [[nested_dead := 1 for _ in [0]] if False else [] for _ in [0]]
+    # error: [unresolved-reference] "Name `nested_dead` used when not defined"
+    reveal_type(nested_dead)  # revealed: Unknown
+
+    [([nested_order := 1 for _ in [0]], (nested_order := 2)) for _ in [0]]
+    reveal_type(nested_order)  # revealed: Literal[2]
 ```
 
 ## Comprehension referencing outer comprehension
