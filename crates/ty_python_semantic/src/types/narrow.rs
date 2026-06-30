@@ -1483,13 +1483,12 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             if context.positional_sources.is_empty() && kind.keywords.is_empty() {
                 None
             } else {
-                context.class.and_then(|pattern_class| {
-                    filtering_subject_ty
-                        .nominal_class(self.db)
-                        .and_then(|subject_class| {
-                            self.specialize_pattern_class_for_subject(pattern_class, subject_class)
-                        })
-                })
+                context
+                    .class
+                    .zip(filtering_subject_ty.nominal_class(self.db))
+                    .and_then(|(pattern_class, subject_class)| {
+                        self.specialize_pattern_class_for_subject(pattern_class, subject_class)
+                    })
             };
         let member_type = |name: &Name| {
             let original_member_ty = original_subject_ty
@@ -1613,6 +1612,18 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     /// This intentionally handles only the case where every pattern-class type variable has one
     /// exact solution. Variant base classes and pattern classes with unconstrained parameters keep
     /// the existing conservative member type.
+    ///
+    /// ```python
+    /// class Base[T]: ...
+    ///
+    /// class Child[T](Base[T]):
+    ///     item: T
+    ///
+    /// def f(value: Base[int]) -> None:
+    ///     match value:
+    ///         case Child(item=item):
+    ///             reveal_type(item)  # int
+    /// ```
     fn specialize_pattern_class_for_subject(
         &self,
         pattern_class: ClassLiteral<'db>,
@@ -1650,10 +1661,9 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             return None;
         };
 
-        let typevars = generic_context.variables(self.db).collect::<Vec<_>>();
+        let typevars = generic_context.variables(self.db);
         let types = typevars
-            .iter()
-            .copied()
+            .clone()
             .map(|typevar| {
                 solution
                     .iter()
@@ -1662,7 +1672,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             })
             .collect::<Option<Vec<_>>>()?;
         if types.iter().any(|ty| {
-            typevars.iter().any(|typevar| {
+            typevars.clone().any(|typevar| {
                 ty.references_typevar(self.db, typevar.typevar(self.db).identity(self.db))
             })
         }) {
