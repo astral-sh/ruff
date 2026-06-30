@@ -131,6 +131,15 @@ def conditional_filter(flag: bool):
     reveal_type(value)  # revealed: int
 ```
 
+An assignment in the element only runs when every preceding filter succeeds:
+
+```py
+def assignment_after_filter(flag: bool):
+    [(value := 1) for _ in [0] if flag]
+    # error: [possibly-unresolved-reference]
+    reveal_type(value)  # revealed: int
+```
+
 ### Assignments that depend on earlier iterations
 
 An assignment can read the value left by an earlier iteration. In this example, the final value is
