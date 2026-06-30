@@ -21,6 +21,10 @@ flamegraph.svg
 # `CARGO_TARGET_DIR=target-llvm-lines RUSTFLAGS="-Csymbol-mangling-version=v0" cargo llvm-lines -p ruff --lib`
 /target*
 
+# Dev-only vendored crates (recreated by scripts/dev-unblock-lsp-types.sh).
+# Sidesteps the proxy-denied astral-sh/lsp-types git host; never committed.
+/vendor/
+
 # samply profiles
 profile.json
 
