@@ -53,21 +53,15 @@ reveal_type(dict_key)  # revealed: int
 reveal_type(dict_value)  # revealed: int
 ```
 
-### Examples using `any` and `all`
+### Generator expressions
 
-PEP 572 calls out two common uses of this rule: retaining the value that made `any` succeed and the
-value that made `all` fail.
+The target also binds in the containing scope when the assignment is in a generator expression. PEP
+572 uses this `any` pattern as a motivating example:
 
 ```py
 def find_comment(lines: list[str]):
     if any((comment := line).startswith("#") for line in lines):
         reveal_type(comment)  # revealed: str
-
-def find_nonblank(lines: list[str]):
-    if all((nonblank := line).strip() == "" for line in lines):
-        pass
-    else:
-        reveal_type(nonblank)  # revealed: str
 ```
 
 ### Assignment order
