@@ -270,8 +270,19 @@ impl Token {
 }
 
 impl Ranged for Token {
+    #[inline]
     fn range(&self) -> TextRange {
         self.range()
+    }
+
+    #[inline]
+    fn start(&self) -> TextSize {
+        TextSize::new(u32::from_ne_bytes(self.start))
+    }
+
+    #[inline]
+    fn end(&self) -> TextSize {
+        TextSize::new(u32::from_ne_bytes(self.end))
     }
 }
 
@@ -1066,7 +1077,7 @@ impl TokenFlags {
 mod tests {
     use std::mem::size_of;
 
-    use ruff_text_size::{TextRange, TextSize};
+    use ruff_text_size::{Ranged, TextRange, TextSize};
 
     use super::{Token, TokenFlags, TokenKind};
 
@@ -1082,6 +1093,8 @@ mod tests {
             let token = Token::new(kind, range, flags);
             assert_eq!(token.kind_and_flags(), (kind, flags));
             assert_eq!(token.as_tuple(), (kind, range));
+            assert_eq!(token.start(), range.start());
+            assert_eq!(token.end(), range.end());
         }
 
         for encoded in u8::MIN..=u8::MAX {
