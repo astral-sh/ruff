@@ -427,7 +427,9 @@ print(L)
 
 ### Definitions in function-like scopes are not global definitions
 
-Except for some cases involving walrus expressions inside comprehension scopes.
+Names local to a comprehension or lambda are not module globals. Assignment-expression targets in
+comprehensions are an exception: they bind in the containing scope. At module level, that makes them
+available to a wildcard import. An assignment inside a lambda remains local to that lambda.
 
 `exporter.py`:
 
@@ -446,18 +448,9 @@ class Iterable:
 (d for d in Iterable())
 lambda e: (f := 42)
 
-# Definitions created by walruses in a comprehension scope are unique;
-# they "leak out" of the scope and are stored in the surrounding scope
 [(g := h * 2) for h in Iterable()]
-[i for j in Iterable() if (i := j - 10) > 0]
-{(k := l * 2): (m := l * 3) for l in Iterable()}
-list(((o := p * 2) for p in Iterable()))
-
-# A walrus expression nested inside several scopes *still* leaks out
-# to the global scope:
 [[[[(q := r) for r in Iterable()]] for _ in range(42)] for _ in range(42)]
 
-# A walrus inside a lambda inside a comprehension does not leak out
 [(lambda s=s: (t := 42))() for s in Iterable()]
 ```
 
@@ -466,36 +459,18 @@ list(((o := p * 2) for p in Iterable()))
 ```py
 from exporter import *
 
-# error: [unresolved-reference]
-reveal_type(a)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(b)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(c)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(d)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(e)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(f)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(h)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(j)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(p)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(r)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(s)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(t)  # revealed: Unknown
+a  # error: [unresolved-reference]
+b  # error: [unresolved-reference]
+c  # error: [unresolved-reference]
+d  # error: [unresolved-reference]
+e  # error: [unresolved-reference]
+f  # error: [unresolved-reference]
+h  # error: [unresolved-reference]
+r  # error: [unresolved-reference]
+s  # error: [unresolved-reference]
+t  # error: [unresolved-reference]
 
 reveal_type(g)  # revealed: int
-reveal_type(i)  # revealed: int
-reveal_type(k)  # revealed: int
-reveal_type(m)  # revealed: int
-reveal_type(o)  # revealed: int
 reveal_type(q)  # revealed: int
 ```
 

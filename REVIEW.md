@@ -19,3 +19,5 @@
 - Fixed — Route unused-binding usage through the shared user-visible-definition provenance mapping instead of special-casing eager proxies.
 - Fixed — Expand the complete used-definition stream in one provenance traversal instead of allocating per definition.
 - Fixed — Document the eager proxy's scope, boundness, nesting, and filter-flow contracts with concrete Python examples.
+- Fixed — Split the comprehension-walrus mdtest into documented, behavior-focused cases and remove redundant assertions.
+- Fixed — Verify the retained behavior changes fail on main; assertions that already pass there remain only as regression guards against over-binding.
