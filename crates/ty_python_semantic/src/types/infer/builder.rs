@@ -2543,10 +2543,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             union.add_in_place(ty);
         }
         let ty = union.build();
-        let ty = if nested_bindings_kind.has_loop_carried_binding {
-            ty.promote(db)
-        } else {
-            ty
+        let ty = match nested_bindings_kind.execution {
+            NestedBindingExecution::Lazy => ty,
+            NestedBindingExecution::Eager => ty.promote(db),
         };
         self.bindings.insert(definition, ty);
     }

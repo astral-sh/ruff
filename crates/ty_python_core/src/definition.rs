@@ -1595,7 +1595,6 @@ impl LoopHeaderDefinitionKind {
 pub struct NestedBindingsDefinitionKind {
     pub name: Name,
     pub execution: NestedBindingExecution,
-    pub has_loop_carried_binding: bool,
     // Note that in general this can include both `global` and `nonlocal` declarations from
     // different nested scopes, because we don't necessarily know at synthesis time which of those
     // kind will be visible in the current scope.
