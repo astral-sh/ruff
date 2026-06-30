@@ -35,3 +35,4 @@
 - Fixed — Resolve cross-file references and rename conservatively by expanding eager proxies during imported-symbol lookup and treating every comprehension walrus as potentially externally visible; function-local walruses may trigger harmless extra workspace scans, but semantic matching still filters unrelated occurrences.
 - Fixed — Resolve current-scope eager proxies before forwarding global and nonlocal IDE lookups.
 - Rejected — Keep inference-unreachable eager sources conservatively because distinguishing invariant and loop-carried guards requires the iteration dependency modeling intentionally excluded from Issue 162.
+- Fixed — Preserve global comprehension-walrus targets by retaining current-scope named expressions and following lazy proxy chains only when they lead to another nested-binding proxy.
