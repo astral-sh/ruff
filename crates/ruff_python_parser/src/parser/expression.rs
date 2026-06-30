@@ -816,7 +816,7 @@ impl<'src> Parser<'src> {
         }
 
         let mut args = vec![];
-        let mut keywords = vec![];
+        let mut keywords = ThinVec::new();
         let mut seen_keyword_argument = false; // foo = 1
         let mut seen_keyword_unpacking = false; // **foo
 
@@ -947,12 +947,13 @@ impl<'src> Parser<'src> {
             });
 
         self.expect(TokenKind::Rpar);
+        keywords.shrink_to_fit();
 
         let arguments = ast::Arguments {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
             args: args.into_boxed_slice(),
-            keywords: keywords.into(),
+            keywords,
         };
 
         self.validate_arguments(&arguments, has_trailing_comma, context);
