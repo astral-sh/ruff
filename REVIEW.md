@@ -16,3 +16,4 @@
 - Rejected — Outer conditional expressions can still lose walrus boundness, but the same flow bug affects ordinary walruses on `main`; fixing it is outside Issue 162.
 - Fixed — Separate eager comprehension proxy synthesis from the existing lazy nested-function binding path.
 - Fixed — Name and document IDE proxy expansion in terms of the user-visible walrus definitions it returns.
+- Fixed — Route unused-binding usage through the shared user-visible-definition provenance mapping instead of special-casing eager proxies.
