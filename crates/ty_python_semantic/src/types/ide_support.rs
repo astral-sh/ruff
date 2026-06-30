@@ -99,7 +99,7 @@ pub fn definitions_for_name<'db>(
 
             if let Some(global_symbol_id) = global_place_table.symbol_id(name_str) {
                 let global_use_def_map = ty_python_core::use_def_map(db, global_scope_id);
-                all_definitions.extend(reachable_definitions(
+                all_definitions.extend(user_visible_definitions(
                     db,
                     global_use_def_map
                         .reachable_symbol_bindings(global_symbol_id)
@@ -123,7 +123,7 @@ pub fn definitions_for_name<'db>(
         let use_def_map = index.use_def_map(scope_id);
 
         // Get all definitions (both bindings and declarations) for this place
-        all_definitions.extend(reachable_definitions(
+        all_definitions.extend(user_visible_definitions(
             db,
             use_def_map
                 .reachable_symbol_bindings(symbol_id)
@@ -405,7 +405,18 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
     resolved
 }
 
-fn reachable_definitions<'db>(
+/// Returns the user-visible definitions represented by a use-def binding.
+///
+/// Comprehension walruses are represented in the containing scope by synthetic eager bindings:
+///
+/// ```python
+/// [(last := item) for item in items]
+/// print(last)  # Go to definition should select `last := item` above.
+/// ```
+///
+/// The binding for the use in `print` is synthetic, so follow it into the comprehension's
+/// end-of-scope bindings. Nested comprehensions can produce a chain of these proxies.
+fn user_visible_definitions<'db>(
     db: &'db dyn Db,
     definitions: impl IntoIterator<Item = Definition<'db>>,
 ) -> FxIndexSet<Definition<'db>> {
@@ -451,7 +462,7 @@ fn resolve_reachable_definitions<'db>(
     symbol_name: &str,
     definitions: impl IntoIterator<Item = Definition<'db>>,
 ) -> Vec<ResolvedDefinition<'db>> {
-    reachable_definitions(db, definitions)
+    user_visible_definitions(db, definitions)
         .into_iter()
         .flat_map(|definition| {
             resolve_definition(
