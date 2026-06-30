@@ -7,7 +7,9 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
-use ty_python_core::definition::{DefinitionCategory, DefinitionKind, DefinitionState};
+use ty_python_core::definition::{
+    DefinitionCategory, DefinitionKind, DefinitionState, NestedBindingExecution,
+};
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
 use ty_python_core::{SemanticIndex, semantic_index};
@@ -40,7 +42,7 @@ fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
         | DefinitionKind::ParamSpec(_)
         | DefinitionKind::TypeVarTuple(_)
         | DefinitionKind::LoopHeader(_) => false,
-        DefinitionKind::NestedBindings(_) => false,
+        DefinitionKind::NestedBindings(nested) => nested.execution == NestedBindingExecution::Eager,
     }
 }
 
@@ -269,6 +271,29 @@ mod tests {
                 "dead_walrus",
                 "dead_with",
             ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn reports_unused_comprehension_named_expression() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def f(items: list[int]):
+                [(dead := item) for item in items]
+                [(used := item) for item in items]
+                print(used)
+            ",
+        );
+
+        let bindings = collect_unused_bindings(&source)?;
+        let dead_start = TextSize::try_from(source.find("dead := item").unwrap()).unwrap();
+        assert_eq!(
+            bindings,
+            vec![UnusedBinding {
+                range: TextRange::new(dead_start, dead_start + TextSize::new(4)),
+                name: Name::new("dead"),
+            }]
         );
         Ok(())
     }
