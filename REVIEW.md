@@ -12,3 +12,4 @@
 - Rejected — Nested same-name binders only cause safe over-widening in a contrived case; precise handling requires nested-scope name resolution, while mypy likewise widens to `str`.
 - Fixed — Preserve unused-binding usage and target ranges per comprehension walrus definition.
 - Fixed — Preserve walrus writes and conditional boundness from rejected comprehension-filter paths.
+- Fixed — Forward only the flow-aware proxy across nested comprehensions so inner writes cannot bypass outer reachability or ordering.
