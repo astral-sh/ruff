@@ -30,8 +30,9 @@ pub(crate) fn collect_for_loop_bindings(for_stmt: &ast::StmtFor) -> Vec<PlaceExp
 /// The first iterable is evaluated outside the comprehension scope, so it is intentionally not
 /// visited. Each entry contains the bindings that are visible to that generator's back edge:
 /// bindings in its filters, later generators, and the result expressions. Generator targets are
-/// excluded because each one is freshly assigned before its uses on an iteration; only assignment
-/// expressions can carry a value from a previous iteration.
+/// excluded from their own loop headers because they are freshly assigned on each iteration. Later
+/// generator targets are included in enclosing loop headers because their value from the preceding
+/// outer iteration can be read before the later generator runs again.
 pub(crate) fn collect_comprehension_named_expression_bindings_by_generator<'ast>(
     generators: &'ast [ast::Comprehension],
     result_expressions: impl IntoIterator<Item = &'ast ast::Expr>,
@@ -48,6 +49,7 @@ pub(crate) fn collect_comprehension_named_expression_bindings_by_generator<'ast>
             }
             for later_generator in &generators[index + 1..] {
                 collector.visit_expr(&later_generator.iter);
+                collector.add_place_from_target(&later_generator.target);
                 for if_expr in &later_generator.ifs {
                     collector.visit_expr(if_expr);
                 }

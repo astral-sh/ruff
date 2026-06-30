@@ -237,6 +237,32 @@ def inner_generator_loop_back_edge():
     ]
 ```
 
+### Later generator targets on enclosing back edges
+
+A later generator's target is freshly assigned for each of its own iterations, but its final value
+remains visible when the enclosing generator starts its next iteration:
+
+```py
+def later_generator_target_on_outer_back_edge():
+    later_target_first = True
+    [
+        (later_target_first := False)
+        for _ in [0, 1]
+        if (
+            (
+                later_target_value := ""
+                if later_target_first
+                # TODO: This is also reported for equivalent explicit nested loops because loop
+                # headers do not correlate the two loop-carried bindings.
+                else later_target_y  # error: [possibly-unresolved-reference]
+            )
+            or True
+        )
+        for later_target_y in [1]
+    ]
+    reveal_type(later_target_value)  # revealed: str | int
+```
+
 ### Function-local targets
 
 Even if the assignment is in a branch known not to run, its target belongs to the containing
