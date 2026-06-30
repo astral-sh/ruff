@@ -122,7 +122,8 @@ use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
     Definition, DefinitionKind, DefinitionNodeKey, DefinitionState, ExceptHandlerDefinitionKind,
     ForStmtDefinitionKind, LambdaParameterDefinitionNodeKind, LoopHeaderDefinitionKind,
-    NestedBindingsDefinitionKind, ParameterDefinitionNodeKind, TargetKind, WithItemDefinitionKind,
+    NestedBindingExecution, NestedBindingsDefinitionKind, ParameterDefinitionNodeKind, TargetKind,
+    WithItemDefinitionKind,
 };
 use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
@@ -2520,9 +2521,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .symbol_id(&nested_bindings_kind.name)
                 .unwrap();
             let use_def = self.index.use_def_map(declaration.file_scope_id);
+            let bindings = match nested_bindings_kind.execution {
+                NestedBindingExecution::Lazy => use_def.reachable_bindings(nested_symbol_id.into()),
+                NestedBindingExecution::Eager => {
+                    use_def.end_of_scope_bindings(nested_symbol_id.into())
+                }
+            };
             let Some(ty) = place_from_bindings_with_reachability_cache(
                 db,
-                use_def.reachable_bindings(nested_symbol_id.into()),
+                bindings,
                 self.reachability_cache(),
             )
             .place

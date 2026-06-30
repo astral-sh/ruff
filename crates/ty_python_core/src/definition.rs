@@ -1594,10 +1594,17 @@ impl LoopHeaderDefinitionKind {
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct NestedBindingsDefinitionKind {
     pub name: Name,
+    pub execution: NestedBindingExecution,
     // Note that in general this can include both `global` and `nonlocal` declarations from
     // different nested scopes, because we don't necessarily know at synthesis time which of those
     // kind will be visible in the current scope.
     pub nested_declarations: SmallVec<[crate::builder::NestedDeclaration; 1]>,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+pub enum NestedBindingExecution {
+    Lazy,
+    Eager,
 }
 
 #[derive(

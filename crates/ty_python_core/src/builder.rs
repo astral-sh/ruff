@@ -32,8 +32,8 @@ use crate::definition::{
     ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef, ImportDefinitionNodeRef,
     ImportFromDefinitionNodeRef, ImportFromSubmoduleDefinitionNodeRef,
     LambdaParameterDefinitionNodeRef, LoopHeaderDefinitionNodeRef, LoopStmtRef,
-    MatchPatternDefinitionNodeRef, NestedBindingsDefinitionKind, ParameterDefinitionNodeRef,
-    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    MatchPatternDefinitionNodeRef, NestedBindingExecution, NestedBindingsDefinitionKind,
+    ParameterDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::expression::{Expression, ExpressionKind};
 use crate::frozen::{FrozenMap, FrozenSet};
@@ -199,12 +199,6 @@ impl NestedDeclaration {
 pub enum GlobalOrNonlocal {
     Global,
     Nonlocal,
-}
-
-#[derive(Copy, Clone, Eq, PartialEq)]
-enum NestedBindingExecution {
-    Lazy,
-    Eager,
 }
 
 struct ConditionFlowSnapshots {
@@ -1861,6 +1855,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 place,
                 DefinitionKind::NestedBindings(Box::new(NestedBindingsDefinitionKind {
                     name,
+                    execution,
                     nested_declarations: declarations,
                 })),
                 false,
