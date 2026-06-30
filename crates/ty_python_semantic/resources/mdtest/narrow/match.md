@@ -884,6 +884,15 @@ DefaultGenericPatternT = TypeVar("DefaultGenericPatternT", default=str)
 
 class GenericPatternBase(Generic[GenericPatternT]): ...
 
+OptionalGenericPatternT = TypeVar(
+    "OptionalGenericPatternT",
+    bound=GenericPatternBase[int] | None,
+)
+UnionBoundGenericPatternT = TypeVar(
+    "UnionBoundGenericPatternT",
+    bound=GenericPatternBase[int] | GenericPatternBase[str],
+)
+
 class GenericPatternChild(GenericPatternBase[GenericPatternT]):
     item: GenericPatternT
     items: list[GenericPatternT]
@@ -947,6 +956,20 @@ def test_match_generic_subclass_capture(value: GenericPatternBase[int]) -> None:
     match value:
         case GenericPatternChild(item=item):
             reveal_type(item)  # revealed: int
+
+def test_match_generic_subclass_capture_from_optional_typevar_bound(
+    value: OptionalGenericPatternT,
+) -> None:
+    match value:
+        case GenericPatternChild(item=item):
+            reveal_type(item)  # revealed: int
+
+def test_match_generic_subclass_capture_from_union_typevar_bound(
+    value: UnionBoundGenericPatternT,
+) -> None:
+    match value:
+        case GenericPatternChild(item=item):
+            reveal_type(item)  # revealed: int | str
 
 def test_match_nested_generic_subclass_capture(value: GenericPatternBase[int]) -> list[int]:
     match value:

@@ -1473,6 +1473,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         kind: &ClassPatternPredicateKind<'db>,
         context: &ClassPatternContext<'db>,
         original_subject_ty: Type<'db>,
+        filtering_subject_ty: Type<'db>,
         subject_ty: Type<'db>,
     ) -> Option<Vec<ClassPatternArgument<'db>>> {
         let subject_is_final = subject_ty
@@ -1483,7 +1484,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 None
             } else {
                 context.class.and_then(|pattern_class| {
-                    original_subject_ty
+                    filtering_subject_ty
                         .nominal_class(self.db)
                         .and_then(|subject_class| {
                             self.specialize_pattern_class_for_subject(pattern_class, subject_class)
@@ -1719,6 +1720,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             kind,
             context,
             original_subject_ty,
+            subject_ty,
             narrowed_subject_ty,
         )?;
         Some((narrowed_subject_ty, arguments))
