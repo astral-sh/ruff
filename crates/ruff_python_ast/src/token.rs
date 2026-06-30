@@ -46,8 +46,19 @@ impl Token {
 
     /// Returns the token kind.
     #[inline]
+    #[expect(
+        unsafe_code,
+        reason = "decoding a compact contiguous TokenKind discriminant requires a transmute"
+    )]
     pub const fn kind(&self) -> TokenKind {
-        self.kind_and_flags().0
+        let encoded = self.kind_and_flags;
+        if encoded <= TokenKind::Unknown as u8 {
+            // SAFETY: The compile-time assertion below proves that every value in this range is
+            // a valid `TokenKind` discriminant.
+            unsafe { std::mem::transmute::<u8, TokenKind>(encoded) }
+        } else {
+            self.kind_and_flags().0
+        }
     }
 
     /// Returns the token as a tuple of (kind, range).
@@ -477,6 +488,14 @@ pub enum TokenKind {
 
     Unknown,
 }
+
+const _: () = {
+    let mut encoded = 0;
+    while encoded <= TokenKind::Unknown as u8 {
+        assert!(TokenKind::from_repr(encoded).is_some());
+        encoded += 1;
+    }
+};
 
 impl TokenKind {
     /// Returns `true` if this is an end of file token.
