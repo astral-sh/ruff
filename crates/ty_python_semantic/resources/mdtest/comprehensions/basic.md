@@ -59,6 +59,10 @@ reveal_type(e)  # revealed: int
 reveal_type(g)  # revealed: int
 reveal_type(h)  # revealed: int
 
+# Later assignment expressions in the same comprehension iteration shadow earlier ones.
+[(ordered := item, ordered := "") for item in Iterable()]
+reveal_type(ordered)  # revealed: Literal[""]
+
 def local_scope():
     [(local_target := value) for value in Iterable()]
     reveal_type(local_target)  # revealed: int
