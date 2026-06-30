@@ -31,49 +31,34 @@ class Table:
 [[reveal_type((x, y)) for x in range(3)] for y in range(3)]
 ```
 
-## Named expressions bind in the containing scope
+## Assignment expressions in comprehensions
 
-PEP 572 specifies that assignment-expression targets in comprehensions bind in the scope containing
-the outermost comprehension, rather than in the comprehension's own scope.
+[PEP 572] specifies that an assignment expression in a comprehension binds its target in the scope
+containing the outermost comprehension.
 
-This uses ty's existing eager approximation for comprehension scopes. We intentionally do not model
-zero iterations or whether a generator expression is consumed.
+ty currently assumes that a comprehension runs at least once. It also analyzes a generator
+expression as though it is consumed immediately. The tests below follow those existing assumptions.
+
+### Basic forms
+
+Assignment expressions can appear in the element of a list comprehension and in the key or value of
+a dictionary comprehension:
 
 ```py
-class Iterator:
-    def __next__(self) -> int:
-        return 42
+[(list_value := item) for item in [1]]
+{(dict_key := item): (dict_value := item) for item in [1]}
 
-class Iterable:
-    def __iter__(self) -> Iterator:
-        return Iterator()
+reveal_type(list_value)  # revealed: int
+reveal_type(dict_key)  # revealed: int
+reveal_type(dict_value)  # revealed: int
+```
 
-[(a := b * 2) for b in Iterable()]
-[c for d in Iterable() if (c := d - 10) > 0]
-{(e := f * 2): (g := f * 3) for f in Iterable()}
-list(((h := i * 2) for i in Iterable()))
+### Examples using `any` and `all`
 
-reveal_type(a)  # revealed: int
-reveal_type(c)  # revealed: int
-reveal_type(e)  # revealed: int
-reveal_type(g)  # revealed: int
-reveal_type(h)  # revealed: int
+PEP 572 calls out two common uses of this rule: retaining the value that made `any` succeed and the
+value that made `all` fail.
 
-# Later assignment expressions in the same comprehension iteration shadow earlier ones.
-[(ordered := item, ordered := "") for item in Iterable()]
-reveal_type(ordered)  # revealed: str
-
-# Targets in statically unreachable branches remain unbound.
-[(dead := 1) if False else (live := 2) for _ in [0]]
-# error: [unresolved-reference] "Name `dead` used when not defined"
-# revealed: Unknown
-reveal_type(dead)
-reveal_type(live)  # revealed: int
-
-def local_scope():
-    [(local_target := value) for value in Iterable()]
-    reveal_type(local_target)  # revealed: int
-
+```py
 def find_comment(lines: list[str]):
     if any((comment := line).startswith("#") for line in lines):
         reveal_type(comment)  # revealed: str
@@ -83,55 +68,130 @@ def find_nonblank(lines: list[str]):
         pass
     else:
         reveal_type(nonblank)  # revealed: str
+```
 
-def conditional_binding(flag: bool):
-    x = "old"
-    [(x := 1) if flag else 0 for _ in [0]]
-    reveal_type(x)  # revealed: Literal["old"] | int
+### Assignment order
 
-def possibly_unbound_binding(flag: bool):
-    [(maybe := 1) if flag else 0 for _ in [0]]
-    # error: [possibly-unresolved-reference] "Name `maybe` used when possibly not defined"
-    reveal_type(maybe)  # revealed: int
+If an iteration assigns the same target more than once, the last assignment determines its value
+after the comprehension:
 
-def filter_binding(flag: bool):
-    [value for value in [True, False] if (last_filter_value := value)]
-    reveal_type(last_filter_value)  # revealed: bool
+```py
+[(ordered := item, ordered := "") for item in [1]]
+reveal_type(ordered)  # revealed: str
+```
 
-    [0 for _ in [0] if flag and (conditional_filter_value := 1)]
-    # error: [possibly-unresolved-reference] "Name `conditional_filter_value` used when possibly not defined"
-    reveal_type(conditional_filter_value)  # revealed: int
+### Branches that do not assign
 
+A target in a branch known not to run remains unbound. A target in the branch that does run is
+available after the comprehension:
+
+```py
+[(dead := 1) if False else (live := 2) for _ in [0]]
+
+dead  # error: [unresolved-reference]
+reveal_type(live)  # revealed: int
+```
+
+### Assignments on only some paths
+
+When the assignment only runs on one possible path, an earlier value remains possible:
+
+```py
+def conditional_with_previous_value(flag: bool):
+    value = "old"
+    [(value := 1) if flag else 0 for _ in [0]]
+    reveal_type(value)  # revealed: Literal["old"] | int
+```
+
+Without an earlier value, the target may be unbound:
+
+```py
+def conditional_without_previous_value(flag: bool):
+    [(value := 1) if flag else 0 for _ in [0]]
+    # error: [possibly-unresolved-reference]
+    reveal_type(value)  # revealed: int
+```
+
+### Comprehension filters
+
+A false filter skips the element, but an assignment made while evaluating that filter still takes
+effect:
+
+```py
+[value for value in [True, False] if (last_value := value)]
+reveal_type(last_value)  # revealed: bool
+```
+
+If short-circuit evaluation skips the assignment, the target may be unbound:
+
+```py
+def conditional_filter(flag: bool):
+    [0 for _ in [0] if flag and (value := 1)]
+    # error: [possibly-unresolved-reference]
+    reveal_type(value)  # revealed: int
+```
+
+### Assignments that depend on earlier iterations
+
+An assignment can read the value left by an earlier iteration. In this example, the final value is
+`3`, so retaining only the first iteration's literal values would be incorrect:
+
+```py
 def partial_sum():
     total = 0
     [total := total + value for value in [1, 2]]
     reveal_type(total)  # revealed: int
+```
 
-def mutually_loop_carried():
+The same applies when two targets depend on values from earlier iterations:
+
+```py
+def two_dependent_targets():
     x = 0
     y = 0
     [(y := x, x := y + 1) for _ in [1, 2]]
     reveal_type(x)  # revealed: int
     reveal_type(y)  # revealed: int
+```
 
-unreachable_local = "global"
+### Function-local targets
 
-def unreachable_local_owner():
-    [(unreachable_local := 1) if False else 0 for _ in [0]]
-    # error: [unresolved-reference] "Name `unreachable_local` used when not defined"
-    reveal_type(unreachable_local)  # revealed: Unknown
+Even if the assignment is in a branch known not to run, its target belongs to the containing
+function. A read in that function must not fall back to a global variable with the same name:
 
-def nested_comprehension_flow():
-    nested_target = "old"
-    [[nested_target := 1 for _ in [0]] if False else [] for _ in [0]]
-    reveal_type(nested_target)  # revealed: Literal["old"]
+```py
+local_target = "global"
 
-    [[nested_dead := 1 for _ in [0]] if False else [] for _ in [0]]
-    # error: [unresolved-reference] "Name `nested_dead` used when not defined"
-    reveal_type(nested_dead)  # revealed: Unknown
+def read_local_target():
+    [(local_target := 1) if False else 0 for _ in [0]]
+    local_target  # error: [unresolved-reference]
+```
 
-    [([nested_order := 1 for _ in [0]], (nested_order := 2)) for _ in [0]]
-    reveal_type(nested_order)  # revealed: int
+### Nested comprehensions
+
+An assignment in an inner comprehension still binds outside the outermost comprehension. The order
+of assignments in the outer comprehension is preserved:
+
+```py
+[([nested_order := 1 for _ in [0]], (nested_order := 2)) for _ in [0]]
+reveal_type(nested_order)  # revealed: int
+```
+
+An inner comprehension that is never evaluated must not replace an earlier value:
+
+```py
+def unreachable_nested_assignment_with_previous_value():
+    value = "old"
+    [[value := 1 for _ in [0]] if False else [] for _ in [0]]
+    reveal_type(value)  # revealed: Literal["old"]
+```
+
+Nor should it create a new value:
+
+```py
+def unreachable_nested_assignment_without_previous_value():
+    [[value := 1 for _ in [0]] if False else [] for _ in [0]]
+    value  # error: [unresolved-reference]
 ```
 
 ## Comprehension referencing outer comprehension
@@ -365,3 +425,5 @@ reveal_type(dict_with_literal_values)  # revealed: dict[str, Literal[1, 2, 3]]
 set_with_literals: set[Literal[1, 2, 3]] = {k for k in (1, 2, 3)}
 reveal_type(set_with_literals)  # revealed: set[Literal[1, 2, 3]]
 ```
+
+[pep 572]: https://peps.python.org/pep-0572/#scope-of-the-target
