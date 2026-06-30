@@ -1,0 +1,37 @@
+# Review decisions
+
+- Fixed (`e394e65de3`) — Preserve final-write ordering for eager comprehension walruses.
+- Fixed (`9b99a059f5`) — Leave statically unreachable walrus targets unbound outside the comprehension.
+- Fixed (`b63eae4f7d`) — Preserve unused-binding hints for unread comprehension walruses.
+- Fixed (`db5d6876a8`) — Preserve prior values and possible unboundness for conditional walruses.
+- Fixed (`adeccfb828`) — Conservatively widen directly loop-carried walrus values.
+- Fixed (`61c3de88c6`) — Propagate same-comprehension reads to the exported binding.
+- Fixed (`5f59e17e3a`) — Resolve exported bindings to their originating walrus for IDE navigation.
+- Fixed — Keep statically unreachable function walruses locally owned while leaving their value unbound.
+- Fixed — Conservatively promote every eager export, covering direct and cross-target loop-carried values without a dependency graph.
+- Rejected — Eager exports intentionally use promoted base types, so preserving literals through nested same-name binders is outside Issue 162; mypy likewise widens to `str`.
+- Fixed — Preserve unused-binding usage and target ranges per comprehension walrus definition.
+- Fixed — Preserve walrus writes and conditional boundness from filtered-out comprehension paths.
+- Fixed — Forward only the flow-aware proxy across nested comprehensions so inner writes cannot bypass outer reachability or ordering.
+- Rejected — No outer conditional-expression bug for runtime-unknown conditions: with `possibly-unresolved-reference` enabled, both ordinary and comprehension walruses preserve conditional boundness.
+- Fixed — Separate eager comprehension proxy synthesis from the existing lazy nested-function binding path.
+- Fixed — Name and document IDE proxy expansion in terms of the user-visible walrus definitions it returns.
+- Fixed — Route unused-binding usage through the shared user-visible-definition provenance mapping instead of special-casing eager proxies.
+- Fixed — Expand the complete used-definition stream in one provenance traversal instead of allocating per definition.
+- Fixed — Document the eager proxy's scope, boundness, nesting, and filter-flow contracts with concrete Python examples.
+- Fixed — Split the comprehension-walrus mdtest into documented, behavior-focused cases and remove redundant assertions.
+- Fixed — Verify the retained behavior changes fail on main; assertions that already pass there remain only as regression guards against over-binding.
+- Fixed — Preserve conditional boundness when a walrus assignment runs after a comprehension filter; the missing falsy constraint previously caused a panic.
+- Rejected — Unused hints for module, global, and nonlocal comprehension walruses occur at the same target ranges on main.
+- Rejected — Unused hints for loop-carried comprehension walruses occur at the same target ranges on main and require separate repeated-iteration usage modeling.
+- Rejected — Copying the real walrus definitions directly into the containing scope would lose scope-local flow constraints and would infer their value expressions in the wrong scope.
+- Rejected — Modeling comprehensions as full loops could reuse loop-header machinery, but it would require broader AST and flow changes and would make Issue 162 larger rather than smaller.
+- Fixed — Route ordinary definitions and eager comprehension proxies through the same definition-recording bookkeeping.
+- Fixed — Resolve nested binding sources once on `NestedBindingsDefinitionKind` for both inference and IDE provenance.
+- Fixed — Conservatively preserve eager-export source types when reachability is only resolved during inference.
+- Rejected — Keep direct go-to-definition coverage out of this change; semantic mdtests cannot exercise IDE navigation and the focused Rust test was intentionally removed during simplification.
+- Rejected — Keep direct unused-binding coverage out of this change; semantic mdtests cannot exercise IDE hints and the focused Rust test was intentionally removed during simplification.
+- Fixed — Keep first-iteration-false eager exports possibly bound because later comprehension iterations can change their guards.
+- Fixed — Resolve cross-file references and rename conservatively by expanding eager proxies during imported-symbol lookup and treating every comprehension walrus as potentially externally visible; function-local walruses may trigger harmless extra workspace scans, but semantic matching still filters unrelated occurrences.
+- Fixed — Resolve current-scope eager proxies before forwarding global and nonlocal IDE lookups.
+- Rejected — Keep inference-unreachable eager sources conservatively because distinguishing invariant and loop-carried guards requires the iteration dependency modeling intentionally excluded from Issue 162.
