@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use crate::FxIndexSet;
 use crate::place::builtins_module_scope;
@@ -21,7 +21,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::Module;
-use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::definition::{Definition, DefinitionKind, NestedBindingExecution};
 use ty_python_core::{attribute_scopes, global_scope, semantic_index, use_def_map};
 
 mod unreachable_code;
@@ -409,10 +409,41 @@ fn reachable_definitions<'db>(
     db: &'db dyn Db,
     definitions: impl IntoIterator<Item = Definition<'db>>,
 ) -> FxIndexSet<Definition<'db>> {
-    definitions
-        .into_iter()
-        .filter(|definition| definition.kind(db).is_user_visible())
-        .collect()
+    let mut pending = definitions.into_iter().collect::<VecDeque<_>>();
+    let mut seen = FxHashSet::default();
+    let mut result = FxIndexSet::default();
+
+    while let Some(definition) = pending.pop_front() {
+        if !seen.insert(definition) {
+            continue;
+        }
+
+        match definition.kind(db) {
+            DefinitionKind::NestedBindings(nested)
+                if nested.execution == NestedBindingExecution::Eager =>
+            {
+                let index = semantic_index(db, definition.file(db));
+                for declaration in &nested.nested_declarations {
+                    let place_table = index.place_table(declaration.file_scope_id);
+                    let Some(symbol) = place_table.symbol_id(&nested.name) else {
+                        continue;
+                    };
+                    pending.extend(
+                        index
+                            .use_def_map(declaration.file_scope_id)
+                            .end_of_scope_symbol_bindings(symbol)
+                            .filter_map(|binding| binding.binding.definition()),
+                    );
+                }
+            }
+            kind if kind.is_user_visible() => {
+                result.insert(definition);
+            }
+            _ => {}
+        }
+    }
+
+    result
 }
 
 fn resolve_reachable_definitions<'db>(
@@ -2221,11 +2252,56 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
 
 #[cfg(test)]
 mod tests {
-    use super::{CallArgumentForm, call_argument_forms};
+    use super::{
+        CallArgumentForm, ImportAliasResolution, call_argument_forms, definition_for_name,
+    };
     use crate::SemanticModel;
     use crate::db::tests::TestDbBuilder;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
+    use ruff_text_size::{TextRange, TextSize};
+    use ty_python_core::definition::DefinitionKind;
+
+    #[test]
+    fn comprehension_walrus_definition_resolves_from_containing_scope() -> anyhow::Result<()> {
+        let source = "[(leaked := 1) for _ in [0]]\nprint(leaked)\n";
+        let db = TestDbBuilder::new()
+            .with_file("/src/foo.py", source)
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let name = parsed
+            .suite()
+            .last()
+            .unwrap()
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap()
+            .arguments
+            .args
+            .first()
+            .unwrap()
+            .as_name_expr()
+            .unwrap();
+        let model = SemanticModel::new(&db, file);
+
+        let definition =
+            definition_for_name(&model, name, ImportAliasResolution::ResolveAliases).unwrap();
+        assert!(matches!(
+            definition.kind(&db),
+            DefinitionKind::NamedExpression(_)
+        ));
+        let target_start = TextSize::try_from(source.find("leaked :=").unwrap()).unwrap();
+        assert_eq!(
+            definition.kind(&db).target_range(&parsed),
+            TextRange::new(target_start, target_start + TextSize::new(6))
+        );
+
+        Ok(())
+    }
 
     #[test]
     fn keyword_call_argument_forms_follow_source_order() -> anyhow::Result<()> {
