@@ -1,7 +1,7 @@
 [package]
 name = "ruff_python_ast"
-version = "0.0.0"
-publish = false
+version = "0.0.3"
+description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -24,6 +24,7 @@ ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 
 aho-corasick = { workspace = true }
+arrayvec = { workspace = true }
 bitflags = { workspace = true }
 compact_str = { workspace = true }
 get-size2 = { workspace = true, optional = true }

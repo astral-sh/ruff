@@ -10,13 +10,11 @@ D412 [*] No blank lines allowed between a section header and its content ("Examp
    |     ^^^^^^^
    |
 help: Remove blank line(s)
-12 |     """
-13 |     Example:
+   |
 14 |
    -
 15 |     .. code-block:: python
-16 |
-17 |         import foo
+   |
 
 D412 [*] No blank lines allowed between a section header and its content ("Example")
   --> sphinx.py:24:5
@@ -27,14 +25,12 @@ D412 [*] No blank lines allowed between a section header and its content ("Examp
    |     ^^^^^^^
    |
 help: Remove blank line(s)
-23 |     """
-24 |     Example:
+   |
 25 |
    -
    -
 26 |     .. code-block:: python
-27 |
-28 |         import foo
+   |
 
 D412 [*] No blank lines allowed between a section header and its content ("Example")
   --> sphinx.py:47:5
@@ -46,13 +42,11 @@ D412 [*] No blank lines allowed between a section header and its content ("Examp
 48 |     -------
    |
 help: Remove blank line(s)
-47 |     Example
-48 |     -------
+   |
 49 |
    -
 50 |     .. code-block:: python
-51 |
-52 |         import foo
+   |
 
 D412 [*] No blank lines allowed between a section header and its content ("Example")
   --> sphinx.py:59:5
@@ -64,11 +58,9 @@ D412 [*] No blank lines allowed between a section header and its content ("Examp
 60 |     -------
    |
 help: Remove blank line(s)
-59 |     Example
-60 |     -------
+   |
 61 |
    -
    -
 62 |     .. code-block:: python
-63 |
-64 |         import foo
+   |

@@ -32,7 +32,7 @@ use crate::subscript::PyIndex;
 use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
-    ConstraintBounds, ConstraintSet, ConstraintSetBuilder, PathBounds, Solutions,
+    ConstraintSet, ConstraintSetBuilder, PathBound, PathBounds, Solutions,
 };
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_DATACLASS,
@@ -579,25 +579,30 @@ impl<'db> Bindings<'db> {
     where
         I: IntoIterator<Item = Bindings<'db>>,
     {
-        let mut implicit_dunder_new_is_possibly_unbound = false;
-        let mut implicit_dunder_init_is_possibly_unbound = false;
-        let mut elements_acc = SmallVec::new();
+        let mut bindings_iter = bindings_iter.into_iter();
+        // Use the first binding as the accumulator to reuse its elements buffer.
+        let Self {
+            callable_type: _,
+            mut implicit_dunder_new_is_possibly_unbound,
+            mut implicit_dunder_init_is_possibly_unbound,
+            mut elements,
+            enclosing_binding_contexts: _,
+        } = bindings_iter.next().expect("bindings must not be empty");
 
-        // Preserve each input's existing union/intersection structure.
-        for set in bindings_iter {
-            implicit_dunder_new_is_possibly_unbound |= set.implicit_dunder_new_is_possibly_unbound;
+        for bindings in bindings_iter {
+            implicit_dunder_new_is_possibly_unbound |=
+                bindings.implicit_dunder_new_is_possibly_unbound;
             implicit_dunder_init_is_possibly_unbound |=
-                set.implicit_dunder_init_is_possibly_unbound;
-            elements_acc.extend(set.elements);
+                bindings.implicit_dunder_init_is_possibly_unbound;
+            elements.extend(bindings.elements);
         }
 
-        let elements = elements_acc;
         assert!(!elements.is_empty());
         Self {
             callable_type,
-            elements,
             implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound,
+            elements,
             enclosing_binding_contexts: None,
         }
     }
@@ -2060,7 +2065,9 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty)] = overload.parameter_types() {
                                 let return_ty = match ty {
                                     Type::ClassLiteral(class) => {
-                                        if let Some(metadata) = enums::enum_metadata(db, *class) {
+                                        if let Some(metadata) = enums::enum_metadata(db, *class)
+                                            && metadata.aliases_are_known
+                                        {
                                             Type::heterogeneous_tuple(
                                                 db,
                                                 metadata
@@ -3563,13 +3570,16 @@ impl<'db> CallableBinding<'db> {
                         matched_argument.iter().map(move |matched_parameter| {
                             // TODO: For an unannotated `self` / `cls` parameter, the type should be
                             // `typing.Self` / `type[typing.Self]`
-                            let parameter_type = overload.signature.parameters()
+                            let raw_parameter_type = overload.signature.parameters()
                                 [matched_parameter.index]
-                                .annotated_type()
+                                .annotated_type();
+                            let parameter_type = raw_parameter_type
                                 .apply_optional_specialization(db, overload.specialization);
                             OverloadFilterSlot {
                                 parameter: parameter_type,
-                                argument: argument_types.get_for_declared_type(parameter_type),
+                                // Argument types are cached by the raw parameter type, even when
+                                // they were inferred using a return-context specialization.
+                                argument: argument_types.get_for_declared_type(raw_parameter_type),
                                 variadic_argument: matched_parameter.argument_type,
                             }
                         })
@@ -4899,13 +4909,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 // lower/upper bounds on each BDD path.
                 let mut variance_map: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
                     FxHashMap::default();
-                let solutions = path_bounds.solve_with(|typevar, variance, bounds| {
-                    let identity = typevar.identity(self.db);
+                let solutions = path_bounds.solve_with(|variance, path_bound| {
+                    let identity = path_bound.bound_typevar.identity(self.db);
                     variance_map
                         .entry(identity)
                         .and_modify(|current| *current = current.join(variance))
                         .or_insert(variance);
-                    PathBounds::default_solve(self.db, constraints, typevar, bounds)
+                    PathBounds::default_solve(self.db, constraints, path_bound)
                 });
 
                 let Solutions::Constrained(solutions) = solutions else {
@@ -4933,13 +4943,18 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         // Filter out inferable typevars (cross-typevar references from
                         // SequentMap transitivity) and unspecialized typevars (from partially
                         // specialized contexts).
-                        let inferred_ty = binding.solution.filter_union(self.db, |ty| {
-                            if ty.has_unspecialized_type_var(self.db) {
-                                partially_specialized_declared_type.insert(identity);
-                                return false;
-                            }
-                            true
-                        });
+                        let inferred_ty = builder
+                            .remove_inferable_typevar_artifacts_from_solution(
+                                binding.bound_typevar,
+                                binding.solution,
+                            )
+                            .filter_union(self.db, |ty| {
+                                if ty.has_unspecialized_type_var(self.db) {
+                                    partially_specialized_declared_type.insert(identity);
+                                    return false;
+                                }
+                                true
+                            });
                         if inferred_ty.has_unspecialized_type_var(self.db) {
                             continue;
                         }
@@ -5015,7 +5030,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Attempt to promote any promotable types assigned to the specialization.
         // The hook receives (typevar, bounds) and returns Some(ty) to override the default
         // solution, or None to keep it.
-        let maybe_promote = |typevar: BoundTypeVarInstance<'db>, bounds: ConstraintBounds<'db>| {
+        let maybe_promote = |typevar: BoundTypeVarInstance<'db>, bounds: &PathBound<'db>| {
             let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
 
             // For constrained TypeVars, the inferred type is already one of the
@@ -5060,19 +5075,18 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             Some(promoted)
         };
 
-        let choose_solution =
-            |typevar: BoundTypeVarInstance<'db>, bounds: Option<ConstraintBounds<'db>>| {
-                let bounds = bounds?;
-                if let Some(lower) = bounds.lower
-                    && let Some(&preferred_ty) =
-                        preferred_type_mappings.get(&typevar.identity(self.db))
-                    && lower.is_assignable_to(self.db, preferred_ty)
-                {
-                    return Some(preferred_ty);
-                }
+        let choose_solution = |typevar: BoundTypeVarInstance<'db>,
+                               bounds: Option<&PathBound<'db>>| {
+            let bounds = bounds?;
+            if let Some(lower) = bounds.lower
+                && let Some(&preferred_ty) = preferred_type_mappings.get(&typevar.identity(self.db))
+                && lower.is_assignable_to(self.db, preferred_ty)
+            {
+                return Some(preferred_ty);
+            }
 
-                maybe_promote(typevar, bounds)
-            };
+            maybe_promote(typevar, bounds)
+        };
 
         let specialization = builder.build_with(generic_context, choose_solution);
 

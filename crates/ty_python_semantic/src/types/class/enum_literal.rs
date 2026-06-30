@@ -119,7 +119,7 @@ impl<'db> DynamicEnumLiteral<'db> {
 
         Some(Self::new(
             db,
-            self.name(db).clone(),
+            self.name(db),
             self.anchor(db)
                 .recursive_type_normalized_impl(db, div, nested)?,
             self.base_class(db),
@@ -241,14 +241,11 @@ impl<'db> DynamicEnumLiteral<'db> {
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
         let spec = self.spec(db);
         if spec.has_known_members(db)
-            && spec
-                .members(db)
-                .iter()
-                .any(|(member_name, _)| member_name == name)
+            && let Some(enum_class) = ClassLiteral::DynamicEnum(self).into_enum_class(db)
+            && let Some(canonical_name) = enum_class.resolve_member(db, &Name::new(name))
         {
-            let class_lit = ClassLiteral::DynamicEnum(self);
             let enum_lit =
-                crate::types::literal::EnumLiteralType::new(db, class_lit, Name::new(name));
+                crate::types::literal::EnumLiteralType::new(db, enum_class, canonical_name.clone());
             return Member::definitely_declared(Type::enum_literal(enum_lit));
         }
         Member::unbound()

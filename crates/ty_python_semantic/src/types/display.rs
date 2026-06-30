@@ -34,7 +34,8 @@ use crate::types::{
     CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceType, Protocol,
     ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
-    Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
+    Type, TypeAliasType, TypeGuardLike, TypedDictModule, TypedDictType, UnionType,
+    WrapperDescriptorKind, visitor,
 };
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
@@ -1311,9 +1312,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     )
                 }
                 // We used to return `str` as the type here because that feels generally more useful.
-                // However, the inoncistency between the type shown in the inlay hint and its hover, and the
+                // However, the inconsistency between the type shown in the inlay hint and its hover, and the
                 // inconsistency to what's shown when hovering the backed inlay hint of a `LiteralString`
-                // convinvced us that we should change the type to `LiteralString`.
+                // convinced us that we should change the type to `LiteralString`.
                 LiteralValueTypeKind::LiteralString => f
                     .with_type(Type::SpecialForm(SpecialFormType::LiteralString))
                     .write_str("LiteralString"),
@@ -1391,8 +1392,10 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::TypedDict(TypedDictType::Synthesized(synthesized)) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
-                f.with_type(Type::SpecialForm(SpecialFormType::TypedDict))
-                    .write_str("TypedDict")?;
+                f.with_type(Type::SpecialForm(SpecialFormType::TypedDict(
+                    TypedDictModule::Typing,
+                )))
+                .write_str("TypedDict")?;
                 f.write_str(" with items ")?;
                 let items = synthesized.items(self.db);
                 for (i, name) in items.keys().enumerate() {
@@ -3266,6 +3269,9 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                     .fmt_detailed(f)?;
                 f.write_str("]")
             }
+            KnownInstanceType::Range { .. } => f
+                .with_type(KnownClass::Range.to_class_literal(self.db))
+                .write_str("range"),
         }
     }
 }

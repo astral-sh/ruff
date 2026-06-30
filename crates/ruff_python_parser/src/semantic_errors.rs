@@ -1117,7 +1117,14 @@ impl SemanticSyntaxChecker {
         generators: &[ast::Comprehension],
         ctx: &Ctx,
     ) {
+        // test_ok starred_comprehension_target
+        // [item for (*items,) in source]
+
+        // test_err starred_comprehension_target
+        // [item for *items in source]
         for (index, generator) in generators.iter().enumerate() {
+            Self::invalid_star_expression(&generator.target, ctx);
+
             for if_expr in &generator.ifs {
                 Self::check_rebound_variables(
                     if_expr,

@@ -8,5 +8,7 @@ D300 [*] Use triple double quotes `"""`
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Convert to triple double quotes
+  |
   - ﻿''' SAM macro definitions '''
 1 + ﻿""" SAM macro definitions """
+  |

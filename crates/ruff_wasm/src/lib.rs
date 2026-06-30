@@ -2,6 +2,7 @@ use std::path::Path;
 
 use js_sys::Error;
 use ruff_db::diagnostic;
+use ruff_linter::preview::is_human_readable_names_enabled;
 use ruff_linter::settings::types::PythonVersion;
 use ruff_linter::suppression::Suppressions;
 use serde::{Deserialize, Serialize};
@@ -9,18 +10,19 @@ use wasm_bindgen::prelude::*;
 
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{FormatResult, Formatted, IndentStyle};
-use ruff_linter::Locator;
 use ruff_linter::directives;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::linter::check_path;
 use ruff_linter::settings::{DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, flags};
 use ruff_linter::source_kind::SourceKind;
+use ruff_linter::{Locator, UnresolvedRuleSelector};
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{PyFormatContext, QuoteStyle, format_module_ast, pretty_comments};
 use ruff_python_index::Indexer;
 use ruff_python_parser::{Mode, ParseOptions, Parsed, parse, parse_unchecked};
-use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::TriviaRanges;
+use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use ruff_source_file::{OneIndexed, PositionEncoding as SourcePositionEncoding, SourceLocation};
 use ruff_text_size::Ranged;
 use ruff_workspace::Settings;
@@ -32,6 +34,7 @@ const TYPES: &'static str = r#"
 export interface Diagnostic {
     code: string | null;
     message: string;
+    tags: DiagnosticTag[];
     annotations: DiagnosticAnnotation[];
     subDiagnostics: SubDiagnostic[];
     start_location: {
@@ -57,6 +60,8 @@ export interface Diagnostic {
         }[];
     } | null;
 }
+
+export type DiagnosticTag = "unnecessary" | "deprecated";
 
 export interface DiagnosticAnnotation {
     primary: boolean;
@@ -95,6 +100,7 @@ export interface DiagnosticLocation {
 pub struct ExpandedMessage {
     pub code: String,
     pub message: String,
+    pub tags: Vec<ExpandedDiagnosticTag>,
     pub annotations: Vec<ExpandedDiagnosticAnnotation>,
     #[serde(rename = "subDiagnostics")]
     pub sub_diagnostics: Vec<ExpandedSubDiagnostic>,
@@ -178,6 +184,22 @@ struct ExpandedEdit {
     content: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum ExpandedDiagnosticTag {
+    Unnecessary,
+    Deprecated,
+}
+
+impl From<&diagnostic::DiagnosticTag> for ExpandedDiagnosticTag {
+    fn from(value: &diagnostic::DiagnosticTag) -> Self {
+        match value {
+            diagnostic::DiagnosticTag::Unnecessary => Self::Unnecessary,
+            diagnostic::DiagnosticTag::Deprecated => Self::Deprecated,
+        }
+    }
+}
+
 /// Perform global constructor initialization.
 #[cfg(target_family = "wasm")]
 #[expect(unsafe_code)]
@@ -257,6 +279,7 @@ impl Workspace {
 
     #[wasm_bindgen(constructor)]
     pub fn new(options: JsValue, position_encoding: PositionEncoding) -> Result<Workspace, Error> {
+        let _guard = ValueSourceGuard::new(ValueSource::Cli, false);
         let options: Options = serde_wasm_bindgen::from_value(options).map_err(into_error)?;
         let configuration =
             Configuration::from_options(options, Some(Path::new(".")), Path::new("."))
@@ -289,7 +312,15 @@ impl Workspace {
                     allowed_confusables: Some(Vec::default()),
                     dummy_variable_rgx: Some(DUMMY_VARIABLE_RGX.as_str().to_string()),
                     ignore: Some(Vec::default()),
-                    select: Some(DEFAULT_SELECTORS.to_vec()),
+                    select: Some(
+                        DEFAULT_SELECTORS
+                            .iter()
+                            .map(|selector| {
+                                let (prefix, code) = selector.prefix_and_code();
+                                UnresolvedRuleSelector::cli(format!("{prefix}{code}"))
+                            })
+                            .collect(),
+                    ),
                     extend_fixable: Some(Vec::default()),
                     extend_select: Some(Vec::default()),
                     external: Some(Vec::default()),
@@ -398,9 +429,23 @@ impl Workspace {
                     })
                     .collect();
 
+                let code = if !is_human_readable_names_enabled(self.settings.linter.preview)
+                    && let Some(code) = msg.secondary_code()
+                {
+                    code.as_str()
+                } else {
+                    msg.id().as_str()
+                };
+
                 ExpandedMessage {
-                    code: msg.secondary_code_or_id().to_string(),
+                    code: code.to_string(),
                     message: msg.concise_message().to_string(),
+                    tags: msg
+                        .primary_tags()
+                        .unwrap_or_default()
+                        .iter()
+                        .map(ExpandedDiagnosticTag::from)
+                        .collect(),
                     annotations,
                     sub_diagnostics,
                     start_location: source_code
@@ -451,8 +496,8 @@ impl Workspace {
 
     pub fn comments(&self, contents: &str) -> Result<String, Error> {
         let parsed = ParsedModule::from_source(contents)?;
-        let comment_ranges = CommentRanges::from(parsed.parsed.tokens());
-        let comments = pretty_comments(parsed.parsed.syntax(), &comment_ranges, contents);
+        let trivia_ranges = TriviaRanges::from(parsed.parsed.tokens());
+        let comments = pretty_comments(parsed.parsed.syntax(), &trivia_ranges, contents);
         Ok(comments)
     }
 
@@ -477,17 +522,17 @@ pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
 struct ParsedModule<'a> {
     source_code: &'a str,
     parsed: Parsed<Mod>,
-    comment_ranges: CommentRanges,
+    trivia_ranges: TriviaRanges,
 }
 
 impl<'a> ParsedModule<'a> {
     fn from_source(source_code: &'a str) -> Result<Self, Error> {
         let parsed = parse(source_code, ParseOptions::from(Mode::Module)).map_err(into_error)?;
-        let comment_ranges = CommentRanges::from(parsed.tokens());
+        let trivia_ranges = TriviaRanges::from(parsed.tokens());
         Ok(Self {
             source_code,
             parsed,
-            comment_ranges,
+            trivia_ranges,
         })
     }
 
@@ -498,12 +543,7 @@ impl<'a> ParsedModule<'a> {
             .to_format_options(PySourceType::default(), self.source_code, None)
             .with_source_map_generation(SourceMapGeneration::Enabled);
 
-        format_module_ast(
-            &self.parsed,
-            &self.comment_ranges,
-            self.source_code,
-            options,
-        )
+        format_module_ast(&self.parsed, &self.trivia_ranges, self.source_code, options)
     }
 }
 

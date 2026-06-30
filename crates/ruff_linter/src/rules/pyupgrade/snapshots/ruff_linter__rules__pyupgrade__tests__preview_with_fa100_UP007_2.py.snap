@@ -18,10 +18,10 @@ FA100 [*] Add `from __future__ import annotations` to simplify `typing.Union`
 6 |     ...
   |
 help: Add `from __future__ import annotations`
+  |
 1 + from __future__ import annotations
 2 | import typing
-3 | from typing import Union
-4 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -33,10 +33,10 @@ FA100 [*] Add `from __future__ import annotations` to simplify `typing.Union`
 6 |     ...
   |
 help: Add `from __future__ import annotations`
+  |
 1 + from __future__ import annotations
 2 | import typing
-3 | from typing import Union
-4 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -48,10 +48,10 @@ FA100 [*] Add `from __future__ import annotations` to simplify `typing.Union`
 10 |     ...
    |
 help: Add `from __future__ import annotations`
+  |
 1 + from __future__ import annotations
 2 | import typing
-3 | from typing import Union
-4 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -65,6 +65,7 @@ UP007 [*] Use `X | Y` for type annotations
 6 |     ...
   |
 help: Convert to `X | Y`
+  |
 1 + from __future__ import annotations
 2 | import typing
 3 | from typing import Union
@@ -73,8 +74,7 @@ help: Convert to `X | Y`
   - def f(x: Union[str, int, Union[float, bytes]]) -> None:
 6 + def f(x: str | int | Union[float, bytes]) -> None:
 7 |     ...
-8 |
-9 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -86,6 +86,7 @@ UP007 [*] Use `X | Y` for type annotations
 6 |     ...
   |
 help: Convert to `X | Y`
+  |
 1 + from __future__ import annotations
 2 | import typing
 3 | from typing import Union
@@ -94,8 +95,7 @@ help: Convert to `X | Y`
   - def f(x: Union[str, int, Union[float, bytes]]) -> None:
 6 + def f(x: Union[str, int, float | bytes]) -> None:
 7 |     ...
-8 |
-9 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 
@@ -107,15 +107,13 @@ UP007 [*] Use `X | Y` for type annotations
 10 |     ...
    |
 help: Convert to `X | Y`
+   |
 1  + from __future__ import annotations
 2  | import typing
-3  | from typing import Union
-4  |
 --------------------------------------------------------------------------------
-7  |     ...
-8  |
 9  |
    - def f(x: typing.Union[str, int]) -> None:
 10 + def f(x: str | int) -> None:
 11 |     ...
+   |
 note: This is an unsafe fix and may change runtime behavior

@@ -12,6 +12,9 @@ pub(super) fn generate_diagnostics(snapshot: &DocumentSnapshot) -> DiagnosticsMa
             document,
             snapshot.encoding(),
             snapshot.client_settings().show_syntax_errors(),
+            snapshot
+                .resolved_client_capabilities()
+                .diagnostic_related_information,
         )
     } else {
         DiagnosticsMap::default()

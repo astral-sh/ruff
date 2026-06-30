@@ -171,6 +171,34 @@ At the time of writing, the repository includes the following crates:
 - `crates/ruff_wasm`: library crate for exposing Ruff as a WebAssembly module. Powers the
     [Ruff Playground](https://play.ruff.rs/).
 
+#### Adding a new crate
+
+When adding a workspace crate under `crates/`, first decide whether it should be published to
+crates.io as part of Ruff's releases:
+
+- Test, benchmark, development, and other non-release crates must set `publish = false` in their
+    `Cargo.toml`.
+- Publishable crates should inherit the workspace package metadata and follow Ruff's [crate
+    versioning policy](https://docs.astral.sh/ruff/versioning/#crate-versioning). If the crate is
+    listed under `[workspace.dependencies]`, specify both its path and matching version.
+
+For a publishable crate, generate its README and verify that the workspace can still be packaged:
+
+```shell
+uv run --script scripts/generate-crate-readmes.py
+cargo publish --workspace --dry-run
+```
+
+Before merging a publishable crate, ask a crates.io owner to bootstrap it by running:
+
+```shell
+CARGO_REGISTRY_TOKEN=<token> uv run --no-config --script scripts/setup-crates-io-publish.py
+```
+
+The bootstrap script reserves the crate name, configures the release workflow as its trusted
+publisher, requires trusted publishing for future versions, and adds the crate to `.known-crates`.
+Commit the generated README and `.known-crates` update with the new crate.
+
 ### Example: Adding a new lint rule
 
 At a high level, the steps involved in adding a new lint rule are as follows:

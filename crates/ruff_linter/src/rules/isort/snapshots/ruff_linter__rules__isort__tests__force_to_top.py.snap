@@ -30,6 +30,7 @@ I001 [*] Import block is un-sorted or un-formatted
    | |______________________________^
    |
 help: Organize imports
+   |
    - import lib6
 1  + import foo
 2  + import lib1
@@ -63,3 +64,4 @@ help: Organize imports
 17 | from lib3.lib4.lib5 import foo
 18 + from lib4 import lib1, lib2
 19 + from lib5 import lib1, lib2
+   |

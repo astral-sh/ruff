@@ -66,7 +66,7 @@ from typing import (
     overload,
     type_check_only,
 )
-from typing_extensions import Self, TypeIs, deprecated, disjoint_base
+from typing_extensions import Never, Self, TypeIs, deprecated, disjoint_base
 
 if sys.version_info >= (3, 14):
     from annotationlib import Format
@@ -265,7 +265,7 @@ def getmodulename(path: StrPath) -> str | None:
 def ismodule(object: object) -> TypeIs[ModuleType]:
     """Return true if the object is a module."""
 
-def isclass(object: object) -> TypeIs[type[Any]]:
+def isclass(object: object) -> TypeIs[type[object]]:
     """Return true if the object is a class."""
 
 def ismethod(object: object) -> TypeIs[MethodType]:
@@ -326,7 +326,7 @@ def iscoroutinefunction(obj: Callable[_P, object]) -> TypeGuard[Callable[_P, Cor
 @overload
 def iscoroutinefunction(obj: object) -> TypeGuard[Callable[..., CoroutineType[Any, Any, Any]]]: ...
 
-def isgenerator(object: object) -> TypeIs[GeneratorType[Any, Any, Any]]:
+def isgenerator(object: object) -> TypeIs[GeneratorType[object, Never, object]]:
     """Return true if the object is a generator.
 
     Generator objects provide these attributes:
@@ -371,7 +371,7 @@ class _SupportsSet(Protocol[_T_contra, _V_contra]):
 class _SupportsDelete(Protocol[_T_contra]):
     def __delete__(self, instance: _T_contra, /) -> None: ...
 
-def isasyncgen(object: object) -> TypeIs[AsyncGeneratorType[Any, Any]]:
+def isasyncgen(object: object) -> TypeIs[AsyncGeneratorType[object, Never]]:
     """Return true if the object is an asynchronous generator."""
 
 def istraceback(object: object) -> TypeIs[TracebackType]:
@@ -493,7 +493,7 @@ def isgetsetdescriptor(object: object) -> TypeIs[GetSetDescriptorType]:
     modules.
     """
 
-def isdatadescriptor(object: object) -> TypeIs[_SupportsSet[Any, Any] | _SupportsDelete[Any]]:
+def isdatadescriptor(object: object) -> TypeIs[_SupportsSet[Never, Never] | _SupportsDelete[Never]]:
     """Return true if the object is a data descriptor.
 
     Data descriptors have a __set__ or a __delete__ attribute.  Examples are

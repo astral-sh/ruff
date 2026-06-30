@@ -852,42 +852,19 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         generic_context: GenericContext<'db>,
     ) -> Option<TypeVarNonce> {
-        let mut max_freshness = None;
-        let mut update = |freshness| {
-            max_freshness = max_freshness.max(freshness);
-        };
+        let typevars = self
+            .generic_context
+            .into_iter()
+            .flat_map(|context| context.variables(db))
+            .map(Type::TypeVar);
+        let parameters = self.parameters.iter().flat_map(|parameter| {
+            std::iter::once(parameter.annotated_type()).chain(parameter.default_type())
+        });
+        let types = typevars
+            .chain(parameters)
+            .chain(std::iter::once(self.return_ty));
 
-        if let Some(signature_generic_context) = self.generic_context {
-            for typevar in signature_generic_context.variables(db) {
-                update(max_typevar_freshness_matching_generic_context(
-                    db,
-                    Type::TypeVar(typevar),
-                    generic_context,
-                ));
-            }
-        }
-
-        for param in &self.parameters {
-            update(max_typevar_freshness_matching_generic_context(
-                db,
-                param.annotated_type(),
-                generic_context,
-            ));
-            if let Some(default_ty) = param.default_type() {
-                update(max_typevar_freshness_matching_generic_context(
-                    db,
-                    default_ty,
-                    generic_context,
-                ));
-            }
-        }
-        update(max_typevar_freshness_matching_generic_context(
-            db,
-            self.return_ty,
-            generic_context,
-        ));
-
-        max_freshness
+        max_typevar_freshness_matching_generic_context(db, types, generic_context)
     }
 
     pub(crate) fn find_legacy_typevars_impl(
@@ -3226,41 +3203,51 @@ impl<'db> Parameters<'db> {
 
         for parameter in parameters {
             if let Some(unpacked_typed_dict) = parameter.unpacked_typed_dict(db) {
-                let kwargs_name = parameter
-                    .name()
-                    .expect("keyword variadic parameter always has a name")
-                    .clone();
-
-                for (name, field) in unpacked_typed_dict.items(db) {
-                    if value
-                        .iter()
-                        .any(|existing| existing.callable_by_name(name.as_str()))
-                    {
-                        continue;
-                    }
-
-                    value.push(
-                        Parameter::keyword_only(name.clone())
-                            .with_annotated_type(field.declared_ty)
-                            .with_optional_default_type(
-                                (!field.is_required()).then_some(Type::unknown()),
-                            )
-                            .with_definition(field.first_declaration()),
-                    );
-                }
-
-                if let Some(extra_items) = unpacked_typed_dict.openness(db).effective_extra_items()
-                {
-                    value.push(
-                        Parameter::keyword_variadic(kwargs_name)
-                            .with_annotated_type(extra_items.declared_ty),
-                    );
-                }
+                Self::push_unpacked_typed_dict(db, &mut value, &parameter, unpacked_typed_dict);
             } else {
                 value.push(parameter);
             }
         }
 
+        Self::from_normalized(db, value)
+    }
+
+    fn push_unpacked_typed_dict(
+        db: &'db dyn Db,
+        value: &mut Vec<Parameter<'db>>,
+        parameter: &Parameter<'db>,
+        unpacked_typed_dict: TypedDictType<'db>,
+    ) {
+        let kwargs_name = parameter
+            .name()
+            .expect("keyword variadic parameter always has a name")
+            .clone();
+
+        for (name, field) in unpacked_typed_dict.items(db) {
+            if value
+                .iter()
+                .any(|existing| existing.callable_by_name(name.as_str()))
+            {
+                continue;
+            }
+
+            value.push(
+                Parameter::keyword_only(name.clone())
+                    .with_annotated_type(field.declared_ty)
+                    .with_optional_default_type((!field.is_required()).then_some(Type::unknown()))
+                    .with_definition(field.first_declaration()),
+            );
+        }
+
+        if let Some(extra_items) = unpacked_typed_dict.openness(db).effective_extra_items() {
+            value.push(
+                Parameter::keyword_variadic(kwargs_name)
+                    .with_annotated_type(extra_items.declared_ty),
+            );
+        }
+    }
+
+    fn from_normalized(db: &'db dyn Db, value: Vec<Parameter<'db>>) -> Self {
         let mut kind = ParametersKind::Standard;
 
         let variadic_param = value

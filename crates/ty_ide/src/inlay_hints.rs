@@ -589,7 +589,7 @@ fn name_matches_parameter(argument_name: &str, parameter_name: &str) -> bool {
 /// Given a function call, check if the expression is the "same name"
 /// as the function being called.
 ///
-/// This allows us to filter out reptitive inlay hints like `x: T = T(...)`.
+/// This allows us to filter out repetitive inlay hints like `x: T = T(...)`.
 /// While still allowing non-trivial ones like `x: T[U] = T()`.
 fn call_matches_name(expr: &Expr, name: &str) -> bool {
     // Only care about function calls
@@ -1101,11 +1101,10 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
+           |
         1  + from typing import Literal
         2  |
-        3  | def i(x: int, /) -> int:
-        4  |     return x
-        5  |
+        --------------------------------------------------------------------------------
         6  | x = 1
            - y = x
            - z = i(1)
@@ -1116,6 +1115,7 @@ Source with applied edits:
         10 | aa = b'foo'
            - bb = aa
         11 + bb: Literal[b"foo"] = aa
+           |
         "#);
     }
 
@@ -1422,11 +1422,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        2 | def i(x: int, /) -> int:
-        3 |     return x
+          |
         4 |
           - __special__ = i(1)
         5 + __special__: int = i(1)
+          |
         ");
     }
 
@@ -1740,13 +1740,10 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
+           |
         1  + from typing import Literal
         2  |
-        3  | def i(x: int, /) -> int:
-        4  |     return x
         --------------------------------------------------------------------------------
-        6  |     return x
-        7  |
         8  | x = (1, 'abc')
            - y = x
            - z = (i(1), s('abc'))
@@ -1754,6 +1751,7 @@ Source with applied edits:
         9  + y: tuple[Literal[1], Literal["abc"]] = x
         10 + z: tuple[int, str] = (i(1), s('abc'))
         11 + w: tuple[int, str] = z
+           |
         "#);
     }
 
@@ -2007,17 +2005,17 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
+          |
         1 + from typing import Literal
         2 |
-        3 | def i(x: int, /) -> int:
-        4 |     return x
-        5 |
+        --------------------------------------------------------------------------------
         6 | x: int = 1
           - y = x
         7 + y: Literal[1] = x
         8 | z: int = i(1)
           - w = z
         9 + w: int = z
+          |
         ");
     }
 
@@ -2054,12 +2052,12 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
-        2 | def i(x: int, /) -> int:
+          |
         3 |     return x
           - x = i(1)
         4 + x: int = i(1)
         5 | z = x
+          |
         ");
     }
 
@@ -2117,6 +2115,7 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
+          |
         1 + from ty_extensions import Unknown
         2 |
         3 | class A:
@@ -2128,6 +2127,7 @@ Source with applied edits:
           - a = A(2)
         8 + a = A(y=2)
         9 | a.y = int(3)
+          |
         ");
     }
 
@@ -2147,7 +2147,30 @@ Source with applied edits:
         def my_func(command: str):
             match command.split():
                 case ["get", ab]:
-                    x[: @Todo] = ab
+                    x[: str] = ab
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ^^^
+           |
+        info: Source
+          --> main2.py:LL:17
+           |
+        LL |             x[: str] = ab
+           |                 ^^^
+           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+          |
+        4 |         case ["get", ab]:
+          -             x = ab
+        5 +             x: str = ab
+          |
         "#);
     }
 
@@ -2167,7 +2190,43 @@ Source with applied edits:
         def my_func(command: str):
             match command.split():
                 case ["get", *ab]:
-                    x[: @Todo] = ab
+                    x[: list[str]] = ab
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class list(MutableSequence[_T]):
+           |       ^^^^
+           |
+        info: Source
+          --> main2.py:LL:17
+           |
+        LL |             x[: list[str]] = ab
+           |                 ^^^^
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ^^^
+           |
+        info: Source
+          --> main2.py:LL:22
+           |
+        LL |             x[: list[str]] = ab
+           |                      ^^^
+           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+          |
+        4 |         case ["get", *ab]:
+          -             x = ab
+        5 +             x: list[str] = ab
+          |
         "#);
     }
 
@@ -2187,7 +2246,30 @@ Source with applied edits:
         def my_func(command: str):
             match command.split():
                 case ["get", ("a" | "b") as ab]:
-                    x[: @Todo] = ab
+                    x[: str] = ab
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ^^^
+           |
+        info: Source
+          --> main2.py:LL:17
+           |
+        LL |             x[: str] = ab
+           |                 ^^^
+           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+          |
+        4 |         case ["get", ("a" | "b") as ab]:
+          -             x = ab
+        5 +             x: str = ab
+          |
         "#);
     }
 
@@ -2219,7 +2301,30 @@ Source with applied edits:
         def my_func(event: Click):
             match event:
                 case Click(x, button=ab):
-                    x[: @Todo] = ab
+                    x[: str] = ab
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ^^^
+           |
+        info: Source
+          --> main2.py:LL:17
+           |
+        LL |             x[: str] = ab
+           |                 ^^^
+           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+           |
+        10 |         case Click(x, button=ab):
+           -             x = ab
+        11 +             x: str = ab
+           |
         "#);
     }
 
@@ -2777,6 +2882,7 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
+           |
         1  + from ty_extensions import Unknown
         2  + from string.templatelib import Template
         3  |
@@ -2802,6 +2908,7 @@ Source with applied edits:
         12 + i: list[bytes] = [b'/x01', b'/x02']
         13 + j: list[int | float] = [+1, +2.0]
         14 + k: list[int | float] = [-1, -2.0]
+           |
         "#);
     }
 
@@ -2992,13 +3099,12 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        4 |         self.x: int = 1
-        5 |
+          |
         6 | x = MyClass()
           - y = (MyClass(), MyClass())
         7 + y: tuple[MyClass, MyClass] = (MyClass(), MyClass())
         8 | a, b = MyClass(), MyClass()
-        9 | c, d = (MyClass(), MyClass())
+          |
         ");
     }
 
@@ -3528,8 +3634,7 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        4  |         self.x = x
-        5  |         self.y = y
+           |
         6  |
            - x = MyClass([42], ("a", "b"))
            - y = (MyClass([42], ("a", "b")), MyClass([42], ("a", "b")))
@@ -3539,6 +3644,7 @@ Source with applied edits:
         8  + y: tuple[MyClass[int, str], MyClass[int, str]] = (MyClass([42], y=("a", "b")), MyClass([42], y=("a", "b")))
         9  + a, b = MyClass([42], y=("a", "b")), MyClass([42], y=("a", "b"))
         10 + c, d = (MyClass([42], y=("a", "b")), MyClass([42], y=("a", "b")))
+           |
         "#);
     }
 
@@ -3597,10 +3703,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
+          |
         2 | def foo(x: int): pass
           - foo(1)
         3 + foo(x=1)
+          |
         ");
     }
 
@@ -3639,11 +3746,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        3 | x = 1
-        4 | y = 2
+          |
         5 | foo(x)
           - foo(y)
         6 + foo(x=y)
+          |
         ");
     }
 
@@ -3690,11 +3797,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        7  | val = MyClass()
-        8  |
+           |
         9  | foo(val.x)
            - foo(val.y)
         10 + foo(x=val.y)
+           |
         ");
     }
 
@@ -3742,11 +3849,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        7  | x = MyClass()
-        8  |
+           |
         9  | foo(x.x)
            - foo(x.y)
         10 + foo(x=x.y)
+           |
         ");
     }
 
@@ -3797,11 +3904,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        9  | val = MyClass()
-        10 |
+           |
         11 | foo(val.x())
            - foo(val.y())
         12 + foo(x=val.y())
+           |
         ");
     }
 
@@ -3856,11 +3963,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        11 | val = MyClass()
-        12 |
+           |
         13 | foo(val.x()[0])
            - foo(val.y()[1])
         14 + foo(x=val.y()[1])
+           |
         ");
     }
 
@@ -3953,7 +4060,7 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
+          |
         2 | def foo(x: int): pass
           - x = [1]
           - y = [2]
@@ -3963,6 +4070,7 @@ Source with applied edits:
         6 | foo(x[0])
           - foo(y[0])
         7 + foo(x=y[0])
+          |
         ");
     }
 
@@ -4060,11 +4168,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
-        2 | def foo(a: str, b: int, c: int, d: str): ...
+          |
         3 | t: tuple[int, int] = (23, 42)
           - foo('foo', *t, d='bar')
         4 + foo(a='foo', *t, d='bar')
+          |
         ");
     }
 
@@ -4126,11 +4234,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
-        2 | def foo(a: str, b: int, c: str): ...
+          |
         3 | t: tuple[int] = (42,)
           - foo('foo', *t, 'bar')
         4 + foo('foo', *t, c='bar')
+          |
         ");
     }
 
@@ -4178,11 +4286,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
-        2 | def foo(a: int, b: int): ...
+          |
         3 | t: tuple[int] = (2,)
           - foo(1, *t)
         4 + foo(a=1, *t)
+          |
         ");
     }
 
@@ -4245,10 +4353,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
+          |
         2 | def foo(x: int, /, y: int): pass
           - foo(1, 2)
         3 + foo(1, y=2)
+          |
         ");
     }
 
@@ -4328,13 +4437,13 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
-        2 | class Foo:
+          |
         3 |     def __init__(self, x: int): pass
           - Foo(1)
           - f = Foo(1)
         4 + Foo(x=1)
         5 + f = Foo(x=1)
+          |
         ");
     }
 
@@ -4390,11 +4499,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        5 |     x: int
-        6 |     y: str
+          |
         7 |
           - Foo(1, 'a')
         8 + Foo(1, y='a')
+          |
         ");
     }
 
@@ -4444,13 +4553,13 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
-        2 | class Foo:
+          |
         3 |     def __new__(cls, x: int): pass
           - Foo(1)
           - f = Foo(1)
         4 + Foo(x=1)
         5 + f = Foo(x=1)
+          |
         ");
     }
 
@@ -4489,11 +4598,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        3 |     def __call__(self, x: int): pass
-        4 | class Foo(metaclass=MetaFoo):
+          |
         5 |     pass
           - Foo(1)
         6 + Foo(x=1)
+          |
         ");
     }
 
@@ -4545,11 +4654,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
-        2 | class Foo:
+          |
         3 |     def bar(self, y: int): pass
           - Foo().bar(2)
         4 + Foo().bar(y=2)
+          |
         ");
     }
 
@@ -4619,13 +4728,13 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        11 | class Child(Parent): pass
-        12 |
+           |
         13 | def f(parent: Parent, child: Child):
            -     parent.choose(1)
            -     child.choose(2)
         14 +     parent.choose(parent_value=1)
         15 +     child.choose(child_value=2)
+           |
         "#);
     }
 
@@ -4662,11 +4771,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        2 | class Foo:
-        3 |     @classmethod
+          |
         4 |     def bar(cls, y: int): pass
           - Foo.bar(2)
         5 + Foo.bar(y=2)
+          |
         ");
     }
 
@@ -4703,11 +4812,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        2 | class Foo:
-        3 |     @staticmethod
+          |
         4 |     def bar(y: int): pass
           - Foo.bar(2)
         5 + Foo.bar(y=2)
+          |
         ");
     }
 
@@ -4755,12 +4864,13 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
+          |
         2 | def foo(x: int | str): pass
           - foo(1)
           - foo('abc')
         3 + foo(x=1)
         4 + foo(x='abc')
+          |
         ");
     }
 
@@ -4819,10 +4929,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
+          |
         2 | def foo(x: int, y: str, z: bool): pass
           - foo(1, 'hello', True)
         3 + foo(1, 'hello', z=True)
+          |
         ");
     }
 
@@ -4885,11 +4996,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        2 | def add(x: int, b, y: int) -> int:
-        3 |     return x + y
+          |
         4 |
           - total = add(3, 2, y=4)
         5 + total: int = add(3, b=2, y=4)
+          |
         ");
     }
 
@@ -4922,10 +5033,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
+          |
         2 | def foo(x: int, y: str, z: bool): pass
           - foo(1, z=True, y='hello')
         3 + foo(x=1, z=True, y='hello')
+          |
         ");
     }
 
@@ -4960,10 +5072,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
+          |
         2 | def foo(x: int, y: str): pass
           - foo(y='hello', 1)
         3 + foo(y='hello', y=1)
+          |
         ");
     }
 
@@ -5065,7 +5178,7 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
+          |
         2 | def foo(x: int, y: str = 'default', z: bool = False): pass
           - foo(1)
           - foo(1, 'custom')
@@ -5073,6 +5186,7 @@ Source with applied edits:
         3 + foo(x=1)
         4 + foo(1, y='custom')
         5 + foo(1, 'custom', z=True)
+          |
         ");
     }
 
@@ -5184,11 +5298,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        7  |
-        8  | def baz(a: int, b: str, c: bool): pass
+           |
         9  |
            - baz(foo(5), bar(bar('test')), True)
         10 + baz(foo(x=5), bar(y=bar(y='test')), c=True)
+           |
         ");
     }
 
@@ -5244,11 +5358,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        5 |     def bar(self, name: str) -> 'A':
-        6 |         return self
+          |
         7 |     def baz(self): pass
           - A().foo(42).bar('test').baz()
         8 + A().foo(value=42).bar(name='test').baz()
+          |
         ");
     }
 
@@ -5287,11 +5401,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        2 | def foo(x: str) -> str:
-        3 |     return x
+          |
         4 | def bar(y: int): pass
           - bar(y=foo('test'))
         5 + bar(y=foo(x='test'))
+          |
         ");
     }
 
@@ -5341,13 +5455,13 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
-        2 | foo = lambda x: x * 2
+          |
         3 | bar = lambda a, b: a + b
           - foo(5)
           - bar(1, 2)
         4 + foo(x=5)
         5 + bar(1, b=2)
+          |
         ");
     }
 
@@ -5384,12 +5498,12 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
-        2 | from typing import LiteralString
+          |
         3 | def my_func(x: LiteralString):
           -     y = x
         4 +     y: LiteralString = x
         5 | my_func(x="hello")
+          |
         "#);
     }
 
@@ -5507,16 +5621,14 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
+           |
         1  + from typing import Literal
         2  |
-        3  | def branch(cond: int):
-        4  |     if cond < 10:
         --------------------------------------------------------------------------------
-        11 |         x = "hello"
-        12 |     else:
         13 |         x = None
            -     y = x
         14 +     y: Literal[1, 2, 3, "hello"] | None = x
+           |
         "#);
     }
 
@@ -5618,10 +5730,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
+          |
         2 | def f(x: list[str]):
           -     y = type(x)
         3 +     y: type[list[str]] = type(x)
+          |
         ");
     }
 
@@ -5716,12 +5829,13 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
+          |
         2 | def foo(a: int, b: str, /, c: float, d: bool = True, *, e: int, f: str = 'default'): pass
           - foo(1, 'pos', 3.14, False, e=42)
           - foo(1, 'pos', 3.14, e=42, f='custom')
         3 + foo(1, 'pos', 3.14, d=False, e=42)
         4 + foo(1, 'pos', c=3.14, e=42, f='custom')
+          |
         ");
     }
 
@@ -5763,11 +5877,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
-        2 | from foo import bar
+          |
         3 |
           - bar(1)
         4 + bar(x=1)
+          |
         ");
     }
 
@@ -5831,13 +5945,13 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        8  | def foo(x):
-        9  |     return x
+           |
         10 |
            - foo(42)
            - foo('hello')
         11 + foo(x=42)
         12 + foo(x='hello')
+           |
         ");
     }
 
@@ -5903,11 +6017,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        8  | def S():
-        9  |     pass
+           |
         10 |
            - b = S('x', 'y')
         11 + b: Sequence[str] = S('x', 'y')
+           |
         ");
     }
 
@@ -5961,11 +6075,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        8  | def f(x):
-        9  |     return x
+           |
         10 |
            - f([])
         11 + f(x=[])
+           |
         ");
     }
 
@@ -6072,7 +6186,7 @@ Source with applied edits:
             foo(parameter)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r#"
+        assert_snapshot!(test.inlay_hints(), @"
 
         def foo(param: int): pass
         param2 = 1
@@ -6125,8 +6239,7 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        4 | my_param2 = 1
-        5 | parameter = 1
+          |
         6 |
           - foo(param2)
           - foo(my_param2)
@@ -6134,7 +6247,8 @@ Source with applied edits:
         7 + foo(param=param2)
         8 + foo(param=my_param2)
         9 + foo(param=parameter)
-        "#);
+          |
+        ");
     }
 
     #[test]
@@ -6155,7 +6269,7 @@ Source with applied edits:
             foo(focus_end_range)",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r#"
+        assert_snapshot!(test.inlay_hints(), @"
 
         def foo(focus_range: int): pass
         focus_range = 1
@@ -6186,12 +6300,12 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        10 | foo(FOCUS_RANGE)
-        11 | foo(focus_range_end)
+           |
         12 | foo(start_focus_range)
            - foo(focus_end_range)
         13 + foo(focus_range=focus_end_range)
-        "#);
+           |
+        ");
     }
 
     #[test]
@@ -6227,12 +6341,12 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
-        2 | def foo(x: int): pass
+          |
         3 | def bar(y: int): pass
           - foo(1)
         4 + foo(x=1)
         5 | bar(2)
+          |
         ");
     }
 
@@ -6265,10 +6379,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
+          |
         2 | def foo(_x: int, y: int): pass
           - foo(1, 2)
         3 + foo(1, y=2)
+          |
         ");
     }
 
@@ -6322,11 +6437,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        4 |     y: int
-        5 | ): ...
+          |
         6 |
           - foo(1, 2)
         7 + foo(1, y=2)
+          |
         ");
     }
 
@@ -6764,13 +6879,12 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
-        2 | from typing import NewType
+          |
         3 |
           - N = NewType('N', str)
         4 + N = NewType('N', tp=str)
         5 |
-        6 | Y = N
+          |
         ");
     }
 
@@ -6872,11 +6986,12 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
+          |
         2 | from typing import Protocol, TypeVar
           - T = TypeVar('T')
         3 + T = TypeVar(name='T')
         4 | Strange = Protocol[T]
+          |
         ");
     }
 
@@ -6909,10 +7024,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
+          |
         2 | from typing import ParamSpec
           - P = ParamSpec('P')
         3 + P = ParamSpec(name='P')
+          |
         ");
     }
 
@@ -6958,10 +7074,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
+          |
         2 | from typing_extensions import TypeAliasType
           - A = TypeAliasType('A', str)
         3 + A = TypeAliasType('A', value=str)
+          |
         ");
     }
 
@@ -6979,10 +7096,10 @@ Source with applied edits:
         Ts = TypeVarTuple([name=]'Ts')
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/typing.pyi:LL:30
+          --> stdlib/typing_extensions.pyi:LL:17
            |
-        LL |             def __new__(cls, name: str, *, default: Any = ...) -> Self: ...  # AnnotationForm
-           |                              ^^^^
+        LL |                 name: str,
+           |                 ^^^^
            |
         info: Source
           --> main2.py:LL:20
@@ -6994,10 +7111,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 |
+          |
         2 | from typing_extensions import TypeVarTuple
           - Ts = TypeVarTuple('Ts')
         3 + Ts = TypeVarTuple(name='Ts')
+          |
         ");
     }
 
@@ -7060,6 +7178,7 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
+          |
         1 + from ty_extensions import Top
         2 + from ty_extensions import Unknown
         3 |
@@ -7067,6 +7186,7 @@ Source with applied edits:
         5 |     if isinstance(xyxy, list):
           -         x = xyxy
         6 +         x: Top[list[Unknown]] = xyxy
+          |
         ");
     }
 
@@ -7229,12 +7349,14 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
+          |
         1 + from bar import D
         2 |
         3 | import foo
         4 |
           - a = foo.C().foo()
         5 + a: foo.B[foo.A[D[int, list[str | foo.A[foo.B[int]]]]]] = foo.C().foo()
+          |
         ");
     }
 
@@ -7397,6 +7519,7 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
+          |
         1 + from bar import D
         2 |
           - from foo import C
@@ -7404,6 +7527,7 @@ Source with applied edits:
         4 |
           - a = C().foo()
         5 + a: B[A[D[int, list[str | A[B[int]]]]]] = C().foo()
+          |
         ");
     }
 
@@ -7486,11 +7610,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        3 |
-        4 | class Baz: ...
+          |
         5 |
           - a = D(Baz)
         6 + a: D[Baz] = D(x=Baz)
+          |
         ");
     }
 
@@ -7555,6 +7679,7 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
+          |
         1 |
           - from typing import Any
         2 + from typing import Any, Literal
@@ -7562,6 +7687,7 @@ Source with applied edits:
         4 | def foo(x: Any):
           -     a = getattr(x, 'foo', "some")
         5 +     a: Any | Literal["some"] = getattr(x, 'foo', "some")
+          |
         "#);
     }
 
@@ -7646,6 +7772,7 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
+          |
         1 + from typing import TypeVar
         2 + from typing import Any
         3 |
@@ -7653,6 +7780,7 @@ Source with applied edits:
         5 |
           - a = foo()
         6 + a: dict[TypeVar, Any] | None = foo()
+          |
         ");
     }
 
@@ -7730,6 +7858,7 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
+          |
         1 + import bar
         2 + import baz
         3 |
@@ -7737,6 +7866,7 @@ Source with applied edits:
         5 |
           - a = foo()
         6 + a: bar.A | baz.A = foo()
+          |
         ");
     }
 
@@ -7858,6 +7988,7 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
+          |
         1 + import bar
         2 + import baz
         3 |
@@ -7866,6 +7997,7 @@ Source with applied edits:
         6 |
           - a = foo()
         7 + a: bar.A | baz.A | list[bar.A | baz.A] = foo()
+          |
         ");
     }
 
@@ -7952,11 +8084,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        8  | class B[T]:
-        9  |     x: T
+           |
         10 |
            - b = B(foo.A())
         11 + b: B[foo.A] = B(x=foo.A())
+           |
         ");
     }
 
@@ -8107,11 +8239,11 @@ Source with applied edits:
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        5 | def wrap[T](x: T) -> list[T]:
-        6 |     return [x]
+          |
         7 |
           - y = wrap(Outer.Inner())
         8 + y = wrap(x=Outer.Inner())
+          |
         ");
     }
 

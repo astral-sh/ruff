@@ -10,13 +10,14 @@ use ruff_db::system::{
     file_time_now,
 };
 use ruff_python_ast::PythonVersion;
+use ruff_ranged_value::RangedValue;
 use ty_module_resolver::{Module, ModuleName, resolve_module_confident};
 use ty_project::metadata::options::{
     EnvironmentOptions, Options, ProjectOptionsOverrides, SrcOptions,
 };
 use ty_project::metadata::pyproject::{PyProject, Tool};
 use ty_project::metadata::python_version::SupportedPythonVersion;
-use ty_project::metadata::value::{RangedValue, RelativeGlobPattern, RelativePathBuf};
+use ty_project::metadata::value::{RelativeGlobPattern, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
 use ty_project::{ChangeResult, Db, ProjectDatabase, ProjectMetadata};
 use ty_python_core::platform::PythonPlatform;
@@ -1571,7 +1572,7 @@ fn hard_links_in_project() -> anyhow::Result<()> {
 /// ```
 ///
 /// # Linux
-/// inotiyf doesn't support observing changes to hard linked files.
+/// inotify doesn't support observing changes to hard linked files.
 ///
 /// > Note: when monitoring a directory, events are not generated for
 /// > the files inside the directory when the events are performed via

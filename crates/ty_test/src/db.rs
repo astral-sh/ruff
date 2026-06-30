@@ -110,8 +110,12 @@ impl Db {
         }
     }
 
-    pub(crate) fn update_mdtest_rule_selection(&mut self, rules: Option<&Rules>) {
-        let rule_selection = mdtest_rule_selection(rules);
+    pub(crate) fn update_mdtest_rule_selection(
+        &mut self,
+        rules: Option<&Rules>,
+        required_rule: Option<&str>,
+    ) {
+        let rule_selection = mdtest_rule_selection(rules, required_rule);
 
         let settings = self.settings();
         if settings.rule_selection(self) != &rule_selection {
@@ -227,7 +231,7 @@ struct MdtestRuleSelection(RuleSelection);
 
 impl Default for MdtestRuleSelection {
     fn default() -> Self {
-        Self(mdtest_rule_selection(None))
+        Self(mdtest_rule_selection(None, None))
     }
 }
 
@@ -239,7 +243,7 @@ impl std::ops::Deref for MdtestRuleSelection {
     }
 }
 
-fn mdtest_rule_selection(rules: Option<&Rules>) -> RuleSelection {
+fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> RuleSelection {
     let registry = default_lint_registry();
     let mut selection = RuleSelection::all(registry, Severity::Info);
 
@@ -253,6 +257,13 @@ fn mdtest_rule_selection(rules: Option<&Rules>) -> RuleSelection {
         .get("missing-override-decorator")
         .expect("missing-override-decorator is a known lint rule");
     selection.disable(missing_override_decorator);
+
+    // `experimental-syntax` is also an exception: we make use of `&` and `~` for intersection and
+    // negation types in our tests for better readability.
+    let experimental_syntax = registry
+        .get("experimental-syntax")
+        .expect("experimental-syntax is a known lint rule");
+    selection.disable(experimental_syntax);
 
     if let Some(rules) = rules {
         let set_lint_level =
@@ -281,6 +292,17 @@ fn mdtest_rule_selection(rules: Option<&Rules>) -> RuleSelection {
                 .unwrap_or_else(|error| panic!("Unknown lint rule `{rule_name}`: {error}"));
             set_lint_level(&mut selection, lint, *level);
         }
+    }
+
+    if let Some(required_rule) = required_rule {
+        let lint = registry
+            .get(required_rule)
+            .unwrap_or_else(|error| panic!("Unknown lint rule `{required_rule}`: {error}"));
+        selection.enable(
+            lint,
+            Severity::Info,
+            ty_python_semantic::lint::LintSource::File,
+        );
     }
 
     selection

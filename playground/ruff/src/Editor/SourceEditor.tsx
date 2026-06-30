@@ -12,12 +12,17 @@ import {
   Range,
 } from "monaco-editor";
 import { useCallback, useEffect, useRef } from "react";
-import type { Diagnostic, DiagnosticLocation } from "ruff_wasm";
+import type { Diagnostic, DiagnosticLocation, DiagnosticTag } from "ruff_wasm";
 import { secondaryAnnotationsWithMessages, Theme } from "shared";
 import CodeActionProvider = languages.CodeActionProvider;
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 
 export const PLAYGROUND_FILE_PATH = "<filename>";
+
+const markerTagByDiagnosticTag = {
+  unnecessary: MarkerTag.Unnecessary,
+  deprecated: MarkerTag.Deprecated,
+} satisfies Record<DiagnosticTag, MarkerTag>;
 
 type MonacoEditorState = {
   monaco: Monaco;
@@ -196,10 +201,7 @@ function updateMarkers(monaco: Monaco, diagnostics: Array<Diagnostic>) {
         message: diagnostic.code ? `${diagnostic.code}: ${message}` : message,
         relatedInformation: diagnosticRelatedInformation(diagnostic, model.uri),
         severity: MarkerSeverity.Error,
-        tags:
-          diagnostic.code === "F401" || diagnostic.code === "F841"
-            ? [MarkerTag.Unnecessary]
-            : [],
+        tags: diagnostic.tags.map((tag) => markerTagByDiagnosticTag[tag]),
       };
     }),
   );

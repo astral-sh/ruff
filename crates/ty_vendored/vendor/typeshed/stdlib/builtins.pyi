@@ -45,7 +45,7 @@ from _typeshed import (
 from collections.abc import Awaitable, Callable, Iterable, Iterator, MutableSet, Reversible, Set as AbstractSet, Sized
 from io import BufferedRandom, BufferedReader, BufferedWriter, FileIO, TextIOWrapper
 from os import PathLike
-from types import CellType, CodeType, EllipsisType, GenericAlias, NotImplementedType, TracebackType
+from types import CellType, CodeType, EllipsisType, GenericAlias, NotImplementedType, TracebackType, UnionType
 
 # mypy crashes if any of {ByteString, Sequence, MutableSequence, Mapping, MutableMapping}
 # are imported from collections.abc in builtins.pyi
@@ -1423,13 +1423,14 @@ class str(Sequence[str]):
         def maketrans(x: dict[int, _T] | dict[str, _T] | dict[str | int, _T], /) -> dict[int, _T]:
             """Return a translation table usable for str.translate().
 
-            If there is only one argument, it must be a dictionary mapping Unicode
-            ordinals (integers) or characters to Unicode ordinals, strings or None.
-            Character keys will be then converted to ordinals.
-            If there are two arguments, they must be strings of equal length, and
-            in the resulting dictionary, each character in x will be mapped to the
-            character at the same position in y. If there is a third argument, it
-            must be a string, whose characters will be mapped to None in the result.
+            If there is only one argument, it must be a dictionary mapping
+            Unicode ordinals (integers) or characters to Unicode ordinals,
+            strings or None.  Character keys will be then converted to ordinals.
+            If there are two arguments, they must be strings of equal length,
+            and in the resulting dictionary, each character in x will be mapped
+            to the character at the same position in y.  If there is a third
+            argument, it must be a string, whose characters will be mapped to
+            None in the result.
             """
 
     @staticmethod
@@ -2469,7 +2470,8 @@ class bytearray(MutableSequence[int]):
             """Create a bytearray object from a string of hexadecimal numbers.
 
             Spaces between two numbers are accepted.
-            Example: bytearray.fromhex('B9 01EF') -> bytearray(b'\\\\xb9\\\\x01\\\\xef')
+            Example:
+                bytearray.fromhex('B9 01EF') -> bytearray(b'\\\\xb9\\\\x01\\\\xef')
             """
 
     @staticmethod
@@ -2728,7 +2730,7 @@ class memoryview(Sequence[_I]):
 
     if sys.version_info >= (3, 14):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-            """See PEP 585"""
+            """memoryviews are generic over the type of their underlying data"""
 
 @final
 class bool(int):
@@ -2841,7 +2843,7 @@ class slice(Generic[_StartT_co, _StopT_co, _StepT_co]):
 
     if sys.version_info >= (3, 15):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-            """See PEP 585"""
+            """slices are generic over the types of their start, end, and step values"""
 
 @disjoint_base
 class tuple(Sequence[_T_co]):
@@ -2898,7 +2900,14 @@ class tuple(Sequence[_T_co]):
         """
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """Tuples are generic over the types of their contents.
+
+        For example, use ``tuple[int, str]`` for a pair whose first element
+        is an int and second element is a string.
+
+        Tuples also support the form ``tuple[T, ...]`` to indicate
+        an arbitrary length tuple of elements of type T.
+        """
 
 # Doesn't exist at runtime, but deleting this breaks mypy and pyright. See:
 # https://github.com/python/typeshed/issues/7580
@@ -3072,7 +3081,7 @@ class list(MutableSequence[_T]):
     def __le__(self, value: list[_T], /) -> bool: ...
     def __eq__(self, value: object, /) -> bool: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """lists are generic over the type of their contents"""
 
 @disjoint_base
 class dict(MutableMapping[_KT, _VT]):
@@ -3160,9 +3169,9 @@ class dict(MutableMapping[_KT, _VT]):
         raise a KeyError.
         """
     @overload
-    def pop(self, key: _KT, default: _VT, /) -> _VT: ...
+    def pop(self, key: object, default: _VT, /) -> _VT: ...
     @overload
-    def pop(self, key: _KT, default: _T, /) -> _VT | _T: ...
+    def pop(self, key: object, default: _T, /) -> _VT | _T: ...
 
     def __len__(self) -> int:
         """Return len(self)."""
@@ -3185,7 +3194,7 @@ class dict(MutableMapping[_KT, _VT]):
 
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """dicts are generic over two types, signifying (respectively) the types of their keys and values"""
 
     if sys.version_info >= (3, 15):
         def __or__(self, value: dict[_T1, _T2] | frozendict[_T1, _T2], /) -> dict[_KT | _T1, _VT | _T2]:
@@ -3284,7 +3293,7 @@ if sys.version_info >= (3, 15):
 
         def __hash__(self) -> int: ...
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-            """See PEP 585"""
+            """frozendicts are generic over two types, signifying (respectively) the types of the frozendict's keys and values"""
 
         def __or__(self, value: dict[_T1, _T2] | frozendict[_T1, _T2], /) -> frozendict[_KT | _T1, _VT | _T2]:
             """Return self|value."""
@@ -3399,7 +3408,7 @@ class set(MutableSet[_T]):
     def __eq__(self, value: object, /) -> bool: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """sets are generic over the type of their elements"""
 
 @disjoint_base
 class frozenset(AbstractSet[_T_co]):
@@ -3462,7 +3471,7 @@ class frozenset(AbstractSet[_T_co]):
     def __eq__(self, value: object, /) -> bool: ...
     def __hash__(self) -> int: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """frozensets are generic over the type of their elements"""
 
 @disjoint_base
 class enumerate(Generic[_T]):
@@ -3486,7 +3495,7 @@ class enumerate(Generic[_T]):
         """Implement next(self)."""
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """'enumerate' objects are generic over the type of their values"""
 
 @final
 class range(Sequence[int]):
@@ -3767,16 +3776,17 @@ else:
     ) -> CodeType:
         """Compile source into a code object that can be executed by exec() or eval().
 
-        The source code may represent a Python module, statement or expression.
+        The source code may represent a Python module, statement or
+        expression.
         The filename will be used for run-time error messages.
         The mode must be 'exec' to compile a module, 'single' to compile a
         single (interactive) statement, or 'eval' to compile an expression.
-        The flags argument, if present, controls which future statements influence
-        the compilation of the code.
+        The flags argument, if present, controls which future statements
+        influence the compilation of the code.
         The dont_inherit argument, if true, stops the compilation inheriting
         the effects of any future statements in effect in the code calling
-        compile; if absent or false these statements do influence the compilation,
-        in addition to any features explicitly specified.
+        compile; if absent or false these statements do influence the
+        compilation, in addition to any features explicitly specified.
         """
     @overload
     def compile(
@@ -4697,13 +4707,15 @@ if sys.version_info >= (3, 15):
 
         __name__: str
         __module__: str
-        def __new__(cls, name: str, /, *, repr: str | None = None) -> Self: ...
-        def __copy__(self, /) -> Self: ...
-        def __deepcopy__(self, memo: Any, /) -> Self: ...
-        def __or__(self, other: Any, /) -> Any:
+        def __new__(cls, name: str, /, *, repr: str | None = None) -> sentinel: ...
+        def __copy__(self, /) -> sentinel: ...
+        def __deepcopy__(self, memo: Any, /) -> sentinel: ...
+        # `other` can be any legal form for unions.
+        # `x | x` creates a `sentinel` instance if `x` is a sentinel, not a `UnionType` instance.
+        def __or__(self, other: Any, /) -> UnionType | sentinel:
             """Return self|value."""
 
-        def __ror__(self, other: Any, /) -> Any:
+        def __ror__(self, other: Any, /) -> UnionType | sentinel:
             """Return value|self."""
 
 @overload
@@ -5317,7 +5329,7 @@ if sys.version_info >= (3, 11):
         def derive(self, excs: Sequence[_BaseExceptionT], /) -> BaseExceptionGroup[_BaseExceptionT]: ...
 
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-            """See PEP 585"""
+            """Exception groups are generic over the type of their contained exceptions"""
 
     class ExceptionGroup(BaseExceptionGroup[_ExceptionT_co], Exception):
         def __new__(cls, message: str, exceptions: Sequence[_ExceptionT_co], /) -> Self: ...

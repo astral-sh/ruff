@@ -58,4 +58,4 @@ class SimpleQueue(Generic[_T]):
         """Return the approximate size of the queue (not reliable!)."""
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """SimpleQueues are generic over the type of their contents"""

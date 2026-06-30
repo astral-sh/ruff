@@ -10,8 +10,9 @@ C401 [*] Unnecessary generator (rewrite as a set comprehension)
   | ^^^^^^^^^^^^^^^^^^^
   |
 help: Rewrite as a set comprehension
-1 | xs = [[1], [2]]
+  |
 2 |
   - set(*x for x in xs)
 3 + {*x for x in xs}
+  |
 note: This is an unsafe fix and may change runtime behavior

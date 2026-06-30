@@ -215,7 +215,6 @@ fn all_submodule_names_for_package<'db>(
         SystemOrVendoredPathRef::Vendored(parent_directory) => db
             .vendored()
             .read_directory(parent_directory)
-            .into_iter()
             .filter(|entry| {
                 let ty = entry.file_type();
                 let path = entry.path();
@@ -384,6 +383,10 @@ impl KnownModule {
 
     pub const fn is_typing(self) -> bool {
         matches!(self, Self::Typing)
+    }
+
+    pub const fn is_typing_extensions(self) -> bool {
+        matches!(self, Self::TypingExtensions)
     }
 
     pub const fn is_ty_extensions(self) -> bool {

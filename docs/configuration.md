@@ -767,6 +767,9 @@ File selection:
           files. Use `--no-respect-gitignore` to disable
       --exclude <FILE_PATTERN>
           List of paths, used to omit files and/or directories from analysis
+      --extend-exclude <FILE_PATTERN>
+          Like --exclude, but adds additional files and directories on top of
+          those already excluded
       --force-exclude
           Enforce exclusions, even for paths passed to Ruff directly on the
           command-line. Use `--no-force-exclude` to disable

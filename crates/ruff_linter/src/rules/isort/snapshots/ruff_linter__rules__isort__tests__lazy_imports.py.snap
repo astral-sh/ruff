@@ -11,9 +11,11 @@ I001 [*] Import block is un-sorted or un-formatted
   | |_________^
   |
 help: Organize imports
+  |
   - lazy from math import pi
 1 + import os
 2 | from math import pi
 3 | lazy import os
   - import os
 4 + lazy from math import pi
+  |

@@ -16,7 +16,7 @@ I001 [*] Import block is un-sorted or un-formatted
   | |_____________________^
   |
 help: Organize imports
-1 | import A
+  |
 2 | import B
 3 + import C
 4 + import E
@@ -29,3 +29,4 @@ help: Organize imports
   - from h import A, b, C
 8 + from g import B, a, c
 9 + from h import A, C, b
+  |

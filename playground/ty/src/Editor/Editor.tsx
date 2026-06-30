@@ -34,6 +34,7 @@ import {
   type FileHandle,
   DocumentHighlight,
   DocumentHighlightKind,
+  DiagnosticTag,
   InlayHintKind,
   LocationLink,
   TextEdit,
@@ -47,6 +48,11 @@ import {
 } from "./Diagnostics";
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 import CompletionItemKind = languages.CompletionItemKind;
+
+const markerTagByDiagnosticTag = {
+  [DiagnosticTag.Unnecessary]: MarkerTag.Unnecessary,
+  [DiagnosticTag.Deprecated]: MarkerTag.Deprecated,
+} satisfies Record<DiagnosticTag, MarkerTag>;
 
 type Props = {
   visible: boolean;
@@ -603,7 +609,7 @@ class PlaygroundServer
           message: diagnosticDisplayMessage(diagnostic),
           relatedInformation: this.diagnosticRelatedInformation(diagnostic),
           severity: mapSeverity(diagnostic.severity),
-          tags: [],
+          tags: diagnostic.tags.map((tag) => markerTagByDiagnosticTag[tag]),
         };
       }),
       ...hints.map((hint) => ({

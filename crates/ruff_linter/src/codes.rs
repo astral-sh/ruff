@@ -9,7 +9,6 @@ use serde::Serialize;
 use strum_macros::EnumIter;
 
 use crate::registry::Linter;
-use crate::rule_selector::is_single_rule_selector;
 use crate::rules;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -24,6 +23,10 @@ impl NoqaCode {
     /// Return the suffix for the [`NoqaCode`], e.g., `101` for `SIM101`.
     pub fn suffix(&self) -> &str {
         self.1
+    }
+
+    pub(crate) const fn into_parts(self) -> (&'static str, &'static str) {
+        (self.0, self.1)
     }
 }
 
@@ -822,7 +825,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "029") => rules::flake8_pyi::rules::StrOrReprDefinedInStub,
         (Flake8Pyi, "030") => rules::flake8_pyi::rules::UnnecessaryLiteralUnion,
         (Flake8Pyi, "032") => rules::flake8_pyi::rules::AnyEqNeAnnotation,
-        (Flake8Pyi, "033") => rules::flake8_pyi::rules::TypeCommentInStub,
+        (Flake8Pyi, "033") => rules::flake8_pyi::rules::LegacyTypeComment,
         (Flake8Pyi, "034") => rules::flake8_pyi::rules::NonSelfReturnType,
         (Flake8Pyi, "035") => rules::flake8_pyi::rules::UnassignedSpecialVariableInStub,
         (Flake8Pyi, "036") => rules::flake8_pyi::rules::BadExitAnnotation,

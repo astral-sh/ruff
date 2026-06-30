@@ -289,7 +289,7 @@ impl<'db> OverloadLiteral<'db> {
     fn with_deprecated(self, db: &'db dyn Db, deprecated: DeprecatedInstance<'db>) -> Self {
         Self::new(
             db,
-            self.name(db).clone(),
+            self.name(db),
             self.known(db),
             self.body_scope(db),
             self.decorators(db),
@@ -306,7 +306,7 @@ impl<'db> OverloadLiteral<'db> {
     ) -> Self {
         Self::new(
             db,
-            self.name(db).clone(),
+            self.name(db),
             self.known(db),
             self.body_scope(db),
             self.decorators(db),
@@ -1032,7 +1032,7 @@ impl<'db> UpdatedFunctionSignatures<'db> {
 pub struct FunctionType<'db> {
     pub(crate) literal: FunctionLiteral<'db>,
 
-    #[returns(as_ref)]
+    #[returns(ref)]
     updated_signatures: Option<Box<UpdatedFunctionSignatures<'db>>>,
 }
 
@@ -1058,11 +1058,13 @@ pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 impl<'db> FunctionType<'db> {
     fn updated_signature(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
         self.updated_signatures(db)
+            .as_deref()
             .and_then(|updated| updated.signature.as_ref())
     }
 
     fn updated_implementation_signature(self, db: &'db dyn Db) -> Option<&'db Signature<'db>> {
         self.updated_signatures(db)
+            .as_deref()
             .and_then(|updated| updated.implementation_signature.as_ref())
     }
 
@@ -1175,7 +1177,7 @@ impl<'db> FunctionType<'db> {
             last_definition: literal.last_definition.with_deprecated(db, deprecated),
             ..literal
         };
-        Self::new(db, literal, self.updated_signatures(db).cloned())
+        Self::new(db, literal, self.updated_signatures(db))
     }
 
     /// Returns the [`File`] in which this function is defined.

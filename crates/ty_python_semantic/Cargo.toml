@@ -1,7 +1,7 @@
 [package]
 name = "ty_python_semantic"
-version = "0.0.0"
-publish = false
+version = "0.0.3"
+description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -49,7 +49,6 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing"] }
-ruff_python_parser = { workspace = true }
 test-case = { workspace = true }
 ty_test = { workspace = true }
 ty_vendored = { workspace = true }

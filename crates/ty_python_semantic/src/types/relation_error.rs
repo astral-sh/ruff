@@ -456,16 +456,8 @@ impl<'db> From<ErrorContext<'db>> for ErrorContextTree<'db> {
 }
 
 impl<'db> ErrorContextTree<'db> {
-    /// Create a new, empty error context tree with collection disabled.
-    pub(crate) fn disabled() -> Self {
-        Self {
-            root: Rc::default(),
-            enabled: Cell::new(false),
-        }
-    }
-
     /// Create a new, empty error context tree with collection enabled.
-    pub(crate) fn enabled() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             root: Rc::default(),
             enabled: Cell::new(true),

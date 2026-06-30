@@ -309,7 +309,7 @@ Here, both `Foo.foo` and `Bar.bar` use `Self`. When accessing a bound method, we
 occurrences of `Self` with the bound `self` type. In this example, when we access `x.foo`, we only
 want to substitute the occurrences of `Self` in `Foo.foo` — that is, occurrences of `Self@foo`. The
 fact that `x` is an instance of `Foo[Self@bar]` (a completely different `Self` type) should not
-affect that subtitution. If we blindly substitute all occurrences of `Self`, we would get
+affect that substitution. If we blindly substitute all occurrences of `Self`, we would get
 `Foo[Self@bar]` as the return type of the bound method.
 
 ```py
@@ -471,6 +471,21 @@ class Child(Parent):
 
 # When called on concrete types, Self is substituted correctly.
 reveal_type(Child.create())  # revealed: Child
+```
+
+An inherited classmethod should also preserve the method's `Self` type when accessed through `self`.
+
+```py
+from typing import Self, assert_type
+
+class Parent:
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+class Child(Parent):
+    def method(self) -> None:
+        assert_type(self.create(), Self)
 ```
 
 ## Attributes

@@ -245,6 +245,8 @@ class SubclassOfAny(Any):
 a = SubclassOfAny()
 assert_type(a.method(), int)
 
+value: str = a.method()  # error: [invalid-assignment]
+
 assert_type(a.non_existing_method(), Any)
 ```
 
@@ -414,6 +416,29 @@ reveal_type(Derived().f)  # revealed: bound method type[Derived].f(x: int) -> st
 
 reveal_type(Derived.f(1))  # revealed: str
 reveal_type(Derived().f(1))  # revealed: str
+```
+
+### Implicit receivers in generic final classes
+
+For a generic final class, an implicit `type[Self]` receiver can bind to another classmethod on the
+exact generic class object:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import final
+
+@final
+class GenericFinal[T]:
+    @classmethod
+    def call_method(cls) -> None:
+        cls.method()
+
+    @classmethod
+    def method(cls) -> None: ...
 ```
 
 ### Accessing the classmethod as a static member

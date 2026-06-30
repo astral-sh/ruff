@@ -1174,7 +1174,7 @@ reveal_type(run(multi, x=1, y=2))  # revealed: int | str
 reveal_type(run(multi, 1, "b"))  # revealed: int | str
 ```
 
-### Overloads with subtitution of `P.args` and `P.kwargs`
+### Overloads with substitution of `P.args` and `P.kwargs`
 
 This is regression test for <https://github.com/astral-sh/ty/issues/2027>
 

@@ -800,6 +800,33 @@ def specialized(box: Box[Callable[..., Any]]) -> None:
     box.cls.whatever
 ```
 
+## Attribute access on TypeVars bounded by `type[...]`
+
+Regression test for <https://github.com/astral-sh/ty/issues/3782>.
+
+```py
+from typing import ClassVar, Self
+
+class A:
+    attr: ClassVar[str]
+    current: ClassVar[Self]
+
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+class B:
+    attr: ClassVar[int]
+
+def single_bound[T: type[A]](cls: T) -> None:
+    reveal_type(cls.attr)  # revealed: str
+    reveal_type(cls.current)  # revealed: T'instance@single_bound
+    reveal_type(cls.create())  # revealed: T'instance@single_bound
+
+def union_bound[T: type[A] | type[B]](cls: T) -> None:
+    reveal_type(cls.attr)  # revealed: str | int
+```
+
 ## Solving TypeVars with upper bounds in unions
 
 ```py
@@ -1263,7 +1290,7 @@ def g[S: (bool, str)](x: S) -> S:
 ## Display ordering
 
 Where possible, we want the types that appear in inferred specializations to line up with the types
-that are listed in the source code. We don't want arbitarily reorder e.g. union elements as part of
+that are listed in the source code. We don't want arbitrarily reorder e.g. union elements as part of
 finding a solution.
 
 ```py

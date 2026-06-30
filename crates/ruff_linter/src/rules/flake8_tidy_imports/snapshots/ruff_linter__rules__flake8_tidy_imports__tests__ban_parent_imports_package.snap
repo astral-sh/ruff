@@ -23,14 +23,12 @@ TID252 [*] Prefer absolute imports over relative imports from parent modules
 8 | from .. import server
   |
 help: Replace relative imports from parent modules with absolute imports
-3 | import attrs
-4 |
+  |
 5 | from ....import unknown
   - from ..protocol import commands, definitions, responses
 6 + from my_package.sublib.protocol import commands, definitions, responses
 7 | from ..server import example
-8 | from .. import server
-9 | from . import logger, models
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 TID252 [*] Prefer absolute imports over relative imports from parent modules
@@ -43,14 +41,12 @@ TID252 [*] Prefer absolute imports over relative imports from parent modules
 8 | from .. import server
   |
 help: Replace relative imports from parent modules with absolute imports
-3 | import attrs
-4 |
+  |
 5 | from ....import unknown
   - from ..protocol import commands, definitions, responses
 6 + from my_package.sublib.protocol import commands, definitions, responses
 7 | from ..server import example
-8 | from .. import server
-9 | from . import logger, models
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 TID252 [*] Prefer absolute imports over relative imports from parent modules
@@ -63,14 +59,12 @@ TID252 [*] Prefer absolute imports over relative imports from parent modules
 8 | from .. import server
   |
 help: Replace relative imports from parent modules with absolute imports
-3 | import attrs
-4 |
+  |
 5 | from ....import unknown
   - from ..protocol import commands, definitions, responses
 6 + from my_package.sublib.protocol import commands, definitions, responses
 7 | from ..server import example
-8 | from .. import server
-9 | from . import logger, models
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 TID252 [*] Prefer absolute imports over relative imports from parent modules
@@ -84,14 +78,12 @@ TID252 [*] Prefer absolute imports over relative imports from parent modules
 9 | from . import logger, models
   |
 help: Replace relative imports from parent modules with absolute imports
-4  |
-5  | from ....import unknown
-6  | from ..protocol import commands, definitions, responses
-   - from ..server import example
-7  + from my_package.sublib.server import example
-8  | from .. import server
-9  | from . import logger, models
-10 | from ..protocol.UpperCaseModule import some_function
+  |
+6 | from ..protocol import commands, definitions, responses
+  - from ..server import example
+7 + from my_package.sublib.server import example
+8 | from .. import server
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 TID252 [*] Prefer absolute imports over relative imports from parent modules
@@ -105,13 +97,12 @@ TID252 [*] Prefer absolute imports over relative imports from parent modules
 10 | from ..protocol.UpperCaseModule import some_function
    |
 help: Replace relative imports from parent modules with absolute imports
-5  | from ....import unknown
-6  | from ..protocol import commands, definitions, responses
-7  | from ..server import example
-   - from .. import server
-8  + from my_package.sublib import server
-9  | from . import logger, models
-10 | from ..protocol.UpperCaseModule import some_function
+  |
+7 | from ..server import example
+  - from .. import server
+8 + from my_package.sublib import server
+9 | from . import logger, models
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 TID252 [*] Prefer absolute imports over relative imports from parent modules
@@ -123,9 +114,9 @@ TID252 [*] Prefer absolute imports over relative imports from parent modules
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Replace relative imports from parent modules with absolute imports
-7  | from ..server import example
-8  | from .. import server
+   |
 9  | from . import logger, models
    - from ..protocol.UpperCaseModule import some_function
 10 + from my_package.sublib.protocol.UpperCaseModule import some_function
+   |
 note: This is an unsafe fix and may change runtime behavior

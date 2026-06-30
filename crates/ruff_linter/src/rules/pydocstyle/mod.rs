@@ -90,6 +90,7 @@ mod tests {
     #[test_case(Rule::MismatchedSectionUnderlineLength, Path::new("sections.py"))]
     #[test_case(Rule::OverindentedSectionUnderline, Path::new("sections.py"))]
     #[test_case(Rule::OverloadWithDocstring, Path::new("D.py"))]
+    #[test_case(Rule::OverloadWithDocstring, Path::new("D418.pyi"))]
     #[test_case(Rule::EscapeSequenceInDocstring, Path::new("D.py"))]
     #[test_case(Rule::EscapeSequenceInDocstring, Path::new("D301.py"))]
     #[test_case(Rule::PropertyDocstringStartsWithVerb, Path::new("D421.py"))]

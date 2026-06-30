@@ -4489,7 +4489,7 @@ lambda: fu
     }
 
     #[test]
-    fn idiomiatic_typing_guards() {
+    fn idiomatic_typing_guards() {
         // typing.TYPE_CHECKING: python3.5.3+.
         flakes(
             r"

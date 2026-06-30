@@ -22,18 +22,16 @@ ruff_linter = { path = "../crates/ruff_linter" }
 ruff_python_ast = { path = "../crates/ruff_python_ast" }
 ruff_python_codegen = { path = "../crates/ruff_python_codegen" }
 ruff_python_parser = { path = "../crates/ruff_python_parser" }
-ruff_source_file = { path = "../crates/ruff_source_file" }
 ruff_python_formatter = { path = "../crates/ruff_python_formatter" }
 ruff_text_size = { path = "../crates/ruff_text_size" }
 
 ty_module_resolver = { path = "../crates/ty_module_resolver" }
 ty_python_semantic = { path = "../crates/ty_python_semantic" }
 ty_vendored = { path = "../crates/ty_vendored" }
-ty_site_packages = { path = "../crates/ty_site_packages" }
 ty_python_core = { path = "../crates/ty_python_core" }
 
 libfuzzer-sys = { git = "https://github.com/rust-fuzz/libfuzzer", default-features = false }
-salsa = { version = "0.27.0", default-features = false, features = [
+salsa = { version = "0.27.2", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",

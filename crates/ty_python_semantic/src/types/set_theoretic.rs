@@ -226,6 +226,30 @@ impl<'db> UnionType<'db> {
         self.try_map(db, |element| element.to_instance(db))
     }
 
+    /// Returns a shared fully static supertype for a union of literal-value types.
+    ///
+    /// The returned type is broader than the literal types themselves. For example, the
+    /// supertype for `Literal["a"] | Literal["b"]` is `LiteralString`.
+    pub(crate) fn common_literal_supertype(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        // Do not use `Type::literal_fallback_instance` here: it also falls back from function
+        // literals to `FunctionType`. Since `FunctionType.__call__` is gradual, it can be
+        // assignable to a callable that the function literal's precise signature is not.
+        // Literal values have fully static supertypes, so a successful relation check for the
+        // supertype proves the relation for every literal in the union.
+        let supertype = |element: &Type<'db>| match element {
+            Type::LiteralValue(literal) if literal.is_string() => Some(Type::literal_string()),
+            Type::LiteralValue(literal) => Some(literal.fallback_instance(db)),
+            _ => None,
+        };
+
+        let mut elements = self.elements(db).iter();
+        let shared_supertype = supertype(elements.next()?)?;
+        elements.try_fold(shared_supertype, |shared_supertype, element| {
+            let next = supertype(element)?;
+            (next == shared_supertype).then_some(shared_supertype)
+        })
+    }
+
     pub(crate) fn filter(self, db: &'db dyn Db, f: impl FnMut(&Type<'db>) -> bool) -> Type<'db> {
         let current = self.elements(db);
         let new: Box<[Type<'db>]> = current.iter().copied().filter(f).collect();
@@ -507,7 +531,7 @@ impl<'db> NegativeIntersectionElements<'db> {
 
     pub(crate) fn is_empty(&self) -> bool {
         // See struct-level comment: we don't try to maintain the invariant that empty
-        // collections are representend as `Self::Empty`
+        // collections are represented as `Self::Empty`
         self.len() == 0
     }
 
@@ -673,6 +697,8 @@ impl std::iter::FusedIterator for NegativeIntersectionElementsIterator<'_, '_> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for IntersectionType<'_> {}
 
+const MAX_INTERSECTION_DNF_TERMS: usize = 4;
+
 pub(crate) fn walk_intersection_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     intersection: IntersectionType<'db>,
@@ -740,6 +766,83 @@ impl<'db> IntersectionType<'db> {
         } else {
             Type::object()
         }
+    }
+
+    /// Create an intersection type `E1 & E2 & ... & En` from a list of (positive) elements, while
+    /// ensuring that we only expand an intersection of unions within a limited budget.
+    ///
+    /// Our `Type` representation is in DNF, which means that the size of an intersection of unions
+    /// grows as the product of all of the union sizes. [`from_elements`][Self::from_elements] will
+    /// blindly calculate that full expansion. This method detects when we exceed a fixed budget of
+    /// work, and if so, returns `None`. (Redundant terms do not count toward the budget.)
+    ///
+    /// Like [`from_elements`][Self::from_elements], a successful result is exact.
+    pub(crate) fn bounded_from_elements<I, T>(db: &'db dyn Db, elements: I) -> Option<Type<'db>>
+    where
+        I: IntoIterator<Item = T>,
+        I::IntoIter: Clone,
+        Type<'db>: From<T>,
+    {
+        // TODO: Consider folding this logic into IntersectionBuilder itself, and having it check
+        // an optional budget as part of its existing `add_positive` methods.
+
+        let elements = elements.into_iter().map(Type::from);
+        let union_count = elements.clone().filter(|ty| ty.is_union()).count();
+        if union_count <= 1 {
+            // If there are no unions, then all we have to do is check for redundant elements. If
+            // there is a single union, the product of all union counts should be reasonable, even
+            // if it exceeds the budget below. In both cases, just return the precise answer
+            // without considering the budget.
+            return Some(Self::from_elements(db, elements));
+        }
+
+        let non_union_elements = elements.clone().filter(|element| !element.is_union());
+        let initial = Self::from_elements(db, non_union_elements);
+        let insert_candidate = |candidates: &mut Vec<Type<'db>>, new_ty: Type<'db>| -> Option<()> {
+            if new_ty.is_never()
+                || candidates
+                    .iter()
+                    .any(|old| new_ty.is_redundant_with(db, *old))
+            {
+                return Some(());
+            }
+
+            candidates.retain(|old| !old.is_redundant_with(db, new_ty));
+            if candidates.len() >= MAX_INTERSECTION_DNF_TERMS {
+                return None;
+            }
+            candidates.push(new_ty);
+            Some(())
+        };
+
+        let mut frontier = Vec::new();
+        let mut next = Vec::new();
+        insert_candidate(&mut frontier, initial)?;
+
+        for (idx, clause) in elements.filter_map(Type::as_union).enumerate() {
+            // Don't check the budget for the first union clause. That ensures that we have a
+            // chance for pairs of types to "annihilate" each other without contributing to the
+            // result. For instance, this allows us to return the precise result for
+            // `(A | B | C | D | E) & (A | B | F | G | H)` (in which each class is final), since
+            // most of the pairs are disjoint.
+            let skip_budget_check = (idx == 0).then_some(());
+
+            next.clear();
+            for candidate in &frontier {
+                for alternative in clause.elements(db) {
+                    let refined = Self::from_two_elements(db, *candidate, *alternative);
+                    insert_candidate(&mut next, refined).or(skip_budget_check)?;
+                }
+            }
+
+            if next.is_empty() {
+                return Some(Type::Never);
+            }
+
+            std::mem::swap(&mut frontier, &mut next);
+        }
+
+        Some(UnionType::from_elements(db, frontier))
     }
 
     /// Create an intersection type `A & B` from two elements `A` and `B`.

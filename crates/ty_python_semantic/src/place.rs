@@ -26,8 +26,8 @@ use ty_python_core::reachability_constraints::{
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
     BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
-    DeclarationWithConstraint, DeclarationsIterator, Truthiness, get_loop_header, global_scope,
-    place_table, use_def_map,
+    DeclarationWithConstraint, DeclarationsIterator, Truthiness, global_scope, place_table,
+    use_def_map,
 };
 
 pub(crate) use implicit_globals::{
@@ -1368,7 +1368,7 @@ fn loop_header_reachability_impl<'db>(
 
     let scope = definition.scope(db);
     let use_def = use_def_map(db, scope);
-    let loop_header = get_loop_header(db, loop_header_definition.loop_token());
+    let loop_header = use_def.loop_header(loop_header_definition.loop_header_id());
     let place = loop_header_definition.place();
 
     let mut deleted_reachability = Truthiness::AlwaysFalse;

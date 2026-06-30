@@ -12,14 +12,12 @@ F401 [*] `exceptiongroup.ExceptionGroup` imported but unused
 14 | # Already-empty block handled in a single pass by RUF050
    |
 help: Remove unused import: `exceptiongroup.ExceptionGroup`
-9  | # F401 removes the unused `ExceptionGroup` import, leaving `pass`.
-10 | # Then RUF050 removes the empty `if`, and F401 removes `sys`.
+   |
 11 | if sys.version_info < (3, 11):
    -     from exceptiongroup import ExceptionGroup
 12 +     pass
 13 |
-14 | # Already-empty block handled in a single pass by RUF050
-15 | if sys.version_info < (3, 11):
+   |
 
 RUF050 [*] Empty `if` statement
   --> RUF050_F401.py:15:1
@@ -32,10 +30,9 @@ RUF050 [*] Empty `if` statement
 18 |   print(os.getcwd())
    |
 help: Remove the `if` statement
-12 |     from exceptiongroup import ExceptionGroup
-13 |
+   |
 14 | # Already-empty block handled in a single pass by RUF050
    - if sys.version_info < (3, 11):
    -     pass
 15 |
-16 | print(os.getcwd())
+   |

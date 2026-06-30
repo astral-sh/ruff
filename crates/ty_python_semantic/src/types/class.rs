@@ -39,8 +39,8 @@ use crate::types::signatures::{
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
-    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, UnionBuilder,
-    VarianceInferable,
+    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, TypedDictModule,
+    UnionBuilder, VarianceInferable,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet,
@@ -65,6 +65,22 @@ mod named_tuple;
 mod static_literal;
 mod typed_dict;
 
+bitflags::bitflags! {
+    /// Properties that affect the representation of instances of a class.
+    ///
+    /// This combines properties derived from the MRO into the existing class-classification
+    /// query, avoiding a separate cached query for each property.
+    #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Hash, salsa::Update)]
+    pub(super) struct ClassInstanceFlags: u8 {
+        /// The class is, or inherits from, a `TypedDict` specification.
+        const TYPED_DICT = 1 << 0;
+        /// The class directly or indirectly inherits from an explicit `Any` base.
+        const INHERITS_FROM_EXPLICIT_ANY = 1 << 1;
+    }
+}
+
+impl get_size2::GetSize for ClassInstanceFlags {}
+
 /// A category of classes with code generation capabilities (with synthesized methods).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum CodeGeneratorKind<'db> {
@@ -72,7 +88,7 @@ pub(crate) enum CodeGeneratorKind<'db> {
     DataclassLike(Option<DataclassTransformerParams<'db>>),
     /// Classes inheriting from `typing.NamedTuple`
     NamedTuple,
-    /// Classes inheriting from `typing.TypedDict`
+    /// Classes inheriting from `typing.TypedDict` or `typing_extensions.TypedDict`
     TypedDict,
 }
 
@@ -154,7 +170,9 @@ impl<'db> CodeGeneratorKind<'db> {
     }
 
     fn from_dynamic_class(db: &'db dyn Db, class: DynamicClassLiteral<'db>) -> Option<Self> {
-        #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(cycle_initial=|_, _, _| None,
+            heap_size=ruff_memory_usage::heap_size
+        )]
         fn code_generator_of_dynamic_class<'db>(
             db: &'db dyn Db,
             class: DynamicClassLiteral<'db>,
@@ -214,6 +232,24 @@ pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 impl get_size2::GetSize for GenericAlias<'_> {}
 
 impl<'db> GenericAlias<'db> {
+    /// Merge two cycle iterations that specialize the same class origin.
+    ///
+    /// A semantic union of these class objects is not a valid class base. Keep the shared class
+    /// identity and merge the approximations inside its specialization instead.
+    pub(super) fn merge_cycle_recovery(self, db: &'db dyn Db, previous: Self) -> Option<Self> {
+        let origin = self.origin(db);
+        if origin != previous.origin(db) {
+            return None;
+        }
+
+        Some(Self::new(
+            db,
+            origin,
+            self.specialization(db)
+                .merge_cycle_recovery(db, previous.specialization(db))?,
+        ))
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -336,6 +372,7 @@ pub enum ClassLiteral<'db> {
     DynamicEnum(DynamicEnumLiteral<'db>),
 }
 
+#[salsa::tracked]
 impl<'db> ClassLiteral<'db> {
     /// Return a `ClassLiteral` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db) -> Self {
@@ -395,6 +432,34 @@ impl<'db> ClassLiteral<'db> {
         MroIterator::new(db, self, None)
     }
 
+    /// Return the properties that affect how instances of this class are represented.
+    pub(super) fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
+        match self {
+            Self::Static(literal) => literal.instance_flags(db),
+            Self::DynamicTypedDict(_) => ClassInstanceFlags::TYPED_DICT,
+            Self::DynamicNamedTuple(_) => ClassInstanceFlags::empty(),
+            Self::Dynamic(literal) if literal.explicit_bases(db).is_empty() => {
+                ClassInstanceFlags::empty()
+            }
+            Self::DynamicEnum(literal) if literal.explicit_bases(db).is_empty() => {
+                ClassInstanceFlags::empty()
+            }
+            Self::Dynamic(_) | Self::DynamicEnum(_) => {
+                if self.iter_mro(db).any(ClassBase::is_explicit_any_base) {
+                    ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY
+                } else {
+                    ClassInstanceFlags::empty()
+                }
+            }
+        }
+    }
+
+    /// Return whether this class directly or indirectly inherits from an explicit `Any` base.
+    pub(super) fn inherits_from_explicit_any(self, db: &'db dyn Db) -> bool {
+        self.instance_flags(db)
+            .contains(ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY)
+    }
+
     /// Returns the metaclass of this class.
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         match self {
@@ -442,10 +507,9 @@ impl<'db> ClassLiteral<'db> {
                 let result = MroLookup::new(db, mro_iter).class_member(name, policy, None, false);
                 match result {
                     ClassMemberResult::Done(result) => result.finalize(db),
-                    ClassMemberResult::TypedDict => KnownClass::TypedDictFallback
-                        .to_class_literal(db)
-                        .find_name_in_mro_with_policy(db, name, policy)
-                        .expect("Will return Some() when called on class literal"),
+                    ClassMemberResult::TypedDict(module) => {
+                        typed_dict::typed_dict_fallback_class_member(db, module, policy, name)
+                    }
                 }
             }
         }
@@ -1090,7 +1154,7 @@ impl<'db> ClassType<'db> {
     /// and have not been overridden with a concrete implementation anywhere in the MRO
     ///
     /// The value of the map is a struct containing information about the abstract method.
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn abstract_methods(self, db: &'db dyn Db) -> FxIndexMap<Name, AbstractMethod<'db>> {
         fn type_as_abstract_method<'db>(
             db: &'db dyn Db,
@@ -1881,6 +1945,7 @@ impl<'db> ClassType<'db> {
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
     #[salsa::tracked(
+        returns(clone),
         cycle_initial=|db, _, _| CallableTypes::one(CallableType::bottom(db)),
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -2171,6 +2236,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         source.iter_mro(db).when_any(db, self.constraints, |base| {
             match base {
+                ClassBase::Any => ConstraintSet::from_bool(
+                    self.constraints,
+                    self.relation.is_assignability() || target.is_object(db),
+                ),
                 ClassBase::Dynamic(_) | ClassBase::Divergent(_) => match self.relation {
                     TypeRelation::Subtyping
                     | TypeRelation::Redundancy { .. }
@@ -2183,7 +2252,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 },
 
                 // Protocol, Generic, and TypedDict are special bases that don't match ClassType.
-                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => self.never(),
+                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict(_) => self.never(),
 
                 ClassBase::Class(source) => match (source, target) {
                     // Two non-generic classes match if they have the same class literal.
@@ -2226,7 +2295,7 @@ pub(super) struct AbstractMethod<'db> {
 }
 
 /// The decorator category for a method-like function.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, get_size2::GetSize)]
 pub enum MethodDecorator {
     /// An instance method with an implicit instance receiver, conventionally named `self`.
     #[default]
@@ -2367,8 +2436,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// - `inherited_generic_context`: Generic context for `own_class_member` calls
     /// - `is_self_object`: Whether the class itself is `object` (affects policy filtering)
     ///
-    /// Returns `ClassMemberResult::TypedDict` if a `TypedDict` base is encountered,
-    /// allowing the caller to handle this case specially.
+    /// Returns `ClassMemberResult::TypedDict` with the originating module if a `TypedDict` base is
+    /// encountered, allowing the caller to handle this case specially.
     ///
     /// If we encounter a dynamic type in the MRO, we save it and after traversal:
     /// 1. Use it as the type if no other classes define the attribute, or
@@ -2390,7 +2459,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 ClassBase::Generic | ClassBase::Protocol => {
                     // Skip over these very special class bases that aren't really classes.
                 }
-                ClassBase::Dynamic(_) => {
+                ClassBase::Any | ClassBase::Dynamic(_) if policy.require_concrete() => {}
+                ClassBase::Any | ClassBase::Dynamic(_) => {
                     // Note: calling `Type::from(superclass).member()` would be incorrect here.
                     // What we'd really want is a `Type::Any.own_class_member()` method,
                     // but adding such a method wouldn't make much sense -- it would always return `Any`!
@@ -2429,8 +2499,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         )
                     });
                 }
-                ClassBase::TypedDict => {
-                    return ClassMemberResult::TypedDict;
+                ClassBase::TypedDict(module) => {
+                    return ClassMemberResult::TypedDict(module);
                 }
             }
             if lookup_result.is_ok() {
@@ -2465,7 +2535,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 ClassBase::Generic | ClassBase::Protocol => {
                     // Skip over these very special class bases that aren't really classes.
                 }
-                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+                ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
                     // We already return the dynamic type for class member lookup, so we can
                     // just return unbound here (to avoid having to build a union of the
                     // dynamic type with itself).
@@ -2505,7 +2575,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         union_qualifiers |= qualifiers;
                     }
                 }
-                ClassBase::TypedDict => {
+                ClassBase::TypedDict(_) => {
                     return InstanceMemberResult::TypedDict;
                 }
             }
@@ -2539,7 +2609,7 @@ pub(super) enum ClassMemberResult<'db> {
     /// Found the member or exhausted the MRO.
     Done(CompletedMemberLookup<'db>),
     /// Encountered a `TypedDict` base.
-    TypedDict,
+    TypedDict(TypedDictModule),
 }
 
 pub(super) struct CompletedMemberLookup<'db> {
