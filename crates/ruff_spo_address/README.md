@@ -48,42 +48,30 @@ reported in `Mint::truncated()` — beyond the cap the facet is a routing prefix
 not a lossless address (deeper levels are the registry/ref-escape's job).
 
 Earlier this doc claimed "for class graphs (depth ≈ 3–4) nothing truncates."
-**The `medcare_probe` example falsified that** against a real Roslyn harvest of
-the MedCare C# corpus (9 199 nodes):
+**That was falsified against a real multi-thousand-node corpus** (a Roslyn
+harvest of a production C# codebase, run downstream via `ruff_csharp_spo`):
+the naive [`mint`] produced real collisions and truncations once two
+structures crossed the 255-sibling cap — a **God-class** (a single class with
+hundreds of fields, the part_of axis) and a **flat is_a root** (a kind-
+discriminator type with thousands of direct children, the is_a axis). Coarse
+queries (`documentSymbol`, prefix routing) still held because they only need
+the *coarse* prefix, which never saturates; only fine-grained identity
+(injectivity) broke.
 
-| measure | result |
-|---|---|
-| nodes / classes | 9 199 / 162 |
-| **collisions** (injectivity) | **730** — `MainForm.ribbonBar5 == MainForm.ribbonButton1` |
-| **truncated** | **8 525 / 9 199 (93 %)** |
-| prefix-routable part_of | 9 305 / 9 305 ✓ |
-| `documentSymbol` recovery | 640 / 640 ✓ |
-| is_a redundancy | 92.5 % |
-
-Cause (one mechanism, two shapes): the per-tier rank is a `u8`, so **God-classes**
-(`mod_f_2_7_sono_gelenkStatus` 640 members, `MainForm` 330) and especially **flat
-is_a roots** (`ogit:Property` 6 272 children, `ogit:Function` 2 748) overflow the
-255-sibling cap and saturate to a shared rank → collisions. `documentSymbol` and
-prefix-routing still hold because they only need the *coarse* prefix, which never
-saturates.
-
-The fix is not a bigger int — it is that a member's **kind** (Property/Function)
-belongs in its `facet_classid`, not in a 6-tier sibling rank under a mega-root.
-That is the same move the classid-gate proposes, and the 92.5 % is_a redundancy
-is the evidence for it. See the `medcare_probe` [G] section (the 256-cap-is-a-lint law).
-
-Reproduce:
-
-```sh
-dotnet run --project crates/ruff_csharp_spo/harvester -- /path/to/MedCare out.ndjson
-cargo run -p ruff_spo_address --example medcare_probe -- out.ndjson
-```
+The fix is not a bigger int — it is that a member's **kind** (e.g.
+Property/Function) belongs in its `facet_classid`, not in a 6-tier sibling
+rank under a mega-root. That is the same move the classid-gate proposes.
+[`mint_factored`] is the corrected minter: it builds is_a from
+`inherits_from` only (the kind-discriminator mega-root never enters the
+sibling rank) and gives part_of a base-255 positional path that cascades
+deeper instead of saturating — both failure modes go to zero on the same
+corpus that exhibited them.
 
 ## Where it sits
 
 This is brick 2 of the AST-as-`(part_of:is_a)`-address pipeline
 (lance-graph `.claude/knowledge/ast-as-partof-isa-address.md`): brick 1 is the
-`ruff_*_spo` harvest, brick 3 is the `medcare_probe` example (harvest → mint →
-SoA → `documentSymbol`/prefix query; MedCareV2 reserved as the parity oracle).
-The per-tier `FacetCascade` layout is locked upstream, so the minter invents no
-new type — it writes into existing tiers.
+`ruff_*_spo` harvest, brick 3 is a downstream probe (harvest → mint → SoA →
+`documentSymbol`/prefix query) against your own corpus. The per-tier
+`FacetCascade` layout is locked upstream, so the minter invents no new type —
+it writes into existing tiers.

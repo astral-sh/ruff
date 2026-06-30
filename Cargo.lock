@@ -3672,7 +3672,6 @@ dependencies = [
 name = "ruff_spo_address"
 version = "0.1.0"
 dependencies = [
- "ruff_csharp_spo",
  "ruff_spo_triplet",
 ]
 
