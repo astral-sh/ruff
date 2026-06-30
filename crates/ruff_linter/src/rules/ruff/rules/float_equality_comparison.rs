@@ -155,41 +155,16 @@ fn has_float(expr: &Expr, semantic: &SemanticModel) -> bool {
         ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float | NumberLike::Complex)) => {
             true
         }
-        _ => {
-            match expr {
-                Expr::Call(ast::ExprCall { func, .. }) => ["float", "complex"]
-                    .iter()
-                    .any(|s| semantic.match_builtin_expr(func, s)),
-                Expr::BinOp(ast::ExprBinOp {
-                    left, right, op, ..
-                }) => {
-                    // Division always returns float in Python
-                    // https://docs.python.org/3/tutorial/introduction.html#numbers
-                    match op {
-                        ast::Operator::Div => {
-                            // Only trigger for numeric divisions, not path operations
-                            // Ex) `Path(__file__).parents[2] / "text.txt"`
-                            is_numeric_expr(left) || is_numeric_expr(right)
-                        }
-                        _ => has_float(left, semantic) || has_float(right, semantic),
-                    }
-                }
-                Expr::Named(ast::ExprNamed { value, .. }) => has_float(value, semantic),
-                _ => false,
+        _ => match expr {
+            Expr::Call(ast::ExprCall { func, .. }) => ["float", "complex"]
+                .iter()
+                .any(|s| semantic.match_builtin_expr(func, s)),
+            Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
+                has_float(left, semantic) || has_float(right, semantic)
             }
-        }
-    }
-}
-
-fn is_numeric_expr(expr: &Expr) -> bool {
-    match expr {
-        Expr::NumberLiteral(_) => true,
-        Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
-            is_numeric_expr(left) || is_numeric_expr(right)
-        }
-        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => is_numeric_expr(operand),
-        Expr::Named(ast::ExprNamed { value, .. }) => is_numeric_expr(value),
-        _ => false,
+            Expr::Named(ast::ExprNamed { value, .. }) => has_float(value, semantic),
+            _ => false,
+        },
     }
 }
 
