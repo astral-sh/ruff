@@ -825,22 +825,16 @@ impl<'db> ScopeInference<'db> {
         previous_inference: &ScopeInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ScopeInference<'db> {
-        if self.unknowns.iter().next().is_some() {
-            let expressions = std::mem::take(&mut self.expressions);
-            self.expressions = expressions
-                .iter()
-                .chain(
-                    self.unknowns
-                        .iter()
-                        .map(|expression| (*expression, Type::unknown())),
+        self.expressions = self
+            .expression_types()
+            .map(|(expression, ty)| {
+                (
+                    expression,
+                    ty.cycle_normalized(db, previous_inference.expression_type(expression), cycle),
                 )
-                .collect();
-            self.unknowns = FrozenSet::default();
-        }
-
-        self.expressions.map_values(|expr, ty| {
-            ty.cycle_normalized(db, previous_inference.expression_type(expr), cycle)
-        });
+            })
+            .collect();
+        self.unknowns = FrozenSet::default();
 
         if cycle.iteration() > crate::TAINTED_CYCLES
             && let Some(previous_extra) = previous_inference.extra.as_deref()
@@ -863,6 +857,14 @@ impl<'db> ScopeInference<'db> {
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
         self.try_expression_type(expression)
             .unwrap_or_else(Type::unknown)
+    }
+
+    fn expression_types(&self) -> impl Iterator<Item = (ExpressionNodeKey, Type<'db>)> + '_ {
+        self.expressions.iter().chain(
+            self.unknowns
+                .iter()
+                .map(|expression| (*expression, Type::unknown())),
+        )
     }
 
     pub(crate) fn try_expression_type(

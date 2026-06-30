@@ -604,13 +604,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn extend_scope(&mut self, inference: &ScopeInference<'db>) {
-        self.expressions.extend(inference.expressions.iter());
-        self.expressions.extend(
-            inference
-                .unknowns
-                .iter()
-                .map(|expression| (*expression, Type::unknown())),
-        );
+        self.expressions.extend(inference.expression_types());
 
         if let Some(extra) = &inference.extra {
             self.context.extend(&extra.diagnostics);
@@ -10543,7 +10537,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let unknowns = if cycle_recovery.is_none() {
             let mut unknowns = FxHashSet::default();
             expressions.retain(|expression, ty| {
-                if ty.is_unknown() {
+                if matches!(ty, Type::Dynamic(DynamicType::Unknown)) {
                     unknowns.insert(*expression);
                     false
                 } else {
