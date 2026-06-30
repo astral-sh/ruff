@@ -1778,10 +1778,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         nested_bindings.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
 
         for (name, mut declarations) in nested_bindings {
-            // Filter down to only the declarations with `is_bound: true`. If there are none left,
-            // skip synthesizing a definition for this symbol. (The reason we track these at all is
-            // that we reuse some of the same machinery to report semantic syntax errors for
-            // invalid `nonlocal`s, and those don't necessarily need a binding.)
+            // Ignore declarations used only to validate `nonlocal` syntax.
             declarations.retain(|d| d.is_bound);
             declarations.shrink_to_fit();
             if declarations.is_empty() {
@@ -1860,10 +1857,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         nested_bindings.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
 
         for (name, mut declarations) in nested_bindings {
-            // Filter down to only the declarations with `is_bound: true`. If there are none left,
-            // skip synthesizing a definition for this symbol. (The reason we track these at all is
-            // that we reuse some of the same machinery to report semantic syntax errors for
-            // invalid `nonlocal`s, and those don't necessarily need a binding.)
+            // Ignore declarations used only to validate `nonlocal` syntax.
             declarations.retain(|d| d.is_bound);
             declarations.shrink_to_fit();
             let Some(first_declaration) = declarations.first().copied() else {
@@ -1874,9 +1868,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             let symbol = self.add_symbol(name.clone());
             debug_assert!(
-                declarations.iter().all(
-                    |declaration| declaration.is_global() == first_declaration.is_global()
-                )
+                declarations
+                    .iter()
+                    .all(|declaration| declaration.is_global() == first_declaration.is_global())
             );
             self.forward_comprehension_binding(&name, first_declaration, symbol);
 
@@ -1905,8 +1899,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             } else {
                 PreviousDefinitions::AreKept
             };
-            self.current_use_def_map_mut()
-                .record_binding(place, definition, previous, FutureDefinitions::ShadowThisOne);
+            self.current_use_def_map_mut().record_binding(
+                place,
+                definition,
+                previous,
+                FutureDefinitions::ShadowThisOne,
+            );
 
             self.delete_associated_bindings(place);
             self.record_pending_capture_binding(symbol, definition_id);
@@ -1966,15 +1964,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             return;
         }
 
-        // The synthetic binding captures the inner declarations through this scope's flow state.
-        // Forward only that proxy so inner writes cannot bypass reachability or shadowing in an
-        // enclosing comprehension.
         self.current_scope_info_mut()
             .nested_global_or_nonlocal_declarations
             .remove(name);
 
-        let is_global = first_declaration.is_global();
-        if is_global {
+        if first_declaration.is_global() {
             self.current_place_table_mut()
                 .symbol_mut(symbol)
                 .mark_global();
@@ -2647,9 +2641,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             value,
         );
 
-        let mut rejected_filter_paths = Vec::new();
+        let mut filtered_out_paths = Vec::new();
         for if_expr in &generator.ifs {
-            rejected_filter_paths.push(self.visit_comprehension_filter(if_expr));
+            filtered_out_paths.push(self.visit_comprehension_filter(if_expr));
         }
 
         for generator in generators_iter {
@@ -2666,13 +2660,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             );
 
             for if_expr in &generator.ifs {
-                rejected_filter_paths.push(self.visit_comprehension_filter(if_expr));
+                filtered_out_paths.push(self.visit_comprehension_filter(if_expr));
             }
         }
 
         visit_outer_elt(self);
-        for rejected_filter_path in rejected_filter_paths {
-            self.flow_merge(rejected_filter_path);
+        for filtered_out_path in filtered_out_paths {
+            self.flow_merge(filtered_out_path);
         }
         let nested_bindings = self.pop_scope();
         self.synthesize_comprehension_binding_definitions(nested_bindings);
@@ -2695,14 +2689,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.visit_expr(if_expr);
         let fallback = self.flow_snapshot();
         let condition_flow_snapshot = self.flow_snapshot_for_condition(if_expr);
-        let rejected = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
+        let filtered_out = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
             self.flow_restore(snapshots.truthy);
             snapshots.falsy
         } else {
             fallback
         };
         let _ = self.record_expression_narrowing_constraint(if_expr);
-        rejected
+        filtered_out
     }
 
     fn declare_parameters(&mut self, parameters: &'ast ast::Parameters) {

@@ -84,8 +84,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
             .all_definitions_with_usage()
             .filter_map(|(_, state, is_used)| is_used.then_some(state.definition()).flatten())
     });
-    let used_user_visible_definitions =
-        super::user_visible_definitions(db, used_definitions);
+    let used_user_visible_definitions = super::user_visible_definitions(db, used_definitions);
 
     for scope_id in index.scope_ids() {
         let file_scope_id = scope_id.file_scope_id(db);
