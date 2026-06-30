@@ -2484,18 +2484,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let this_scope_sees_nonlocal_bindings = !(this_scope_sees_global_bindings
             || (scope.scope(db).kind().is_class() && symbol.is_local()));
 
-        let mut visible_nested_declarations = nested_bindings_kind
-            .nested_declarations
-            .iter()
-            .filter(|declaration| {
-                if declaration.is_global() {
+        let mut binding_sources = nested_bindings_kind
+            .binding_sources(self.index)
+            .filter_map(|(is_global, bindings)| {
+                (if is_global {
                     this_scope_sees_global_bindings
                 } else {
                     this_scope_sees_nonlocal_bindings
-                }
+                })
+                .then_some(bindings)
             })
             .peekable();
-        if visible_nested_declarations.peek().is_some()
+        if binding_sources.peek().is_some()
             && self
                 .index
                 .use_def_map(scope_id)
@@ -2515,22 +2515,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             NestedBindingExecution::Eager => RecursivelyDefined::No,
         };
         let mut union = UnionBuilder::new(db).recursively_defined(recursively_defined);
-        for declaration in visible_nested_declarations {
-            assert!(
-                declaration.is_bound,
-                "nested declarations without bindings shouldn't be recorded here",
-            );
-            let nested_place_table = self.index.place_table(declaration.file_scope_id);
-            let nested_symbol_id = nested_place_table
-                .symbol_id(&nested_bindings_kind.name)
-                .unwrap();
-            let use_def = self.index.use_def_map(declaration.file_scope_id);
-            let bindings = match nested_bindings_kind.execution {
-                NestedBindingExecution::Lazy => use_def.reachable_bindings(nested_symbol_id.into()),
-                NestedBindingExecution::Eager => {
-                    use_def.end_of_scope_bindings(nested_symbol_id.into())
-                }
-            };
+        for bindings in binding_sources {
             let Some(ty) = place_from_bindings_with_reachability_cache(
                 db,
                 bindings,

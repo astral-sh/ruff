@@ -1544,13 +1544,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             definitions.len()
         };
 
-        self.record_definition(place, definition);
+        self.record_definition(place, definition, None);
 
         (definition, num_definitions)
     }
 
     /// Records an already-created definition in the current scope.
-    fn record_definition(&mut self, place: ScopedPlaceId, definition: Definition<'db>) {
+    ///
+    /// `binding_shadowing` overrides the ordinary assignment behavior for synthetic bindings.
+    fn record_definition(
+        &mut self,
+        place: ScopedPlaceId,
+        definition: Definition<'db>,
+        binding_shadowing: Option<(PreviousDefinitions, FutureDefinitions)>,
+    ) {
         let kind = definition.kind(self.db);
         let is_loop_header = kind.is_loop_header();
         let category = kind.category(self.source_type.is_stub(), self.module);
@@ -1580,18 +1587,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             DefinitionCategory::Declaration => use_def.record_declaration(place, definition),
             DefinitionCategory::Binding => {
-                // Loop-header bindings don't shadow prior bindings.
-                let previous_definitions = if is_loop_header {
-                    PreviousDefinitions::AreKept
-                } else {
-                    PreviousDefinitions::AreShadowed
-                };
-                use_def.record_binding(
-                    place,
-                    definition,
-                    previous_definitions,
+                let (previous, future) = binding_shadowing.unwrap_or((
+                    if is_loop_header {
+                        PreviousDefinitions::AreKept
+                    } else {
+                        PreviousDefinitions::AreShadowed
+                    },
                     FutureDefinitions::ShadowThisOne,
-                );
+                ));
+                use_def.record_binding(place, definition, previous, future);
                 if !is_loop_header {
                     self.delete_associated_bindings(place);
                 }
@@ -1889,29 +1893,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 })),
                 false,
             );
-            self.invalidate_narrowing_aliases_for(place);
-
-            let definition_id = self.current_use_def_map().next_definition_id();
             let previous = if binding_status == LiveBindingStatus::Bound {
                 PreviousDefinitions::AreShadowed
             } else {
                 PreviousDefinitions::AreKept
             };
-            self.current_use_def_map_mut().record_binding(
-                place,
-                definition,
-                previous,
-                FutureDefinitions::ShadowThisOne,
-            );
-
-            self.delete_associated_bindings(place);
-            self.record_pending_capture_binding(symbol, definition_id);
-            self.update_lazy_snapshots(symbol);
-
-            let mut try_node_stack_manager =
-                std::mem::take(&mut self.try_node_context_stack_manager);
-            try_node_stack_manager.record_definition(self);
-            self.try_node_context_stack_manager = try_node_stack_manager;
+            let shadowing = Some((previous, FutureDefinitions::ShadowThisOne));
+            self.record_definition(place, definition, shadowing);
         }
     }
 

@@ -434,18 +434,12 @@ fn user_visible_definitions<'db>(
                 if nested.execution == NestedBindingExecution::Eager =>
             {
                 let index = semantic_index(db, definition.file(db));
-                for declaration in &nested.nested_declarations {
-                    let place_table = index.place_table(declaration.file_scope_id);
-                    let Some(symbol) = place_table.symbol_id(&nested.name) else {
-                        continue;
-                    };
-                    pending.extend(
-                        index
-                            .use_def_map(declaration.file_scope_id)
-                            .end_of_scope_symbol_bindings(symbol)
-                            .filter_map(|binding| binding.binding.definition()),
-                    );
-                }
+                pending.extend(
+                    nested
+                        .binding_sources(index)
+                        .flat_map(|(_, bindings)| bindings)
+                        .filter_map(|binding| binding.binding.definition()),
+                );
             }
             kind if kind.is_user_visible() => {
                 result.insert(definition);
