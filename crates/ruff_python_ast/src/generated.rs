@@ -6889,6 +6889,11 @@ impl<'a> From<&'a crate::Identifier> for AnyNodeRef<'a> {
 }
 
 impl ruff_text_size::Ranged for AnyNodeRef<'_> {
+    #[expect(
+        clippy::inline_always,
+        reason = "enables constant-folding for known `AnyNodeRef` variants"
+    )]
+    #[inline(always)]
     fn range(&self) -> ruff_text_size::TextRange {
         match self {
             AnyNodeRef::ModModule(node) => node.range(),

@@ -70,6 +70,11 @@ impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
 }
 
 impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
+    #[expect(
+        clippy::inline_always,
+        reason = "enables constant-folding of `AnyNodeRef` helpers"
+    )]
+    #[inline(always)]
     fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
         let node_range = node.range();
 
@@ -111,6 +116,11 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
         }
     }
 
+    #[expect(
+        clippy::inline_always,
+        reason = "enables constant-folding of `AnyNodeRef` helpers"
+    )]
+    #[inline(always)]
     fn leave_node(&mut self, node: AnyNodeRef<'ast>) {
         // We are leaving this node, pop it from the parent stack.
         self.parents.pop();
@@ -147,6 +157,11 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
         self.preceding_node = Some(node);
     }
 
+    #[expect(
+        clippy::inline_always,
+        reason = "enables constant-folding of `AnyNodeRef` helpers"
+    )]
+    #[inline(always)]
     fn visit_body(&mut self, body: &'ast [Stmt]) {
         match body {
             [] => {
