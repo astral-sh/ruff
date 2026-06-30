@@ -176,6 +176,10 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
             (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => {
                 left.definition(db) == right.definition(db)
             }
+            (Type::GenericAlias(left), Type::GenericAlias(right)) => left
+                .type_alias_origin(db)
+                .zip(right.type_alias_origin(db))
+                .is_some_and(|(left, right)| left == right),
             _ => false,
         }
     }

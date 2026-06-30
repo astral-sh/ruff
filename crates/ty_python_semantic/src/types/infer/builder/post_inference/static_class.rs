@@ -310,7 +310,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 continue;
             }
             Type::ClassLiteral(class) => ClassType::NonGeneric(class),
-            Type::GenericAlias(base_alias) => {
+            Type::GenericAlias(base_alias) if base_alias.class_origin(db).is_some() => {
                 if check_explicit_base_variance
                     && let Some(generic_context) = class.generic_context(db)
                     && let Some((typevar, declared_variance, required_variance)) =
@@ -331,13 +331,13 @@ pub(crate) fn check_static_class_definitions<'db>(
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Variance of type variable `{}` is incompatible with base class `{}`",
                         typevar.typevar(db).name(db),
-                        base_alias.origin(db).name(db),
+                        base_alias.expect_class_origin(db).name(db),
                     ));
                     diagnostic.help(format_args!(
                         "Type variable `{}` is declared as {}, but base class `{}` requires it to be {}",
                         typevar.typevar(db).name(db),
                         declared_variance.as_str(),
-                        base_alias.origin(db).name(db),
+                        base_alias.expect_class_origin(db).name(db),
                         required_variance.as_str(),
                     ));
                 }

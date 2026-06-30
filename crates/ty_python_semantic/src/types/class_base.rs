@@ -140,7 +140,13 @@ impl<'db> ClassBase<'db> {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
             Type::Divergent(divergent) => Some(Self::Divergent(divergent)),
             Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
-            Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
+            Type::GenericAlias(generic) if generic.type_alias_origin(db).is_some() => {
+                Self::try_from_type(db, generic.expect_type_alias_value_type(db), subclass)
+            }
+            Type::GenericAlias(generic) if generic.class_origin(db).is_some() => {
+                Some(Self::Class(ClassType::Generic(generic)))
+            }
+            Type::GenericAlias(_) => None,
             Type::NominalInstance(instance)
                 if instance.has_known_class(db, KnownClass::GenericAlias) =>
             {

@@ -2064,7 +2064,9 @@ fn extract_class_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassLit
                 | crate::types::SubclassOfInner::TypeVar(_) => None,
             }
         }
-        Type::GenericAlias(generic_alias) => Some(ClassLiteral::Static(generic_alias.origin(db))),
+        Type::GenericAlias(generic_alias) => {
+            generic_alias.class_origin(db).map(ClassLiteral::Static)
+        }
         Type::NominalInstance(instance) => Some(instance.class(db).class_literal(db)),
         Type::Union(union) => union
             .elements(db)

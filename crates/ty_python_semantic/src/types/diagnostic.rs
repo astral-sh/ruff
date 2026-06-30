@@ -3556,7 +3556,9 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
 
     'outer: for (i, base) in explicit_bases.iter().enumerate() {
         let base_class = match base {
-            Type::GenericAlias(alias) => ClassType::Generic(*alias),
+            Type::GenericAlias(alias) if alias.class_origin(db).is_some() => {
+                ClassType::Generic(*alias)
+            }
             Type::ClassLiteral(class) if class.generic_context(db).is_none() => {
                 ClassType::NonGeneric(*class)
             }
@@ -3567,7 +3569,7 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
             let ClassBase::Class(ClassType::Generic(supercls_alias)) = supercls else {
                 continue;
             };
-            let origin = supercls_alias.origin(db);
+            let origin = supercls_alias.expect_class_origin(db);
 
             if let Some(&(earlier_alias, earlier_idx)) = ancestor_specs.get(&origin) {
                 if earlier_idx != i
@@ -3588,7 +3590,7 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
                     ));
                     let later_is_direct = matches!(
                         base,
-                        Type::GenericAlias(alias) if alias.origin(db) == origin
+                        Type::GenericAlias(alias) if alias.class_origin(db) == Some(origin)
                     );
 
                     if let (Some(earlier_base), Some(later_base)) = (

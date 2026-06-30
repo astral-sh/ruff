@@ -527,7 +527,7 @@ type Foo[T] = list[T] | Bar[T]
 type Bar[T] = int | Foo[T]
 
 def _(x: Bar[int]):
-    reveal_type(x)  # revealed: int | list[int]
+    reveal_type(x)  # revealed: int | Foo[int]
 ```
 
 ### With legacy generic

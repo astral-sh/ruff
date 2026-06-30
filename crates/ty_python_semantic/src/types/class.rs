@@ -15,7 +15,7 @@ pub(crate) use self::static_literal::{
 pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use super::{
     BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType, SubclassOfType, Type,
-    TypeQualifiers, class_base::ClassBase, function::FunctionType,
+    TypeAliasType, TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, Provenance, TypeOrigin};
@@ -213,10 +213,45 @@ impl<'db> CodeGeneratorKind<'db> {
     }
 }
 
-/// A specialization of a generic class with a particular assignment of types to typevars.
+/// The origin of a `types.GenericAlias` object.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub enum GenericAliasOrigin<'db> {
+    Class(StaticClassLiteral<'db>),
+    TypeAlias(TypeAliasType<'db>),
+}
+
+impl<'db> GenericAliasOrigin<'db> {
+    pub(crate) const fn into_class(self) -> Option<StaticClassLiteral<'db>> {
+        match self {
+            Self::Class(class) => Some(class),
+            Self::TypeAlias(_) => None,
+        }
+    }
+
+    pub(crate) const fn into_type_alias(self) -> Option<TypeAliasType<'db>> {
+        match self {
+            Self::Class(_) => None,
+            Self::TypeAlias(type_alias) => Some(type_alias),
+        }
+    }
+}
+
+impl<'db> From<StaticClassLiteral<'db>> for GenericAliasOrigin<'db> {
+    fn from(class: StaticClassLiteral<'db>) -> Self {
+        Self::Class(class)
+    }
+}
+
+impl<'db> From<TypeAliasType<'db>> for GenericAliasOrigin<'db> {
+    fn from(type_alias: TypeAliasType<'db>) -> Self {
+        Self::TypeAlias(type_alias)
+    }
+}
+
+/// A `types.GenericAlias` object with a particular assignment of types to typevars.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct GenericAlias<'db> {
-    pub(crate) origin: StaticClassLiteral<'db>,
+    pub(crate) origin: GenericAliasOrigin<'db>,
     pub(crate) specialization: Specialization<'db>,
 }
 
@@ -264,8 +299,31 @@ impl<'db> GenericAlias<'db> {
         ))
     }
 
-    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
-        self.origin(db).definition(db)
+    pub(crate) fn class_origin(self, db: &'db dyn Db) -> Option<StaticClassLiteral<'db>> {
+        self.origin(db).into_class()
+    }
+
+    pub(crate) fn expect_class_origin(self, db: &'db dyn Db) -> StaticClassLiteral<'db> {
+        self.class_origin(db)
+            .expect("class generic alias origin must be a class")
+    }
+
+    pub(crate) fn type_alias_origin(self, db: &'db dyn Db) -> Option<TypeAliasType<'db>> {
+        self.origin(db).into_type_alias()
+    }
+
+    pub(crate) fn type_alias_value_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let type_alias = self.type_alias_origin(db)?;
+        Some(type_alias.apply_specialization_to_type(
+            db,
+            type_alias.raw_value_type(db),
+            self.specialization(db),
+        ))
+    }
+
+    pub(crate) fn expect_type_alias_value_type(self, db: &'db dyn Db) -> Type<'db> {
+        self.type_alias_value_type(db)
+            .expect("type alias generic alias origin must be a type alias")
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(
@@ -275,9 +333,12 @@ impl<'db> GenericAlias<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        let tcx = tcx
-            .annotation
-            .and_then(|ty| ty.specialization_of(db, self.origin(db)))
+        let tcx = self
+            .class_origin(db)
+            .and_then(|origin| {
+                tcx.annotation
+                    .and_then(|ty| ty.specialization_of(db, origin))
+            })
             .map(|specialization| specialization.types(db))
             .unwrap_or(&[]);
 
@@ -303,7 +364,8 @@ impl<'db> GenericAlias<'db> {
     }
 
     pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
-        self.origin(db).is_typed_dict(db)
+        self.class_origin(db)
+            .is_some_and(|origin| origin.is_typed_dict(db))
     }
 }
 
@@ -346,9 +408,14 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
                     // to see if the class literal query was already run.
 
                     let typevar_variance_in_substituted_type = ty.variance_of(db, typevar);
-                    origin
-                        .with_polarity(typevar_variance_in_substituted_type)
-                        .variance_of(db, generic_typevar)
+                    match origin {
+                        GenericAliasOrigin::Class(class) => class
+                            .with_polarity(typevar_variance_in_substituted_type)
+                            .variance_of(db, generic_typevar),
+                        GenericAliasOrigin::TypeAlias(type_alias) => type_alias
+                            .with_polarity(typevar_variance_in_substituted_type)
+                            .variance_of(db, generic_typevar),
+                    }
                 }
             })
             .collect()
@@ -909,6 +976,10 @@ pub enum ClassType<'db> {
     // should use `StaticClassLiteral::default_specialization` instead of assuming
     // `ClassType::NonGeneric`.
     NonGeneric(ClassLiteral<'db>),
+    /// A specialization of a class origin.
+    ///
+    /// The `GenericAlias` must have a `GenericAliasOrigin::Class` origin. Type-alias-origin
+    /// generic aliases represent `types.GenericAlias` values, not classes.
     Generic(GenericAlias<'db>),
 }
 
@@ -957,7 +1028,7 @@ impl<'db> ClassType<'db> {
     pub(crate) fn class_literal(self, db: &'db dyn Db) -> ClassLiteral<'db> {
         match self {
             Self::NonGeneric(literal) => literal,
-            Self::Generic(generic) => ClassLiteral::Static(generic.origin(db)),
+            Self::Generic(generic) => ClassLiteral::Static(generic.expect_class_origin(db)),
         }
     }
 
@@ -972,7 +1043,7 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(literal) => (literal, None),
             Self::Generic(generic) => (
-                ClassLiteral::Static(generic.origin(db)),
+                ClassLiteral::Static(generic.expect_class_origin(db)),
                 Some(generic.specialization(db)),
             ),
         }
@@ -992,7 +1063,10 @@ impl<'db> ClassType<'db> {
                 | ClassLiteral::DynamicTypedDict(_)
                 | ClassLiteral::DynamicEnum(_),
             ) => None,
-            Self::Generic(generic) => Some((generic.origin(db), Some(generic.specialization(db)))),
+            Self::Generic(generic) => Some((
+                generic.expect_class_origin(db),
+                Some(generic.specialization(db)),
+            )),
         }
     }
 
@@ -1012,7 +1086,7 @@ impl<'db> ClassType<'db> {
                 | ClassLiteral::DynamicEnum(_),
             ) => None,
             Self::Generic(generic) => Some((
-                generic.origin(db),
+                generic.expect_class_origin(db),
                 Some(
                     generic
                         .specialization(db)
@@ -1118,7 +1192,7 @@ impl<'db> ClassType<'db> {
             Self::NonGeneric(class) => class.iter_mro(db),
             Self::Generic(generic) => MroIterator::new(
                 db,
-                ClassLiteral::Static(generic.origin(db)),
+                ClassLiteral::Static(generic.expect_class_origin(db)),
                 Some(generic.specialization(db)),
             ),
         }
@@ -1135,7 +1209,7 @@ impl<'db> ClassType<'db> {
             Self::NonGeneric(class) => class.iter_mro(db),
             Self::Generic(generic) => MroIterator::new(
                 db,
-                ClassLiteral::Static(generic.origin(db)),
+                ClassLiteral::Static(generic.expect_class_origin(db)),
                 Some(
                     generic
                         .specialization(db)
@@ -1289,7 +1363,7 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(class) => class.metaclass(db),
             Self::Generic(generic) => generic
-                .origin(db)
+                .expect_class_origin(db)
                 .metaclass(db)
                 .apply_optional_specialization(db, Some(generic.specialization(db))),
         }
@@ -1525,7 +1599,7 @@ impl<'db> ClassType<'db> {
     ) -> PlaceAndQualifiers<'db> {
         match self {
             Self::NonGeneric(class) => class.class_member(db, name, policy),
-            Self::Generic(generic) => generic.origin(db).class_member_inner(
+            Self::Generic(generic) => generic.expect_class_origin(db).class_member_inner(
                 db,
                 Some(generic.specialization(db)),
                 name,
@@ -1577,7 +1651,10 @@ impl<'db> ClassType<'db> {
                 return enum_lit.own_class_member(db, name);
             }
             Self::NonGeneric(ClassLiteral::Static(class)) => (class, None),
-            Self::Generic(generic) => (generic.origin(db), Some(generic.specialization(db))),
+            Self::Generic(generic) => (
+                generic.expect_class_origin(db),
+                Some(generic.specialization(db)),
+            ),
         };
 
         let fallback_member_lookup = || {
@@ -1878,7 +1955,7 @@ impl<'db> ClassType<'db> {
                 class.instance_member(db, None, name)
             }
             Self::Generic(generic) => {
-                let class_literal = generic.origin(db);
+                let class_literal = generic.expect_class_origin(db);
                 let specialization = Some(generic.specialization(db));
 
                 if class_literal.is_typed_dict(db) {
@@ -1903,7 +1980,7 @@ impl<'db> ClassType<'db> {
                 class.converter_input_type_for_field(db, name)
             }
             Self::Generic(generic) => generic
-                .origin(db)
+                .expect_class_origin(db)
                 .converter_input_type_for_field(db, name)
                 .map(|ty| ty.apply_optional_specialization(db, Some(generic.specialization(db)))),
             Self::NonGeneric(
@@ -1935,7 +2012,7 @@ impl<'db> ClassType<'db> {
             Self::Generic(generic) => {
                 let specialization = generic.specialization(db);
                 generic
-                    .origin(db)
+                    .expect_class_origin(db)
                     .own_instance_member(db, name)
                     .map_type(|ty| ty.apply_optional_specialization(db, Some(specialization)))
             }
@@ -2158,12 +2235,6 @@ impl<'db> ClassType<'db> {
     /// For dynamic classes, this is the `type()` call expression.
     pub(super) fn definition_span(self, db: &'db dyn Db) -> Span {
         self.class_literal(db).header_span(db)
-    }
-}
-
-impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
-    fn from(generic: GenericAlias<'db>) -> ClassType<'db> {
-        ClassType::Generic(generic)
     }
 }
 

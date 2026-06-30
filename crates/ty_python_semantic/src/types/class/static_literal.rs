@@ -20,10 +20,11 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallArguments, CallableType, ClassBase,
         ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias,
-        GenericContext, KnownClass, KnownInstanceType, MaterializationKind, MemberLookupPolicy,
-        MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType,
-        Signature, SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
-        TypeMapping, TypeVarVariance, TypedDictModule, UnionBuilder, UnionType,
+        GenericAliasOrigin, GenericContext, KnownClass, KnownInstanceType, MaterializationKind,
+        MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters,
+        PropertyInstanceType, Signature, SpecialFormType, StaticMroError, SubclassOfType,
+        Truthiness, Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictModule, UnionBuilder,
+        UnionType,
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
@@ -418,7 +419,11 @@ impl<'db> StaticClassLiteral<'db> {
             Some(generic_context) => {
                 let specialization = f(generic_context);
 
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
+                ClassType::Generic(GenericAlias::new(
+                    db,
+                    GenericAliasOrigin::Class(self),
+                    specialization,
+                ))
             }
         }
     }
@@ -1806,9 +1811,11 @@ impl<'db> StaticClassLiteral<'db> {
             Place::bound(member).into()
         } else {
             let class = match specialization {
-                Some(specialization) => {
-                    ClassType::Generic(GenericAlias::new(db, self, specialization))
-                }
+                Some(specialization) => ClassType::Generic(GenericAlias::new(
+                    db,
+                    GenericAliasOrigin::Class(self),
+                    specialization,
+                )),
                 None => self.identity_specialization(db),
             };
             let Some(module) = self.typed_dict_module(db) else {
@@ -2825,7 +2832,7 @@ impl<'db> StaticClassLiteral<'db> {
                 for explicit_base in class.explicit_bases(db) {
                     let explicit_base_class_literal = match explicit_base {
                         Type::ClassLiteral(class_literal) => class_literal.as_static(),
-                        Type::GenericAlias(generic_alias) => Some(generic_alias.origin(db)),
+                        Type::GenericAlias(generic_alias) => generic_alias.class_origin(db),
                         _ => continue,
                     };
                     let Some(explicit_base_class_literal) = explicit_base_class_literal else {

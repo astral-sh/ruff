@@ -50,6 +50,10 @@ impl<'db> Type<'db> {
                 Type::TypeAlias(alias) => {
                     visitor.visit(ty, || project(db, alias.value_type(db), visitor))
                 }
+                Type::GenericAlias(alias) if alias.type_alias_origin(db).is_some() => visitor
+                    .visit(ty, || {
+                        project(db, alias.expect_type_alias_value_type(db), visitor)
+                    }),
                 Type::Union(union) => {
                     let mut elements = union
                         .elements(db)

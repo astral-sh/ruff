@@ -20,7 +20,7 @@ use ty_module_resolver::file_to_module;
 use crate::Db;
 use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
-use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
+use crate::types::class::{ClassLiteral, ClassType, GenericAlias, GenericAliasOrigin};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
@@ -576,7 +576,11 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'db> {
                 }
             }
             Type::GenericAlias(alias) => {
-                self.record_class(db, ClassLiteral::Static(alias.origin(db)));
+                if let Some(class) = alias.class_origin(db) {
+                    self.record_class(db, ClassLiteral::Static(class));
+                } else if let Some(type_alias) = alias.type_alias_origin(db) {
+                    self.record_type_alias(db, type_alias);
+                }
             }
             Type::TypeAlias(type_alias) => self.record_type_alias(db, type_alias),
             // Visit the class (as if it were a nominal-instance type)
@@ -1027,13 +1031,19 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.write_str("'>")
             }
             Type::GenericAlias(generic) => {
-                f.set_invalid_type_annotation();
-                let mut f = f.with_type(self.ty);
-                f.write_str("<class '")?;
-                generic
-                    .display_with(self.db, self.settings.clone())
-                    .fmt_detailed(&mut f)?;
-                f.write_str("'>")
+                if generic.type_alias_origin(self.db).is_some() {
+                    generic
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)
+                } else {
+                    f.set_invalid_type_annotation();
+                    let mut f = f.with_type(self.ty);
+                    f.write_str("<class '")?;
+                    generic
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(&mut f)?;
+                    f.write_str("'>")
+                }
             }
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
@@ -1407,17 +1417,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 }
                 f.write_char('>')
             }
-            Type::TypeAlias(alias) => {
-                alias
-                    .display_with(self.db, self.settings.clone())
-                    .fmt_detailed(f)?;
-                match alias.specialization(self.db) {
-                    None => Ok(()),
-                    Some(specialization) => specialization
-                        .display_short(self.db, TupleSpecialization::No, self.settings.clone())
-                        .fmt_detailed(f),
-                }
-            }
+            Type::TypeAlias(alias) => alias
+                .display_with(self.db, self.settings.clone())
+                .fmt_detailed(f),
             Type::NewTypeInstance(newtype) => f.with_type(self.ty).write_str(newtype.name(self.db)),
         }
     }
@@ -1710,8 +1712,7 @@ impl<'db> GenericAlias<'db> {
         settings: DisplaySettings<'db>,
     ) -> DisplayGenericAlias<'db> {
         DisplayGenericAlias {
-            origin: ClassLiteral::Static(self.origin(db)),
-            specialization: self.specialization(db),
+            alias: self,
             db,
             settings,
         }
@@ -1719,25 +1720,27 @@ impl<'db> GenericAlias<'db> {
 }
 
 pub(crate) struct DisplayGenericAlias<'db> {
-    origin: ClassLiteral<'db>,
-    specialization: Specialization<'db>,
+    alias: GenericAlias<'db>,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        if let Some(tuple) = self.specialization.tuple(self.db) {
+        let specialization = self.alias.specialization(self.db);
+        if self.alias.class_origin(self.db).is_some()
+            && let Some(tuple) = specialization.tuple(self.db)
+        {
             tuple
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f)
         } else {
-            let prefix_details = match self.specialization.materialization_kind(self.db) {
+            let prefix_details = match specialization.materialization_kind(self.db) {
                 None => None,
                 Some(MaterializationKind::Top) => Some(("Top", SpecialFormType::Top)),
                 Some(MaterializationKind::Bottom) => Some(("Bottom", SpecialFormType::Bottom)),
             };
-            let suffix = match self.specialization.materialization_kind(self.db) {
+            let suffix = match specialization.materialization_kind(self.db) {
                 None => "",
                 Some(_) => "]",
             };
@@ -1745,13 +1748,22 @@ impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'db> {
                 f.with_type(Type::SpecialForm(form)).write_str(name)?;
                 f.write_char('[')?;
             }
-            self.origin
-                .display_with(self.db, self.settings.clone())
-                .fmt_detailed(f)?;
-            self.specialization
+            match self.alias.origin(self.db) {
+                GenericAliasOrigin::Class(class) => ClassLiteral::Static(class)
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f)?,
+                GenericAliasOrigin::TypeAlias(type_alias) => type_alias
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f)?,
+            }
+            specialization
                 .display_short(
                     self.db,
-                    TupleSpecialization::from_class(self.db, self.origin),
+                    self.alias
+                        .class_origin(self.db)
+                        .map_or(TupleSpecialization::No, |class| {
+                            TupleSpecialization::from_class(self.db, ClassLiteral::Static(class))
+                        }),
                     self.settings.clone(),
                 )
                 .fmt_detailed(f)?;
@@ -3134,18 +3146,8 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 generic_context.display(self.db).fmt_detailed(f)?;
                 f.write_str("'>")
             }
-            KnownInstanceType::TypeAliasType(alias) => {
-                if let Some(specialization) = alias.specialization(self.db) {
-                    f.set_invalid_type_annotation();
-                    f.write_str("<type alias '")?;
-                    f.with_type(ty).write_str(alias.name(self.db))?;
-                    specialization
-                        .display_short(self.db, TupleSpecialization::No, DisplaySettings::default())
-                        .fmt_detailed(f)?;
-                    f.write_str("'>")
-                } else {
-                    f.with_type(ty).write_str("TypeAliasType")
-                }
+            KnownInstanceType::TypeAliasType(_) => {
+                f.with_type(ty).write_str("TypeAliasType")
             }
             // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
             // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll

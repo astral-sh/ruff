@@ -74,7 +74,7 @@ The specialization must match the generic types:
 
 ```py
 # error: [invalid-type-arguments] "Too many type arguments: expected 1, got 2"
-reveal_type(C[int, int])  # revealed: <type alias 'C[Unknown]'>
+reveal_type(C[int, int])  # revealed: C[Unknown]
 ```
 
 And non-generic types cannot be specialized:
@@ -176,19 +176,19 @@ type BoundedByUnion[T: int | str] = list[T]
 
 class IntSubclass(int): ...
 
-reveal_type(Bounded[int])  # revealed: <type alias 'Bounded[int]'>
-reveal_type(Bounded[IntSubclass])  # revealed: <type alias 'Bounded[IntSubclass]'>
+reveal_type(Bounded[int])  # revealed: Bounded[int]
+reveal_type(Bounded[IntSubclass])  # revealed: Bounded[IntSubclass]
 
 # error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `T@Bounded`"
-reveal_type(Bounded[str])  # revealed: <type alias 'Bounded[Unknown]'>
+reveal_type(Bounded[str])  # revealed: Bounded[Unknown]
 
 # error: [invalid-type-arguments] "Type `int | str` is not assignable to upper bound `int` of type variable `T@Bounded`"
-reveal_type(Bounded[int | str])  # revealed: <type alias 'Bounded[Unknown]'>
+reveal_type(Bounded[int | str])  # revealed: Bounded[Unknown]
 
-reveal_type(BoundedByUnion[int])  # revealed: <type alias 'BoundedByUnion[int]'>
-reveal_type(BoundedByUnion[IntSubclass])  # revealed: <type alias 'BoundedByUnion[IntSubclass]'>
-reveal_type(BoundedByUnion[str])  # revealed: <type alias 'BoundedByUnion[str]'>
-reveal_type(BoundedByUnion[int | str])  # revealed: <type alias 'BoundedByUnion[int | str]'>
+reveal_type(BoundedByUnion[int])  # revealed: BoundedByUnion[int]
+reveal_type(BoundedByUnion[IntSubclass])  # revealed: BoundedByUnion[IntSubclass]
+reveal_type(BoundedByUnion[str])  # revealed: BoundedByUnion[str]
+reveal_type(BoundedByUnion[int | str])  # revealed: BoundedByUnion[int | str]
 
 type TupleOfIntAndStr[T: int, U: str] = tuple[T, U]
 
@@ -205,20 +205,20 @@ If the type variable is constrained, the specialized type must satisfy those con
 ```py
 type Constrained[T: (int, str)] = list[T]
 
-reveal_type(Constrained[int])  # revealed: <type alias 'Constrained[int]'>
+reveal_type(Constrained[int])  # revealed: Constrained[int]
 
 # TODO: error: [invalid-argument-type]
 # TODO: revealed: Constrained[Unknown]
-reveal_type(Constrained[IntSubclass])  # revealed: <type alias 'Constrained[IntSubclass]'>
+reveal_type(Constrained[IntSubclass])  # revealed: Constrained[IntSubclass]
 
-reveal_type(Constrained[str])  # revealed: <type alias 'Constrained[str]'>
+reveal_type(Constrained[str])  # revealed: Constrained[str]
 
 # TODO: error: [invalid-argument-type]
 # TODO: revealed: Unknown
-reveal_type(Constrained[int | str])  # revealed: <type alias 'Constrained[int | str]'>
+reveal_type(Constrained[int | str])  # revealed: Constrained[int | str]
 
 # error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `T@Constrained`"
-reveal_type(Constrained[object])  # revealed: <type alias 'Constrained[Unknown]'>
+reveal_type(Constrained[object])  # revealed: Constrained[Unknown]
 
 type TupleOfIntOrStr[T: (int, str), U: (int, str)] = tuple[T, U]
 
@@ -235,8 +235,8 @@ If the type variable has a default, it can be omitted:
 ```py
 type WithDefault[T, U = int] = dict[T, U]
 
-reveal_type(WithDefault[str, str])  # revealed: <type alias 'WithDefault[str, str]'>
-reveal_type(WithDefault[str])  # revealed: <type alias 'WithDefault[str, int]'>
+reveal_type(WithDefault[str, str])  # revealed: WithDefault[str, str]
+reveal_type(WithDefault[str])  # revealed: WithDefault[str, int]
 ```
 
 If the type alias is not specialized explicitly, it is implicitly specialized to `Unknown`:
@@ -284,7 +284,7 @@ type ExplicitAlias[
 ] = list[SecondT]
 
 def explicit_alias_default(x: ExplicitAlias):
-    reveal_type(x)  # revealed: list[ExplicitAlias[int, str]]
+    reveal_type(x)  # revealed: list[list[str]]
 ```
 
 A self-referential default that does not reference itself in the alias body should also not crash,
@@ -368,7 +368,7 @@ type B[T] = T
 # error: [call-non-callable] "Object of type `TypeAliasType` is not callable"
 reveal_type(A())  # revealed: Unknown
 
-# error: [call-non-callable] "Object of type `GenericAlias` is not callable"
+# error: [call-non-callable] "Object of type `B[int]` is not callable"
 reveal_type(B[int]())  # revealed: Unknown
 ```
 
@@ -390,18 +390,18 @@ type RecursiveList[T] = T | list[RecursiveList[T]]
 
 r1: RecursiveList[int] = 1
 r2: RecursiveList[int] = [1, [1, 2, 3]]
-# error: [invalid-assignment] "Object of type `Literal["a"]` is not assignable to `RecursiveList[int]`"
+# error: [invalid-assignment] "Object of type `Literal["a"]` is not assignable to `int | list[RecursiveList[int]]`"
 r3: RecursiveList[int] = "a"
 # error: [invalid-assignment]
 r4: RecursiveList[int] = ["a"]
-# error: [invalid-assignment] "Object of type `list[int | list[RecursiveList[int]] | list[int | list[RecursiveList[int]] | str]]` is not assignable to `RecursiveList[int]`"
+# error: [invalid-assignment] "Object of type `list[int | list[RecursiveList[int]] | list[int | list[RecursiveList[int]] | str]]` is not assignable to `int | list[RecursiveList[int]]`"
 r5: RecursiveList[int] = [1, ["a"]]
 
 def _(x: RecursiveList[int]):
     if isinstance(x, list):
-        reveal_type(x[0])  # revealed: int | list[RecursiveList[int]]
+        reveal_type(x[0])  # revealed: RecursiveList[int]
     if isinstance(x, list) and isinstance(x[0], list):
-        reveal_type(x[0])  # revealed: list[RecursiveList[int]]
+        reveal_type(x[0])  # revealed: RecursiveList[int] & Top[list[Unknown]]
 ```
 
 Assignment checks respect structural subtyping, i.e. type aliases with the same structure are
@@ -434,12 +434,22 @@ d1: DivergentList[int] = []
 d2: DivergentList[int] = [1]
 # error: [invalid-assignment]
 d3: DivergentList[int] = ["a"]
-# error: [invalid-assignment] "Object of type `list[list[DivergentList[int]] | list[list[DivergentList[int]] | int]]` is not assignable to `DivergentList[int]`"
+# error: [invalid-assignment] "Object of type `list[DivergentList[int] | list[DivergentList[int] | int]]` is not assignable to `list[DivergentList[int]]`"
 d4: DivergentList[int] = [[1]]
 
 def _(x: DivergentList[int]):
     d1: DivergentList[int] = [x]
     d2: DivergentList[int] = x[0]
+```
+
+Recursive specializations that keep growing structurally should not make function signature analysis
+diverge:
+
+```py
+type GrowingList[T] = list[GrowingList[T | GrowingList[T]]]
+
+def _(x: GrowingList[int]):
+    reveal_type(x)  # revealed: list[GrowingList[int | GrowingList[int]]]
 ```
 
 ## Solving generics with type alias parameters
@@ -607,7 +617,7 @@ class Y:
     type GenAlias[T] = dict[str, T]
 
 def h(x: X.GenAlias[int], y: Y.GenAlias[int]) -> None:
-    # error: [invalid-assignment] "Object of type `mdtest_snippet.Y.GenAlias[int]` is not assignable to `mdtest_snippet.X.GenAlias[int]`"
+    # error: [invalid-assignment] "Object of type `dict[str, int]` is not assignable to `list[int]`"
     a: X.GenAlias[int] = y
 ```
 
@@ -623,7 +633,7 @@ class Box[T]:
 type RefBox[T] = Box[T]
 
 def transmute_inner[T, V](x: RefBox[T]) -> RefBox[V]:
-    # error: [invalid-return-type] "Return type does not match returned value: expected `RefBox[V@transmute_inner]`, found `RefBox[T@transmute_inner]`"
+    # error: [invalid-return-type] "Return type does not match returned value: expected `Box[V@transmute_inner]`, found `Box[T@transmute_inner]`"
     return x
 ```
 

@@ -1838,6 +1838,9 @@ fn is_instance_truthiness<'db>(
         Type::ClassLiteral(..) => always_true_if(is_instance(&KnownClass::Type.to_instance(db))),
 
         Type::TypeAlias(alias) => is_instance_truthiness(db, alias.value_type(db), class),
+        Type::GenericAlias(alias) if alias.type_alias_origin(db).is_some() => {
+            is_instance_truthiness(db, alias.expect_type_alias_value_type(db), class)
+        }
 
         Type::TypeVar(bound_typevar) => match bound_typevar.typevar(db).bound_or_constraints(db) {
             None => is_instance_truthiness(db, Type::object(), class),
@@ -2453,7 +2456,11 @@ impl KnownFunction {
                 let mut good_argument = true;
                 let classes = match param_type {
                     Type::ClassLiteral(class) => vec![ClassType::NonGeneric(*class)],
-                    Type::GenericAlias(generic_alias) => vec![ClassType::Generic(*generic_alias)],
+                    Type::GenericAlias(generic_alias)
+                        if generic_alias.class_origin(db).is_some() =>
+                    {
+                        vec![ClassType::Generic(*generic_alias)]
+                    }
                     Type::Union(union) => {
                         let elements = union.elements(db);
                         let mut classes = Vec::with_capacity(elements.len());
@@ -2462,7 +2469,9 @@ impl KnownFunction {
                                 Type::ClassLiteral(class) => {
                                     classes.push(ClassType::NonGeneric(*class));
                                 }
-                                Type::GenericAlias(generic_alias) => {
+                                Type::GenericAlias(generic_alias)
+                                    if generic_alias.class_origin(db).is_some() =>
+                                {
                                     classes.push(ClassType::Generic(*generic_alias));
                                 }
                                 _ => {
@@ -2602,7 +2611,9 @@ impl KnownFunction {
 
                 let class = match class_type {
                     Type::ClassLiteral(class) => ClassType::NonGeneric(*class),
-                    Type::GenericAlias(generic) => ClassType::Generic(*generic),
+                    Type::GenericAlias(generic) if generic.class_origin(db).is_some() => {
+                        ClassType::Generic(*generic)
+                    }
                     _ => return,
                 };
 

@@ -117,11 +117,11 @@ type GenericArray1d[T] = list[T] | tuple[T]
 def h(x: Scalar | GenericArray1d[Scalar]) -> None:
     pass
 
-reveal_type(h)  # revealed: def h(x: Scalar | GenericArray1d[Scalar]) -> None
+reveal_type(h)  # revealed: def h(x: Scalar | list[Scalar] | tuple[Scalar]) -> None
 
 class Baz:
     def h(self, x: Scalar | GenericArray1d[Scalar]) -> None:
         pass
 
-reveal_type(Baz().h)  # revealed: bound method Baz.h(x: Scalar | GenericArray1d[Scalar]) -> None
+reveal_type(Baz().h)  # revealed: bound method Baz.h(x: Scalar | list[Scalar] | tuple[Scalar]) -> None
 ```

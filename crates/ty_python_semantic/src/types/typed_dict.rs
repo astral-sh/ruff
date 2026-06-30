@@ -287,7 +287,9 @@ impl<'db> TypedDictType<'db> {
                 let base = base.apply_optional_specialization(db, specialization);
                 let base_class = match base {
                     Type::ClassLiteral(base) => ClassType::NonGeneric(base),
-                    Type::GenericAlias(base) => ClassType::Generic(base),
+                    Type::GenericAlias(base) if base.class_origin(db).is_some() => {
+                        ClassType::Generic(base)
+                    }
                     _ => continue,
                 };
 

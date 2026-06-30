@@ -258,9 +258,21 @@ impl<'db> Type<'db> {
                     .metaclass_instance_type(db)
                     .try_bool_impl(db, allow_short_circuit, visitor)?
             }
-            Type::GenericAlias(alias) => ClassType::from(*alias)
-                .metaclass_instance_type(db)
-                .try_bool_impl(db, allow_short_circuit, visitor)?,
+            Type::GenericAlias(alias) if alias.class_origin(db).is_some() => {
+                ClassType::Generic(*alias)
+                    .metaclass_instance_type(db)
+                    .try_bool_impl(db, allow_short_circuit, visitor)?
+            }
+            Type::GenericAlias(alias) if alias.type_alias_origin(db).is_some() => {
+                visitor.visit(*self, || {
+                    alias.expect_type_alias_value_type(db).try_bool_impl(
+                        db,
+                        allow_short_circuit,
+                        visitor,
+                    )
+                })?
+            }
+            Type::GenericAlias(_) => Truthiness::AlwaysTrue,
 
             Type::SubclassOf(subclass_of_ty) => {
                 match subclass_of_ty.subclass_of().with_transposed_type_var(db) {

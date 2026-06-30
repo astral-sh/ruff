@@ -13,9 +13,9 @@ use crate::{
         TypeOrigin,
     },
     types::{
-        ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
-        KnownClass, KnownInstanceType, MaterializationKind, Parameter, Parameters, Type,
-        TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType,
+        GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Parameter, Parameters,
+        Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
         any_over_type, binding_type, definition_expression_type,
         tuple::Tuple,
         variance::VarianceInferable,
@@ -398,24 +398,14 @@ impl<'db> TypeVarInstance<'db> {
                 seen_type_aliases.push(type_alias);
             }
 
-            let value_type = if let Some(specialization) = type_alias.specialization(state.db) {
-                if specialization
-                    .types(state.db)
-                    .iter()
-                    .any(|ty| type_is_self_referential_impl(state, *ty, self_identity))
-                {
-                    return true;
-                }
-                type_alias.value_type(state.db)
-            } else if let Some(generic_context) = type_alias.generic_context(state.db)
+            let value_type = if let Some(generic_context) = type_alias.generic_context(state.db)
                 && generic_context.variables(state.db).any(|typevar| {
                     typevar_default_is_self_referential(
                         state,
                         typevar.typevar(state.db),
                         self_identity,
                     )
-                })
-            {
+                }) {
                 return true;
             } else {
                 type_alias.raw_value_type(state.db)

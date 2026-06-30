@@ -546,13 +546,13 @@ type H[T] = G[T]
     let rec_list = get_type_alias(&db, "RecursiveList");
     assert_eq!(
         rec_list.expand_eagerly(&db).display(&db).to_string(),
-        "list[Divergent]",
+        "list[T@RecursiveList | list[T@RecursiveList | RecursiveList[T@RecursiveList]]]",
     );
 
     let rec_int_list = get_type_alias(&db, "RecursiveIntList");
     assert_eq!(
         rec_int_list.expand_eagerly(&db).display(&db).to_string(),
-        "list[Divergent]",
+        "list[int | list[int | RecursiveList[int]]]",
     );
 
     let itself = get_type_alias(&db, "Itself");

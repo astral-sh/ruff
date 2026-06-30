@@ -1903,7 +1903,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.db(),
                 &type_alias.name.as_name_expr().unwrap().id,
                 rhs_scope,
-                None,
             )),
         ));
 
@@ -3229,6 +3228,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
+            Type::GenericAlias(alias) if alias.type_alias_origin(db).is_some() => self
+                .validate_attribute_assignment(
+                    target,
+                    KnownClass::GenericAlias.to_instance(db),
+                    attribute,
+                    infer_value_ty,
+                    emit_diagnostics,
+                ),
+
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                 let Some((meta_attr, fallback_attr)) =
                     self.assignment_attribute_members(object_ty, attribute)
@@ -3722,6 +3730,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeForm(_)
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_) => object_ty.instance_member(db, attribute),
+                Type::GenericAlias(alias) if alias.type_alias_origin(db).is_some() => {
+                    object_ty.instance_member(db, attribute)
+                }
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                     object_ty.class_object_member(db, attribute, MemberLookupPolicy::default())
                 }
@@ -7335,13 +7346,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             if compatible {
-                let class_type = collection_alias.origin(self.db()).apply_specialization(
-                    self.db(),
-                    |generic_context| {
+                let class_type = collection_alias
+                    .expect_class_origin(self.db())
+                    .apply_specialization(self.db(), |generic_context| {
                         generic_context
                             .specialize_recursive(self.db(), specialization.into_iter().map(Some))
-                    },
-                );
+                    });
                 return Type::from(class_type).to_instance(self.db());
             }
 
@@ -7412,7 +7422,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 {
                     // Infer `collection[Divergent]` for the initial cycle result.
                     let divergent_instance = collection_alias
-                        .origin(self.db())
+                        .expect_class_origin(self.db())
                         .apply_specialization(self.db(), |generic_context| {
                             generic_context
                                 .repeat_specialization(self.db(), Type::Divergent(divergent))
@@ -7548,7 +7558,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let class_type = collection_alias
-            .origin(self.db())
+            .expect_class_origin(self.db())
             .apply_specialization(self.db(), |_| {
                 builder.build_with(generic_context, |current_typevar, bounds| {
                     let lower = bounds?.lower?;
@@ -8698,7 +8708,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let class = match callable_type {
             Type::ClassLiteral(class) => Some(ClassType::NonGeneric(class)),
-            Type::GenericAlias(generic) => Some(ClassType::Generic(generic)),
+            Type::GenericAlias(generic) if generic.class_origin(self.db()).is_some() => {
+                Some(ClassType::Generic(generic))
+            }
             Type::SubclassOf(subclass) => subclass.subclass_of().into_class(self.db()),
             _ => None,
         };

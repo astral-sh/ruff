@@ -65,7 +65,9 @@ impl<'db> SubclassOfType<'db> {
             Type::ClassLiteral(literal) => {
                 SubclassOfInner::Class(literal.default_specialization(db))
             }
-            Type::GenericAlias(generic) => SubclassOfInner::Class(ClassType::Generic(generic)),
+            Type::GenericAlias(generic) if generic.class_origin(db).is_some() => {
+                SubclassOfInner::Class(ClassType::Generic(generic))
+            }
             Type::SpecialForm(SpecialFormType::Any) => SubclassOfInner::Dynamic(DynamicType::Any),
             Type::SpecialForm(SpecialFormType::Unknown) => {
                 SubclassOfInner::Dynamic(DynamicType::Unknown)

@@ -4,7 +4,9 @@ use crate::{
     Db,
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, GenericContext, Type, TypeContext,
-        TypeMapping, TypeVarVariance, definition_expression_type,
+        TypeMapping, TypeVarVariance,
+        class::{GenericAlias, GenericAliasOrigin},
+        definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization},
         variance::VarianceInferable,
@@ -27,8 +29,6 @@ pub struct PEP695TypeAliasType<'db> {
     pub name: Name,
 
     rhs_scope: ScopeId<'db>,
-
-    pub(super) specialization: Option<Specialization<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -52,7 +52,7 @@ impl<'db> PEP695TypeAliasType<'db> {
 
     /// The RHS type of a PEP-695 style type alias with specialization applied.
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
-        self.apply_function_specialization(db, self.raw_value_type(db))
+        self.apply_default_specialization(db, self.raw_value_type(db))
     }
 
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.
@@ -70,62 +70,64 @@ impl<'db> PEP695TypeAliasType<'db> {
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
 
-        definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
+        let value_type =
+            definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value);
+        match value_type {
+            Type::TypeAlias(alias) => alias.value_type(db),
+            Type::GenericAlias(alias) if alias.type_alias_origin(db).is_some() => {
+                alias.expect_type_alias_value_type(db)
+            }
+            _ => value_type,
+        }
     }
 
-    fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    fn apply_default_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         if let Some(generic_context) = self.generic_context(db) {
-            let specialization = self
-                .specialization(db)
-                .unwrap_or_else(|| generic_context.default_specialization(db, None));
-            let type_mapping = match specialization.materialization_kind(db) {
-                None => {
-                    TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(specialization))
-                }
-                Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
-                    specialization: ApplySpecialization::TypeAlias(specialization),
-                    materialization_kind,
-                },
-            };
-
-            ty.apply_type_mapping_impl(
+            Self::apply_type_alias_specialization(
                 db,
-                &type_mapping,
-                TypeContext::default(),
-                &ApplyTypeMappingVisitor::default(),
+                ty,
+                generic_context.default_specialization(db, None),
             )
         } else {
             ty
         }
     }
 
+    fn apply_type_alias_specialization(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        specialization: Specialization<'db>,
+    ) -> Type<'db> {
+        let type_mapping = match specialization.materialization_kind(db) {
+            None => {
+                TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(specialization))
+            }
+            Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
+                specialization: ApplySpecialization::TypeAlias(specialization),
+                materialization_kind,
+            },
+        };
+
+        ty.apply_type_mapping_impl(
+            db,
+            &type_mapping,
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
+    }
+
     pub(crate) fn apply_specialization(
         self,
         db: &'db dyn Db,
         f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
-    ) -> PEP695TypeAliasType<'db> {
-        match self.generic_context(db) {
-            None => self,
-
-            Some(generic_context) => {
-                // Note that at runtime, a specialized type alias is an instance of `typing.GenericAlias`.
-                // However, the `GenericAlias` type in ty is heavily special cased to refer to specialized
-                // class literals, so we instead represent specialized type aliases as instances of
-                // `typing.TypeAliasType` internally, and pass the specialization through to the value type,
-                // except when resolving to an instance of the type alias, or its display representation.
-                let specialization = f(generic_context);
-                PEP695TypeAliasType::new(
-                    db,
-                    self.name(db),
-                    self.rhs_scope(db),
-                    Some(specialization),
-                )
-            }
-        }
-    }
-
-    pub(crate) fn is_specialized(self, db: &'db dyn Db) -> bool {
-        self.specialization(db).is_some()
+    ) -> Option<GenericAlias<'db>> {
+        self.generic_context(db).map(|generic_context| {
+            GenericAlias::new(
+                db,
+                GenericAliasOrigin::TypeAlias(TypeAliasType::PEP695(self)),
+                f(generic_context),
+            )
+        })
     }
 
     #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
@@ -271,16 +273,23 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub(crate) fn specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+    pub(super) fn apply_default_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         match self {
-            TypeAliasType::PEP695(type_alias) => type_alias.specialization(db),
-            TypeAliasType::ManualPEP695(_) => None,
+            TypeAliasType::PEP695(type_alias) => type_alias.apply_default_specialization(db, ty),
+            TypeAliasType::ManualPEP695(_) => ty,
         }
     }
 
-    pub(super) fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    pub(super) fn apply_specialization_to_type(
+        self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        specialization: Specialization<'db>,
+    ) -> Type<'db> {
         match self {
-            TypeAliasType::PEP695(type_alias) => type_alias.apply_function_specialization(db, ty),
+            TypeAliasType::PEP695(_) => {
+                PEP695TypeAliasType::apply_type_alias_specialization(db, ty, specialization)
+            }
             TypeAliasType::ManualPEP695(_) => ty,
         }
     }
@@ -289,12 +298,10 @@ impl<'db> TypeAliasType<'db> {
         self,
         db: &'db dyn Db,
         f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
-    ) -> Self {
+    ) -> Option<GenericAlias<'db>> {
         match self {
-            TypeAliasType::PEP695(type_alias) => {
-                TypeAliasType::PEP695(type_alias.apply_specialization(db, f))
-            }
-            TypeAliasType::ManualPEP695(_) => self,
+            TypeAliasType::PEP695(type_alias) => type_alias.apply_specialization(db, f),
+            TypeAliasType::ManualPEP695(_) => None,
         }
     }
 

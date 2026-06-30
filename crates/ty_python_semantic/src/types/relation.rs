@@ -17,9 +17,9 @@ use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    GenericAliasOrigin, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType,
+    SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -1142,6 +1142,22 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_type_pair(db, source, target_alias.value_type(db))
             }),
 
+            (Type::GenericAlias(source_alias), _)
+                if source_alias.type_alias_origin(db).is_some() =>
+            {
+                self.with_recursion_guard(source, target, || {
+                    self.check_type_pair(db, source_alias.expect_type_alias_value_type(db), target)
+                })
+            }
+
+            (_, Type::GenericAlias(target_alias))
+                if target_alias.type_alias_origin(db).is_some() =>
+            {
+                self.with_recursion_guard(source, target, || {
+                    self.check_type_pair(db, source, target_alias.expect_type_alias_value_type(db))
+                })
+            }
+
             // Annotation unions retain type aliases so recursive aliases can be represented.
             // Normalize direct alias elements together before checking the union so reductions
             // that depend on multiple elements, such as all members of an enum, are visible.
@@ -1180,12 +1196,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     target_typeform.type_argument(db),
                 ),
 
-            (Type::GenericAlias(source_alias), Type::TypeForm(target_typeform)) => self
-                .check_type_pair(
+            (Type::GenericAlias(source_alias), Type::TypeForm(target_typeform))
+                if source_alias.class_origin(db).is_some() =>
+            {
+                self.check_type_pair(
                     db,
                     Type::instance(db, ClassType::Generic(source_alias)),
                     target_typeform.type_argument(db),
-                ),
+                )
+            }
 
             (Type::KnownInstance(source_instance), Type::TypeForm(target_typeform))
                 if source_instance.is_type_form_value() =>
@@ -2115,26 +2134,31 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     })
             }
 
-            // Similarly, `<class 'C'>` is assignable to `<class 'C[...]'>` (a generic-alias type)
-            // if the default specialization of `C` is assignable to `C[...]`. This scenario occurs
-            // with final generic types, where `type[C[...]]` is simplified to the generic-alias
-            // type `<class 'C[...]'>`, due to the fact that `C[...]` has no subclasses.
-            (Type::ClassLiteral(source_cls), Type::GenericAlias(target_alias)) => self
-                .check_class_pair(
+            (Type::ClassLiteral(source_cls), Type::GenericAlias(target_alias))
+                if target_alias.class_origin(db).is_some() =>
+            {
+                self.check_class_pair(
                     db,
                     source_cls.default_specialization(db),
                     ClassType::Generic(target_alias),
-                ),
+                )
+            }
 
             // For generic aliases, we delegate to the underlying class type.
-            (Type::GenericAlias(source_alias), Type::GenericAlias(target_alias)) => self
-                .check_class_pair(
+            (Type::GenericAlias(source_alias), Type::GenericAlias(target_alias))
+                if source_alias.class_origin(db).is_some()
+                    && target_alias.class_origin(db).is_some() =>
+            {
+                self.check_class_pair(
                     db,
                     ClassType::Generic(source_alias),
                     ClassType::Generic(target_alias),
-                ),
+                )
+            }
 
-            (Type::GenericAlias(source_alias), Type::SubclassOf(target_subclass_ty)) => {
+            (Type::GenericAlias(source_alias), Type::SubclassOf(target_subclass_ty))
+                if source_alias.class_origin(db).is_some() =>
+            {
                 target_subclass_ty
                     .subclass_of()
                     .into_class(db)
@@ -2157,11 +2181,16 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::ClassLiteral(source_class), _) => {
                 self.check_type_pair(db, source_class.metaclass_instance_type(db), target)
             }
-            (Type::GenericAlias(source_alias), _) => self.check_type_pair(
-                db,
-                ClassType::Generic(source_alias).metaclass_instance_type(db),
-                target,
-            ),
+            (Type::GenericAlias(source_alias), _) => match source_alias.origin(db) {
+                GenericAliasOrigin::Class(_) => self.check_type_pair(
+                    db,
+                    ClassType::Generic(source_alias).metaclass_instance_type(db),
+                    target,
+                ),
+                GenericAliasOrigin::TypeAlias(_) => {
+                    self.check_type_pair(db, source_alias.expect_type_alias_value_type(db), target)
+                }
+            },
 
             // `type[Any]` is a subtype of `type[object]`, and is assignable to any `type[...]`
             (Type::SubclassOf(subclass_of_ty), _) if subclass_of_ty.is_dynamic() => {
@@ -2552,6 +2581,16 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
+            (Type::GenericAlias(alias), _) if alias.type_alias_origin(db).is_some() => self
+                .with_recursion_guard(left, right, || {
+                    self.check_type_pair(db, alias.expect_type_alias_value_type(db), right)
+                }),
+
+            (_, Type::GenericAlias(alias)) if alias.type_alias_origin(db).is_some() => self
+                .with_recursion_guard(left, right, || {
+                    self.check_type_pair(db, left, alias.expect_type_alias_value_type(db))
+                }),
+
             (Type::EnumComplement(complement), other) => {
                 self.check_type_pair(db, complement.remaining_literal_union(db), other)
             }
@@ -2906,12 +2945,20 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             }
 
             (Type::ClassLiteral(class), Type::GenericAlias(alias_b))
-            | (Type::GenericAlias(alias_b), Type::ClassLiteral(class)) => class
-                .default_specialization(db)
-                .into_generic_alias()
-                .when_none_or(db, self.constraints, |alias| {
-                    self.check_type_pair(db, Type::GenericAlias(alias_b), Type::GenericAlias(alias))
-                }),
+            | (Type::GenericAlias(alias_b), Type::ClassLiteral(class))
+                if alias_b.class_origin(db).is_some() =>
+            {
+                class
+                    .default_specialization(db)
+                    .into_generic_alias()
+                    .when_none_or(db, self.constraints, |alias| {
+                        self.check_type_pair(
+                            db,
+                            Type::GenericAlias(alias_b),
+                            Type::GenericAlias(alias),
+                        )
+                    })
+            }
 
             (Type::SubclassOf(subclass_of_ty), Type::ClassLiteral(class_b))
             | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
@@ -2930,7 +2977,9 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             }
 
             (Type::SubclassOf(subclass_of_ty), Type::GenericAlias(alias_b))
-            | (Type::GenericAlias(alias_b), Type::SubclassOf(subclass_of_ty)) => {
+            | (Type::GenericAlias(alias_b), Type::SubclassOf(subclass_of_ty))
+                if alias_b.class_origin(db).is_some() =>
+            {
                 match subclass_of_ty.subclass_of() {
                     SubclassOfInner::Dynamic(_) => self.never(),
                     SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
@@ -3033,14 +3082,17 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 .negate(db, self.constraints),
 
             (Type::GenericAlias(alias), Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::GenericAlias(alias)) => self
-                .as_relation_checker(TypeRelation::Subtyping)
-                .check_type_pair(
-                    db,
-                    ClassType::Generic(alias).metaclass_instance_type(db),
-                    Type::NominalInstance(instance),
-                )
-                .negate(db, self.constraints),
+            | (Type::NominalInstance(instance), Type::GenericAlias(alias))
+                if alias.class_origin(db).is_some() =>
+            {
+                self.as_relation_checker(TypeRelation::Subtyping)
+                    .check_type_pair(
+                        db,
+                        ClassType::Generic(alias).metaclass_instance_type(db),
+                        Type::NominalInstance(instance),
+                    )
+                    .negate(db, self.constraints)
+            }
 
             (Type::FunctionLiteral(..), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::FunctionLiteral(..)) => {

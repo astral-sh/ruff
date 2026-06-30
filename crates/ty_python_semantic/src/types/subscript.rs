@@ -759,7 +759,6 @@ impl<'db> Type<'db> {
                 Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))),
                 _,
             ) if alias.generic_context(db).is_none() => {
-                debug_assert!(alias.specialization(db).is_none());
                 Some(Err(SubscriptError::new(
                     Type::unknown(),
                     SubscriptErrorKind::NonGenericTypeAlias {

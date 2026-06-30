@@ -136,7 +136,13 @@ impl<'db> Type<'db> {
                 Some(class_literal.identity_specialization(db).into_callable(db))
             }
 
-            Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
+            Type::GenericAlias(alias) if alias.class_origin(db).is_some() => {
+                Some(ClassType::Generic(alias).into_callable(db))
+            }
+            Type::GenericAlias(alias) if alias.type_alias_origin(db).is_some() => alias
+                .expect_type_alias_value_type(db)
+                .try_upcast_to_callable_with_policy_and_context(db, policy, context),
+            Type::GenericAlias(_) => None,
 
             Type::NewTypeInstance(newtype) => newtype
                 .concrete_base_type(db)

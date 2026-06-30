@@ -2500,6 +2500,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             (Type::TypeAlias(alias), _) => {
                 return self.infer_map_impl(alias.value_type(self.db), actual, polarity, seen);
             }
+            (Type::GenericAlias(alias), _) if alias.type_alias_origin(self.db).is_some() => {
+                return self.infer_map_impl(
+                    alias.expect_type_alias_value_type(self.db),
+                    actual,
+                    polarity,
+                    seen,
+                );
+            }
 
             (Type::TypeForm(formal_typeform), Type::TypeForm(actual_typeform)) => {
                 let variance = TypeVarVariance::Covariant.compose(polarity);
@@ -3049,6 +3057,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // e.g., `reveal_type(alias)` should reveal the type alias, not its value type.
             (formal, Type::TypeAlias(alias)) => {
                 return self.infer_map_impl(formal, alias.value_type(self.db), polarity, seen);
+            }
+            (formal, Type::GenericAlias(alias)) if alias.type_alias_origin(self.db).is_some() => {
+                return self.infer_map_impl(
+                    formal,
+                    alias.expect_type_alias_value_type(self.db),
+                    polarity,
+                    seen,
+                );
             }
 
             // TODO: Add more forms that we can structurally induct into: type[C], callables

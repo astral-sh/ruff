@@ -95,17 +95,55 @@ impl<'db> UnionType<'db> {
 
     /// Returns `true` if any direct element of this union is a type alias.
     pub(crate) fn has_aliases(self, db: &'db dyn Db) -> bool {
-        self.elements(db)
-            .iter()
-            .any(|element| matches!(element, Type::TypeAlias(_)))
+        self.elements(db).iter().any(|element| match element {
+            Type::TypeAlias(_) => true,
+            Type::GenericAlias(alias) => alias.type_alias_origin(db).is_some(),
+            _ => false,
+        })
     }
 
     /// Recursively expands aliases that expose top-level union elements.
     ///
     /// Aliases nested inside non-union elements remain part of those elements.
     pub(crate) fn expand_aliases(self, db: &'db dyn Db) -> Type<'db> {
-        // Rebuild the union so that `UnionBuilder` simplifies any redundancies exposed.
-        Self::from_elements(db, self.elements(db).iter().copied())
+        let mut seen_aliases = Vec::new();
+        self.expand_aliases_impl(db, &mut seen_aliases)
+    }
+
+    fn expand_aliases_impl(self, db: &'db dyn Db, seen_aliases: &mut Vec<Type<'db>>) -> Type<'db> {
+        let mut builder = UnionBuilder::new(db);
+        for element in self.elements(db) {
+            builder = Self::add_expanded_alias(builder, db, *element, seen_aliases);
+        }
+        builder.build()
+    }
+
+    fn add_expanded_alias(
+        builder: UnionBuilder<'db>,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        seen_aliases: &mut Vec<Type<'db>>,
+    ) -> UnionBuilder<'db> {
+        if let Some(value_type) = ty.type_alias_value_type(db) {
+            if seen_aliases.contains(&ty) {
+                return builder;
+            }
+
+            seen_aliases.push(ty);
+            let builder = if let Type::Union(union) = value_type {
+                let mut builder = builder;
+                for element in union.elements(db) {
+                    builder = Self::add_expanded_alias(builder, db, *element, seen_aliases);
+                }
+                builder
+            } else {
+                Self::add_expanded_alias(builder, db, value_type, seen_aliases)
+            };
+            seen_aliases.pop();
+            builder
+        } else {
+            builder.add(ty)
+        }
     }
 
     pub(crate) fn from_elements_cycle_recovery<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>

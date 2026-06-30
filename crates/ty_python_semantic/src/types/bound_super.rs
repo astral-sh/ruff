@@ -744,6 +744,9 @@ impl<'db> BoundSuperType<'db> {
             Type::TypeAlias(alias) => {
                 return delegate_to(alias.value_type(db));
             }
+            Type::GenericAlias(alias) if alias.type_alias_origin(db).is_some() => {
+                return delegate_to(alias.expect_type_alias_value_type(db));
+            }
             Type::TypeVar(bound_typevar) => {
                 let typevar = bound_typevar.typevar(db);
                 match typevar.bound_or_constraints(db) {

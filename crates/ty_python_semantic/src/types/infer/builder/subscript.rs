@@ -462,11 +462,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Type<'db> {
         let db = self.db();
         let specialize = &|types: &[Option<Type<'db>>]| {
-            let type_alias = generic_type_alias.apply_specialization(db, |_| {
-                generic_context.specialize_partial(db, types.iter().copied())
-            });
+            let type_alias = generic_type_alias
+                .apply_specialization(db, |_| {
+                    generic_context.specialize_partial(db, types.iter().copied())
+                })
+                .expect("generic type aliases must support specialization");
 
-            Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias))
+            Type::GenericAlias(type_alias)
         };
 
         self.infer_explicit_callable_specialization(
