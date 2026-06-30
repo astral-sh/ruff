@@ -409,6 +409,15 @@ fn stub_package_search_paths(db: &dyn Db) -> StubPackageSearchPaths {
     StubPackageSearchPaths::from_search_paths(db, search_paths(db, ModuleResolveMode::StubsAllowed))
 }
 
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn extra_stub_package_search_paths(db: &dyn Db) -> StubPackageSearchPaths {
+    StubPackageSearchPaths::from_search_paths(
+        db,
+        search_paths(db, ModuleResolveMode::StubsAllowed)
+            .take_while(|search_path| search_path.is_extra()),
+    )
+}
+
 fn search_path_may_contain_stub_package(db: &dyn Db, search_path: &SearchPath) -> bool {
     let Some(path) = search_path.as_system_path() else {
         return false;
@@ -978,6 +987,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
 /// are only calculated lazily.
 ///
 /// [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
+#[derive(Clone)]
 pub struct SearchPathIterator<'db> {
     db: &'db dyn Db,
     static_paths: std::slice::Iter<'db, SearchPath>,
@@ -1031,7 +1041,30 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
     } else {
         &empty_stub_search_paths
     };
-    resolve_name_impl(db, name, mode, search_paths, stub_search_paths)
+
+    if mode.stubs_allowed()
+        && let Some(resolved) = resolve_name_impl(
+            db,
+            name,
+            mode,
+            search_paths
+                .clone()
+                .take_while(|search_path| search_path.is_extra()),
+            extra_stub_package_search_paths(db),
+            FinalModuleFilter::Stub,
+        )
+    {
+        return Some(resolved);
+    }
+
+    resolve_name_impl(
+        db,
+        name,
+        mode,
+        search_paths,
+        stub_search_paths,
+        FinalModuleFilter::Any,
+    )
 }
 
 /// Like `resolve_name` but for cases where it failed to resolve the module
@@ -1055,6 +1088,7 @@ fn desperately_resolve_name(
         } else {
             StubPackageSearchPaths::empty()
         },
+        FinalModuleFilter::Any,
     )
 }
 
@@ -1064,6 +1098,43 @@ enum ResolvedModule {
     LegacyNamespacePackage(File),
     RegularPackage(File),
     Module(File),
+}
+
+impl ResolvedModule {
+    fn has_stub_file(self, db: &dyn Db) -> bool {
+        match self {
+            Self::NamespacePackage => false,
+            Self::LegacyNamespacePackage(file)
+            | Self::RegularPackage(file)
+            | Self::Module(file) => file.source_type(db) == PySourceType::Stub,
+        }
+    }
+}
+
+/// Restricts the kind of file that may represent the requested module.
+///
+/// Parent packages are always resolved normally; the filter applies only to the final component.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum FinalModuleFilter {
+    Any,
+    Stub,
+}
+
+impl FinalModuleFilter {
+    fn for_component(self, is_final: bool) -> Self {
+        if is_final { self } else { Self::Any }
+    }
+
+    fn retain_candidates(
+        self,
+        db: &dyn Db,
+        candidates: &mut Vec<ModuleResolutionCandidate>,
+        is_final: bool,
+    ) {
+        if is_final && self == Self::Stub {
+            candidates.retain(|candidate| candidate.module.has_stub_file(db));
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1081,65 +1152,29 @@ struct ModuleResolutionCandidate {
 /// sorts used by the resolver preserve search-path order between candidates in the same tier.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum CandidatePrecedence {
-    /// A regular PEP 561 stub-only package on a user-configured extra search path.
-    ///
-    /// Stub-only packages are more specific than regular packages on extra paths and take
-    /// precedence regardless of the relative order of those paths. Search-path order still breaks
-    /// ties between multiple extra-path stub packages.
-    ExtraStubPackage,
-
-    /// A candidate from a user-configured extra search path while stubs are allowed.
-    ///
-    /// These paths are the equivalent of mypy's `MYPYPATH` or pyright's `stubPath`: they give the
-    /// user final control over typing information and may contain either stubs or Python source.
-    /// They only receive this precedence during stub-aware resolution; real-module resolution
-    /// continues to follow Python's runtime import semantics.
-    ExtraSearchPath,
-
     /// A PEP 561 stub-only package named `<package>-stubs`.
     ///
     /// Stub packages take precedence over the corresponding runtime package regardless of where
-    /// that runtime package appears in the search-path order. A stub package on an extra search
-    /// path receives [`CandidatePrecedence::ExtraStubPackage`].
+    /// that runtime package appears in the search-path order.
     StubPackage,
 
     /// An ordinary runtime candidate.
     ///
     /// This includes first-party packages, editable installs, site-packages, the standard library,
-    /// and extra-path candidates when stubs are not allowed.
+    /// and regular packages and modules on extra paths.
     Runtime,
 }
 
-/// Final ordering after all components of the requested module name have been resolved.
-///
-/// Namespace candidates must remain available while descending into submodules because they can
-/// provide a higher-precedence overlay. Once resolution reaches the requested module itself, a
-/// concrete module or package is preferred so that, for example, `import package` resolves to the
-/// runtime package's `__init__.py` rather than to an incomplete namespace overlay.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-enum ResolutionPriority {
-    Concrete(CandidatePrecedence),
-    Namespace(CandidatePrecedence),
-}
-
-impl CandidatePrecedence {
-    fn with_stub_package(self, is_namespace_package: bool) -> Self {
-        match self {
-            Self::ExtraSearchPath if is_namespace_package => Self::ExtraSearchPath,
-            Self::ExtraStubPackage | Self::ExtraSearchPath => Self::ExtraStubPackage,
-            Self::StubPackage | Self::Runtime => Self::StubPackage,
-        }
-    }
-}
-
 impl ModuleResolutionCandidate {
-    fn root(search_path: &SearchPath, mode: ModuleResolveMode) -> Self {
-        let precedence = if mode.stubs_allowed() && search_path.is_extra() {
-            CandidatePrecedence::ExtraSearchPath
-        } else {
-            CandidatePrecedence::Runtime
-        };
+    fn root(search_path: &SearchPath) -> Self {
+        Self::with_precedence(search_path, CandidatePrecedence::Runtime)
+    }
 
+    fn stub(search_path: &SearchPath) -> Self {
+        Self::with_precedence(search_path, CandidatePrecedence::StubPackage)
+    }
+
+    fn with_precedence(search_path: &SearchPath, precedence: CandidatePrecedence) -> Self {
         Self {
             path: search_path.to_module_path(),
             module: ResolvedModule::NamespacePackage,
@@ -1155,15 +1190,6 @@ impl ModuleResolutionCandidate {
             ResolvedModule::LegacyNamespacePackage(_) => true,
             ResolvedModule::RegularPackage(_) => false,
             ResolvedModule::Module(_) => false,
-        }
-    }
-
-    /// Orders candidates once the requested module has been resolved.
-    fn resolution_priority(&self) -> ResolutionPriority {
-        if self.is_any_namespace_package() {
-            ResolutionPriority::Namespace(self.precedence)
-        } else {
-            ResolutionPriority::Concrete(self.precedence)
         }
     }
 
@@ -1247,11 +1273,13 @@ fn resolve_stub_package_in_search_path(
     search_path: &SearchPath,
     stub_name: &str,
 ) -> Option<ModuleResolutionCandidate> {
-    let mut candidate = ModuleResolutionCandidate::root(search_path, context.mode);
+    debug_assert!(context.mode.stubs_allowed());
+
+    let mut candidate = ModuleResolutionCandidate::stub(search_path);
     if !candidate_may_exist(context, &candidate, stub_name) {
         return None;
     }
-    resolve_name_in_search_path(context, &mut candidate, stub_name).ok()?;
+    resolve_component(context, &mut candidate, stub_name, FinalModuleFilter::Any).ok()?;
 
     // `mypackage-stubs.py(i)` is not a valid result.
     if matches!(candidate.module, ResolvedModule::Module(_)) {
@@ -1261,9 +1289,6 @@ fn resolve_stub_package_in_search_path(
         );
         None
     } else {
-        candidate.precedence = candidate
-            .precedence
-            .with_stub_package(candidate.is_any_namespace_package());
         Some(candidate)
     }
 }
@@ -1274,11 +1299,14 @@ fn resolve_name_impl<'a>(
     mode: ModuleResolveMode,
     search_paths: impl Iterator<Item = &'a SearchPath>,
     stub_search_paths: &StubPackageSearchPaths,
+    final_module_filter: FinalModuleFilter,
 ) -> Option<ResolvedNames> {
+    debug_assert!(mode.stubs_allowed() || stub_search_paths.is_empty());
+
     let python_version = db.python_version();
     let context = ResolverContext::new(db, python_version, mode);
     let is_non_shadowable = mode.is_non_shadowable(python_version.minor, name.as_str());
-    let mut components = name.components();
+    let mut components = name.components().peekable();
     let root_component = components.next()?;
     let stub_name = (!is_non_shadowable && !stub_search_paths.is_empty())
         .then(|| format!("{root_component}-stubs"));
@@ -1296,7 +1324,7 @@ fn resolve_name_impl<'a>(
         pending_stub_paths.extend(after_stdlib.iter().filter(|search_path| {
             candidate_may_exist(
                 &context,
-                &ModuleResolutionCandidate::root(search_path, mode),
+                &ModuleResolutionCandidate::stub(search_path),
                 stub_name,
             )
         }));
@@ -1316,10 +1344,15 @@ fn resolve_name_impl<'a>(
         // A terminal candidate can stop the search unless a matching post-stdlib stub package
         // could still override it. A terminal stdlib candidate always stops the search.
         let can_stop = is_stdlib || pending_stub_paths.is_empty();
-        let mut candidate = ModuleResolutionCandidate::root(search_path, mode);
+        let mut candidate = ModuleResolutionCandidate::root(search_path);
         let terminal = if candidate_may_exist(&context, &candidate, root_component) {
-            let resolved =
-                resolve_name_in_search_path(&context, &mut candidate, root_component).is_ok();
+            let resolved = resolve_component(
+                &context,
+                &mut candidate,
+                root_component,
+                final_module_filter.for_component(components.peek().is_none()),
+            )
+            .is_ok();
             let terminal = candidate.missing_submodule_is_terminal();
             if resolved {
                 cur_candidates.push(candidate);
@@ -1343,19 +1376,25 @@ fn resolve_name_impl<'a>(
         }
     }
 
-    discard_shadowed_namespace_candidates(db, &mut cur_candidates);
+    final_module_filter.retain_candidates(db, &mut cur_candidates, components.peek().is_none());
     if cur_candidates.is_empty() {
         return None;
     }
-
-    cur_candidates.sort_by_key(|candidate| candidate.precedence);
+    normalize_candidates(db, &mut cur_candidates);
 
     let mut next_candidates = Vec::new();
 
-    for component in components {
+    while let Some(component) = components.next() {
+        let is_final = components.peek().is_none();
         for mut candidate in cur_candidates.drain(..) {
             if !candidate_may_exist(&context, &candidate, component)
-                || resolve_name_in_search_path(&context, &mut candidate, component).is_err()
+                || resolve_component(
+                    &context,
+                    &mut candidate,
+                    component,
+                    final_module_filter.for_component(is_final),
+                )
+                .is_err()
             {
                 if candidate.missing_submodule_is_terminal() {
                     // Everything after this package should be shadowed out by
@@ -1372,39 +1411,34 @@ fn resolve_name_impl<'a>(
             }
         }
 
-        discard_shadowed_namespace_candidates(db, &mut next_candidates);
+        final_module_filter.retain_candidates(db, &mut next_candidates, is_final);
         if next_candidates.is_empty() {
             return None;
         }
-
-        next_candidates.sort_by_key(|candidate| candidate.precedence);
+        normalize_candidates(db, &mut next_candidates);
 
         // Advance to the next level of candidates while reusing allocations
         // (we used `drain` so cur_candidates is empty)
         std::mem::swap(&mut cur_candidates, &mut next_candidates);
     }
 
-    cur_candidates.sort_by_key(ModuleResolutionCandidate::resolution_priority);
     Some(cur_candidates)
 }
 
-fn discard_shadowed_namespace_candidates(
-    db: &dyn Db,
-    candidates: &mut Vec<ModuleResolutionCandidate>,
-) {
-    // A concrete candidate shadows namespace candidates at the same or lower precedence. A
-    // higher-precedence namespace remains as an overlay while resolution descends into child
-    // components.
+fn normalize_candidates(db: &dyn Db, candidates: &mut Vec<ModuleResolutionCandidate>) {
+    debug_assert!(!candidates.is_empty());
+
+    // A concrete candidate shadows all namespace candidates.
     //
     // We can't do this "delete all namespace packages" eagerly because we want a
     // `PyTyped::Partial` regular package to shadow namespace packages after it.
     // (FIXME: I guess we could just set a flag not to add them...)
 
-    let best_concrete_precedence = candidates
+    let found_concrete = candidates
         .iter()
-        .filter(|candidate| !candidate.is_any_namespace_package())
-        .map(|candidate| candidate.precedence)
-        .min();
+        .any(|candidate| !candidate.is_any_namespace_package());
+
+    candidates.sort_by_key(|candidate| candidate.precedence);
 
     // Note that we intentionally do *not* filter out non-stub
     // candidates when a stub package is found. Even when a
@@ -1426,10 +1460,7 @@ fn discard_shadowed_namespace_candidates(
         // regular packages/modules). In that case, this logic currently
         // retains both candidates.
 
-        let namespace_is_shadowed =
-            best_concrete_precedence.is_some_and(|precedence| precedence <= candidate.precedence);
-
-        if namespace_is_shadowed && candidate.is_any_namespace_package() {
+        if found_concrete && candidate.is_any_namespace_package() {
             tracing::trace!(
                 "Discarding namespace package `{}` because a non-namespace entry of the same name \
                  was found",
@@ -1440,26 +1471,16 @@ fn discard_shadowed_namespace_candidates(
             true
         }
     });
+
+    debug_assert!(!candidates.is_empty());
 }
 
-/// Attempts to resolve a module name in a particular search path.
-///
-/// `search_path` should be the directory to start looking for the module.
-///
-/// `name` should be a complete non-empty module name, e.g, `foo` or
-/// `foo.bar.baz`.
-///
-/// Upon success, this returns the kind of the parent package (root, regular
-/// package or namespace package) along with the resolved details of the
-/// module: its kind (single-file module or package), the search path in
-/// which it was found (guaranteed to be equal to the one given) and the
-/// corresponding `File`.
-///
-/// Upon error, the kind of the parent package is returned.
-fn resolve_name_in_search_path(
+/// Resolves one component relative to the candidate's current package.
+fn resolve_component(
     context: &ResolverContext,
     candidate: &mut ModuleResolutionCandidate,
     module_name: &str,
+    final_module_filter: FinalModuleFilter,
 ) -> Result<(), ()> {
     if matches!(candidate.module, ResolvedModule::Module(_)) {
         tracing::trace!(
@@ -1473,7 +1494,8 @@ fn resolve_name_in_search_path(
 
     // Check for a regular package first (highest priority)
     package_path.push("__init__");
-    if let Some(init) = resolve_file_module(package_path, context) {
+    if let Some(init) = resolve_file_module_with_filter(package_path, context, final_module_filter)
+    {
         // Remove the `__init__` component for any potential next step
         package_path.pop();
         candidate.py_typed = package_path
@@ -1490,7 +1512,9 @@ fn resolve_name_in_search_path(
     // Check for a file module next
     package_path.pop();
 
-    if let Some(file_module) = resolve_file_module(package_path, context) {
+    if let Some(file_module) =
+        resolve_file_module_with_filter(package_path, context, final_module_filter)
+    {
         candidate.module = ResolvedModule::Module(file_module);
         return Ok(());
     }
@@ -1554,19 +1578,29 @@ pub(super) fn resolve_file_module(
     module: &ModulePath,
     resolver_state: &ResolverContext,
 ) -> Option<File> {
+    resolve_file_module_with_filter(module, resolver_state, FinalModuleFilter::Any)
+}
+
+fn resolve_file_module_with_filter(
+    module: &ModulePath,
+    resolver_state: &ResolverContext,
+    filter: FinalModuleFilter,
+) -> Option<File> {
     // Stubs have precedence over source files
     let stub_file = if resolver_state.mode.stubs_allowed() {
         module.with_pyi_extension().to_file(resolver_state)
     } else {
         None
     };
-    let file = stub_file.or_else(|| {
+    if filter == FinalModuleFilter::Stub {
+        return stub_file;
+    }
+
+    stub_file.or_else(|| {
         module
             .with_py_extension()
             .and_then(|path| path.to_file(resolver_state))
-    })?;
-
-    Some(file)
+    })
 }
 
 /// Determines whether a package is a legacy namespace package.

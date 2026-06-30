@@ -214,6 +214,46 @@ reveal_type(ROOT)  # revealed: Literal["runtime"]
 reveal_type(RATE)  # revealed: str
 ```
 
+## Python source on an extra path is not a stub overlay
+
+An implicit namespace package on an extra path only overlays a regular package when it provides a
+stub for the requested module. Ordinary Python source follows runtime namespace-package shadowing.
+
+```toml
+[environment]
+extra-paths = ["/extra"]
+```
+
+`/extra/pkg_source/vendor/get_rate.py`:
+
+```py
+RATE = "extra"
+```
+
+`/src/pkg_source/__init__.py`:
+
+```py
+```
+
+`/src/pkg_source/vendor/__init__.py`:
+
+```py
+```
+
+`/src/pkg_source/vendor/get_rate.py`:
+
+```py
+RATE = 1
+```
+
+`main.py`:
+
+```py
+from pkg_source.vendor.get_rate import RATE
+
+reveal_type(RATE)  # revealed: Literal[1]
+```
+
 ## User stub overlay for an editable package
 
 Regression test for <https://github.com/astral-sh/ty/issues/3870>.
