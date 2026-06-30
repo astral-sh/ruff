@@ -1498,6 +1498,46 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_use_def_map_mut().delete_binding(place);
     }
 
+    /// Push a new [`Definition`] onto the list of definitions
+    /// associated with the `definition_node` AST node.
+    ///
+    /// Returns a 2-element tuple, where the first element is the newly created [`Definition`]
+    /// and the second element is the number of definitions that are now associated with
+    /// `definition_node`.
+    ///
+    /// Most AST nodes can only be associated with at most one [`Definition`]. Generally prefer
+    /// `add_definition` above, which enforces that. This method should currently only be used with
+    /// `*` imports and loop headers.
+    fn push_additional_definition(
+        &mut self,
+        place: ScopedPlaceId,
+        definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
+    ) -> (Definition<'db>, usize) {
+        let definition_node: DefinitionNodeRef<'ast, 'db> = definition_node.into();
+
+        // Note `definition_node` is guaranteed to be a child of `self.module`
+        let kind = definition_node.into_owned(self.module);
+        let is_loop_header = kind.is_loop_header();
+        let is_reexported = kind.is_reexported();
+
+        let definition: Definition<'db> =
+            Definition::new(self.db, self.current_scope_id(), place, kind, is_reexported);
+
+        let num_definitions = if is_loop_header {
+            // Loop headers are internal use-def definitions. They are retrieved through the loop
+            // token rather than by their AST node.
+            0
+        } else {
+            let definitions = self.add_entry_for_definition_key(definition_node.key());
+            definitions.push(definition);
+            definitions.len()
+        };
+
+        self.record_definition(place, definition);
+
+        (definition, num_definitions)
+    }
+
     /// Records an already-created definition in the current scope.
     fn record_definition(&mut self, place: ScopedPlaceId, definition: Definition<'db>) {
         let kind = definition.kind(self.db);
@@ -1557,46 +1597,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
         try_node_stack_manager.record_definition(self);
         self.try_node_context_stack_manager = try_node_stack_manager;
-    }
-
-    /// Push a new [`Definition`] onto the list of definitions
-    /// associated with the `definition_node` AST node.
-    ///
-    /// Returns a 2-element tuple, where the first element is the newly created [`Definition`]
-    /// and the second element is the number of definitions that are now associated with
-    /// `definition_node`.
-    ///
-    /// Most AST nodes can only be associated with at most one [`Definition`]. Generally prefer
-    /// `add_definition` above, which enforces that. This method should currently only be used with
-    /// `*` imports and loop headers.
-    fn push_additional_definition(
-        &mut self,
-        place: ScopedPlaceId,
-        definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
-    ) -> (Definition<'db>, usize) {
-        let definition_node: DefinitionNodeRef<'ast, 'db> = definition_node.into();
-
-        // Note `definition_node` is guaranteed to be a child of `self.module`
-        let kind = definition_node.into_owned(self.module);
-        let is_loop_header = kind.is_loop_header();
-        let is_reexported = kind.is_reexported();
-
-        let definition: Definition<'db> =
-            Definition::new(self.db, self.current_scope_id(), place, kind, is_reexported);
-
-        let num_definitions = if is_loop_header {
-            // Loop headers are internal use-def definitions. They are retrieved through the loop
-            // token rather than by their AST node.
-            0
-        } else {
-            let definitions = self.add_entry_for_definition_key(definition_node.key());
-            definitions.push(definition);
-            definitions.len()
-        };
-
-        self.record_definition(place, definition);
-
-        (definition, num_definitions)
     }
 
     // Creates a definition for each key-value assignment in the dictionary.
