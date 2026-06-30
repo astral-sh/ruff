@@ -46,6 +46,27 @@ while 1:
     y = (y, *y)
 ```
 
+## Generic `NamedTuple` with recursive fields
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3872>. Computing the
+`NamedTuple` fields while building the class's MRO must not try to determine whether the same class
+is a `TypedDict`.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import NamedTuple
+
+class Node[KT, VT](NamedTuple):
+    children: tuple[Node[KT, VT], ...] | tuple[Leaf[VT], ...]
+
+class Leaf[VT](NamedTuple):
+    values: tuple[VT, ...]
+```
+
 ## Literal reduction during cycle recovery
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3851>. Constructing a union
