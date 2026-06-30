@@ -1,5 +1,10 @@
 # Narrowing for `callable()`
 
+```toml
+[semantics]
+isinstance-narrowing = "strict"
+```
+
 ## Basic narrowing
 
 The `callable()` builtin returns `TypeIs[Callable[..., object]]`, which narrows the type to the

@@ -586,6 +586,8 @@ impl<'db> TypeVarInstance<'db> {
                     | DynamicType::TodoTypeVarTuple => Parameters::todo(),
                     DynamicType::Any
                     | DynamicType::Unknown
+                    | DynamicType::GradualTop
+                    | DynamicType::GradualBottom
                     | DynamicType::UnknownGeneric(_)
                     | DynamicType::UnspecializedTypeVar
                     | DynamicType::InvalidConcatenateUnknown

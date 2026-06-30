@@ -141,6 +141,199 @@ fn todo_types() {
 }
 
 #[test]
+fn gradual_materialization_results() {
+    let db = setup_db();
+    let visitor = ApplyTypeMappingVisitor::default();
+    let unknown = Type::unknown();
+
+    assert_eq!(
+        unknown.materialize(&db, MaterializationKind::Top, &visitor),
+        Type::object()
+    );
+    assert_eq!(
+        unknown.materialize(&db, MaterializationKind::Bottom, &visitor),
+        Type::Never
+    );
+    assert_eq!(
+        unknown.materialize(&db, MaterializationKind::GradualTop, &visitor),
+        Type::gradual_top()
+    );
+    assert_eq!(
+        unknown.materialize(&db, MaterializationKind::GradualBottom, &visitor),
+        Type::gradual_bottom()
+    );
+
+    let subclass_of_any = SubclassOfType::subclass_of_any();
+    let gradual_type_top = subclass_of_any.materialize(
+        &db,
+        MaterializationKind::GradualTop,
+        &ApplyTypeMappingVisitor::default(),
+    );
+    let gradual_type_bottom = subclass_of_any.materialize(
+        &db,
+        MaterializationKind::GradualBottom,
+        &ApplyTypeMappingVisitor::default(),
+    );
+    let subclass_of_gradual_bottom = Type::gradual_bottom().to_meta_type(&db);
+    let subclass_of_int = KnownClass::Int.to_instance(&db).to_meta_type(&db);
+
+    assert_eq!(gradual_type_top.display(&db).to_string(), "type[object*]");
+    assert_eq!(gradual_type_bottom, Type::gradual_bottom());
+    assert!(subclass_of_int.is_subtype_of(&db, gradual_type_top));
+    assert!(!gradual_type_top.is_subtype_of(&db, subclass_of_int));
+    assert!(subclass_of_int.is_assignable_to(&db, gradual_type_top));
+    assert!(gradual_type_top.is_assignable_to(&db, subclass_of_int));
+
+    assert_eq!(
+        subclass_of_gradual_bottom.display(&db).to_string(),
+        "type[Never*]"
+    );
+    assert!(subclass_of_gradual_bottom.is_subtype_of(&db, subclass_of_int));
+    assert!(!subclass_of_int.is_subtype_of(&db, subclass_of_gradual_bottom));
+    assert!(subclass_of_gradual_bottom.is_disjoint_from(&db, subclass_of_int));
+    assert!(subclass_of_gradual_bottom.is_assignable_to(&db, subclass_of_int));
+    assert!(subclass_of_int.is_assignable_to(&db, subclass_of_gradual_bottom));
+}
+
+#[test]
+fn gradual_bounds_set_operations() {
+    let db = setup_db();
+    let int = KnownClass::Int.to_instance(&db);
+    let object = Type::object();
+    let gradual_top = Type::gradual_top();
+    let gradual_bottom = Type::gradual_bottom();
+
+    assert_eq!(gradual_top.negate(&db), gradual_bottom);
+    assert_eq!(gradual_bottom.negate(&db), gradual_top);
+    assert_eq!(
+        IntersectionBuilder::new(&db)
+            .add_negative(gradual_top)
+            .build(),
+        gradual_bottom
+    );
+    assert_eq!(
+        IntersectionBuilder::new(&db)
+            .add_negative(gradual_bottom)
+            .build(),
+        gradual_top
+    );
+
+    assert_eq!(
+        UnionType::from_two_elements(&db, gradual_top, int),
+        gradual_top
+    );
+    assert_eq!(
+        UnionType::from_two_elements(&db, int, gradual_top),
+        gradual_top
+    );
+    assert_eq!(
+        IntersectionType::from_two_elements(&db, gradual_top, int),
+        int
+    );
+    assert_eq!(
+        IntersectionType::from_two_elements(&db, int, gradual_top),
+        int
+    );
+
+    assert_eq!(UnionType::from_two_elements(&db, gradual_bottom, int), int);
+    assert_eq!(UnionType::from_two_elements(&db, int, gradual_bottom), int);
+    assert_eq!(
+        IntersectionType::from_two_elements(&db, gradual_bottom, int),
+        gradual_bottom
+    );
+    assert_eq!(
+        IntersectionType::from_two_elements(&db, int, gradual_bottom),
+        gradual_bottom
+    );
+
+    // Set-equivalent strict and gradual bounds simplify deterministically. An intersection keeps
+    // the strict constraint, while a union keeps the gradual behavior from either branch.
+    assert_eq!(
+        IntersectionType::from_two_elements(&db, object, gradual_top),
+        object
+    );
+    assert_eq!(
+        IntersectionType::from_two_elements(&db, gradual_top, object),
+        object
+    );
+    assert_eq!(
+        UnionType::from_two_elements(&db, object, gradual_top),
+        gradual_top
+    );
+    assert_eq!(
+        UnionType::from_two_elements(&db, gradual_top, object),
+        gradual_top
+    );
+    assert_eq!(
+        IntersectionType::from_two_elements(&db, Type::Never, gradual_bottom),
+        Type::Never
+    );
+    assert_eq!(
+        IntersectionType::from_two_elements(&db, gradual_bottom, Type::Never),
+        Type::Never
+    );
+    assert_eq!(
+        UnionType::from_two_elements(&db, Type::Never, gradual_bottom),
+        gradual_bottom
+    );
+    assert_eq!(
+        UnionType::from_two_elements(&db, gradual_bottom, Type::Never),
+        gradual_bottom
+    );
+
+    let sequence_object = KnownClass::Sequence.to_specialized_instance(&db, &[object]);
+    let sequence_gradual = KnownClass::Sequence.to_specialized_instance(&db, &[gradual_top]);
+    assert_eq!(
+        IntersectionType::from_two_elements(&db, sequence_object, sequence_gradual),
+        sequence_object
+    );
+    assert_eq!(
+        IntersectionType::from_two_elements(&db, sequence_gradual, sequence_object),
+        sequence_object
+    );
+    assert_eq!(
+        UnionType::from_two_elements(&db, sequence_object, sequence_gradual),
+        sequence_gradual
+    );
+    assert_eq!(
+        UnionType::from_two_elements(&db, sequence_gradual, sequence_object),
+        sequence_gradual
+    );
+}
+
+#[test]
+fn gradual_bounds_relations() {
+    let db = setup_db();
+    let int = KnownClass::Int.to_instance(&db);
+    let gradual_top = Type::gradual_top();
+    let gradual_bottom = Type::gradual_bottom();
+
+    assert!(gradual_top.is_assignable_to(&db, int));
+    assert!(int.is_assignable_to(&db, gradual_top));
+    assert!(gradual_bottom.is_assignable_to(&db, int));
+    assert!(int.is_assignable_to(&db, gradual_bottom));
+
+    assert!(int.is_subtype_of(&db, gradual_top));
+    assert!(!gradual_top.is_subtype_of(&db, int));
+    assert!(gradual_bottom.is_subtype_of(&db, int));
+    assert!(!int.is_subtype_of(&db, gradual_bottom));
+
+    // Gradual bounds form an internal preorder with their strict set-equivalents. They are
+    // mutually subtypes but deliberately not equivalent, because only the starred form retains
+    // gradual behavior when used in operations.
+    let object = Type::object();
+    assert!(object.is_subtype_of(&db, gradual_top));
+    assert!(gradual_top.is_subtype_of(&db, object));
+    assert!(!object.is_equivalent_to(&db, gradual_top));
+
+    assert!(Type::Never.is_subtype_of(&db, gradual_bottom));
+    assert!(gradual_bottom.is_subtype_of(&db, Type::Never));
+    assert!(!Type::Never.is_equivalent_to(&db, gradual_bottom));
+    assert!(!gradual_bottom.is_never());
+    assert!(gradual_bottom.is_disjoint_from(&db, gradual_bottom));
+}
+
+#[test]
 fn divergent_type() {
     let db = setup_db();
     let div = Type::divergent(salsa::plumbing::Id::from_bits(1));

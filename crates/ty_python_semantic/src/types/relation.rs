@@ -17,9 +17,9 @@ use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    DynamicType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType,
+    SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -1102,6 +1102,21 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 })
         };
 
+        // Gradual bounds are set-equivalent to their strict counterparts for subtyping and
+        // non-pure redundancy, but they are not type-equivalent: only the starred form retains
+        // gradual behavior when it is used. The equality fast path above still makes each bound
+        // equivalent to itself.
+        let is_gradual_bound = |ty| match ty {
+            Type::Dynamic(DynamicType::GradualTop | DynamicType::GradualBottom) => true,
+            Type::SubclassOf(subclass) => subclass.is_gradual_top() || subclass.is_gradual_bottom(),
+            _ => false,
+        };
+        if matches!(self.relation, TypeRelation::Redundancy { pure: true })
+            && (is_gradual_bound(source) || is_gradual_bound(target))
+        {
+            return self.never();
+        }
+
         match (source, target) {
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(target)) if target.is_object() => self.always(),
@@ -1112,6 +1127,49 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // `Never` is the bottom type, the empty set.
             // It is a subtype of all other types.
             (Type::Never, _) => self.always(),
+
+            // Gradual bounds retain dynamic behavior for assignability, but represent the same
+            // sets as `object` and `Never` for subtyping and redundancy. This deliberately makes
+            // subtyping an internal preorder: `object*` and `object` (and likewise `Never*` and
+            // `Never`) are mutual subtypes without being equivalent, because only the starred
+            // form is operationally gradual. Handling these cases before the general dynamic
+            // cases lets normal generic variance drive set-theoretic simplifications.
+            (Type::Dynamic(DynamicType::GradualBottom), _) if !self.relation.is_assignability() => {
+                self.always()
+            }
+            (_, Type::Dynamic(DynamicType::GradualTop)) if !self.relation.is_assignability() => {
+                self.always()
+            }
+            (Type::Dynamic(DynamicType::GradualTop), _) if !self.relation.is_assignability() => {
+                self.check_type_pair(db, Type::object(), target)
+            }
+            (_, Type::Dynamic(DynamicType::GradualBottom)) if !self.relation.is_assignability() => {
+                self.check_type_pair(db, source, Type::Never)
+            }
+
+            (Type::SubclassOf(subclass), _)
+                if subclass.is_gradual_bottom() && !self.relation.is_assignability() =>
+            {
+                self.check_type_pair(db, Type::Never, target)
+            }
+            (_, Type::SubclassOf(subclass))
+                if subclass.is_gradual_bottom() && !self.relation.is_assignability() =>
+            {
+                self.check_type_pair(db, source, Type::Never)
+            }
+
+            // The gradual top materialization of `type[Any]` retains dynamic class-object
+            // behavior, but its set-theoretic upper bound is still `type`.
+            (Type::SubclassOf(subclass), _)
+                if subclass.is_gradual_top() && !self.relation.is_assignability() =>
+            {
+                self.check_type_pair(db, KnownClass::Type.to_instance(db), target)
+            }
+            (_, Type::SubclassOf(subclass))
+                if subclass.is_gradual_top() && !self.relation.is_assignability() =>
+            {
+                self.check_type_pair(db, source, KnownClass::Type.to_instance(db))
+            }
 
             (Type::TypeVar(source_typevar), Type::TypeVar(target_typevar))
                 if source_typevar.is_same_typevar_as(db, target_typevar) =>
@@ -1351,7 +1409,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
             (Type::Intersection(intersection), _)
                 if self.is_eager_assignability()
-                    && intersection.positive(db).iter().any(Type::is_dynamic) =>
+                    && intersection
+                        .positive(db)
+                        .iter()
+                        .any(Type::is_non_divergent_dynamic) =>
             {
                 // If the intersection contains `Any`/`Unknown`/`@Todo`, it is assignable to any type.
                 // `Any` could materialize to `Never`, `Never & T & ~S` simplifies to `Never` for any
@@ -2534,6 +2595,23 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
         match (left, right) {
             (Type::Never, _) | (_, Type::Never) => self.always(),
+
+            // `Never*` has the same empty set of inhabitants as `Never`, so it is disjoint even
+            // from itself. It intentionally remains distinct from `Never` to retain gradual
+            // behavior when used, making this an internal exception to the usual irreflexive
+            // disjointness and subtype-implies-not-disjoint properties.
+            (Type::Dynamic(DynamicType::GradualBottom), _)
+            | (_, Type::Dynamic(DynamicType::GradualBottom)) => self.always(),
+
+            (Type::SubclassOf(subclass), _) if subclass.is_gradual_bottom() => self.always(),
+            (_, Type::SubclassOf(subclass)) if subclass.is_gradual_bottom() => self.always(),
+
+            (Type::SubclassOf(subclass), _) if subclass.is_gradual_top() => {
+                self.check_type_pair(db, KnownClass::Type.to_instance(db), right)
+            }
+            (_, Type::SubclassOf(subclass)) if subclass.is_gradual_top() => {
+                self.check_type_pair(db, left, KnownClass::Type.to_instance(db))
+            }
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),

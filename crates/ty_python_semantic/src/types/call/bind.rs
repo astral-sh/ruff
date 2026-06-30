@@ -6222,6 +6222,14 @@ impl<'db> Binding<'db> {
         let parameters = self.signature.parameters();
 
         if parameters.is_top() {
+            // A gradual top-materialized callable represents the same set of signatures as a
+            // strict top callable, but retains gradual behavior when called.
+            if matches!(
+                self.return_ty,
+                Type::Dynamic(DynamicType::GradualTop | DynamicType::GradualBottom)
+            ) {
+                return;
+            }
             self.errors
                 .push(BindingError::CalledTopCallable(self.signature_type));
             return;

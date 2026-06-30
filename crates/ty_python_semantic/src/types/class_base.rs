@@ -69,6 +69,8 @@ impl<'db> ClassBase<'db> {
                 | DynamicType::InvalidConcatenateUnknown
                 | DynamicType::AmbiguousOverload,
             ) => "Unknown",
+            ClassBase::Dynamic(DynamicType::GradualTop) => "object*",
+            ClassBase::Dynamic(DynamicType::GradualBottom) => "Never*",
             ClassBase::Dynamic(DynamicType::UnspecializedTypeVar) => "UnspecializedTypeVar",
             ClassBase::Dynamic(
                 DynamicType::Todo(_)

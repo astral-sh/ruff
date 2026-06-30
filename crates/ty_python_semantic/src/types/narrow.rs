@@ -11,14 +11,14 @@ use crate::types::typed_dict::{
     TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
 use crate::types::{
-    CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    Parameter, Parameters, Signature, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
-    Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type,
-    class_pattern_positional_sources, definite_match_pattern_type_for_subject,
-    exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
-    pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
-    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
+    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource,
+    ClassType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, MaterializationKind, Parameter, Parameters, Signature, SpecialFormType,
+    SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints,
+    UnionBuilder, callable_pattern_type, class_pattern_positional_sources,
+    definite_match_pattern_type_for_subject, exact_sequence_pattern_type, infer_expression_types,
+    mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
+    singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 use crate::{Db, IsInstanceNarrowing};
 use ty_python_core::expression::Expression;
@@ -450,7 +450,7 @@ impl ClassInfoConstraintFunction {
                 db,
                 match isinstance_narrowing {
                     IsInstanceNarrowing::Strict => class.top_materialization(db),
-                    IsInstanceNarrowing::Relaxed => class.default_specialization(db),
+                    IsInstanceNarrowing::Relaxed => class.gradual_top_materialization(db),
                 },
             ),
             ClassInfoConstraintFunction::IsSubclass => {
@@ -583,9 +583,19 @@ impl ClassInfoConstraintFunction {
 
                 // We don't have a good meta-type for `Callable`s right now,
                 // so only apply `isinstance()` narrowing, not `issubclass()`
-                SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => (self
-                    == ClassInfoConstraintFunction::IsInstance)
-                    .then(|| Type::Callable(CallableType::unknown(db)).top_materialization(db)),
+                SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
+                    (self == ClassInfoConstraintFunction::IsInstance).then(|| {
+                        let callable = Type::Callable(CallableType::unknown(db));
+                        match isinstance_narrowing {
+                            IsInstanceNarrowing::Strict => callable.top_materialization(db),
+                            IsInstanceNarrowing::Relaxed => callable.materialize(
+                                db,
+                                MaterializationKind::GradualTop,
+                                &ApplyTypeMappingVisitor::default(),
+                            ),
+                        }
+                    })
+                }
 
                 // `InitVar` is a class at runtime, so can be used in `isinstance()`,
                 // but we can't represent internally the type that we should narrow to after an `isinstance()` check,

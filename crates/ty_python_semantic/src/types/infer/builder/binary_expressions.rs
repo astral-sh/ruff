@@ -389,6 +389,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
 
+            (bound @ Type::Dynamic(DynamicType::GradualTop | DynamicType::GradualBottom), _, _)
+            | (_, bound @ Type::Dynamic(DynamicType::GradualTop | DynamicType::GradualBottom), _) => {
+                Some(bound)
+            }
+
             (unknown @ Type::Dynamic(DynamicType::InvalidConcatenateUnknown), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::InvalidConcatenateUnknown), _) => {
                 Some(unknown)

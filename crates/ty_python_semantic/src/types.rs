@@ -291,6 +291,8 @@ fn definition_expression_annotation<'db>(
 struct ApplyDefaultTypeMapping;
 struct ApplyTopMaterialization;
 struct ApplyBottomMaterialization;
+struct ApplyGradualTopMaterialization;
+struct ApplyGradualBottomMaterialization;
 struct ApplyMaterializationEquivalence;
 
 type MaterializationEquivalenceVisitor<'db> =
@@ -298,13 +300,16 @@ type MaterializationEquivalenceVisitor<'db> =
 
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
-/// Materialization is the only mapping mode that needs to visit the same type under two different
-/// mappings within a single recursive call chain (`Top` and `Bottom`). Keep separate cycle caches
-/// for those modes so invariant checks can safely reuse one visitor.
+/// Materialization is the only mapping mode that needs to visit the same type under multiple
+/// mappings within a single recursive call chain. Keep separate cycle caches for the strict and
+/// gradual top and bottom modes so invariant checks can safely reuse one visitor.
 pub(crate) struct ApplyTypeMappingVisitor<'db> {
     default: OnceCell<TypeTransformer<'db, ApplyDefaultTypeMapping>>,
     top_materialization: OnceCell<TypeTransformer<'db, ApplyTopMaterialization>>,
     bottom_materialization: OnceCell<TypeTransformer<'db, ApplyBottomMaterialization>>,
+    gradual_top_materialization: OnceCell<TypeTransformer<'db, ApplyGradualTopMaterialization>>,
+    gradual_bottom_materialization:
+        OnceCell<TypeTransformer<'db, ApplyGradualBottomMaterialization>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
 }
 
@@ -328,6 +333,14 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
                 .visit_type(db, ty, func),
             TypeMapping::Materialize(MaterializationKind::Bottom) => self
                 .bottom_materialization
+                .get_or_init(TypeTransformer::default)
+                .visit_type(db, ty, func),
+            TypeMapping::Materialize(MaterializationKind::GradualTop) => self
+                .gradual_top_materialization
+                .get_or_init(TypeTransformer::default)
+                .visit_type(db, ty, func),
+            TypeMapping::Materialize(MaterializationKind::GradualBottom) => self
+                .gradual_bottom_materialization
                 .get_or_init(TypeTransformer::default)
                 .visit_type(db, ty, func),
             _ => self
@@ -358,6 +371,8 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
             default: OnceCell::new(),
             top_materialization: OnceCell::new(),
             bottom_materialization: OnceCell::new(),
+            gradual_top_materialization: OnceCell::new(),
+            gradual_bottom_materialization: OnceCell::new(),
             materialization_equivalence,
         }
     }
@@ -369,6 +384,8 @@ impl Default for ApplyTypeMappingVisitor<'_> {
             default: OnceCell::new(),
             top_materialization: OnceCell::new(),
             bottom_materialization: OnceCell::new(),
+            gradual_top_materialization: OnceCell::new(),
+            gradual_bottom_materialization: OnceCell::new(),
             materialization_equivalence: OnceCell::new(),
         }
     }
@@ -396,10 +413,17 @@ pub(crate) struct VisitSpecialization;
 /// Similarly, there is `Bottom[list[Any]]`.
 /// This type is harder to make sense of in a set-theoretic framework, but
 /// it is a subtype of all materializations of `list[Any]`.
+///
+/// The gradual variants represent the same set-theoretic bounds, but retain gradual behavior when
+/// a bound is used. They are internal to relaxed `isinstance` narrowing.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub enum MaterializationKind {
     Top,
     Bottom,
+    /// A top materialization that retains gradual behavior at use sites.
+    GradualTop,
+    /// A bottom materialization that retains gradual behavior at use sites.
+    GradualBottom,
 }
 
 impl MaterializationKind {
@@ -409,6 +433,30 @@ impl MaterializationKind {
         match self {
             Self::Top => Self::Bottom,
             Self::Bottom => Self::Top,
+            Self::GradualTop => Self::GradualBottom,
+            Self::GradualBottom => Self::GradualTop,
+        }
+    }
+
+    /// Return the corresponding strict materialization kind.
+    #[must_use]
+    pub const fn static_kind(self) -> Self {
+        match self {
+            Self::Top | Self::GradualTop => Self::Top,
+            Self::Bottom | Self::GradualBottom => Self::Bottom,
+        }
+    }
+
+    pub const fn is_top(self) -> bool {
+        matches!(self, Self::Top | Self::GradualTop)
+    }
+
+    /// Return the top materialization with the same gradualness.
+    #[must_use]
+    pub const fn top(self) -> Self {
+        match self {
+            Self::Top | Self::Bottom => Self::Top,
+            Self::GradualTop | Self::GradualBottom => Self::GradualTop,
         }
     }
 }
@@ -1047,6 +1095,16 @@ impl<'db> Type<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
+    /// The top bound of a gradual type, with gradual behavior retained at use sites.
+    pub(crate) const fn gradual_top() -> Self {
+        Self::Dynamic(DynamicType::GradualTop)
+    }
+
+    /// The bottom bound of a gradual type, with gradual behavior retained at use sites.
+    pub(crate) const fn gradual_bottom() -> Self {
+        Self::Dynamic(DynamicType::GradualBottom)
+    }
+
     pub(crate) fn divergent(id: salsa::Id) -> Self {
         Self::Divergent(DivergentType::new(id))
     }
@@ -1080,8 +1138,8 @@ impl<'db> Type<'db> {
         };
 
         match divergent.materialization_kind() {
-            Some(MaterializationKind::Top) => Some(Type::object()),
-            Some(MaterializationKind::Bottom) => Some(Type::Never),
+            Some(kind) if kind.is_top() => Some(Type::object()),
+            Some(_) => Some(Type::Never),
             None => None,
         }
     }
@@ -1266,6 +1324,8 @@ impl<'db> Type<'db> {
         self.as_dynamic().is_some_and(|dynamic| match dynamic {
             DynamicType::Any
             | DynamicType::Unknown
+            | DynamicType::GradualTop
+            | DynamicType::GradualBottom
             | DynamicType::InvalidConcatenateUnknown
             | DynamicType::UnknownGeneric(_)
             | DynamicType::UnspecializedTypeVar
@@ -1330,7 +1390,7 @@ impl<'db> Type<'db> {
     }
 
     const fn is_non_divergent_dynamic(&self) -> bool {
-        self.is_dynamic() && !self.is_divergent()
+        matches!(self, Type::Dynamic(dynamic) if !matches!(dynamic, DynamicType::GradualTop | DynamicType::GradualBottom))
     }
 
     /// Returns `true` if this type is an awaitable that should be awaited before being discarded.
@@ -1831,6 +1891,10 @@ impl<'db> Type<'db> {
         match self {
             Type::Never => Type::object(),
 
+            Type::Dynamic(DynamicType::GradualTop) => Type::gradual_bottom(),
+
+            Type::Dynamic(DynamicType::GradualBottom) => Type::gradual_top(),
+
             Type::Dynamic(_) => *self,
 
             Type::Divergent(_) => (*self)
@@ -1897,12 +1961,24 @@ impl<'db> Type<'db> {
             // Not all `Callable` types are spellable using the `Callable` type form,
             // but they are all spellable using callback protocols.
             | Type::Callable(_)
-            // `Unknown` and `@Todo` are nonstandard extensions,
-            // but they are both exactly equivalent to `Any`
-            | Type::Dynamic(_)
             | Type::TypeVar(_)
             | Type::TypeAlias(_)
             | Type::SubclassOf(_) => true,
+            // `Unknown` and `@Todo` are nonstandard extensions,
+            // but they are both exactly equivalent to `Any`.
+            Type::Dynamic(
+                DynamicType::Any
+                | DynamicType::Unknown
+                | DynamicType::UnknownGeneric(_)
+                | DynamicType::UnspecializedTypeVar
+                | DynamicType::InvalidConcatenateUnknown
+                | DynamicType::AmbiguousOverload
+                | DynamicType::Todo(_)
+                | DynamicType::TodoUnpack
+                | DynamicType::TodoStarredExpression
+                | DynamicType::TodoTypeVarTuple,
+            ) => true,
+            Type::Dynamic(DynamicType::GradualTop | DynamicType::GradualBottom) => false,
             Type::TypeForm(typeform) => typeform.type_argument(db).is_spellable(db),
             Type::Intersection(_) => false,
             Type::EnumComplement(complement) => complement.is_spellable(db),
@@ -1986,6 +2062,8 @@ impl<'db> Type<'db> {
             Type::Dynamic(dynamic) => match dynamic {
                 DynamicType::Any => true,
                 DynamicType::Unknown
+                | DynamicType::GradualTop
+                | DynamicType::GradualBottom
                 | DynamicType::UnknownGeneric(_)
                 | DynamicType::UnspecializedTypeVar
                 | DynamicType::TodoUnpack
@@ -6443,6 +6521,7 @@ impl<'db> Type<'db> {
                 TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => self.promote_impl(db),
             }
 
+            Type::Dynamic(DynamicType::GradualTop | DynamicType::GradualBottom) => self,
             Type::Dynamic(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::ApplySpecializationWithMaterialization { .. } |
@@ -6457,6 +6536,8 @@ impl<'db> Type<'db> {
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
                     MaterializationKind::Bottom => Type::Never,
+                    MaterializationKind::GradualTop => Type::gradual_top(),
+                    MaterializationKind::GradualBottom => Type::gradual_bottom(),
                 }
             }
             // `Divergent` is an internal cycle marker rather than a gradual type like `Any` or
@@ -6464,7 +6545,7 @@ impl<'db> Type<'db> {
             // occurrence should behave like the top (`object`) or bottom (`Never`) bound.
             Type::Divergent(divergent) => match type_mapping {
                 TypeMapping::Materialize(materialization_kind) => {
-                    Type::Divergent(divergent.materialized(*materialization_kind))
+                    Type::Divergent(divergent.materialized(materialization_kind.static_kind()))
                 }
                 _ => self,
             },
@@ -6976,7 +7057,10 @@ impl<'db> Type<'db> {
 
             // These types have no definition
             Self::Dynamic(
-                DynamicType::InvalidConcatenateUnknown | DynamicType::UnspecializedTypeVar,
+                DynamicType::InvalidConcatenateUnknown
+                | DynamicType::UnspecializedTypeVar
+                | DynamicType::GradualTop
+                | DynamicType::GradualBottom,
             )
             | Self::Callable(_)
             | Self::TypeIs(_)
@@ -7658,6 +7742,12 @@ pub enum DynamicType<'db> {
     Any,
     /// An unannotated value, or a dynamic type resulting from an error
     Unknown,
+    /// The top bound of a gradual type. It behaves like `object` for set-theoretic
+    /// simplification, but like `Unknown` when used.
+    GradualTop,
+    /// The bottom bound of a gradual type. It behaves like `Never` for set-theoretic
+    /// simplification, but like `Unknown` when used.
+    GradualBottom,
     /// Similar to `Unknown`, this represents a dynamic type that has been explicitly specialized
     /// with legacy typevars, e.g. `UnknownClass[T]`, where `T` is a legacy typevar. We keep track
     /// of the type variables in the generic context in case this type is later specialized again.
@@ -7716,6 +7806,8 @@ impl std::fmt::Display for DynamicType<'_> {
             | DynamicType::UnknownGeneric(_)
             | DynamicType::InvalidConcatenateUnknown
             | DynamicType::AmbiguousOverload => f.write_str("Unknown"),
+            DynamicType::GradualTop => f.write_str("object*"),
+            DynamicType::GradualBottom => f.write_str("Never*"),
             DynamicType::UnspecializedTypeVar => f.write_str("UnspecializedTypeVar"),
             // `DynamicType::Todo`'s display should be explicit that is not a valid display of
             // any other type

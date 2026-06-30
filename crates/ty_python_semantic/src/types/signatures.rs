@@ -34,9 +34,9 @@ use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annot
 use crate::types::typevar::{BoundTypeVarIdentity, max_typevar_freshness_matching_generic_context};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
-    ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind,
-    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping, TypeVarNonce,
-    TypedDictType, UnionBuilder, VarianceInferable, infer_complete_scope_types, todo_type,
+    ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass, ParamSpecAttrKind,
+    ParameterDescription, SelfBinding, TypeContext, TypeMapping, TypeVarNonce, TypedDictType,
+    UnionBuilder, VarianceInferable, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -3638,16 +3638,13 @@ impl<'db> Parameters<'db> {
                 ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
             )
         {
-            match materialization_kind {
-                MaterializationKind::Bottom => {
-                    // The bottom materialization of the `...` parameters is `(*object, **object)`,
-                    // which accepts any call and is thus a subtype of all other parameters.
-                    return Parameters::bottom();
-                }
-                MaterializationKind::Top => {
-                    return Parameters::top();
-                }
+            if materialization_kind.is_top() {
+                return Parameters::top();
             }
+
+            // The bottom materialization of the `...` parameters is `(*object, **object)`,
+            // which accepts any call and is thus a subtype of all other parameters.
+            return Parameters::bottom();
         }
 
         // Parameters are in contravariant position, so we need to flip the type mapping.

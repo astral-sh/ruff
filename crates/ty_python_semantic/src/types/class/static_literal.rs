@@ -446,6 +446,19 @@ impl<'db> StaticClassLiteral<'db> {
         })
     }
 
+    /// Return the top materialization while retaining gradual behavior for dynamic bounds.
+    pub(crate) fn gradual_top_materialization(self, db: &'db dyn Db) -> ClassType<'db> {
+        self.apply_specialization(db, |generic_context| {
+            generic_context
+                .default_specialization(db, self.known(db))
+                .materialize_impl(
+                    db,
+                    MaterializationKind::GradualTop,
+                    &ApplyTypeMappingVisitor::default(),
+                )
+        })
+    }
+
     /// Returns the default specialization of this class. For non-generic classes, the class is
     /// returned unchanged. For a non-specialized generic class, we return a generic alias that
     /// applies the default specialization to the class's typevars.

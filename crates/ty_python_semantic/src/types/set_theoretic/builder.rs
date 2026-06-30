@@ -39,14 +39,46 @@
 use super::RecursivelyDefined;
 use crate::types::enums::EnumComplement;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
+use crate::types::visitor::any_over_type;
 use crate::types::{
-    BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
+    BytesLiteralType, ClassLiteral, DynamicType, EnumLiteralType, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
     StringLiteralType, SubclassOfType, Type, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
+
+/// Return `true` if `ty` contains one of the internal gradual bounds used by relaxed
+/// materialization.
+///
+/// A gradual bound represents the same set of values as its strict counterpart, but retains
+/// gradual behavior when used in operations. Set builders use this distinction to choose a
+/// deterministic representation when both forms occur: unions preserve the gradual form, while
+/// intersections preserve the strict form.
+fn contains_gradual_bound<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    any_over_type(db, ty, false, |nested| match nested {
+        Type::Dynamic(DynamicType::GradualTop | DynamicType::GradualBottom) => true,
+        Type::SubclassOf(subclass) => subclass.is_gradual_top() || subclass.is_gradual_bottom(),
+        _ => false,
+    })
+}
+
+fn prefer_gradual_equivalent<'db>(
+    db: &'db dyn Db,
+    candidate: Type<'db>,
+    current: Type<'db>,
+) -> bool {
+    contains_gradual_bound(db, candidate) && !contains_gradual_bound(db, current)
+}
+
+fn prefer_strict_equivalent<'db>(
+    db: &'db dyn Db,
+    candidate: Type<'db>,
+    current: Type<'db>,
+) -> bool {
+    !contains_gradual_bound(db, candidate) && contains_gradual_bound(db, current)
+}
 
 /// Extract `(core, guard)` from truthiness-guarded intersections.
 ///
@@ -982,8 +1014,22 @@ impl<'db> UnionBuilder<'db> {
                     _ => self.push_type(ty, seen_aliases),
                 }
             }
-            // Adding `object` to a union results in `object`.
-            ty if ty.is_object() && !cycle_recovery => self.collapse_to_object(),
+            // Adding `object` to a union normally results in `object`. If the union already
+            // contains a set-equivalent gradual bound, however, preserve the gradual form: a
+            // value reaching us through either branch should retain gradual behavior.
+            ty if ty.is_object() && !cycle_recovery => {
+                let has_gradual_equivalent = self.elements.iter().any(|element| {
+                    let UnionElement::Type(existing) = element else {
+                        return false;
+                    };
+                    contains_gradual_bound(self.db, *existing)
+                        && existing.is_redundant_with(self.db, ty)
+                        && ty.is_redundant_with(self.db, *existing)
+                });
+                if !has_gradual_equivalent {
+                    self.collapse_to_object();
+                }
+            }
             _ => self.push_type(ty, seen_aliases),
         }
     }
@@ -1028,8 +1074,17 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
-            // `object` already contains every possible union element.
+            // `object` already contains every possible union element. A set-equivalent gradual
+            // element is preferred for unions, though, because either branch can introduce the
+            // gradual behavior.
             if !self.cycle_recovery && element_type == Type::object() {
+                if prefer_gradual_equivalent(self.db, ty, element_type)
+                    && element_type.is_redundant_with(self.db, ty)
+                    && ty.is_redundant_with(self.db, element_type)
+                {
+                    to_remove.push(i);
+                    continue;
+                }
                 return;
             }
 
@@ -1081,6 +1136,12 @@ impl<'db> UnionBuilder<'db> {
 
             if should_simplify_full && !matches!(element_type, Type::TypeAlias(_)) {
                 if ty.is_redundant_with(self.db, element_type) {
+                    if prefer_gradual_equivalent(self.db, ty, element_type)
+                        && element_type.is_redundant_with(self.db, ty)
+                    {
+                        to_remove.push(i);
+                        continue;
+                    }
                     return;
                 }
 
@@ -1394,6 +1455,9 @@ impl<'db> IntersectionBuilder<'db> {
 struct InnerIntersectionBuilder<'db> {
     positive: FxOrderSet<Type<'db>>,
     negative: NegativeIntersectionElements<'db>,
+    /// Whether strict `object` was explicitly added. `object` is normally represented by an empty
+    /// positive set, but retaining this bit lets it win over a subsequently-added `object*`.
+    has_explicit_object: bool,
 }
 
 impl<'db> InnerIntersectionBuilder<'db> {
@@ -1472,6 +1536,24 @@ impl<'db> InnerIntersectionBuilder<'db> {
         if new_positive.is_never() {
             *self = Self::default();
             self.positive.insert(Type::Never);
+            return;
+        }
+
+        // `Never*` has the same empty set of inhabitants as `Never`, but retains gradual
+        // behavior if it survives as the result of the intersection.
+        if new_positive == Type::gradual_bottom() {
+            *self = Self::default();
+            self.positive.insert(new_positive);
+            return;
+        }
+        if self.positive.contains(&Type::gradual_bottom()) {
+            return;
+        }
+
+        // An explicitly-added strict `object` wins over its set-equivalent gradual form. We need
+        // this separate check because strict `object` is otherwise represented by an empty set of
+        // positive constraints.
+        if new_positive == Type::gradual_top() && self.has_explicit_object {
             return;
         }
 
@@ -1565,7 +1647,22 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 if let Some(instance) = positive_as_instance
                     && instance.is_object()
                 {
-                    // `object & T` -> `T`; it is always redundant to add `object` to an intersection
+                    // `object & T` -> `T`; it is normally redundant to add `object` to an
+                    // intersection. Remove a set-equivalent gradual bound first, so the strict
+                    // representation wins regardless of insertion order.
+                    let mut to_remove = SmallVec::<[usize; 1]>::new();
+                    for (index, existing) in self.positive.iter().enumerate() {
+                        if prefer_strict_equivalent(db, new_positive, *existing)
+                            && existing.is_redundant_with(db, new_positive)
+                            && new_positive.is_redundant_with(db, *existing)
+                        {
+                            to_remove.push(index);
+                        }
+                    }
+                    for index in to_remove.into_iter().rev() {
+                        self.positive.swap_remove_index(index);
+                    }
+                    self.has_explicit_object = true;
                     return;
                 }
 
@@ -1639,6 +1736,12 @@ impl<'db> InnerIntersectionBuilder<'db> {
                             *existing_positive,
                         )
                     {
+                        if prefer_strict_equivalent(db, new_positive, *existing_positive)
+                            && new_positive.is_redundant_with(db, *existing_positive)
+                        {
+                            to_remove.push(index);
+                            continue;
+                        }
                         return;
                     }
                     // same rule, reverse order
@@ -1727,6 +1830,14 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 // Adding ~object to an intersection results in Never.
                 *self = Self::default();
                 self.positive.insert(Type::Never);
+            }
+            Type::Dynamic(DynamicType::GradualTop) => {
+                // `object*` has the same set-theoretic upper bound as `object`, while retaining
+                // gradual behavior when the complementary `Never*` is used directly.
+                self.add_positive(db, Type::gradual_bottom());
+            }
+            Type::Dynamic(DynamicType::GradualBottom) => {
+                self.add_positive(db, Type::gradual_top());
             }
             ty @ Type::Dynamic(_) => {
                 // Adding any of these types to the negative side of an intersection

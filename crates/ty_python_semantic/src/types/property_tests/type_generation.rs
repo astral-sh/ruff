@@ -308,6 +308,12 @@ fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
     let int_lit = Ty::IntLiteral(*g.choose(&[-2, -1, 0, 1, 2]).unwrap());
     let bool_lit = Ty::BooleanLiteral(bool::arbitrary(g));
 
+    // `object*` and `Never*` are deliberately omitted from this generator. They are internal
+    // operational bounds rather than user-facing types: set-theoretically they form a preorder
+    // with `object` and `Never`, while operationally they remain distinct gradual types. Including
+    // them would therefore violate the global antisymmetry and disjointness properties by design;
+    // focused unit tests cover those exceptions instead.
+    //
     // Update this if new non-fully-static types are added below.
     let fully_static_index = 8;
     let types = &[

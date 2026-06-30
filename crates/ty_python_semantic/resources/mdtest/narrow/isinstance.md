@@ -842,8 +842,8 @@ def _(xs: OpenItem | list[OpenItem]):
 
 ### Relaxed mode
 
-The `semantics.isinstance-narrowing` option can be set to `relaxed` to narrow to the default
-specialization of a generic class without top-materializing it:
+The `semantics.isinstance-narrowing` option can be set to `relaxed` to retain gradual behavior in
+the bounds introduced by top materialization:
 
 ```toml
 [semantics]
@@ -859,11 +859,13 @@ from typing import Sequence, final
 
 def _(xs: object):
     if isinstance(xs, Sequence):
-        reveal_type(xs)  # revealed: Sequence[Unknown]
+        reveal_type(xs)  # revealed: Sequence[object*]
         for x in xs:
-            reveal_type(x)  # revealed: Unknown
+            reveal_type(x)  # revealed: object*
+            x.some_method()
+            y: int = x
     else:
-        reveal_type(xs)  # revealed: ~Sequence[Unknown]
+        reveal_type(xs)  # revealed: ~Sequence[object*]
 ```
 
 Narrowing from `Item | Sequence[Item]` via `isinstance(.., Sequence)`:
@@ -874,12 +876,11 @@ class Item: ...
 
 def _(xs: Item | Sequence[Item]):
     if isinstance(xs, Sequence):
-        # TODO: we might want to simplify this to `Sequence[Item & Unknown]`
-        reveal_type(xs)  # revealed: Sequence[Item] & Sequence[Unknown]
+        reveal_type(xs)  # revealed: Sequence[Item]
         for x in xs:
-            reveal_type(x)  # revealed: Item & Unknown
+            reveal_type(x)  # revealed: Item
     else:
-        reveal_type(xs)  # revealed: Item | (Sequence[Item] & ~Sequence[Unknown])
+        reveal_type(xs)  # revealed: Item
 ```
 
 Narrowing from (non-final) `OpenItem | Sequence[OpenItem]` via `isinstance(.., Sequence)`:
@@ -889,11 +890,61 @@ class OpenItem: ...
 
 def _(xs: OpenItem | Sequence[OpenItem]):
     if isinstance(xs, Sequence):
-        reveal_type(xs)  # revealed: (OpenItem & Sequence[Unknown]) | (Sequence[OpenItem] & Sequence[Unknown])
+        reveal_type(xs)  # revealed: (OpenItem & Sequence[object*]) | Sequence[OpenItem]
         for x in xs:
-            reveal_type(x)  # revealed: Unknown
+            reveal_type(x)  # revealed: object*
     else:
-        reveal_type(xs)  # revealed: (OpenItem & ~Sequence[Unknown]) | (Sequence[OpenItem] & ~Sequence[Unknown])
+        reveal_type(xs)  # revealed: OpenItem & ~Sequence[object*]
+```
+
+#### Contravariance
+
+Top materialization uses the gradual lower bound `Never*` in contravariant positions. Like
+`object*`, it is gradual when used, so calls remain permitted:
+
+```py
+from typing import Generic, TypeVar
+
+T_consumer_contra = TypeVar("T_consumer_contra", contravariant=True)
+
+class Consumer(Generic[T_consumer_contra]):
+    def consume(self, value: T_consumer_contra, /) -> None: ...
+
+def _(consumer: object):
+    if isinstance(consumer, Consumer):
+        reveal_type(consumer)  # revealed: Consumer[Never*]
+        consumer.consume(1)
+```
+
+The gradual lower bound also remains usable when it appears inside `type[]`:
+
+```py
+from typing import Generic, TypeVar
+
+T_class_contra = TypeVar("T_class_contra", contravariant=True)
+
+class TypeConsumer(Generic[T_class_contra]):
+    def consume(self, value: type[T_class_contra], /) -> None: ...
+
+def _(consumer: object):
+    if isinstance(consumer, TypeConsumer):
+        reveal_type(consumer)  # revealed: TypeConsumer[Never*]
+        consumer.consume(int)
+```
+
+#### Callables
+
+The relaxed top materialization of `Callable` remains callable with arbitrary arguments, and its
+return type retains gradual behavior:
+
+```py
+from collections.abc import Callable
+
+def _(value: object):
+    if isinstance(value, Callable):
+        reveal_type(value)  # revealed: Top[(...) -> object*]
+        reveal_type(value())  # revealed: object*
+        reveal_type(value(1, keyword="value"))  # revealed: object*
 ```
 
 #### Invariance
@@ -903,15 +954,39 @@ Narrowing from `object` via `isinstance(.., list)`:
 ```py
 def _(xs: object):
     if isinstance(xs, list):
-        reveal_type(xs)  # revealed: list[Unknown]
+        reveal_type(xs)  # revealed: Top[list[Unknown]]
         for x in xs:
-            reveal_type(x)  # revealed: Unknown
+            reveal_type(x)  # revealed: object*
 
-        # In relaxed mode, this is fine
+        # `append` expects `Never*`, which is gradual when used.
         xs.append(1)
 
     else:
-        reveal_type(xs)  # revealed: ~list[Unknown]
+        reveal_type(xs)  # revealed: ~Top[list[Unknown]]
+```
+
+An invariant generic nested in a covariant member position preserves the ambient materialization
+envelope and its gradual use-site behavior:
+
+```py
+from typing import Generic, TypeVar
+
+T_nested = TypeVar("T_nested")
+
+class NestedInvariant(Generic[T_nested]):
+    def get(self) -> list[T_nested]:
+        raise NotImplementedError
+
+def _(value: object):
+    if isinstance(value, NestedInvariant):
+        reveal_type(value)  # revealed: Top[NestedInvariant[Unknown]]
+        result = value.get()
+        reveal_type(result)  # revealed: Top[list[Unknown]]
+        for item in result:
+            reveal_type(item)  # revealed: object*
+            item.some_method()
+            target: int = item
+        result.append(1)
 ```
 
 Narrowing from `Item | list[Item]` via `isinstance(.., list)`:
@@ -928,7 +1003,7 @@ def _(xs: Item | list[Item]):
         for x in xs:
             reveal_type(x)  # revealed: Item
     else:
-        reveal_type(xs)  # revealed: Item | (list[Item] & ~list[Unknown])
+        reveal_type(xs)  # revealed: Item
 ```
 
 Narrowing from (non-final) `OpenItem | list[OpenItem]` via `isinstance(.., list)`:
@@ -938,20 +1013,18 @@ class OpenItem: ...
 
 def _(xs: OpenItem | list[OpenItem]):
     if isinstance(xs, list):
-        reveal_type(xs)  # revealed: (OpenItem & list[Unknown]) | list[OpenItem]
+        reveal_type(xs)  # revealed: (OpenItem & Top[list[Unknown]]) | list[OpenItem]
         for x in xs:
-            reveal_type(x)  # revealed: Unknown | OpenItem
+            reveal_type(x)  # revealed: object*
     else:
-        reveal_type(xs)  # revealed: (OpenItem & ~list[Unknown]) | (list[OpenItem] & ~list[Unknown])
+        reveal_type(xs)  # revealed: OpenItem & ~Top[list[Unknown]]
 ```
 
 #### Exhaustiveness checking
 
-In relaxed mode, exhaustiveness checking is harder to achieve:
+The gradual bounds still simplify set-theoretically, so this remains exhaustive in relaxed mode:
 
 ```py
-# TODO
-# error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `str`"
 def _(xs: list[str] | set[str]) -> str:
     if isinstance(xs, list):
         return "it's a list!"

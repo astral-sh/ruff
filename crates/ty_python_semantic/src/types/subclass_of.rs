@@ -126,6 +126,20 @@ impl<'db> SubclassOfType<'db> {
         subclass_of.is_dynamic()
     }
 
+    pub(crate) const fn is_gradual_top(self) -> bool {
+        matches!(
+            self.subclass_of,
+            SubclassOfInner::Dynamic(DynamicType::GradualTop)
+        )
+    }
+
+    pub(crate) const fn is_gradual_bottom(self) -> bool {
+        matches!(
+            self.subclass_of,
+            SubclassOfInner::Dynamic(DynamicType::GradualBottom)
+        )
+    }
+
     pub(crate) const fn is_type_var(self) -> bool {
         let Self { subclass_of } = self;
         subclass_of.is_type_var()
@@ -167,6 +181,10 @@ impl<'db> SubclassOfType<'db> {
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => KnownClass::Type.to_instance(db),
                     MaterializationKind::Bottom => Type::Never,
+                    MaterializationKind::GradualTop => Type::SubclassOf(Self {
+                        subclass_of: SubclassOfInner::Dynamic(DynamicType::GradualTop),
+                    }),
+                    MaterializationKind::GradualBottom => Type::gradual_bottom(),
                 },
                 _ => Type::SubclassOf(self),
             },

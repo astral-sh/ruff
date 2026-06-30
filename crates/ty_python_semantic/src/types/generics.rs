@@ -1085,7 +1085,8 @@ pub struct Specialization<'db> {
     /// generic type `A`, `Top[A[Any]]` is a supertype of all materializations of `A[Any]`,
     /// and is represented here with `Some(MaterializationKind::Top)`. Similarly,
     /// `Bottom[A[Any]]` is a subtype of all materializations of `A[Any]`, and is represented
-    /// with `Some(MaterializationKind::Bottom)`.
+    /// with `Some(MaterializationKind::Bottom)`. Gradual kinds describe the same set-theoretic
+    /// bounds but preserve gradual behavior when substituted into members.
     /// The `materialization_kind` field may be non-`None` only if the specialization contains
     /// dynamic types in invariant positions.
     pub(crate) materialization_kind: Option<MaterializationKind>,
@@ -1284,12 +1285,63 @@ impl<'db> Specialization<'db> {
             return self.materialize_impl(db, *materialization_kind, visitor);
         }
 
+        let mut new_materialization_kind = self.materialization_kind(db);
         let types = self.map_types(db, |i, typevar, ty| {
             let tcx = TypeContext::new(tcx.get(i).copied());
-            if typevar.variance(db).is_covariant() {
-                ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-            } else {
-                ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor)
+            match (type_mapping, typevar.variance(db)) {
+                (
+                    TypeMapping::ApplySpecializationWithMaterialization {
+                        specialization,
+                        materialization_kind,
+                    },
+                    TypeVarVariance::Invariant,
+                ) if matches!(
+                    *materialization_kind,
+                    MaterializationKind::GradualTop | MaterializationKind::GradualBottom
+                ) =>
+                {
+                    // A gradual invariant position needs the full range of materializations,
+                    // rather than either directional bound. Apply the substitution without
+                    // materializing its typevars, and record the ambient materialization on this
+                    // specialization if a substituted typevar is gradual. Strict materialization
+                    // keeps its existing behavior in the fallback arms below.
+                    let plain_mapping = TypeMapping::ApplySpecialization(*specialization);
+                    let plain_mapping_visitor = ApplyTypeMappingVisitor::default();
+                    let mapped =
+                        ty.apply_type_mapping_impl(db, &plain_mapping, tcx, &plain_mapping_visitor);
+                    let has_dynamic_substitution = mapped != ty
+                        && any_over_type(db, ty, false, |nested| {
+                            let Type::TypeVar(typevar) = nested else {
+                                return false;
+                            };
+                            let Some(substituted) = specialization.get(db, typevar) else {
+                                return false;
+                            };
+                            if substituted == nested {
+                                return false;
+                            }
+
+                            let materialization_visitor = ApplyTypeMappingVisitor::default();
+                            let top = substituted.materialize(
+                                db,
+                                materialization_kind.top(),
+                                &materialization_visitor,
+                            );
+                            !materialization_visitor.is_equivalent_to_materialization(
+                                db,
+                                substituted,
+                                top,
+                            )
+                        });
+                    if has_dynamic_substitution && new_materialization_kind.is_none() {
+                        new_materialization_kind = Some(*materialization_kind);
+                    }
+                    mapped
+                }
+                (_, variance) if variance.is_covariant() => {
+                    ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                }
+                _ => ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
             }
         });
 
@@ -1299,8 +1351,9 @@ impl<'db> Specialization<'db> {
         });
 
         // Keep this check in sync with every field that can be transformed above.
-        let specialization_unchanged =
-            matches!(&types, Cow::Borrowed(_)) && tuple_inner == original_tuple_inner;
+        let specialization_unchanged = matches!(&types, Cow::Borrowed(_))
+            && tuple_inner == original_tuple_inner
+            && new_materialization_kind == self.materialization_kind(db);
         if specialization_unchanged {
             self
         } else {
@@ -1308,7 +1361,7 @@ impl<'db> Specialization<'db> {
                 db,
                 self.generic_context(db),
                 types,
-                self.materialization_kind(db),
+                new_materialization_kind,
                 tuple_inner,
             )
         }
@@ -1394,8 +1447,8 @@ impl<'db> Specialization<'db> {
         materialization_kind: MaterializationKind,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        // The top and bottom materializations are fully static types already, so materializing them
-        // further does nothing.
+        // The specialization already records its materialized bounds, so materializing it further
+        // does nothing.
         if self.materialization_kind(db).is_some() {
             return self;
         }
@@ -1405,7 +1458,7 @@ impl<'db> Specialization<'db> {
                 TypeVarVariance::Bivariant => {
                     // With bivariance, all specializations are subtypes of each other,
                     // so any materialization is acceptable.
-                    vartype.materialize(db, MaterializationKind::Top, visitor)
+                    vartype.materialize(db, materialization_kind.top(), visitor)
                 }
                 TypeVarVariance::Covariant => {
                     vartype.materialize(db, materialization_kind, visitor)
@@ -1415,7 +1468,7 @@ impl<'db> Specialization<'db> {
                 }
                 TypeVarVariance::Invariant => {
                     let top_materialization =
-                        vartype.materialize(db, MaterializationKind::Top, visitor);
+                        vartype.materialize(db, materialization_kind.top(), visitor);
                     if !visitor.is_equivalent_to_materialization(db, vartype, top_materialization) {
                         has_dynamic_invariant_typevar = true;
                     }
@@ -1567,8 +1620,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target_materialization,
             self.relation,
         ) {
-            // Top and bottom materializations are fully static types, so subtyping
-            // is the same as assignability.
+            // Top and bottom materializations have fixed set-theoretic bounds, so subtyping is the
+            // same as assignability. Gradual kinds only differ in their use-site behavior.
             (Some(source_mat), Some(target_mat), _) => self.check_subtyping_in_invariant_position(
                 db,
                 source_type,
@@ -1678,16 +1731,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
             self.check_type_pair(db, source, target)
         };
-        match (source_materialization, target_materialization) {
+        match (
+            source_materialization.is_top(),
+            target_materialization.is_top(),
+        ) {
             // `source` is a subtype of `target` if the range of materializations covered by `source`
             // is a subset of the range covered by `target`.
-            (MaterializationKind::Top, MaterializationKind::Top) => {
+            (true, true) => {
                 is_subtype_of(target_bottom, source_bottom).and(db, self.constraints, || {
                     is_subtype_of(source_top, target_top)
                 })
             }
             // One bottom is a subtype of another if it covers a strictly larger set of materializations.
-            (MaterializationKind::Bottom, MaterializationKind::Bottom) => {
+            (false, false) => {
                 is_subtype_of(source_bottom, target_bottom).and(db, self.constraints, || {
                     is_subtype_of(target_top, source_top)
                 })
@@ -1696,25 +1752,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // of `target` if there is some type that is both within the
             // range of types covered by derived and within the range covered by base, because if such a type
             // exists, it's a subtype of `Top[target]` and a supertype of `Bottom[source]`.
-            (MaterializationKind::Bottom, MaterializationKind::Top) => {
-                is_subtype_of(target_bottom, source_bottom)
-                    .and(db, self.constraints, || {
+            (false, true) => is_subtype_of(target_bottom, source_bottom)
+                .and(db, self.constraints, || {
+                    is_subtype_of(source_bottom, target_top)
+                })
+                .or(db, self.constraints, || {
+                    is_subtype_of(target_bottom, source_top).and(db, self.constraints, || {
+                        is_subtype_of(source_top, target_top)
+                    })
+                })
+                .or(db, self.constraints, || {
+                    is_subtype_of(target_top, source_top).and(db, self.constraints, || {
                         is_subtype_of(source_bottom, target_top)
                     })
-                    .or(db, self.constraints, || {
-                        is_subtype_of(target_bottom, source_top).and(db, self.constraints, || {
-                            is_subtype_of(source_top, target_top)
-                        })
-                    })
-                    .or(db, self.constraints, || {
-                        is_subtype_of(target_top, source_top).and(db, self.constraints, || {
-                            is_subtype_of(source_bottom, target_top)
-                        })
-                    })
-            }
+                }),
             // A top materialization is a subtype of a bottom materialization only if both original
             // un-materialized types are the same fully static type.
-            (MaterializationKind::Top, MaterializationKind::Bottom) => {
+            (true, false) => {
                 is_subtype_of(source_top, target_bottom).and(db, self.constraints, || {
                     is_subtype_of(target_top, source_bottom)
                 })

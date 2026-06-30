@@ -1567,7 +1567,7 @@
       "type": "object",
       "properties": {
         "isinstance-narrowing": {
-          "description": "Controls how ty narrows to unspecialized generic classes in `isinstance()` checks.\n\nWith `strict`, ty narrows to the top materialization of the class. For example,\n`isinstance(value, list)` narrows an `object` value to `Top[list[Unknown]]`, representing\na list with any possible specialization.\n\nWith `relaxed`, ty narrows to the class's default specialization instead. The same check\nnarrows an `object` value to `list[Unknown]`.\n\nDefaults to `relaxed`.",
+          "description": "Controls how ty narrows to unspecialized generic classes in `isinstance()` checks.\n\nWith `strict`, ty uses fully static bounds in the top materialization. For example,\n`isinstance(value, Sequence)` narrows an `object` value to `Sequence[object]`.\n\nWith `relaxed`, ty still narrows to the top materialization, but retains gradual behavior\nin its bounds. The same check narrows to `Sequence[object*]`, where `object*` simplifies\nlike `object` but behaves like `Unknown` when used. For invariant classes, reads and writes\nsimilarly use the gradual bounds `object*` and `Never*`.\nThese starred names are internal, reveal-only notation and cannot be written in annotations.\n\nDefaults to `relaxed`.",
           "anyOf": [
             {
               "$ref": "#/definitions/IsInstanceNarrowing"

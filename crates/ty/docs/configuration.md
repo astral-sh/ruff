@@ -660,12 +660,14 @@ Defaults to `true`.
 
 Controls how ty narrows to unspecialized generic classes in `isinstance()` checks.
 
-With `strict`, ty narrows to the top materialization of the class. For example,
-`isinstance(value, list)` narrows an `object` value to `Top[list[Unknown]]`, representing
-a list with any possible specialization.
+With `strict`, ty uses fully static bounds in the top materialization. For example,
+`isinstance(value, Sequence)` narrows an `object` value to `Sequence[object]`.
 
-With `relaxed`, ty narrows to the class's default specialization instead. The same check
-narrows an `object` value to `list[Unknown]`.
+With `relaxed`, ty still narrows to the top materialization, but retains gradual behavior
+in its bounds. The same check narrows to `Sequence[object*]`, where `object*` simplifies
+like `object` but behaves like `Unknown` when used. For invariant classes, reads and writes
+similarly use the gradual bounds `object*` and `Never*`.
+These starred names are internal, reveal-only notation and cannot be written in annotations.
 
 Defaults to `relaxed`.
 

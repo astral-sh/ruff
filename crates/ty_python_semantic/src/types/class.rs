@@ -815,6 +815,17 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    /// Returns the top materialization with gradual bounds for this class.
+    pub(crate) fn gradual_top_materialization(self, db: &'db dyn Db) -> ClassType<'db> {
+        match self {
+            Self::Static(class) => class.gradual_top_materialization(db),
+            Self::Dynamic(_)
+            | Self::DynamicNamedTuple(_)
+            | Self::DynamicTypedDict(_)
+            | Self::DynamicEnum(_) => ClassType::NonGeneric(self),
+        }
+    }
+
     /// Returns the `TypedDict` member lookup.
     pub(crate) fn typed_dict_member(
         self,

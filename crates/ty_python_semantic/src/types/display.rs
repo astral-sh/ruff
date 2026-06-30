@@ -32,10 +32,9 @@ use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
     CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceType, Protocol,
-    ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
-    Type, TypeAliasType, TypeGuardLike, TypedDictModule, TypedDictType, UnionType,
-    WrapperDescriptorKind, visitor,
+    LiteralValueType, LiteralValueTypeKind, PropertyInstanceType, Protocol, ProtocolInstanceType,
+    SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType, Type, TypeAliasType,
+    TypeGuardLike, TypedDictModule, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
@@ -1734,8 +1733,8 @@ impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'db> {
         } else {
             let prefix_details = match self.specialization.materialization_kind(self.db) {
                 None => None,
-                Some(MaterializationKind::Top) => Some(("Top", SpecialFormType::Top)),
-                Some(MaterializationKind::Bottom) => Some(("Bottom", SpecialFormType::Bottom)),
+                Some(kind) if kind.is_top() => Some(("Top", SpecialFormType::Top)),
+                Some(_) => Some(("Bottom", SpecialFormType::Bottom)),
             };
             let suffix = match self.specialization.materialization_kind(self.db) {
                 None => "",
