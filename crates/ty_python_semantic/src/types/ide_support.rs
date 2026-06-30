@@ -81,10 +81,30 @@ pub fn definitions_for_name<'db>(
             continue; // Name not found in this scope, try parent scope
         };
 
+        let use_def_map = index.use_def_map(scope_id);
+
         // Check if this place is marked as global or nonlocal
         let place_expr = place_table.symbol(symbol_id);
         let is_global = place_expr.is_global();
         let is_nonlocal = place_expr.is_nonlocal();
+
+        if is_global || is_nonlocal {
+            // Assignments in a forwarding scope remain valid navigation targets, including eager
+            // walrus bindings exported from comprehensions.
+            all_definitions.extend(user_visible_definitions(
+                db,
+                use_def_map
+                    .reachable_symbol_bindings(symbol_id)
+                    .filter_map(|binding| binding.binding.definition())
+                    .filter(|definition| {
+                        matches!(
+                            definition.kind(db),
+                            DefinitionKind::NestedBindings(nested)
+                                if nested.execution == NestedBindingExecution::Eager
+                        )
+                    }),
+            ));
+        }
 
         // TODO: The current algorithm doesn't return definitions or bindings
         // for other scopes that are outside of this scope hierarchy that target
@@ -119,8 +139,6 @@ pub fn definitions_for_name<'db>(
             // Continue searching in parent scopes, but skip the current scope
             continue;
         }
-
-        let use_def_map = index.use_def_map(scope_id);
 
         // Get all definitions (both bindings and declarations) for this place
         all_definitions.extend(user_visible_definitions(
@@ -1703,7 +1721,9 @@ mod resolve_definition {
             }
         }
 
-        definitions
+        super::user_visible_definitions(db, definitions)
+            .into_iter()
+            .collect()
     }
 
     /// Given a definition that may be in a stub file, find the "real" definition in a non-stub.
