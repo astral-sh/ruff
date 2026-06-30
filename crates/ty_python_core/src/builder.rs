@@ -105,6 +105,25 @@ struct NarrowingAlias<'ast> {
     narrowed_places: PossiblyNarrowedPlaces,
 }
 
+struct NameReadVisitor<'name> {
+    name: &'name str,
+    found: bool,
+}
+
+impl<'ast> Visitor<'ast> for NameReadVisitor<'_> {
+    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+        match expr {
+            ast::Expr::Name(name) if name.ctx.is_load() && name.id == self.name => {
+                self.found = true;
+            }
+            // A lambda body is not evaluated as part of the assignment.
+            ast::Expr::Lambda(_) => {}
+            _ if !self.found => walk_expr(self, expr),
+            _ => {}
+        }
+    }
+}
+
 struct ScopeInfo<'ast> {
     file_scope_id: FileScopeId,
     /// Current loop state; None if we are not currently visiting a loop
@@ -1845,6 +1864,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 None
             };
 
+            let has_loop_carried_binding = execution == NestedBindingExecution::Eager
+                && declarations.iter().any(|declaration| {
+                    let scope_id = declaration.file_scope_id;
+                    let Some(symbol) = self.place_tables[scope_id].symbol_id(&name) else {
+                        return false;
+                    };
+                    let use_def = &self.use_def_maps[scope_id];
+                    use_def
+                        .symbol_binding_definition_ids(symbol)
+                        .filter_map(|id| use_def.definition(id).definition())
+                        .any(|definition| match definition.kind(self.db) {
+                            DefinitionKind::NamedExpression(named) => {
+                                let mut visitor = NameReadVisitor {
+                                    name: &name,
+                                    found: false,
+                                };
+                                visitor.visit_expr(&named.node(self.module).value);
+                                visitor.found
+                            }
+                            DefinitionKind::NestedBindings(nested) => {
+                                nested.has_loop_carried_binding
+                            }
+                            _ => false,
+                        })
+                });
+
             let symbol = self.add_symbol(name.clone());
 
             // Nested comprehensions share the scope containing the outermost comprehension. Keep
@@ -1882,6 +1927,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 DefinitionKind::NestedBindings(Box::new(NestedBindingsDefinitionKind {
                     name,
                     execution,
+                    has_loop_carried_binding,
                     nested_declarations: declarations,
                 })),
                 false,

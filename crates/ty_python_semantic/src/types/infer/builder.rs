@@ -2542,7 +2542,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             union.add_in_place(ty);
         }
-        self.bindings.insert(definition, union.build());
+        let ty = union.build();
+        let ty = if nested_bindings_kind.has_loop_carried_binding {
+            ty.promote(db)
+        } else {
+            ty
+        };
+        self.bindings.insert(definition, ty);
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {

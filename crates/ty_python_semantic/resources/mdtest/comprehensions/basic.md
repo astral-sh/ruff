@@ -93,6 +93,11 @@ def possibly_unbound_binding(flag: bool):
     [(maybe := 1) if flag else 0 for _ in [0]]
     # error: [possibly-unresolved-reference] "Name `maybe` used when possibly not defined"
     reveal_type(maybe)  # revealed: Literal[1]
+
+def partial_sum():
+    total = 0
+    [total := total + value for value in [1, 2]]
+    reveal_type(total)  # revealed: int
 ```
 
 ## Comprehension referencing outer comprehension
