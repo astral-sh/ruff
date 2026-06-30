@@ -201,6 +201,12 @@ pub enum GlobalOrNonlocal {
     Nonlocal,
 }
 
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum NestedBindingExecution {
+    Lazy,
+    Eager,
+}
+
 struct ConditionFlowSnapshots {
     truthy: FlowSnapshot,
     falsy: FlowSnapshot,
@@ -1429,9 +1435,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 );
             }
             Some(CurrentAssignment::Named(named)) => {
-                // TODO(dhruvmanila): If the current scope is a comprehension, then the
-                // named expression is implicitly nonlocal. This is yet to be
-                // implemented.
+                self.mark_comprehension_named_target(place_id, named.target.range());
                 self.add_definition(place_id, named);
             }
             Some(CurrentAssignment::Comprehension {
@@ -1776,6 +1780,37 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self,
         nested_bindings: NestedGlobalOrNonlocalDeclarations,
     ) {
+        self.synthesize_nested_binding_definitions_impl(
+            nested_bindings,
+            NestedBindingExecution::Lazy,
+        );
+    }
+
+    /// Records assignment-expression bindings from a comprehension in its containing scope.
+    ///
+    /// The value expression still belongs to the comprehension scope, so the real definition
+    /// stays there. The synthetic definition lets the containing scope observe that binding while
+    /// retaining the comprehension's scope for type inference.
+    ///
+    /// This follows ty's existing eager model for comprehension scopes: it does not represent the
+    /// zero-iteration path or distinguish a consumed generator expression from an unconsumed one.
+    /// Modeling those cases requires cross-scope reachability that is intentionally out of scope
+    /// here.
+    fn synthesize_comprehension_binding_definitions(
+        &mut self,
+        nested_bindings: NestedGlobalOrNonlocalDeclarations,
+    ) {
+        self.synthesize_nested_binding_definitions_impl(
+            nested_bindings,
+            NestedBindingExecution::Eager,
+        );
+    }
+
+    fn synthesize_nested_binding_definitions_impl(
+        &mut self,
+        nested_bindings: NestedGlobalOrNonlocalDeclarations,
+        execution: NestedBindingExecution,
+    ) {
         let mut nested_bindings = nested_bindings.into_iter().collect::<Vec<_>>();
         nested_bindings.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
 
@@ -1786,11 +1821,40 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             // invalid `nonlocal`s, and those don't necessarily need a binding.)
             declarations.retain(|d| d.is_bound);
             declarations.shrink_to_fit();
-            if declarations.is_empty() {
+            let Some(first_declaration) = declarations.first() else {
                 continue;
+            };
+
+            let symbol = self.add_symbol(name.clone());
+
+            // Nested comprehensions share the scope containing the outermost comprehension. Keep
+            // forwarding the binding until that scope is reached.
+            if execution == NestedBindingExecution::Eager
+                && self.scopes[self.current_scope()].kind() == ScopeKind::Comprehension
+            {
+                let is_global = first_declaration.is_global();
+                let range = first_declaration.range;
+                debug_assert!(
+                    declarations
+                        .iter()
+                        .all(|declaration| declaration.is_global() == is_global)
+                );
+                if is_global {
+                    self.current_place_table_mut()
+                        .symbol_mut(symbol)
+                        .mark_global();
+                } else {
+                    self.current_place_table_mut()
+                        .symbol_mut(symbol)
+                        .mark_nonlocal();
+                }
+                self.current_scope_info_mut()
+                    .this_scope_global_or_nonlocal_declarations
+                    .entry(name.clone())
+                    .or_insert(range);
             }
 
-            let place: ScopedPlaceId = self.add_symbol(name.clone()).into();
+            let place: ScopedPlaceId = symbol.into();
             let definition = Definition::new(
                 self.db,
                 self.current_scope_id(),
@@ -1801,6 +1865,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 })),
                 false,
             );
+
+            if execution == NestedBindingExecution::Eager {
+                self.mark_place_bound(place);
+            }
 
             // Adding a binding typically invalidates narrowing aliases like
             // `is_int = isinstance(x, int)`. However, for the same reason that we retain both
@@ -1824,18 +1892,94 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             // TODO: We could be more precise here by delaying invalidation until inference time.
             self.invalidate_narrowing_aliases_for(place);
 
-            self.current_use_def_map_mut().record_binding(
-                place,
-                definition,
-                // Nested bindings definitions are like loop headers in that they don't shadow
-                // prior bindings, but they're different in that they *also* don't get shadowed by
-                // bindings that come later. The idea is that nested functions can be called at any
-                // time, so these bindings are effectively always visible after their function
-                // definitions.
-                PreviousDefinitions::AreKept,
-                FutureDefinitions::DontShadowThisOne,
-            );
+            let definition_id = self.current_use_def_map().next_definition_id();
+            let (previous, future) = match execution {
+                NestedBindingExecution::Lazy => (
+                    // Bindings from nested functions can become visible at any time, so they
+                    // neither shadow earlier bindings nor get shadowed by later ones.
+                    PreviousDefinitions::AreKept,
+                    FutureDefinitions::DontShadowThisOne,
+                ),
+                NestedBindingExecution::Eager => (
+                    PreviousDefinitions::AreShadowed,
+                    FutureDefinitions::ShadowThisOne,
+                ),
+            };
+            self.current_use_def_map_mut()
+                .record_binding(place, definition, previous, future);
+
+            if execution == NestedBindingExecution::Eager {
+                self.delete_associated_bindings(place);
+                self.record_pending_capture_binding(symbol, definition_id);
+                self.update_lazy_snapshots(symbol);
+
+                let mut try_node_stack_manager =
+                    std::mem::take(&mut self.try_node_context_stack_manager);
+                try_node_stack_manager.record_definition(self);
+                self.try_node_context_stack_manager = try_node_stack_manager;
+            }
         }
+    }
+
+    fn mark_comprehension_named_target(&mut self, place: ScopedPlaceId, range: TextRange) {
+        if self.scopes[self.current_scope()].kind() != ScopeKind::Comprehension {
+            return;
+        }
+        if self.semantic_syntax_errors.borrow().iter().any(|error| {
+            matches!(
+                error.kind,
+                SemanticSyntaxErrorKind::ReboundComprehensionVariable
+            ) && error.range == range
+        }) {
+            return;
+        }
+
+        let Some(symbol) = place.as_symbol() else {
+            return;
+        };
+        let name = self.current_place_table().symbol(symbol).name().clone();
+        let Some(containing_scope) = self.scope_stack.iter().rev().find(|scope_info| {
+            self.scopes[scope_info.file_scope_id].kind() != ScopeKind::Comprehension
+        }) else {
+            return;
+        };
+
+        let containing_scope_id = containing_scope.file_scope_id;
+        let kind = match self.scopes[containing_scope_id].kind() {
+            ScopeKind::Module => GlobalOrNonlocal::Global,
+            ScopeKind::Function | ScopeKind::Lambda => {
+                let is_global = self.place_tables[containing_scope_id]
+                    .symbol_id(&name)
+                    .is_some_and(|symbol| {
+                        self.place_tables[containing_scope_id]
+                            .symbol(symbol)
+                            .is_global()
+                    });
+                if is_global {
+                    GlobalOrNonlocal::Global
+                } else {
+                    GlobalOrNonlocal::Nonlocal
+                }
+            }
+            // Assignment expressions are invalid in comprehensions directly contained by these
+            // scopes. Leave the recovered target local to the comprehension.
+            ScopeKind::Class | ScopeKind::TypeAlias | ScopeKind::TypeParams => return,
+            ScopeKind::Comprehension => return,
+        };
+
+        match kind {
+            GlobalOrNonlocal::Global => self
+                .current_place_table_mut()
+                .symbol_mut(symbol)
+                .mark_global(),
+            GlobalOrNonlocal::Nonlocal => self
+                .current_place_table_mut()
+                .symbol_mut(symbol)
+                .mark_nonlocal(),
+        }
+        self.current_scope_info_mut()
+            .this_scope_global_or_nonlocal_declarations
+            .insert(name, range);
     }
 
     fn record_expression_narrowing_constraint(
@@ -2448,7 +2592,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
 
         visit_outer_elt(self);
-        self.pop_scope();
+        let nested_bindings = self.pop_scope();
+        self.synthesize_comprehension_binding_definitions(nested_bindings);
 
         self.current_assignments = saved_assignments;
 
@@ -4436,7 +4581,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             }
             ast::Expr::Named(node) => {
-                // TODO walrus in comprehensions is implicitly nonlocal
                 self.visit_expr(&node.value);
 
                 // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
