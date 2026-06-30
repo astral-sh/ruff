@@ -61,14 +61,14 @@ reveal_type(h)  # revealed: int
 
 # Later assignment expressions in the same comprehension iteration shadow earlier ones.
 [(ordered := item, ordered := "") for item in Iterable()]
-reveal_type(ordered)  # revealed: Literal[""]
+reveal_type(ordered)  # revealed: str
 
 # Targets in statically unreachable branches remain unbound.
 [(dead := 1) if False else (live := 2) for _ in [0]]
 # error: [unresolved-reference] "Name `dead` used when not defined"
 # revealed: Unknown
 reveal_type(dead)
-reveal_type(live)  # revealed: Literal[2]
+reveal_type(live)  # revealed: int
 
 def local_scope():
     [(local_target := value) for value in Iterable()]
@@ -87,12 +87,12 @@ def find_nonblank(lines: list[str]):
 def conditional_binding(flag: bool):
     x = "old"
     [(x := 1) if flag else 0 for _ in [0]]
-    reveal_type(x)  # revealed: Literal["old", 1]
+    reveal_type(x)  # revealed: Literal["old"] | int
 
 def possibly_unbound_binding(flag: bool):
     [(maybe := 1) if flag else 0 for _ in [0]]
     # error: [possibly-unresolved-reference] "Name `maybe` used when possibly not defined"
-    reveal_type(maybe)  # revealed: Literal[1]
+    reveal_type(maybe)  # revealed: int
 
 def filter_binding(flag: bool):
     [value for value in [True, False] if (last_filter_value := value)]
@@ -100,12 +100,19 @@ def filter_binding(flag: bool):
 
     [0 for _ in [0] if flag and (conditional_filter_value := 1)]
     # error: [possibly-unresolved-reference] "Name `conditional_filter_value` used when possibly not defined"
-    reveal_type(conditional_filter_value)  # revealed: Literal[1]
+    reveal_type(conditional_filter_value)  # revealed: int
 
 def partial_sum():
     total = 0
     [total := total + value for value in [1, 2]]
     reveal_type(total)  # revealed: int
+
+def mutually_loop_carried():
+    x = 0
+    y = 0
+    [(y := x, x := y + 1) for _ in [1, 2]]
+    reveal_type(x)  # revealed: int
+    reveal_type(y)  # revealed: int
 
 unreachable_local = "global"
 
@@ -124,7 +131,7 @@ def nested_comprehension_flow():
     reveal_type(nested_dead)  # revealed: Unknown
 
     [([nested_order := 1 for _ in [0]], (nested_order := 2)) for _ in [0]]
-    reveal_type(nested_order)  # revealed: Literal[2]
+    reveal_type(nested_order)  # revealed: int
 ```
 
 ## Comprehension referencing outer comprehension
