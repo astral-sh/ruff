@@ -94,7 +94,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Box<[UnusedBi
                         if nested.execution == NestedBindingExecution::Eager
                 )
             {
-                used_proxy_targets.extend(super::reachable_definitions(db, [definition]));
+                used_proxy_targets.extend(super::user_visible_definitions(db, [definition]));
             }
         }
     }
