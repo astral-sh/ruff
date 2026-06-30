@@ -224,8 +224,10 @@ pub(crate) fn is_top_level_expression_in_statement(checker: &Checker) -> bool {
         && checker.semantic().current_statement().is_expr_stmt()
 }
 
-pub(crate) fn is_keyword_true(argument: &Arguments, name: &str) -> Option<bool> {
-    let kw = argument.find_keyword(name)?;
+pub(crate) fn is_keyword_true_or_default(argument: &Arguments, name: &str) -> Option<bool> {
+    let Some(kw) = argument.find_keyword(name) else {
+        return Some(true);
+    };
 
     match &kw.value {
         Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some(*value),
