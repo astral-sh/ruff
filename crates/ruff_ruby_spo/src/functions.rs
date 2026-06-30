@@ -148,14 +148,22 @@ fn walk_method_body(node: &Node, known_relations: &[String], func: &mut Function
         // `self.<x>` — write (`self.x = …`), mutator call (`self.save`),
         // or plain attribute read (`self.x`), in that priority order.
         Node::Send(s) if matches!(s.recv.as_deref(), Some(Node::Self_(_))) => {
-            if let Some(field) = s.method_name.strip_suffix('=') {
+            let method = s.method_name.as_str();
+            if let Some(field) = method.strip_suffix('=')
+                && is_attr_ident(field)
+            {
                 // `self.<field> = …` — the setter call: a write of `<field>`.
+                // The `is_attr_ident` guard excludes comparison operators
+                // (`==`, `<=`, `>=`, `===`) and `[]=`, which also end in `=`
+                // but are not setters — without it, `self == other` would
+                // record a bogus write of a field named `=`.
                 func.writes.push(field.to_string());
-            } else if is_ar_mutator(&s.method_name) {
+            } else if is_ar_mutator(method) {
                 // `self.save` / `self.update(...)` — lifecycle mutator on self.
-                func.calls.push(format!("self.{}", s.method_name));
-            } else {
-                // `self.<field>` — a plain attribute read.
+                func.calls.push(format!("self.{method}"));
+            } else if is_attr_ident(method) {
+                // `self.<field>` — a plain attribute read (operator self-sends
+                // such as `self == other` are neither a read nor a write).
                 func.reads.push(s.method_name.clone());
             }
             // Recurse into args (the RHS of a write, or call/read args, may
@@ -296,6 +304,18 @@ const AR_MUTATORS: &[&str] = &[
 /// Is `method` one of the [`AR_MUTATORS`]?
 fn is_ar_mutator(method: &str) -> bool {
     AR_MUTATORS.contains(&method)
+}
+
+/// Is `name` a valid Ruby attribute identifier — `[A-Za-z_][A-Za-z0-9_]*`?
+/// Distinguishes attribute reads/setters (`name`, `name=`) from operator
+/// methods (`==`, `<=`, `[]=`, `+`, …), so an operator self-send never
+/// becomes a `reads`/`writes` entry. A setter is recognised by stripping the
+/// trailing `=` and checking the base with this — `==` strips to `=` (not an
+/// ident → not a write), `state=` strips to `state` (ident → a write).
+fn is_attr_ident(name: &str) -> bool {
+    let mut chars = name.chars();
+    matches!(chars.next(), Some(c) if c.is_ascii_alphabetic() || c == '_')
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 /// Best-effort label for a call receiver, used for the `calls` capture
@@ -713,6 +733,40 @@ end
             funcs[0].calls.is_empty(),
             "non-mutator calls must not be captured; got {:?}",
             funcs[0].calls,
+        );
+    }
+
+    #[test]
+    fn operator_self_send_is_neither_write_nor_read() {
+        // `self == other` / `self <= other` are comparison operators whose
+        // method names end in `=` — they must NOT strip to a bogus write of a
+        // field named `=`/`<` (codex P2), nor be recorded as reads.
+        let funcs = class_functions(
+            r#"
+class M
+  def ==(other)
+    self.id == other.id
+  end
+  def le(other)
+    self <= other
+  end
+end
+"#,
+        );
+        let eq = funcs.iter().find(|f| f.name == "==").unwrap();
+        assert!(
+            eq.writes.is_empty(),
+            "operator method must not produce a write; got {:?}",
+            eq.writes,
+        );
+        // `self.id` IS a valid attribute read; the `==` operator send is not.
+        assert_eq!(eq.reads, vec!["id"]);
+        let le = funcs.iter().find(|f| f.name == "le").unwrap();
+        assert!(
+            le.writes.is_empty() && le.reads.is_empty(),
+            "`self <= other` is neither write nor read; got writes {:?} reads {:?}",
+            le.writes,
+            le.reads,
         );
     }
 }

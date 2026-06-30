@@ -1,13 +1,16 @@
-//! End-to-end exploration over the real OpenProject corpus.
+//! End-to-end exploration over the real `OpenProject` corpus.
 //!
 //! Runs the AST extractor + expander against `$OPENPROJECT_PATH`, dumps
 //! the resulting SPO triples to `/tmp/op_triples.ndjson`, and computes
 //! the statistics that let us pick the highest-value next deliverable.
 //!
 //! Run with:
-//!     OPENPROJECT_PATH=/home/user/openproject \
-//!       cargo test -p ruff_ruby_spo --test op_pipeline_explore \
-//!       -- --ignored --nocapture
+//!
+//! ```text
+//! OPENPROJECT_PATH=/home/user/openproject \
+//!   cargo test -p ruff_ruby_spo --test op_pipeline_explore \
+//!   -- --ignored --nocapture
+//! ```
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -68,7 +71,7 @@ fn dump_openproject_triples_and_stats() {
             )
         })
         .collect();
-    model_decl_counts.sort_by(|a, b| b.1.cmp(&a.1));
+    model_decl_counts.sort_by_key(|x| std::cmp::Reverse(x.1));
     eprintln!("\n=== Top 20 fattest models ===");
     for (name, count) in model_decl_counts.iter().take(20) {
         eprintln!("  {count:>4}  {name}");
