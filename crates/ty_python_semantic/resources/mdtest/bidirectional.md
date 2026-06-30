@@ -35,7 +35,7 @@ def _(l: list[int] | None = None):
     reveal_type(l1)  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
 
     l2: list[int] = l or list()
-    reveal_type(l2)  # revealed: list[int]
+    reveal_type(l2)  # revealed: (list[int] & ~AlwaysFalsy) | list[int]
 
 class TextContent: ...
 class TagContent: ...
@@ -627,11 +627,11 @@ class Payload(TypedDict):
     required: int
 
 def from_or(values: list[str] | None) -> None:
-    for value in reveal_type(values or []):  # revealed: list[str]
+    for value in reveal_type(values or []):  # revealed: (list[str] & ~AlwaysFalsy) | list[str]
         reveal_type(value)  # revealed: str
 
 def from_and(values: list[str]) -> None:
-    reveal_type(values and [])  # revealed: list[str]
+    reveal_type(values and [])  # revealed: list[str] & ~AlwaysTruthy
 
 def chained_or(first: list[int], second: list[str]) -> None:
     for value in first or second or []:
@@ -653,7 +653,7 @@ def non_empty_dict_fallback(values: dict[Key, int] | None) -> None:
     reveal_type(values or {"foo": 0})  # revealed: dict[Literal["foo", "bar"], int]
 
 def non_empty_set_fallback(values: set[Key] | None) -> None:
-    reveal_type(values or {"foo"})  # revealed: set[Literal["foo", "bar"]]
+    reveal_type(values or {"foo"})  # revealed: set[Key] & ~AlwaysFalsy
 
 def preserve_generic[T](value: T) -> T:
     return value
@@ -662,7 +662,8 @@ def preserve_partially_specialized[T](value: list[T | int]) -> list[T | int]:
     return value
 
 def generic_type_context(values: list[int | str] | None) -> None:
-    reveal_type(preserve_generic(values or []))  # revealed: list[int | str]
+    # revealed: (list[int | str] & ~AlwaysFalsy) | list[int | str]
+    reveal_type(preserve_generic(values or []))
     reveal_type(preserve_partially_specialized(values or []))  # revealed: list[Unknown | int]
 
 def widened_non_empty_fallback(values: list[int] | None) -> None:

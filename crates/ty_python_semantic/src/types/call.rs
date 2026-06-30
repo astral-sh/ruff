@@ -1,9 +1,9 @@
 use super::context::InferContext;
-use super::{Signature, Type, TypeContext};
+use super::{NominalInstanceType, Signature, Type, TypeContext};
 use crate::Db;
 use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
-use crate::types::{MemberLookupPolicy, PropertyInstanceType};
+use crate::types::{CollectionCardinality, KnownClass, MemberLookupPolicy, PropertyInstanceType};
 use ruff_python_ast as ast;
 
 mod arguments;
@@ -29,10 +29,99 @@ impl<'db> Type<'db> {
         ) -> Option<Type<'db>> {
             Type::try_call_bin_op(db, left_ty, op, right_ty)
                 .ok()
-                .map(|bindings| bindings.return_type(db))
+                .map(|bindings| {
+                    let result = bindings.return_type(db).forget_collection_cardinality(db);
+                    if let (Type::NominalInstance(left), Type::NominalInstance(right)) =
+                        (left_ty, right_ty)
+                        && left.is_exact()
+                        && right.is_exact()
+                    {
+                        Type::refine_exact_builtin_binary_result(db, left, op, right, result)
+                    } else {
+                        result
+                    }
+                })
         }
 
         try_call_bin_op_return_type_impl(db, left_ty, op, right_ty)
+    }
+
+    fn refine_exact_builtin_binary_result(
+        db: &'db dyn Db,
+        left: NominalInstanceType<'db>,
+        op: ast::Operator,
+        right: NominalInstanceType<'db>,
+        result: Type<'db>,
+    ) -> Type<'db> {
+        fn concatenated_cardinality(
+            left: CollectionCardinality,
+            right: CollectionCardinality,
+        ) -> CollectionCardinality {
+            match (left, right) {
+                (CollectionCardinality::NonEmpty, _) | (_, CollectionCardinality::NonEmpty) => {
+                    CollectionCardinality::NonEmpty
+                }
+                (CollectionCardinality::Empty, CollectionCardinality::Empty) => {
+                    CollectionCardinality::Empty
+                }
+                _ => CollectionCardinality::Unknown,
+            }
+        }
+
+        let exact_cardinalities = |known_class| {
+            Some((
+                left.has_known_class(db, known_class)
+                    .then(|| left.exact_collection_cardinality(db))??,
+                right
+                    .has_known_class(db, known_class)
+                    .then(|| right.exact_collection_cardinality(db))??,
+            ))
+        };
+
+        let refinement = match op {
+            ast::Operator::Add => exact_cardinalities(KnownClass::List)
+                .map(|(left, right)| (KnownClass::List, concatenated_cardinality(left, right))),
+            ast::Operator::BitOr => exact_cardinalities(KnownClass::Set)
+                .map(|(left, right)| (KnownClass::Set, concatenated_cardinality(left, right))),
+            ast::Operator::BitAnd => exact_cardinalities(KnownClass::Set).map(|(left, right)| {
+                let cardinality = if matches!(left, CollectionCardinality::Empty)
+                    || matches!(right, CollectionCardinality::Empty)
+                {
+                    CollectionCardinality::Empty
+                } else {
+                    CollectionCardinality::Unknown
+                };
+                (KnownClass::Set, cardinality)
+            }),
+            ast::Operator::Sub => exact_cardinalities(KnownClass::Set).map(|(left, right)| {
+                let cardinality = match (left, right) {
+                    (CollectionCardinality::Empty, _) => CollectionCardinality::Empty,
+                    (left, CollectionCardinality::Empty) => left,
+                    _ => CollectionCardinality::Unknown,
+                };
+                (KnownClass::Set, cardinality)
+            }),
+            ast::Operator::BitXor => exact_cardinalities(KnownClass::Set).map(|(left, right)| {
+                let cardinality = match (left, right) {
+                    (CollectionCardinality::Empty, right) => right,
+                    (left, CollectionCardinality::Empty) => left,
+                    _ => CollectionCardinality::Unknown,
+                };
+                (KnownClass::Set, cardinality)
+            }),
+            _ => None,
+        };
+
+        refinement.map_or(result, |(known_class, cardinality)| {
+            let refined = result.into_exact_collection(db, cardinality);
+            if refined.exact_collection_cardinality(db).is_some() {
+                refined
+            } else {
+                known_class
+                    .to_specialized_instance(db, &[result])
+                    .into_exact_collection(db, cardinality)
+            }
+        })
     }
 
     pub(crate) fn try_call_bin_op(

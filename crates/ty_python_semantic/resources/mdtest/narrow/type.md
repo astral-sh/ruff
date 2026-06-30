@@ -15,15 +15,13 @@ def _(x: A | B, y: A | C):
     if type(x) is A:
         reveal_type(x)  # revealed: A
     else:
-        # It would be wrong to infer `B` here. The type
-        # of `x` could be a subclass of `A`, so we need
-        # to infer the full union type:
-        reveal_type(x)  # revealed: A | B
+        # Subclasses of `A` remain possible, but exact `A` instances are excluded.
+        reveal_type(x)  # revealed: (A & ~Exact[A]) | B
 
     if A is type(x):
         reveal_type(x)  # revealed: A
     else:
-        reveal_type(x)  # revealed: A | B
+        reveal_type(x)  # revealed: (A & ~Exact[A]) | B
 
     if type(y) is C:
         reveal_type(y)  # revealed: C
@@ -41,16 +39,12 @@ def _(x: A | B, y: A | C):
     if type(y) is A:
         reveal_type(y)  # revealed: A
     else:
-        # but here, `type(y)` could be a subclass of `A`,
-        # in which case the `type(y) is A` call would evaluate
-        # to `False` even if `y` was an instance of `A`,
-        # so narrowing cannot occur
-        reveal_type(y)  # revealed: A | C
+        reveal_type(y)  # revealed: (A & ~Exact[A]) | C
 
     if A is type(y):
         reveal_type(y)  # revealed: A
     else:
-        reveal_type(y)  # revealed: A | C
+        reveal_type(y)  # revealed: (A & ~Exact[A]) | C
 ```
 
 ## `type(x) is C` in chained comparisons
@@ -97,8 +91,7 @@ class C: ...
 
 def _(x: A | B, y: A | C):
     if type(x) is not A:
-        # Same reasoning as above: no narrowing should occur here.
-        reveal_type(x)  # revealed: A | B
+        reveal_type(x)  # revealed: (A & ~Exact[A]) | B
     else:
         reveal_type(x)  # revealed: A
 
@@ -109,9 +102,7 @@ def _(x: A | B, y: A | C):
         reveal_type(y)  # revealed: C
 
     if type(y) is not A:
-        # same reasoning as above: narrowing *cannot* occur here
-        # because `A` is not `@final`
-        reveal_type(y)  # revealed: A | C
+        reveal_type(y)  # revealed: (A & ~Exact[A]) | C
     else:
         reveal_type(y)  # revealed: A
 ```
@@ -131,7 +122,7 @@ def _(x: A | B, y: A | C):
     if x.__class__ is A:
         reveal_type(x)  # revealed: A
     else:
-        reveal_type(x)  # revealed: A | B
+        reveal_type(x)  # revealed: (A & ~Exact[A]) | B
 
     if C is y.__class__:
         reveal_type(y)  # revealed: C
@@ -139,7 +130,7 @@ def _(x: A | B, y: A | C):
         reveal_type(y)  # revealed: A
 
     if x.__class__ is not A:
-        reveal_type(x)  # revealed: A | B
+        reveal_type(x)  # revealed: (A & ~Exact[A]) | B
     else:
         reveal_type(x)  # revealed: A
 
@@ -156,11 +147,12 @@ def _(x: A | B, y: A | C):
 def f(x: list[int] | None):
     if type(x) is list:
         reveal_type(x)  # revealed: list[int]
+        reveal_type(type(x))  # revealed: <class 'list'>
     else:
-        reveal_type(x)  # revealed: list[int] | None
+        reveal_type(x)  # revealed: (list[int] & ~Exact[Top[list[Unknown]]]) | None
 
     if type(x) is not list:
-        reveal_type(x)  # revealed: list[int] | None
+        reveal_type(x)  # revealed: (list[int] & ~Exact[Top[list[Unknown]]]) | None
     else:
         reveal_type(x)  # revealed: list[int]
 
@@ -169,23 +161,24 @@ def g(x: frozenset[bytes] | None):
     if type(x) is frozenset:
         reveal_type(x)  # revealed: frozenset[bytes]
     else:
-        reveal_type(x)  # revealed: frozenset[bytes] | None
+        reveal_type(x)  # revealed: (frozenset[bytes] & ~Exact[frozenset[object]]) | None
 
     if type(x) is not frozenset:
-        reveal_type(x)  # revealed: frozenset[bytes] | None
+        reveal_type(x)  # revealed: (frozenset[bytes] & ~Exact[frozenset[object]]) | None
     else:
         reveal_type(x)  # revealed: frozenset[bytes]
 
 def h(x: object):
     if type(x) is list:
         reveal_type(x)  # revealed: Top[list[Unknown]]
+        reveal_type(type(x))  # revealed: <class 'list'>
     elif type(x) is frozenset:
         reveal_type(x)  # revealed: frozenset[object]
     else:
-        reveal_type(x)  # revealed: object
+        reveal_type(x)  # revealed: ~Exact[Top[list[Unknown]]] & ~Exact[frozenset[object]]
 
     if type(x) is not list and type(x) is not frozenset:
-        reveal_type(x)  # revealed: object
+        reveal_type(x)  # revealed: ~Exact[Top[list[Unknown]]] & ~Exact[frozenset[object]]
     else:
         reveal_type(x)  # revealed: Top[list[Unknown]] | frozenset[object]
 ```
@@ -214,12 +207,12 @@ def f(x: A[int] | B):
     if type(x) is A:
         reveal_type(x)  # revealed: A[int]
     else:
-        reveal_type(x)  # revealed: A[int] | B
+        reveal_type(x)  # revealed: (A[int] & ~Exact[A[object]]) | B
 
     if type(x) is B:
         reveal_type(x)  # revealed: B
     else:
-        reveal_type(x)  # revealed: A[int] | B
+        reveal_type(x)  # revealed: A[int] | (B & ~Exact[B])
 
     if type(x) is not A[int]:
         reveal_type(x)  # revealed: A[int] | B
@@ -228,12 +221,12 @@ def f(x: A[int] | B):
         reveal_type(x)  # revealed: A[int] | B
 
     if type(x) is not A:
-        reveal_type(x)  # revealed: A[int] | B
+        reveal_type(x)  # revealed: (A[int] & ~Exact[A[object]]) | B
     else:
         reveal_type(x)  # revealed: A[int]
 
     if type(x) is not B:
-        reveal_type(x)  # revealed: A[int] | B
+        reveal_type(x)  # revealed: A[int] | (B & ~Exact[B])
     else:
         reveal_type(x)  # revealed: B
 ```
@@ -360,7 +353,11 @@ def _(val):
         reveal_type(val)  # revealed: Unknown & tuple[object, ...]
 ```
 
-## Limitations
+## Exact runtime classes
+
+An identity comparison against a class literal narrows to exactly that runtime class. This makes an
+exact base class disjoint from its proper subclasses, while keeping the public display of the
+instance type unchanged.
 
 ```py
 class Base: ...
@@ -368,9 +365,109 @@ class Derived(Base): ...
 
 def _(x: Base):
     if type(x) is Base:
-        # Ideally, this could be narrower, but there is now way to
-        # express a constraint like `Base & ~ProperSubtypeOf[Base]`.
         reveal_type(x)  # revealed: Base
+        reveal_type(type(x))  # revealed: <class 'Base'>
+
+def _(x: Derived):
+    if type(x) is Base:
+        reveal_type(x)  # revealed: Never
+    else:
+        reveal_type(x)  # revealed: Derived
+```
+
+An exact runtime class can still coexist with another nominal class when it inherits from an
+explicit `Any` base, because the dynamic base may materialize as that class:
+
+```py
+from typing import Any
+
+class DynamicBase(Any): ...
+class Unrelated: ...
+
+def _(x: DynamicBase):
+    if type(x) is DynamicBase:
+        if isinstance(x, Unrelated):
+            reveal_type(x)  # revealed: DynamicBase & Unrelated
+```
+
+`TypedDict` values also have one exact runtime class, `dict`, but `TypedDict` is represented
+separately from nominal `dict` types and is deliberately not assignable to mutable `dict` types.
+Consequently, runtime-class narrowing does not yet preserve `TypedDict` arms. This existing
+limitation is tracked by [ty#1130](https://github.com/astral-sh/ty/issues/1130) and implemented in
+draft [ruff#25851](https://github.com/astral-sh/ruff/pull/25851). The assertions below deliberately
+record the current behavior; the desired types are `ExactDictTD` and `list[int]`, respectively.
+
+```py
+from typing import TypedDict
+
+class ExactDictTD(TypedDict):
+    value: int
+
+def _(x: ExactDictTD | list[int]):
+    if type(x) is dict:
+        reveal_type(x)  # revealed: Never
+    else:
+        reveal_type(x)  # revealed: ExactDictTD | list[int]
+```
+
+Literal and singleton types also have one exact runtime class. The exact-class constraint uses that
+information rather than widening them to their nominal fallback:
+
+```py
+from typing import Literal
+
+def _(x: Literal[1, True, "one"]):
+    if type(x) is int:
+        reveal_type(x)  # revealed: Literal[1]
+    else:
+        reveal_type(x)  # revealed: Literal[True, "one"]
+```
+
+## Module literals with custom runtime classes
+
+A module can replace its runtime class with a subclass of `types.ModuleType`. Its module-literal
+type must therefore remain compatible with exact-class narrowing to that subclass.
+
+`custom_module.py`:
+
+```py
+import sys
+from types import ModuleType
+
+class CustomModule(ModuleType): ...
+
+sys.modules[__name__].__class__ = CustomModule
+```
+
+`check.py`:
+
+```py
+import custom_module
+from custom_module import CustomModule
+
+reveal_type(custom_module)  # revealed: <module 'custom_module'>
+
+if type(custom_module) is CustomModule:
+    reveal_type(custom_module)  # revealed: <module 'custom_module'> & CustomModule
+```
+
+Narrowing a module to exactly `ModuleType` should retain the module literal's known members.
+`ModuleType`'s gradual `__getattr__` fallback must not make arbitrary missing members valid:
+
+`plain_module.py`:
+
+```py
+value = 1
+```
+
+`check_members.py`:
+
+```py
+from types import ModuleType
+import plain_module
+
+assert type(plain_module) is ModuleType
+plain_module.deprecated_name  # error: [unresolved-attribute]
 ```
 
 ## Assignment expressions
@@ -415,10 +512,10 @@ def g(x: object, y: type[Bar]):
         reveal_type(x)  # revealed: Bar
     else:
         # `Bar` is `@final`, so we can do `else`-branch narrowing here
-        reveal_type(x)  # revealed: ~Bar
+        reveal_type(x)  # revealed: ~Exact[Bar]
 
     if type(x) is not y:
-        reveal_type(x)  # revealed: ~Bar
+        reveal_type(x)  # revealed: ~Exact[Bar]
     else:
         reveal_type(x)  # revealed: Bar
 

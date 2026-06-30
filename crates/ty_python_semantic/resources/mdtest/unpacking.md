@@ -81,6 +81,14 @@ reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
 ```
 
+### Empty exact collection
+
+```py
+# error: [invalid-assignment] "Not enough values to unpack: Expected 1"
+(item,) = list()
+reveal_type(item)  # revealed: Unknown
+```
+
 ### Nested uneven unpacking (1)
 
 ```py

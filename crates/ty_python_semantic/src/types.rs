@@ -104,6 +104,7 @@ use crate::types::visitor::any_over_type;
 use crate::{Db, FxOrderSet, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator};
+pub(crate) use instance::CollectionCardinality;
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
 pub(crate) use literal::{
@@ -3620,7 +3621,26 @@ impl<'db> Type<'db> {
                         enums::member_lookup_for_enum_complement(db, complement, name_str, policy)
                     } else {
                         let receiver = Some(receiver.unwrap_or(this));
+                        let has_module_literal = intersection
+                            .positive(db)
+                            .iter()
+                            .any(|element| matches!(element, Type::ModuleLiteral(_)));
                         intersection.map_with_boundness_and_qualifiers(db, |elem| {
+                            // A module literal already includes the real `ModuleType` members that
+                            // apply to that module. Do not also consult the exact `ModuleType` arm:
+                            // typeshed gives it a gradual `__getattr__` that direct module-literal
+                            // lookup intentionally excludes.
+                            if has_module_literal
+                                && matches!(
+                                    elem,
+                                    Type::NominalInstance(instance)
+                                        if instance.is_exact()
+                                            && instance.has_known_class(db, KnownClass::ModuleType)
+                                )
+                            {
+                                return Place::Undefined.into();
+                            }
+
                             elem.member_lookup_with_policy_and_receiver(
                                 db,
                                 name_str.into(),
@@ -4156,6 +4176,10 @@ impl<'db> Type<'db> {
                 }
                 _ => None,
             }
+        }
+
+        if self.exact_collection_cardinality(db) == Some(CollectionCardinality::Empty) {
+            return Some(Type::int_literal(0));
         }
 
         let return_ty = match self.try_call_dunder(
@@ -6038,7 +6062,8 @@ impl<'db> Type<'db> {
     ///
     /// For most types, this is equivalent to the meta type of this type. For `TypedDict` types,
     /// this returns `type[dict[str, object]]` instead, because inhabitants of a `TypedDict` are
-    /// instances of `dict` at runtime.
+    /// instances of `dict` at runtime. For module literals, this returns `type[ModuleType]`
+    /// because a module can replace its runtime class with a `ModuleType` subclass.
     #[must_use]
     pub(crate) fn dunder_class(self, db: &'db dyn Db) -> Type<'db> {
         if self.is_typed_dict() {
@@ -6049,7 +6074,49 @@ impl<'db> Type<'db> {
                 .unwrap_or_else(Type::unknown);
         }
 
+        if matches!(self, Type::ModuleLiteral(_)) {
+            return KnownClass::ModuleType.to_subclass_of(db);
+        }
+
+        if let Type::NominalInstance(instance) = self
+            && instance.is_exact()
+        {
+            return Type::ClassLiteral(instance.class_literal(db));
+        }
+
         self.to_meta_type(db)
+    }
+
+    /// Return this type's single known runtime class, if subclasses are excluded.
+    pub(crate) fn exact_runtime_class(self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
+        // Let relation checking decompose these types before querying their runtime class. In
+        // particular, resolving a recursive type alias here would bypass the relation visitor's
+        // cycle guard.
+        if matches!(
+            self,
+            Type::TypeAlias(_)
+                | Type::Union(_)
+                | Type::Intersection(_)
+                | Type::EnumComplement(_)
+                | Type::ProtocolInstance(_)
+        ) {
+            return None;
+        }
+
+        // An ordinary nominal instance can inhabit a subclass, and an implicit protocol
+        // implementation need not have the protocol class anywhere in its MRO.
+        if let Type::NominalInstance(instance) = self
+            && !instance.is_exact()
+            && instance.own_tuple_spec(db).is_none()
+            && !instance.class(db).is_final(db)
+        {
+            return None;
+        }
+
+        match self.dunder_class(db) {
+            Type::ClassLiteral(class) => Some(class),
+            _ => None,
+        }
     }
 
     #[must_use]
@@ -6189,6 +6256,18 @@ impl<'db> Type<'db> {
             )
         {
             return SubclassOfType::from(db, class.default_specialization(db));
+        }
+
+        // Cardinality is invalidated only for the stored value and values reachable through its
+        // data shape. It must not erase refinements in unrelated metadata such as a stored
+        // function's return type.
+        if matches!(type_mapping, TypeMapping::ForgetCollectionCardinality)
+            && !matches!(
+                self,
+                Type::NominalInstance(_) | Type::Union(_) | Type::Intersection(_)
+            )
+        {
+            return self;
         }
 
         match self {
@@ -6434,6 +6513,8 @@ impl<'db> Type<'db> {
                 TypeMapping::Materialize(_) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
+                TypeMapping::ForgetCollectionCardinality |
+                TypeMapping::ForgetExactness |
                 TypeMapping::RescopeReturnCallables(_) |
                 TypeMapping::Promote(PromotionMode::Off, _) |
                 TypeMapping::Promote(
@@ -6453,6 +6534,8 @@ impl<'db> Type<'db> {
                 TypeMapping::Promote(..) |
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
+                TypeMapping::ForgetCollectionCardinality |
+                TypeMapping::ForgetExactness |
                 TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
@@ -7514,6 +7597,12 @@ pub enum TypeMapping<'a, 'db> {
     /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
     EagerExpansion,
 
+    /// Erase definite cardinality refinements from mutable builtin collections.
+    ForgetCollectionCardinality,
+
+    /// Erase exact runtime-class refinements.
+    ForgetExactness,
+
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
 }
@@ -7560,6 +7649,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
+            | TypeMapping::ForgetCollectionCardinality
+            | TypeMapping::ForgetExactness
             | TypeMapping::RescopeReturnCallables(_) => context,
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {
@@ -7606,6 +7697,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceSelf { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
+            | TypeMapping::ForgetCollectionCardinality
+            | TypeMapping::ForgetExactness
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
     }

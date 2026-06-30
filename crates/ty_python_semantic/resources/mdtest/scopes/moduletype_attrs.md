@@ -118,14 +118,14 @@ reveal_type(typing.__file__)  # revealed: str
 
 # These come from `builtins.object`, not `types.ModuleType`:
 reveal_type(typing.__eq__)  # revealed: bound method ModuleType.__eq__(value: object, /) -> bool
-reveal_type(typing.__class__)  # revealed: <class 'ModuleType'>
+reveal_type(typing.__class__)  # revealed: type[ModuleType]
 reveal_type(typing.__dict__)  # revealed: dict[str, Any]
 
 reveal_type(namespace_package.__name__)  # revealed: str
 reveal_type(namespace_package.__init__)  # revealed: bound method ModuleType.__init__(name: str, doc: str | None = ...) -> None
 reveal_type(namespace_package.__file__)  # revealed: None
 reveal_type(namespace_package.__eq__)  # revealed: bound method ModuleType.__eq__(value: object, /) -> bool
-reveal_type(namespace_package.__class__)  # revealed: <class 'ModuleType'>
+reveal_type(namespace_package.__class__)  # revealed: type[ModuleType]
 reveal_type(namespace_package.__dict__)  # revealed: dict[str, Any]
 ```
 

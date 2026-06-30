@@ -2217,6 +2217,7 @@ impl KnownFunction {
                 let [Some(actual_ty), Some(asserted_ty)] = parameter_types else {
                     return;
                 };
+                let actual_ty = actual_ty.forget_exactness_recursively(db);
                 let asserted_ty = asserted_ty.project_type_form(db);
                 if actual_ty.is_equivalent_to(db, asserted_ty) {
                     return;

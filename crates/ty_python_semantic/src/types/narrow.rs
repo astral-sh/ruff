@@ -2992,16 +2992,27 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 if let Some(is_positive) = is_positive
                     && let Some(target) = PlaceExpr::try_from_expr(target_expr)
                     && let Some(other_class) = find_underlying_class(self.db, other)
-                    // `else`-branch narrowing for `if type(x) is Y` can only be done
-                    // if `Y` is a final class
-                    && (is_positive || other_class.is_final(self.db))
                 {
+                    let other_is_class_literal =
+                        matches!(other.resolve_type_alias(self.db), Type::ClassLiteral(_));
+                    // When the right-hand side is only known as `type[Y]`, it may be a subclass of
+                    // `Y`; negative narrowing is therefore only safe if `Y` is final. A class
+                    // literal identifies one exact runtime class, so its complement is safe for
+                    // non-final classes too.
+                    if !is_positive && !other_is_class_literal && !other_class.is_final(self.db) {
+                        continue;
+                    }
+
                     let place = self.expect_place(&target);
+                    let narrowed_instance = if other_is_class_literal {
+                        Type::exact_instance(self.db, other_class.top_materialization(self.db))
+                    } else {
+                        Type::instance(self.db, other_class.top_materialization(self.db))
+                    };
                     constraints.insert(
                         place,
                         NarrowingConstraint::intersection(
-                            Type::instance(self.db, other_class.top_materialization(self.db))
-                                .negate_if(self.db, !is_positive),
+                            narrowed_instance.negate_if(self.db, !is_positive),
                         ),
                     );
                 }

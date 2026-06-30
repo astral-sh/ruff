@@ -110,7 +110,7 @@ reveal_type(len(FixedLengthSubclassWithDunderLenOverridden((1,))))  # revealed: 
 ### Lists, sets and dictionaries
 
 ```py
-reveal_type(len([]))  # revealed: int
+reveal_type(len([]))  # revealed: Literal[0]
 reveal_type(len([1]))  # revealed: int
 reveal_type(len([1, 2]))  # revealed: int
 reveal_type(len([*{}, *dict()]))  # revealed: int
@@ -123,8 +123,8 @@ reveal_type(len({1}))  # revealed: int
 reveal_type(len({1, 2}))  # revealed: int
 reveal_type(len({*[], 2}))  # revealed: int
 
-reveal_type(len(list()))  # revealed: int
-reveal_type(len(set()))  # revealed: int
+reveal_type(len(list()))  # revealed: Literal[0]
+reveal_type(len(set()))  # revealed: Literal[0]
 reveal_type(len(dict()))  # revealed: int
 reveal_type(len(frozenset()))  # revealed: int
 ```

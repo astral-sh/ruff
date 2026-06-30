@@ -16,10 +16,11 @@ use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType,
+    CollectionCardinality, CycleDetector, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
+    ProtocolInstanceType, SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType,
+    UpcastPolicy,
 };
 use crate::{
     Db,
@@ -1046,6 +1047,46 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return self.always();
         }
 
+        // An exact nominal target requires one specific runtime class. Types such as literals and
+        // known instances carry that information outside `NominalInstanceType`, so compare their
+        // runtime class here before delegating generic specialization checks to the ordinary
+        // nominal target.
+        if let Type::NominalInstance(target_instance) = target
+            && target_instance.is_exact()
+            && let Some(source_class) = source.exact_runtime_class(db)
+        {
+            if source_class != target_instance.class_literal(db) {
+                return self.never();
+            }
+
+            let cardinality_is_compatible = match target.exact_collection_cardinality(db) {
+                Some(CollectionCardinality::Empty) => {
+                    source.exact_collection_cardinality(db) == Some(CollectionCardinality::Empty)
+                }
+                Some(CollectionCardinality::NonEmpty) => {
+                    source.exact_collection_cardinality(db) == Some(CollectionCardinality::NonEmpty)
+                }
+                Some(CollectionCardinality::Unknown) | None => true,
+            };
+            if !cardinality_is_compatible {
+                return self.never();
+            }
+
+            return self.check_type_pair(db, source, target.forget_exactness(db));
+        }
+
+        // Exactness only imposes an additional constraint on a nominal relation when the target is
+        // also exact. Otherwise, delegate through the same nominal specialization without the
+        // runtime-class refinement. This restores the ordinary reflexivity fast path for the
+        // common case of a list or set literal flowing into its inferred or declared instance type.
+        if let (Type::NominalInstance(source_instance), Type::NominalInstance(target_instance)) =
+            (source, target)
+            && source_instance.is_exact()
+            && !target_instance.is_exact()
+        {
+            return self.check_type_pair(db, source.forget_exactness(db), target);
+        }
+
         // Handle constraint implication first. If either `source` or `target` is a typevar, check
         // the constraint set to see if the corresponding constraint is satisfied.
         if self.relation == TypeRelation::SubtypingAssuming
@@ -1129,7 +1170,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Instances of classes that inherit from an explicit `Any` base retain their nominal
             // identity and precise members, but have the same assignability as `Any`.
             (Type::NominalInstance(source), _)
-                if self.relation.is_assignability() && source.inherits_from_explicit_any() =>
+                if self.relation.is_assignability() && source.inherits_from_explicit_any(db) =>
             {
                 self.always()
             }
@@ -2530,6 +2571,26 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
         if let Some(right) = right.materialized_divergent_fallback() {
             return self.check_type_pair(db, left, right);
+        }
+
+        // A value with one known runtime class cannot inhabit a different exact nominal class,
+        // even when its class is a subclass of that nominal class. For example, `Literal[True]`
+        // is disjoint from exact `int`, despite `bool` being a subclass of `int`.
+        if let Type::NominalInstance(right_instance) = right
+            && right_instance.is_exact()
+            && let Some(left_class) = left.exact_runtime_class(db)
+        {
+            if left_class != right_instance.class_literal(db) {
+                return self.always();
+            }
+        }
+        if let Type::NominalInstance(left_instance) = left
+            && left_instance.is_exact()
+            && let Some(right_class) = right.exact_runtime_class(db)
+        {
+            if right_class != left_instance.class_literal(db) {
+                return self.always();
+            }
         }
 
         match (left, right) {

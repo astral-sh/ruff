@@ -2611,13 +2611,14 @@ def _(obj: Immutable) -> None:
 ## Objects of all types have a `__class__` method
 
 The type of `x.__class__` is the same as `x`'s meta-type. `x.__class__` is always the same value as
-`type(x)`.
+`type(x)`. A module is represented as `type[ModuleType]` because it can replace its runtime class
+with a `ModuleType` subclass.
 
 ```py
 import typing_extensions
 
-reveal_type(typing_extensions.__class__)  # revealed: <class 'ModuleType'>
-reveal_type(type(typing_extensions))  # revealed: <class 'ModuleType'>
+reveal_type(typing_extensions.__class__)  # revealed: type[ModuleType]
+reveal_type(type(typing_extensions))  # revealed: type[ModuleType]
 
 a = 42
 reveal_type(a.__class__)  # revealed: <class 'int'>
@@ -2963,6 +2964,51 @@ def f(never: Never):
     never.another_attribute = never
 ```
 
+### Mutable collection refinements
+
+An inferred instance attribute can be mutated through any access to the attribute, so its initial
+cardinality cannot be retained. It is also a mutable place that can be reassigned, so its initial
+exact runtime class cannot constrain later assignments:
+
+```py
+from typing import Final
+
+class InitiallyEmpty:
+    def __init__(self):
+        self.items = []
+
+class InitiallyNonEmpty:
+    def __init__(self):
+        self.items = [1]
+
+class FinalItems:
+    def __init__(self):
+        self.items: Final = []
+
+class CopiedItems:
+    def __init__(self):
+        self.items = list[int]()
+
+    def copy_to(self, other: "CopiedItems") -> None:
+        other.items = self.items.copy()
+
+empty = InitiallyEmpty()
+empty.items.append(1)
+(item,) = empty.items
+reveal_type(item)  # revealed: Unknown
+reveal_type(bool(empty.items))  # revealed: bool
+
+non_empty = InitiallyNonEmpty()
+non_empty.items.clear()
+reveal_type(bool(non_empty.items))  # revealed: bool
+assert not non_empty.items
+object().missing  # error: [unresolved-attribute]
+
+final_items = FinalItems()
+final_items.items.append(1)
+reveal_type(bool(final_items.items))  # revealed: bool
+```
+
 ### Cyclic implicit attributes
 
 Inferring types for undeclared implicit attributes can be cyclic:
@@ -3118,7 +3164,8 @@ class ManyCycles2:
         self.x3 = [1]
 
     def f1(self: "ManyCycles2"):
-        reveal_type(self.x3)  # revealed: list[int] | list[Divergent] | Unknown | list[Unknown]
+        # revealed: list[int] | list[Divergent] | Unknown | list[list[Unknown] | int] | list[Unknown]
+        reveal_type(self.x3)
 
         self.x1 = [self.x2] + [self.x3]
         self.x2 = [self.x1] + [self.x3]
@@ -3220,9 +3267,10 @@ class NestedLists2:
 reveal_type(NestedLists2().x)  # revealed: list[Divergent]
 ```
 
-During fixpoint iteration, overloads may fail to resolve correctly and be treated as `Unknown`. Even
-in this case, `Divergent` is propagated, guaranteeing the convergence of type inference. Here is the
-regression test for this scenario (<https://github.com/astral-sh/ty/issues/3614>):
+During fixpoint iteration, overloads may fail to resolve correctly. Exact list operands still let us
+recover a `list[Unknown]` result, while `Divergent` is propagated to guarantee convergence of type
+inference. Here is the regression test for this scenario
+(<https://github.com/astral-sh/ty/issues/3614>):
 
 ```py
 from typing import Any
@@ -3237,7 +3285,7 @@ class NestedListsConcat:
         self.x = [self.x] + []
         self.y = [self.y].__add__(y)
 
-reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[Divergent] | Unknown
+reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[Divergent] | list[Unknown]
 reveal_type(NestedListsConcat().y)  # revealed: list[int] | list[Divergent] | Unknown
 ```
 

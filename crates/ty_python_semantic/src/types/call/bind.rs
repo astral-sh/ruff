@@ -5062,7 +5062,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
 
             let lower = bounds.lower?;
-            let promoted = lower.promote(self.db);
+            let promoted = lower.forget_exactness_recursively(self.db).promote(self.db);
 
             // If the TypeVar has an upper bound, only use the promoted type if it
             // still satisfies the bound.

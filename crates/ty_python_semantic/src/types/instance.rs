@@ -25,6 +25,7 @@ use crate::types::relation::{
 };
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
+use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
     FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
@@ -86,6 +87,195 @@ impl<'db> Type<'db> {
                 }
             }
         }
+    }
+
+    /// Return the type of objects whose runtime class is exactly `class`.
+    pub(crate) fn exact_instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
+        Type::NominalInstance(NominalInstanceType::from_exact_class(db, class))
+    }
+
+    /// Return an exact `list` or `set` instance with statically known cardinality.
+    pub(crate) fn exact_collection_instance(
+        db: &'db dyn Db,
+        class: ClassType<'db>,
+        cardinality: CollectionCardinality,
+    ) -> Self {
+        Type::NominalInstance(NominalInstanceType::from_exact_collection_class(
+            db,
+            class,
+            cardinality,
+        ))
+    }
+
+    /// Preserve this instance's class and specialization while marking it as an exact collection.
+    ///
+    /// `self` is returned unchanged unless it is a `list` or `set` instance.
+    pub(crate) fn into_exact_collection(
+        self,
+        db: &'db dyn Db,
+        cardinality: CollectionCardinality,
+    ) -> Self {
+        match self {
+            Type::NominalInstance(instance)
+                if matches!(
+                    instance.known_class(db),
+                    Some(KnownClass::List | KnownClass::Set)
+                ) =>
+            {
+                Type::exact_collection_instance(db, instance.class(db), cardinality)
+            }
+            _ => self,
+        }
+    }
+
+    /// Erase definite cardinality while preserving exact runtime-class information.
+    pub(crate) fn forget_collection_cardinality(self, db: &'db dyn Db) -> Self {
+        if !self.may_have_definite_collection_cardinality(db, 16) {
+            return self;
+        }
+
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::ForgetCollectionCardinality,
+            TypeContext::default(),
+        )
+    }
+
+    /// Return whether `self` might contain an exact collection with definite cardinality.
+    ///
+    /// This mirrors the data-shape traversal of [`TypeMapping::ForgetCollectionCardinality`], but
+    /// avoids rebuilding and re-interning the overwhelmingly common types that contain no such
+    /// refinement. The depth limit conservatively falls back to the full mapping for recursive or
+    /// unusually deep types.
+    fn may_have_definite_collection_cardinality(self, db: &'db dyn Db, depth: u8) -> bool {
+        if depth == 0 {
+            return true;
+        }
+        let nested_depth = depth - 1;
+
+        match self {
+            Type::NominalInstance(instance) => match instance.0 {
+                NominalInstanceInner::ExactTuple(tuple) => {
+                    tuple.tuple(db).iter_all_elements().any(|element| {
+                        element.may_have_definite_collection_cardinality(db, nested_depth)
+                    })
+                }
+                NominalInstanceInner::NonTuple(class) => {
+                    if matches!(
+                        class.exact_collection_cardinality(db),
+                        Some(CollectionCardinality::Empty | CollectionCardinality::NonEmpty)
+                    ) {
+                        return true;
+                    }
+
+                    match class.class(db) {
+                        ClassType::NonGeneric(_) => false,
+                        ClassType::Generic(alias) => alias
+                            .specialization(db)
+                            .types(db)
+                            .iter()
+                            .copied()
+                            .any(|ty| {
+                                ty.may_have_definite_collection_cardinality(db, nested_depth)
+                            }),
+                    }
+                }
+                NominalInstanceInner::Object | NominalInstanceInner::SysVersionInfo => false,
+            },
+            Type::Union(union) => {
+                union.elements(db).iter().copied().any(|element| {
+                    element.may_have_definite_collection_cardinality(db, nested_depth)
+                })
+            }
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .chain(intersection.negative(db).iter())
+                .copied()
+                .any(|element| element.may_have_definite_collection_cardinality(db, nested_depth)),
+            _ => false,
+        }
+    }
+
+    /// Erase only this type's outer cardinality refinement.
+    pub(crate) fn forget_own_collection_cardinality(self, db: &'db dyn Db) -> Self {
+        match self {
+            Type::NominalInstance(instance) => {
+                Type::NominalInstance(instance.forget_own_collection_cardinality(db))
+            }
+            _ => self,
+        }
+    }
+
+    /// Erase exact runtime-class information while preserving the nominal specialization.
+    pub(crate) fn forget_exactness(self, db: &'db dyn Db) -> Self {
+        match self {
+            Type::NominalInstance(instance) => Type::NominalInstance(instance.forget_exactness(db)),
+            _ => self,
+        }
+    }
+
+    /// Recursively erase exact runtime-class information while preserving nominal specializations.
+    pub(crate) fn forget_exactness_recursively(self, db: &'db dyn Db) -> Self {
+        if !any_over_type(db, self, false, Type::is_exact_instance) {
+            return self;
+        }
+
+        self.apply_type_mapping(db, &TypeMapping::ForgetExactness, TypeContext::default())
+    }
+
+    /// Return whether this type consists of instances of one exact runtime class.
+    pub(crate) const fn is_exact_instance(self) -> bool {
+        matches!(self, Type::NominalInstance(instance) if instance.is_exact())
+    }
+
+    /// Return this exact builtin collection's statically known cardinality.
+    pub(crate) fn exact_collection_cardinality(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<CollectionCardinality> {
+        match self {
+            Type::NominalInstance(instance) => instance.exact_collection_cardinality(db),
+            _ => None,
+        }
+    }
+
+    /// Intersect this nominal instance with an exact instance of the same runtime class.
+    ///
+    /// This is used for exact-class narrowing such as `type(value) is list`: the exact narrowing
+    /// target carries the top materialization of the class, while `self` carries the useful generic
+    /// specialization of the original value.
+    pub(crate) fn with_exact_runtime_class_of(
+        self,
+        db: &'db dyn Db,
+        exact: Type<'db>,
+    ) -> Option<Self> {
+        let (Type::NominalInstance(instance), Type::NominalInstance(exact_instance)) =
+            (self, exact)
+        else {
+            return None;
+        };
+        if instance.is_exact()
+            || !exact_instance.is_exact()
+            || instance.class_literal(db) != exact_instance.class_literal(db)
+        {
+            return None;
+        }
+
+        let exact_class = exact_instance.class(db);
+        let exact_is_generalization = exact_class == instance.class(db)
+            || exact_class.into_generic_alias().is_some_and(|alias| {
+                alias.specialization(db).materialization_kind(db) == Some(MaterializationKind::Top)
+            })
+            || self.is_subtype_of(db, Type::instance(db, exact_class));
+        if !exact_is_generalization {
+            return None;
+        }
+
+        Some(exact_instance.exact_collection_cardinality(db).map_or_else(
+            || Type::exact_instance(db, instance.class(db)),
+            |cardinality| Type::exact_collection_instance(db, instance.class(db), cardinality),
+        ))
     }
 
     pub(crate) fn tuple(tuple: Option<TupleType<'db>>) -> Self {
@@ -166,6 +356,14 @@ impl<'db> Type<'db> {
     }
 }
 
+/// The statically known cardinality of an exact builtin collection.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) enum CollectionCardinality {
+    Empty,
+    NonEmpty,
+    Unknown,
+}
+
 /// A type representing the set of runtime objects which are instances of a certain nominal class.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
 pub struct NominalInstanceType<'db>(
@@ -184,7 +382,9 @@ pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db
             walk_tuple_type(db, tuple, visitor);
         }
         NominalInstanceInner::Object => {}
-        NominalInstanceInner::NonTuple(class) => visitor.visit_type(db, class.class(db).into()),
+        NominalInstanceInner::NonTuple(class) => {
+            visitor.visit_type(db, class.class(db).into());
+        }
         NominalInstanceInner::SysVersionInfo => {}
     }
 }
@@ -196,10 +396,65 @@ impl<'db> NominalInstanceType<'db> {
         ))
     }
 
-    /// Return whether this instance's class inherits from an explicit `Any` base.
-    pub(super) const fn inherits_from_explicit_any(self) -> bool {
+    fn from_exact_class(db: &'db dyn Db, class: ClassType<'db>) -> Self {
+        let cardinality = matches!(class.known(db), Some(KnownClass::List | KnownClass::Set))
+            .then_some(CollectionCardinality::Unknown);
+        Self(NominalInstanceInner::NonTuple(
+            NominalInstanceClass::from_exact_class(db, class, cardinality),
+        ))
+    }
+
+    fn from_exact_collection_class(
+        db: &'db dyn Db,
+        class: ClassType<'db>,
+        cardinality: CollectionCardinality,
+    ) -> Self {
+        debug_assert!(matches!(
+            class.known(db),
+            Some(KnownClass::List | KnownClass::Set)
+        ));
+
+        Self(NominalInstanceInner::NonTuple(
+            NominalInstanceClass::from_exact_class(db, class, Some(cardinality)),
+        ))
+    }
+
+    pub(super) const fn is_exact(self) -> bool {
+        matches!(self.0, NominalInstanceInner::NonTuple(class) if class.is_exact())
+    }
+
+    pub(super) fn exact_collection_cardinality(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<CollectionCardinality> {
         match self.0 {
-            NominalInstanceInner::NonTuple(class) => class.inherits_from_explicit_any(),
+            NominalInstanceInner::NonTuple(class) => class.exact_collection_cardinality(db),
+            _ => None,
+        }
+    }
+
+    fn forget_own_collection_cardinality(self, db: &'db dyn Db) -> Self {
+        match self.0 {
+            NominalInstanceInner::NonTuple(class) => Self(NominalInstanceInner::NonTuple(
+                class.forget_collection_cardinality(db),
+            )),
+            _ => self,
+        }
+    }
+
+    fn forget_exactness(self, db: &'db dyn Db) -> Self {
+        match self.0 {
+            NominalInstanceInner::NonTuple(class) => {
+                Self(NominalInstanceInner::NonTuple(class.forget_exactness(db)))
+            }
+            _ => self,
+        }
+    }
+
+    /// Return whether this instance's class inherits from an explicit `Any` base.
+    pub(super) fn inherits_from_explicit_any(self, db: &'db dyn Db) -> bool {
+        match self.0 {
+            NominalInstanceInner::NonTuple(class) => class.inherits_from_explicit_any(db),
             _ => false,
         }
     }
@@ -399,9 +654,17 @@ impl<'db> NominalInstanceType<'db> {
                 let transformed = class
                     .class(db)
                     .recursive_type_normalized_impl(db, div, nested)?;
-                Some(Self(NominalInstanceInner::NonTuple(
-                    class.with_class(db, transformed),
-                )))
+                let class = class.with_class(db, transformed);
+
+                // Exactness and mutable cardinality refinements are safe to forget during cycle
+                // recovery. Widening them avoids creating a distinct recursive type for every
+                // refinement state of the same nominal instance.
+                let class = if class.is_exact() {
+                    class.forget_exactness(db)
+                } else {
+                    class
+                };
+                Some(Self(NominalInstanceInner::NonTuple(class)))
             }
         }
     }
@@ -459,9 +722,15 @@ impl<'db> NominalInstanceType<'db> {
                     class
                         .class(db)
                         .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-                Type::NominalInstance(Self(NominalInstanceInner::NonTuple(
-                    class.with_class(db, transformed),
-                )))
+                let class = class.with_class(db, transformed);
+                let class = match type_mapping {
+                    TypeMapping::ForgetCollectionCardinality => {
+                        class.forget_collection_cardinality(db)
+                    }
+                    TypeMapping::ForgetExactness => class.forget_exactness(db),
+                    _ => class,
+                };
+                Type::NominalInstance(Self(NominalInstanceInner::NonTuple(class)))
             }
         }
     }
@@ -583,6 +852,26 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: NominalInstanceType<'db>,
         target: NominalInstanceType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if target.is_exact() {
+            let source_is_exact = source.is_exact() || source.class(db).is_final(db);
+            if !source_is_exact || source.class_literal(db) != target.class_literal(db) {
+                return self.never();
+            }
+
+            let cardinality_is_compatible = match target.exact_collection_cardinality(db) {
+                Some(CollectionCardinality::Empty) => {
+                    source.exact_collection_cardinality(db) == Some(CollectionCardinality::Empty)
+                }
+                Some(CollectionCardinality::NonEmpty) => {
+                    source.exact_collection_cardinality(db) == Some(CollectionCardinality::NonEmpty)
+                }
+                Some(CollectionCardinality::Unknown) | None => true,
+            };
+            if !cardinality_is_compatible {
+                return self.never();
+            }
+        }
+
         match (source.0, target.0) {
             (_, NominalInstanceInner::Object) => self.always(),
             (
@@ -614,9 +903,59 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         left: NominalInstanceType<'db>,
         right: NominalInstanceType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let contains_inferable_typevar = |instance| {
+            any_over_type(
+                db,
+                Type::NominalInstance(instance),
+                false,
+                |ty| matches!(ty, Type::TypeVar(typevar) if typevar.is_inferable(db, self.inferable)),
+            )
+        };
+
         let mut result = self.never();
         if left.is_object() || right.is_object() {
             return result;
+        }
+
+        if left.class_literal(db) == right.class_literal(db)
+            && matches!(
+                (
+                    left.exact_collection_cardinality(db),
+                    right.exact_collection_cardinality(db)
+                ),
+                (
+                    Some(CollectionCardinality::Empty),
+                    Some(CollectionCardinality::NonEmpty)
+                ) | (
+                    Some(CollectionCardinality::NonEmpty),
+                    Some(CollectionCardinality::Empty)
+                )
+            )
+        {
+            return self.always();
+        }
+
+        if left.is_exact() && right.is_exact() && left.class_literal(db) != right.class_literal(db)
+        {
+            return self.always();
+        }
+        // An explicit `Any` base may materialize as the other nominal class, so knowing the exact
+        // runtime class does not prove disjointness in the one-exact case.
+        if left.is_exact()
+            && !left.inherits_from_explicit_any(db)
+            && !contains_inferable_typevar(right)
+            && left.class_literal(db) != right.class_literal(db)
+            && !left.class(db).is_subclass_of(db, right.class(db))
+        {
+            return self.always();
+        }
+        if right.is_exact()
+            && !right.inherits_from_explicit_any(db)
+            && !contains_inferable_typevar(left)
+            && right.class_literal(db) != left.class_literal(db)
+            && !right.class(db).is_subclass_of(db, left.class(db))
+        {
+            return self.always();
         }
         if let Some(left_spec) = left.tuple_spec(db) {
             if let Some(right_spec) = right.tuple_spec(db) {
@@ -650,14 +989,27 @@ struct ExplicitAnyInstanceClass<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ExplicitAnyInstanceClass<'_> {}
 
+/// The class stored by an exact nominal instance.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct ExactNominalInstanceClass<'db> {
+    class: ClassType<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ExactNominalInstanceClass<'_> {}
+
 /// The class stored by a non-tuple nominal instance.
 ///
-/// Interning the uncommon explicit-`Any` case lets this type store the additional semantic bit
-/// without increasing the size of [`Type`].
+/// Interning the refined cases lets this type store exactness, cardinality, and explicit-`Any`
+/// information without increasing the size of [`Type`].
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
 enum NominalInstanceClass<'db> {
     Plain(ClassType<'db>),
     InheritsFromExplicitAny(ExplicitAnyInstanceClass<'db>),
+    Exact(ExactNominalInstanceClass<'db>),
+    ExactCollection(ExactNominalInstanceClass<'db>),
+    ExactEmptyCollection(ExactNominalInstanceClass<'db>),
+    ExactNonEmptyCollection(ExactNominalInstanceClass<'db>),
 }
 
 impl<'db> NominalInstanceClass<'db> {
@@ -669,14 +1021,80 @@ impl<'db> NominalInstanceClass<'db> {
         }
     }
 
-    const fn inherits_from_explicit_any(self) -> bool {
-        matches!(self, Self::InheritsFromExplicitAny(_))
+    fn from_exact_class(
+        db: &'db dyn Db,
+        class: ClassType<'db>,
+        cardinality: Option<CollectionCardinality>,
+    ) -> Self {
+        let exact = ExactNominalInstanceClass::new(db, class);
+        match cardinality {
+            None => Self::Exact(exact),
+            Some(CollectionCardinality::Unknown) => Self::ExactCollection(exact),
+            Some(CollectionCardinality::Empty) => Self::ExactEmptyCollection(exact),
+            Some(CollectionCardinality::NonEmpty) => Self::ExactNonEmptyCollection(exact),
+        }
+    }
+
+    const fn is_exact(self) -> bool {
+        matches!(
+            self,
+            Self::Exact(_)
+                | Self::ExactCollection(_)
+                | Self::ExactEmptyCollection(_)
+                | Self::ExactNonEmptyCollection(_)
+        )
+    }
+
+    const fn exact_collection_cardinality(self, _db: &'db dyn Db) -> Option<CollectionCardinality> {
+        match self {
+            Self::ExactCollection(_) => Some(CollectionCardinality::Unknown),
+            Self::ExactEmptyCollection(_) => Some(CollectionCardinality::Empty),
+            Self::ExactNonEmptyCollection(_) => Some(CollectionCardinality::NonEmpty),
+            _ => None,
+        }
+    }
+
+    const fn forget_collection_cardinality(self, _db: &'db dyn Db) -> Self {
+        match self {
+            Self::ExactEmptyCollection(class) | Self::ExactNonEmptyCollection(class) => {
+                Self::ExactCollection(class)
+            }
+            _ => self,
+        }
+    }
+
+    fn forget_exactness(self, db: &'db dyn Db) -> Self {
+        match self {
+            Self::Exact(class)
+            | Self::ExactCollection(class)
+            | Self::ExactEmptyCollection(class)
+            | Self::ExactNonEmptyCollection(class) => Self::from_class(db, class.class(db)),
+            _ => self,
+        }
+    }
+
+    fn inherits_from_explicit_any(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::Plain(_) => false,
+            Self::InheritsFromExplicitAny(_) => true,
+            Self::Exact(class) => class
+                .class(db)
+                .class_literal(db)
+                .inherits_from_explicit_any(db),
+            Self::ExactCollection(_)
+            | Self::ExactEmptyCollection(_)
+            | Self::ExactNonEmptyCollection(_) => false,
+        }
     }
 
     fn class(self, db: &'db dyn Db) -> ClassType<'db> {
         match self {
             Self::Plain(class) => class,
             Self::InheritsFromExplicitAny(class) => class.class(db),
+            Self::Exact(class)
+            | Self::ExactCollection(class)
+            | Self::ExactEmptyCollection(class)
+            | Self::ExactNonEmptyCollection(class) => class.class(db),
         }
     }
 
@@ -685,6 +1103,16 @@ impl<'db> NominalInstanceClass<'db> {
             Self::Plain(_) => Self::Plain(class),
             Self::InheritsFromExplicitAny(_) => {
                 Self::InheritsFromExplicitAny(ExplicitAnyInstanceClass::new(db, class))
+            }
+            Self::Exact(_) => Self::from_exact_class(db, class, None),
+            Self::ExactCollection(_) => {
+                Self::from_exact_class(db, class, Some(CollectionCardinality::Unknown))
+            }
+            Self::ExactEmptyCollection(_) => {
+                Self::from_exact_class(db, class, Some(CollectionCardinality::Empty))
+            }
+            Self::ExactNonEmptyCollection(_) => {
+                Self::from_exact_class(db, class, Some(CollectionCardinality::NonEmpty))
             }
         }
     }

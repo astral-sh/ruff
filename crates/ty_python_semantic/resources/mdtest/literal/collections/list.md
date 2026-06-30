@@ -4,6 +4,104 @@
 
 ```py
 reveal_type([])  # revealed: list[Unknown]
+reveal_type(type([]))  # revealed: <class 'list'>
+reveal_type(bool([]))  # revealed: Literal[False]
+reveal_type(type(list[int]()))  # revealed: <class 'list'>
+reveal_type(bool(list[int]()))  # revealed: Literal[False]
+```
+
+The runtime class remains exact when two exact lists are concatenated. If either operand could be a
+list subclass, the result could be produced by an overridden `__add__` or `__radd__` method and is
+therefore not exact:
+
+```py
+left = [1]
+right = [2]
+reveal_type(type(left + right))  # revealed: <class 'list'>
+reveal_type(bool([] + []))  # revealed: Literal[False]
+reveal_type(bool([1] + []))  # revealed: Literal[True]
+
+def concatenate(left: list[int], right: list[int]) -> None:
+    reveal_type(type(left + right))  # revealed: type[list[int]]
+    reveal_type(type([1] + right))  # revealed: type[list[int]]
+    reveal_type(type(left + [1]))  # revealed: type[list[int]]
+    reveal_type(bool([] + right))  # revealed: bool
+```
+
+Exact runtime class survives storage, but cardinality does not. A list can be mutated through the
+stored place or another alias, so definite cardinality is retained only on fresh expressions and
+results:
+
+```py
+empty = []
+reveal_type(type(empty))  # revealed: <class 'list'>
+reveal_type(bool(empty))  # revealed: bool
+
+nested = [[]]
+reveal_type(bool(nested[0]))  # revealed: bool
+
+annotated: list[int] = []
+annotated.append(1)
+reveal_type(bool(annotated))  # revealed: bool
+```
+
+Exactness is widened when a collection becomes an element of another mutable collection. The outer
+collection could later be mutated to contain an instance of a subclass:
+
+```py
+from typing import overload
+from typing_extensions import assert_type
+
+def takes_lists(values: dict[str, list[int]]) -> None: ...
+
+empty_list: list[int] = []
+lists = {"nonempty": [1], "empty": empty_list}
+takes_lists(lists)
+
+def takes_sets(values: list[set[int]]) -> None: ...
+
+empty_set: set[int] = set()
+sets = [{1}, empty_set]
+takes_sets(sets)
+
+@overload
+def choose(values: dict[str, list[int]]) -> int: ...
+@overload
+def choose(values: object) -> str: ...
+def choose(values: object) -> int | str:
+    return 0
+
+assert_type(choose(lists), int)
+```
+
+Potentially mutating calls can return an argument or receiver, so their results preserve exact
+runtime class but not cardinality unless the call's cardinality behavior is explicitly modeled:
+
+```py
+from typing import Any, TypeVar, cast
+
+T = TypeVar("T")
+
+def append_and_return(value: T) -> T:
+    cast(Any, value).append(1)
+    return value
+
+class MutatingAdd:
+    def __add__(self, value: T) -> T:
+        cast(Any, value).append(1)
+        return value
+
+reveal_type(type([].__iadd__([1])))  # revealed: <class 'list'>
+reveal_type(bool([].__iadd__([1])))  # revealed: bool
+reveal_type(len([].__iadd__([1])))  # revealed: int
+
+reveal_type(type(append_and_return([])))  # revealed: <class 'list'>
+reveal_type(bool(append_and_return([])))  # revealed: bool
+reveal_type(len(append_and_return([])))  # revealed: int
+
+reveal_type(type(MutatingAdd() + []))  # revealed: <class 'list'>
+reveal_type(bool(MutatingAdd() + []))  # revealed: bool
+reveal_type(len(MutatingAdd() + []))  # revealed: int
 ```
 
 ## List of tuples

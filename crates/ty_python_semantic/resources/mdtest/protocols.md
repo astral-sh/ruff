@@ -3155,6 +3155,47 @@ def check_protocol_union_box(x: IntBox | StrBox):
     reveal_type(infer_protocol_union_box(x, 1))  # revealed: tuple[int | str, Literal[1]]
 ```
 
+## Exact collection arguments and protocol inference
+
+An exact collection argument should satisfy a generic protocol using its ordinary nominal
+specialization. The runtime-class refinement should not cause overload resolution to fall back to a
+less precise overload:
+
+```py
+from typing import Generic, Protocol, Sequence, TypeVar, overload
+
+T = TypeVar("T")
+T_contra = TypeVar("T_contra", bound=int, contravariant=True)
+R = TypeVar("R", bound=int)
+
+def first(value: T_contra | Sequence[T_contra]) -> T_contra:
+    raise NotImplementedError
+
+reveal_type(first([1]))  # revealed: int
+
+class ElementOpsMixin(Generic[T]): ...
+
+class SupportsProtoAdd(Protocol[T_contra, R]):
+    def _proto_add(self, other: T_contra, /) -> ElementOpsMixin[R]: ...
+
+class Series(ElementOpsMixin[T]):
+    def _proto_add(self, other: T, /) -> ElementOpsMixin[T]:
+        return ElementOpsMixin()
+
+    @overload
+    def add(
+        self: SupportsProtoAdd[T_contra, R],
+        other: T_contra | Sequence[T_contra],
+    ) -> "Series[R]": ...
+    @overload
+    def add(self, other: object) -> "Series[object]": ...
+    def add(self, other: object) -> "Series[object]":
+        return Series()
+
+left = Series[int]()
+reveal_type(left.add([1]))  # revealed: Series[int]
+```
+
 ## Nominal subtyping of protocols
 
 Protocols can participate in nominal subtyping as well as structural subtyping. The main use case

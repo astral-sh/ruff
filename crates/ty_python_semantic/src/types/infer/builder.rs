@@ -101,14 +101,14 @@ use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIde
 use crate::types::unpacker::UnpackResult;
 use crate::types::{
     BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType,
-    DynamicType, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind,
-    MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters, SentinelInstance, Signature,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictModule,
-    TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
-    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
-    is_discarded_dict_key_assignment, todo_type,
+    CollectionCardinality, DynamicType, InferenceFlags, InternedConstraintSet, InternedType,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
+    LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters,
+    SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
+    TypeVarVariance, TypedDictModule, TypedDictType, UnionAccumulator, UnionBuilder, UnionType,
+    any_over_type, binding_type, extract_fixed_length_iterable_element_types,
+    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -1586,7 +1586,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         self.declarations.insert(definition, declared_ty);
-        self.bindings.insert(definition, inferred_ty);
+        self.insert_binding(definition, inferred_ty);
+    }
+
+    /// Insert a binding while discarding cardinality facts that mutation could invalidate.
+    ///
+    /// Exact runtime class is stable for builtin collections, but cardinality is not: the value
+    /// can be mutated through this place or an alias. Cardinality remains available on the fresh
+    /// expression that produced the value.
+    fn insert_binding(&mut self, definition: Definition<'db>, ty: Type<'db>) {
+        let ty = ty.forget_collection_cardinality(self.db());
+        self.bindings.insert(definition, ty);
     }
 
     fn add_unknown_declaration_with_binding(
@@ -2274,7 +2284,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if use_def.reachability_constraints().used_interiors().len()
             > MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES
         {
-            self.bindings.insert(definition, Type::unknown());
+            self.insert_binding(definition, Type::unknown());
             return;
         }
 
@@ -2291,7 +2301,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             union.add_in_place(narrowed_ty);
         }
 
-        self.bindings.insert(definition, union.build());
+        self.insert_binding(definition, union.build());
     }
 
     fn infer_nested_bindings_definition(
@@ -2369,7 +2379,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             // As with loop header definitions above, use a reachability cutoff to avoid excessive
             // perf costs in complicated projects like `isort`.
-            self.bindings.insert(definition, Type::unknown());
+            self.insert_binding(definition, Type::unknown());
             return;
         }
 
@@ -2395,7 +2405,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
             union.add_in_place(ty);
         }
-        self.bindings.insert(definition, union.build());
+        self.insert_binding(definition, union.build());
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
@@ -6838,6 +6848,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ctx: _,
         } = list;
 
+        let cardinality = if elts.is_empty() {
+            CollectionCardinality::Empty
+        } else if elts.iter().any(|elt| !elt.is_starred_expr()) {
+            CollectionCardinality::NonEmpty
+        } else {
+            CollectionCardinality::Unknown
+        };
+
         let elts = elts.iter().map(|elt| [Some(elt)]).collect_vec();
         let mut infer_elt_ty =
             |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
@@ -6850,6 +6868,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             tcx,
         )
         .unwrap_or_else(|| KnownClass::List.to_specialized_instance(self.db(), &[Type::unknown()]))
+        .into_exact_collection(self.db(), cardinality)
     }
 
     fn infer_set_expression(&mut self, set: &ast::ExprSet, tcx: TypeContext<'db>) -> Type<'db> {
@@ -6858,6 +6877,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             elts,
         } = set;
+
+        let cardinality = if elts.iter().any(|elt| !elt.is_starred_expr()) {
+            CollectionCardinality::NonEmpty
+        } else {
+            CollectionCardinality::Unknown
+        };
 
         let elts = elts.iter().map(|elt| [Some(elt)]).collect_vec();
         let fallback_tcx = self.incomplete_typed_dict_key_context(set, tcx);
@@ -6874,6 +6899,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             tcx,
         )
         .unwrap_or_else(|| KnownClass::Set.to_specialized_instance(self.db(), &[Type::unknown()]))
+        .into_exact_collection(self.db(), cardinality)
     }
 
     /// Infers a set element, optionally with a fallback context for an incomplete `TypedDict` key.
@@ -7460,7 +7486,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     continue;
                 };
-
                 let mut elt_tys = elt_tys.clone();
                 if let Some((key_ty, value_ty)) = elt_tys.next_tuple() {
                     tuple_size_promotion_constraints.record_unpromotable_type(
@@ -7533,7 +7558,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else {
                     inferred_elt_ty
                 };
-
                 tuple_size_promotion_constraints.record_inferred_expression_type(
                     self.db(),
                     elt_ty_identity,
@@ -7552,6 +7576,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .apply_specialization(self.db(), |_| {
                 builder.build_with(generic_context, |current_typevar, bounds| {
                     let lower = bounds?.lower?;
+
+                    // Mutable collections can later receive instances of subclasses, so exact
+                    // element types cannot become invariant type arguments.
+                    let lower = lower.forget_exactness_recursively(self.db());
 
                     let lower = if tcx.annotation.is_none() {
                         // Constraints learned from later collection uses should follow the same
@@ -7770,6 +7798,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             tcx,
         )
         .unwrap_or_else(|| KnownClass::List.to_specialized_instance(self.db(), &[Type::unknown()]))
+        .into_exact_collection(self.db(), CollectionCardinality::Unknown)
     }
 
     fn infer_set_comprehension_expression(
@@ -7804,6 +7833,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             tcx,
         )
         .unwrap_or_else(|| KnownClass::Set.to_specialized_instance(self.db(), &[Type::unknown()]))
+        .into_exact_collection(self.db(), CollectionCardinality::Unknown)
     }
 
     fn infer_dict_comprehension_expression(
@@ -8566,6 +8596,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }))
     }
 
+    /// Refine calls to the builtin `list` and `set` class objects to exact instances.
+    fn infer_builtin_collection_instance_type(
+        &self,
+        callable_type: Type<'db>,
+        arguments: &ast::Arguments,
+        return_type: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let class = match callable_type {
+            Type::ClassLiteral(class) => ClassType::NonGeneric(class),
+            Type::GenericAlias(alias) => ClassType::Generic(alias),
+            _ => return None,
+        };
+        if !matches!(
+            class.known(self.db()),
+            Some(KnownClass::List | KnownClass::Set)
+        ) {
+            return None;
+        }
+
+        let cardinality = if arguments.args.is_empty() && arguments.keywords.is_empty() {
+            CollectionCardinality::Empty
+        } else {
+            CollectionCardinality::Unknown
+        };
+        Some(return_type.into_exact_collection(self.db(), cardinality))
+    }
+
     fn infer_call_expression_impl(
         &mut self,
         call_expression: &ast::ExprCall,
@@ -9037,7 +9094,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Ok(()) => bindings,
             Err(_) => {
                 bindings.report_diagnostics(&self.context, call_expression.into());
-                return bindings.return_type(self.db());
+                return bindings
+                    .return_type(self.db())
+                    .forget_collection_cardinality(self.db());
             }
         };
 
@@ -9176,6 +9235,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             _ => return_ty,
         };
+        // A call can mutate an argument or receiver and return it through `Self` or a type variable.
+        // Forget cardinality recursively, then restore it for calls whose behavior we model.
+        let return_ty = return_ty.forget_collection_cardinality(db);
+        let return_ty = self
+            .infer_builtin_collection_instance_type(callable_type, arguments, return_ty)
+            .unwrap_or(return_ty);
 
         let find_narrowed_place = |argument_index: usize| match arguments.args.get(argument_index) {
             None => {
@@ -12107,7 +12172,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             }
         }
 
-        builder.bindings.insert(self.binding, bound_ty);
+        builder.insert_binding(self.binding, bound_ty);
 
         inferred_ty
     }

@@ -1130,3 +1130,24 @@ def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
     # error: [invalid-argument-type] "Argument to function `first` is incorrect: Argument type `Unrelated1` does not satisfy upper bound `Base` of type variable `T`"
     reveal_type(first(x))  # revealed: Unknown
 ```
+
+## Exact collections in inferred invariant specializations
+
+An exact collection should be widened before it becomes the invariant type argument of an inferred
+user-defined generic specialization:
+
+```py
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def __init__(self, value: T) -> None:
+        self.value = value
+
+def consume(value: Box[list[Any]]) -> None: ...
+
+items: list[Any] = []
+wrapped = Box(items)
+consume(wrapped)
+```
