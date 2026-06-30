@@ -170,9 +170,7 @@ Settings: Settings {
             regex_set: RegexSet([]),
             globs: [],
         },
-    },
-    semantics: SemanticSettings {
-        isinstance_narrowing: Relaxed,
+        generic_narrowing: Relaxed,
     },
     overrides: [],
 }

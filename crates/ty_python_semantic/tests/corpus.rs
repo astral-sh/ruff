@@ -12,9 +12,7 @@ use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::{
-    AnalysisSettings, SemanticSettings, check_file_unwrap, default_lint_registry,
-};
+use ty_python_semantic::{AnalysisSettings, check_file_unwrap, default_lint_registry};
 use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
 use ruff_db::diagnostic::Diagnostic;
@@ -186,7 +184,6 @@ pub struct CorpusDb {
     system: TestSystem,
     vendored: VendoredFileSystem,
     analysis_settings: Arc<AnalysisSettings>,
-    semantic_settings: Arc<SemanticSettings>,
 }
 
 impl CorpusDb {
@@ -199,7 +196,6 @@ impl CorpusDb {
             rule_selection: RuleSelection::from_registry(default_lint_registry()),
             files: Files::default(),
             analysis_settings: Arc::new(AnalysisSettings::default()),
-            semantic_settings: Arc::new(SemanticSettings::default()),
         };
 
         Program::from_settings(
@@ -287,10 +283,6 @@ impl ty_python_semantic::Db for CorpusDb {
 
     fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
         &self.analysis_settings
-    }
-
-    fn semantic_settings(&self, _file: File) -> &SemanticSettings {
-        &self.semantic_settings
     }
 
     fn dyn_clone(&self) -> Box<dyn ty_python_semantic::Db> {

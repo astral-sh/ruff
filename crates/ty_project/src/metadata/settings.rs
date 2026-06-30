@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use ruff_db::files::File;
 use ty_combine::Combine;
+use ty_python_semantic::AnalysisSettings;
 use ty_python_semantic::lint::RuleSelection;
-use ty_python_semantic::{AnalysisSettings, SemanticSettings};
 
 use crate::metadata::options::{InnerOverrideOptions, OutputFormat};
 use crate::{Db, glob::IncludeExcludeFilter};
@@ -27,7 +27,6 @@ pub struct Settings {
     pub(super) terminal: TerminalSettings,
     pub(super) src: SrcSettings,
     pub(super) analysis: AnalysisSettings,
-    pub(super) semantics: SemanticSettings,
 
     /// Settings for configuration overrides that apply to specific file patterns.
     ///
@@ -60,10 +59,6 @@ impl Settings {
 
     pub fn analysis(&self) -> &AnalysisSettings {
         &self.analysis
-    }
-
-    pub fn semantics(&self) -> &SemanticSettings {
-        &self.semantics
     }
 }
 

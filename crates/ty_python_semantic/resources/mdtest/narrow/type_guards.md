@@ -401,13 +401,9 @@ def _(x: Foo | Bar, is_bar: Callable[[object], TypeIs[Bar]]):
         reveal_type(x)  # revealed: Foo & ~Bar
 ```
 
-For generics, we transform the argument passed into `TypeIs[]` from `X` to `Top[X]`. This helps
-especially when using various functions from typeshed that are annotated as returning
-`TypeIs[SomeCovariantGeneric[Any]]` to avoid false positives in other type checkers. For ty's
-purposes, it would usually lead to more intuitive results if `object` was used as the specialization
-for a covariant generic inside the `TypeIs` special form, but this is mitigated by our implicit
-transformation from `TypeIs[SomeCovariantGeneric[Any]]` to `TypeIs[Top[SomeCovariantGeneric[Any]]]`
-(which just simplifies to `TypeIs[SomeCovariantGeneric[object]]`).
+For generics, we transform the argument passed into `TypeIs[]` from `X` to a top materialization of
+`X`. In the default relaxed generic-narrowing mode, the materialization retains gradual behavior.
+For example, `TypeIs[SomeCovariantGeneric[Any]]` narrows to `SomeCovariantGeneric[object*]`:
 
 ```py
 class Unrelated: ...
@@ -426,11 +422,83 @@ def _(x: Unrelated | Covariant[int]):
     if is_instance_of_covariant(x):
         raise RuntimeError("oh no")
 
-    reveal_type(x)  # revealed: Unrelated & ~Covariant[object]
+    reveal_type(x)  # revealed: Unrelated & ~Covariant[object*]
 
     # We would emit a false-positive diagnostic here if we didn't implicitly transform
-    # `TypeIs[Covariant[Any]]` to `TypeIs[Covariant[object]]`
+    # `TypeIs[Covariant[Any]]` to `TypeIs[Covariant[object*]]`.
     needs_instance_of_unrelated(x)
+
+def _(x: object):
+    if is_instance_of_covariant(x):
+        reveal_type(x)  # revealed: Covariant[object*]
+        value = x.get()
+        reveal_type(value)  # revealed: object*
+        value.some_method()
+        integer: int = value
+
+def is_list(arg: object) -> TypeIs[list[Any]]:
+    return isinstance(arg, list)
+
+def _(x: object):
+    if is_list(x):
+        reveal_type(x)  # revealed: Top[list[Any]]
+        value = x[0]
+        reveal_type(value)  # revealed: object*
+        value.some_method()
+        integer: int = value
+        x.append(1)
+```
+
+## Generic `TypeIs` narrowing in strict mode
+
+Strict generic narrowing instead uses fully static bounds:
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+generic-narrowing = "strict"
+```
+
+```py
+from typing import Any
+from typing_extensions import TypeIs
+
+class Unrelated: ...
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def is_instance_of_covariant(arg: object) -> TypeIs[Covariant[Any]]:
+    return isinstance(arg, Covariant)
+
+def _(x: Unrelated | Covariant[int]):
+    if is_instance_of_covariant(x):
+        raise RuntimeError("oh no")
+
+    reveal_type(x)  # revealed: Unrelated & ~Covariant[object]
+
+def _(x: object):
+    if is_instance_of_covariant(x):
+        reveal_type(x)  # revealed: Covariant[object]
+        value = x.get()
+        reveal_type(value)  # revealed: object
+        value.some_method()  # error: [unresolved-attribute]
+        integer: int = value  # error: [invalid-assignment]
+
+def is_list(arg: object) -> TypeIs[list[Any]]:
+    return isinstance(arg, list)
+
+def _(x: object):
+    if is_list(x):
+        reveal_type(x)  # revealed: Top[list[Any]]
+        value = x[0]
+        reveal_type(value)  # revealed: object
+        value.some_method()  # error: [unresolved-attribute]
+        integer: int = value  # error: [invalid-assignment]
+        x.append(1)  # error: [invalid-argument-type]
 ```
 
 ## `TypeGuard` special cases

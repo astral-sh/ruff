@@ -1,8 +1,8 @@
 # Narrowing for `callable()`
 
 ```toml
-[semantics]
-isinstance-narrowing = "strict"
+[analysis]
+generic-narrowing = "strict"
 ```
 
 ## Basic narrowing

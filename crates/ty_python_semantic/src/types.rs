@@ -8565,8 +8565,8 @@ impl<'db> TypeIsType<'db> {
 
     /// Construct an unbound `TypeIs` return type from the user-written type expression.
     ///
-    /// The user-written type is preserved for `TypeIs` invariance checks, while the return type
-    /// used for narrowing applies the top materialization on demand.
+    /// The user-written type is preserved for `TypeIs` invariance checks, while narrowing applies
+    /// the configured top materialization on demand.
     ///
     /// ```python
     /// from typing import TypeIs
@@ -8578,7 +8578,7 @@ impl<'db> TypeIsType<'db> {
         Type::TypeIs(Self::new(db, ty, None))
     }
 
-    pub(crate) fn return_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn strict_return_type(self, db: &'db dyn Db) -> Type<'db> {
         // N.B. Using the top materialization here is a pragmatic decision that
         // makes us produce more intuitive results given how `TypeIs` is used in
         // the real world (in particular, in typeshed). However, there's some

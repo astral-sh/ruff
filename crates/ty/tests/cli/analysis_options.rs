@@ -41,6 +41,66 @@ fn respect_type_ignore_comments_is_turned_off() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Generic narrowing can be configured globally and overridden for specific files.
+#[test]
+fn generic_narrowing_override() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.analysis]
+            generic-narrowing = "relaxed"
+
+            [[tool.ty.overrides]]
+            include = ["strict.py"]
+
+            [tool.ty.overrides.analysis]
+            generic-narrowing = "strict"
+            "#,
+        ),
+        (
+            "relaxed.py",
+            r#"
+            from typing import Sequence
+
+            def f(xs: object):
+                if isinstance(xs, Sequence):
+                    for x in xs:
+                        x.some_method()
+            "#,
+        ),
+        (
+            "strict.py",
+            r#"
+            from typing import Sequence
+
+            def f(xs: object):
+                if isinstance(xs, Sequence):
+                    for x in xs:
+                        x.some_method()
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-attribute]: Object of type `object` has no attribute `some_method`
+     --> strict.py:7:13
+      |
+    7 |             x.some_method()
+      |             ^^^^^^^^^^^^^
+      |
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
 /// Basic override functionality: override analysis options for a specific file
 #[test]
 fn overrides_basic() -> anyhow::Result<()> {

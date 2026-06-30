@@ -141,8 +141,8 @@ def f(x: Covariant[int]):
 ## Mapping patterns
 
 ```toml
-[semantics]
-isinstance-narrowing = "strict"
+[analysis]
+generic-narrowing = "strict"
 ```
 
 ```py

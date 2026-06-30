@@ -302,8 +302,8 @@ Certain special forms in `typing.py` are aliases to classes elsewhere in the sta
 can be used in `isinstance()` and `issubclass()` checks. We support narrowing using them:
 
 ```toml
-[semantics]
-isinstance-narrowing = "strict"
+[analysis]
+generic-narrowing = "strict"
 ```
 
 ```py
@@ -602,8 +602,8 @@ def i[T: Intersection[type[Bar], type[Baz | Spam]], U: (type[Eggs], type[Ham])](
 [environment]
 python-version = "3.12"
 
-[semantics]
-isinstance-narrowing = "strict"
+[analysis]
+generic-narrowing = "strict"
 ```
 
 Narrowing to a generic class using `isinstance()` uses the top materialization of the generic. With
@@ -741,8 +741,8 @@ def _(x: type[object], y: type[object], z: type[object]):
 ### Strict mode
 
 ```toml
-[semantics]
-isinstance-narrowing = "strict"
+[analysis]
+generic-narrowing = "strict"
 ```
 
 #### Covariance
@@ -842,12 +842,12 @@ def _(xs: OpenItem | list[OpenItem]):
 
 ### Relaxed mode
 
-The `semantics.isinstance-narrowing` option can be set to `relaxed` to retain gradual behavior in
-the bounds introduced by top materialization:
+The `analysis.generic-narrowing` option can be set to `relaxed` to retain gradual behavior in the
+bounds introduced by top materialization:
 
 ```toml
-[semantics]
-isinstance-narrowing = "relaxed"
+[analysis]
+generic-narrowing = "relaxed"
 ```
 
 #### Covariance
@@ -1042,8 +1042,8 @@ instead), so the default value is irrelevant here:
 [environment]
 python-version = "3.13"
 
-[semantics]
-isinstance-narrowing = "strict"
+[analysis]
+generic-narrowing = "strict"
 ```
 
 ```py
@@ -1082,8 +1082,8 @@ arm that later causes `call-top-callable` false positives.
 [environment]
 python-version = "3.13"
 
-[semantics]
-isinstance-narrowing = "strict"
+[analysis]
+generic-narrowing = "strict"
 ```
 
 ```py

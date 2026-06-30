@@ -20,7 +20,7 @@ use crate::types::{
     mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
     singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
-use crate::{Db, IsInstanceNarrowing};
+use crate::{Db, GenericNarrowing};
 use ty_python_core::expression::Expression;
 use ty_python_core::frozen::FrozenMap;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
@@ -443,14 +443,14 @@ impl ClassInfoConstraintFunction {
         db: &'db dyn Db,
         classinfo: Type<'db>,
         is_positive: bool,
-        isinstance_narrowing: IsInstanceNarrowing,
+        generic_narrowing: GenericNarrowing,
     ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
             ClassInfoConstraintFunction::IsInstance => Type::instance(
                 db,
-                match isinstance_narrowing {
-                    IsInstanceNarrowing::Strict => class.top_materialization(db),
-                    IsInstanceNarrowing::Relaxed => class.gradual_top_materialization(db),
+                match generic_narrowing {
+                    GenericNarrowing::Strict => class.top_materialization(db),
+                    GenericNarrowing::Relaxed => class.gradual_top_materialization(db),
                 },
             ),
             ClassInfoConstraintFunction::IsSubclass => {
@@ -459,12 +459,9 @@ impl ClassInfoConstraintFunction {
         };
 
         match classinfo {
-            Type::TypeAlias(alias) => self.generate_constraint(
-                db,
-                alias.value_type(db),
-                is_positive,
-                isinstance_narrowing,
-            ),
+            Type::TypeAlias(alias) => {
+                self.generate_constraint(db, alias.value_type(db), is_positive, generic_narrowing)
+            }
             Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => {
                 // We can't narrow negatively from a `SubclassOf` type. `if !isinstance(x, y)`
@@ -499,7 +496,7 @@ impl ClassInfoConstraintFunction {
                             db,
                             *element,
                             is_positive,
-                            isinstance_narrowing,
+                            generic_narrowing,
                         )?);
                     }
                     Some(builder.build())
@@ -509,19 +506,19 @@ impl ClassInfoConstraintFunction {
                 }
             }
             Type::Union(union) => union.try_map(db, |element| {
-                self.generate_constraint(db, *element, is_positive, isinstance_narrowing)
+                self.generate_constraint(db, *element, is_positive, generic_narrowing)
             }),
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        self.generate_constraint(db, bound, is_positive, isinstance_narrowing)
+                        self.generate_constraint(db, bound, is_positive, generic_narrowing)
                     }
                     TypeVarBoundOrConstraints::Constraints(constraints) => self
                         .generate_constraint(
                             db,
                             constraints.as_type(db),
                             is_positive,
-                            isinstance_narrowing,
+                            generic_narrowing,
                         ),
                 }
             }
@@ -534,7 +531,7 @@ impl ClassInfoConstraintFunction {
                 UnionType::try_from_elements(
                     db,
                     tuple.iter_all_elements().map(|element| {
-                        self.generate_constraint(db, element, is_positive, isinstance_narrowing)
+                        self.generate_constraint(db, element, is_positive, generic_narrowing)
                     }),
                 )
             }),
@@ -552,10 +549,10 @@ impl ClassInfoConstraintFunction {
                                 db,
                                 KnownClass::NoneType.to_class_literal(db),
                                 is_positive,
-                                isinstance_narrowing,
+                                generic_narrowing,
                             )
                         } else {
-                            self.generate_constraint(db, element, is_positive, isinstance_narrowing)
+                            self.generate_constraint(db, element, is_positive, generic_narrowing)
                         }
                     }),
                 )
@@ -566,19 +563,19 @@ impl ClassInfoConstraintFunction {
                     db,
                     alias.aliased_class().to_class_literal(db),
                     is_positive,
-                    isinstance_narrowing,
+                    generic_narrowing,
                 ),
                 SpecialFormType::Tuple => self.generate_constraint(
                     db,
                     KnownClass::Tuple.to_class_literal(db),
                     is_positive,
-                    isinstance_narrowing,
+                    generic_narrowing,
                 ),
                 SpecialFormType::Type => self.generate_constraint(
                     db,
                     KnownClass::Type.to_class_literal(db),
                     is_positive,
-                    isinstance_narrowing,
+                    generic_narrowing,
                 ),
 
                 // We don't have a good meta-type for `Callable`s right now,
@@ -586,9 +583,9 @@ impl ClassInfoConstraintFunction {
                 SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
                     (self == ClassInfoConstraintFunction::IsInstance).then(|| {
                         let callable = Type::Callable(CallableType::unknown(db));
-                        match isinstance_narrowing {
-                            IsInstanceNarrowing::Strict => callable.top_materialization(db),
-                            IsInstanceNarrowing::Relaxed => callable.materialize(
+                        match generic_narrowing {
+                            GenericNarrowing::Strict => callable.top_materialization(db),
+                            GenericNarrowing::Relaxed => callable.materialize(
                                 db,
                                 MaterializationKind::GradualTop,
                                 &ApplyTypeMappingVisitor::default(),
@@ -954,7 +951,7 @@ fn positive_class_pattern_type<'db>(
                 db,
                 class_expression_ty,
                 true,
-                IsInstanceNarrowing::Strict,
+                GenericNarrowing::Strict,
             )
         }
         _ => None,
@@ -3164,16 +3161,16 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
                 let class_info_ty = inference.expression_type(second_arg);
 
-                let isinstance_narrowing = if function == ClassInfoConstraintFunction::IsInstance {
+                let generic_narrowing = if function == ClassInfoConstraintFunction::IsInstance {
                     self.db
-                        .semantic_settings(self.scope().file(self.db))
-                        .isinstance_narrowing
+                        .analysis_settings(self.scope().file(self.db))
+                        .generic_narrowing
                 } else {
-                    IsInstanceNarrowing::Strict
+                    GenericNarrowing::Strict
                 };
 
                 function
-                    .generate_constraint(self.db, class_info_ty, is_positive, isinstance_narrowing)
+                    .generate_constraint(self.db, class_info_ty, is_positive, generic_narrowing)
                     .map(|constraint| {
                         NarrowingConstraints::from_iter([(
                             place,
@@ -3212,12 +3209,23 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let place_and_constraint = match return_ty {
             Type::TypeIs(type_is) => {
                 let (_, place) = type_is.place_info(self.db)?;
+                let materialization = match self
+                    .db
+                    .analysis_settings(self.scope().file(self.db))
+                    .generic_narrowing
+                {
+                    GenericNarrowing::Strict => MaterializationKind::Top,
+                    GenericNarrowing::Relaxed => MaterializationKind::GradualTop,
+                };
+                let narrowed_type = type_is.type_argument(self.db).materialize(
+                    self.db,
+                    materialization,
+                    &ApplyTypeMappingVisitor::default(),
+                );
                 Some((
                     place,
                     NarrowingConstraint::intersection(
-                        type_is
-                            .return_type(self.db)
-                            .negate_if(self.db, !is_positive),
+                        narrowed_type.negate_if(self.db, !is_positive),
                     ),
                 ))
             }
@@ -3290,7 +3298,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             self.db,
             KnownClass::Mapping.to_class_literal(self.db),
             true,
-            IsInstanceNarrowing::Strict,
+            GenericNarrowing::Strict,
         )?;
 
         Some(NarrowingConstraints::from_iter([(

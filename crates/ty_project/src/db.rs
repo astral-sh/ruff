@@ -19,7 +19,7 @@ use ty_python_core::program::{
     FallibleStrategy, MisconfigurationStrategy, Program, UseDefaultStrategy,
 };
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, SemanticSettings};
+use ty_python_semantic::{AnalysisSettings, Db as SemanticDb};
 
 mod changes;
 mod ignore;
@@ -549,10 +549,6 @@ impl SemanticDb for ProjectDatabase {
         settings.analysis(self)
     }
 
-    fn semantic_settings(&self, _file: File) -> &SemanticSettings {
-        self.project().settings(self).semantics()
-    }
-
     fn verbose(&self) -> bool {
         self.project().verbose(self)
     }
@@ -633,7 +629,7 @@ pub(crate) mod testing {
     use ty_python_core::platform::PythonPlatform;
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-    use ty_python_semantic::{AnalysisSettings, PythonVersionWithSource, SemanticSettings};
+    use ty_python_semantic::{AnalysisSettings, PythonVersionWithSource};
 
     use crate::db::Db;
     use crate::{Project, ProjectMetadata};
@@ -780,10 +776,6 @@ pub(crate) mod testing {
 
         fn analysis_settings(&self, _file: ruff_db::files::File) -> &AnalysisSettings {
             self.project().settings(self).analysis()
-        }
-
-        fn semantic_settings(&self, _file: ruff_db::files::File) -> &SemanticSettings {
-            self.project().settings(self).semantics()
         }
 
         fn verbose(&self) -> bool {

@@ -1,5 +1,5 @@
+use crate::AnalysisSettings;
 use crate::lint::{LintRegistry, RuleSelection};
-use crate::{AnalysisSettings, SemanticSettings};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
 use ty_python_core::Db as PythonCoreDb;
@@ -15,8 +15,6 @@ pub trait Db: PythonCoreDb {
     fn lint_registry(&self) -> &LintRegistry;
 
     fn analysis_settings(&self, file: File) -> &AnalysisSettings;
-
-    fn semantic_settings(&self, file: File) -> &SemanticSettings;
 
     /// Whether ty is running with logging verbosity INFO or higher (`-v` or more).
     fn verbose(&self) -> bool;
@@ -57,7 +55,6 @@ pub(crate) mod tests {
         events: Events,
         rule_selection: Arc<RuleSelection>,
         analysis_settings: Arc<AnalysisSettings>,
-        semantic_settings: Arc<SemanticSettings>,
     }
 
     impl TestDb {
@@ -78,7 +75,6 @@ pub(crate) mod tests {
                 files: Files::default(),
                 rule_selection: Arc::new(RuleSelection::from_registry(default_lint_registry())),
                 analysis_settings: AnalysisSettings::default().into(),
-                semantic_settings: SemanticSettings::default().into(),
             }
         }
 
@@ -154,10 +150,6 @@ pub(crate) mod tests {
 
         fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
             &self.analysis_settings
-        }
-
-        fn semantic_settings(&self, _file: File) -> &SemanticSettings {
-            &self.semantic_settings
         }
 
         fn verbose(&self) -> bool {

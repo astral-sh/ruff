@@ -22,7 +22,7 @@ pub(crate) fn check_type_guard_definition<'db>(
 
         // Check if this is a `TypeIs` or `TypeGuard` return type.
         let (type_guard_form_name, narrowed_type) = match return_ty {
-            Type::TypeIs(type_is) => ("TypeIs", Some(type_is.return_type(db))),
+            Type::TypeIs(type_is) => ("TypeIs", Some(type_is.strict_return_type(db))),
             Type::TypeGuard(_) => ("TypeGuard", None),
             _ => continue,
         };

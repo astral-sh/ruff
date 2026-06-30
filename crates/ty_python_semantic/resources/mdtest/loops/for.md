@@ -698,8 +698,8 @@ When we have an intersection type via `isinstance` narrowing, we should be able 
 iterable element type precisely:
 
 ```toml
-[semantics]
-isinstance-narrowing = "strict"
+[analysis]
+generic-narrowing = "strict"
 ```
 
 ```py
@@ -1577,8 +1577,8 @@ iteration.
 [environment]
 python-version = "3.12"
 
-[semantics]
-isinstance-narrowing = "strict"
+[analysis]
+generic-narrowing = "strict"
 ```
 
 ### TypeVar bound with non-iterable elements

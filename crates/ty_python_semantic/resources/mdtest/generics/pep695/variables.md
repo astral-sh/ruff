@@ -4,8 +4,8 @@
 [environment]
 python-version = "3.13"
 
-[semantics]
-isinstance-narrowing = "strict"
+[analysis]
+generic-narrowing = "strict"
 ```
 
 [PEP 695] and Python 3.12 introduced new, more ergonomic syntax for type variables.

@@ -150,7 +150,7 @@ def get_any() -> Any:
 async def test():
     x = get_any()
     if inspect.isawaitable(x):
-        reveal_type(x)  # revealed: Any & Awaitable[object]
+        reveal_type(x)  # revealed: Any & Awaitable[object*]
         y = await x
         reveal_type(y)  # revealed: Any
 ```

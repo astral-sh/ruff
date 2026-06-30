@@ -37,9 +37,9 @@ use ty_python_core::platform::PythonPlatform;
 use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings};
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
-    AnalysisSettings, IsInstanceNarrowing, PythonEnvironment, PythonVersionFileSource,
-    PythonVersionSource, PythonVersionWithSource, SemanticSettings, SitePackagesPaths,
-    SysPrefixPathOrigin, inferred_python_version_source_annotation,
+    AnalysisSettings, GenericNarrowing, PythonEnvironment, PythonVersionFileSource,
+    PythonVersionSource, PythonVersionWithSource, SitePackagesPaths, SysPrefixPathOrigin,
+    inferred_python_version_source_annotation,
 };
 use ty_static::EnvVars;
 
@@ -99,11 +99,6 @@ pub struct Options {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option_group]
     pub analysis: Option<AnalysisOptions>,
-
-    /// Configures semantic type inference behavior.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[option_group]
-    pub semantics: Option<SemanticsOptions>,
 
     /// Override configurations for specific file patterns.
     ///
@@ -495,8 +490,6 @@ impl Options {
             };
         let analysis = strategy.fallback(analysis_result, |_| AnalysisSettings::default())?;
 
-        let semantics = self.semantics.or_default().to_settings();
-
         let overrides = self
             .to_overrides_settings(db, project_root, &mut diagnostics)
             .map_err(|err| ToSettingsError {
@@ -511,7 +504,6 @@ impl Options {
             terminal,
             src,
             analysis,
-            semantics,
             overrides,
         };
 
@@ -1464,7 +1456,6 @@ pub struct TerminalOptions {
     Eq,
     PartialEq,
     Hash,
-    Combine,
     Serialize,
     Deserialize,
     OptionsMetadata,
@@ -1540,6 +1531,43 @@ pub struct AnalysisOptions {
         "#
     )]
     pub replace_imports_with_any: Option<Vec<RangedValue<String>>>,
+
+    /// Controls how ty narrows to unspecialized generic classes in `isinstance()` checks and
+    /// functions returning `TypeIs`.
+    ///
+    /// With `strict`, ty uses fully static bounds in the top materialization. For example,
+    /// narrowing an `object` value to `Sequence` results in `Sequence[object]`.
+    ///
+    /// With `relaxed`, ty still narrows to the top materialization, but retains gradual behavior
+    /// in its bounds. The same narrowing results in `Sequence[object*]`, where `object*` simplifies
+    /// like `object` but behaves like `Unknown` when used. For invariant classes, reads and writes
+    /// similarly use the gradual bounds `object*` and `Never*`.
+    /// These starred names are internal, reveal-only notation and cannot be written in annotations.
+    ///
+    /// Defaults to `relaxed`.
+    #[option(
+        default = "relaxed",
+        value_type = "strict | relaxed",
+        example = r#"
+            generic-narrowing = "strict"
+        "#
+    )]
+    pub generic_narrowing: Option<RangedValue<GenericNarrowing>>,
+}
+
+impl Combine for AnalysisOptions {
+    fn combine_with(&mut self, other: Self) {
+        self.respect_type_ignore_comments
+            .combine_with(other.respect_type_ignore_comments);
+        self.allowed_unresolved_imports
+            .combine_with(other.allowed_unresolved_imports);
+        self.replace_imports_with_any
+            .combine_with(other.replace_imports_with_any);
+
+        if self.generic_narrowing.is_none() {
+            self.generic_narrowing = other.generic_narrowing;
+        }
+    }
 }
 
 impl AnalysisOptions {
@@ -1552,12 +1580,14 @@ impl AnalysisOptions {
             respect_type_ignore_comments,
             allowed_unresolved_imports,
             replace_imports_with_any,
+            generic_narrowing,
         } = self;
 
         let AnalysisSettings {
             respect_type_ignore_comments: respect_type_ignore_default,
             allowed_unresolved_imports: allowed_unresolved_imports_default,
             replace_imports_with_any: replace_imports_with_any_default,
+            generic_narrowing: generic_narrowing_default,
         } = AnalysisSettings::default();
 
         let allowed_unresolved_imports =
@@ -1587,62 +1617,10 @@ impl AnalysisOptions {
                 .unwrap_or(respect_type_ignore_default),
             allowed_unresolved_imports,
             replace_imports_with_any,
-        }
-    }
-}
-
-#[derive(
-    Debug,
-    Default,
-    Clone,
-    Eq,
-    PartialEq,
-    Serialize,
-    Deserialize,
-    OptionsMetadata,
-    get_size2::GetSize,
-)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct SemanticsOptions {
-    /// Controls how ty narrows to unspecialized generic classes in `isinstance()` checks.
-    ///
-    /// With `strict`, ty uses fully static bounds in the top materialization. For example,
-    /// `isinstance(value, Sequence)` narrows an `object` value to `Sequence[object]`.
-    ///
-    /// With `relaxed`, ty still narrows to the top materialization, but retains gradual behavior
-    /// in its bounds. The same check narrows to `Sequence[object*]`, where `object*` simplifies
-    /// like `object` but behaves like `Unknown` when used. For invariant classes, reads and writes
-    /// similarly use the gradual bounds `object*` and `Never*`.
-    /// These starred names are internal, reveal-only notation and cannot be written in annotations.
-    ///
-    /// Defaults to `relaxed`.
-    #[option(
-        default = "relaxed",
-        value_type = "strict | relaxed",
-        example = r#"
-            isinstance-narrowing = "strict"
-        "#
-    )]
-    pub isinstance_narrowing: Option<RangedValue<IsInstanceNarrowing>>,
-}
-
-impl SemanticsOptions {
-    fn to_settings(&self) -> SemanticSettings {
-        SemanticSettings {
-            isinstance_narrowing: self
-                .isinstance_narrowing
+            generic_narrowing: generic_narrowing
                 .as_deref()
                 .copied()
-                .unwrap_or_default(),
-        }
-    }
-}
-
-impl Combine for SemanticsOptions {
-    fn combine_with(&mut self, other: Self) {
-        if self.isinstance_narrowing.is_none() {
-            self.isinstance_narrowing = other.isinstance_narrowing;
+                .unwrap_or(generic_narrowing_default),
         }
     }
 }

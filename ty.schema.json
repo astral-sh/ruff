@@ -46,17 +46,6 @@
         }
       ]
     },
-    "semantics": {
-      "description": "Configures semantic type inference behavior.",
-      "anyOf": [
-        {
-          "$ref": "#/definitions/SemanticsOptions"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
     "src": {
       "anyOf": [
         {
@@ -92,6 +81,17 @@
           "items": {
             "$ref": "#/definitions/string"
           }
+        },
+        "generic-narrowing": {
+          "description": "Controls how ty narrows to unspecialized generic classes in `isinstance()` checks and\nfunctions returning `TypeIs`.\n\nWith `strict`, ty uses fully static bounds in the top materialization. For example,\nnarrowing an `object` value to `Sequence` results in `Sequence[object]`.\n\nWith `relaxed`, ty still narrows to the top materialization, but retains gradual behavior\nin its bounds. The same narrowing results in `Sequence[object*]`, where `object*` simplifies\nlike `object` but behaves like `Unknown` when used. For invariant classes, reads and writes\nsimilarly use the gradual bounds `object*` and `Never*`.\nThese starred names are internal, reveal-only notation and cannot be written in annotations.\n\nDefaults to `relaxed`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/GenericNarrowing"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "replace-imports-with-any": {
           "description": "A list of module glob patterns whose imports should be replaced with `typing.Any`.\n\nUnlike `allowed-unresolved-imports`, this setting replaces the module's type information\nwith `typing.Any` even if the module can be resolved. Import diagnostics are\nunconditionally suppressed for matching modules.\n\n- Prefix a pattern with `!` to exclude matching modules\n\nWhen multiple patterns match, later entries take precedence.\n\nGlob patterns can be used in combinations with each other. For example, to suppress errors for\nany module where the first component contains the substring `test`, use `*test*.**`.\n\nWhen multiple patterns match, later entries take precedence.",
@@ -189,7 +189,7 @@
       },
       "additionalProperties": false
     },
-    "IsInstanceNarrowing": {
+    "GenericNarrowing": {
       "type": "string",
       "enum": [
         "strict",
@@ -1562,23 +1562,6 @@
       "additionalProperties": {
         "$ref": "#/definitions/Level"
       }
-    },
-    "SemanticsOptions": {
-      "type": "object",
-      "properties": {
-        "isinstance-narrowing": {
-          "description": "Controls how ty narrows to unspecialized generic classes in `isinstance()` checks.\n\nWith `strict`, ty uses fully static bounds in the top materialization. For example,\n`isinstance(value, Sequence)` narrows an `object` value to `Sequence[object]`.\n\nWith `relaxed`, ty still narrows to the top materialization, but retains gradual behavior\nin its bounds. The same check narrows to `Sequence[object*]`, where `object*` simplifies\nlike `object` but behaves like `Unknown` when used. For invariant classes, reads and writes\nsimilarly use the gradual bounds `object*` and `Never*`.\nThese starred names are internal, reveal-only notation and cannot be written in annotations.\n\nDefaults to `relaxed`.",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/IsInstanceNarrowing"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "additionalProperties": false
     },
     "SrcOptions": {
       "type": "object",

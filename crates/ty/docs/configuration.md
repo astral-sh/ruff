@@ -83,6 +83,44 @@ any module where the first component contains the substring `test`, use `*test*.
 
 ---
 
+### `generic-narrowing`
+
+Controls how ty narrows to unspecialized generic classes in `isinstance()` checks and
+functions returning `TypeIs`.
+
+With `strict`, ty uses fully static bounds in the top materialization. For example,
+narrowing an `object` value to `Sequence` results in `Sequence[object]`.
+
+With `relaxed`, ty still narrows to the top materialization, but retains gradual behavior
+in its bounds. The same narrowing results in `Sequence[object*]`, where `object*` simplifies
+like `object` but behaves like `Unknown` when used. For invariant classes, reads and writes
+similarly use the gradual bounds `object*` and `Never*`.
+These starred names are internal, reveal-only notation and cannot be written in annotations.
+
+Defaults to `relaxed`.
+
+**Default value**: `relaxed`
+
+**Type**: `strict | relaxed`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    generic-narrowing = "strict"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    generic-narrowing = "strict"
+    ```
+
+---
+
 ### `replace-imports-with-any`
 
 A list of module glob patterns whose imports should be replaced with `typing.Any`.
@@ -577,6 +615,44 @@ any module where the first component contains the substring `test`, use `*test*.
 
 ---
 
+#### `generic-narrowing`
+
+Controls how ty narrows to unspecialized generic classes in `isinstance()` checks and
+functions returning `TypeIs`.
+
+With `strict`, ty uses fully static bounds in the top materialization. For example,
+narrowing an `object` value to `Sequence` results in `Sequence[object]`.
+
+With `relaxed`, ty still narrows to the top materialization, but retains gradual behavior
+in its bounds. The same narrowing results in `Sequence[object*]`, where `object*` simplifies
+like `object` but behaves like `Unknown` when used. For invariant classes, reads and writes
+similarly use the gradual bounds `object*` and `Never*`.
+These starred names are internal, reveal-only notation and cannot be written in annotations.
+
+Defaults to `relaxed`.
+
+**Default value**: `relaxed`
+
+**Type**: `strict | relaxed`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    generic-narrowing = "strict"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    generic-narrowing = "strict"
+    ```
+
+---
+
 #### `replace-imports-with-any`
 
 A list of module glob patterns whose imports should be replaced with `typing.Any`.
@@ -650,45 +726,6 @@ Defaults to `true`.
     [overrides.analysis]
     # Disable support for `type: ignore` comments
     respect-type-ignore-comments = false
-    ```
-
----
-
-## `semantics`
-
-### `isinstance-narrowing`
-
-Controls how ty narrows to unspecialized generic classes in `isinstance()` checks.
-
-With `strict`, ty uses fully static bounds in the top materialization. For example,
-`isinstance(value, Sequence)` narrows an `object` value to `Sequence[object]`.
-
-With `relaxed`, ty still narrows to the top materialization, but retains gradual behavior
-in its bounds. The same check narrows to `Sequence[object*]`, where `object*` simplifies
-like `object` but behaves like `Unknown` when used. For invariant classes, reads and writes
-similarly use the gradual bounds `object*` and `Never*`.
-These starred names are internal, reveal-only notation and cannot be written in annotations.
-
-Defaults to `relaxed`.
-
-**Default value**: `relaxed`
-
-**Type**: `strict | relaxed`
-
-**Example usage**:
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ty.semantics]
-    isinstance-narrowing = "strict"
-    ```
-
-=== "ty.toml"
-
-    ```toml
-    [semantics]
-    isinstance-narrowing = "strict"
     ```
 
 ---
