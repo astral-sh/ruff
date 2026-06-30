@@ -11,3 +11,4 @@
 - Rejected — Cross-target loop dependency cycles are outside Issue 162's realistic partial-sum case; modeling them requires a new dependency graph, and Pyright also leaves this case literal-precise.
 - Rejected — Nested same-name binders only cause safe over-widening in a contrived case; precise handling requires nested-scope name resolution, while mypy likewise widens to `str`.
 - Fixed — Preserve unused-binding usage and target ranges per comprehension walrus definition.
+- Fixed — Preserve walrus writes and conditional boundness from rejected comprehension-filter paths.

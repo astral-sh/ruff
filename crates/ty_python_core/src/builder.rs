@@ -2623,8 +2623,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             value,
         );
 
+        let mut rejected_filter_paths = Vec::new();
         for if_expr in &generator.ifs {
-            self.visit_comprehension_filter(if_expr);
+            rejected_filter_paths.push(self.visit_comprehension_filter(if_expr));
         }
 
         for generator in generators_iter {
@@ -2641,24 +2642,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             );
 
             for if_expr in &generator.ifs {
-                self.visit_comprehension_filter(if_expr);
+                rejected_filter_paths.push(self.visit_comprehension_filter(if_expr));
             }
         }
 
         visit_outer_elt(self);
+        for rejected_filter_path in rejected_filter_paths {
+            self.flow_merge(rejected_filter_path);
+        }
         let nested_bindings = self.pop_scope();
         self.synthesize_comprehension_binding_definitions(nested_bindings);
 
         self.current_assignments = saved_assignments;
     }
 
-    fn visit_comprehension_filter(&mut self, if_expr: &'ast ast::Expr) {
+    fn visit_comprehension_filter(&mut self, if_expr: &'ast ast::Expr) -> FlowSnapshot {
         self.visit_expr(if_expr);
+        let fallback = self.flow_snapshot();
         let condition_flow_snapshot = self.flow_snapshot_for_condition(if_expr);
-        if let Some(truthy) = condition_flow_snapshot.into_truthy() {
-            self.flow_restore(truthy);
-        }
+        let rejected = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
+            self.flow_restore(snapshots.truthy);
+            snapshots.falsy
+        } else {
+            fallback
+        };
         let _ = self.record_expression_narrowing_constraint(if_expr);
+        rejected
     }
 
     fn declare_parameters(&mut self, parameters: &'ast ast::Parameters) {
