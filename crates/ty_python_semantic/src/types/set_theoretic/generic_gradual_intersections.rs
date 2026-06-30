@@ -39,11 +39,34 @@ pub(super) fn negated_generalization_bottom<'db>(
     }
 
     dynamic_generalization_of(db, general, specific)?;
-    if specific.has_dynamic(db) {
+    if has_semantic_dynamic(db, specific) {
         None
     } else {
         Some(general.bottom_materialization(db))
     }
+}
+
+/// Return whether a generic specialization contains dynamic information that is semantically
+/// relevant to its type arguments.
+///
+/// A concrete `ParamSpecValue` has a synthetic `Unknown` return type which is only an internal
+/// representation detail. Its parameter list can still be fully static.
+fn has_semantic_dynamic(db: &dyn Db, ty: Type) -> bool {
+    if !ty.has_dynamic(db) {
+        return false;
+    }
+
+    let Some((_, specialization)) = ty.class_specialization(db) else {
+        return true;
+    };
+
+    specialization.types(db).iter().any(|argument| {
+        argument.has_dynamic(db)
+            && !matches!(
+                argument,
+                Type::Callable(callable) if callable.is_fully_static_paramspec_value(db)
+            )
+    })
 }
 
 /// Describes how intersecting a dynamic generic specialization such as `list[Any]` with a more
@@ -188,7 +211,14 @@ fn dynamic_generalization_of<'db>(
         .variables(db)
         .zip(general_specialization.types(db))
         .zip(specific_specialization.types(db))
-        .any(|((_, general), specific)| general != specific && !general.is_non_divergent_dynamic())
+        .any(|((_, general), specific)| {
+            general != specific
+                && !general.is_non_divergent_dynamic()
+                && !matches!(
+                    general,
+                    Type::Callable(callable) if callable.is_gradual_paramspec_value(db)
+                )
+        })
     {
         return None;
     }
@@ -205,7 +235,7 @@ fn dynamic_generalization_of<'db>(
                 )
         })
     {
-        if specific.has_dynamic(db) {
+        if has_semantic_dynamic(db, specific) {
             return None;
         }
         Some(DynamicGeneralization::RebuildSpecialization {

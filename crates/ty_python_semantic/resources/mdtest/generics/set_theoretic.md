@@ -338,6 +338,36 @@ static_assert(is_equivalent_to(Invariant[P] & ~Invariant[Any], Invariant[P] & ~B
 static_assert(is_equivalent_to(~Invariant[Any] & Invariant[P], Invariant[P] & ~Bottom[Invariant[Any]] & Any))
 ```
 
+The same identity applies when a bare `...` gradually generalizes a concrete `ParamSpec`:
+
+```pyi
+from typing import Any, Awaitable, Callable, cast
+from ty_extensions import Bottom, static_assert, is_equivalent_to
+
+type GradualClassmethod = classmethod[Any, ..., Any]
+type ConcreteClassmethod = classmethod[object, [], Awaitable[None]]
+
+static_assert(
+    is_equivalent_to(
+        ConcreteClassmethod & ~GradualClassmethod,
+        ConcreteClassmethod & ~Bottom[GradualClassmethod] & Any,
+    )
+)
+
+class Task:
+    def __init__(
+        self,
+        fn: Callable[[], Awaitable[None]] | ConcreteClassmethod,
+    ) -> None:
+        if isinstance(fn, classmethod):
+            fn = cast(Callable[[], Awaitable[None]], fn.__func__)
+        assert callable(fn)
+        self.fn = fn
+
+async def run() -> None:
+    await Task(run).fn()
+```
+
 ## Edge cases
 
 ### Multi-parameter and mixed-variance generics

@@ -13,7 +13,7 @@ use crate::{
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
-        signatures::{CallableSignature, PartialSignatureApplication},
+        signatures::{CallableSignature, ParametersKind, PartialSignatureApplication},
         visitor, walk_signature,
     },
 };
@@ -488,6 +488,34 @@ impl<'db> CallableType<'db> {
 
     pub(crate) fn is_staticmethod_like(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::StaticMethodLike)
+    }
+
+    /// Return `true` if this callable is the gradual `...` value for a `ParamSpec`.
+    ///
+    /// This intentionally does not match arbitrary gradual callables or prefixed gradual forms
+    /// such as `Callable[Concatenate[int, ...], object]`.
+    pub(crate) fn is_gradual_paramspec_value(self, db: &'db dyn Db) -> bool {
+        self.kind(db) == CallableTypeKind::ParamSpecValue
+            && self
+                .signatures(db)
+                .iter()
+                .all(|signature| signature.parameters().kind() == ParametersKind::Gradual)
+    }
+
+    /// Return `true` if this callable represents a fully-static concrete `ParamSpec` value.
+    ///
+    /// The synthetic return type of a `ParamSpecValue` is `Unknown`, but it is not part of the
+    /// represented parameter list and should not make a concrete specialization gradual.
+    pub(crate) fn is_fully_static_paramspec_value(self, db: &'db dyn Db) -> bool {
+        self.kind(db) == CallableTypeKind::ParamSpecValue
+            && self.signatures(db).iter().all(|signature| {
+                signature.parameters().kind() == ParametersKind::Standard
+                    && signature
+                        .parameters()
+                        .as_slice()
+                        .iter()
+                        .all(|parameter| !parameter.annotated_type().has_dynamic(db))
+            })
     }
 
     /// Returns `true` if this callable represents a function used as a class member.

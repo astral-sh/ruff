@@ -1403,7 +1403,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 if self.is_eager_assignability()
                     && !bound_typevar.is_inferable(db, self.inferable)
                     && bound_typevar.is_paramspec(db)
-                    && Self::is_gradual_paramspec_value(db, other) =>
+                    && other.is_gradual_paramspec_value(db) =>
             {
                 self.always()
             }
@@ -2288,24 +2288,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             signature_relation_visitor: self.signature_relation_visitor,
             materialization_visitor: self.materialization_visitor,
         }
-    }
-
-    /// Return `true` if `callable` is the gradual `...` value for a `ParamSpec`.
-    ///
-    /// For example, in `Command[Any, ..., Any]`, the middle type argument is represented as a
-    /// callable-shaped `ParamSpec` value with gradual parameters. That value is assignability-
-    /// consistent with a concrete `ParamSpec` specialization such as the middle type argument in
-    /// `Command[int, [str], object]`.
-    ///
-    /// This intentionally does not match arbitrary gradual callables like `Callable[..., object]`
-    /// or prefixed gradual forms like `Callable[Concatenate[int, ...], object]`; it only matches
-    /// the internal value used to represent a bare `...` `ParamSpec` specialization.
-    fn is_gradual_paramspec_value(db: &'db dyn Db, callable: CallableType<'db>) -> bool {
-        callable.kind(db) == CallableTypeKind::ParamSpecValue
-            && callable
-                .signatures(db)
-                .iter()
-                .all(|signature| signature.parameters().kind() == ParametersKind::Gradual)
     }
 
     /// Returns `true` if `callable` is the top materialization of a `ParamSpec` value.
