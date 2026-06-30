@@ -94,6 +94,14 @@ def possibly_unbound_binding(flag: bool):
     # error: [possibly-unresolved-reference] "Name `maybe` used when possibly not defined"
     reveal_type(maybe)  # revealed: Literal[1]
 
+def filter_binding(flag: bool):
+    [value for value in [True, False] if (last_filter_value := value)]
+    reveal_type(last_filter_value)  # revealed: bool
+
+    [0 for _ in [0] if flag and (conditional_filter_value := 1)]
+    # error: [possibly-unresolved-reference] "Name `conditional_filter_value` used when possibly not defined"
+    reveal_type(conditional_filter_value)  # revealed: Literal[1]
+
 def partial_sum():
     total = 0
     [total := total + value for value in [1, 2]]
