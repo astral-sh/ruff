@@ -759,6 +759,10 @@ pub struct UseDefMap<'db> {
         DefinitionsAtDefinition<InternedBindingsId, InternedDeclarationsId>,
     >,
 
+    /// Default prior state for definitions omitted from `definitions_by_definition`.
+    initial_definitions_at_definition:
+        DefinitionsAtDefinition<InternedBindingsId, InternedDeclarationsId>,
+
     /// Retained [`PlaceState`] values for each symbol.
     symbol_states: FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates<InternedPlaceStateId>>,
 
@@ -1042,7 +1046,11 @@ impl<'db> UseDefMap<'db> {
         &self,
         definition: Definition<'db>,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings_id = self.definitions_by_definition[&definition].bindings;
+        let bindings_id = self
+            .definitions_by_definition
+            .get(&definition)
+            .unwrap_or(&self.initial_definitions_at_definition)
+            .bindings;
         self.bindings_iterator(
             &self.interned_bindings[bindings_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
@@ -1053,7 +1061,10 @@ impl<'db> UseDefMap<'db> {
         &self,
         binding: Definition<'db>,
     ) -> DeclarationsIterator<'_, 'db> {
-        let declarations_id = self.definitions_by_definition[&binding]
+        let declarations_id = self
+            .definitions_by_definition
+            .get(&binding)
+            .unwrap_or(&self.initial_definitions_at_definition)
             .declarations
             .expect("binding definition should have retained declarations");
         self.declarations_iterator(
@@ -2527,6 +2538,14 @@ impl<'db> UseDefMapBuilder<'db> {
             interned_ids_by_declarations_capacity,
             interned_declarations_capacity,
         );
+        let initial_definitions_at_definition = {
+            let (bindings, declarations) =
+                PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE).into_parts();
+            DefinitionsAtDefinition {
+                bindings: place_state_interner.intern_bindings(&bindings),
+                declarations: Some(place_state_interner.intern_declarations(declarations)),
+            }
+        };
         // These fields are manually interned because they have a statistically high duplication rate (>50%).
         let definitions_by_definition = Self::intern_definitions_by_definition(
             self.definitions_by_definition,
@@ -2583,6 +2602,13 @@ impl<'db> UseDefMapBuilder<'db> {
                 &mut self.reachability_constraints,
             );
         }
+        // Keep default entries while building so they remain barriers between non-contiguous
+        // ranges with the same metadata. Once construction is complete, absence represents the
+        // default of reachable code outside a `TYPE_CHECKING` block.
+        self.range_reachability.retain(|(_, info)| {
+            info.reachability != ScopedReachabilityConstraintId::ALWAYS_TRUE
+                || info.in_type_checking_block
+        });
         for &(_, RangeInfo { reachability, .. }) in &self.range_reachability {
             self.reachability_constraints.mark_used(reachability);
         }
@@ -2634,6 +2660,7 @@ impl<'db> UseDefMapBuilder<'db> {
             range_reachability: self.range_reachability.into_boxed_slice(),
             symbol_states,
             definitions_by_definition,
+            initial_definitions_at_definition,
             extra,
             end_of_scope_reachability: self.reachability,
         }
@@ -2681,6 +2708,14 @@ impl<'db> UseDefMapBuilder<'db> {
             },
         ) in definitions_by_definition
         {
+            if bindings.is_always_unbound()
+                && declarations
+                    .as_ref()
+                    .is_none_or(Declarations::is_always_undeclared)
+            {
+                continue;
+            }
+
             let bindings = place_state_interner.intern_bindings(&bindings);
             let declarations = declarations
                 .map(|declarations| place_state_interner.intern_declarations(declarations));
