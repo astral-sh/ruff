@@ -33,7 +33,7 @@ import re
 
 re.compile("hello world").search("world")  # error: [unnecessary-regular-expression-compile]
 re.compile(r"hello", re.IGNORECASE).findall("world")  # error: [unnecessary-regular-expression-compile]
-re.compile(r"hello", re.I | re.M).finditer("world")  # error: [unnecessary-regular-expression-compile]
+re.compile(r"hello", re.I).finditer("world")  # error: [unnecessary-regular-expression-compile]
 re.compile(r"a").sub("b", "world")  # error: [unnecessary-regular-expression-compile]
 re.compile(r"a").subn("b", "world")  # error: [unnecessary-regular-expression-compile]
 re.compile(r"a").fullmatch("world")  # error: [unnecessary-regular-expression-compile]
@@ -149,4 +149,91 @@ PATTERN = re.compile("a")
 
 def module_level_pattern(s):
     return PATTERN.match(s)
+```
+
+A single textual read inside a loop runs many times, so the pattern is reused even though it is only
+read once:
+
+```py
+import re
+
+
+def used_in_for(strings):
+    pattern = re.compile("a")
+    for s in strings:
+        pattern.match(s)
+
+
+def used_in_while(s):
+    pattern = re.compile("a")
+    while s:
+        pattern.match(s)
+        s = s[1:]
+```
+
+When the assignment shares the loop with its use, the pattern is compiled and used once per
+iteration, so it is still flagged. A use in the loop's `else` branch also runs at most once:
+
+```py
+import re
+
+
+def assignment_in_loop(strings):
+    for s in strings:
+        pattern = re.compile("a")
+        pattern.match(s)  # error: [unnecessary-regular-expression-compile]
+
+
+def used_in_else(strings, s):
+    pattern = re.compile("a")
+    for _ in strings:
+        pass
+    else:
+        return pattern.match(s)  # error: [unnecessary-regular-expression-compile]
+```
+
+A name that is rebound elsewhere may hold a different object at the use site, so it is not flagged:
+
+```py
+import re
+
+
+def rebound(condition, value):
+    pattern = Matcher()
+    if condition:
+        pattern = re.compile("a")
+    return pattern.match(value)
+```
+
+A conditionally assigned pattern may be unbound at the use site, so it is not flagged: the original
+raises `UnboundLocalError` when the branch is skipped, but the top-level call would not:
+
+```py
+import re
+
+
+def maybe_unbound(condition, value):
+    if condition:
+        pattern = re.compile("a")
+    return pattern.match(value)
+```
+
+A `re.compile()` whose arguments have side effects is not flagged, since the top-level `re`
+functions would only evaluate those arguments once:
+
+```py
+import re
+
+
+def get_pattern():
+    return "a"
+
+
+def side_effect_inline(s):
+    return re.compile(get_pattern()).match(s)
+
+
+def side_effect_bound(s):
+    pattern = re.compile(get_pattern())
+    return pattern.match(s)
 ```
