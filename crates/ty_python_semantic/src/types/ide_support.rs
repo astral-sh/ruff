@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 use crate::FxIndexSet;
 use crate::place::builtins_module_scope;
@@ -21,7 +21,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::Module;
-use ty_python_core::definition::{Definition, DefinitionKind, NestedBindingExecution};
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::{attribute_scopes, global_scope, semantic_index, use_def_map};
 
 mod unreachable_code;
@@ -81,30 +81,10 @@ pub fn definitions_for_name<'db>(
             continue; // Name not found in this scope, try parent scope
         };
 
-        let use_def_map = index.use_def_map(scope_id);
-
         // Check if this place is marked as global or nonlocal
         let place_expr = place_table.symbol(symbol_id);
         let is_global = place_expr.is_global();
         let is_nonlocal = place_expr.is_nonlocal();
-
-        if is_global || is_nonlocal {
-            // Assignments in a forwarding scope remain valid navigation targets, including eager
-            // walrus bindings exported from comprehensions.
-            all_definitions.extend(user_visible_definitions(
-                db,
-                use_def_map
-                    .reachable_symbol_bindings(symbol_id)
-                    .filter_map(|binding| binding.binding.definition())
-                    .filter(|definition| match definition.kind(db) {
-                        DefinitionKind::NamedExpression(_) => true,
-                        DefinitionKind::NestedBindings(nested) => {
-                            nested.execution == NestedBindingExecution::Eager
-                        }
-                        _ => false,
-                    }),
-            ));
-        }
 
         // TODO: The current algorithm doesn't return definitions or bindings
         // for other scopes that are outside of this scope hierarchy that target
@@ -119,7 +99,7 @@ pub fn definitions_for_name<'db>(
 
             if let Some(global_symbol_id) = global_place_table.symbol_id(name_str) {
                 let global_use_def_map = ty_python_core::use_def_map(db, global_scope_id);
-                all_definitions.extend(user_visible_definitions(
+                all_definitions.extend(reachable_definitions(
                     db,
                     global_use_def_map
                         .reachable_symbol_bindings(global_symbol_id)
@@ -140,8 +120,10 @@ pub fn definitions_for_name<'db>(
             continue;
         }
 
+        let use_def_map = index.use_def_map(scope_id);
+
         // Get all definitions (both bindings and declarations) for this place
-        all_definitions.extend(user_visible_definitions(
+        all_definitions.extend(reachable_definitions(
             db,
             use_def_map
                 .reachable_symbol_bindings(symbol_id)
@@ -423,52 +405,14 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
     resolved
 }
 
-/// Returns the user-visible definitions represented by a use-def binding.
-///
-/// Comprehension walruses are represented in the containing scope by synthetic eager bindings:
-///
-/// ```python
-/// [(last := item) for item in items]
-/// print(last)  # Go to definition should select `last := item` above.
-/// ```
-///
-/// The binding for the use in `print` is synthetic, so follow it into the comprehension's
-/// end-of-scope bindings. Nested comprehensions can produce a chain of these proxies.
-fn user_visible_definitions<'db>(
+fn reachable_definitions<'db>(
     db: &'db dyn Db,
     definitions: impl IntoIterator<Item = Definition<'db>>,
 ) -> FxIndexSet<Definition<'db>> {
-    let mut pending = definitions.into_iter().collect::<VecDeque<_>>();
-    let mut seen = FxHashSet::default();
-    let mut result = FxIndexSet::default();
-
-    while let Some(definition) = pending.pop_front() {
-        if !seen.insert(definition) {
-            continue;
-        }
-
-        match definition.kind(db) {
-            DefinitionKind::NestedBindings(nested) => {
-                let index = semantic_index(db, definition.file(db));
-                let sources = nested
-                    .binding_sources(index)
-                    .flat_map(|(_, bindings)| bindings)
-                    .filter_map(|binding| binding.binding.definition());
-                // A lazy function proxy can lead to an eager comprehension proxy. Follow that
-                // proxy-only chain without exposing ordinary lazy nested assignments.
-                pending.extend(sources.filter(|source| {
-                    nested.execution == NestedBindingExecution::Eager
-                        || matches!(source.kind(db), DefinitionKind::NestedBindings(_))
-                }));
-            }
-            kind if kind.is_user_visible() => {
-                result.insert(definition);
-            }
-            _ => {}
-        }
-    }
-
-    result
+    definitions
+        .into_iter()
+        .filter(|definition| definition.kind(db).is_user_visible())
+        .collect()
 }
 
 fn resolve_reachable_definitions<'db>(
@@ -476,7 +420,7 @@ fn resolve_reachable_definitions<'db>(
     symbol_name: &str,
     definitions: impl IntoIterator<Item = Definition<'db>>,
 ) -> Vec<ResolvedDefinition<'db>> {
-    user_visible_definitions(db, definitions)
+    reachable_definitions(db, definitions)
         .into_iter()
         .flat_map(|definition| {
             resolve_definition(
@@ -1723,9 +1667,7 @@ mod resolve_definition {
             }
         }
 
-        super::user_visible_definitions(db, definitions)
-            .into_iter()
-            .collect()
+        definitions
     }
 
     /// Given a definition that may be in a stub file, find the "real" definition in a non-stub.
