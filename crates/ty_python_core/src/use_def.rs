@@ -2291,6 +2291,11 @@ impl<'db> UseDefMapBuilder<'db> {
             .map(LiveBinding::binding)
     }
 
+    pub(super) fn symbol_has_used_binding(&self, symbol: ScopedSymbolId) -> bool {
+        self.symbol_binding_definition_ids(symbol)
+            .any(|definition| self.used_bindings[definition])
+    }
+
     pub(super) fn symbol_live_binding_status(
         &mut self,
         symbol: ScopedSymbolId,

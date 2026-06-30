@@ -1890,6 +1890,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         })
                 });
 
+            let eager_binding_is_used = execution == NestedBindingExecution::Eager
+                && declarations.iter().any(|declaration| {
+                    let scope_id = declaration.file_scope_id;
+                    self.place_tables[scope_id]
+                        .symbol_id(&name)
+                        .is_some_and(|symbol| {
+                            self.use_def_maps[scope_id].symbol_has_used_binding(symbol)
+                        })
+                });
+
             let symbol = self.add_symbol(name.clone());
 
             // Nested comprehensions share the scope containing the outermost comprehension. Keep
@@ -1980,6 +1990,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .record_binding(place, definition, previous, future);
 
             if execution == NestedBindingExecution::Eager {
+                if eager_binding_is_used {
+                    self.current_use_def_map_mut()
+                        .mark_binding_definitions_used([definition_id]);
+                }
                 self.delete_associated_bindings(place);
                 self.record_pending_capture_binding(symbol, definition_id);
                 self.update_lazy_snapshots(symbol);
