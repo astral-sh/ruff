@@ -2,8 +2,8 @@
 
 ## Later comprehension targets cannot be modeled precisely by the current loop headers
 
-The branch now carries later generator targets through enclosing comprehension loop headers. This
-fixes the type of a target left behind by a completed inner loop:
+An earlier version of the branch carried later generator targets through enclosing comprehension
+loop headers. This fixed the type of a target left behind by a completed inner loop:
 
 ```py
 first = True
@@ -48,3 +48,9 @@ headers. This restores the definite unresolved-reference diagnostic for reads be
 assignment, at the cost of retaining the existing loss of precision for values left behind by prior
 inner iterations. Precise support for both cases should be handled separately as a larger control-
 flow project.
+
+### Resolution
+
+Later generator targets are now excluded from enclosing loop headers. The comprehension mdtests
+cover both the restored first-iteration diagnostic and the intentionally conservative loss of the
+prior inner iteration's target type.

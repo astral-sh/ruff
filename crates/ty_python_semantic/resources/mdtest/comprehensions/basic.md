@@ -237,10 +237,25 @@ def inner_generator_loop_back_edge():
     ]
 ```
 
-### Later generator targets on enclosing back edges
+### Later generator targets
 
-A later generator's target is freshly assigned for each of its own iterations, but its final value
-remains visible when the enclosing generator starts its next iteration:
+A later generator's target is unbound before that generator starts its first iteration. It must not
+be carried through an enclosing loop header, even if a named expression in the suffix causes that
+header to be created:
+
+```py
+def later_generator_target_unbound_on_first_iteration():
+    [
+        None
+        for _ in [0, 1]
+        if later_target  # error: [unresolved-reference]
+        for later_target in [1]
+        if (flag := True)
+    ]
+```
+
+This conservatively loses the final value left behind by a completed inner loop. Modeling both
+states would require correlating the later target with whether its generator has run:
 
 ```py
 def later_generator_target_on_outer_back_edge():
@@ -250,17 +265,13 @@ def later_generator_target_on_outer_back_edge():
         for _ in [0, 1]
         if (
             (
-                later_target_value := ""
-                if later_target_first
-                # TODO: This is also reported for equivalent explicit nested loops because loop
-                # headers do not correlate the two loop-carried bindings.
-                else later_target_y  # error: [possibly-unresolved-reference]
+                later_target_value := "" if later_target_first else later_target_y  # error: [unresolved-reference]
             )
             or True
         )
         for later_target_y in [1]
     ]
-    reveal_type(later_target_value)  # revealed: str | int
+    reveal_type(later_target_value)  # revealed: str | Unknown
 ```
 
 ### Function-local targets
