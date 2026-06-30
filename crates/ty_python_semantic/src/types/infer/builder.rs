@@ -2516,6 +2516,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let mut union = UnionBuilder::new(db).recursively_defined(recursively_defined);
         for bindings in binding_sources {
+            if nested_bindings_kind.execution == NestedBindingExecution::Eager {
+                // A comprehension can execute repeatedly, so a source that is unreachable in the
+                // first modeled iteration may become reachable in a later one. Preserve each
+                // source's narrowed type and let the proxy's outer use-def state track boundness.
+                for binding in bindings {
+                    let DefinitionState::Defined(source) = binding.binding else {
+                        continue;
+                    };
+                    let ty = binding_type(db, source);
+                    union.add_in_place(binding.narrowing_constraint.narrow(
+                        db,
+                        ty,
+                        source.place(db),
+                    ));
+                }
+                continue;
+            }
+
             let Some(ty) = place_from_bindings_with_reachability_cache(
                 db,
                 bindings,

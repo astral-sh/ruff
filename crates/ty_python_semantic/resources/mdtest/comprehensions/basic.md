@@ -106,6 +106,18 @@ def conditional_without_previous_value(flag: bool):
     reveal_type(value)  # revealed: int
 ```
 
+A comprehension may execute repeatedly, so the exported binding conservatively retains its value
+type when a condition is only proven false during type inference. The target remains possibly
+unbound, and reading it must not make the rest of the function appear unreachable:
+
+```py
+def statically_false_condition():
+    [(value := 1) if 0 == 1 else 0 for _ in [0]]
+    # error: [possibly-unresolved-reference]
+    reveal_type(value)  # revealed: int
+    still_reachable  # error: [unresolved-reference]
+```
+
 ### Comprehension filters
 
 A false filter skips the element, but an assignment made while evaluating that filter still takes
@@ -155,6 +167,17 @@ def two_dependent_targets():
     [(y := x, x := y + 1) for _ in [1, 2]]
     reveal_type(x)  # revealed: int
     reveal_type(y)  # revealed: int
+```
+
+A guard can also depend on a value changed by a later assignment in the same iteration. The first
+iteration below sets `flag`, so the second iteration assigns `value`:
+
+```py
+def loop_carried_guard():
+    flag = False
+    [((value := 1) if flag else 0, (flag := True)) for _ in [0, 1]]
+    # error: [possibly-unresolved-reference]
+    reveal_type(value)  # revealed: int
 ```
 
 ### Function-local targets
