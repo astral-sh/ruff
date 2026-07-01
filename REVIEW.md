@@ -1,0 +1,26 @@
+# Review decisions
+
+- Fixed — Model issue #3535 through direct metaclass instance-variable declarations. The declaration is a contract for an attribute stored in each constructed class namespace.
+- Rejected — Infer arbitrary metaclass method writes as constructed-class attributes. A method-only assignment is deliberately insufficient without a class-body declaration.
+- Rejected — Screen inferred writes against data descriptors. The narrow implementation does not infer writes, so descriptor interception is not part of this change.
+- Rejected — Model custom-metaclass shadows of builtin `type` descriptors. No builtin descriptor shim is needed for declaration contracts.
+- Rejected — Ignore annotation-only declarations when deciding whether an attribute exists. ty intentionally treats declarations as attribute contracts.
+- Rejected — Inspect higher-order metaclass-populated descriptors. Higher-order runtime namespace reconstruction is outside issue #3535.
+- Rejected — Distinguish definite and possible descriptor unions. The removed write-propagation model was the only consumer of this distinction.
+- Rejected — Add special descriptor handling for direct dynamic types. Dynamic runtime values are outside the declaration-contract lookup.
+- Rejected — Add special descriptor handling for dynamic union arms. Union-valued runtime writes are outside the declaration-contract lookup.
+- Rejected — Distinguish dynamic alternatives from dynamic generic arguments during descriptor screening. Descriptor screening was removed.
+- Rejected — Resolve descriptor type aliases before screening. Descriptor screening was removed.
+- Rejected — Let higher-order populated descriptors override declared class contracts. That requires modeling physical runtime overwrite order rather than ty's declaration abstraction.
+- Rejected — Route TypeVars, NewTypes, and exact enum literals through a populated-runtime namespace lookup. The issue only requires direct nominal instances.
+- Rejected — Preserve constrained TypeVar metaclass alternatives. Alternative-metaclass runtime inference is outside the direct nominal declaration lookup.
+- Rejected — Include metaclass-populated namespaces in bound-`super` lookup. `super()` is outside issue #3535.
+- Rejected — Restrict inferred writes to construction hooks or account for custom `__setattr__`. The implementation no longer infers any method writes.
+- Rejected — Expose non-data members inherited directly from `type`. They are not declarations of attributes stored in constructed classes.
+- Rejected — Preserve NewType and exact-enum receivers through descriptor binding. Those representations are no longer routed through this feature.
+- Rejected — Continue descriptor lookup through metaclass mixins after `type`. The implementation performs no descriptor lookup.
+- Rejected — Recover descriptors hidden by declared supertypes such as `object`. Declared types remain contracts; runtime binding reconstruction is out of scope.
+- Rejected — Infer attributes from populating mixins that follow `type` in the metaclass MRO. Inherited method writes are outside the declaration contract.
+- Rejected — Analyze conditional non-descriptor shadows before propagating writes. No writes are propagated.
+- Rejected — Preserve union-valued metaclasses through nominal-instance lookup. Alternative runtime metaclasses are outside this issue.
+- Rejected — Distribute union-valued metaclasses during inherited or `super()` lookup. Those lookup paths are unchanged.

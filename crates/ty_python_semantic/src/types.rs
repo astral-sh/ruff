@@ -2775,6 +2775,11 @@ impl<'db> Type<'db> {
                 }
             }
 
+            Type::NominalInstance(_) => {
+                self.to_meta_type(db)
+                    .class_namespace_member(db, name.as_str(), policy)
+            }
+
             Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => self
                 .to_meta_type(db)
                 .class_object_member(db, name.as_str(), policy),
@@ -2841,6 +2846,29 @@ impl<'db> Type<'db> {
         } else {
             metaclass_attr.or_fall_back_to(db, || class_attr)
         }
+    }
+
+    /// Look up class attributes inherited by instances of this class.
+    ///
+    /// A direct instance-variable declaration on the metaclass is a contract for an attribute that
+    /// the metaclass stores in each constructed class's namespace.
+    fn class_namespace_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        let class_attr = self.find_name_in_mro_with_policy(db, name, policy).expect(
+            "Calling `class_namespace_member` on a class literal should always find an MRO",
+        );
+        let metaclass_declaration = self
+            .to_meta_type(db)
+            .to_instance(db)
+            .and_then(|metaclass| metaclass.nominal_class(db))
+            .map_or_else(PlaceAndQualifiers::default, |metaclass| {
+                metaclass.own_declared_instance_member(db, name).inner
+            });
+        class_attr.or_fall_back_to(db, || metaclass_declaration)
     }
 
     /// This function roughly corresponds to looking up an attribute in the `__dict__` of an object.
