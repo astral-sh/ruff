@@ -1385,9 +1385,7 @@ reveal_type(ShadowsInheritedGeneratedProperty().generated)  # revealed: str
 
 # A generated data descriptor takes precedence over an instance attribute.
 class GeneratedDescriptor:
-    def __get__(
-        self, instance: object, owner: type | None = None
-    ) -> Literal["descriptor"]:
+    def __get__(self, instance: object, owner: type | None = None) -> Literal["descriptor"]:
         return "descriptor"
 
     def __set__(self, instance: object, value: int) -> None: ...
@@ -1404,6 +1402,21 @@ class UsesGeneratedDescriptor(metaclass=DescriptorMeta):
         self.generated_descriptor = 1
 
 reveal_type(UsesGeneratedDescriptor().generated_descriptor)  # revealed: Literal["descriptor"]
+
+# A generated contract that may be a data descriptor preserves the descriptor result alongside
+# the value stored on the instance.
+class MaybeDescriptorMeta(type):
+    generated_descriptor: GeneratedDescriptor | int
+
+    def __new__(mcls, name: str, bases: tuple[type, ...], namespace: dict[str, object]):
+        namespace["generated_descriptor"] = GeneratedDescriptor()
+        return super().__new__(mcls, name, bases, namespace)
+
+class UsesMaybeGeneratedDescriptor(metaclass=MaybeDescriptorMeta):
+    def __init__(self) -> None:
+        self.generated_descriptor = 1
+
+reveal_type(UsesMaybeGeneratedDescriptor().generated_descriptor)  # revealed: Literal["descriptor"] | int
 
 # An annotation-only instance declaration does not create a class-namespace binding that could
 # shadow the generated data descriptor.
