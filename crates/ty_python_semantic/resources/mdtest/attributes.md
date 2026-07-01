@@ -1342,6 +1342,14 @@ class StoresGenerated(GeneratedBase, metaclass=StoringMeta): ...
 
 reveal_type(StoresGenerated().generated)  # revealed: int
 
+# An instance member initialized directly on the constructed class takes precedence over the
+# metaclass declaration.
+class InitializesGenerated(metaclass=StoringMeta):
+    def __init__(self) -> None:
+        self.generated: str = "instance"
+
+reveal_type(InitializesGenerated().generated)  # revealed: str
+
 # A bound metaclass class attribute is not stored in the constructed class's namespace.
 class MetaclassAttributeOnly(type):
     metaclass_only: int = 1
