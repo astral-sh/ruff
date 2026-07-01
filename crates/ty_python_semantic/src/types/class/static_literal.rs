@@ -2634,15 +2634,12 @@ impl<'db> StaticClassLiteral<'db> {
 
     fn has_own_implicit_instance_member(self, db: &'db dyn Db, name: &str) -> bool {
         let body_scope = self.body_scope(db);
-        if implicit_attribute_names(db, body_scope)
-            .binary_search_by(|candidate| candidate.as_str().cmp(name))
-            .is_err()
-        {
-            return false;
-        }
-        implicit_instance_attribute_names(db, body_scope)
+        implicit_attribute_names(db, body_scope)
             .binary_search_by(|candidate| candidate.as_str().cmp(name))
             .is_ok()
+            && implicit_instance_attribute_names(db, body_scope)
+                .binary_search_by(|candidate| candidate.as_str().cmp(name))
+                .is_ok()
     }
 
     /// Return whether this class has an annotation-only declaration that contributes an instance
@@ -3416,8 +3413,6 @@ fn method_matches_decorator<'db>(
         return true;
     };
 
-    // Check the decorators directly on the AST node. This is more reliable than checking the
-    // final evaluated type, which may be wrapped by other decorators like `@cache`.
     let function_node = method.node(&module);
     let definition = index.expect_single_definition(method);
     let mut is_classmethod = is_implicit_classmethod(&function_node.name);

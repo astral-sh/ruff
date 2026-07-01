@@ -1981,90 +1981,38 @@ impl<'db> ClassType<'db> {
     ///
     /// This excludes inherited declarations and declarations with a class-body binding.
     pub(super) fn own_declared_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
-        match self {
-            Self::NonGeneric(ClassLiteral::Static(class)) => {
-                class.own_declared_instance_member(db, name)
-            }
-            Self::Generic(generic) => {
-                let specialization = generic.specialization(db);
-                generic
-                    .origin(db)
-                    .own_declared_instance_member(db, name)
-                    .map_type(|ty| ty.apply_optional_specialization(db, Some(specialization)))
-            }
-            Self::NonGeneric(
-                ClassLiteral::Dynamic(_)
-                | ClassLiteral::DynamicNamedTuple(_)
-                | ClassLiteral::DynamicTypedDict(_)
-                | ClassLiteral::DynamicEnum(_),
-            ) => Member::default(),
-        }
+        let Some((class, specialization)) = self.static_class_literal(db) else {
+            return Member::unbound();
+        };
+        class
+            .own_declared_instance_member(db, name)
+            .map_type(|ty| ty.apply_optional_specialization(db, specialization))
     }
 
     /// Return whether this class or any of its bases declares or assigns an instance member named
     /// `name`.
     pub(super) fn has_instance_member(self, db: &'db dyn Db, name: &str) -> bool {
-        self.iter_mro(db).any(|base| match base {
-            ClassBase::Class(class) => class.has_own_inheritable_instance_member(db, name),
-            ClassBase::Any
-            | ClassBase::Dynamic(_)
-            | ClassBase::Divergent(_)
-            | ClassBase::Generic
-            | ClassBase::Protocol
-            | ClassBase::TypedDict(_) => false,
-        })
+        self.iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .any(|class| class.has_own_inheritable_instance_member(db, name))
     }
 
     fn has_own_inheritable_instance_member(self, db: &'db dyn Db, name: &str) -> bool {
-        match self {
-            Self::NonGeneric(ClassLiteral::Static(class)) => {
-                class.has_own_inheritable_instance_member(db, name)
-            }
-            Self::Generic(generic) => generic
-                .origin(db)
-                .has_own_inheritable_instance_member(db, name),
-            Self::NonGeneric(
-                ClassLiteral::Dynamic(_)
-                | ClassLiteral::DynamicNamedTuple(_)
-                | ClassLiteral::DynamicTypedDict(_)
-                | ClassLiteral::DynamicEnum(_),
-            ) => false,
-        }
+        self.static_class_literal(db)
+            .is_some_and(|(class, _)| class.has_own_inheritable_instance_member(db, name))
     }
 
     /// Return whether this class directly declares an instance member named `name` in its body.
     pub(super) fn has_own_instance_declaration(self, db: &'db dyn Db, name: &str) -> bool {
-        match self {
-            Self::NonGeneric(ClassLiteral::Static(class)) => {
-                class.has_own_instance_declaration(db, name)
-            }
-            Self::Generic(generic) => generic.origin(db).has_own_instance_declaration(db, name),
-            Self::NonGeneric(
-                ClassLiteral::Dynamic(_)
-                | ClassLiteral::DynamicNamedTuple(_)
-                | ClassLiteral::DynamicTypedDict(_)
-                | ClassLiteral::DynamicEnum(_),
-            ) => false,
-        }
+        self.static_class_literal(db)
+            .is_some_and(|(class, _)| class.has_own_instance_declaration(db, name))
     }
 
     /// Return whether this class has an annotation-only instance declaration named `name` in its
     /// body.
     pub(super) fn has_own_unbound_instance_declaration(self, db: &'db dyn Db, name: &str) -> bool {
-        match self {
-            Self::NonGeneric(ClassLiteral::Static(class)) => {
-                class.has_own_unbound_instance_declaration(db, name)
-            }
-            Self::Generic(generic) => generic
-                .origin(db)
-                .has_own_unbound_instance_declaration(db, name),
-            Self::NonGeneric(
-                ClassLiteral::Dynamic(_)
-                | ClassLiteral::DynamicNamedTuple(_)
-                | ClassLiteral::DynamicTypedDict(_)
-                | ClassLiteral::DynamicEnum(_),
-            ) => false,
-        }
+        self.static_class_literal(db)
+            .is_some_and(|(class, _)| class.has_own_unbound_instance_declaration(db, name))
     }
 
     /// Returns the converter input type for a dataclass field, if the field has a `converter`.
