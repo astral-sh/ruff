@@ -2058,7 +2058,7 @@ Sequence patterns also contribute to negative narrowing and exhaustiveness. Exac
 make a match exhaustive.
 
 ```py
-from typing import NamedTuple
+from typing import Any, NamedTuple
 from typing_extensions import assert_never
 
 class HasX:
@@ -2077,6 +2077,11 @@ def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
             reveal_type(subj)  # revealed: tuple[int | str, int]
             reveal_type(subj[0])  # revealed: int | str
             reveal_type(subj[1])  # revealed: int
+
+def match_exact_tuple_sequence_preserves_gradualness(value: tuple[Any]) -> None:
+    match value:
+        case [str()]:
+            reveal_type(value)  # revealed: tuple[Any & str]
 
 def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) -> int:
     match value:

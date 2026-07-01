@@ -13,7 +13,6 @@ use crate::types::tuple::{
 use crate::types::typed_dict::{
     TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
-use crate::types::visitor::any_over_type;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -942,8 +941,8 @@ fn positive_class_pattern_type<'db>(
 /// annotation preserve the builtin relationship between iteration and indexing. Statically known
 /// tuple subclasses are not refined here.
 ///
-/// Dynamic element types remain represented by the synthesized sequence protocol. Replacing a
-/// gradual tuple element such as `Any` with the observed pattern type would lose gradualness.
+/// Gradual tuple elements retain their uncertainty through intersection with the observed pattern
+/// type. For example, matching `tuple[Any]` against `[str()]` produces `tuple[Any & str]`.
 ///
 /// In the example below, `subject_ty` is `tuple[int | str]`, `pattern_element_types` is `[str]`,
 /// and the refined type returned is `tuple[str]`.
@@ -960,15 +959,6 @@ fn refine_exact_tuple_for_sequence_pattern<'db>(
     pattern_element_types: &[Type<'db>],
 ) -> Option<Type<'db>> {
     let tuple = subject_ty.exact_tuple_instance_spec(db)?;
-    if tuple
-        .all_elements()
-        .iter()
-        .chain(pattern_element_types)
-        .any(|element| any_over_type(db, *element, true, |ty| ty.is_dynamic()))
-    {
-        return None;
-    }
-
     let pattern_tuple = TupleSpec::heterogeneous(pattern_element_types.iter().copied());
     Some(
         TupleSpecBuilder::from(tuple.as_ref())
