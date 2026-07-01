@@ -185,6 +185,17 @@ The loop-back value does not hide that the name is unbound on the first iteratio
 
 ```py
 def missing_initial_value():
+    [value := value + 1 for _ in [0, 1]]  # error: [unresolved-reference]
+
+def missing_initial_value_after_filter(flag: bool):
+    [value := value + 1 for _ in [0, 1] if flag]  # error: [unresolved-reference]
+
+def missing_initial_value_in_nested_generator():
+    [value := value + 1 for _ in [0, 1] for _ in [0, 1]]  # error: [unresolved-reference]
+
+def possibly_missing_initial_value(flag: bool):
+    if flag:
+        value = 0
     [value := value + 1 for _ in [0, 1]]  # error: [possibly-unresolved-reference]
 ```
 

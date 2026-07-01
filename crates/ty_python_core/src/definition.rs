@@ -1586,6 +1586,10 @@ impl LoopHeaderDefinitionKind {
         self.loop_header_id
     }
 
+    pub fn is_comprehension(&self) -> bool {
+        matches!(&self.loop_node, LoopNodeKind::Comprehension(_))
+    }
+
     pub fn place(&self) -> ScopedPlaceId {
         self.place
     }

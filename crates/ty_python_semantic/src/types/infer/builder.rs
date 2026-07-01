@@ -124,6 +124,7 @@ use ty_python_core::narrowing_constraints::ConstraintKey;
 use ty_python_core::node_key::NodeKey;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
 use ty_python_core::predicate::PatternPredicate;
+use ty_python_core::reachability_constraints::ScopedReachabilityConstraintId;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
 use ty_python_core::symbol::{ScopedSymbolId, Symbol};
 use ty_python_core::{
@@ -173,6 +174,41 @@ impl<'db> DeclaredAndInferredType<'db> {
             TypeOrigin::Inferred,
             TypeQualifiers::empty(),
         ))
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PlaceLoad<'db> {
+    resolved: PlaceAndQualifiers<'db>,
+    unbound_on_first_comprehension_entry: bool,
+}
+
+impl<'db> PlaceLoad<'db> {
+    fn or_fall_back_to(
+        self,
+        db: &'db dyn Db,
+        fallback_fn: impl FnOnce() -> PlaceAndQualifiers<'db>,
+    ) -> Self {
+        let mut fallback_has_binding = false;
+        let resolved = self.resolved.or_fall_back_to(db, || {
+            let fallback = fallback_fn();
+            fallback_has_binding = !fallback.is_undefined();
+            fallback
+        });
+
+        Self {
+            resolved,
+            unbound_on_first_comprehension_entry: self.unbound_on_first_comprehension_entry
+                && !fallback_has_binding,
+        }
+    }
+
+    fn finish(self) -> PlaceAndQualifiers<'db> {
+        if self.unbound_on_first_comprehension_entry {
+            Place::Undefined.with_qualifiers(self.resolved.qualifiers)
+        } else {
+            self.resolved
+        }
     }
 }
 
@@ -9602,7 +9638,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else {
                     Place::Undefined.into()
                 }
-            });
+            })
+            .finish();
 
         let ty =
             resolved_after_fallback.unwrap_with_diagnostic(db, |lookup_error| match lookup_error {
@@ -9769,7 +9806,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &self,
         place_expr: PlaceExprRef,
         expr_ref: ast::ExprRef,
-    ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
+    ) -> (PlaceLoad<'db>, Vec<(FileScopeId, ConstraintKey)>) {
         let db = self.db();
         let scope = self.scope();
         let file_scope_id = scope.file_scope_id(db);
@@ -9777,11 +9814,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut constraint_keys = vec![];
         let (local_scope_place, use_id) = self.infer_local_place_load(place_expr, expr_ref);
+        // Keep the initial entry state separate while resolving enclosing bindings. A real entry
+        // binding should be unioned with the back edge, but a lone back edge cannot rescue an
+        // unbound read on the first iteration.
+        let unbound_on_first_comprehension_entry = use_id.is_some_and(|use_id| {
+            let mut has_unbound_entry = false;
+            let mut has_comprehension_loop_back = false;
+
+            for binding in self
+                .index
+                .use_def_map(file_scope_id)
+                .bindings_at_use(use_id)
+            {
+                if binding.reachability_constraint == ScopedReachabilityConstraintId::ALWAYS_FALSE {
+                    continue;
+                }
+                match binding.binding {
+                    DefinitionState::Undefined => {
+                        has_unbound_entry = true;
+                    }
+                    DefinitionState::Defined(definition)
+                        if matches!(
+                            definition.kind(db),
+                            DefinitionKind::LoopHeader(header) if header.is_comprehension()
+                        ) =>
+                    {
+                        has_comprehension_loop_back = true;
+                    }
+                    _ => return false,
+                }
+            }
+
+            has_unbound_entry && has_comprehension_loop_back
+        });
         if let Some(use_id) = use_id {
             constraint_keys.push((file_scope_id, ConstraintKey::UseId(use_id)));
         }
 
-        let place = PlaceAndQualifiers::from(local_scope_place).or_fall_back_to(db, || {
+        let place = PlaceLoad {
+            resolved: PlaceAndQualifiers::from(local_scope_place),
+            unbound_on_first_comprehension_entry,
+        }
+        .or_fall_back_to(db, || {
             let mut symbol_resolves_locally = false;
             if let Some(symbol) = place_expr.as_symbol()
                 && let Some(symbol_id) = place_table.symbol_id(symbol.name())
@@ -10060,7 +10134,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 })
         });
 
-        if let Some(ty) = place.place.ignore_possibly_undefined() {
+        if let Some(ty) = place.resolved.place.ignore_possibly_undefined() {
             self.check_deprecated(expr_ref, ty);
         }
 
@@ -10241,7 +10315,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ty,
                 definedness: Definedness::AlwaysDefined,
                 ..
-            }) = resolved.place
+            }) = resolved.resolved.place
             {
                 assigned_type = Some(ty);
             }

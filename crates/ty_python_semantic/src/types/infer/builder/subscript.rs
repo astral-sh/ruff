@@ -196,7 +196,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ty,
                     definedness: Definedness::AlwaysDefined,
                     ..
-                }) = place.place
+                }) = place.resolved.place
                 {
                     // Even if we can obtain the subscript type based on the assignments, we still perform default type inference
                     // (to store the expression type and to report errors).
