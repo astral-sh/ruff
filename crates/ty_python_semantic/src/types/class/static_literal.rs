@@ -2508,12 +2508,38 @@ impl<'db> StaticClassLiteral<'db> {
         self.own_instance_member(db, name)
     }
 
-    /// Return whether this class directly declares or assigns an instance member named `name`.
-    pub(super) fn has_own_instance_member(self, db: &'db dyn Db, name: &str) -> bool {
-        self.has_own_instance_declaration(db, name)
-            || implicit_instance_attribute_names(db, self.body_scope(db))
-                .binary_search_by(|candidate| candidate.as_str().cmp(name))
-                .is_ok()
+    /// Return whether this class directly defines an instance member that can be inherited.
+    pub(super) fn has_own_inheritable_instance_member(self, db: &'db dyn Db, name: &str) -> bool {
+        self.has_own_unbound_instance_declaration(db, name)
+            || self.has_own_implicit_instance_member(db, name)
+    }
+
+    fn has_own_implicit_instance_member(self, db: &'db dyn Db, name: &str) -> bool {
+        let body_scope = self.body_scope(db);
+        if implicit_attribute_names(db, body_scope)
+            .binary_search_by(|candidate| candidate.as_str().cmp(name))
+            .is_err()
+        {
+            return false;
+        }
+        implicit_instance_attribute_names(db, body_scope)
+            .binary_search_by(|candidate| candidate.as_str().cmp(name))
+            .is_ok()
+    }
+
+    fn has_own_unbound_instance_declaration(self, db: &'db dyn Db, name: &str) -> bool {
+        let body_scope = self.body_scope(db);
+        let Some(symbol_id) = place_table(db, body_scope).symbol_id(name) else {
+            return false;
+        };
+        let use_def = use_def_map(db, body_scope);
+        use_def
+            .end_of_scope_symbol_declarations(symbol_id)
+            .next()
+            .is_some()
+            && !use_def
+                .end_of_scope_symbol_bindings(symbol_id)
+                .any(|binding| binding.binding.definition().is_some())
     }
 
     /// Return whether this class directly declares an instance member named `name` in its body.

@@ -1350,6 +1350,15 @@ class InitializesGenerated(metaclass=StoringMeta):
 
 reveal_type(InitializesGenerated().generated)  # revealed: str
 
+# An inherited instance member also takes precedence over a normal generated class attribute.
+class InitializesInheritedGenerated:
+    def __init__(self) -> None:
+        self.generated: str = "instance"
+
+class InheritsGenerated(InitializesInheritedGenerated, metaclass=StoringMeta): ...
+
+reveal_type(InheritsGenerated().generated)  # revealed: str
+
 # A generated data descriptor takes precedence over an instance attribute.
 class GeneratedDescriptor:
     def __get__(
