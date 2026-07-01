@@ -1444,6 +1444,23 @@ class UsesMaybeGeneratedDescriptorWithBytes(metaclass=MaybeDescriptorMeta):
 
 reveal_type(UsesMaybeGeneratedDescriptorWithBytes().generated_descriptor)  # revealed: Literal["descriptor"] | bytes
 
+# A dynamic union arm is excluded by the existing possible-descriptor heuristic, so the retained
+# descriptor arm must be treated as only possibly present and compose with the instance value.
+class MaybeDynamicDescriptorMeta(type):
+    generated_descriptor: GeneratedDescriptor | Any
+
+    def __new__(mcls, name: str, bases: tuple[type, ...], namespace: dict[str, object]):
+        namespace["generated_descriptor"] = GeneratedDescriptor()
+        return super().__new__(mcls, name, bases, namespace)
+
+class DynamicDescriptorInstanceBase:
+    def __init__(self) -> None:
+        self.generated_descriptor: bytes = b"instance"
+
+class UsesMaybeDynamicDescriptor(DynamicDescriptorInstanceBase, metaclass=MaybeDynamicDescriptorMeta): ...
+
+reveal_type(UsesMaybeDynamicDescriptor().generated_descriptor)  # revealed: Literal["descriptor"] | bytes
+
 # An annotation-only instance declaration does not create a class-namespace binding that could
 # shadow the generated data descriptor.
 class DeclaresGeneratedDescriptor(metaclass=DescriptorMeta):
