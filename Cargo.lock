@@ -558,31 +558,13 @@ dependencies = [
 
 [[package]]
 name = "codspeed"
-version = "4.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b684e94583e85a5ca7e1a6454a89d76a5121240f2fb67eb564129d9bafdb9db0"
-dependencies = [
- "anyhow",
- "cc",
- "colored 2.2.0",
- "getrandom 0.2.16",
- "glob",
- "libc",
- "nix",
- "serde",
- "serde_json",
- "statrs",
-]
-
-[[package]]
-name = "codspeed"
 version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7083f253260bcb4aaa3b4aa4c52973703dabc1a85c2f193997e2689aafa8a919"
 dependencies = [
  "anyhow",
  "cc",
- "colored 3.1.1",
+ "colored",
  "getrandom 0.4.2",
  "glob",
  "libc",
@@ -594,28 +576,28 @@ dependencies = [
 
 [[package]]
 name = "codspeed-criterion-compat"
-version = "4.4.1"
+version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e65444156eb73ad7f57618188f8d4a281726d133ef55b96d1dcff89528609ab"
+checksum = "d9f24251445188c69d50f10179d795424bd71b533b7e3f84fc03f26893b01af0"
 dependencies = [
  "clap",
- "codspeed 4.4.1",
+ "codspeed",
  "codspeed-criterion-compat-walltime",
- "colored 2.2.0",
+ "colored",
  "regex",
 ]
 
 [[package]]
 name = "codspeed-criterion-compat-walltime"
-version = "4.4.1"
+version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96389aaa4bbb872ea4924dc0335b2bb181bcf28d6eedbe8fea29afcc5bde36a6"
+checksum = "5c38205d56e2cb4fe04b708de7f9653a3f1b89edbe3a20b28f21e9e525e9e061"
 dependencies = [
  "anes",
  "cast",
  "ciborium",
  "clap",
- "codspeed 4.4.1",
+ "codspeed",
  "criterion-plot 0.5.0",
  "is-terminal",
  "itertools 0.10.5",
@@ -637,7 +619,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc1065d507e1cbab731a7976db4cef7e47e49b87b4dbc0a925df07d343558420"
 dependencies = [
  "clap",
- "codspeed 5.0.1",
+ "codspeed",
  "codspeed-divan-compat-macros",
  "codspeed-divan-compat-walltime",
  "regex",
@@ -665,7 +647,7 @@ checksum = "d2f8eae75b8fa85357020a404899c4280d590c9fd1c47640b3ce53106c62d2ee"
 dependencies = [
  "cfg-if",
  "clap",
- "codspeed 5.0.1",
+ "codspeed",
  "condtype",
  "divan-macros",
  "libc",
@@ -683,16 +665,6 @@ name = "colorchoice"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
-
-[[package]]
-name = "colored"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "117725a109d387c937a1533ce01b450cbde6b88abceea8473c4d7a85853cda3c"
-dependencies = [
- "lazy_static",
- "windows-sys 0.59.0",
-]
 
 [[package]]
 name = "colored"
@@ -2111,7 +2083,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "camino",
- "colored 3.1.1",
+ "colored",
  "indexmap",
  "insta",
  "memchr",
@@ -3105,7 +3077,7 @@ dependencies = [
  "clap",
  "clap_complete_command",
  "clearscreen",
- "colored 3.1.1",
+ "colored",
  "dunce",
  "filetime",
  "globwalk",
@@ -3367,7 +3339,7 @@ dependencies = [
  "anyhow",
  "bitflags 2.13.0",
  "clap",
- "colored 3.1.1",
+ "colored",
  "compact_str",
  "fern",
  "glob",
@@ -3801,7 +3773,7 @@ name = "ruff_workspace"
 version = "0.0.3"
 dependencies = [
  "anyhow",
- "colored 3.1.1",
+ "colored",
  "etcetera",
  "glob",
  "globset",
@@ -4647,7 +4619,7 @@ dependencies = [
  "clap",
  "clap_complete_command",
  "clearscreen",
- "colored 3.1.1",
+ "colored",
  "crossbeam",
  "ctrlc",
  "dunce",
@@ -4796,7 +4768,7 @@ dependencies = [
  "anyhow",
  "bitvec",
  "camino",
- "colored 3.1.1",
+ "colored",
  "crossbeam",
  "get-size2",
  "globset",
@@ -4966,7 +4938,7 @@ name = "ty_site_packages"
 version = "0.0.3"
 dependencies = [
  "camino",
- "colored 3.1.1",
+ "colored",
  "get-size2",
  "indexmap",
  "ruff_annotate_snippets",
