@@ -2612,8 +2612,10 @@ impl<'db> StaticClassLiteral<'db> {
 
     /// Return whether this class directly defines an instance member that can be inherited.
     pub(super) fn has_own_inheritable_instance_member(self, db: &'db dyn Db, name: &str) -> bool {
-        self.has_own_unbound_instance_declaration(db, name)
+        let may_have_instance_member = self.has_own_unbound_declaration(db, name)
             || self.has_own_implicit_instance_member(db, name)
+            || self.is_own_dataclass_instance_field(db, name);
+        may_have_instance_member && !self.own_instance_member(db, name).inner.is_undefined()
     }
 
     fn has_own_implicit_instance_member(self, db: &'db dyn Db, name: &str) -> bool {
@@ -2630,6 +2632,11 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     pub(super) fn has_own_unbound_instance_declaration(self, db: &'db dyn Db, name: &str) -> bool {
+        self.has_own_unbound_declaration(db, name)
+            && !self.own_instance_member(db, name).inner.is_undefined()
+    }
+
+    fn has_own_unbound_declaration(self, db: &'db dyn Db, name: &str) -> bool {
         let body_scope = self.body_scope(db);
         let Some(symbol_id) = place_table(db, body_scope).symbol_id(name) else {
             return false;

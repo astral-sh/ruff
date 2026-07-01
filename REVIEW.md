@@ -10,6 +10,7 @@
 - Fixed — Ignore instance assignments in conditionally defined methods when deciding precedence. They cannot suppress an always-present metaclass contract.
 - Fixed — Preserve generated data-descriptor contracts despite direct instance writes. Descriptor precedence is part of composing the new contract with existing lookup semantics.
 - Fixed — Preserve inherited constructed-class instance members over normal generated attributes. The new lookup must not degrade instance-member behavior already supported on `main`.
+- Fixed — Keep inherited-instance preflight aligned with actual lookup. Filtered declarations such as `ClassVar` are not instance members, while synthesized dataclass fields are.
 - Fixed — Do not resurrect inherited descriptors after a normal generated member shadows them. Return the effective instance member rather than the inherited class-member lookup.
 - Fixed — Let generated data descriptors override direct annotation-only instance declarations. An annotation creates no class-namespace binding that can shadow the installed descriptor.
 - Rejected — Include declarations inherited by the concrete metaclass. Clean `main` already leaves this unresolved, and supporting it would expand the direct-declaration contract rather than prevent a regression.

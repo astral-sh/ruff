@@ -1299,6 +1299,7 @@ reveal_type(InitializedDerived.inherited_attr)  # revealed: int
 
 # A metaclass declaration can describe an attribute that the metaclass stores in the namespace of
 # each class it constructs. The declared attribute is then available on instances of that class.
+from dataclasses import dataclass
 from typing import Any, Iterator, Literal, Protocol, TypeVar
 
 class EnumProtocol(Protocol):
@@ -1358,6 +1359,23 @@ class InitializesInheritedGenerated:
 class InheritsGenerated(InitializesInheritedGenerated, metaclass=StoringMeta): ...
 
 reveal_type(InheritsGenerated().generated)  # revealed: str
+
+# An inherited ClassVar is not an instance member, so it cannot suppress the generated attribute.
+class ClassVarGeneratedBase:
+    generated: ClassVar[str]
+
+class InheritsClassVarGenerated(ClassVarGeneratedBase, metaclass=StoringMeta): ...
+
+reveal_type(InheritsClassVarGenerated().generated)  # revealed: int
+
+# A dataclass field is initialized on the instance even without an explicit assignment in a method.
+@dataclass
+class DataclassGeneratedBase:
+    generated: str = "instance"
+
+class InheritsDataclassGenerated(DataclassGeneratedBase, metaclass=StoringMeta): ...
+
+reveal_type(InheritsDataclassGenerated().generated)  # revealed: str
 
 # A normal generated class attribute shadows an inherited descriptor, allowing an instance
 # attribute to take precedence over the generated value.
