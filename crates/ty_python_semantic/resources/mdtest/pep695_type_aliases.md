@@ -633,9 +633,9 @@ type StableWrapped[T] = list[StableWrapped[T]]
 def stable_wrapped(x: StableWrapped[int], y: StableWrapped[str]):
     reveal_type(x)  # revealed: list[StableWrapped[int]]
     reveal_type(y)  # revealed: list[StableWrapped[str]]
-    # error: [invalid-assignment] "Cannot assign `list[StableWrapped[str]]` to `list[StableWrapped[int]]`"
+    # error: [invalid-assignment] "Object of type `StableWrapped[str]` is not assignable to `StableWrapped[int]`"
     x = y
-    # error: [invalid-assignment] "Cannot assign `list[StableWrapped[int]]` to `list[StableWrapped[str]]`"
+    # error: [invalid-assignment] "Object of type `StableWrapped[int]` is not assignable to `StableWrapped[str]`"
     y = x
 ```
 

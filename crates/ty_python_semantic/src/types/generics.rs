@@ -738,6 +738,7 @@ impl<'db> GenericContext<'db> {
         struct FindTypeVarLocations<'db> {
             locations: RefCell<TypeVarLocations<'db>>,
             recursion_guard: TypeCollector<'db>,
+            active_type_aliases: RefCell<FxHashSet<Definition<'db>>>,
             in_return_type: bool,
             in_callable_type: Cell<Option<CallableType<'db>>>,
         }
@@ -789,6 +790,26 @@ impl<'db> GenericContext<'db> {
                 // The default implementation would do this for us if we returned `true` from
                 // `should_visit_lazy_type_attributes`. However, this is the _only_ lazy type
                 // attribute that we want to recurse into, so we do it by hand.
+                let definition = type_alias.definition(db);
+                if !self.active_type_aliases.borrow_mut().insert(definition) {
+                    // Keep recursive aliases finite while still seeing typevars in their current
+                    // specialization.
+                    let specialization = type_alias.specialization(db).or_else(|| {
+                        type_alias
+                            .generic_context(db)
+                            .map(|generic_context| generic_context.default_specialization(db, None))
+                    });
+                    if let Some(specialization) = specialization {
+                        for ty in specialization.types(db) {
+                            self.visit_type(db, *ty);
+                        }
+                        if let Some(tuple) = specialization.tuple_inner(db) {
+                            walk_tuple_type(db, tuple, self);
+                        }
+                    }
+                    return;
+                }
+
                 match type_alias {
                     TypeAliasType::PEP695(type_alias) => {
                         walk_pep_695_type_alias(db, type_alias, self);
@@ -797,6 +818,8 @@ impl<'db> GenericContext<'db> {
                         walk_manual_pep_695_type_alias(db, type_alias, self);
                     }
                 }
+
+                self.active_type_aliases.borrow_mut().remove(&definition);
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -1554,7 +1577,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// Whether two types encountered in an invariant position
     /// have a relation (subtyping or assignability), taking into account
     /// that the two types may come from a top or bottom materialization.
-    fn check_relation_in_invariant_position(
+    pub(super) fn check_relation_in_invariant_position(
         &self,
         db: &'db dyn Db,
         source_type: Type<'db>,
