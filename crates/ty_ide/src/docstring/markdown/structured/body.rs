@@ -1,10 +1,12 @@
+use std::borrow::Cow;
+
 use crate::docstring::document::preformatted::PreformattedBlockScanner;
 use crate::docstring::document::syntax::{ParsedLine, indentation, strip_code_span_wrapper};
 
 use super::{SectionItem, SectionKind};
 
 pub(super) struct SectionItemBuilder<'a> {
-    display_name: Option<&'a str>,
+    display_name: Option<Cow<'a, str>>,
     ty: Option<&'a str>,
     inline_description: Option<&'a str>,
     continuation_lines: Vec<&'a str>,
@@ -18,7 +20,7 @@ impl<'a> SectionItemBuilder<'a> {
     ) -> Self {
         let inline_description = inline_description.trim();
         Self {
-            display_name,
+            display_name: display_name.map(Cow::Borrowed),
             ty: ty.map(strip_code_span_wrapper),
             inline_description: (!inline_description.is_empty()).then_some(inline_description),
             continuation_lines: Vec::new(),
@@ -27,7 +29,11 @@ impl<'a> SectionItemBuilder<'a> {
 
     pub(super) fn finish(self, kind: SectionKind) -> SectionItem {
         let description = self.description_source();
-        SectionItem::new(kind, self.display_name, self.ty, description)
+        SectionItem::new(kind, self.display_name.as_deref(), self.ty, description)
+    }
+
+    pub(super) fn set_display_name(&mut self, display_name: impl Into<String>) {
+        self.display_name = Some(Cow::Owned(display_name.into()));
     }
 
     pub(super) fn push_description(&mut self, line: &'a str) {
@@ -73,9 +79,19 @@ impl<'a> SectionItemBuilder<'a> {
 pub(super) fn parse_named_items<'a>(
     kind: SectionKind,
     body: &[ParsedLine<'a>],
-    parse_item: impl FnMut(&ParsedLine<'a>) -> Option<SectionItemBuilder<'a>>,
+    parse_item: impl Fn(&ParsedLine<'a>) -> Option<SectionItemBuilder<'a>>,
 ) -> Option<Vec<SectionItem>> {
-    parse_named_items_impl(kind, None, body, parse_item)
+    parse_named_items_impl(kind, None, None, false, body, parse_item)
+}
+
+/// Parses named items while preserving prose before the first item.
+pub(super) fn parse_named_items_with_leading_prose<'a>(
+    kind: SectionKind,
+    body: &[ParsedLine<'a>],
+    parse_item: impl Fn(&ParsedLine<'a>) -> Option<SectionItemBuilder<'a>>,
+) -> Option<Vec<SectionItem>> {
+    let item_indent = shallowest_item_indent(body, &parse_item)?;
+    parse_named_items_impl(kind, None, Some(item_indent), true, body, parse_item)
 }
 
 /// Parses named items while accepting continuations aligned with a first-line section heading.
@@ -83,32 +99,39 @@ pub(super) fn parse_named_items_with_aligned_continuations<'a>(
     kind: SectionKind,
     header_indent: usize,
     body: &[ParsedLine<'a>],
-    parse_item: impl FnMut(&ParsedLine<'a>) -> Option<SectionItemBuilder<'a>>,
+    parse_item: impl Fn(&ParsedLine<'a>) -> Option<SectionItemBuilder<'a>>,
 ) -> Option<Vec<SectionItem>> {
-    parse_named_items_impl(kind, Some(header_indent), body, parse_item)
+    parse_named_items_impl(kind, Some(header_indent), None, false, body, parse_item)
 }
 
 fn parse_named_items_impl<'a>(
     kind: SectionKind,
     aligned_continuation_indent: Option<usize>,
+    required_item_indent: Option<usize>,
+    preserve_leading_prose: bool,
     body: &[ParsedLine<'a>],
-    mut parse_item: impl FnMut(&ParsedLine<'a>) -> Option<SectionItemBuilder<'a>>,
+    parse_item: impl Fn(&ParsedLine<'a>) -> Option<SectionItemBuilder<'a>>,
 ) -> Option<Vec<SectionItem>> {
     let mut items = Vec::new();
     let mut current: Option<SectionItemBuilder<'a>> = None;
+    let mut leading_prose = Vec::new();
     let mut item_indent = None;
     let mut preformatted = PreformattedBlockScanner::default();
 
     for line in body {
-        if let Some(current) = &mut current
-            && preformatted.consume_preformatted_line(line.text)
-        {
-            if !line.text.trim().is_empty()
-                && item_indent.is_some_and(|indent| indentation(line.text) < indent)
-            {
+        if preformatted.consume_preformatted_line(line.text) {
+            if let Some(current) = &mut current {
+                if !line.text.trim().is_empty()
+                    && item_indent.is_some_and(|indent| indentation(line.text) <= indent)
+                {
+                    return None;
+                }
+                current.push_description(line.text);
+            } else if preserve_leading_prose {
+                leading_prose.push(line.text);
+            } else {
                 return None;
             }
-            current.push_description(line.text);
             continue;
         }
 
@@ -116,13 +139,27 @@ fn parse_named_items_impl<'a>(
         if trimmed.is_empty() {
             if let Some(current) = &mut current {
                 current.push_description("");
+            } else if preserve_leading_prose {
+                leading_prose.push("");
             }
             continue;
         }
 
         let line_indent = indentation(line.text);
-        if item_indent.is_none_or(|indent| line_indent == indent) {
+        if item_indent.map_or_else(
+            || required_item_indent.is_none_or(|indent| line_indent == indent),
+            |indent| line_indent == indent,
+        ) {
             if let Some(item) = parse_item(line) {
+                if preserve_leading_prose
+                    && leading_prose.iter().any(|line| !line.trim().is_empty())
+                {
+                    let mut preamble = SectionItemBuilder::new(None, None, "");
+                    for line in leading_prose.drain(..) {
+                        preamble.push_description(line);
+                    }
+                    items.push(preamble.finish(kind));
+                }
                 if let Some(current) = current.replace(item) {
                     items.push(current.finish(kind));
                 }
@@ -149,6 +186,12 @@ fn parse_named_items_impl<'a>(
             return None;
         }
 
+        if current.is_none() && preserve_leading_prose {
+            leading_prose.push(line.text);
+            preformatted.observe_line_outside_preformatted_block(line.text);
+            continue;
+        }
+
         let current = current.as_mut()?;
         current.push_description(line.text);
         preformatted.observe_line_outside_preformatted_block(line.text);
@@ -158,6 +201,29 @@ fn parse_named_items_impl<'a>(
         items.push(current.finish(kind));
     }
     (!items.is_empty()).then_some(items)
+}
+
+fn shallowest_item_indent<'a>(
+    body: &[ParsedLine<'a>],
+    parse_item: &impl Fn(&ParsedLine<'a>) -> Option<SectionItemBuilder<'a>>,
+) -> Option<usize> {
+    let mut preformatted = PreformattedBlockScanner::default();
+    let mut item_indent = None;
+
+    for line in body {
+        if preformatted.consume_preformatted_line(line.text) {
+            continue;
+        }
+
+        if parse_item(line).is_some() {
+            let line_indent = indentation(line.text);
+            item_indent =
+                Some(item_indent.map_or(line_indent, |indent: usize| indent.min(line_indent)));
+        }
+        preformatted.observe_line_outside_preformatted_block(line.text);
+    }
+
+    item_indent
 }
 
 fn strip_indentation(line: &str, width: usize) -> &str {
