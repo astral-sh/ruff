@@ -1820,9 +1820,8 @@ class Meta(type):
 
 class UsesMeta(metaclass=Meta): ...
 
-# TODO: these should pass
-static_assert(is_subtype_of(UsesMeta, HasX))  # error: [static-assert-error]
-static_assert(is_assignable_to(UsesMeta, HasX))  # error: [static-assert-error]
+static_assert(is_subtype_of(UsesMeta, HasX))
+static_assert(is_assignable_to(UsesMeta, HasX))
 ```
 
 ## `ClassVar` attribute members

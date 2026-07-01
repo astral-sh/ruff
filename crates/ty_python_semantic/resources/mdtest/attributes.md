@@ -1296,6 +1296,56 @@ class DeclaringBase:
 class InitializedDerived(DeclaringBase, metaclass=DerivedInitializingMeta): ...
 
 reveal_type(InitializedDerived.inherited_attr)  # revealed: int
+
+# A metaclass declaration can describe an attribute that the metaclass stores in the namespace of
+# each class it constructs. The declared attribute is then available on instances of that class.
+from typing import Iterator, Protocol, TypeVar
+
+class EnumProtocol(Protocol):
+    _member_map_: dict[str, int]
+
+    def __init__(self, value: int) -> None: ...
+
+T = TypeVar("T", bound=EnumProtocol)
+
+class EnumMeta(type, EnumProtocol):
+    _member_map_: dict[str, int]
+
+    def __new__(mcls, name: str, bases: tuple[type, ...], namespace: dict[str, object]):
+        namespace["_member_map_"] = {"one": 1}
+        return super().__new__(mcls, name, bases, namespace)
+
+    def __iter__(cls: type[T]) -> Iterator[T]:
+        return iter(cls(value) for value in cls._member_map_.values())
+
+class EnumValue(int, metaclass=EnumMeta):
+    def __init__(self, value: int) -> None: ...
+
+reveal_type(EnumValue(1)._member_map_)  # revealed: dict[str, int]
+
+for member in EnumValue:
+    reveal_type(member)  # revealed: EnumValue
+
+# A bound metaclass class attribute is not stored in the constructed class's namespace.
+class MetaclassAttributeOnly(type):
+    metaclass_only: int = 1
+
+class DoesNotInheritMetaclassAttribute(metaclass=MetaclassAttributeOnly): ...
+
+reveal_type(DoesNotInheritMetaclassAttribute.metaclass_only)  # revealed: int
+# error: [unresolved-attribute]
+reveal_type(DoesNotInheritMetaclassAttribute().metaclass_only)  # revealed: Unknown
+
+# An assignment in a metaclass method is not enough evidence without a class-body declaration.
+class AssignmentOnlyMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.assignment_only: int = 1
+
+class DoesNotInferAssignment(metaclass=AssignmentOnlyMeta): ...
+
+reveal_type(DoesNotInferAssignment.assignment_only)  # revealed: int
+# error: [unresolved-attribute]
+reveal_type(DoesNotInferAssignment().assignment_only)  # revealed: Unknown
 ```
 
 However, the metaclass attribute only takes precedence over a class-level attribute if it is a data

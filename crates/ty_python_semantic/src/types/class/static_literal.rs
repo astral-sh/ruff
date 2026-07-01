@@ -2655,6 +2655,24 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
+    /// Look up an instance member that has a declaration in this class's body.
+    pub(super) fn own_declared_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+        let body_scope = self.body_scope(db);
+        let table = place_table(db, body_scope);
+        let Some(symbol_id) = table.symbol_id(name) else {
+            return Member::unbound();
+        };
+        let use_def = use_def_map(db, body_scope);
+        if place_from_declarations(db, use_def.end_of_scope_symbol_declarations(symbol_id))
+            .ignore_conflicting_declarations()
+            .place
+            .is_undefined()
+        {
+            return Member::unbound();
+        }
+        self.own_instance_member(db, name)
+    }
+
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
     pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {

@@ -1977,6 +1977,28 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Look up an instance member declared directly in this class's body.
+    pub(super) fn own_declared_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+        match self {
+            Self::NonGeneric(ClassLiteral::Static(class)) => {
+                class.own_declared_instance_member(db, name)
+            }
+            Self::Generic(generic) => {
+                let specialization = generic.specialization(db);
+                generic
+                    .origin(db)
+                    .own_declared_instance_member(db, name)
+                    .map_type(|ty| ty.apply_optional_specialization(db, Some(specialization)))
+            }
+            Self::NonGeneric(
+                ClassLiteral::Dynamic(_)
+                | ClassLiteral::DynamicNamedTuple(_)
+                | ClassLiteral::DynamicTypedDict(_)
+                | ClassLiteral::DynamicEnum(_),
+            ) => Member::default(),
+        }
+    }
+
     /// Returns the converter input type for a dataclass field, if the field has a `converter`.
     pub(super) fn converter_input_type_for_field(
         self,
