@@ -40,3 +40,4 @@
 - Rejected — Analyze conditional non-descriptor shadows before propagating writes. No writes are propagated.
 - Rejected — Preserve union-valued metaclasses through nominal-instance lookup. Alternative runtime metaclasses are outside this issue.
 - Rejected — Distribute union-valued metaclasses during inherited or `super()` lookup. Those lookup paths are unchanged.
+- Rejected — Treat the one-shot Expression and steam.py ecosystem differences as branch regressions. Both projects are registered as flaky, and the workflow's ten-run classification finds no stable diagnostic changes across all 162 projects.
