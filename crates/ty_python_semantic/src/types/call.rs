@@ -62,13 +62,28 @@ impl<'db> Type<'db> {
         //
         // [1] https://docs.python.org/3/reference/datamodel.html#object.__radd__
 
-        // Technically we don't have to check left_ty != right_ty here, since if the types
-        // are the same, they will trivially have the same implementation of the reflected
-        // dunder, and so we'll fail the inner check. But the type equality check will be
-        // faster for the common case, and allow us to skip the (two) class member lookups.
+        // Reflected-method precedence is based on the operands' runtime classes, not on whether
+        // one value type is a subtype of the other. This matters for literals: an enum literal can
+        // have a class that is a strict subclass of `int` even though it is not a subtype of a
+        // specific integer literal.
+        //
+        // Technically, the type equality check is not required for correctness: equal value types
+        // have the same runtime class and reflected implementation. It provides a fast path for
+        // the common case and avoids the runtime-class checks and two class member lookups below.
+        let right_is_strict_subclass = left_ty != right_ty
+            && match (left_ty.nominal_class(db), right_ty.nominal_class(db)) {
+                (Some(left_class), Some(right_class))
+                    if !left_ty.is_type_var() && !right_ty.is_type_var() =>
+                {
+                    left_class.class_literal(db) != right_class.class_literal(db)
+                        && right_class.is_subclass_of(db, left_class)
+                }
+                _ => right_ty.is_subtype_of(db, left_ty),
+            };
+
         let left_class = left_ty.to_meta_type(db);
         let right_class = right_ty.to_meta_type(db);
-        if left_ty != right_ty && right_ty.is_subtype_of(db, left_ty) {
+        if right_is_strict_subclass {
             let reflected_dunder = op.reflected_dunder();
             let rhs_reflected = right_class.member(db, reflected_dunder).place;
             // TODO: if `rhs_reflected` is possibly unbound, we should union the two possible
