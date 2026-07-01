@@ -22,8 +22,8 @@
 - Fixed — Compose only the descriptor arms of a generated union contract with the effective instance member. Normal generated arms remain shadowed by the instance value.
 - Rejected — Add special descriptor handling for direct dynamic types. Dynamic runtime values are outside the declaration-contract lookup.
 - Rejected — Add special descriptor handling for dynamic union arms. Union-valued runtime writes are outside the declaration-contract lookup.
-- Rejected — Distinguish dynamic alternatives from dynamic generic arguments during descriptor screening. Descriptor screening was removed.
-- Rejected — Resolve descriptor type aliases before screening. Descriptor screening was removed.
+- Rejected — Distinguish dynamic alternatives from dynamic generic arguments during descriptor screening. Existing `may_be_data_descriptor` semantics deliberately exclude dynamic alternatives, and changing them is outside issue #3535.
+- Rejected — Resolve descriptor type aliases before screening. Clean `main` already mishandles descriptor-union aliases on ordinary class attributes, so fixing alias descriptor dispatch is out of scope.
 - Rejected — Let higher-order populated descriptors override declared class contracts. That requires modeling physical runtime overwrite order rather than ty's declaration abstraction.
 - Rejected — Route TypeVars, NewTypes, and exact enum literals through a populated-runtime namespace lookup. The issue only requires direct nominal instances.
 - Rejected — Preserve constrained TypeVar metaclass alternatives. Alternative-metaclass runtime inference is outside the direct nominal declaration lookup.
