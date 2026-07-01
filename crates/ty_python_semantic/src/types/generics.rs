@@ -2300,6 +2300,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         self.intersect_pending_typevar_constraint(bound_typevar, bounds);
     }
 
+    /// Adds a constraint set to the specialization that this builder is building up.
+    pub(crate) fn add_constraint_set(&mut self, set: ConstraintSet<'db, 'c>) {
+        self.pending.intersect(self.db, self.constraints, set);
+    }
+
     /// Finds all of the valid specializations of a constraint set, and adds their type mappings to
     /// the specialization that this builder is building up.
     ///

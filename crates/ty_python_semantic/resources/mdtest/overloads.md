@@ -275,9 +275,7 @@ def union_receiver(reader: Reader[int | str]):
 ## Method type variables inferred from `self`
 
 Binding an overload whose explicit receiver introduces a method type variable should infer that
-variable from the concrete receiver and apply it to the remainder of the signature. At present,
-receiver matching retains the overload, but does not yet apply the inferred `S = str`
-specialization.
+variable from the concrete receiver and apply it to the remainder of the signature.
 
 ```toml
 [environment]
@@ -285,9 +283,11 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import overload
+from typing import Any, Callable, overload
 
 class ReceiverGeneric[T]:
+    value: T
+
     @overload
     def method[S](self: "ReceiverGeneric[S]", value: S) -> S: ...
     @overload
@@ -295,19 +295,46 @@ class ReceiverGeneric[T]:
     def method(self, value: object) -> object:
         return value
 
-# TODO: `Signature::can_bind_self_to` currently reduces receiver matching to a boolean. Instead,
-# each retained overload should preserve its receiver constraints so later specialization can apply
-# them.
-# TODO: revealed: Overload[(value: str) -> str, (value: bytes) -> bytes]
-reveal_type(ReceiverGeneric[str]().method)  # revealed: Overload[[S](value: S) -> S, (value: bytes) -> bytes]
+reveal_type(ReceiverGeneric[str]().method)  # revealed: Overload[(value: str) -> str, (value: bytes) -> bytes]
+
+def takes_callable(fn: Callable[..., Any]) -> None: ...
+def use_generic_receiver[T](value: ReceiverGeneric[T]) -> None:
+    # revealed: Overload[(value: T@use_generic_receiver) -> T@use_generic_receiver, (value: bytes) -> bytes]
+    reveal_type(value.method)
+    takes_callable(value.method)
+```
+
+## Callable objects with generic explicit receivers
+
+An overloaded `__call__` method with a generic explicit receiver should still make an unspecialized
+instance callable.
+
+```py
+from typing import Any, Callable, Generic, TypeVar, overload
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def takes_callable(fn: Callable[..., Any]) -> None: ...
+
+class GenericCallable(Generic[T]):
+    @overload
+    def __call__(self: "GenericCallable[U]", value: U) -> U: ...
+    @overload
+    def __call__(self: "GenericCallable[bytes]", value: bytes) -> bytes: ...
+    def __call__(self, value: object) -> object:
+        return value
+
+    def method(self) -> None:
+        reveal_type(self.__call__)  # revealed: bound method Self@method.__call__[U](value: U) -> U
+        takes_callable(self)
 ```
 
 ## Structural protocol receivers
 
 Checking a generic protocol receiver requires solving all uses of its type variable together. Here
 `get()` would require `int` to be assignable to `T`, while `put()` would require `T` to be
-assignable to `str`, so no `T` can satisfy `ProtocolSelf[T]`. At present, the incompatible overload
-is retained because structural receiver specialization is not yet supported.
+assignable to `str`, so no `T` can satisfy `ProtocolSelf[T]`.
 
 ```py
 from typing import Callable, Protocol, TypeVar, overload
@@ -332,13 +359,93 @@ class ProtocolSelfImplementation(BaseWithProtocolSelf):
 
     def put(self, x: str) -> None: ...
 
-# TODO: The first overload should be eliminated, leaving `bound method
-# BaseWithProtocolSelf.method() -> bytes`.
-reveal_type(ProtocolSelfImplementation().method)  # revealed: Overload[[ProtocolSelfT]() -> ProtocolSelfT, () -> bytes]
+reveal_type(ProtocolSelfImplementation().method)  # revealed: bound method ProtocolSelfImplementation.method() -> bytes
 
 good_protocol_receiver: Callable[[], bytes] = ProtocolSelfImplementation().method
+bad_protocol_receiver: Callable[[], int] = ProtocolSelfImplementation().method  # error: [invalid-assignment]
+```
+
+## One-sided constraints from protocol receivers
+
+An explicit protocol receiver can constrain a method type variable without determining an exact
+specialization. The type variable should remain generic so that the bound method is assignable to
+compatible callbacks.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Protocol, overload
+
+class Producer[T](Protocol):
+    def get(self) -> T: ...
+
+class BaseWithProducer:
+    @overload
+    def method[S](self: Producer[S], value: S) -> S: ...
+    @overload
+    def method(self, value: bytes) -> bytes: ...
+    def method(self, value: object) -> object:
+        return value
+
+class ProducerImplementation(BaseWithProducer):
+    def get(self) -> str:
+        return ""
+
+reveal_type(ProducerImplementation().method)  # revealed: Overload[[S](value: S) -> S, (value: bytes) -> bytes]
+producer_callback: Callable[[object], object] = ProducerImplementation().method
+# TODO: Retain the receiver constraint when converting the bound method to another callable.
 # TODO: error: [invalid-assignment]
-bad_protocol_receiver: Callable[[], int] = ProtocolSelfImplementation().method
+bad_producer_callback: Callable[[int], int] = ProducerImplementation().method
+reveal_type(ProducerImplementation().method(1))  # revealed: str | Literal[1]
+
+class Consumer[T](Protocol):
+    def put(self, value: T) -> None: ...
+
+class BaseWithConsumer:
+    @overload
+    def method[S](self: Consumer[S], value: S) -> S: ...
+    @overload
+    def method(self, value: bytes) -> bytes: ...
+    def method(self, value: object) -> object:
+        return value
+
+class ConsumerImplementation(BaseWithConsumer):
+    def put(self, value: object) -> None:
+        pass
+
+reveal_type(ConsumerImplementation().method)  # revealed: Overload[[S](value: S) -> S, (value: bytes) -> bytes]
+consumer_callback: Callable[[str], str] = ConsumerImplementation().method
+```
+
+## Class-object receivers
+
+A generic alias receiver should determine a method type variable that only flows out of an
+overloaded metaclass method, just like a class literal.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import overload
+from ty_extensions import into_regular_callable
+
+class Meta(type):
+    @overload
+    def __call__[T](cls: type[T], value: int) -> T: ...
+    @overload
+    def __call__(cls, value: str) -> str: ...
+    def __call__(cls, value: int | str) -> object:
+        return super().__call__()
+
+class GenericTarget[T](metaclass=Meta): ...
+
+# revealed: Overload[(value: int) -> GenericTarget[int], (value: str) -> str]
+reveal_type(into_regular_callable(GenericTarget[int]))
 ```
 
 ## Constructor
