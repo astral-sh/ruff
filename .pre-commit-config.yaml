@@ -74,6 +74,28 @@ repos:
       - id: check-github-workflows
         priority: 0
 
+  # `actionlint` hook, for verifying correct syntax in GitHub Actions workflows.
+  # Some additional configuration for `actionlint` can be found in `.github/actionlint.yaml`.
+  - repo: https://github.com/rhysd/actionlint
+    rev: 914e7df21a07ef503a81201c76d2b11c789d3fca # frozen: v1.7.12
+    hooks:
+      - id: actionlint
+        stages:
+          # This hook is disabled by default, since it's quite slow.
+          # To run all hooks *including* this hook, use `uv run --only-group dev --locked prek run --all-files --hook-stage=manual`.
+          # To run *just* this hook, use `uv run --only-group dev --locked prek run actionlint --all-files --hook-stage=manual`.
+          - manual
+        args:
+          - "-ignore=SC2129" # ignorable stylistic lint from shellcheck
+          - "-ignore=SC2016" # another shellcheck lint: seems to have false positives?
+        language: golang # means renovate will also update `additional_dependencies`
+        additional_dependencies:
+          # actionlint has a shellcheck integration which extracts shell scripts in `run:` steps from GitHub Actions
+          # and checks these with shellcheck. This is arguably its most useful feature,
+          # but the integration only works if shellcheck is installed
+          - "github.com/wasilibs/go-shellcheck/cmd/shellcheck@v0.11.1"
+        priority: 0
+
   - repo: https://github.com/executablebooks/mdformat
     rev: 82912cdaea4fb830f751504486a7879c70526547 # frozen: 1.0.0
     hooks:
@@ -90,12 +112,23 @@ repos:
           )$
         priority: 0
 
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: fc310cf5c89c3772bdfae0073eeb2f200b6118bb # frozen: 0.11.25
+    hooks:
+      - id: uv-lock
+        priority: 0
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: c59bba8fb259db0fec2bbb77ad8ba51ea7341b56 # frozen: v0.15.20
     hooks:
       - id: ruff-format
         exclude: crates/ty_python_semantic/resources/corpus/
         priority: 0
+
+  # Priority 1: Second-pass fixers (e.g., markdownlint-fix runs after mdformat).
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 745be0411e3c150e246d527e531e5a221b8c3462 # frozen: v0.15.19
+    hooks:
       - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix]
         types_or: [python, pyi]
@@ -103,7 +136,6 @@ repos:
         require_serial: true
         priority: 1
 
-  # Priority 1: Second-pass fixers (e.g., markdownlint-fix runs after mdformat).
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: a4d5d37e66ebcd6b3705204a1d6dbb56dea66338 # frozen: v0.49.0
     hooks:
@@ -126,25 +158,3 @@ repos:
         files: '^crates/.*/resources/(mdtest|lint_docs)/.*\.md$'
         pass_filenames: true
         priority: 2
-
-  # `actionlint` hook, for verifying correct syntax in GitHub Actions workflows.
-  # Some additional configuration for `actionlint` can be found in `.github/actionlint.yaml`.
-  - repo: https://github.com/rhysd/actionlint
-    rev: 914e7df21a07ef503a81201c76d2b11c789d3fca # frozen: v1.7.12
-    hooks:
-      - id: actionlint
-        stages:
-          # This hook is disabled by default, since it's quite slow.
-          # To run all hooks *including* this hook, use `uvx prek run -a --hook-stage=manual`.
-          # To run *just* this hook, use `uvx prek run -a actionlint --hook-stage=manual`.
-          - manual
-        args:
-          - "-ignore=SC2129" # ignorable stylistic lint from shellcheck
-          - "-ignore=SC2016" # another shellcheck lint: seems to have false positives?
-        language: golang # means renovate will also update `additional_dependencies`
-        additional_dependencies:
-          # actionlint has a shellcheck integration which extracts shell scripts in `run:` steps from GitHub Actions
-          # and checks these with shellcheck. This is arguably its most useful feature,
-          # but the integration only works if shellcheck is installed
-          - "github.com/wasilibs/go-shellcheck/cmd/shellcheck@v0.11.1"
-        priority: 0
