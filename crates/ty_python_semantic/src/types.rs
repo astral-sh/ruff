@@ -2920,6 +2920,9 @@ impl<'db> Type<'db> {
         if generated_attribute_is_shadowed {
             return class_attr.or_fall_back_to(db, || metaclass_declaration);
         }
+        if !generated_may_be_data_descriptor && class.has_dynamic_instance_fallback(db) {
+            return class_attr;
+        }
         if class.has_instance_member(db, name) {
             if generated_may_be_data_descriptor {
                 return match metaclass_declaration {
