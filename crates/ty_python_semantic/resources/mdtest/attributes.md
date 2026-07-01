@@ -1306,7 +1306,7 @@ generic metaclass method relies on a protocol describing the classes it accepts:
 
 ```py
 from dataclasses import dataclass
-from typing import Any, ClassVar, Iterator, Literal, Protocol, TypeVar
+from typing import Any, Callable, ClassVar, Iterator, Literal, Protocol, TypeVar
 
 class EnumProtocol(Protocol):
     _member_map_: dict[str, int]
@@ -1381,6 +1381,27 @@ DynamicGeneratedBase: Any = object
 class InheritsDynamicGenerated(DynamicGeneratedBase, metaclass=StoringMeta): ...
 
 reveal_type(InheritsDynamicGenerated().generated)  # revealed: Any
+```
+
+Implicit special method lookup ignores attributes stored on an instance. It therefore uses the
+method supplied by a metaclass declaration even if the initializer assigns the same name:
+
+```py
+class IteratingMeta(type):
+    __iter__: Callable[[], Iterator[int]]
+
+    def __new__(mcls, name: str, bases: tuple[type, ...], namespace: dict[str, object]):
+        def generated(self: object) -> Iterator[int]:
+            return iter((1,))
+
+        namespace["__iter__"] = generated
+        return super().__new__(mcls, name, bases, namespace)
+
+class StoresInstanceIter(metaclass=IteratingMeta):
+    def __init__(self) -> None:
+        self.__iter__: Callable[[], Iterator[str]] = lambda: iter(("instance",))
+
+reveal_type(iter(StoresInstanceIter()))  # revealed: Iterator[int]
 ```
 
 An inherited `ClassVar` does not describe an instance attribute, but an inherited dataclass field

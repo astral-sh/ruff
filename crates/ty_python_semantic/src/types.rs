@@ -2885,17 +2885,23 @@ impl<'db> Type<'db> {
         if metaclass_declaration.is_undefined() {
             return class_attr;
         }
+        let own_class_member_is_defined = !class.own_class_member(db, None, name).is_undefined();
+        if policy.no_instance_fallback() {
+            return if own_class_member_is_defined {
+                class_attr.or_fall_back_to(db, || metaclass_declaration)
+            } else {
+                metaclass_declaration.or_fall_back_to(db, || class_attr)
+            };
+        }
         let generated_may_be_data_descriptor = metaclass_declaration
             .ignore_possibly_undefined()
             .is_some_and(|ty| ty.may_be_data_descriptor(db));
         let has_own_unbound_instance_declaration =
             class.has_own_unbound_instance_declaration(db, name);
         let generated_attribute_is_shadowed = if generated_may_be_data_descriptor {
-            !has_own_unbound_instance_declaration
-                && !class.own_class_member(db, None, name).is_undefined()
+            !has_own_unbound_instance_declaration && own_class_member_is_defined
         } else {
-            !class.own_class_member(db, None, name).is_undefined()
-                || class.has_own_instance_declaration(db, name)
+            own_class_member_is_defined || class.has_own_instance_declaration(db, name)
         };
         if generated_attribute_is_shadowed {
             return class_attr.or_fall_back_to(db, || metaclass_declaration);
