@@ -283,13 +283,6 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub(super) fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        match self {
-            TypeAliasType::PEP695(type_alias) => type_alias.apply_function_specialization(db, ty),
-            TypeAliasType::ManualPEP695(_) => ty,
-        }
-    }
-
     pub(crate) fn apply_specialization(
         self,
         db: &'db dyn Db,
@@ -317,6 +310,16 @@ impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
+        // Infers the variance of the recursive alias's own type parameters from the raw RHS.
+        // Applying alias specialization here would result in requesting the same `variance_of` query recursively.
+        if self.generic_context(db).is_some_and(|generic_context| {
+            generic_context
+                .variables(db)
+                .any(|alias_typevar| alias_typevar.identity(db) == typevar)
+        }) {
+            return self.raw_value_type(db).variance_of(db, typevar);
+        }
+
         self.value_type(db).variance_of(db, typevar)
     }
 }

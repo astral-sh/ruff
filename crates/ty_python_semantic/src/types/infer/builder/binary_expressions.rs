@@ -5,7 +5,7 @@ use super::TypeInferenceBuilder;
 use crate::Db;
 use crate::types::call::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
-use crate::types::cyclic::CycleDetector;
+use crate::types::cyclic::{CycleDetector, HasIdentity, TypeIdentity};
 use crate::types::diagnostic::{
     DIVISION_BY_ZERO, report_unsupported_augmented_assignment, report_unsupported_binary_operation,
 };
@@ -23,7 +23,15 @@ enum BinaryExpressionOperandTypes<'db> {
 }
 
 type BinaryExpressionVisitor<'db> =
-    CycleDetector<ast::Operator, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>, 1>;
+    CycleDetector<'db, ast::Operator, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>, 1>;
+
+impl<'db> HasIdentity<'db> for (Type<'db>, ast::Operator, Type<'db>) {
+    type Id = (TypeIdentity<'db>, ast::Operator, TypeIdentity<'db>);
+
+    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
+        (self.0.to_identity(db), self.1, self.2.to_identity(db))
+    }
+}
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_binary_expression(
@@ -343,7 +351,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
             }),
 
-            (Type::TypeAlias(alias), rhs, _) => visitor.visit((left_ty, op, right_ty), || {
+            (Type::TypeAlias(alias), rhs, _) => visitor.visit(db, (left_ty, op, right_ty), || {
                 self.infer_binary_expression_type_impl(
                     node,
                     emitted_division_by_zero_diagnostic,
@@ -354,7 +362,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
             }),
 
-            (lhs, Type::TypeAlias(alias), _) => visitor.visit((left_ty, op, right_ty), || {
+            (lhs, Type::TypeAlias(alias), _) => visitor.visit(db, (left_ty, op, right_ty), || {
                 self.infer_binary_expression_type_impl(
                     node,
                     emitted_division_by_zero_diagnostic,
