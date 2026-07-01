@@ -12,7 +12,8 @@ reveal_type(__name__)  # revealed: str
 reveal_type(__file__)  # revealed: str
 reveal_type(__loader__)  # revealed: LoaderProtocol | None
 reveal_type(__package__)  # revealed: str | None
-reveal_type(__doc__)  # revealed: str | None
+# This module has no docstring, so `__doc__` is `None`, not the wider `str | None`
+reveal_type(__doc__)  # revealed: None
 reveal_type(__spec__)  # revealed: ModuleSpec | None
 reveal_type(__path__)  # revealed: MutableSequence[str]
 reveal_type(__builtins__)  # revealed: Any
@@ -54,8 +55,8 @@ reveal_type(__init__)
 ## `__doc__` reflects the module's actual docstring
 
 Typeshed says `types.ModuleType.__doc__` is `str | None`, but a module that has a literal docstring
-always has `__doc__` set to that string at runtime. Just like `__file__` above, `__doc__` should be
-narrowed to `str` in that case, rather than the widened `str | None`:
+always has `__doc__` set to that string at runtime. Just like `__file__` above, `__doc__` is
+narrowed to `str` in that case, rather than the wider `str | None`:
 
 ```py
 """I am `typeshed.stdlib.types.ModuleType.__doc__: str | None` and this value is a `str`."""
@@ -76,7 +77,7 @@ redeclaration:
 ```py
 __file__ = None
 __path__: list[str] = []
-__doc__: int  # error: [invalid-declaration] "Cannot declare type `int` for inferred type `str | None`"
+__doc__: int  # error: [invalid-declaration] "Cannot declare type `int` for inferred type `None`"
 # error: [invalid-declaration] "Cannot shadow implicit global attribute `__package__` with declaration of type `int`"
 __package__: int = 42
 __spec__ = 42  # error: [invalid-assignment] "Object of type `Literal[42]` is not assignable to `ModuleSpec | None`"
