@@ -129,33 +129,47 @@ where
     #[inline]
     pub fn visit(&self, db: &'db dyn Db, item: T, compute: impl FnOnce() -> R) -> R {
         match self.begin_visit(db, item) {
-            BeginVisit::Ready(result) => result,
-            BeginVisit::Pending(item) => {
+            CycleDetectorVisit::Ready(result) => result,
+            CycleDetectorVisit::Cycle(_) => self.fallback.clone(),
+            CycleDetectorVisit::Pending(item) => {
                 let result = compute();
                 self.finish_visit(item, result)
             }
         }
     }
 
-    fn begin_visit(&self, db: &'db dyn Db, item: T) -> BeginVisit<T, R> {
+    /// Start visiting an item, exposing recursive cycles to callers that need an item-specific
+    /// fallback.
+    pub(crate) fn begin_visit(&self, db: &'db dyn Db, item: T) -> CycleDetectorVisit<T, R> {
         if let Some(result) = self.cache.borrow().get(&item) {
-            return BeginVisit::Ready(result.clone());
+            return CycleDetectorVisit::Ready(result.clone());
         }
 
         let identity = item.to_identity(db);
         if self.seen.borrow().contains(&identity) {
-            return BeginVisit::Ready(self.fallback.clone());
+            return CycleDetectorVisit::Cycle(item);
         }
 
         self.seen.borrow_mut().push(identity);
-        BeginVisit::Pending(item)
+        CycleDetectorVisit::Pending(item)
     }
 
-    fn finish_visit(&self, item: T, result: R) -> R {
+    /// Finish a [`CycleDetectorVisit::Pending`] visit and cache its result.
+    pub(crate) fn finish_visit(&self, item: T, result: R) -> R {
         self.seen.borrow_mut().pop();
         self.cache.borrow_mut().insert_new(item, result.clone());
         result
     }
+}
+
+/// Result of starting a cycle-detector visit.
+pub(crate) enum CycleDetectorVisit<T, R> {
+    /// The item was already completed in this recursive operation.
+    Ready(R),
+    /// The item is already active on the recursion stack.
+    Cycle(T),
+    /// The caller should compute the result and pass it to [`CycleDetector::finish_visit`].
+    Pending(T),
 }
 
 pub(crate) struct TypeTransformer<'db, Tag> {
