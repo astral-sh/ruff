@@ -1319,6 +1319,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 AnnotationContext::RuntimeRequired => {
                                     self.visit_runtime_required_annotation(expr);
                                 }
+                                AnnotationContext::RuntimeAmbiguous => {
+                                    self.visit_runtime_ambiguous_annotation(expr);
+                                }
                                 AnnotationContext::RuntimeEvaluated => {
                                     self.visit_runtime_evaluated_annotation(expr);
                                 }
@@ -1336,6 +1339,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         match annotation {
                             AnnotationContext::RuntimeRequired => {
                                 self.visit_runtime_required_annotation(expr);
+                            }
+                            AnnotationContext::RuntimeAmbiguous => {
+                                self.visit_runtime_ambiguous_annotation(expr);
                             }
                             AnnotationContext::RuntimeEvaluated => {
                                 self.visit_runtime_evaluated_annotation(expr);
@@ -1498,6 +1504,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 ) {
                     AnnotationContext::RuntimeRequired => {
                         self.visit_runtime_required_annotation(annotation);
+                    }
+                    AnnotationContext::RuntimeAmbiguous => {
+                        self.visit_runtime_ambiguous_annotation(annotation);
                     }
                     AnnotationContext::RuntimeEvaluated
                         if flake8_type_checking::helpers::is_dataclass_meta_annotation(
@@ -2578,6 +2587,14 @@ impl<'a> Checker<'a> {
     fn visit_runtime_required_annotation(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::RUNTIME_REQUIRED_ANNOTATION;
+        self.visit_type_definition(expr);
+        self.semantic.flags = snapshot;
+    }
+
+    /// Visit an [`Expr`], and treat it as a runtime-ambiguous type annotation.
+    fn visit_runtime_ambiguous_annotation(&mut self, expr: &'a Expr) {
+        let snapshot = self.semantic.flags;
+        self.semantic.flags |= SemanticModelFlags::RUNTIME_AMBIGUOUS_ANNOTATION;
         self.visit_type_definition(expr);
         self.semantic.flags = snapshot;
     }
