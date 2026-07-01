@@ -9,17 +9,18 @@ use crate::types::constraints::{
     ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
     OwnedConstraintSet,
 };
-use crate::types::cyclic::{HasIdentity, PairVisitor, TypeIdentity};
+use crate::types::cyclic::{CycleDetectorVisit, HasIdentity, PairVisitor, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
-use crate::types::tuple::TupleType;
+use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    SubclassOfType, TypeAliasType, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    UpcastPolicy,
 };
 use crate::{
     Db,
@@ -954,10 +955,89 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         target: Type<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        self.relation_visitor.visit(
+        match self
+            .relation_visitor
+            .begin_visit(db, (source, target, self.relation, self.typevar_evaluation))
+        {
+            CycleDetectorVisit::Ready(result) => result,
+            CycleDetectorVisit::Cycle((source, target, _, _)) => {
+                self.recursive_type_pair_fallback(db, source, target)
+            }
+            CycleDetectorVisit::Pending(item) => {
+                let result = work();
+                self.relation_visitor.finish_visit(item, result)
+            }
+        }
+    }
+
+    fn recursive_type_pair_fallback(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        if let (Type::TypeAlias(source_alias), Type::TypeAlias(target_alias)) = (source, target)
+            && source_alias.definition(db) == target_alias.definition(db)
+        {
+            return self.check_recursive_type_alias_specialization_pair(
+                db,
+                source_alias,
+                target_alias,
+            );
+        }
+
+        self.always()
+    }
+
+    fn check_recursive_type_alias_specialization_pair(
+        &self,
+        db: &'db dyn Db,
+        source: TypeAliasType<'db>,
+        target: TypeAliasType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let Some(source_specialization) = source.specialization(db).or_else(|| {
+            source
+                .generic_context(db)
+                .map(|generic_context| generic_context.default_specialization(db, None))
+        }) else {
+            return self.always();
+        };
+        let Some(target_specialization) = target.specialization(db).or_else(|| {
+            target
+                .generic_context(db)
+                .map(|generic_context| generic_context.default_specialization(db, None))
+        }) else {
+            return self.always();
+        };
+
+        let generic_context = source_specialization.generic_context(db);
+        if generic_context != target_specialization.generic_context(db) {
+            return self.never();
+        }
+
+        itertools::izip!(
+            generic_context.variables(db),
+            source_specialization.types(db),
+            target_specialization.types(db),
+        )
+        .when_all(
             db,
-            (source, target, self.relation, self.typevar_evaluation),
-            work,
+            self.constraints,
+            |(bound_typevar, source_type, target_type)| match source.variance_of(db, bound_typevar)
+            {
+                TypeVarVariance::Covariant => self.check_type_pair(db, *source_type, *target_type),
+                TypeVarVariance::Contravariant => {
+                    self.check_type_pair(db, *target_type, *source_type)
+                }
+                TypeVarVariance::Invariant | TypeVarVariance::Bivariant => self
+                    .check_relation_in_invariant_position(
+                        db,
+                        *source_type,
+                        source_specialization.materialization_kind(db),
+                        *target_type,
+                        target_specialization.materialization_kind(db),
+                    ),
+            },
         )
     }
 
