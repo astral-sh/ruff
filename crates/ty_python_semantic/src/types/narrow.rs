@@ -52,21 +52,168 @@ use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
-/// Return whether `ty` includes a value with bytes-like containment semantics.
-///
-/// `bytes` and `bytearray` accept byte subsequences and objects implementing `__index__`, so their
-/// iteration element type does not describe every value that can satisfy a membership test.
-fn has_bytes_like_containment<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    match ty.resolve_type_alias(db) {
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .any(|element| has_bytes_like_containment(db, *element)),
-        ty => {
-            ty.is_subtype_of(db, KnownClass::Bytes.to_instance(db))
-                || ty.is_subtype_of(db, KnownClass::Bytearray.to_instance(db))
+enum ContainmentBehavior<'db> {
+    /// Membership compares against the elements of this type.
+    Elementwise(Type<'db>),
+    /// A statically visible `__contains__` defines different membership behavior.
+    Custom,
+    /// No containment behavior can be established from the static type.
+    Unknown,
+}
+
+impl<'db> Type<'db> {
+    /// Return the containment behavior known for this type.
+    ///
+    /// For subclasses that inherit a known built-in `__contains__`, the stored type is the
+    /// specialized built-in base rather than `self`. This preserves the built-in element type even
+    /// if the subclass overrides `__iter__`.
+    fn containment_behavior(self, db: &'db dyn Db) -> ContainmentBehavior<'db> {
+        let ty = self.resolve_type_alias(db);
+
+        match ty {
+            Type::Union(union) => {
+                let mut builder = UnionBuilder::new(db);
+                let mut has_unknown_behavior = false;
+                for element in union.elements(db) {
+                    match element.containment_behavior(db) {
+                        ContainmentBehavior::Elementwise(membership_type) => {
+                            builder = builder.add(membership_type);
+                        }
+                        ContainmentBehavior::Custom => return ContainmentBehavior::Custom,
+                        ContainmentBehavior::Unknown => has_unknown_behavior = true,
+                    }
+                }
+                if has_unknown_behavior {
+                    ContainmentBehavior::Unknown
+                } else {
+                    ContainmentBehavior::Elementwise(builder.build())
+                }
+            }
+            Type::TypeVar(type_var) => type_var
+                .typevar(db)
+                .bound_or_constraints(db)
+                .map_or(ContainmentBehavior::Unknown, |bound_or_constraints| {
+                    bound_or_constraints.as_type(db).containment_behavior(db)
+                }),
+            Type::NewTypeInstance(newtype) => {
+                newtype.concrete_base_type(db).containment_behavior(db)
+            }
+            Type::Intersection(intersection) => {
+                // Replace known positive components with the types whose elements membership
+                // compares against, but retain unknown components so that their element types
+                // still constrain iteration. A visible custom implementation can precede a known
+                // implementation in the MRO of a concrete intersection inhabitant, so it makes
+                // the combined containment behavior custom.
+                let mut has_elementwise_behavior = false;
+                let mut has_custom_behavior = false;
+                let membership_type = intersection.map_positive(db, |element| {
+                    match element.containment_behavior(db) {
+                        ContainmentBehavior::Elementwise(membership_type) => {
+                            has_elementwise_behavior = true;
+                            membership_type
+                        }
+                        ContainmentBehavior::Custom => {
+                            has_custom_behavior = true;
+                            *element
+                        }
+                        ContainmentBehavior::Unknown => *element,
+                    }
+                });
+                if has_custom_behavior {
+                    ContainmentBehavior::Custom
+                } else if has_elementwise_behavior {
+                    ContainmentBehavior::Elementwise(membership_type)
+                } else {
+                    ContainmentBehavior::Unknown
+                }
+            }
+            Type::TypedDict(_) => ContainmentBehavior::Elementwise(ty),
+            Type::NominalInstance(instance) => {
+                // Walk the MRO until we find either a visible override or a supported built-in
+                // implementation. Returning the built-in base preserves its specialization;
+                // normal member lookup specializes inherited signatures for the subclass instead.
+                for base in instance.class(db).iter_mro(db) {
+                    let class = match base {
+                        ClassBase::Class(class) => class,
+                        ClassBase::Generic | ClassBase::Protocol => continue,
+                        ClassBase::Any
+                        | ClassBase::Dynamic(_)
+                        | ClassBase::Divergent(_)
+                        | ClassBase::TypedDict(_) => {
+                            return ContainmentBehavior::Unknown;
+                        }
+                    };
+                    if matches!(
+                        class.known(db),
+                        Some(
+                            KnownClass::List
+                                | KnownClass::Set
+                                | KnownClass::FrozenSet
+                                | KnownClass::Dict
+                                | KnownClass::Tuple
+                                | KnownClass::Range
+                        )
+                    ) {
+                        return ContainmentBehavior::Elementwise(Type::instance(db, class));
+                    }
+                    if !class
+                        .own_class_member(db, None, "__contains__")
+                        .is_undefined()
+                    {
+                        return ContainmentBehavior::Custom;
+                    }
+                }
+                if instance.class(db).is_final(db) {
+                    ContainmentBehavior::Elementwise(ty)
+                } else {
+                    ContainmentBehavior::Unknown
+                }
+            }
+            _ => ContainmentBehavior::Unknown,
         }
     }
+
+    fn elementwise_membership_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self.containment_behavior(db) {
+            ContainmentBehavior::Elementwise(membership_type) => Some(membership_type),
+            ContainmentBehavior::Custom | ContainmentBehavior::Unknown => None,
+        }
+    }
+}
+
+/// Narrow membership in a known string literal using substring semantics.
+fn narrow_string_membership<'db>(
+    db: &'db dyn Db,
+    lhs_ty: Type<'db>,
+    haystack: &str,
+    is_contained: bool,
+) -> Option<Type<'db>> {
+    let lhs_ty = lhs_ty.resolve_type_alias(db);
+    let flattened_lhs_ty = lhs_ty.flatten_typevars(db);
+    let keep = |element: &Type<'db>| {
+        let element = element.resolve_type_alias(db);
+        if let Some(needle) = element.as_string_literal() {
+            haystack.contains(needle.value(db)) == is_contained
+        } else {
+            !(is_contained && element.is_disjoint_from(db, KnownClass::Str.to_instance(db)))
+        }
+    };
+
+    let mut narrowed = match flattened_lhs_ty {
+        Type::Union(union) => union.filter(db, keep),
+        _ if keep(&flattened_lhs_ty) => flattened_lhs_ty,
+        _ => Type::Never,
+    };
+
+    if !is_contained {
+        let mut builder = IntersectionBuilder::new(db).add_positive(narrowed);
+        for character in haystack.chars() {
+            builder = builder.add_negative(Type::single_char_string_literal(db, character));
+        }
+        narrowed = builder.build();
+    }
+
+    (narrowed != flattened_lhs_ty).then_some(narrowed)
 }
 
 /// Return the type constraints that `test` would place on `symbol` if true and false.
@@ -2624,20 +2771,22 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     }
 
     fn evaluate_expr_in(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        if has_bytes_like_containment(self.db, rhs_ty) {
-            return None;
+        let rhs_ty = rhs_ty.resolve_type_alias(self.db);
+        if let Some(haystack) = rhs_ty.as_string_literal() {
+            return narrow_string_membership(self.db, lhs_ty, haystack.value(self.db), true);
         }
+        if let Type::Union(union) = rhs_ty {
+            let mut builder = UnionBuilder::new(self.db);
+            for element in union.elements(self.db) {
+                builder = builder.add(self.evaluate_expr_in(lhs_ty, *element)?);
+            }
+            let narrowed = builder.build();
+            return (narrowed != lhs_ty).then_some(narrowed);
+        }
+        let membership_type = rhs_ty.elementwise_membership_type(self.db)?;
+        let iterable = membership_type.try_iterate(self.db).ok()?;
 
-        let iterable = rhs_ty.try_iterate(self.db).ok()?;
-
-        // A fixed-length iteration spec with no elements does not imply that membership is always
-        // false: `"" in ""` is true. Exact tuples are the fixed-length containers here whose
-        // membership is known to test their elements individually.
-        if matches!(
-            rhs_ty.resolve_type_alias(self.db),
-            Type::NominalInstance(instance)
-                if instance.has_known_class(self.db, KnownClass::Tuple)
-        ) && iterable
+        if iterable
             .as_fixed_length()
             .is_some_and(|fixed| fixed.all_elements().is_empty())
         {
@@ -2658,7 +2807,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         }
     }
 
-    /// Apply equality compatibility without losing the container's declared element domain.
+    /// Apply equality compatibility without losing the container's declared element type.
     ///
     /// Generic equality retains disjoint single-valued arms when an element subclass could define
     /// custom equality. Membership narrowing instead removes those arms unless the equality
@@ -2721,8 +2870,12 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         (narrowed != lhs_ty).then_some(narrowed)
     }
 
-    fn evaluate_expr_not_in(&self, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        let iterable = rhs_ty.try_iterate(self.db).ok()?;
+    fn evaluate_expr_not_in(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+        if let Some(haystack) = rhs_ty.resolve_type_alias(self.db).as_string_literal() {
+            return narrow_string_membership(self.db, lhs_ty, haystack.value(self.db), false);
+        }
+        let membership_type = rhs_ty.elementwise_membership_type(self.db)?;
+        let iterable = membership_type.try_iterate(self.db).ok()?;
         let fixed_length = iterable.as_fixed_length()?;
         let mut builder = IntersectionBuilder::new(self.db);
         let mut constrained = false;
@@ -2766,7 +2919,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             }
             ast::CmpOp::Is => Some(rhs_ty),
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
-            ast::CmpOp::NotIn => self.evaluate_expr_not_in(rhs_ty),
+            ast::CmpOp::NotIn => self.evaluate_expr_not_in(lhs_ty, rhs_ty),
             _ => None,
         }
     }

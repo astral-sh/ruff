@@ -108,13 +108,34 @@ def _(x: str):
 ```
 
 ```py
-from typing import Literal
+from typing import Literal, TypeVar
+
+T = TypeVar("T", Literal["a"], Literal["d"])
 
 def _(x: Literal["a", "b", "c", "d"]):
     if x in "abc":
         reveal_type(x)  # revealed: Literal["a", "b", "c"]
     else:
         reveal_type(x)  # revealed: Literal["d"]
+
+def substring(x: Literal["", "ab", "z"]):
+    if x in "abc":
+        reveal_type(x)  # revealed: Literal["", "ab"]
+    else:
+        reveal_type(x)  # revealed: Literal["z"]
+
+def constrained_substring(x: T):
+    if x in "abc":
+        reveal_type(x)  # revealed: T@constrained_substring & Literal["a"]
+    else:
+        reveal_type(x)  # revealed: T@constrained_substring & Literal["d"]
+
+def union_literal_haystack(x: Literal["a", "ab", "z"], flag: bool):
+    values = "abc" if flag else "def"
+    if x in values:
+        reveal_type(x)  # revealed: Literal["a", "ab"]
+    else:
+        reveal_type(x)  # revealed: Literal["a", "ab", "z"]
 ```
 
 ```py
@@ -145,8 +166,7 @@ def empty_bytes(x: bytes):
 ## Byte containment
 
 `bytes` and `bytearray` accept byte subsequences and objects implementing `__index__`, not only the
-integers described by their iteration type. We therefore leave the subject unchanged in the positive
-branch:
+integers described by their iteration type. We therefore leave the subject unchanged:
 
 ```py
 from typing import Literal, final
@@ -163,7 +183,7 @@ def bytes_subsequence(value: ByteSubstring | Literal[97]) -> None:
     if value in b"abc":
         reveal_type(value)  # revealed: ByteSubstring | Literal[97]
     else:
-        reveal_type(value)  # revealed: ByteSubstring
+        reveal_type(value)  # revealed: ByteSubstring | Literal[97]
 
 def bytes_index(value: ByteIndex | Literal[97], values: bytes) -> None:
     if value in values:
@@ -394,35 +414,260 @@ def empty_tuple(x: Payload | Literal["missing"], values: tuple[()]):
 
 ## Custom containment methods
 
-Python uses `__contains__` when a class defines it. The method can return `True` for values that the
-class would never produce during iteration. We don't yet model this distinction. Instead, we
-determine possible membership matches from the class's iterable element type. The inferred type
-below therefore excludes `Payload`, even though `__contains__` returns `True` for it. This documents
-a known limitation:
+When a class defines `__contains__`, membership need not check the values produced by iteration. The
+iterator's element type therefore cannot narrow the value being tested:
 
 ```py
+from collections.abc import Iterator
+from typing import Literal
+
+class ContainsEverything:
+    def __iter__(self) -> Iterator[Literal["missing"]]:
+        yield "missing"
+
+    def __contains__(self, value: object) -> bool:
+        return True
+
+def custom_contains(
+    x: Literal["present", "missing"],
+    values: ContainsEverything,
+):
+    if x in values:
+        reveal_type(x)  # revealed: Literal["present", "missing"]
+```
+
+## Classes that only define `__iter__`
+
+A subclass can add `__contains__`, so an `__iter__` annotation on a non-final class is not enough to
+narrow a membership test. A final class cannot gain a new `__contains__` method through subclassing;
+if it only defines `__iter__`, membership is known to check the iterated values:
+
+```py
+from collections.abc import Iterator
+from typing import Literal, TypedDict, final
+
+class Payload(TypedDict):
+    value: int
+
+class IteratesMissing:
+    def __iter__(self) -> Iterator[Literal["missing"]]:
+        yield "missing"
+
+def non_final_iterable(x: Payload | Literal["missing"], values: IteratesMissing):
+    if x in values:
+        reveal_type(x)  # revealed: Payload | Literal["missing"]
+
+@final
+class FinalIterable:
+    def __iter__(self) -> Iterator[Literal["missing"]]:
+        yield "missing"
+
+def final_iterable(x: Payload | Literal["missing"], values: FinalIterable):
+    if x in values:
+        reveal_type(x)  # revealed: Literal["missing"]
+```
+
+## Assignment expression on the right-hand side
+
+A named expression around a tuple literal is still known to use tuple membership:
+
+```py
+from typing import Literal, final
+
+@final
+class Token: ...
+
+def assignment_expression(value: Token | Literal[1]) -> None:
+    if value in (values := (1,)):
+        reveal_type(value)  # revealed: Literal[1]
+```
+
+## Type wrappers and `isinstance` narrowing
+
+A bound or constrained type variable can use its item type only if membership checks those items for
+every possible container. A `NewType` uses the behavior of its underlying type.
+
+```py
+from collections.abc import Iterable, Iterator, Sized
+from typing import Any, Literal, NewType, TypeVar, final
+
+@final
+class Token: ...
+
+WrappedTuple = NewType("WrappedTuple", tuple[Literal[1], ...])
+
+def wrapped_tuple(
+    value: Token | Literal[1],
+    values: WrappedTuple,
+) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: Literal[1]
+
+BoundTuple = TypeVar("BoundTuple", bound=tuple[Literal[1], ...])
+
+def bounded_tuple(
+    value: Token | Literal[1],
+    values: BoundTuple,
+) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: Literal[1]
+
+ConstrainedTuple = TypeVar(
+    "ConstrainedTuple",
+    tuple[Literal[1], ...],
+    tuple[Literal[1]],
+)
+
+def constrained_tuple(
+    value: Token | Literal[1],
+    values: ConstrainedTuple,
+) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: Literal[1]
+
+class OpenIterable:
+    def __iter__(self) -> Iterator[Literal[1]]:
+        yield 1
+
+MixedContainers = TypeVar(
+    "MixedContainers",
+    tuple[Literal[1], ...],
+    OpenIterable,
+)
+
+def mixed_constraints(
+    value: Token | Literal[1],
+    values: MixedContainers,
+) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: Token | Literal[1]
+```
+
+An `isinstance` check can also identify a concrete container. After narrowing to `tuple`, membership
+can use the tuple's item type. Checking only an unrelated protocol such as `Sized` does not tell us
+how membership works. A custom `__contains__` from another intersection component can precede a
+known implementation in a concrete subclass, so that intersection also remains conservative.
+
+```py
+def tuple_intersection(
+    value: Token | Literal[1],
+    values: Iterable[Literal[1]],
+) -> None:
+    if isinstance(values, tuple) and value in values:
+        reveal_type(value)  # revealed: Literal[1]
+
+def unrelated_intersection(
+    value: Token | Literal[1],
+    values: Iterable[Literal[1]],
+) -> None:
+    if isinstance(values, Sized) and value in values:
+        reveal_type(value)  # revealed: Token | Literal[1]
+
+class ContainsEverything:
+    def __contains__(self, value: object) -> bool:
+        return True
+
+class Items(list[Literal[1]]):
+    def __iter__(self) -> Iterator[Any]:
+        return super().__iter__()
+
+class Actual(ContainsEverything, Items): ...
+
+def custom_contains_precedes_builtin(
+    value: Token | Literal[1],
+    values: Items,
+) -> None:
+    if isinstance(values, ContainsEverything) and value in values:
+        reveal_type(value)  # revealed: Token | Literal[1]
+```
+
+## Range membership
+
+A `range` contains integers, so a string literal can be removed from the type of the tested value:
+
+```py
+from typing import Literal
+
+def range_membership(value: Literal["x", 1], values: range) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: Literal[1]
+```
+
+## Inherited built-in containment
+
+A subclass that does not define `__contains__` uses the method inherited from its built-in base.
+Membership still checks the built-in container's stored items if the subclass changes `__iter__`. If
+the subclass, or an intermediate base, defines `__contains__`, its iterator annotation no longer
+describes membership and cannot be used to narrow:
+
+```py
+from collections.abc import Iterator
 from typing import Literal, TypedDict
 
 class Payload(TypedDict):
     value: int
 
-class ContainsEverything(tuple[Literal["missing"], ...]):
+class MissingList(list[Literal["missing"]]): ...
+class MissingSet(set[Literal["missing"]]): ...
+class MissingFrozenSet(frozenset[Literal["missing"]]): ...
+class MissingDict(dict[Literal["missing"], object]): ...
+class MissingTuple(tuple[Literal["missing"], ...]): ...
+
+def inherited_builtin_contains(
+    x: Payload | Literal["missing"],
+    values: MissingList | MissingSet | MissingFrozenSet | MissingDict | MissingTuple,
+):
+    if x in values:
+        reveal_type(x)  # revealed: Literal["missing"]
+
+class OverridesBuiltinIteration(list[object]):
+    def __iter__(self) -> Iterator[Literal["missing"]]:
+        yield "missing"
+
+def overridden_iteration(
+    x: Payload | Literal["missing"],
+    values: OverridesBuiltinIteration,
+):
+    if x in values:
+        reveal_type(x)  # revealed: Payload | Literal["missing"]
+
+class ContainsEverythingList(list[Literal["missing"]]):
     def __contains__(self, value: object) -> bool:
         return True
 
-def custom_contains(x: Payload | Literal["missing"], values: ContainsEverything):
+class InheritsCustomContains(ContainsEverythingList): ...
+
+def inherited_custom_contains(
+    x: Payload | Literal["missing"],
+    values: InheritsCustomContains,
+):
     if x in values:
-        # TODO: `x` can still be `Payload` because `values.__contains__` always returns `True`.
-        reveal_type(x)  # revealed: Literal["missing"]
+        reveal_type(x)  # revealed: Payload | Literal["missing"]
+
+class ContainsNothingTuple(tuple[Literal[1]]):
+    def __contains__(self, value: object) -> bool:
+        return False
+
+def custom_tuple_not_in(x: Literal[1] | None, values: ContainsNothingTuple):
+    if x not in values:
+        reveal_type(x)  # revealed: Literal[1] | None
 ```
 
-## No present-key narrowing without a `TypedDict`
+## `TypedDict` key membership
 
-We only synthesize a key-access protocol for string membership tests on right-hand-side values that
-include a `TypedDict`. Other membership tests can mean substring or element containment instead:
+Membership in a `TypedDict` checks its string keys, so the tested value can be narrowed to a
+possible key. We do not apply key-based narrowing to arbitrary values, because `in` may test
+substrings or elements instead:
 
 ```py
-from typing import Literal
+from typing import Literal, TypedDict
+
+class Values(TypedDict):
+    present: int
+
+def typed_dict_container(value: Literal["present", 1], values: Values) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: Literal["present"]
 
 def f(x: Literal["abc", "def"]):
     if "a" in x:
@@ -570,17 +815,15 @@ def test(x: Status | int):
 
 ## Union with tuple and `Literal`
 
-We assume that tuple subclasses don't override `tuple.__eq__`, which only returns True for other
-tuples. So they are excluded from the narrowed type when disjoint from the RHS values.
+A built-in tuple cannot compare equal to a string literal, so the tuple alternative is excluded from
+the narrowed type.
 
 ```py
 from typing import Literal
 
 def test(x: Literal["none", "auto", "required"] | tuple[list[str], Literal["auto", "required"]]):
     if x in ("auto", "required"):
-        # tuple type is excluded because it's disjoint from the string literals
         reveal_type(x)  # revealed: Literal["auto", "required"]
     else:
-        # tuple type remains in the else branch
         reveal_type(x)  # revealed: Literal["none"] | tuple[list[str], Literal["auto", "required"]]
 ```
