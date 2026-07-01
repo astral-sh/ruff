@@ -49,3 +49,6 @@
 - Fixed — Use distinct assignment types in the static-method and conditional-method cases so their reveals test precedence instead of coincidental equal types.
 - Fixed — Confirm that every assertion intended to demonstrate improved behavior fails on the exact merge base, including both protocol relationship assertions.
 - Rejected — Remove focused instance-precedence, dataclass, and negative cases solely because they pass on `main`. They are guardrails ensuring that the new lookup preserves existing behavior and remains narrowly scoped.
+- Rejected — Preserve metaclass declarations as fallbacks for conditional instance writes. The merge base and this branch both reveal only the inferred instance type; carrying conditional assignment definedness is an existing instance-member limitation.
+- Rejected — Preserve generated descriptor alternatives across an annotation plus a conditional class-body binding. The merge base and this branch both reveal the declared instance type; modeling the runtime namespace separately on each path would expand the feature.
+- Rejected — Reclassify eager child scopes inside static methods. The merge base and this branch both treat the comprehension assignment as an instance attribute, so fixing enclosing-method classification is an existing `main` issue.
