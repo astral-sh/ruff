@@ -1369,6 +1369,14 @@ class ConditionalGenerated(metaclass=StoringMeta):
 
 reveal_type(ConditionalGenerated().generated)  # revealed: int
 
+# An assignment in a conditionally defined method does not suppress the metaclass declaration.
+class ConditionalMethodAssignment(metaclass=StoringMeta):
+    if flag:
+        def assign(self) -> None:
+            self.generated = 1
+
+reveal_type(ConditionalMethodAssignment().generated)  # revealed: int
+
 # A bound metaclass class attribute is not stored in the constructed class's namespace.
 class MetaclassAttributeOnly(type):
     metaclass_only: int = 1

@@ -2252,8 +2252,6 @@ impl<'db> StaticClassLiteral<'db> {
         let file = class_body_scope.file(db);
         let module = parsed_module(db, file).load(db);
         let index = semantic_index(db, file);
-        let class_map = use_def_map(db, class_body_scope);
-        let class_table = place_table(db, class_body_scope);
         // First check declarations
         for (attribute_declarations, method_scope_id) in
             attribute_declarations(db, class_body_scope, name)
@@ -2322,7 +2320,6 @@ impl<'db> StaticClassLiteral<'db> {
         for (attribute_assignments, attribute_binding_scope_id) in
             attribute_assignments(db, class_body_scope, name)
         {
-            let binding_scope = index.scope(attribute_binding_scope_id);
             if !method_matches_decorator(
                 db,
                 class_body_scope,
@@ -2332,39 +2329,9 @@ impl<'db> StaticClassLiteral<'db> {
                 continue;
             }
 
-            let scope_for_reachability_analysis = {
-                if binding_scope.node().as_function().is_some() {
-                    binding_scope
-                } else if binding_scope.is_eager() {
-                    let mut eager_scope_parent = binding_scope;
-                    while eager_scope_parent.is_eager()
-                        && let Some(parent) = eager_scope_parent.parent()
-                    {
-                        eager_scope_parent = index.scope(parent);
-                    }
-                    eager_scope_parent
-                } else {
-                    binding_scope
-                }
-            };
-
             // The attribute assignment inherits the reachability of the method which contains it
             let is_method_reachable =
-                if let Some(method_def) = scope_for_reachability_analysis.node().as_function() {
-                    let method = index.expect_single_definition(method_def);
-                    let method_place = class_table
-                        .symbol_id(&method_def.node(&module).name)
-                        .unwrap();
-                    class_map
-                        .reachable_symbol_bindings(method_place)
-                        .find_map(|bind| {
-                            (bind.binding.is_defined_and(|def| def == method))
-                                .then(|| binding_reachability(db, class_map, &bind))
-                        })
-                        .unwrap_or(Truthiness::AlwaysFalse)
-                } else {
-                    Truthiness::AlwaysFalse
-                };
+                method_reachability(db, class_body_scope, attribute_binding_scope_id);
             if is_method_reachable.is_always_false() {
                 continue;
             }
@@ -3258,6 +3225,9 @@ fn implicit_instance_attribute_names<'db>(
         ) {
             continue;
         }
+        if !method_reachability(db, class_body_scope, function_scope_id).is_always_true() {
+            continue;
+        }
 
         names.extend(
             index
@@ -3310,6 +3280,42 @@ fn method_matches_decorator<'db>(
         MethodDecorator::ClassMethod => is_classmethod,
         MethodDecorator::StaticMethod => is_staticmethod,
     }
+}
+
+fn method_reachability<'db>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+    method_scope_id: FileScopeId,
+) -> Truthiness {
+    let file = class_body_scope.file(db);
+    let module = parsed_module(db, file).load(db);
+    let index = semantic_index(db, file);
+    let mut method_scope = index.scope(method_scope_id);
+    while method_scope.is_eager()
+        && method_scope.node().as_function().is_none()
+        && let Some(parent) = method_scope.parent()
+    {
+        method_scope = index.scope(parent);
+    }
+
+    let Some(method_node) = method_scope.node().as_function() else {
+        return Truthiness::AlwaysFalse;
+    };
+    let method = index.expect_single_definition(method_node);
+    let class_map = use_def_map(db, class_body_scope);
+    let class_table = place_table(db, class_body_scope);
+    let Some(method_place) = class_table.symbol_id(&method_node.node(&module).name) else {
+        return Truthiness::AlwaysFalse;
+    };
+    class_map
+        .reachable_symbol_bindings(method_place)
+        .find_map(|binding| {
+            binding
+                .binding
+                .is_defined_and(|definition| definition == method)
+                .then(|| binding_reachability(db, class_map, &binding))
+        })
+        .unwrap_or(Truthiness::AlwaysFalse)
 }
 
 fn implicit_attribute_cycle_recover<'db>(
