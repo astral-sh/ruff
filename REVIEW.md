@@ -54,3 +54,4 @@
 - Rejected — Reclassify eager child scopes inside static methods. The merge base and this branch both treat the comprehension assignment as an instance attribute, so fixing enclosing-method classification is an existing `main` issue.
 - Fixed — Preserve instance-member uncertainty from dynamic bases. The new generated-namespace lookup must not replace the `Any` or `Unknown` fallback already provided by the class MRO.
 - Fixed — Honor `NO_INSTANCE_FALLBACK` for generated namespace members. Implicit special-method lookup must not select an attribute stored on the instance.
+- Rejected — Replace an inherited fallback behind a conditional direct class binding with the metaclass contract. The merge base and this branch produce the same inherited union; making that lookup path-sensitive would expand the feature rather than prevent a regression.
