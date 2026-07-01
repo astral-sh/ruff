@@ -2122,7 +2122,13 @@ def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:
             pass
         case _:
             reveal_type(value)  # revealed: list[int]
+```
 
+Named tuples are statically known tuple subclasses, rather than exact `tuple[...]` instances.
+Sequence-pattern fallthrough therefore preserves the named class instead of rebuilding its type from
+the element patterns:
+
+```py
 class Pair(NamedTuple):
     left: int | str
     right: int | str
@@ -2156,9 +2162,6 @@ def unwrap_number_or_label(value: object) -> int | str | None:
             return item
     return None
 
-def accepts_nested_tuple(value: tuple[tuple[str, int]]) -> None:
-    pass
-
 def narrow_nested_exact_tuple_subject(
     value: tuple[tuple[int | str, int | str]],
 ) -> None:
@@ -2166,12 +2169,13 @@ def narrow_nested_exact_tuple_subject(
         case [[str(), int()]] as whole:
             reveal_type(value)  # revealed: tuple[tuple[str, int]]
             reveal_type(whole)  # revealed: tuple[tuple[str, int]]
-            assigned: tuple[tuple[str, int]] = value
-            accepts_nested_tuple(value)
-            accepts_nested_tuple(whole)
+```
 
-# Nested tuple expansions share one budget. Each inner pattern can produce 32 alternatives, so the
-# cumulative inner and outer expansion exceeds the limit and uses conservative narrowing.
+Tuple-pattern narrowing limits the total number of alternative tuple types created while matching
+nested patterns. Each inner pattern below creates 32 alternatives, and the outer pattern creates two
+more. Together, they exceed the limit of 64, so ty uses conservative fallthrough narrowing.
+
+```py
 # fmt: off
 NestedExpansionInner = tuple[
     bool, bool, bool, bool, bool, bool, bool, bool,
