@@ -443,6 +443,10 @@ impl<'a> Printer<'a> {
 
     // LLVM considers this function too large to inline on its own, but it is called for every
     // text element visited by the printing loop.
+    #[expect(
+        clippy::inline_always,
+        reason = "improves formatter benchmarks by 5-7%"
+    )]
     #[inline(always)]
     fn print_text(&mut self, text: Text) {
         if !self.state.pending_indent.is_empty() {
