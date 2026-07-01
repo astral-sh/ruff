@@ -7,7 +7,9 @@ use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::special_form::TypeQualifier;
-use crate::types::tuple::{Tuple, TupleLength, TupleType, TupleUnpacker};
+use crate::types::tuple::{
+    Tuple, TupleLength, TupleSpec, TupleSpecBuilder, TupleType, TupleUnpacker,
+};
 use crate::types::typed_dict::{
     TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
@@ -931,6 +933,40 @@ fn positive_class_pattern_type<'db>(
         }
         _ => None,
     }
+}
+
+/// Refine an exact tuple with the element types established by an exact sequence pattern.
+///
+/// As elsewhere in tuple-pattern narrowing, this assumes that values represented by a `tuple[...]`
+/// annotation preserve the builtin relationship between iteration and indexing. Statically known
+/// tuple subclasses are not refined here.
+///
+/// Gradual tuple elements retain their uncertainty through intersection with the observed pattern
+/// type. For example, matching `tuple[Any]` against `[str()]` produces `tuple[Any & str]`.
+///
+/// In the example below, `subject_ty` is `tuple[int | str]`, `pattern_element_types` is `[str]`,
+/// and the refined type returned is `tuple[str]`.
+///
+/// ```python
+/// def f(value: tuple[int | str]) -> None:
+///     match value:
+///         case [str()]:
+///             reveal_type(value)  # tuple[str]
+/// ```
+fn refine_exact_tuple_for_sequence_pattern<'db>(
+    db: &'db dyn Db,
+    subject_ty: Type<'db>,
+    pattern_element_types: &[Type<'db>],
+) -> Option<Type<'db>> {
+    let tuple = subject_ty.exact_tuple_instance_spec(db)?;
+    let pattern_tuple = TupleSpec::heterogeneous(pattern_element_types.iter().copied());
+    Some(
+        TupleSpecBuilder::from(tuple.as_ref())
+            .intersect(db, &pattern_tuple)
+            .map_or(Type::Never, |refined| {
+                Type::tuple(TupleType::new(db, &refined.build()))
+            }),
+    )
 }
 
 /// Return a type that contains every value that can match `pattern`.
@@ -2031,6 +2067,13 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         narrowed_subject_ty: Type<'db>,
         matched_element_types: &[Type<'db>],
     ) -> Type<'db> {
+        if kind.split_around_star().is_none()
+            && let Some(refined) =
+                refine_exact_tuple_for_sequence_pattern(self.db, subject_ty, matched_element_types)
+        {
+            return refined;
+        }
+
         if subject_ty.exact_tuple_instance_spec(self.db).is_some() {
             self.intersect_types(
                 narrowed_subject_ty,
@@ -2053,6 +2096,13 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         subject_ty: Type<'db>,
         binding_element_types: &[Type<'db>],
     ) -> Type<'db> {
+        if kind.split_around_star().is_none()
+            && let Some(refined) =
+                refine_exact_tuple_for_sequence_pattern(self.db, subject_ty, binding_element_types)
+        {
+            return refined;
+        }
+
         if subject_ty.exact_tuple_instance_spec(self.db).is_some() {
             self.intersect_types(
                 subject_ty,
@@ -2408,19 +2458,63 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 })
             }
             _ => {
-                let sequence_ty = if resolved.exact_tuple_instance_spec(db).is_some() {
-                    necessary_sequence_pattern_type(db, kind)
-                } else {
-                    sequence_pattern_type_builder(db).build()
-                };
-                IntersectionBuilder::new(db)
-                    .add_positive(resolved)
-                    .add_positive(sequence_ty)
-                    .build()
+                let refined_exact = resolved
+                    .exact_tuple_instance_spec(db)
+                    .filter(|_| kind.split_around_star().is_none())
+                    .and_then(|tuple| {
+                        tuple
+                            .resize(db, TupleLength::Fixed(kind.patterns.len()))
+                            .ok()
+                    })
+                    .and_then(|tuple| {
+                        let element_types = tuple
+                            .iter_all_elements()
+                            .zip(kind.patterns.iter())
+                            .map(|(element, pattern)| {
+                                Self::necessary_match_pattern_type_for_subject(db, pattern, element)
+                            })
+                            .collect::<Vec<_>>();
+                        refine_exact_tuple_for_sequence_pattern(db, resolved, &element_types)
+                    });
+
+                refined_exact.unwrap_or_else(|| {
+                    let sequence_ty = if resolved.exact_tuple_instance_spec(db).is_some() {
+                        necessary_sequence_pattern_type(db, kind)
+                    } else {
+                        sequence_pattern_type_builder(db).build()
+                    };
+                    IntersectionBuilder::new(db)
+                        .add_positive(resolved)
+                        .add_positive(sequence_ty)
+                        .build()
+                })
             }
         };
 
         if narrowed == resolved { ty } else { narrowed }
+    }
+
+    /// Return the type required by `pattern`, preserving nested exact tuples from `subject_ty`.
+    fn necessary_match_pattern_type_for_subject(
+        db: &'db dyn Db,
+        pattern: &PatternPredicateKind<'db>,
+        subject_ty: Type<'db>,
+    ) -> Type<'db> {
+        match pattern {
+            PatternPredicateKind::Sequence(kind) => {
+                Self::narrow_type_by_sequence_pattern(db, subject_ty, kind)
+            }
+            PatternPredicateKind::Or(patterns) => UnionType::from_elements(
+                db,
+                patterns.iter().map(|pattern| {
+                    Self::necessary_match_pattern_type_for_subject(db, pattern, subject_ty)
+                }),
+            ),
+            PatternPredicateKind::As(Some(pattern), _) => {
+                Self::necessary_match_pattern_type_for_subject(db, pattern, subject_ty)
+            }
+            _ => necessary_match_pattern_type(db, pattern),
+        }
     }
 
     /// Filter a type based on an equality or inequality comparison against an exact length.

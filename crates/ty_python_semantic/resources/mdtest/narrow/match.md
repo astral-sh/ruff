@@ -2058,6 +2058,7 @@ Sequence patterns also contribute to negative narrowing and exhaustiveness. Exac
 make a match exhaustive.
 
 ```py
+from typing import Any, NamedTuple
 from typing_extensions import assert_never
 
 class HasX:
@@ -2066,23 +2067,21 @@ class HasX:
 def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
     match subj:
         case x, str():
-            # TODO: This should simplify to `tuple[int | str, str]`.
-            # revealed: tuple[int | str, int | str] & <Protocol with members '__getitem__', '__len__'>
-            reveal_type(subj)
+            reveal_type(subj)  # revealed: tuple[int | str, str]
             reveal_type(subj[0])  # revealed: int | str
             reveal_type(subj[1])  # revealed: str
             first, second = subj
             reveal_type(first)  # revealed: int | str
-            # TODO: This should reveal `str`.
-            reveal_type(second)  # revealed: int | str
+            reveal_type(second)  # revealed: str
         case y:
-            # TODO: This should simplify to `tuple[int | str, int]`.
-            # revealed: tuple[int | str, int | str] & ~<Protocol with members '__getitem__', '__len__'>
-            reveal_type(subj)
+            reveal_type(subj)  # revealed: tuple[int | str, int]
             reveal_type(subj[0])  # revealed: int | str
-            # TODO: This should reveal `int` once we simplify the negative
-            # intersection above.
-            reveal_type(subj[1])  # revealed: int | str
+            reveal_type(subj[1])  # revealed: int
+
+def match_exact_tuple_sequence_preserves_gradualness(value: tuple[Any]) -> None:
+    match value:
+        case [str()]:
+            reveal_type(value)  # revealed: tuple[Any & str]
 
 def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) -> int:
     match value:
@@ -2109,8 +2108,18 @@ def test_match_exact_tuple_element_union_is_exhaustive(x: tuple[int | str]) -> i
         case [str()]:
             return 42
         case _:
-            # revealed: Never
-            reveal_type(x)
+            assert_never(x)
+
+def test_match_exact_tuple_multiple_negative_constraints(
+    value: tuple[int | str, int | str],
+) -> tuple[str, int | str] | tuple[int | str, int]:
+    match value:
+        case [int(), str()]:
+            raise ValueError
+        case _:
+            # revealed: tuple[str, int | str] | tuple[int | str, int]
+            reveal_type(value)
+            return value
 
 def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:
     match value:
@@ -2118,6 +2127,23 @@ def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:
             pass
         case _:
             reveal_type(value)  # revealed: list[int]
+```
+
+Named tuples are statically known tuple subclasses, rather than exact `tuple[...]` instances.
+Sequence-pattern fallthrough therefore preserves the named class instead of rebuilding its type from
+the element patterns:
+
+```py
+class Pair(NamedTuple):
+    left: int | str
+    right: int | str
+
+def test_match_exact_tuple_sequence_subclass(value: Pair) -> None:
+    match value:
+        case _, str():
+            pass
+        case _:
+            reveal_type(value)  # revealed: Pair
 ```
 
 ## Nested sequence patterns
@@ -2140,6 +2166,51 @@ def unwrap_number_or_label(value: object) -> int | str | None:
             reveal_type(item)  # revealed: int | str
             return item
     return None
+
+def narrow_nested_exact_tuple_subject(
+    value: tuple[tuple[int | str, int | str]],
+) -> None:
+    match value:
+        case [[str(), int()]] as whole:
+            reveal_type(value)  # revealed: tuple[tuple[str, int]]
+            reveal_type(whole)  # revealed: tuple[tuple[str, int]]
+```
+
+Tuple-pattern narrowing limits the total number of alternative tuple types created while matching
+nested patterns. Each inner pattern below creates 32 alternatives, and the outer pattern creates two
+more. Together, they exceed the limit of 64, so ty uses conservative fallthrough narrowing.
+
+```py
+# fmt: off
+NestedExpansionInner = tuple[
+    bool, bool, bool, bool, bool, bool, bool, bool,
+    bool, bool, bool, bool, bool, bool, bool, bool,
+    bool, bool, bool, bool, bool, bool, bool, bool,
+    bool, bool, bool, bool, bool, bool, bool, bool,
+]
+NestedExpansionOuter = tuple[NestedExpansionInner, NestedExpansionInner]
+
+def nested_tuple_expansion_limit(value: NestedExpansionOuter) -> None:
+    match value:
+        case (
+            (
+                True, True, True, True, True, True, True, True,
+                True, True, True, True, True, True, True, True,
+                True, True, True, True, True, True, True, True,
+                True, True, True, True, True, True, True, True,
+            ),
+            (
+                True, True, True, True, True, True, True, True,
+                True, True, True, True, True, True, True, True,
+                True, True, True, True, True, True, True, True,
+                True, True, True, True, True, True, True, True,
+            ),
+        ):
+            pass
+        case _:
+            # revealed: tuple[tuple[bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool], tuple[bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool]] & ~<Protocol with members '__getitem__', '__len__'>
+            reveal_type(value)
+# fmt: on
 ```
 
 ## Sequence display subjects

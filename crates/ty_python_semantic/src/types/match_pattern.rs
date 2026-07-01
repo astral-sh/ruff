@@ -12,6 +12,7 @@ use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::equality::{evaluate_type_equality, is_same_enum_domain};
 use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
+use crate::types::visitor::any_over_type;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass,
     Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext,
@@ -719,40 +720,109 @@ pub(crate) fn pattern_fallthrough_type<'db>(
 /// Failure of a sequence pattern establishes length and indexed-element facts at the instant of
 /// matching, but those facts can become stale for mutable or stateful sequences. Exact tuples are
 /// immutable, so they retain normal sequence-pattern fallthrough narrowing.
+///
+/// In the example below, `subject_ty` is `tuple[int | str, int | str]`, `kind` represents the
+/// `[int(), str()]` sequence pattern, and the returned fallthrough type is
+/// `tuple[str, int | str] | tuple[int | str, int]`.
+///
+/// ```python
+/// def f(value: tuple[int | str, int | str]) -> None:
+///     match value:
+///         case [int(), str()]:
+///             pass
+///         case _:
+///             # tuple[str, int | str] | tuple[int | str, int]
+///             reveal_type(value)
+/// ```
 pub(crate) fn pattern_binding_fallthrough_type<'db>(
     db: &'db dyn Db,
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
+    let mut budget = ExactTuplePatternExpansionBudget::default();
+    try_pattern_binding_fallthrough_type(db, kind, subject_ty, &mut budget)
+        .unwrap_or_else(|()| conservative_pattern_binding_fallthrough_type(db, kind, subject_ty))
+}
+
+/// Compute binding fallthrough while charging every nested exact-tuple expansion to `budget`.
+///
+/// An error means that the caller must discard the partially expanded type and recompute the
+/// complete pattern conservatively.
+fn try_pattern_binding_fallthrough_type<'db>(
+    db: &'db dyn Db,
+    kind: &PatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+    budget: &mut ExactTuplePatternExpansionBudget,
+) -> Result<Type<'db>, ()> {
     match kind {
         PatternPredicateKind::Sequence(sequence) => {
-            sequence_pattern_binding_fallthrough_type(db, sequence, subject_ty)
+            try_sequence_pattern_binding_fallthrough_type(db, sequence, subject_ty, budget)
         }
         PatternPredicateKind::Or(patterns) => {
-            patterns.iter().fold(subject_ty, |remaining, pattern| {
-                pattern_binding_fallthrough_type(db, pattern, remaining)
+            patterns.iter().try_fold(subject_ty, |remaining, pattern| {
+                try_pattern_binding_fallthrough_type(db, pattern, remaining, budget)
             })
         }
         PatternPredicateKind::As(Some(pattern), _) => {
-            pattern_binding_fallthrough_type(db, pattern, subject_ty)
+            try_pattern_binding_fallthrough_type(db, pattern, subject_ty, budget)
+        }
+        _ => Ok(pattern_fallthrough_type(db, kind, subject_ty)),
+    }
+}
+
+/// Compute binding fallthrough without expanding exact tuples.
+///
+/// This preserves the recursive handling of `Or` and `As` patterns while providing the fallback
+/// used when the precise traversal exceeds its expansion budget.
+fn conservative_pattern_binding_fallthrough_type<'db>(
+    db: &'db dyn Db,
+    kind: &PatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+) -> Type<'db> {
+    match kind {
+        PatternPredicateKind::Or(patterns) => {
+            patterns.iter().fold(subject_ty, |remaining, pattern| {
+                conservative_pattern_binding_fallthrough_type(db, pattern, remaining)
+            })
+        }
+        PatternPredicateKind::As(Some(pattern), _) => {
+            conservative_pattern_binding_fallthrough_type(db, pattern, subject_ty)
         }
         _ => pattern_fallthrough_type(db, kind, subject_ty),
     }
 }
 
-fn sequence_pattern_binding_fallthrough_type<'db>(
+/// Apply sequence-pattern binding fallthrough, expanding immutable exact tuples within `budget`.
+///
+/// The budget is shared by unions, intersections, and nested patterns so that their cumulative
+/// expansion cannot exceed the configured limits.
+fn try_sequence_pattern_binding_fallthrough_type<'db>(
     db: &'db dyn Db,
     kind: &SequencePatternPredicateKind<'db>,
     subject_ty: Type<'db>,
-) -> Type<'db> {
+    budget: &mut ExactTuplePatternExpansionBudget,
+) -> Result<Type<'db>, ()> {
     let resolved = subject_ty.resolve_type_alias(db);
     let narrowed = match resolved {
-        Type::Union(union) => union.map(db, |element| {
-            sequence_pattern_binding_fallthrough_type(db, kind, *element)
-        }),
-        Type::Intersection(intersection) => intersection.map_positive(db, |element| {
-            sequence_pattern_binding_fallthrough_type(db, kind, *element)
-        }),
+        Type::Union(union) => union
+            .try_map(db, |element| {
+                try_sequence_pattern_binding_fallthrough_type(db, kind, *element, budget).ok()
+            })
+            .ok_or(())?,
+        Type::Intersection(intersection) => {
+            let mut failed = false;
+            let narrowed = intersection.map_positive(db, |element| {
+                try_sequence_pattern_binding_fallthrough_type(db, kind, *element, budget)
+                    .unwrap_or_else(|()| {
+                        failed = true;
+                        *element
+                    })
+            });
+            if failed {
+                return Err(());
+            }
+            narrowed
+        }
         Type::TypeVar(typevar)
             if typevar.typevar(db).upper_bound(db).is_some_and(|bound| {
                 pattern_fallthrough_type(db, &PatternPredicateKind::Sequence(kind.clone()), bound)
@@ -762,7 +832,14 @@ fn sequence_pattern_binding_fallthrough_type<'db>(
             Type::Never
         }
         _ if resolved.exact_tuple_instance_spec(db).is_some() => {
-            pattern_fallthrough_type(db, &PatternPredicateKind::Sequence(kind.clone()), resolved)
+            exact_tuple_sequence_pattern_fallthrough_type(db, kind, resolved, budget)?
+                .unwrap_or_else(|| {
+                    pattern_fallthrough_type(
+                        db,
+                        &PatternPredicateKind::Sequence(kind.clone()),
+                        resolved,
+                    )
+                })
         }
         // An irrefutable sequence pattern can only fail if the subject is not eligible for sequence
         // matching. Unlike length and indexed-element facts, eligibility is unaffected by mutation.
@@ -774,10 +851,88 @@ fn sequence_pattern_binding_fallthrough_type<'db>(
     };
 
     if narrowed == resolved {
-        subject_ty
+        Ok(subject_ty)
     } else {
-        narrowed
+        Ok(narrowed)
     }
+}
+
+const MAX_EXACT_TUPLE_PATTERN_ALTERNATIVES: usize = 64;
+const MAX_EXACT_TUPLE_PATTERN_ELEMENTS: usize = 4_096;
+
+/// Limits the cumulative alternatives and element slots created by one pattern traversal.
+#[derive(Default)]
+struct ExactTuplePatternExpansionBudget {
+    alternatives: usize,
+    elements: usize,
+}
+
+impl ExactTuplePatternExpansionBudget {
+    fn add_alternative(&mut self, elements: usize) -> Result<(), ()> {
+        self.alternatives += 1;
+        self.elements = self.elements.saturating_add(elements);
+        if self.alternatives > MAX_EXACT_TUPLE_PATTERN_ALTERNATIVES
+            || self.elements > MAX_EXACT_TUPLE_PATTERN_ELEMENTS
+        {
+            Err(())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+/// Return the part of an exact fixed-length tuple that can remain after a sequence pattern fails.
+///
+/// A pattern fails if any aligned element pattern fails. Represent that as a union with one tuple
+/// alternative per element. Large expansions and gradual tuples keep the synthesized-protocol
+/// representation used by the general fallthrough path.
+fn exact_tuple_sequence_pattern_fallthrough_type<'db>(
+    db: &'db dyn Db,
+    kind: &SequencePatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+    budget: &mut ExactTuplePatternExpansionBudget,
+) -> Result<Option<Type<'db>>, ()> {
+    if kind.split_around_star().is_some() {
+        return Ok(None);
+    }
+
+    let Some(tuple) = subject_ty.exact_tuple_instance_spec(db) else {
+        return Ok(None);
+    };
+    let Some(tuple) = tuple.as_fixed_length() else {
+        return Ok(None);
+    };
+    if tuple
+        .all_elements()
+        .iter()
+        .any(|element| any_over_type(db, *element, true, |ty| ty.is_dynamic()))
+    {
+        return Ok(None);
+    }
+    if tuple.len() != kind.patterns.len() {
+        return Ok(Some(subject_ty));
+    }
+    let mut alternatives = Vec::new();
+    for (index, (element, pattern)) in tuple
+        .iter_all_elements()
+        .zip(kind.patterns.iter())
+        .enumerate()
+    {
+        let remaining = try_pattern_binding_fallthrough_type(db, pattern, element, budget)?;
+        if remaining == element {
+            return Ok(Some(subject_ty));
+        }
+        if remaining.is_never() {
+            continue;
+        }
+
+        budget.add_alternative(tuple.len())?;
+        let mut elements = tuple.all_elements().to_vec();
+        elements[index] = remaining;
+        alternatives.push(Type::heterogeneous_tuple(db, elements));
+    }
+
+    Ok(Some(UnionType::from_elements(db, alternatives)))
 }
 
 /// Return whether every possible value of `ty` belongs to the same enum as `right`, including
