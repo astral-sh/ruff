@@ -1359,6 +1359,16 @@ class StaticMethodAssignment(metaclass=StoringMeta):
 
 reveal_type(StaticMethodAssignment().generated)  # revealed: int
 
+# A conditional direct member takes precedence when present, while the metaclass declaration
+# supplies the attribute on the other path.
+flag = bool()
+
+class ConditionalGenerated(metaclass=StoringMeta):
+    if flag:
+        generated: int = 1
+
+reveal_type(ConditionalGenerated().generated)  # revealed: int
+
 # A bound metaclass class attribute is not stored in the constructed class's namespace.
 class MetaclassAttributeOnly(type):
     metaclass_only: int = 1

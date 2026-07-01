@@ -2885,12 +2885,6 @@ impl<'db> Type<'db> {
             Type::SubclassOf(subclass_of) => subclass_of.subclass_of().into_class(db),
             _ => self.to_class_type(db),
         };
-        if own_class.is_some_and(|class| {
-            !class.own_class_member(db, None, name).is_undefined()
-                || class.has_own_instance_member(db, name)
-        }) {
-            return class_attr;
-        }
         let metaclass_declaration = self
             .to_meta_type(db)
             .to_instance(db)
@@ -2898,6 +2892,15 @@ impl<'db> Type<'db> {
             .map_or_else(PlaceAndQualifiers::default, |metaclass| {
                 metaclass.own_declared_instance_member(db, name).inner
             });
+        if own_class.is_some_and(|class| {
+            !class.own_class_member(db, None, name).is_undefined()
+                || class.has_own_instance_declaration(db, name)
+        }) {
+            return class_attr.or_fall_back_to(db, || metaclass_declaration);
+        }
+        if own_class.is_some_and(|class| class.has_own_instance_member(db, name)) {
+            return class_attr;
+        }
         metaclass_declaration.or_fall_back_to(db, || class_attr)
     }
 
