@@ -320,7 +320,7 @@ impl<'db> Type<'db> {
                 LiteralValueTypeKind::Bytes(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
             },
 
-            Type::TypeAlias(alias) => visitor.visit(*self, || {
+            Type::TypeAlias(alias) => visitor.visit(db, *self, || {
                 alias
                     .value_type(db)
                     .try_bool_impl(db, allow_short_circuit, visitor)
@@ -338,7 +338,7 @@ impl<'db> Type<'db> {
 
 /// A [`CycleDetector`] that is used in `try_bool` methods.
 pub(crate) type TryBoolVisitor<'db> =
-    CycleDetector<TryBool, Type<'db>, Result<Truthiness, BoolError<'db>>, 3>;
+    CycleDetector<'db, TryBool, Type<'db>, Result<Truthiness, BoolError<'db>>, 3>;
 pub(crate) struct TryBool;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
