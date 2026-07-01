@@ -1372,6 +1372,17 @@ class InheritsGenerated(InitializesInheritedGenerated, metaclass=StoringMeta): .
 reveal_type(InheritsGenerated().generated)  # revealed: str
 ```
 
+A dynamic base may provide an instance attribute of any type, so a regular attribute stored by the
+metaclass does not remove that uncertainty:
+
+```py
+DynamicGeneratedBase: Any = object
+
+class InheritsDynamicGenerated(DynamicGeneratedBase, metaclass=StoringMeta): ...
+
+reveal_type(InheritsDynamicGenerated().generated)  # revealed: Any
+```
+
 An inherited `ClassVar` does not describe an instance attribute, but an inherited dataclass field
 does:
 
