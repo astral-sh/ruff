@@ -1433,6 +1433,13 @@ class DeclaresGeneratedDescriptor(metaclass=DescriptorMeta):
 
 reveal_type(DeclaresGeneratedDescriptor().generated_descriptor)  # revealed: Literal["descriptor"]
 
+# An annotation-only instance declaration also shadows the non-descriptor arms of a generated
+# union contract.
+class DeclaresMaybeGeneratedDescriptor(metaclass=MaybeDescriptorMeta):
+    generated_descriptor: bytes
+
+reveal_type(DeclaresMaybeGeneratedDescriptor().generated_descriptor)  # revealed: Literal["descriptor"] | bytes
+
 # An assignment to the first parameter of a static method is not an instance member of the
 # constructed class, so it does not suppress the metaclass declaration.
 class StaticMethodAssignment(metaclass=StoringMeta):
