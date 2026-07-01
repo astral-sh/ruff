@@ -1346,6 +1346,19 @@ class DoesNotInferAssignment(metaclass=AssignmentOnlyMeta): ...
 reveal_type(DoesNotInferAssignment.assignment_only)  # revealed: int
 # error: [unresolved-attribute]
 reveal_type(DoesNotInferAssignment().assignment_only)  # revealed: Unknown
+
+# A bound declaration remains a metaclass attribute even if an arbitrary method writes the name.
+class BoundAndAssignedMeta(type):
+    bound_and_assigned: int = 0
+
+    def never_called(cls) -> None:
+        cls.bound_and_assigned = 1
+
+class DoesNotInferBoundAssignment(metaclass=BoundAndAssignedMeta): ...
+
+reveal_type(DoesNotInferBoundAssignment.bound_and_assigned)  # revealed: int
+# error: [unresolved-attribute]
+reveal_type(DoesNotInferBoundAssignment().bound_and_assigned)  # revealed: Unknown
 ```
 
 However, the metaclass attribute only takes precedence over a class-level attribute if it is a data

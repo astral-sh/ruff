@@ -2,6 +2,7 @@
 
 - Fixed — Model issue #3535 through direct metaclass instance-variable declarations. The declaration is a contract for an attribute stored in each constructed class namespace.
 - Rejected — Infer arbitrary metaclass method writes as constructed-class attributes. A method-only assignment is deliberately insufficient without a class-body declaration.
+- Fixed — Reject bound metaclass declarations even when an arbitrary method writes the same name. Only unbound declarations describe constructed-class attributes.
 - Rejected — Screen inferred writes against data descriptors. The narrow implementation does not infer writes, so descriptor interception is not part of this change.
 - Rejected — Model custom-metaclass shadows of builtin `type` descriptors. No builtin descriptor shim is needed for declaration contracts.
 - Rejected — Ignore annotation-only declarations when deciding whether an attribute exists. ty intentionally treats declarations as attribute contracts.
