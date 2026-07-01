@@ -2487,7 +2487,17 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// Look up an instance member that has a declaration in this class's body.
+    /// Look up an annotation-only instance member declared in this class's body.
+    ///
+    /// For example, this returns `x` but not `y`:
+    ///
+    /// ```python
+    /// class C:
+    ///     x: int
+    ///     y: int = 1
+    /// ```
+    ///
+    /// Inherited declarations are deliberately excluded.
     pub(super) fn own_declared_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
         let body_scope = self.body_scope(db);
         let table = place_table(db, body_scope);
@@ -2509,6 +2519,10 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     /// Return whether this class directly defines an instance member that can be inherited.
+    ///
+    /// This includes annotation-only declarations, assignments in unconditionally defined
+    /// instance methods, and dataclass fields. Qualifier filtering still excludes declarations
+    /// such as `ClassVar`.
     pub(super) fn has_own_inheritable_instance_member(self, db: &'db dyn Db, name: &str) -> bool {
         let may_have_instance_member = self.has_own_unbound_declaration(db, name)
             || self.has_own_implicit_instance_member(db, name)
@@ -2529,6 +2543,8 @@ impl<'db> StaticClassLiteral<'db> {
             .is_ok()
     }
 
+    /// Return whether this class has an annotation-only declaration that contributes an instance
+    /// member after qualifier filtering.
     pub(super) fn has_own_unbound_instance_declaration(self, db: &'db dyn Db, name: &str) -> bool {
         self.has_own_unbound_declaration(db, name)
             && !self.own_instance_member(db, name).inner.is_undefined()
@@ -3241,6 +3257,11 @@ fn implicit_attribute_names<'db>(db: &'db dyn Db, class_body_scope: ScopeId<'db>
     names.into_boxed_slice()
 }
 
+/// Return attributes assigned through `self` in unconditionally defined instance methods.
+///
+/// Unlike [`implicit_attribute_names`], this excludes assignments in class methods, static
+/// methods, and conditionally defined methods. It is used only to determine whether an instance
+/// member can be inherited.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 fn implicit_instance_attribute_names<'db>(
     db: &'db dyn Db,
@@ -3275,6 +3296,11 @@ fn implicit_instance_attribute_names<'db>(
     names.into_boxed_slice()
 }
 
+/// Return whether a method scope has the requested decorator kind.
+///
+/// Direct decorators and implicit dunder-method rules are inspected instead of the final callable
+/// type, which another decorator may wrap. Non-function scopes are accepted; callers handle their
+/// enclosing method separately when needed.
 fn method_matches_decorator<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
@@ -3315,6 +3341,10 @@ fn method_matches_decorator<'db>(
     }
 }
 
+/// Return the class-body reachability of the method binding that contains `method_scope_id`.
+///
+/// Eager child scopes are mapped back to their containing method. If the scope cannot be associated
+/// with a method binding in the class body, it is treated as unreachable.
 fn method_reachability<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
