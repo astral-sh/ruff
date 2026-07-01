@@ -866,24 +866,47 @@ def test_incompatible_declared_class_capture(value: PatternBox[int]) -> None:
 
 ## Generic subclass captures
 
-We do not yet infer a generic subclass's type arguments from its base class. Attributes declared
-only on the subclass therefore use `Unknown` for those arguments, but still retain types such as
-`list[Unknown]`. Attributes inherited from a generic base can use type arguments from the subject.
-When the subject does not provide type arguments, members declared by the pattern class use
-`Unknown`; a type parameter default does not restrict which instances match at runtime.
+When a generic pattern class inherits from the subject's class through an invariant base, the
+subject specialization determines the pattern class's type arguments. This applies to annotated
+attributes and properties. Every pattern-class type parameter must have an exact solution; variant
+bases and unconstrained parameters retain the existing conservative fallback. When the subject does
+not provide type arguments, members declared by the pattern class use `Unknown`; a type parameter
+default does not restrict which instances match at runtime.
 
 ```py
 from typing import final, Generic
 from typing_extensions import TypeVar
 
 GenericPatternT = TypeVar("GenericPatternT")
+ExtraGenericPatternT = TypeVar("ExtraGenericPatternT")
+CovariantGenericPatternT = TypeVar("CovariantGenericPatternT", covariant=True)
 DefaultGenericPatternT = TypeVar("DefaultGenericPatternT", default=str)
 
 class GenericPatternBase(Generic[GenericPatternT]): ...
 
+OptionalGenericPatternT = TypeVar(
+    "OptionalGenericPatternT",
+    bound=GenericPatternBase[int] | None,
+)
+UnionBoundGenericPatternT = TypeVar(
+    "UnionBoundGenericPatternT",
+    bound=GenericPatternBase[int] | GenericPatternBase[str],
+)
+
 class GenericPatternChild(GenericPatternBase[GenericPatternT]):
     item: GenericPatternT
     items: list[GenericPatternT]
+
+class PartiallySpecializedGenericPatternChild(
+    GenericPatternBase[GenericPatternT],
+    Generic[GenericPatternT, ExtraGenericPatternT],
+):
+    item: GenericPatternT
+
+class CovariantGenericPatternBase(Generic[CovariantGenericPatternT]): ...
+
+class CovariantGenericPatternChild(CovariantGenericPatternBase[CovariantGenericPatternT]):
+    item: CovariantGenericPatternT
 
 class GenericMemberBase(Generic[GenericPatternT]):
     item: GenericPatternT
@@ -898,19 +921,79 @@ class FinalGenericPatternBox(Generic[GenericPatternT]):
 class DefaultGenericPatternBox(Generic[DefaultGenericPatternT]):
     value: DefaultGenericPatternT
 
+ResultValueT = TypeVar("ResultValueT")
+ResultErrorT = TypeVar("ResultErrorT")
+
+class MatchResult(Generic[ResultValueT, ResultErrorT]): ...
+
+class MatchOk(MatchResult[ResultValueT, ResultErrorT]):
+    __match_args__ = ("value",)
+
+    @property
+    def value(self) -> ResultValueT:
+        raise NotImplementedError
+
+class MatchErr(MatchResult[ResultValueT, ResultErrorT]):
+    __match_args__ = ("error",)
+
+    @property
+    def error(self) -> ResultErrorT:
+        raise NotImplementedError
+
+def test_match_generic_subclass_property_capture(
+    result: MatchResult[int, str],
+) -> int:
+    match result:
+        case MatchOk(value):
+            reveal_type(value)  # revealed: int
+            return value
+        case MatchErr(error):
+            reveal_type(error)  # revealed: str
+            raise ValueError(error)
+    raise AssertionError
+
 def test_match_generic_subclass_capture(value: GenericPatternBase[int]) -> None:
     match value:
         case GenericPatternChild(item=item):
-            # TODO: This should be `int` once generic subclass specialization is supported.
-            reveal_type(item)  # revealed: Unknown
+            reveal_type(item)  # revealed: int
+
+def test_match_generic_subclass_capture_from_optional_typevar_bound(
+    value: OptionalGenericPatternT,
+) -> None:
+    match value:
+        case GenericPatternChild(item=item):
+            reveal_type(item)  # revealed: int
+
+def test_match_generic_subclass_capture_from_union_typevar_bound(
+    value: UnionBoundGenericPatternT,
+) -> None:
+    match value:
+        case GenericPatternChild(item=item):
+            reveal_type(item)  # revealed: int | str
 
 def test_match_nested_generic_subclass_capture(value: GenericPatternBase[int]) -> list[int]:
     match value:
         case GenericPatternChild(items=items):
-            # TODO: This should be `list[int]` once generic subclass specialization is supported.
-            reveal_type(items)  # revealed: list[Unknown]
+            reveal_type(items)  # revealed: list[int]
             return items
     return []
+
+def test_match_partially_specialized_generic_subclass(
+    value: GenericPatternBase[int],
+) -> None:
+    match value:
+        case PartiallySpecializedGenericPatternChild(item=item):
+            # `ExtraGenericPatternT` is not constrained by the subject, so the pattern class does
+            # not have one exact specialization.
+            reveal_type(item)  # revealed: Unknown
+
+def test_match_covariant_generic_subclass(
+    value: CovariantGenericPatternBase[int],
+) -> None:
+    match value:
+        case CovariantGenericPatternChild(item=item):
+            # The subject constrains only one end of the possible pattern-class specializations.
+            reveal_type(item)  # revealed: Unknown
 
 def test_match_inherited_generic_subclass_capture(
     value: GenericMemberBase[GenericPatternT],
