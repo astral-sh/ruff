@@ -2,6 +2,8 @@ use ruff_python_trivia::leading_indentation;
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::TextRange;
 
+use super::rst::is_field_list_marker;
+
 /// Collects docstring lines without their universal-newline terminators while preserving their
 /// source ranges.
 ///
@@ -41,6 +43,41 @@ pub(in crate::docstring) fn starts_with_markdown_list_item(line: &str) -> bool {
     digit_count > 0
         && matches!(bytes.get(digit_count), Some(b'.' | b')'))
         && matches!(bytes.get(digit_count + 1), Some(b' ' | b'\t'))
+}
+
+/// Returns the end of an indented Markdown or reStructuredText container block.
+pub(in crate::docstring) fn indented_container_end(
+    lines: &[ParsedLine<'_>],
+    index: usize,
+) -> Option<usize> {
+    let marker = lines.get(index)?;
+    if !is_rest_directive_marker(marker.text)
+        && !is_field_list_marker(marker.text)
+        && !starts_with_markdown_list_item(marker.text.trim_start())
+    {
+        return None;
+    }
+
+    let marker_indent = indentation(marker.text);
+    Some(
+        lines[index + 1..]
+            .iter()
+            .position(|line| {
+                !line.text.trim().is_empty() && indentation(line.text) <= marker_indent
+            })
+            .map_or(lines.len(), |offset| index + 1 + offset),
+    )
+}
+
+fn is_rest_directive_marker(line: &str) -> bool {
+    let Some(directive) = line.trim_start().strip_prefix(".. ") else {
+        return false;
+    };
+    let Some((name, _)) = directive.split_once("::") else {
+        return false;
+    };
+
+    !name.is_empty() && !name.chars().any(char::is_whitespace)
 }
 
 /// Splits the input once at the first colon outside bracket pairs and quoted strings.
