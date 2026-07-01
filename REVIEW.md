@@ -8,6 +8,7 @@
 - Fixed — Ignore assignments in static methods when checking for a direct instance member. Such assignments do not suppress the metaclass contract.
 - Fixed — Preserve the metaclass contract behind a possibly-defined direct member. It supplies the attribute on paths where the direct member is absent.
 - Fixed — Ignore instance assignments in conditionally defined methods when deciding precedence. They cannot suppress an always-present metaclass contract.
+- Rejected — Exclude declarations on builtin `type` from namespace contracts. Clean `main` already reveals `C().__annotations__` as `dict[str, Any]`, so that behavior is not owned by this change.
 - Rejected — Screen inferred writes against data descriptors. The narrow implementation does not infer writes, so descriptor interception is not part of this change.
 - Rejected — Model custom-metaclass shadows of builtin `type` descriptors. No builtin descriptor shim is needed for declaration contracts.
 - Rejected — Ignore annotation-only declarations when deciding whether an attribute exists. ty intentionally treats declarations as attribute contracts.
