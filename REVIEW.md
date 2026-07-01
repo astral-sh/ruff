@@ -19,7 +19,8 @@
 - Rejected — Ignore annotation-only declarations when deciding whether an attribute exists. ty intentionally treats declarations as attribute contracts.
 - Rejected — Inspect higher-order metaclass-populated descriptors. Higher-order runtime namespace reconstruction is outside issue #3535.
 - Fixed — Preserve the descriptor result of a generated union contract when instance writes are present.
-- Fixed — Compose only the descriptor arms of a generated union contract with the effective instance member. Normal generated arms remain shadowed by the instance value.
+- Fixed — Compose only the descriptor arms of a generated union contract with an initialized instance member. Normal generated arms remain shadowed by the instance value.
+- Fixed — Compose descriptor arms with direct annotation-only instance declarations. A normal generated arm is shadowed by the declaration contract.
 - Rejected — Treat directly dynamic declarations as possible data descriptors. The lookup reuses existing dynamic-descriptor heuristics; changing them is outside issue #3535.
 - Rejected — Treat dynamic union arms as possible data descriptors. The lookup reuses existing dynamic-descriptor heuristics; changing them is outside issue #3535.
 - Rejected — Distinguish dynamic alternatives from dynamic generic arguments during descriptor screening. Existing `may_be_data_descriptor` semantics deliberately exclude dynamic alternatives, and changing them is outside issue #3535.

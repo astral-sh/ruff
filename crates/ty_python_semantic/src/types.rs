@@ -2878,14 +2878,13 @@ impl<'db> Type<'db> {
         let generated_may_be_data_descriptor = metaclass_declaration
             .ignore_possibly_undefined()
             .is_some_and(|ty| ty.may_be_data_descriptor(db));
-        if generated_may_be_data_descriptor
-            && own_class.is_some_and(|class| class.has_own_unbound_instance_declaration(db, name))
-        {
-            return metaclass_declaration;
-        }
+        let has_own_unbound_instance_declaration =
+            own_class.is_some_and(|class| class.has_own_unbound_instance_declaration(db, name));
         if own_class.is_some_and(|class| {
-            !class.own_class_member(db, None, name).is_undefined()
-                || class.has_own_instance_declaration(db, name)
+            (!generated_may_be_data_descriptor || !has_own_unbound_instance_declaration)
+                && !class.own_class_member(db, None, name).is_undefined()
+                || (!generated_may_be_data_descriptor
+                    && class.has_own_instance_declaration(db, name))
         }) {
             return class_attr.or_fall_back_to(db, || metaclass_declaration);
         }
