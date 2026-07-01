@@ -6,7 +6,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::ExprRef;
 
 use crate::Db;
-use crate::frozen::FrozenMap;
+use crate::node_key::NarrowNodeIndexMap;
 use crate::scope::FileScopeId;
 use crate::semantic_index;
 
@@ -29,7 +29,7 @@ pub use node_key::ExpressionNodeKey;
 #[derive(Debug, salsa::Update, get_size2::GetSize)]
 pub(crate) struct AstIds {
     /// Maps expressions which "use" a place (that is, [`ast::ExprName`], [`ast::ExprAttribute`] or [`ast::ExprSubscript`]) to a use id.
-    uses_map: FrozenMap<ExpressionNodeKey, ScopedUseId>,
+    uses_map: NarrowNodeIndexMap<ScopedUseId>,
 }
 
 impl AstIds {
@@ -41,17 +41,19 @@ impl AstIds {
             uses_map.extend(builder.uses_map);
         }
 
-        let uses_map = FrozenMap::from_entries(uses_map);
-        debug_assert!(
-            uses_map.keys().is_sorted_by(|left, right| left < right),
-            "AST ID builders must contain disjoint keys"
+        let uses_map = NarrowNodeIndexMap::from_entries(
+            uses_map
+                .into_iter()
+                .map(|(key, use_id)| (key.index(), use_id)),
         );
 
         Self { uses_map }
     }
 
     fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
-        self.uses_map[&key.into()]
+        self.uses_map
+            .get(key.into().index())
+            .expect("key not found")
     }
 }
 
@@ -139,6 +141,12 @@ pub(crate) mod node_key {
         Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, salsa::Update, get_size2::GetSize,
     )]
     pub struct ExpressionNodeKey(NodeKey);
+
+    impl ExpressionNodeKey {
+        pub(crate) fn index(self) -> ast::NodeIndex {
+            self.0.index()
+        }
+    }
 
     impl From<ast::ExprRef<'_>> for ExpressionNodeKey {
         fn from(value: ast::ExprRef<'_>) -> Self {

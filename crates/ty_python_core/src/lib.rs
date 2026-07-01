@@ -27,6 +27,7 @@ use builder::SemanticIndexBuilder;
 use definition::{Definition, DefinitionNodeKey, Definitions};
 use expression::Expression;
 use narrowing_constraints::ScopedNarrowingConstraint;
+use node_key::NarrowNodeIndexMap;
 pub use place::{PlaceExprRef, PlaceTable};
 pub use reachability_constraints::ReachabilityConstraintsBuilder;
 pub use scope::FileScopeId;
@@ -241,6 +242,71 @@ struct DefinitionsByNode<'db> {
     non_single: FrozenMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
 }
 
+#[derive(Debug, PartialEq, Eq, Update, get_size2::GetSize)]
+struct ScopesByNode {
+    module: Option<FileScopeId>,
+    primary: NarrowNodeIndexMap<FileScopeId>,
+    type_parameters: NarrowNodeIndexMap<FileScopeId>,
+}
+
+impl ScopesByNode {
+    fn from_map(scopes: FxHashMap<NodeWithScopeKey, FileScopeId>) -> Self {
+        let mut module = None;
+        let mut primary = Vec::new();
+        let mut type_parameters = Vec::new();
+
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "each scope is independently partitioned by its node-key kind"
+        )]
+        for (key, scope) in scopes {
+            match key {
+                NodeWithScopeKey::Module => module = Some(scope),
+                NodeWithScopeKey::ClassTypeParameters(key)
+                | NodeWithScopeKey::FunctionTypeParameters(key)
+                | NodeWithScopeKey::TypeAliasTypeParameters(key) => {
+                    type_parameters.push((key.index(), scope));
+                }
+                NodeWithScopeKey::Class(key)
+                | NodeWithScopeKey::Function(key)
+                | NodeWithScopeKey::TypeAlias(key)
+                | NodeWithScopeKey::Lambda(key)
+                | NodeWithScopeKey::ListComprehension(key)
+                | NodeWithScopeKey::SetComprehension(key)
+                | NodeWithScopeKey::DictComprehension(key)
+                | NodeWithScopeKey::GeneratorExpression(key) => {
+                    primary.push((key.index(), scope));
+                }
+            }
+        }
+
+        Self {
+            module,
+            primary: NarrowNodeIndexMap::from_entries(primary),
+            type_parameters: NarrowNodeIndexMap::from_entries(type_parameters),
+        }
+    }
+
+    fn get(&self, key: NodeWithScopeKey) -> Option<FileScopeId> {
+        match key {
+            NodeWithScopeKey::Module => self.module,
+            NodeWithScopeKey::ClassTypeParameters(key)
+            | NodeWithScopeKey::FunctionTypeParameters(key)
+            | NodeWithScopeKey::TypeAliasTypeParameters(key) => {
+                self.type_parameters.get(key.index())
+            }
+            NodeWithScopeKey::Class(key)
+            | NodeWithScopeKey::Function(key)
+            | NodeWithScopeKey::TypeAlias(key)
+            | NodeWithScopeKey::Lambda(key)
+            | NodeWithScopeKey::ListComprehension(key)
+            | NodeWithScopeKey::SetComprehension(key)
+            | NodeWithScopeKey::DictComprehension(key)
+            | NodeWithScopeKey::GeneratorExpression(key) => self.primary.get(key.index()),
+        }
+    }
+}
+
 impl<'db> DefinitionsByNode<'db> {
     fn from_map(definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>) -> Self {
         let single_count = definitions_by_node
@@ -301,7 +367,7 @@ pub struct SemanticIndex<'db> {
     statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
 
     /// Map from nodes that create a scope to the scope they create.
-    scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
+    scopes_by_node: ScopesByNode,
 
     /// Map from a lambda expression to its containing statement.
     enclosing_lambda_statements: FrozenMap<ExpressionNodeKey, Statement<'db>>,
@@ -680,12 +746,14 @@ impl<'db> SemanticIndex<'db> {
     /// returns the scope in which that definition is defined in.
     #[track_caller]
     pub fn node_scope(&self, node: NodeWithScopeRef) -> FileScopeId {
-        self.scopes_by_node[&node.node_key()]
+        self.scopes_by_node
+            .get(node.node_key())
+            .expect("key not found")
     }
 
     /// Returns the id of the scope that `node` creates, if it exists.
     pub fn try_node_scope(&self, node: NodeWithScopeRef) -> Option<FileScopeId> {
-        self.scopes_by_node.get(&node.node_key()).copied()
+        self.scopes_by_node.get(node.node_key())
     }
 
     /// Returns the id of the scope that the node identified by `key` creates.
@@ -694,7 +762,7 @@ impl<'db> SemanticIndex<'db> {
     /// [`AstNodeRef`](crate::ast_node_ref::AstNodeRef) and want to avoid loading
     /// the parsed module just to look up the scope.
     pub fn node_scope_by_key(&self, key: NodeWithScopeKey) -> FileScopeId {
-        self.scopes_by_node[&key]
+        self.scopes_by_node.get(key).expect("key not found")
     }
 
     /// Checks if there is an import of `__future__.annotations` in the global scope, which affects
