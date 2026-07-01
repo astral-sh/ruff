@@ -387,6 +387,25 @@ fn check_class_declaration<'db>(
                 break;
             };
 
+            // Compare an explicitly restricted superclass method as bound to the subclass. The
+            // defining superclass may not satisfy its own receiver annotation even though the
+            // subclass does.
+            let superclass_type = match (superclass_type, type_on_subclass_instance) {
+                (Type::BoundMethod(superclass_method), Type::BoundMethod(subclass_method))
+                    if superclass_method
+                        .function(db)
+                        .signature(db)
+                        .overloads
+                        .iter()
+                        .any(Signature::has_explicit_positional_receiver_annotation) =>
+                {
+                    Type::BoundMethod(
+                        superclass_method.map_self_type(db, |_| subclass_method.self_instance(db)),
+                    )
+                }
+                _ => superclass_type,
+            };
+
             subclass_overrides_superclass_declaration = true;
 
             // Record the first overridden superclass member that is subject to the missing override

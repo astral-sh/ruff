@@ -932,16 +932,14 @@ class G3(A3):
     def method(self: object) -> Self: ...  # fine
 
 class H3(A3):
-    # TODO: we should emit `invalid-method-override` here
-    # (`A3.method()` can be called on any instance of `A3`,
+    # `A3.method()` can be called on any instance of `A3`,
     # but `H3.method()` can only be called on objects that are
-    # instances of `str`)
-    def method(self: str) -> Self: ...
+    # instances of `str`.
+    def method(self: str) -> Self: ...  # error: [invalid-method-override]
 
 class I3(A3):
-    # TODO: we should emit `invalid-method-override` here
-    # (`I3.method()` cannot be called with any inhabited type!)
-    def method(self: Never) -> Self: ...
+    # `I3.method()` cannot be called with any inhabited type.
+    def method(self: Never) -> Self: ...  # error: [invalid-method-override]
 
 class A4:
     def method[T: int](self, x: T) -> T: ...
@@ -952,6 +950,21 @@ class B4(A4):
     # but this is not necessarily true for `B4.method`: if passed a `bool`,
     # it could return a non-`bool` `int`!
     def method(self, x: int) -> int: ...
+```
+
+## Explicit receivers on inherited methods
+
+An inherited method with an explicit receiver only constrains subclasses accepted by that receiver:
+
+```pyi
+class Base:
+    def method(self: Included, value: object) -> None: ...
+
+class Included(Base):
+    def method(self, value: int) -> None: ...  # error: [invalid-method-override]
+
+class Excluded(Base):
+    def method(self, value: int) -> None: ...  # fine
 ```
 
 ## Generic methods on generic classes work as expected
