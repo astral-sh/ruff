@@ -1,4 +1,5 @@
 use rustc_hash::FxHashSet;
+use smallvec::SmallVec;
 
 use crate::{
     Db,
@@ -10,6 +11,7 @@ use crate::{
         bound_super::walk_bound_super_type,
         callable::walk_callable_type,
         class::walk_generic_alias,
+        cyclic::TypeIdentity,
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
         known_instance::walk_known_instance_type,
@@ -281,32 +283,88 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
     }
 }
 
+/// Walks a type while ignoring recursive cycles.
+///
+/// Use `walk_type_with_recursion_guard_fallback` if the cycle needs further processing.
 pub(crate) fn walk_type_with_recursion_guard<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
     visitor: &impl TypeVisitor<'db>,
-    recursion_guard: &TypeCollector<'db>,
+    recursion_guard: &RecursionGuard<'db>,
 ) {
+    let _cycle = walk_type_with_recursion_guard_fallback(db, ty, visitor, recursion_guard);
+}
+
+/// Walks a type, returning the type when recursion is detected after collecting the exact type.
+#[must_use]
+pub(crate) fn walk_type_with_recursion_guard_fallback<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    visitor: &impl TypeVisitor<'db>,
+    recursion_guard: &RecursionGuard<'db>,
+) -> Option<Type<'db>> {
     match TypeKind::from(ty) {
-        TypeKind::Atomic => {}
-        TypeKind::NonAtomic(non_atomic_type) => {
-            if recursion_guard.type_was_already_seen(ty) {
-                // If we have already seen this type, we can skip it.
-                return;
+        TypeKind::Atomic => None,
+        TypeKind::NonAtomic(non_atomic_type) => match recursion_guard.begin_visit(db, ty) {
+            RecursionGuardVisit::AlreadyCollected => None,
+            RecursionGuardVisit::Cycle => Some(ty),
+            RecursionGuardVisit::Pending => {
+                walk_non_atomic_type(db, non_atomic_type, visitor);
+                recursion_guard.finish_visit(db, ty);
+                None
             }
-            walk_non_atomic_type(db, non_atomic_type, visitor);
-        }
+        },
     }
 }
 
-/// Unlike `CycleDetector`, differences in recursive type specialization etc. are actually important here,
-/// so we should not compare by `TypeIdentity`.
 #[derive(Default, Debug)]
-pub(crate) struct TypeCollector<'db>(RefCell<FxHashSet<Type<'db>>>);
+struct TypeCollector<'db>(RefCell<FxHashSet<Type<'db>>>);
 
 impl<'db> TypeCollector<'db> {
-    pub(crate) fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
-        !self.0.borrow_mut().insert(ty)
+    fn collect_type(&self, ty: Type<'db>) -> bool {
+        self.0.borrow_mut().insert(ty)
+    }
+}
+
+enum RecursionGuardVisit {
+    AlreadyCollected,
+    Cycle,
+    Pending,
+}
+
+/// Guards recursive type walks.
+///
+/// [`TypeCollector`] only de-duplicates exact `Type` values. Recursive aliases must be detected by
+/// identity, so this wrapper keeps an active stack of [`TypeIdentity`] values in addition to the
+/// collected full types.
+#[derive(Default, Debug)]
+pub(crate) struct RecursionGuard<'db> {
+    collected_types: TypeCollector<'db>,
+    active_identities: RefCell<SmallVec<[TypeIdentity<'db>; 4]>>,
+}
+
+impl<'db> RecursionGuard<'db> {
+    fn begin_visit(&self, db: &'db dyn Db, ty: Type<'db>) -> RecursionGuardVisit {
+        // Collect the exact type before checking for identity recursion. A recursive alias keeps
+        // the same identity across different specializations, but callers still need each distinct
+        // specialized type to be collected.
+        let was_collected = self.collected_types.collect_type(ty);
+
+        let identity = ty.to_type_identity(db);
+        if self.active_identities.borrow().contains(&identity) {
+            return RecursionGuardVisit::Cycle;
+        }
+        if !was_collected {
+            return RecursionGuardVisit::AlreadyCollected;
+        }
+
+        self.active_identities.borrow_mut().push(identity);
+        RecursionGuardVisit::Pending
+    }
+
+    fn finish_visit(&self, db: &'db dyn Db, ty: Type<'db>) {
+        let identity = ty.to_type_identity(db);
+        debug_assert_eq!(self.active_identities.borrow_mut().pop(), Some(identity));
     }
 }
 
@@ -323,7 +381,7 @@ where
 {
     struct AnyOverTypeVisitor<'db, 'a, U> {
         query: &'a dyn Fn(Type<'db>) -> U,
-        recursion_guard: TypeCollector<'db>,
+        recursion_guard: RecursionGuard<'db>,
         found_matching_type: Cell<U>,
         should_visit_lazy_type_attributes: bool,
     }
@@ -353,7 +411,7 @@ where
 
     let visitor = AnyOverTypeVisitor {
         query: &query,
-        recursion_guard: TypeCollector::default(),
+        recursion_guard: RecursionGuard::default(),
         found_matching_type: Cell::default(),
         should_visit_lazy_type_attributes,
     };
@@ -364,7 +422,8 @@ where
 /// Return `true` if `ty`, or any of the types contained in `ty`, match the closure passed in.
 ///
 /// The function guards against infinite recursion
-/// by keeping track of the non-atomic types it has already seen.
+/// by keeping track of the non-atomic types it has collected and the type identities that are
+/// active in the current recursive path.
 ///
 /// The `should_visit_lazy_type_attributes` parameter controls whether deferred type attributes
 /// (value of a type alias, attributes of a class-based protocol, bounds/constraints of a typevar)
@@ -386,7 +445,8 @@ pub(super) fn any_over_type<'db>(
 /// function will return `Some(T)`.
 ///
 /// The function guards against infinite recursion
-/// by keeping track of the non-atomic types it has already seen.
+/// by keeping track of the non-atomic types it has collected and the type identities that are
+/// active in the current recursive path.
 ///
 /// The `should_visit_lazy_type_attributes` parameter controls whether deferred type attributes
 /// (value of a type alias, attributes of a class-based protocol, bounds/constraints of a typevar)

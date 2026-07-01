@@ -105,7 +105,7 @@ use crate::types::generics::InferableTypeVars;
 use crate::types::typevar::{BoundTypeVarIdentity, walk_bound_type_var_type};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
-    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+    RecursionGuard, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
     BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, TypeVarVariance,
@@ -954,7 +954,7 @@ impl<'db> ConstraintSetBuilder<'db> {
     fn intern_mentioned_typevars_in_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         struct InternMentionedTypevars<'a, 'db> {
             builder: &'a ConstraintSetBuilder<'db>,
-            recursion_guard: TypeCollector<'db>,
+            recursion_guard: RecursionGuard<'db>,
         }
 
         impl<'db> TypeVisitor<'db> for InternMentionedTypevars<'_, 'db> {
@@ -984,7 +984,7 @@ impl<'db> ConstraintSetBuilder<'db> {
 
         InternMentionedTypevars {
             builder: self,
-            recursion_guard: TypeCollector::default(),
+            recursion_guard: RecursionGuard::default(),
         }
         .visit_type(db, ty);
     }

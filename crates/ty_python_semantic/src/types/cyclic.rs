@@ -203,8 +203,7 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         compute: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
         match self.begin_visit(db, ty) {
-            CycleDetectorVisit::Ready(result)
-            | CycleDetectorVisit::Cycle(result) => result,
+            CycleDetectorVisit::Ready(result) | CycleDetectorVisit::Cycle(result) => result,
             CycleDetectorVisit::Pending(ty) => {
                 let result = compute();
                 self.finish_visit(ty, result)
@@ -212,7 +211,11 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         }
     }
 
-    fn begin_visit(&self, db: &'db dyn Db, ty: Type<'db>) -> CycleDetectorVisit<Type<'db>, Type<'db>> {
+    fn begin_visit(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> CycleDetectorVisit<Type<'db>, Type<'db>> {
         if let Some(result) = self.cache.borrow().get(&ty) {
             return CycleDetectorVisit::Ready(*result);
         }

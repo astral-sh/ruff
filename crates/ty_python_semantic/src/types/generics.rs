@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::fmt::Display;
 
@@ -7,7 +7,6 @@ use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
@@ -25,7 +24,8 @@ use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
 };
 use crate::types::visitor::{
-    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+    RecursionGuard, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+    walk_type_with_recursion_guard_fallback,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
@@ -462,7 +462,7 @@ impl<'db> GenericContext<'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
             typevars: RefCell<FxOrderSet<BoundTypeVarIdentity<'db>>>,
-            recursion_guard: TypeCollector<'db>,
+            recursion_guard: RecursionGuard<'db>,
         }
 
         impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {
@@ -658,7 +658,38 @@ impl<'db> GenericContext<'db> {
                 FxHashMap<CallableType<'db>, FxOrderSet<BoundTypeVarInstance<'db>>>,
         }
 
+        #[derive(Clone, Copy, Eq, Hash, PartialEq)]
+        enum TypeVarLocation<'db> {
+            OutsideCallableReturn,
+            InsideCallableReturn(CallableType<'db>),
+        }
+
         impl<'db> TypeVarLocations<'db> {
+            fn record(
+                &mut self,
+                db: &'db dyn Db,
+                location: TypeVarLocation<'db>,
+                bound_typevar: BoundTypeVarInstance<'db>,
+            ) {
+                let bound_typevar = if bound_typevar.is_paramspec(db) {
+                    bound_typevar.without_paramspec_attr(db)
+                } else {
+                    bound_typevar
+                };
+
+                match location {
+                    TypeVarLocation::OutsideCallableReturn => {
+                        self.found_outside_callable_return.insert(bound_typevar);
+                    }
+                    TypeVarLocation::InsideCallableReturn(callable) => {
+                        self.found_inside_callable_return
+                            .entry(callable)
+                            .or_default()
+                            .insert(bound_typevar);
+                    }
+                }
+            }
+
             /// Returns a set of all of the typevars that _only_ appear in a `Callable` in the
             /// return type, along with a "replacement map" for those `Callable`s. (The key of the
             /// map will be a `Callable` as it originally appears in the return type — i.e., with
@@ -732,18 +763,55 @@ impl<'db> GenericContext<'db> {
             }
         }
 
-        /// A visitor that walks through the parameter and return type annotations, recording
-        /// whether each typevar appears inside and/or outside of a return type `Callable`.
-        #[derive(Default)]
-        struct FindTypeVarLocations<'db> {
-            locations: RefCell<TypeVarLocations<'db>>,
-            recursion_guard: TypeCollector<'db>,
-            active_type_aliases: RefCell<FxHashSet<Definition<'db>>>,
-            in_return_type: bool,
-            in_callable_type: Cell<Option<CallableType<'db>>>,
+        fn walk_type_alias_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
+            db: &'db dyn Db,
+            type_alias: TypeAliasType<'db>,
+            visitor: &V,
+        ) {
+            let specialization = type_alias.specialization(db).or_else(|| {
+                type_alias
+                    .generic_context(db)
+                    .map(|generic_context| generic_context.default_specialization(db, None))
+            });
+            if let Some(specialization) = specialization {
+                for ty in specialization.types(db) {
+                    visitor.visit_type(db, *ty);
+                }
+                if let Some(tuple) = specialization.tuple_inner(db) {
+                    walk_tuple_type(db, tuple, visitor);
+                }
+            }
         }
 
-        impl<'db> TypeVisitor<'db> for FindTypeVarLocations<'db> {
+        /// A visitor that records all typevars it reaches at one logical location.
+        struct TypeVarLocationVisitor<'a, 'db> {
+            locations: &'a RefCell<TypeVarLocations<'db>>,
+            location: TypeVarLocation<'db>,
+            recursion_guard: RecursionGuard<'db>,
+        }
+
+        impl<'a, 'db> TypeVarLocationVisitor<'a, 'db> {
+            fn outside_callable_return(locations: &'a RefCell<TypeVarLocations<'db>>) -> Self {
+                Self {
+                    locations,
+                    location: TypeVarLocation::OutsideCallableReturn,
+                    recursion_guard: RecursionGuard::default(),
+                }
+            }
+
+            fn inside_callable_return(
+                locations: &'a RefCell<TypeVarLocations<'db>>,
+                callable: CallableType<'db>,
+            ) -> Self {
+                Self {
+                    locations,
+                    location: TypeVarLocation::InsideCallableReturn(callable),
+                    recursion_guard: RecursionGuard::default(),
+                }
+            }
+        }
+
+        impl<'db> TypeVisitor<'db> for TypeVarLocationVisitor<'_, 'db> {
             fn should_visit_lazy_type_attributes(&self) -> bool {
                 false
             }
@@ -753,63 +821,15 @@ impl<'db> GenericContext<'db> {
                 db: &'db dyn Db,
                 bound_typevar: BoundTypeVarInstance<'db>,
             ) {
-                let bound_typevar = if bound_typevar.is_paramspec(db) {
-                    bound_typevar.without_paramspec_attr(db)
-                } else {
-                    bound_typevar
-                };
-
-                let mut locations = self.locations.borrow_mut();
-                if self.in_return_type
-                    && let Some(callable) = self.in_callable_type.get()
-                {
-                    locations
-                        .found_inside_callable_return
-                        .entry(callable)
-                        .or_default()
-                        .insert(bound_typevar);
-                } else {
-                    locations
-                        .found_outside_callable_return
-                        .insert(bound_typevar);
-                }
-            }
-
-            fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
-                // Note: We only consider the outermost Callables in the return type.
-                if self.in_return_type && self.in_callable_type.get().is_none() {
-                    self.in_callable_type.set(Some(callable));
-                    walk_callable_type(db, callable, self);
-                    self.in_callable_type.set(None);
-                } else {
-                    walk_callable_type(db, callable, self);
-                }
+                self.locations
+                    .borrow_mut()
+                    .record(db, self.location, bound_typevar);
             }
 
             fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
                 // The default implementation would do this for us if we returned `true` from
                 // `should_visit_lazy_type_attributes`. However, this is the _only_ lazy type
                 // attribute that we want to recurse into, so we do it by hand.
-                let definition = type_alias.definition(db);
-                if !self.active_type_aliases.borrow_mut().insert(definition) {
-                    // Keep recursive aliases finite while still seeing typevars in their current
-                    // specialization.
-                    let specialization = type_alias.specialization(db).or_else(|| {
-                        type_alias
-                            .generic_context(db)
-                            .map(|generic_context| generic_context.default_specialization(db, None))
-                    });
-                    if let Some(specialization) = specialization {
-                        for ty in specialization.types(db) {
-                            self.visit_type(db, *ty);
-                        }
-                        if let Some(tuple) = specialization.tuple_inner(db) {
-                            walk_tuple_type(db, tuple, self);
-                        }
-                    }
-                    return;
-                }
-
                 match type_alias {
                     TypeAliasType::PEP695(type_alias) => {
                         walk_pep_695_type_alias(db, type_alias, self);
@@ -818,12 +838,77 @@ impl<'db> GenericContext<'db> {
                         walk_manual_pep_695_type_alias(db, type_alias, self);
                     }
                 }
-
-                self.active_type_aliases.borrow_mut().remove(&definition);
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+                if let Some(Type::TypeAlias(type_alias)) =
+                    walk_type_with_recursion_guard_fallback(db, ty, self, &self.recursion_guard)
+                {
+                    walk_type_alias_specialization(db, type_alias, self);
+                }
+            }
+        }
+
+        /// A visitor for the return type. It records typevars outside return `Callable`s separately
+        /// from typevars inside each outermost return `Callable`.
+        struct ReturnTypeVisitor<'a, 'db> {
+            locations: &'a RefCell<TypeVarLocations<'db>>,
+            recursion_guard: RecursionGuard<'db>,
+        }
+
+        impl<'a, 'db> ReturnTypeVisitor<'a, 'db> {
+            fn new(locations: &'a RefCell<TypeVarLocations<'db>>) -> Self {
+                Self {
+                    locations,
+                    recursion_guard: RecursionGuard::default(),
+                }
+            }
+        }
+
+        impl<'db> TypeVisitor<'db> for ReturnTypeVisitor<'_, 'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_bound_type_var_type(
+                &self,
+                db: &'db dyn Db,
+                bound_typevar: BoundTypeVarInstance<'db>,
+            ) {
+                self.locations.borrow_mut().record(
+                    db,
+                    TypeVarLocation::OutsideCallableReturn,
+                    bound_typevar,
+                );
+            }
+
+            fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
+                // Only the outermost `Callable` in each return-type branch gets a fresh generic
+                // context. Nested callables remain part of that outermost callable's signature.
+                TypeVarLocationVisitor::inside_callable_return(self.locations, callable)
+                    .visit_type(db, Type::Callable(callable));
+            }
+
+            fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
+                // The default implementation would do this for us if we returned `true` from
+                // `should_visit_lazy_type_attributes`. However, this is the _only_ lazy type
+                // attribute that we want to recurse into, so we do it by hand.
+                match type_alias {
+                    TypeAliasType::PEP695(type_alias) => {
+                        walk_pep_695_type_alias(db, type_alias, self);
+                    }
+                    TypeAliasType::ManualPEP695(type_alias) => {
+                        walk_manual_pep_695_type_alias(db, type_alias, self);
+                    }
+                }
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                if let Some(Type::TypeAlias(type_alias)) =
+                    walk_type_with_recursion_guard_fallback(db, ty, self, &self.recursion_guard)
+                {
+                    walk_type_alias_specialization(db, type_alias, self);
+                }
             }
         }
 
@@ -834,17 +919,22 @@ impl<'db> GenericContext<'db> {
         };
 
         // Find whether each typevar appears inside and/or outside a return type Callable.
-        let mut find_typevar_locations = FindTypeVarLocations::default();
-        for param in parameters {
-            find_typevar_locations.visit_type(db, param.annotated_type());
+        let typevar_locations = RefCell::new(TypeVarLocations::default());
+        {
+            let parameter_visitor =
+                TypeVarLocationVisitor::outside_callable_return(&typevar_locations);
+            for param in parameters {
+                parameter_visitor.visit_type(db, param.annotated_type());
+            }
         }
-        find_typevar_locations.in_return_type = true;
-        find_typevar_locations.visit_type(db, return_type);
+        {
+            let return_visitor = ReturnTypeVisitor::new(&typevar_locations);
+            return_visitor.visit_type(db, return_type);
+        }
 
         // Then update those return type Callables to be generic, with their generic context
         // containing the typevars that don't appear outside any return type Callable.
-        let (found_only_inside_callable_return, replacements) = find_typevar_locations
-            .locations
+        let (found_only_inside_callable_return, replacements) = typevar_locations
             .into_inner()
             .finalize(db, function_definition);
         let type_mapping = TypeMapping::RescopeReturnCallables(&replacements);

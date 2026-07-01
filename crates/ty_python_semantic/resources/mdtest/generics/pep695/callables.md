@@ -236,6 +236,25 @@ def factory[T, U]() -> Callable[[Alias[T], Alias[U]], tuple[Alias[T], Alias[U]]]
 reveal_type(generic_context(factory))  # revealed: None
 reveal_type(factory())  # revealed: [T'return, U'return](T'return, U'return, /) -> tuple[T'return, U'return]
 reveal_type(generic_context(factory()))  # revealed: ty_extensions.GenericContext[T'return@factory, U'return@factory]
+
+def pair_factory[T]() -> tuple[Callable[[int], list[T]], Callable[[str], list[T]]]:
+    raise NotImplementedError
+
+first, second = pair_factory()
+
+reveal_type(generic_context(pair_factory))  # revealed: None
+reveal_type(generic_context(first))  # revealed: ty_extensions.GenericContext[T'return@pair_factory]
+reveal_type(generic_context(second))  # revealed: ty_extensions.GenericContext[T'return@pair_factory]
+reveal_type(first(1))  # revealed: list[Unknown]
+reveal_type(second("x"))  # revealed: list[Unknown]
+
+type RecursiveReturnedCallable[T] = Callable[[], RecursiveReturnedCallable[list[T]]]
+
+def recursive_factory[T]() -> RecursiveReturnedCallable[T]:
+    raise NotImplementedError
+
+reveal_type(generic_context(recursive_factory))  # revealed: None
+reveal_type(generic_context(recursive_factory()))  # revealed: ty_extensions.GenericContext[T'return@recursive_factory]
 ```
 
 If the typevar also appears in a parameter, it is the function that is generic, and the returned
