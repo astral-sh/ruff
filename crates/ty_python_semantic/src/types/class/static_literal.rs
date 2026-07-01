@@ -2629,7 +2629,7 @@ impl<'db> StaticClassLiteral<'db> {
             .is_ok()
     }
 
-    fn has_own_unbound_instance_declaration(self, db: &'db dyn Db, name: &str) -> bool {
+    pub(super) fn has_own_unbound_instance_declaration(self, db: &'db dyn Db, name: &str) -> bool {
         let body_scope = self.body_scope(db);
         let Some(symbol_id) = place_table(db, body_scope).symbol_id(name) else {
             return false;

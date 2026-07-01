@@ -1405,6 +1405,13 @@ class UsesGeneratedDescriptor(metaclass=DescriptorMeta):
 
 reveal_type(UsesGeneratedDescriptor().generated_descriptor)  # revealed: Literal["descriptor"]
 
+# An annotation-only instance declaration does not create a class-namespace binding that could
+# shadow the generated data descriptor.
+class DeclaresGeneratedDescriptor(metaclass=DescriptorMeta):
+    generated_descriptor: int
+
+reveal_type(DeclaresGeneratedDescriptor().generated_descriptor)  # revealed: Literal["descriptor"]
+
 # An assignment to the first parameter of a static method is not an instance member of the
 # constructed class, so it does not suppress the metaclass declaration.
 class StaticMethodAssignment(metaclass=StoringMeta):

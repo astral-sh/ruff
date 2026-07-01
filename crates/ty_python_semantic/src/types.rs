@@ -2895,6 +2895,14 @@ impl<'db> Type<'db> {
         if metaclass_declaration.is_undefined() {
             return class_attr;
         }
+        let generated_is_data_descriptor = metaclass_declaration
+            .ignore_possibly_undefined()
+            .is_some_and(|ty| ty.is_data_descriptor(db));
+        if generated_is_data_descriptor
+            && own_class.is_some_and(|class| class.has_own_unbound_instance_declaration(db, name))
+        {
+            return metaclass_declaration;
+        }
         if own_class.is_some_and(|class| {
             !class.own_class_member(db, None, name).is_undefined()
                 || class.has_own_instance_declaration(db, name)
@@ -2904,10 +2912,7 @@ impl<'db> Type<'db> {
         if let Some(class) = own_class
             && class.has_instance_member(db, name)
         {
-            if metaclass_declaration
-                .ignore_possibly_undefined()
-                .is_some_and(|ty| ty.is_data_descriptor(db))
-            {
+            if generated_is_data_descriptor {
                 return metaclass_declaration;
             }
             return class.instance_member(db, name);
