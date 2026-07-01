@@ -639,6 +639,85 @@ def stable_wrapped(x: StableWrapped[int], y: StableWrapped[str]):
     y = x
 ```
 
+### Subtyping of recursive generic aliases
+
+Type relation for recursive aliases is checked structurally.
+
+```py
+from typing import Callable
+from ty_extensions import static_assert, is_assignable_to, is_subtype_of
+
+type DirectCovariantA[T] = T | tuple[DirectCovariantA[T], ...]
+type DirectCovariantB[T] = T | tuple[DirectCovariantB[T], ...]
+
+static_assert(is_subtype_of(DirectCovariantA[int], DirectCovariantB[object]))
+static_assert(is_subtype_of(DirectCovariantB[int], DirectCovariantA[object]))
+static_assert(not is_subtype_of(DirectCovariantA[object], DirectCovariantB[int]))
+static_assert(is_subtype_of(DirectCovariantA[DirectCovariantA[int]], DirectCovariantB[DirectCovariantB[object]]))
+static_assert(not is_subtype_of(DirectCovariantA[DirectCovariantA[object]], DirectCovariantB[DirectCovariantB[int]]))
+
+type DirectContravariantA[T] = Callable[[T], DirectContravariantA[T] | None]
+type DirectContravariantB[T] = Callable[[T], DirectContravariantB[T] | None]
+
+static_assert(is_subtype_of(DirectContravariantA[object], DirectContravariantB[int]))
+static_assert(is_subtype_of(DirectContravariantB[object], DirectContravariantA[int]))
+static_assert(not is_subtype_of(DirectContravariantA[int], DirectContravariantB[object]))
+static_assert(is_subtype_of(DirectContravariantA[DirectContravariantA[int]], DirectContravariantB[DirectContravariantB[object]]))
+static_assert(not is_subtype_of(DirectContravariantA[DirectContravariantA[object]], DirectContravariantB[DirectContravariantB[int]]))
+
+type DirectInvariantA[T] = list[T | DirectInvariantA[T]]
+type DirectInvariantB[T] = list[T | DirectInvariantB[T]]
+
+static_assert(is_subtype_of(DirectInvariantA[int], DirectInvariantB[int]))
+static_assert(is_subtype_of(DirectInvariantB[int], DirectInvariantA[int]))
+static_assert(not is_subtype_of(DirectInvariantA[int], DirectInvariantB[str]))
+static_assert(not is_subtype_of(DirectInvariantB[str], DirectInvariantA[int]))
+static_assert(not is_subtype_of(DirectInvariantA[int], DirectInvariantB[object]))
+static_assert(not is_assignable_to(DirectInvariantA[int], DirectInvariantB[str]))
+static_assert(is_subtype_of(DirectInvariantA[DirectInvariantA[int]], DirectInvariantB[DirectInvariantB[int]]))
+static_assert(not is_subtype_of(DirectInvariantA[DirectInvariantA[int]], DirectInvariantB[DirectInvariantB[str]]))
+```
+
+### Subtyping of mutually recursive generic aliases
+
+Mutually recursive aliases can be structurally equivalent even when they have different definitions,
+but their type arguments still have to satisfy the alias variance.
+
+```py
+from typing import Callable
+from ty_extensions import static_assert, is_assignable_to, is_subtype_of
+
+type CovariantA[T] = T | tuple[CovariantB[T], ...]
+type CovariantB[T] = T | tuple[CovariantA[T], ...]
+
+static_assert(is_subtype_of(CovariantA[int], CovariantB[object]))
+static_assert(is_subtype_of(CovariantB[int], CovariantA[object]))
+static_assert(not is_subtype_of(CovariantA[object], CovariantB[int]))
+static_assert(is_subtype_of(CovariantA[CovariantA[int]], CovariantB[CovariantB[object]]))
+static_assert(not is_subtype_of(CovariantA[CovariantA[object]], CovariantB[CovariantB[int]]))
+
+type ContravariantA[T] = Callable[[T], ContravariantB[T] | None]
+type ContravariantB[T] = Callable[[T], ContravariantA[T] | None]
+
+static_assert(is_subtype_of(ContravariantA[object], ContravariantB[int]))
+static_assert(is_subtype_of(ContravariantB[object], ContravariantA[int]))
+static_assert(not is_subtype_of(ContravariantA[int], ContravariantB[object]))
+static_assert(is_subtype_of(ContravariantA[ContravariantA[int]], ContravariantB[ContravariantB[object]]))
+static_assert(not is_subtype_of(ContravariantA[ContravariantA[object]], ContravariantB[ContravariantB[int]]))
+
+type InvariantA[T] = list[T | InvariantB[T]]
+type InvariantB[T] = list[T | InvariantA[T]]
+
+static_assert(is_subtype_of(InvariantA[int], InvariantB[int]))
+static_assert(is_subtype_of(InvariantB[int], InvariantA[int]))
+static_assert(not is_subtype_of(InvariantA[int], InvariantB[str]))
+static_assert(not is_subtype_of(InvariantB[str], InvariantA[int]))
+static_assert(not is_subtype_of(InvariantA[int], InvariantB[object]))
+static_assert(not is_assignable_to(InvariantA[int], InvariantB[str]))
+static_assert(is_subtype_of(InvariantA[InvariantA[int]], InvariantB[InvariantB[int]]))
+static_assert(not is_subtype_of(InvariantA[InvariantA[int]], InvariantB[InvariantB[str]]))
+```
+
 ### Subtyping of materializations of cyclic aliases
 
 ```py

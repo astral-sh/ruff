@@ -19,15 +19,16 @@ use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeAliasType, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
-    UpcastPolicy,
+    MaterializationKind, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType,
+    SubclassOfInner, SubclassOfType, TypeAliasType, TypeVarBoundOrConstraints, TypeVarVariance,
+    UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
     types::{
-        ErrorContext, ErrorContextTree, Type, constraints::ConstraintSet,
-        generics::InferableTypeVars,
+        ErrorContext, ErrorContextTree, Type,
+        constraints::ConstraintSet,
+        generics::{InferableTypeVars, Specialization},
     },
 };
 
@@ -777,6 +778,13 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
 }
 
+#[derive(Clone, Copy)]
+struct RecursiveAliasArgument<'db> {
+    variance: TypeVarVariance,
+    materialization_kind: Option<MaterializationKind>,
+    ty: Type<'db>,
+}
+
 impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     pub(super) fn subtyping(
         constraints: &'c ConstraintSetBuilder<'db>,
@@ -972,9 +980,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if let (Type::TypeAlias(source_alias), Type::TypeAlias(target_alias)) = (source, target)
-            && source_alias.definition(db) == target_alias.definition(db)
-        {
+        if let (Type::TypeAlias(source_alias), Type::TypeAlias(target_alias)) = (source, target) {
             return self.check_recursive_type_alias_specialization_pair(
                 db,
                 source_alias,
@@ -985,56 +991,143 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         self.always()
     }
 
+    fn type_alias_specialization_or_default(
+        db: &'db dyn Db,
+        alias: TypeAliasType<'db>,
+    ) -> Option<Specialization<'db>> {
+        alias.specialization(db).or_else(|| {
+            alias
+                .generic_context(db)
+                .map(|generic_context| generic_context.default_specialization(db, None))
+        })
+    }
+
     fn check_recursive_type_alias_specialization_pair(
         &self,
         db: &'db dyn Db,
         source: TypeAliasType<'db>,
         target: TypeAliasType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let Some(source_specialization) = source.specialization(db).or_else(|| {
-            source
-                .generic_context(db)
-                .map(|generic_context| generic_context.default_specialization(db, None))
-        }) else {
+        let Some(source_specialization) = Self::type_alias_specialization_or_default(db, source)
+        else {
             return self.always();
         };
-        let Some(target_specialization) = target.specialization(db).or_else(|| {
-            target
-                .generic_context(db)
-                .map(|generic_context| generic_context.default_specialization(db, None))
-        }) else {
+        let Some(target_specialization) = Self::type_alias_specialization_or_default(db, target)
+        else {
             return self.always();
         };
 
-        let generic_context = source_specialization.generic_context(db);
-        if generic_context != target_specialization.generic_context(db) {
+        let source_generic_context = source_specialization.generic_context(db);
+        let target_generic_context = target_specialization.generic_context(db);
+        let source_types = source_specialization.types(db);
+        let target_types = target_specialization.types(db);
+
+        if source_generic_context.len(db) != source_types.len()
+            || target_generic_context.len(db) != target_types.len()
+            || source_types.len() != target_types.len()
+        {
             return self.never();
         }
 
-        itertools::izip!(
-            generic_context.variables(db),
-            source_specialization.types(db),
-            target_specialization.types(db),
-        )
-        .when_all(
-            db,
-            self.constraints,
-            |(bound_typevar, source_type, target_type)| match source.variance_of(db, bound_typevar)
-            {
-                TypeVarVariance::Covariant => self.check_type_pair(db, *source_type, *target_type),
-                TypeVarVariance::Contravariant => {
-                    self.check_type_pair(db, *target_type, *source_type)
-                }
-                TypeVarVariance::Invariant | TypeVarVariance::Bivariant => self
-                    .check_relation_in_invariant_position(
+        // Type arguments can themselves be recursive aliases:
+        //
+        // ```py
+        // type A[T] = T | tuple[A[T], ...]
+        // type B[T] = T | tuple[B[T], ...]
+        // ```
+        //
+        // While checking `A[A[int]] <: B[B[object]]`, the outer alias pair remains active in
+        // `relation_visitor` until `with_recursion_guard` finishes the original visit. When RHS
+        // expansion reaches the same alias pair again, cycle recovery compares the current
+        // specialization arguments instead of expanding the alias bodies again:
+        //
+        // ```text
+        // fallback(A[A[int]], B[B[object]])
+        //   -> check_type_pair(A[int], B[object])
+        //   -> fallback(A[int], B[object])
+        //   -> check_type_pair(int, object)
+        // ```
+        //
+        // The `check_type_pair(A[int], B[object])` call above re-enters the normal relation
+        // checker, but it does not start from an empty recursion stack. The original alias pair
+        // is still active, so the nested alias relation immediately recovers here instead of
+        // recursively expanding `A` and `B`. This terminates because each fallback step compares
+        // the next layer of finite specialization arguments.
+        if source_generic_context == target_generic_context {
+            return source_generic_context
+                .variables(db)
+                .zip(source_types)
+                .zip(target_types)
+                .when_all(
+                    db,
+                    self.constraints,
+                    |((bound_typevar, source_type), target_type)| {
+                        self.check_recursive_type_alias_type_argument_pair(
+                            db,
+                            RecursiveAliasArgument {
+                                variance: source.variance_of(db, bound_typevar),
+                                materialization_kind: source_specialization
+                                    .materialization_kind(db),
+                                ty: *source_type,
+                            },
+                            RecursiveAliasArgument {
+                                variance: target.variance_of(db, bound_typevar),
+                                materialization_kind: target_specialization
+                                    .materialization_kind(db),
+                                ty: *target_type,
+                            },
+                        )
+                    },
+                );
+        }
+
+        source_generic_context
+            .variables(db)
+            .zip(target_generic_context.variables(db))
+            .zip(source_types)
+            .zip(target_types)
+            .when_all(
+                db,
+                self.constraints,
+                |(((source_typevar, target_typevar), source_type), target_type)| {
+                    self.check_recursive_type_alias_type_argument_pair(
                         db,
-                        *source_type,
-                        source_specialization.materialization_kind(db),
-                        *target_type,
-                        target_specialization.materialization_kind(db),
-                    ),
-            },
-        )
+                        RecursiveAliasArgument {
+                            variance: source.variance_of(db, source_typevar),
+                            materialization_kind: source_specialization.materialization_kind(db),
+                            ty: *source_type,
+                        },
+                        RecursiveAliasArgument {
+                            variance: target.variance_of(db, target_typevar),
+                            materialization_kind: target_specialization.materialization_kind(db),
+                            ty: *target_type,
+                        },
+                    )
+                },
+            )
+    }
+
+    fn check_recursive_type_alias_type_argument_pair(
+        &self,
+        db: &'db dyn Db,
+        source: RecursiveAliasArgument<'db>,
+        target: RecursiveAliasArgument<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        match (source.variance, target.variance) {
+            (TypeVarVariance::Covariant, TypeVarVariance::Covariant) => {
+                self.check_type_pair(db, source.ty, target.ty)
+            }
+            (TypeVarVariance::Contravariant, TypeVarVariance::Contravariant) => {
+                self.check_type_pair(db, target.ty, source.ty)
+            }
+            _ => self.check_relation_in_invariant_position(
+                db,
+                source.ty,
+                source.materialization_kind,
+                target.ty,
+                target.materialization_kind,
+            ),
+        }
     }
 
     /// Is `target` a metaclass instance (a nominal instance of a subclass of `builtins.type`)?

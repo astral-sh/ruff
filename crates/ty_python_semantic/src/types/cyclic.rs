@@ -166,7 +166,8 @@ where
 pub(crate) enum CycleDetectorVisit<T, R> {
     /// The item was already completed in this recursive operation.
     Ready(R),
-    /// The item is already active on the recursion stack.
+    /// The wrapped value here is the input when recursion is detected.
+    /// For complete results, implement recursive-only fallback handling using the wrapped value.
     Cycle(T),
     /// The caller should compute the result and pass it to [`CycleDetector::finish_visit`].
     Pending(T),
@@ -202,28 +203,29 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         compute: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
         match self.begin_visit(db, ty) {
-            BeginVisit::Ready(result) => result,
-            BeginVisit::Pending(ty) => {
+            CycleDetectorVisit::Ready(result)
+            | CycleDetectorVisit::Cycle(result) => result,
+            CycleDetectorVisit::Pending(ty) => {
                 let result = compute();
                 self.finish_visit(ty, result)
             }
         }
     }
 
-    fn begin_visit(&self, db: &'db dyn Db, ty: Type<'db>) -> BeginVisit<Type<'db>, Type<'db>> {
+    fn begin_visit(&self, db: &'db dyn Db, ty: Type<'db>) -> CycleDetectorVisit<Type<'db>, Type<'db>> {
         if let Some(result) = self.cache.borrow().get(&ty) {
-            return BeginVisit::Ready(*result);
+            return CycleDetectorVisit::Ready(*result);
         }
 
         let identity = ty.to_identity(db);
         if self.seen.borrow().contains(&identity) {
             // When a cycle is encountered, the type being visited is returned as a fallback
             // (typically a recursive type alias).
-            return BeginVisit::Ready(ty);
+            return CycleDetectorVisit::Cycle(ty);
         }
 
         self.seen.borrow_mut().push(identity);
-        BeginVisit::Pending(ty)
+        CycleDetectorVisit::Pending(ty)
     }
 
     fn finish_visit(&self, ty: Type<'db>, result: Type<'db>) -> Type<'db> {
@@ -231,11 +233,6 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         self.cache.borrow_mut().insert_new(ty, result);
         result
     }
-}
-
-enum BeginVisit<T, R> {
-    Ready(R),
-    Pending(T),
 }
 
 impl<'db, Tag, T, R: Default, const INLINE_CAPACITY: usize> Default
