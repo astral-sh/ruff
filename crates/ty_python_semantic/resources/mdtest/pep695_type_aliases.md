@@ -633,6 +633,10 @@ type StableWrapped[T] = list[StableWrapped[T]]
 def stable_wrapped(x: StableWrapped[int], y: StableWrapped[str]):
     reveal_type(x)  # revealed: list[StableWrapped[int]]
     reveal_type(y)  # revealed: list[StableWrapped[str]]
+    # error: [invalid-assignment] "Cannot assign `list[StableWrapped[str]]` to `list[StableWrapped[int]]`"
+    x = y
+    # error: [invalid-assignment] "Cannot assign `list[StableWrapped[int]]` to `list[StableWrapped[str]]`"
+    y = x
 ```
 
 ### Subtyping of materializations of cyclic aliases

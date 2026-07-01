@@ -227,6 +227,15 @@ reveal_type(generic_context(decorator_factory()))
 reveal_type(decorator_factory()(identity))
 # revealed: Literal[1]
 reveal_type(decorator_factory()(identity)(1))
+
+type Alias[T] = T
+
+def factory[T, U]() -> Callable[[Alias[T], Alias[U]], tuple[Alias[T], Alias[U]]]:
+    raise NotImplementedError
+
+reveal_type(generic_context(factory))  # revealed: None
+reveal_type(factory())  # revealed: [T'return, U'return](T'return, U'return, /) -> tuple[T'return, U'return]
+reveal_type(generic_context(factory()))  # revealed: ty_extensions.GenericContext[T'return@factory, U'return@factory]
 ```
 
 If the typevar also appears in a parameter, it is the function that is generic, and the returned
