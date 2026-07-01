@@ -456,7 +456,7 @@ fn synthesize_typed_dict_get<'db>(
                 TypeVarVariance::Covariant,
             );
 
-            let parameterss = [
+            let parameters = [
                 Parameter::positional_only(Some(Name::new_static("self")))
                     .with_annotated_type(instance_ty),
                 Parameter::positional_only(Some(Name::new_static("key")))
@@ -467,7 +467,7 @@ fn synthesize_typed_dict_get<'db>(
 
             Signature::new_generic(
                 Some(GenericContext::from_typevar_instances(db, [t_default])),
-                Parameters::new(db, parameterss),
+                Parameters::new(db, parameters),
                 UnionType::from_two_elements(db, fallback_value_ty, Type::TypeVar(t_default)),
             )
         }));

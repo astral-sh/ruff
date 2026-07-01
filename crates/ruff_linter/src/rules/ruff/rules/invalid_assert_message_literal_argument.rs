@@ -15,14 +15,14 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// fruits = ["apples", "plums", "pears"]
-/// fruits.filter(lambda fruit: fruit.startwith("p"))
+/// fruits.filter(lambda fruit: fruit.startswith("p"))
 /// assert len(fruits), 2  # True unless the list is empty
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// fruits = ["apples", "plums", "pears"]
-/// fruits.filter(lambda fruit: fruit.startwith("p"))
+/// fruits.filter(lambda fruit: fruit.startswith("p"))
 /// assert len(fruits) == 2
 /// ```
 #[derive(ViolationMetadata)]

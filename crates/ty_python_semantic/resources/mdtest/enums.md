@@ -2409,7 +2409,7 @@ name = "GoodMatch2"
 GoodMatch2 = Enum(name, "A B")  # also fine
 ```
 
-If there is a mitmatch, we emit the following diagnostic:
+If there is a mismatch, we emit the following diagnostic:
 
 ```py
 # snapshot: mismatched-type-name

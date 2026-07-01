@@ -389,7 +389,7 @@ reveal_type(x)  # revealed: Literal[1, 2]
 The example above (hopefully) feels natural, but if we look at it closely, the reveals there are
 making some beefy assumptions. For one, we assume `f` might be called before the final reveal, even
 though in this case we can actually see that it's never called. A "sufficiently smart compiler"
-could've narrowed that to `Literal[1]`, but we don't/can't track what functions are caled when
+could've narrowed that to `Literal[1]`, but we don't/can't track what functions are called when
 (anywhere really, but especially not in the global scope), so we're being conservative. On the other
 hand, the reveal of `Literal[2]` after the binding in `g` is the opposite, an aggressive assumption
 that's not generally sound. Consider this counterexample where `f` and `g` are siblings that both

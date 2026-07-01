@@ -966,7 +966,7 @@ reveal_type(name)  # revealed: Name
 
 ## `self` in PEP 695 generic methods
 
-When a generic method uses a PEP 695 generic context, an implict or explicit annotation of
+When a generic method uses a PEP 695 generic context, an implicit or explicit annotation of
 `self: Self` is still part of the full generic context:
 
 ```py

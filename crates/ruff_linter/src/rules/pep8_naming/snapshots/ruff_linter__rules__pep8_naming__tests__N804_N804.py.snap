@@ -86,12 +86,12 @@ N804 First argument of a class method should be named `cls`
 help: Rename `this` to `cls`
 
 N804 First argument of a class method should be named `cls`
-  --> N804.py:63:23
+  --> N804.py:63:24
    |
 61 |         pass
 62 |
-63 |     def cls_as_varags(this, *cls):
-   |                       ^^^^
+63 |     def cls_as_varargs(this, *cls):
+   |                        ^^^^
 64 |         pass
    |
 help: Rename `this` to `cls`
