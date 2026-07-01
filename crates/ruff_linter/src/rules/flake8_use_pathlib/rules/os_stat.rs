@@ -9,8 +9,8 @@ use crate::{
     importer::ImportRequest,
     preview::is_fix_os_stat_enabled,
     rules::flake8_use_pathlib::helpers::{
-        has_unknown_keywords_or_starred_expr, is_keyword_only_argument_non_default,
-        is_keyword_true_or_default, is_pathlib_path_call,
+        has_unknown_keywords_or_starred_expr, is_boolean_literal_or_default,
+        is_keyword_only_argument_non_default, is_pathlib_path_call,
     },
 };
 
@@ -104,22 +104,22 @@ pub(crate) fn os_stat(checker: &Checker, call: &ExprCall, segment: &[&str]) {
         return;
     };
 
-    let method = if checker.target_version() >= PythonVersion::PY310 {
-        "stat"
-    } else {
-        match is_keyword_true_or_default(&call.arguments, "follow_symlinks") {
-            Some(true) => "stat",
-            Some(false) => "lstat",
-            None => return,
-        }
-    };
-
     let range = call.range();
     let mut diagnostic = checker.report_diagnostic(OsStat, call.func.range());
 
     if !is_fix_os_stat_enabled(checker.settings()) {
         return;
     }
+
+    let method = if checker.target_version() >= PythonVersion::PY310 {
+        "stat"
+    } else {
+        match is_boolean_literal_or_default(&call.arguments, "follow_symlinks") {
+            Some(true) => "stat",
+            Some(false) => "lstat",
+            None => return,
+        }
+    };
 
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
@@ -136,7 +136,8 @@ pub(crate) fn os_stat(checker: &Checker, call: &ExprCall, segment: &[&str]) {
                 Some(locator.slice(expr.range()))
             }
             ArgOrKeyword::Keyword(kw)
-                if matches!(kw.arg.as_deref(), Some("follow_symlinks")) && method == "stat" =>
+                if matches!(kw.arg.as_deref(), Some("follow_symlinks"))
+                    && checker.target_version() >= PythonVersion::PY310 =>
             {
                 Some(locator.slice(kw.range()))
             }
