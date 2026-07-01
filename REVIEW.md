@@ -44,3 +44,8 @@
 - Fixed — Reuse `ClassType::static_class_literal` instead of repeating static, generic, and dynamic dispatch in four new member helpers.
 - Fixed — Pass the known nominal `ClassType` into generated-namespace lookup instead of recovering it from a `SubclassOf` meta-type.
 - Fixed — Express descriptor and non-descriptor shadowing as separate branches while preserving the original short-circuit lookup order.
+- Fixed — Give the new metaclass-instance cases a standalone literate mdtest section with plain Markdown prose and local imports.
+- Fixed — Remove a weaker descriptor-union case, duplicate class-object reveals, and a combined bound-plus-write guardrail already covered by simpler cases.
+- Fixed — Use distinct assignment types in the static-method and conditional-method cases so their reveals test precedence instead of coincidental equal types.
+- Fixed — Confirm that every assertion intended to demonstrate improved behavior fails on the exact merge base, including both protocol relationship assertions.
+- Rejected — Remove focused instance-precedence, dataclass, and negative cases solely because they pass on `main`. They are guardrails ensuring that the new lookup preserves existing behavior and remains narrowly scoped.
