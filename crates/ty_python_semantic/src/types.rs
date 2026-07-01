@@ -2913,7 +2913,24 @@ impl<'db> Type<'db> {
             && class.has_instance_member(db, name)
         {
             if generated_may_be_data_descriptor {
-                return metaclass_declaration;
+                return match metaclass_declaration {
+                    PlaceAndQualifiers {
+                        place: Place::Defined(declaration),
+                        qualifiers,
+                    } => Place::Defined(DefinedPlace {
+                        ty: declaration
+                            .ty
+                            .filter_union(db, |ty| ty.may_be_data_descriptor(db)),
+                        definedness: if declaration.ty.is_data_descriptor(db) {
+                            declaration.definedness
+                        } else {
+                            Definedness::PossiblyUndefined
+                        },
+                        ..declaration
+                    })
+                    .with_qualifiers(qualifiers),
+                    _ => metaclass_declaration,
+                };
             }
             return class.instance_member(db, name);
         }
