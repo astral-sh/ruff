@@ -5,7 +5,7 @@ A type is single-valued iff it is not empty and all inhabitants of it compare eq
 ```pyi
 import types
 from types import UnionType
-from typing_extensions import Any, Literal, LiteralString, Never, Callable, TypeAliasType
+from typing_extensions import Any, Callable, Generic, Literal, LiteralString, Never, TypeAliasType, TypeVar, final
 from ty_extensions import is_single_valued, static_assert, TypeOf
 
 static_assert(is_single_valued(None))
@@ -48,6 +48,13 @@ static_assert(not is_single_valued(Callable[[int, str], None]))
 static_assert(not is_single_valued(TypeAliasType))
 static_assert(not is_single_valued(UnionType))
 static_assert(is_single_valued(TypeOf[list[int]]))
+
+T = TypeVar("T")
+
+@final
+class FinalGeneric(Generic[T]): ...
+
+static_assert(is_single_valued(type[FinalGeneric[int]]))
 
 class A:
     def method(self): ...

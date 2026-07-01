@@ -1130,7 +1130,17 @@ impl<'db> BoundTypeVarInstance<'db> {
                         // Materialization uses a different mapping mode. Reuse of the outer
                         // visitor can incorrectly hit a cache entry from specialization.
                         let materialization_visitor = ApplyTypeMappingVisitor::default();
-                        mapped.materialize(db, *materialization_kind, &materialization_visitor)
+                        if *materialization_kind == MaterializationKind::Top
+                            && mapped.is_unknown()
+                            && self.variance(db) == TypeVarVariance::Invariant
+                        {
+                            self.typevar(db)
+                                .require_bound_or_constraints(db)
+                                .as_type(db)
+                                .materialize(db, *materialization_kind, &materialization_visitor)
+                        } else {
+                            mapped.materialize(db, *materialization_kind, &materialization_visitor)
+                        }
                     }
                 })
                 .unwrap_or(Type::TypeVar(self)),

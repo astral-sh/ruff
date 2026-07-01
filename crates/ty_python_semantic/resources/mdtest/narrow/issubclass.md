@@ -445,6 +445,57 @@ def _(x: type, y: type[int]):
         reveal_type(x)  # revealed: type[int]
 ```
 
+Generic `type[]` types use the top materialization of the instance type, including when the runtime
+class object comes from `type(y)`:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import final
+
+class Invariant[T]:
+    value: T
+
+class WithConcreteDefault[T = int]:
+    value: T
+
+@final
+class FinalInvariant[T]:
+    value: T
+
+def generic(x: type[object], cls: type[Invariant[int]], y: Invariant[str]):
+    if issubclass(x, cls):
+        reveal_type(x)  # revealed: type[Top[Invariant[Unknown]]]
+
+    if issubclass(x, type(y)):
+        reveal_type(x)  # revealed: type[Top[Invariant[Unknown]]]
+
+def concrete_default(
+    x: type[object],
+    cls: type[WithConcreteDefault[int]],
+    y: WithConcreteDefault[str],
+):
+    if issubclass(x, cls):
+        reveal_type(x)  # revealed: type[Top[WithConcreteDefault[Unknown]]]
+
+    if issubclass(x, type(y)):
+        reveal_type(x)  # revealed: type[Top[WithConcreteDefault[Unknown]]]
+
+def final_generic(
+    x: type[object],
+    cls: type[FinalInvariant[int]],
+    y: FinalInvariant[str],
+):
+    if issubclass(x, cls):
+        reveal_type(x)  # revealed: <class 'Top[FinalInvariant[Unknown]]'>
+
+    if issubclass(x, type(y)):
+        reveal_type(x)  # revealed: <class 'Top[FinalInvariant[Unknown]]'>
+```
+
 ### Disjoint `type[]` types are narrowed to `Never`
 
 Here, `type[UsesMeta1]` and `type[UsesMeta2]` are disjoint because a common subclass of `UsesMeta1`
