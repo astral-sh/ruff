@@ -1326,6 +1326,22 @@ reveal_type(EnumValue(1)._member_map_)  # revealed: dict[str, int]
 for member in EnumValue:
     reveal_type(member)  # revealed: EnumValue
 
+# A metaclass declaration describes a value stored directly in the constructed class namespace, so
+# it takes precedence over an inherited class attribute.
+class StoringMeta(type):
+    generated: int
+
+    def __new__(mcls, name: str, bases: tuple[type, ...], namespace: dict[str, object]):
+        namespace["generated"] = 1
+        return super().__new__(mcls, name, bases, namespace)
+
+class GeneratedBase:
+    generated = "base"
+
+class StoresGenerated(GeneratedBase, metaclass=StoringMeta): ...
+
+reveal_type(StoresGenerated().generated)  # revealed: int
+
 # A bound metaclass class attribute is not stored in the constructed class's namespace.
 class MetaclassAttributeOnly(type):
     metaclass_only: int = 1
