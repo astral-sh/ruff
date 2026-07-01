@@ -93,13 +93,8 @@ pub struct CycleDetector<'db, Tag, T: HasIdentity<'db>, R, const INLINE_CAPACITY
     /// `Type` has extra data than the type structure that should be equated,
     /// so it is compared using identity, which removes extra data.
     seen: RefCell<SmallVec<[T::Id; INLINE_CAPACITY]>>,
-
-    /// Unlike `seen`, this field is a pure performance optimisation (and an essential one). If the
-    /// type we're trying to normalize is present in `cache`, it doesn't necessarily mean we've hit
-    /// a cycle: it just means that we've already visited this inner type as part of a bigger call
-    /// chain we're currently in. Since this cache is just a performance optimisation, it doesn't
-    /// make sense to pop items off the end of the cache after they've been visited (it would
-    /// sort-of defeat the point of a cache if we did!)
+    /// Tracks full items that are either pending in the current recursion stack or completed
+    /// earlier in the same recursive operation.
     cache: RefCell<CycleDetectorCache<T, R>>,
 
     fallback: R,
@@ -133,7 +128,7 @@ where
             CycleDetectorVisit::Cycle(_) => self.fallback.clone(),
             CycleDetectorVisit::Pending(item) => {
                 let result = compute();
-                self.finish_visit(item, result)
+                self.finish_visit(&item, result)
             }
         }
     }
@@ -141,8 +136,18 @@ where
     /// Start visiting an item, exposing recursive cycles to callers that need an item-specific
     /// fallback.
     pub(crate) fn begin_visit(&self, db: &'db dyn Db, item: T) -> CycleDetectorVisit<T, R> {
-        if let Some(result) = self.cache.borrow().get(&item) {
-            return CycleDetectorVisit::Ready(result.clone());
+        if let Some(entry) = self.cache.borrow().get(&item) {
+            return match entry {
+                // The exact same item is already being computed. Use the detector's ordinary
+                // fallback; callers only need to handle cycles between distinct items that share
+                // the same abstract identity.
+                CycleDetectorCacheEntry::Pending => {
+                    CycleDetectorVisit::Ready(self.fallback.clone())
+                }
+                CycleDetectorCacheEntry::Completed(result) => {
+                    CycleDetectorVisit::Ready(result.clone())
+                }
+            };
         }
 
         let identity = item.to_identity(db);
@@ -151,23 +156,28 @@ where
         }
 
         self.seen.borrow_mut().push(identity);
+        self.cache.borrow_mut().insert_pending(item.clone());
         CycleDetectorVisit::Pending(item)
     }
 
     /// Finish a [`CycleDetectorVisit::Pending`] visit and cache its result.
-    pub(crate) fn finish_visit(&self, item: T, result: R) -> R {
+    pub(crate) fn finish_visit(&self, item: &T, result: R) -> R {
         self.seen.borrow_mut().pop();
-        self.cache.borrow_mut().insert_new(item, result.clone());
+        self.cache
+            .borrow_mut()
+            .complete_pending(item, result.clone());
         result
     }
 }
 
 /// Result of starting a cycle-detector visit.
 pub(crate) enum CycleDetectorVisit<T, R> {
-    /// The item was already completed in this recursive operation.
+    /// The item already has a result, either from a completed visit or from the fallback for an
+    /// exact recursive edge.
     Ready(R),
-    /// The wrapped value here is the input when recursion is detected.
-    /// For complete results, implement recursive-only fallback handling using the wrapped value.
+    /// A different item with the same abstract identity is already pending.
+    /// The wrapped value here is the input when recursion is detected. For complete results,
+    /// implement recursive-only fallback handling using the wrapped value.
     Cycle(T),
     /// The caller should compute the result and pass it to [`CycleDetector::finish_visit`].
     Pending(T),
@@ -216,8 +226,11 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         db: &'db dyn Db,
         ty: Type<'db>,
     ) -> CycleDetectorVisit<Type<'db>, Type<'db>> {
-        if let Some(result) = self.cache.borrow().get(&ty) {
-            return CycleDetectorVisit::Ready(*result);
+        if let Some(entry) = self.cache.borrow().get(&ty) {
+            return match entry {
+                CycleDetectorCacheEntry::Pending => CycleDetectorVisit::Cycle(ty),
+                CycleDetectorCacheEntry::Completed(result) => CycleDetectorVisit::Ready(*result),
+            };
         }
 
         let identity = ty.to_identity(db);
@@ -233,7 +246,7 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
 
     fn finish_visit(&self, ty: Type<'db>, result: Type<'db>) -> Type<'db> {
         self.seen.borrow_mut().pop();
-        self.cache.borrow_mut().insert_new(ty, result);
+        self.cache.borrow_mut().insert_completed(ty, result);
         result
     }
 }
@@ -256,9 +269,15 @@ where
 enum CycleDetectorCache<T, R> {
     #[default]
     Empty,
-    One((T, R)),
-    Two([(T, R); 2]),
-    Spilled(FxHashMap<T, R>),
+    One((T, CycleDetectorCacheEntry<R>)),
+    Two([(T, CycleDetectorCacheEntry<R>); 2]),
+    Spilled(FxHashMap<T, CycleDetectorCacheEntry<R>>),
+}
+
+#[derive(Debug)]
+enum CycleDetectorCacheEntry<R> {
+    Pending,
+    Completed(R),
 }
 
 impl<T, R> CycleDetectorCache<T, R> {
@@ -266,7 +285,7 @@ impl<T, R> CycleDetectorCache<T, R> {
         Self::Empty
     }
 
-    fn get(&self, item: &T) -> Option<&R>
+    fn get(&self, item: &T) -> Option<&CycleDetectorCacheEntry<R>>
     where
         T: Hash + Eq,
     {
@@ -280,13 +299,29 @@ impl<T, R> CycleDetectorCache<T, R> {
         }
     }
 
-    /// Inserts a result after the caller has checked that `item` is not already cached.
-    fn insert_new(&mut self, item: T, result: R)
+    /// Inserts a pending item after the caller has checked that `item` is not already cached.
+    fn insert_pending(&mut self, item: T)
     where
         T: Hash + Eq,
     {
         debug_assert!(self.get(&item).is_none());
-        let entry = (item, result);
+        self.insert_new(item, CycleDetectorCacheEntry::Pending);
+    }
+
+    /// Inserts a completed item after the caller has checked that `item` is not already cached.
+    fn insert_completed(&mut self, item: T, result: R)
+    where
+        T: Hash + Eq,
+    {
+        debug_assert!(self.get(&item).is_none());
+        self.insert_new(item, CycleDetectorCacheEntry::Completed(result));
+    }
+
+    fn insert_new(&mut self, item: T, cache_entry: CycleDetectorCacheEntry<R>)
+    where
+        T: Hash + Eq,
+    {
+        let entry = (item, cache_entry);
         *self = match mem::replace(self, Self::Empty) {
             Self::Empty => Self::One(entry),
             Self::One(first) => Self::Two([first, entry]),
@@ -298,8 +333,38 @@ impl<T, R> CycleDetectorCache<T, R> {
         };
     }
 
+    /// Stores the result for a pending item.
+    fn complete_pending(&mut self, item: &T, result: R)
+    where
+        T: Hash + Eq,
+    {
+        let Some(entry) = self.get_mut(item) else {
+            debug_assert!(false, "completed item was not pending");
+            return;
+        };
+        debug_assert!(matches!(entry, CycleDetectorCacheEntry::Pending));
+        *entry = CycleDetectorCacheEntry::Completed(result);
+    }
+
+    fn get_mut(&mut self, item: &T) -> Option<&mut CycleDetectorCacheEntry<R>>
+    where
+        T: Hash + Eq,
+    {
+        match self {
+            Self::Empty => None,
+            Self::One((cached_item, result)) => (cached_item == item).then_some(result),
+            Self::Two(entries) => entries
+                .iter_mut()
+                .find_map(|(cached_item, result)| (cached_item == item).then_some(result)),
+            Self::Spilled(cache) => cache.get_mut(item),
+        }
+    }
+
     #[cold]
-    fn spill(entries: [(T, R); 2], third: (T, R)) -> Self
+    fn spill(
+        entries: [(T, CycleDetectorCacheEntry<R>); 2],
+        third: (T, CycleDetectorCacheEntry<R>),
+    ) -> Self
     where
         T: Hash + Eq,
     {
@@ -370,12 +435,27 @@ mod tests {
 
     struct TestCycleDetector;
     type Detector<'db> = CycleDetector<'db, TestCycleDetector, u8, u8, 1>;
+    type IdentityDetector<'db> = CycleDetector<'db, TestCycleDetector, TestItem, u8, 1>;
 
     impl<'db> HasIdentity<'db> for u8 {
         type Id = u8;
 
         fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
             *self
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    struct TestItem {
+        value: u8,
+        identity: u8,
+    }
+
+    impl<'db> HasIdentity<'db> for TestItem {
+        type Id = u8;
+
+        fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
+            self.identity
         }
     }
 
@@ -404,5 +484,25 @@ mod tests {
             detector.visit(&db, 1, || detector.visit(&db, 1, || 20) + 10),
             10
         );
+    }
+
+    #[test]
+    fn nested_visit_short_circuits_on_identity_cycle_without_caching_it() {
+        let db = setup_db();
+        let detector = IdentityDetector::new(0);
+        let first = TestItem {
+            value: 1,
+            identity: 1,
+        };
+        let second = TestItem {
+            value: 2,
+            identity: 1,
+        };
+
+        assert_eq!(
+            detector.visit(&db, first, || detector.visit(&db, second, || 20) + 10),
+            10
+        );
+        assert_eq!(detector.visit(&db, second, || 30), 30);
     }
 }

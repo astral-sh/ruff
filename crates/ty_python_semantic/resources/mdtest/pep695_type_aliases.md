@@ -736,6 +736,13 @@ static_assert(not is_subtype_of(InvariantA[int], InvariantB[object]))
 static_assert(not is_assignable_to(InvariantA[int], InvariantB[str]))
 static_assert(is_subtype_of(InvariantA[InvariantA[int]], InvariantB[InvariantB[int]]))
 static_assert(not is_subtype_of(InvariantA[InvariantA[int]], InvariantB[InvariantB[str]]))
+
+type SwapA[T, U] = tuple[SwapB[U, T], T, U]
+type SwapB[T, U] = tuple[SwapA[U, T], U, T]
+
+static_assert(is_subtype_of(SwapA[int, str], SwapB[str, int]))
+static_assert(is_subtype_of(SwapB[int, str], SwapA[str, int]))
+static_assert(not is_subtype_of(SwapA[int, str], SwapB[int, str]))
 ```
 
 ### Subtyping of materializations of cyclic aliases

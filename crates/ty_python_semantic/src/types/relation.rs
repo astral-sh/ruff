@@ -969,7 +969,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
             CycleDetectorVisit::Pending(item) => {
                 let result = work();
-                self.relation_visitor.finish_visit(item, result)
+                self.relation_visitor.finish_visit(&item, result)
             }
         }
     }
