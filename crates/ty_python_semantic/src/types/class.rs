@@ -1961,6 +1961,25 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Return whether this class has an annotation-only instance declaration named `name` in its
+    /// body.
+    pub(super) fn has_own_unbound_instance_declaration(self, db: &'db dyn Db, name: &str) -> bool {
+        match self {
+            Self::NonGeneric(ClassLiteral::Static(class)) => {
+                class.has_own_unbound_instance_declaration(db, name)
+            }
+            Self::Generic(generic) => generic
+                .origin(db)
+                .has_own_unbound_instance_declaration(db, name),
+            Self::NonGeneric(
+                ClassLiteral::Dynamic(_)
+                | ClassLiteral::DynamicNamedTuple(_)
+                | ClassLiteral::DynamicTypedDict(_)
+                | ClassLiteral::DynamicEnum(_),
+            ) => false,
+        }
+    }
+
     /// Returns the converter input type for a dataclass field, if the field has a `converter`.
     pub(super) fn converter_input_type_for_field(
         self,
