@@ -6,7 +6,7 @@ use rustc_hash::FxHashMap;
 use ruff_python_ast::helpers::{from_relative_import, map_subscript};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::{self as ast, Expr, ExprContext, PySourceType, Stmt};
-use ruff_python_stdlib::builtins::{is_python_builtin, python_magic_globals};
+use ruff_python_stdlib::builtins::{is_python_builtin, python_builtins, python_magic_globals};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Imported;
@@ -159,7 +159,7 @@ impl<'a> SemanticModel<'a> {
         path: &Path,
         module: Module<'a>,
     ) -> Self {
-        Self {
+        let mut semantic = Self {
             typing_modules,
             custom_builtins,
             python_minor_version,
@@ -184,7 +184,19 @@ impl<'a> SemanticModel<'a> {
             seen: Modules::empty(),
             handled_exceptions: Vec::default(),
             resolved_names: FxHashMap::default(),
-        }
+        };
+
+        let builtin_count = python_builtins(python_minor_version, is_notebook).count()
+            + python_magic_globals(python_minor_version).count()
+            + custom_builtins.len();
+        // Match the capacity that repeated `push` calls would reach while avoiding the
+        // intermediate allocations.
+        semantic
+            .bindings
+            .reserve_exact(builtin_count.next_power_of_two());
+        semantic.global_scope_mut().reserve_bindings(builtin_count);
+
+        semantic
     }
 
     /// Return the [`Binding`] for the given [`BindingId`].
@@ -252,14 +264,6 @@ impl<'a> SemanticModel<'a> {
                 .scopes
                 .ancestor_ids(scope)
                 .all(|scope_id| !self.scopes[scope_id].has(name))
-    }
-
-    /// Reserves capacity for builtin bindings.
-    pub fn reserve_builtin_bindings(&mut self, additional: usize) {
-        // Match the capacity that repeated `push` calls would reach while avoiding the
-        // intermediate allocations.
-        self.bindings.reserve_exact(additional.next_power_of_two());
-        self.global_scope_mut().reserve_bindings(additional);
     }
 
     /// Creates the builtin binding for `name` if it has not been needed before.
@@ -1672,6 +1676,7 @@ impl<'a> SemanticModel<'a> {
         // ```
         if !self.at_top_level() {
             for (name, range) in globals.iter() {
+                self.ensure_builtin_binding(name);
                 if self
                     .global_scope()
                     .get(name)

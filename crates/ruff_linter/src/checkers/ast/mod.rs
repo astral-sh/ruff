@@ -59,7 +59,6 @@ use ruff_python_semantic::{
     Import, Module, ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind, SemanticModel,
     SemanticModelFlags, StarImport, SubmoduleImport,
 };
-use ruff_python_stdlib::builtins::{python_builtins, python_magic_globals};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{OneIndexed, SourceFile, SourceFileBuilder, SourceRow};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -272,11 +271,10 @@ impl<'a> Checker<'a> {
         target_version: TargetVersion,
         context: &'a LintContext<'a>,
     ) -> Self {
-        let (_, python_minor_version) = target_version.linter_version().as_tuple();
         let semantic = SemanticModel::new(
             &settings.typing_modules,
             &settings.builtins,
-            python_minor_version,
+            target_version.linter_version().minor,
             source_type.is_ipynb(),
             path,
             module,
@@ -2293,6 +2291,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 node_index: _,
             }) => {
                 if let Some(name) = name {
+                    self.semantic.ensure_builtin_binding(name.as_str());
+
                     // Store the existing binding, if any.
                     let binding_id = self.semantic.lookup_symbol(name.as_str());
 
@@ -2763,14 +2763,6 @@ impl<'a> Checker<'a> {
         scope.add(name, binding_id);
 
         binding_id
-    }
-
-    fn reserve_builtin_bindings(&mut self) {
-        let builtin_count =
-            python_builtins(self.target_version().minor, self.source_type.is_ipynb()).count()
-                + python_magic_globals(self.target_version().minor).count()
-                + self.settings().builtins.len();
-        self.semantic.reserve_builtin_bindings(builtin_count);
     }
 
     fn handle_node_load(&mut self, expr: &'a Expr) {
@@ -3386,8 +3378,6 @@ pub(crate) fn check_ast(
         target_version,
         context,
     );
-    checker.reserve_builtin_bindings();
-
     // Iterate over the AST.
     checker.visit_module(parsed.suite());
     checker.visit_body(parsed.suite());
