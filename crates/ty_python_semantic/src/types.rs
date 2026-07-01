@@ -2775,10 +2775,12 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::NominalInstance(_) => {
-                self.to_meta_type(db)
-                    .class_namespace_member(db, name.as_str(), policy)
-            }
+            Type::NominalInstance(instance) => self.to_meta_type(db).class_namespace_member(
+                db,
+                instance.class(db),
+                name.as_str(),
+                policy,
+            ),
 
             Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => self
                 .to_meta_type(db)
@@ -2865,23 +2867,21 @@ impl<'db> Type<'db> {
     fn class_namespace_member(
         self,
         db: &'db dyn Db,
+        class: ClassType<'db>,
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        let class_attr = self.find_name_in_mro_with_policy(db, name, policy).expect(
-            "Calling `class_namespace_member` on a class literal should always find an MRO",
-        );
-        let own_class = match self {
-            Type::SubclassOf(subclass_of) => subclass_of.subclass_of().into_class(db),
-            _ => self.to_class_type(db),
-        };
-        let metaclass_declaration = self
+        let class_attr = self
+            .find_name_in_mro_with_policy(db, name, policy)
+            .expect("The meta-type of a nominal instance should always have an MRO");
+        let Some(metaclass) = self
             .to_meta_type(db)
             .to_instance(db)
             .and_then(|metaclass| metaclass.nominal_class(db))
-            .map_or_else(PlaceAndQualifiers::default, |metaclass| {
-                metaclass.own_declared_instance_member(db, name).inner
-            });
+        else {
+            return class_attr;
+        };
+        let metaclass_declaration = metaclass.own_declared_instance_member(db, name).inner;
         if metaclass_declaration.is_undefined() {
             return class_attr;
         }
@@ -2889,32 +2889,34 @@ impl<'db> Type<'db> {
             .ignore_possibly_undefined()
             .is_some_and(|ty| ty.may_be_data_descriptor(db));
         let has_own_unbound_instance_declaration =
-            own_class.is_some_and(|class| class.has_own_unbound_instance_declaration(db, name));
-        if own_class.is_some_and(|class| {
-            (!generated_may_be_data_descriptor || !has_own_unbound_instance_declaration)
+            class.has_own_unbound_instance_declaration(db, name);
+        let generated_attribute_is_shadowed = if generated_may_be_data_descriptor {
+            !has_own_unbound_instance_declaration
                 && !class.own_class_member(db, None, name).is_undefined()
-                || (!generated_may_be_data_descriptor
-                    && class.has_own_instance_declaration(db, name))
-        }) {
+        } else {
+            !class.own_class_member(db, None, name).is_undefined()
+                || class.has_own_instance_declaration(db, name)
+        };
+        if generated_attribute_is_shadowed {
             return class_attr.or_fall_back_to(db, || metaclass_declaration);
         }
-        if let Some(class) = own_class
-            && class.has_instance_member(db, name)
-        {
+        if class.has_instance_member(db, name) {
             if generated_may_be_data_descriptor {
                 return match metaclass_declaration {
                     PlaceAndQualifiers {
                         place: Place::Defined(declaration),
                         qualifiers,
                     } => {
-                        let all_arms_are_possible_data_descriptors =
-                            match declaration.ty.resolve_type_alias(db) {
-                                Type::Union(union) => union
+                        let all_arms_are_possible_data_descriptors = declaration
+                            .ty
+                            .resolve_type_alias(db)
+                            .as_union()
+                            .is_none_or(|union| {
+                                union
                                     .elements(db)
                                     .iter()
-                                    .all(|ty| ty.may_be_data_descriptor(db)),
-                                _ => true,
-                            };
+                                    .all(|ty| ty.may_be_data_descriptor(db))
+                            });
                         Place::Defined(DefinedPlace {
                             ty: declaration
                                 .ty

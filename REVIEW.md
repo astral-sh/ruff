@@ -41,3 +41,6 @@
 - Rejected — Preserve union-valued metaclasses through nominal-instance lookup. Alternative runtime metaclasses are outside this issue.
 - Rejected — Distribute union-valued metaclasses during inherited or `super()` lookup. Those lookup paths are unchanged.
 - Rejected — Treat the one-shot Expression and steam.py ecosystem differences as branch regressions. Both projects are registered as flaky, and the workflow's ten-run classification finds no stable diagnostic changes across all 162 projects.
+- Fixed — Reuse `ClassType::static_class_literal` instead of repeating static, generic, and dynamic dispatch in four new member helpers.
+- Fixed — Pass the known nominal `ClassType` into generated-namespace lookup instead of recovering it from a `SubclassOf` meta-type.
+- Fixed — Express descriptor and non-descriptor shadowing as separate branches while preserving the original short-circuit lookup order.
