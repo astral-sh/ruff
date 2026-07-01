@@ -10,10 +10,12 @@ E402 [*] Module level import not at top of file
   | ^^^^^^^^^
   |
 help: Move module level imports to top of file
+  |
 1 | from __future__ import annotations
 2 + import os
 3 |
 4 | print("something")
 5 |
   - import os
+  |
 note: This is an unsafe fix and may change runtime behavior
