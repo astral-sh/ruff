@@ -656,6 +656,15 @@ static_assert(not is_subtype_of(DirectCovariantA[object], DirectCovariantB[int])
 static_assert(is_subtype_of(DirectCovariantA[DirectCovariantA[int]], DirectCovariantB[DirectCovariantB[object]]))
 static_assert(not is_subtype_of(DirectCovariantA[DirectCovariantA[object]], DirectCovariantB[DirectCovariantB[int]]))
 
+type DirectCovariantA2[T] = T | tuple[DirectCovariantA2[T | DirectCovariantA2[T]], ...]
+type DirectCovariantB2[T] = T | tuple[DirectCovariantB2[T | DirectCovariantB2[T]], ...]
+
+static_assert(is_subtype_of(DirectCovariantA2[int], DirectCovariantB2[int]))
+static_assert(not is_subtype_of(DirectCovariantB2[int], DirectCovariantA2[str]))
+static_assert(is_subtype_of(DirectCovariantA2[int], DirectCovariantB2[object]))
+static_assert(is_subtype_of(DirectCovariantA2[DirectCovariantA2[int]], DirectCovariantB2[DirectCovariantB2[object]]))
+static_assert(not is_subtype_of(DirectCovariantA2[DirectCovariantA2[object]], DirectCovariantB2[DirectCovariantB2[int]]))
+
 type DirectContravariantA[T] = Callable[[T], DirectContravariantA[T] | None]
 type DirectContravariantB[T] = Callable[[T], DirectContravariantB[T] | None]
 
@@ -663,7 +672,9 @@ static_assert(is_subtype_of(DirectContravariantA[object], DirectContravariantB[i
 static_assert(is_subtype_of(DirectContravariantB[object], DirectContravariantA[int]))
 static_assert(not is_subtype_of(DirectContravariantA[int], DirectContravariantB[object]))
 static_assert(is_subtype_of(DirectContravariantA[DirectContravariantA[int]], DirectContravariantB[DirectContravariantB[object]]))
-static_assert(not is_subtype_of(DirectContravariantA[DirectContravariantA[object]], DirectContravariantB[DirectContravariantB[int]]))
+static_assert(
+    not is_subtype_of(DirectContravariantA[DirectContravariantA[object]], DirectContravariantB[DirectContravariantB[int]])
+)
 
 type DirectInvariantA[T] = list[T | DirectInvariantA[T]]
 type DirectInvariantB[T] = list[T | DirectInvariantB[T]]
@@ -695,6 +706,15 @@ static_assert(is_subtype_of(CovariantB[int], CovariantA[object]))
 static_assert(not is_subtype_of(CovariantA[object], CovariantB[int]))
 static_assert(is_subtype_of(CovariantA[CovariantA[int]], CovariantB[CovariantB[object]]))
 static_assert(not is_subtype_of(CovariantA[CovariantA[object]], CovariantB[CovariantB[int]]))
+
+type CovariantA2[T] = T | tuple[CovariantB2[T | CovariantA2[T]], ...]
+type CovariantB2[T] = T | tuple[CovariantA2[T | CovariantB2[T]], ...]
+
+static_assert(is_subtype_of(CovariantA2[int], CovariantB2[int]))
+static_assert(not is_subtype_of(CovariantB2[int], CovariantA2[str]))
+static_assert(is_subtype_of(CovariantA2[int], CovariantB2[object]))
+static_assert(is_subtype_of(CovariantA2[CovariantA2[int]], CovariantB2[CovariantB2[object]]))
+static_assert(not is_subtype_of(CovariantA2[CovariantA2[object]], CovariantB2[CovariantB2[int]]))
 
 type ContravariantA[T] = Callable[[T], ContravariantB[T] | None]
 type ContravariantB[T] = Callable[[T], ContravariantA[T] | None]
