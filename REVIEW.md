@@ -20,8 +20,8 @@
 - Rejected — Inspect higher-order metaclass-populated descriptors. Higher-order runtime namespace reconstruction is outside issue #3535.
 - Fixed — Preserve the descriptor result of a generated union contract when instance writes are present.
 - Fixed — Compose only the descriptor arms of a generated union contract with the effective instance member. Normal generated arms remain shadowed by the instance value.
-- Rejected — Add special descriptor handling for direct dynamic types. Dynamic runtime values are outside the declaration-contract lookup.
-- Rejected — Add special descriptor handling for dynamic union arms. Union-valued runtime writes are outside the declaration-contract lookup.
+- Rejected — Treat directly dynamic declarations as possible data descriptors. The lookup reuses existing dynamic-descriptor heuristics; changing them is outside issue #3535.
+- Rejected — Treat dynamic union arms as possible data descriptors. The lookup reuses existing dynamic-descriptor heuristics; changing them is outside issue #3535.
 - Rejected — Distinguish dynamic alternatives from dynamic generic arguments during descriptor screening. Existing `may_be_data_descriptor` semantics deliberately exclude dynamic alternatives, and changing them is outside issue #3535.
 - Rejected — Resolve descriptor type aliases before screening. Clean `main` already mishandles descriptor-union aliases on ordinary class attributes, so fixing alias descriptor dispatch is out of scope.
 - Rejected — Let higher-order populated descriptors override declared class contracts. That requires modeling physical runtime overwrite order rather than ty's declaration abstraction.
@@ -31,7 +31,7 @@
 - Rejected — Restrict inferred writes to construction hooks or account for custom `__setattr__`. The implementation no longer infers any method writes.
 - Rejected — Expose non-data members inherited directly from `type`. They are not declarations of attributes stored in constructed classes.
 - Rejected — Preserve NewType and exact-enum receivers through descriptor binding. Those representations are no longer routed through this feature.
-- Rejected — Continue descriptor lookup through metaclass mixins after `type`. The implementation performs no descriptor lookup.
+- Rejected — Continue descriptor lookup through metaclass mixins after `type`. The narrow implementation does not inspect the metaclass MRO for descriptors that intercept writes.
 - Rejected — Recover descriptors hidden by declared supertypes such as `object`. Declared types remain contracts; runtime binding reconstruction is out of scope.
 - Rejected — Infer attributes from populating mixins that follow `type` in the metaclass MRO. Inherited method writes are outside the declaration contract.
 - Rejected — Analyze conditional non-descriptor shadows before propagating writes. No writes are propagated.
