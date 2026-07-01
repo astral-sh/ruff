@@ -1299,7 +1299,7 @@ reveal_type(InitializedDerived.inherited_attr)  # revealed: int
 
 # A metaclass declaration can describe an attribute that the metaclass stores in the namespace of
 # each class it constructs. The declared attribute is then available on instances of that class.
-from typing import Any, Iterator, Protocol, TypeVar
+from typing import Any, Iterator, Literal, Protocol, TypeVar
 
 class EnumProtocol(Protocol):
     _member_map_: dict[str, int]
@@ -1349,6 +1349,28 @@ class InitializesGenerated(metaclass=StoringMeta):
         self.generated: str = "instance"
 
 reveal_type(InitializesGenerated().generated)  # revealed: str
+
+# A generated data descriptor takes precedence over an instance attribute.
+class GeneratedDescriptor:
+    def __get__(
+        self, instance: object, owner: type | None = None
+    ) -> Literal["descriptor"]:
+        return "descriptor"
+
+    def __set__(self, instance: object, value: int) -> None: ...
+
+class DescriptorMeta(type):
+    generated_descriptor: GeneratedDescriptor
+
+    def __new__(mcls, name: str, bases: tuple[type, ...], namespace: dict[str, object]):
+        namespace["generated_descriptor"] = GeneratedDescriptor()
+        return super().__new__(mcls, name, bases, namespace)
+
+class UsesGeneratedDescriptor(metaclass=DescriptorMeta):
+    def __init__(self) -> None:
+        self.generated_descriptor = 1
+
+reveal_type(UsesGeneratedDescriptor().generated_descriptor)  # revealed: Literal["descriptor"]
 
 # An assignment to the first parameter of a static method is not an instance member of the
 # constructed class, so it does not suppress the metaclass declaration.
