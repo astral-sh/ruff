@@ -2892,20 +2892,25 @@ impl<'db> Type<'db> {
             .map_or_else(PlaceAndQualifiers::default, |metaclass| {
                 metaclass.own_declared_instance_member(db, name).inner
             });
+        if metaclass_declaration.is_undefined() {
+            return class_attr;
+        }
         if own_class.is_some_and(|class| {
             !class.own_class_member(db, None, name).is_undefined()
                 || class.has_own_instance_declaration(db, name)
         }) {
             return class_attr.or_fall_back_to(db, || metaclass_declaration);
         }
-        if own_class.is_some_and(|class| class.has_instance_member(db, name)) {
+        if let Some(class) = own_class
+            && class.has_instance_member(db, name)
+        {
             if metaclass_declaration
                 .ignore_possibly_undefined()
                 .is_some_and(|ty| ty.is_data_descriptor(db))
             {
                 return metaclass_declaration;
             }
-            return class_attr;
+            return class.instance_member(db, name);
         }
         metaclass_declaration.or_fall_back_to(db, || class_attr)
     }
