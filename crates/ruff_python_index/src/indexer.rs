@@ -42,22 +42,26 @@ impl Indexer {
         let mut line_start = TextSize::default();
 
         for token in tokens {
-            let trivia = &source[TextRange::new(prev_end, token.start())];
+            let token_start = token.start();
 
-            // Get the trivia between the previous and the current token and detect any newlines.
-            // This is necessary because `RustPython` doesn't emit `[Tok::Newline]` tokens
-            // between any two tokens that form a continuation. That's why we have to extract the
-            // newlines "manually".
-            for (index, text) in trivia.match_indices(['\n', '\r']) {
-                if text == "\r" && trivia.as_bytes().get(index + 1) == Some(&b'\n') {
-                    continue;
-                }
-                continuation_lines.push(line_start);
+            if prev_end != token_start {
+                let trivia = &source[TextRange::new(prev_end, token_start)];
 
-                // SAFETY: Safe because of the len assertion at the top of the function.
-                #[expect(clippy::cast_possible_truncation)]
-                {
-                    line_start = prev_end + TextSize::new((index + 1) as u32);
+                // Get the trivia between the previous and the current token and detect any
+                // newlines. This is necessary because `RustPython` doesn't emit `[Tok::Newline]`
+                // tokens between any two tokens that form a continuation. That's why we have to
+                // extract the newlines "manually".
+                for (index, text) in trivia.match_indices(['\n', '\r']) {
+                    if text == "\r" && trivia.as_bytes().get(index + 1) == Some(&b'\n') {
+                        continue;
+                    }
+                    continuation_lines.push(line_start);
+
+                    // SAFETY: Safe because of the len assertion at the top of the function.
+                    #[expect(clippy::cast_possible_truncation)]
+                    {
+                        line_start = prev_end + TextSize::new((index + 1) as u32);
+                    }
                 }
             }
 
