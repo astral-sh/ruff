@@ -1977,7 +1977,9 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    /// Look up an instance member declared directly in this class's body.
+    /// Look up an unbound instance declaration directly in this class's body.
+    ///
+    /// This excludes inherited declarations and declarations with a class-body binding.
     pub(super) fn own_declared_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
         match self {
             Self::NonGeneric(ClassLiteral::Static(class)) => {

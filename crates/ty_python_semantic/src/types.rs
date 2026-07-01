@@ -2868,10 +2868,20 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Look up class attributes inherited by instances of this class.
+    /// Look up attributes that a metaclass declaration promises to store in each constructed
+    /// class's namespace.
     ///
-    /// A direct instance-variable declaration on the metaclass is a contract for an attribute that
-    /// the metaclass stores in each constructed class's namespace.
+    /// ```python
+    /// class Meta(type):
+    ///     generated: int
+    ///
+    /// class C(metaclass=Meta): ...
+    ///
+    /// reveal_type(C().generated)  # int
+    /// ```
+    ///
+    /// Ordinary class bindings and instance members shadow a normal generated attribute. A
+    /// generated data descriptor retains descriptor precedence over instance storage.
     fn class_namespace_member(
         self,
         db: &'db dyn Db,
