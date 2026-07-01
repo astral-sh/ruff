@@ -9,6 +9,7 @@
 - Fixed — Preserve the metaclass contract behind a possibly-defined direct member. It supplies the attribute on paths where the direct member is absent.
 - Fixed — Ignore instance assignments in conditionally defined methods when deciding precedence. They cannot suppress an always-present metaclass contract.
 - Fixed — Preserve generated data-descriptor contracts despite direct instance writes. Descriptor precedence is part of composing the new contract with existing lookup semantics.
+- Rejected — Include declarations inherited by the concrete metaclass. Clean `main` already leaves this unresolved, and supporting it would expand the direct-declaration contract rather than prevent a regression.
 - Rejected — Exclude declarations on builtin `type` from namespace contracts. Clean `main` already reveals `C().__annotations__` as `dict[str, Any]`, so that behavior is not owned by this change.
 - Rejected — Screen inferred writes against data descriptors. The narrow implementation does not infer writes, so descriptor interception is not part of this change.
 - Rejected — Model custom-metaclass shadows of builtin `type` descriptors. No builtin descriptor shim is needed for declaration contracts.
