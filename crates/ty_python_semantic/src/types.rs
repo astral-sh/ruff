@@ -2898,7 +2898,7 @@ impl<'db> Type<'db> {
         }) {
             return class_attr.or_fall_back_to(db, || metaclass_declaration);
         }
-        if own_class.is_some_and(|class| class.has_own_instance_member(db, name)) {
+        if own_class.is_some_and(|class| class.has_instance_member(db, name)) {
             if metaclass_declaration
                 .ignore_possibly_undefined()
                 .is_some_and(|ty| ty.is_data_descriptor(db))

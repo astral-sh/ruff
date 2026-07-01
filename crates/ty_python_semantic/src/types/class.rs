@@ -1999,13 +1999,28 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    /// Return whether this class directly declares or assigns an instance member named `name`.
-    pub(super) fn has_own_instance_member(self, db: &'db dyn Db, name: &str) -> bool {
+    /// Return whether this class or any of its bases declares or assigns an instance member named
+    /// `name`.
+    pub(super) fn has_instance_member(self, db: &'db dyn Db, name: &str) -> bool {
+        self.iter_mro(db).any(|base| match base {
+            ClassBase::Class(class) => class.has_own_inheritable_instance_member(db, name),
+            ClassBase::Any
+            | ClassBase::Dynamic(_)
+            | ClassBase::Divergent(_)
+            | ClassBase::Generic
+            | ClassBase::Protocol
+            | ClassBase::TypedDict(_) => false,
+        })
+    }
+
+    fn has_own_inheritable_instance_member(self, db: &'db dyn Db, name: &str) -> bool {
         match self {
             Self::NonGeneric(ClassLiteral::Static(class)) => {
-                class.has_own_instance_member(db, name)
+                class.has_own_inheritable_instance_member(db, name)
             }
-            Self::Generic(generic) => generic.origin(db).has_own_instance_member(db, name),
+            Self::Generic(generic) => generic
+                .origin(db)
+                .has_own_inheritable_instance_member(db, name),
             Self::NonGeneric(
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicNamedTuple(_)
