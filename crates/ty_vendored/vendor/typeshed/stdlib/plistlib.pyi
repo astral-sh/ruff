@@ -54,6 +54,7 @@ Parse Plist example:
     pl = plistlib.loads(plist)
     print(pl["foo"])
 """
+
 import sys
 from _typeshed import ReadableBuffer
 from collections.abc import Mapping, MutableMapping
@@ -66,6 +67,7 @@ __all__ = ["InvalidFileException", "FMT_XML", "FMT_BINARY", "load", "dump", "loa
 
 class PlistFormat(Enum):
     """An enumeration."""
+
     FMT_XML = 1
     FMT_BINARY = 2
 
@@ -80,8 +82,9 @@ if sys.version_info >= (3, 13):
         aware_datetime: bool = False,
     ) -> Any:
         """Read a .plist file. 'fp' should be a readable and binary file object.
-Return the unpacked root object (which usually is a dictionary).
-"""
+        Return the unpacked root object (which usually is a dictionary).
+        """
+
     def loads(
         value: ReadableBuffer | str,
         *,
@@ -90,20 +93,19 @@ Return the unpacked root object (which usually is a dictionary).
         aware_datetime: bool = False,
     ) -> Any:
         """Read a .plist file from a bytes object.
-Return the unpacked root object (which usually is a dictionary).
-"""
+        Return the unpacked root object (which usually is a dictionary).
+        """
 
 else:
     def load(fp: IO[bytes], *, fmt: PlistFormat | None = None, dict_type: type[MutableMapping[str, Any]] = ...) -> Any:
         """Read a .plist file. 'fp' should be a readable and binary file object.
-    Return the unpacked root object (which usually is a dictionary).
-    """
-    def loads(
-        value: ReadableBuffer, *, fmt: PlistFormat | None = None, dict_type: type[MutableMapping[str, Any]] = ...
-    ) -> Any:
+        Return the unpacked root object (which usually is a dictionary).
+        """
+
+    def loads(value: ReadableBuffer, *, fmt: PlistFormat | None = None, dict_type: type[MutableMapping[str, Any]] = ...) -> Any:
         """Read a .plist file from a bytes object.
-    Return the unpacked root object (which usually is a dictionary).
-    """
+        Return the unpacked root object (which usually is a dictionary).
+        """
 
 if sys.version_info >= (3, 13):
     def dump(
@@ -116,8 +118,9 @@ if sys.version_info >= (3, 13):
         aware_datetime: bool = False,
     ) -> None:
         """Write 'value' to a .plist file. 'fp' should be a writable,
-binary file object.
-"""
+        binary file object.
+        """
+
     def dumps(
         value: Mapping[str, Any] | list[Any] | tuple[Any, ...] | str | bool | float | bytes | bytearray | datetime,
         *,
@@ -138,8 +141,9 @@ else:
         skipkeys: bool = False,
     ) -> None:
         """Write 'value' to a .plist file. 'fp' should be a writable,
-    binary file object.
-    """
+        binary file object.
+        """
+
     def dumps(
         value: Mapping[str, Any] | list[Any] | tuple[Any, ...] | str | bool | float | bytes | bytearray | datetime,
         *,
