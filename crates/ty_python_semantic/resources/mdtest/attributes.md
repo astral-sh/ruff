@@ -1494,6 +1494,14 @@ class UsesMaybeGeneratedDescriptorWithBytes(metaclass=MaybeDescriptorMeta):
 reveal_type(UsesMaybeGeneratedDescriptorWithBytes().generated_descriptor)  # revealed: Literal["descriptor"] | bytes
 ```
 
+A dynamic base likewise supplies the fallback for the non-descriptor members of a union:
+
+```py
+class UsesMaybeGeneratedDescriptorWithDynamicBase(DynamicGeneratedBase, metaclass=MaybeDescriptorMeta): ...
+
+reveal_type(UsesMaybeGeneratedDescriptorWithDynamicBase().generated_descriptor)  # revealed: Literal["descriptor"] | Any
+```
+
 If the declaration can also be `Any`, ty cannot know that the class attribute is always a data
 descriptor. The instance attribute must remain another possible result:
 
