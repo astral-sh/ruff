@@ -2896,18 +2896,28 @@ impl<'db> Type<'db> {
                     PlaceAndQualifiers {
                         place: Place::Defined(declaration),
                         qualifiers,
-                    } => Place::Defined(DefinedPlace {
-                        ty: declaration
-                            .ty
-                            .filter_union(db, |ty| ty.may_be_data_descriptor(db)),
-                        definedness: if declaration.ty.is_data_descriptor(db) {
-                            declaration.definedness
-                        } else {
-                            Definedness::PossiblyUndefined
-                        },
-                        ..declaration
-                    })
-                    .with_qualifiers(qualifiers),
+                    } => {
+                        let all_arms_are_possible_data_descriptors =
+                            match declaration.ty.resolve_type_alias(db) {
+                                Type::Union(union) => union
+                                    .elements(db)
+                                    .iter()
+                                    .all(|ty| ty.may_be_data_descriptor(db)),
+                                _ => true,
+                            };
+                        Place::Defined(DefinedPlace {
+                            ty: declaration
+                                .ty
+                                .filter_union(db, |ty| ty.may_be_data_descriptor(db)),
+                            definedness: if all_arms_are_possible_data_descriptors {
+                                declaration.definedness
+                            } else {
+                                Definedness::PossiblyUndefined
+                            },
+                            ..declaration
+                        })
+                        .with_qualifiers(qualifiers)
+                    }
                     _ => metaclass_declaration,
                 };
             }
