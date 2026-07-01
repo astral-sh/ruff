@@ -945,6 +945,9 @@ fn positive_class_pattern_type<'db>(
 /// Dynamic element types remain represented by the synthesized sequence protocol. Replacing a
 /// gradual tuple element such as `Any` with the observed pattern type would lose gradualness.
 ///
+/// In the example below, `subject_ty` is `tuple[int | str]`, `pattern_element_types` is `[str]`,
+/// and the refined type returned is `tuple[str]`.
+///
 /// ```python
 /// def f(value: tuple[int | str]) -> None:
 ///     match value:
@@ -2501,10 +2504,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         if narrowed == resolved { ty } else { narrowed }
     }
 
-    /// Return the type required by `pattern`, specializing nested sequences against `subject_ty`.
-    ///
-    /// Pattern-only sequence types use a synthesized protocol. Supplying the subject preserves the
-    /// concrete shape of nested exact tuples instead.
+    /// Return the type required by `pattern`, preserving nested exact tuples from `subject_ty`.
     fn necessary_match_pattern_type_for_subject(
         db: &'db dyn Db,
         pattern: &PatternPredicateKind<'db>,

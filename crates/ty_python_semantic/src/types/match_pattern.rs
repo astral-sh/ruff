@@ -721,6 +721,10 @@ pub(crate) fn pattern_fallthrough_type<'db>(
 /// matching, but those facts can become stale for mutable or stateful sequences. Exact tuples are
 /// immutable, so they retain normal sequence-pattern fallthrough narrowing.
 ///
+/// In the example below, `subject_ty` is `tuple[int | str, int | str]`, `kind` represents the
+/// `[int(), str()]` sequence pattern, and the returned fallthrough type is
+/// `tuple[str, int | str] | tuple[int | str, int]`.
+///
 /// ```python
 /// def f(value: tuple[int | str, int | str]) -> None:
 ///     match value:
