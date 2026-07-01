@@ -6,6 +6,7 @@ use rustc_hash::FxHashMap;
 use ruff_python_ast::helpers::{from_relative_import, map_subscript};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::{self as ast, Expr, ExprContext, PySourceType, Stmt};
+use ruff_python_stdlib::builtins::{is_python_builtin, python_magic_globals};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Imported;
@@ -30,6 +31,9 @@ pub mod all;
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
     typing_modules: &'a [String],
+    custom_builtins: &'a [String],
+    python_minor_version: u8,
+    is_notebook: bool,
     module: Module<'a>,
 
     /// Stack of all AST nodes in the program.
@@ -147,9 +151,19 @@ pub struct SemanticModel<'a> {
 }
 
 impl<'a> SemanticModel<'a> {
-    pub fn new(typing_modules: &'a [String], path: &Path, module: Module<'a>) -> Self {
+    pub fn new(
+        typing_modules: &'a [String],
+        custom_builtins: &'a [String],
+        python_minor_version: u8,
+        is_notebook: bool,
+        path: &Path,
+        module: Module<'a>,
+    ) -> Self {
         Self {
             typing_modules,
+            custom_builtins,
+            python_minor_version,
+            is_notebook,
             module,
             nodes: Nodes::default(),
             node_id: None,
@@ -226,12 +240,36 @@ impl<'a> SemanticModel<'a> {
             .chain(self.typing_modules.iter().map(String::as_str))
     }
 
+    fn is_builtin_name(&self, name: &str) -> bool {
+        is_python_builtin(name, self.python_minor_version, self.is_notebook)
+            || python_magic_globals(self.python_minor_version).any(|builtin| builtin == name)
+            || self.custom_builtins.iter().any(|builtin| builtin == name)
+    }
+
+    fn is_unshadowed_builtin(&self, name: &str, scope: ScopeId) -> bool {
+        self.is_builtin_name(name)
+            && self
+                .scopes
+                .ancestor_ids(scope)
+                .all(|scope_id| !self.scopes[scope_id].has(name))
+    }
+
     /// Reserves capacity for builtin bindings.
     pub fn reserve_builtin_bindings(&mut self, additional: usize) {
         // Match the capacity that repeated `push` calls would reach while avoiding the
         // intermediate allocations.
         self.bindings.reserve_exact(additional.next_power_of_two());
         self.global_scope_mut().reserve_bindings(additional);
+    }
+
+    /// Creates the builtin binding for `name` if it has not been needed before.
+    pub fn ensure_builtin_binding(&mut self, name: &'a str) {
+        if self.global_scope().has(name) || !self.is_builtin_name(name) {
+            return;
+        }
+
+        let binding_id = self.push_builtin();
+        self.global_scope_mut().add(name, binding_id);
     }
 
     /// Create a new [`Binding`] for a builtin.
@@ -289,9 +327,11 @@ impl<'a> SemanticModel<'a> {
     /// module, e.g. `import builtins; builtins.open`. It *only* includes the bindings
     /// that are pre-populated in Python's global scope before any imports have taken place.
     pub fn has_builtin_binding_in_scope(&self, member: &str, scope: ScopeId) -> bool {
-        self.lookup_symbol_in_scope(member, scope, false)
-            .map(|binding_id| &self.bindings[binding_id])
-            .is_some_and(|binding| binding.kind.is_builtin())
+        if let Some(binding_id) = self.lookup_symbol_in_scope(member, scope, false) {
+            return self.bindings[binding_id].kind.is_builtin();
+        }
+
+        self.is_unshadowed_builtin(member, scope)
     }
 
     /// If `expr` is a reference to a builtins symbol,
@@ -357,7 +397,9 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Resolve a `del` reference to `symbol` at `range`.
-    pub fn resolve_del(&mut self, symbol: &str, range: TextRange) {
+    pub fn resolve_del(&mut self, symbol: &'a str, range: TextRange) {
+        self.ensure_builtin_binding(symbol);
+
         let is_unbound = self.scopes[self.scope_id]
             .get(symbol)
             .is_none_or(|binding_id| {
@@ -378,7 +420,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Resolve a `load` reference to an [`ast::ExprName`].
-    pub fn resolve_load(&mut self, name: &ast::ExprName) -> ReadResult {
+    pub fn resolve_load(&mut self, name: &'a ast::ExprName) -> ReadResult {
         // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
         // should prefer it over local resolutions.
         if self.in_forward_reference() {
@@ -677,6 +719,22 @@ impl<'a> SemanticModel<'a> {
             }
 
             import_starred = import_starred || scope.uses_star_imports();
+        }
+
+        if self.is_builtin_name(name.id.as_str()) {
+            let binding_id = self.push_builtin();
+            self.global_scope_mut().add(name.id.as_str(), binding_id);
+
+            let reference_id = self.resolved_references.push(
+                self.scope_id,
+                self.node_id,
+                ExprContext::Load,
+                self.flags,
+                name.range,
+            );
+            self.bindings[binding_id].references.push(reference_id);
+            self.resolved_names.insert(name.into(), binding_id);
+            return ReadResult::Resolved(binding_id);
         }
 
         if import_starred {
@@ -1043,7 +1101,24 @@ impl<'a> SemanticModel<'a> {
         let binding = self
             .resolve_name(head)
             .or_else(|| self.lookup_symbol(&head.id))
-            .map(|id| self.binding(id))?;
+            .map(|id| self.binding(id));
+
+        let Some(binding) = binding else {
+            if !self.is_unshadowed_builtin(head.id.as_str(), self.scope_id) {
+                return None;
+            }
+
+            if value.is_name_expr() {
+                return Some(QualifiedName::builtin(head.id.as_str()));
+            }
+
+            let value_name = UnqualifiedName::from_expr(value)?;
+            return Some(
+                std::iter::once("")
+                    .chain(value_name.segments().iter().copied())
+                    .collect(),
+            );
+        };
 
         match &binding.kind {
             BindingKind::Import(Import { qualified_name }) => {

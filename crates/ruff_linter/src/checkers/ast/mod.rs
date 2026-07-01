@@ -272,7 +272,15 @@ impl<'a> Checker<'a> {
         target_version: TargetVersion,
         context: &'a LintContext<'a>,
     ) -> Self {
-        let semantic = SemanticModel::new(&settings.typing_modules, path, module);
+        let (_, python_minor_version) = target_version.linter_version().as_tuple();
+        let semantic = SemanticModel::new(
+            &settings.typing_modules,
+            &settings.builtins,
+            python_minor_version,
+            source_type.is_ipynb(),
+            path,
+            module,
+        );
         Self {
             parsed,
             parsed_type_annotation: None,
@@ -1184,6 +1192,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 node_index: _,
             }) if !self.semantic.scope_id.is_global() => {
                 for name in names {
+                    self.semantic.ensure_builtin_binding(name);
                     let binding_id = self.semantic.global_scope().get(name);
 
                     // Mark the binding in the global scope as "rebound" in the current scope.
@@ -2672,6 +2681,8 @@ impl<'a> Checker<'a> {
         kind: BindingKind<'a>,
         mut flags: BindingFlags,
     ) -> BindingId {
+        self.semantic.ensure_builtin_binding(name);
+
         // Determine the scope to which the binding belongs.
         // Per [PEP 572](https://peps.python.org/pep-0572/#scope-of-the-target), named
         // expressions in generators and comprehensions bind to the scope that contains the
@@ -2754,35 +2765,15 @@ impl<'a> Checker<'a> {
         binding_id
     }
 
-    fn bind_builtins(&mut self) {
-        let target_version = self.target_version();
-        let settings = self.settings();
-        let builtin_count = python_builtins(target_version.minor, self.source_type.is_ipynb())
-            .count()
-            + python_magic_globals(target_version.minor).count()
-            + settings.builtins.len();
-
+    fn reserve_builtin_bindings(&mut self) {
+        let builtin_count =
+            python_builtins(self.target_version().minor, self.source_type.is_ipynb()).count()
+                + python_magic_globals(self.target_version().minor).count()
+                + self.settings().builtins.len();
         self.semantic.reserve_builtin_bindings(builtin_count);
-
-        let mut bind_builtin = |builtin| {
-            // Add the builtin to the scope.
-            let binding_id = self.semantic.push_builtin();
-            let scope = self.semantic.global_scope_mut();
-            scope.add(builtin, binding_id);
-        };
-        let standard_builtins = python_builtins(target_version.minor, self.source_type.is_ipynb());
-        for builtin in standard_builtins {
-            bind_builtin(builtin);
-        }
-        for builtin in python_magic_globals(target_version.minor) {
-            bind_builtin(builtin);
-        }
-        for builtin in &settings.builtins {
-            bind_builtin(builtin);
-        }
     }
 
-    fn handle_node_load(&mut self, expr: &Expr) {
+    fn handle_node_load(&mut self, expr: &'a Expr) {
         let Expr::Name(expr) = expr else {
             return;
         };
@@ -3260,6 +3251,7 @@ impl<'a> Checker<'a> {
         for definition in definitions {
             for export in definition.names() {
                 let (name, range) = (export.name(), export.range());
+                self.semantic.ensure_builtin_binding(name);
                 if let Some(binding_id) = self.semantic.global_scope().get(name) {
                     self.semantic.flags |= SemanticModelFlags::DUNDER_ALL_DEFINITION;
                     // Mark anything referenced in `__all__` as used.
@@ -3394,7 +3386,7 @@ pub(crate) fn check_ast(
         target_version,
         context,
     );
-    checker.bind_builtins();
+    checker.reserve_builtin_bindings();
 
     // Iterate over the AST.
     checker.visit_module(parsed.suite());
