@@ -15,7 +15,7 @@ use crate::{
         bound_super::walk_bound_super_type,
         callable::walk_callable_type,
         class::walk_generic_alias,
-        cyclic::ActiveRecursionDetector,
+        cyclic::{ActiveRecursionDetector, TypeIdentity},
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
         known_instance::walk_known_instance_type,
@@ -296,7 +296,7 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
     match TypeKind::from(ty) {
         TypeKind::Atomic => {}
         TypeKind::NonAtomic(non_atomic_type) => {
-            if recursion_guard.type_was_already_seen(ty) {
+            if recursion_guard.type_was_already_seen(db, ty) {
                 // If we have already seen this type, we can skip it.
                 return;
             }
@@ -309,13 +309,13 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
 pub(crate) struct TypeCollector<'db>(RefCell<CollectedTypes<'db>>);
 
 impl<'db> TypeCollector<'db> {
-    pub(crate) fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
-        !self.0.borrow_mut().insert(ty)
+    pub(crate) fn type_was_already_seen(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        !self.0.borrow_mut().insert(ty.to_type_identity(db))
     }
 }
 
 // Most guarded walks are shallow; avoid allocating a hash table until linear search is costly.
-type CollectedTypes<'db> = SmallSet<Type<'db>, 8>;
+type CollectedTypes<'db> = SmallSet<TypeIdentity<'db>, 8>;
 
 /// A set optimized for values that usually contain only a few distinct elements.
 #[derive(Debug)]
