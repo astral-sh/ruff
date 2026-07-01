@@ -1299,7 +1299,7 @@ reveal_type(InitializedDerived.inherited_attr)  # revealed: int
 
 # A metaclass declaration can describe an attribute that the metaclass stores in the namespace of
 # each class it constructs. The declared attribute is then available on instances of that class.
-from typing import Iterator, Protocol, TypeVar
+from typing import Any, Iterator, Protocol, TypeVar
 
 class EnumProtocol(Protocol):
     _member_map_: dict[str, int]
@@ -1349,6 +1349,15 @@ class InitializesGenerated(metaclass=StoringMeta):
         self.generated: str = "instance"
 
 reveal_type(InitializesGenerated().generated)  # revealed: str
+
+# An assignment to the first parameter of a static method is not an instance member of the
+# constructed class, so it does not suppress the metaclass declaration.
+class StaticMethodAssignment(metaclass=StoringMeta):
+    @staticmethod
+    def assign(obj: Any) -> None:
+        obj.generated = 1
+
+reveal_type(StaticMethodAssignment().generated)  # revealed: int
 
 # A bound metaclass class attribute is not stored in the constructed class's namespace.
 class MetaclassAttributeOnly(type):

@@ -59,7 +59,7 @@ use ty_python_core::{
     attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
     place_table,
-    scope::{Scope, ScopeId},
+    scope::{FileScopeId, ScopeId},
     semantic_index,
     symbol::Symbol,
     use_def_map,
@@ -2254,54 +2254,16 @@ impl<'db> StaticClassLiteral<'db> {
         let index = semantic_index(db, file);
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
-        let is_valid_scope = |method_scope: &Scope| {
-            let Some(method_def) = method_scope.node().as_function() else {
-                return true;
-            };
-
-            // Check the decorators directly on the AST node to determine if this method
-            // is a classmethod or staticmethod. This is more reliable than checking the
-            // final evaluated type, which may be wrapped by other decorators like @cache.
-            let function_node = method_def.node(&module);
-            let definition = index.expect_single_definition(method_def);
-
-            let mut is_classmethod = false;
-            let mut is_staticmethod = false;
-
-            for decorator in &function_node.decorator_list {
-                let decorator_ty =
-                    definition_expression_type(db, definition, &decorator.expression);
-                if let Type::ClassLiteral(class) = decorator_ty {
-                    match class.known(db) {
-                        Some(KnownClass::Classmethod) => is_classmethod = true,
-                        Some(KnownClass::Staticmethod) => is_staticmethod = true,
-                        _ => {}
-                    }
-                }
-            }
-
-            // Also check for implicit classmethods/staticmethods based on method name
-            let method_name = function_node.name.as_str();
-            if is_implicit_classmethod(method_name) {
-                is_classmethod = true;
-            }
-            if is_implicit_staticmethod(method_name) {
-                is_staticmethod = true;
-            }
-
-            match target_method_decorator {
-                MethodDecorator::None => !is_classmethod && !is_staticmethod,
-                MethodDecorator::ClassMethod => is_classmethod,
-                MethodDecorator::StaticMethod => is_staticmethod,
-            }
-        };
-
         // First check declarations
         for (attribute_declarations, method_scope_id) in
             attribute_declarations(db, class_body_scope, name)
         {
-            let method_scope = index.scope(method_scope_id);
-            if !is_valid_scope(method_scope) {
+            if !method_matches_decorator(
+                db,
+                class_body_scope,
+                method_scope_id,
+                target_method_decorator,
+            ) {
                 continue;
             }
 
@@ -2361,7 +2323,12 @@ impl<'db> StaticClassLiteral<'db> {
             attribute_assignments(db, class_body_scope, name)
         {
             let binding_scope = index.scope(attribute_binding_scope_id);
-            if !is_valid_scope(binding_scope) {
+            if !method_matches_decorator(
+                db,
+                class_body_scope,
+                attribute_binding_scope_id,
+                target_method_decorator,
+            ) {
                 continue;
             }
 
@@ -2587,7 +2554,7 @@ impl<'db> StaticClassLiteral<'db> {
                         .is_some()
                 });
         has_declaration
-            || implicit_attribute_names(db, body_scope)
+            || implicit_instance_attribute_names(db, body_scope)
                 .binary_search_by(|candidate| candidate.as_str().cmp(name))
                 .is_ok()
     }
@@ -3269,6 +3236,77 @@ fn implicit_attribute_names<'db>(db: &'db dyn Db, class_body_scope: ScopeId<'db>
     names.sort_unstable();
     names.dedup();
     names.into_boxed_slice()
+}
+
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn implicit_instance_attribute_names<'db>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+) -> Box<[Name]> {
+    let index = semantic_index(db, class_body_scope.file(db));
+    let mut names = Vec::new();
+
+    for function_scope_id in attribute_scopes(db, class_body_scope) {
+        if !method_matches_decorator(
+            db,
+            class_body_scope,
+            function_scope_id,
+            MethodDecorator::None,
+        ) {
+            continue;
+        }
+
+        names.extend(
+            index
+                .place_table(function_scope_id)
+                .members()
+                .filter_map(|member| member.as_instance_attribute().map(Name::new)),
+        );
+    }
+
+    names.sort_unstable();
+    names.dedup();
+    names.into_boxed_slice()
+}
+
+fn method_matches_decorator<'db>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+    method_scope_id: FileScopeId,
+    target: MethodDecorator,
+) -> bool {
+    let file = class_body_scope.file(db);
+    let module = parsed_module(db, file).load(db);
+    let index = semantic_index(db, file);
+    let Some(method) = index.scope(method_scope_id).node().as_function() else {
+        return true;
+    };
+
+    // Check the decorators directly on the AST node. This is more reliable than checking the
+    // final evaluated type, which may be wrapped by other decorators like `@cache`.
+    let function_node = method.node(&module);
+    let definition = index.expect_single_definition(method);
+    let mut is_classmethod = is_implicit_classmethod(&function_node.name);
+    let mut is_staticmethod = is_implicit_staticmethod(&function_node.name);
+
+    for decorator in &function_node.decorator_list {
+        let Type::ClassLiteral(class) =
+            definition_expression_type(db, definition, &decorator.expression)
+        else {
+            continue;
+        };
+        match class.known(db) {
+            Some(KnownClass::Classmethod) => is_classmethod = true,
+            Some(KnownClass::Staticmethod) => is_staticmethod = true,
+            _ => {}
+        }
+    }
+
+    match target {
+        MethodDecorator::None => !is_classmethod && !is_staticmethod,
+        MethodDecorator::ClassMethod => is_classmethod,
+        MethodDecorator::StaticMethod => is_staticmethod,
+    }
 }
 
 fn implicit_attribute_cycle_recover<'db>(
