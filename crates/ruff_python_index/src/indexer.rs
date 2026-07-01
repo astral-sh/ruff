@@ -61,9 +61,6 @@ impl Indexer {
                 }
             }
 
-            interpolated_string_ranges_builder.visit_token(token);
-            multiline_ranges_builder.visit_token(token);
-
             match token.kind() {
                 TokenKind::Newline | TokenKind::NonLogicalNewline => {
                     line_start = token.end();
@@ -71,9 +68,20 @@ impl Indexer {
                 TokenKind::Comment => {
                     comment_ranges.push(token.range());
                 }
-                _ if token.string_flags().is_some() => {
-                    // String-like tokens, including f/t-string start, middle, and end tokens, can
-                    // span multiple lines.
+                // String-like tokens, including f/t-string start, middle, and end tokens, can span
+                // multiple lines.
+                TokenKind::FStringStart
+                | TokenKind::FStringEnd
+                | TokenKind::TStringStart
+                | TokenKind::TStringEnd => {
+                    interpolated_string_ranges_builder.visit_token(token);
+                    line_start = source.line_start(token.end());
+                }
+                TokenKind::String | TokenKind::FStringMiddle => {
+                    multiline_ranges_builder.visit_token(token);
+                    line_start = source.line_start(token.end());
+                }
+                TokenKind::TStringMiddle => {
                     line_start = source.line_start(token.end());
                 }
                 _ => {}
