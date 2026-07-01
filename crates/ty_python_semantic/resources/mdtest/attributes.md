@@ -1359,6 +1359,30 @@ class InheritsGenerated(InitializesInheritedGenerated, metaclass=StoringMeta): .
 
 reveal_type(InheritsGenerated().generated)  # revealed: str
 
+# A normal generated class attribute shadows an inherited descriptor, allowing an instance
+# attribute to take precedence over the generated value.
+class InheritedGeneratedProperty:
+    @property
+    def generated(self) -> Literal["property"]:
+        return "property"
+
+class StringStoringMeta(type):
+    generated: str
+
+    def __new__(mcls, name: str, bases: tuple[type, ...], namespace: dict[str, object]):
+        namespace["generated"] = "class"
+        return super().__new__(mcls, name, bases, namespace)
+
+class InitializesShadowedGenerated:
+    def __init__(self) -> None:
+        self.generated: str = "instance"
+
+class ShadowsInheritedGeneratedProperty(
+    InitializesShadowedGenerated, InheritedGeneratedProperty, metaclass=StringStoringMeta
+): ...
+
+reveal_type(ShadowsInheritedGeneratedProperty().generated)  # revealed: str
+
 # A generated data descriptor takes precedence over an instance attribute.
 class GeneratedDescriptor:
     def __get__(
