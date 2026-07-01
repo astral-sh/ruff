@@ -2667,6 +2667,9 @@ impl<'db> StaticClassLiteral<'db> {
             .ignore_conflicting_declarations()
             .place
             .is_undefined()
+            || !place_from_bindings(db, use_def.end_of_scope_symbol_bindings(symbol_id))
+                .place
+                .is_undefined()
         {
             return Member::unbound();
         }
