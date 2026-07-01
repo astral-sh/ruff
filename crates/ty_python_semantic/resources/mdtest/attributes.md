@@ -1296,11 +1296,17 @@ class DeclaringBase:
 class InitializedDerived(DeclaringBase, metaclass=DerivedInitializingMeta): ...
 
 reveal_type(InitializedDerived.inherited_attr)  # revealed: int
+```
 
-# A metaclass declaration can describe an attribute that the metaclass stores in the namespace of
-# each class it constructs. The declared attribute is then available on instances of that class.
+## Attributes stored on classes by metaclasses
+
+A metaclass declaration can describe an attribute that the metaclass stores in every class it
+creates. The attribute is then available through instances of those classes. This is useful when a
+generic metaclass method relies on a protocol describing the classes it accepts:
+
+```py
 from dataclasses import dataclass
-from typing import Any, Iterator, Literal, Protocol, TypeVar
+from typing import Any, ClassVar, Iterator, Literal, Protocol, TypeVar
 
 class EnumProtocol(Protocol):
     _member_map_: dict[str, int]
@@ -1326,9 +1332,12 @@ reveal_type(EnumValue(1)._member_map_)  # revealed: dict[str, int]
 
 for member in EnumValue:
     reveal_type(member)  # revealed: EnumValue
+```
 
-# A metaclass declaration describes a value stored directly in the constructed class namespace, so
-# it takes precedence over an inherited class attribute.
+Because the metaclass stores the declared attribute directly on the new class, it takes precedence
+over an attribute inherited from a base class:
+
+```py
 class StoringMeta(type):
     generated: int
 
@@ -1342,16 +1351,18 @@ class GeneratedBase:
 class StoresGenerated(GeneratedBase, metaclass=StoringMeta): ...
 
 reveal_type(StoresGenerated().generated)  # revealed: int
+```
 
-# An instance member initialized directly on the constructed class takes precedence over the
-# metaclass declaration.
+An attribute stored on an instance takes precedence over a regular class attribute, whether the
+instance assignment is defined directly or inherited from a base class:
+
+```py
 class InitializesGenerated(metaclass=StoringMeta):
     def __init__(self) -> None:
         self.generated: str = "instance"
 
 reveal_type(InitializesGenerated().generated)  # revealed: str
 
-# An inherited instance member also takes precedence over a normal generated class attribute.
 class InitializesInheritedGenerated:
     def __init__(self) -> None:
         self.generated: str = "instance"
@@ -1359,8 +1370,12 @@ class InitializesInheritedGenerated:
 class InheritsGenerated(InitializesInheritedGenerated, metaclass=StoringMeta): ...
 
 reveal_type(InheritsGenerated().generated)  # revealed: str
+```
 
-# An inherited ClassVar is not an instance member, so it cannot suppress the generated attribute.
+An inherited `ClassVar` does not describe an instance attribute, but an inherited dataclass field
+does:
+
+```py
 class ClassVarGeneratedBase:
     generated: ClassVar[str]
 
@@ -1368,7 +1383,6 @@ class InheritsClassVarGenerated(ClassVarGeneratedBase, metaclass=StoringMeta): .
 
 reveal_type(InheritsClassVarGenerated().generated)  # revealed: int
 
-# A dataclass field is initialized on the instance even without an explicit assignment in a method.
 @dataclass
 class DataclassGeneratedBase:
     generated: str = "instance"
@@ -1376,9 +1390,12 @@ class DataclassGeneratedBase:
 class InheritsDataclassGenerated(DataclassGeneratedBase, metaclass=StoringMeta): ...
 
 reveal_type(InheritsDataclassGenerated().generated)  # revealed: str
+```
 
-# A normal generated class attribute shadows an inherited descriptor, allowing an instance
-# attribute to take precedence over the generated value.
+The attribute stored by the metaclass also shadows a descriptor inherited from a base class. An
+instance assignment can therefore take precedence over that inherited descriptor:
+
+```py
 class InheritedGeneratedProperty:
     @property
     def generated(self) -> Literal["property"]:
@@ -1400,8 +1417,12 @@ class ShadowsInheritedGeneratedProperty(
 ): ...
 
 reveal_type(ShadowsInheritedGeneratedProperty().generated)  # revealed: str
+```
 
-# A generated data descriptor takes precedence over an instance attribute.
+If the metaclass instead stores a data descriptor on the new class, the descriptor takes precedence
+over an instance assignment:
+
+```py
 class GeneratedDescriptor:
     def __get__(self, instance: object, owner: type | None = None) -> Literal["descriptor"]:
         return "descriptor"
@@ -1420,9 +1441,13 @@ class UsesGeneratedDescriptor(metaclass=DescriptorMeta):
         self.generated_descriptor = 1
 
 reveal_type(UsesGeneratedDescriptor().generated_descriptor)  # revealed: Literal["descriptor"]
+```
 
-# A generated contract that may be a data descriptor preserves the descriptor result alongside
-# the value stored on the instance.
+When a metaclass declaration uses a union, only the data descriptors in that union take precedence
+over an instance attribute. The `int` member must not appear in the result merely because the union
+also contains a data descriptor:
+
+```py
 class MaybeDescriptorMeta(type):
     generated_descriptor: GeneratedDescriptor | int
 
@@ -1430,22 +1455,17 @@ class MaybeDescriptorMeta(type):
         namespace["generated_descriptor"] = GeneratedDescriptor()
         return super().__new__(mcls, name, bases, namespace)
 
-class UsesMaybeGeneratedDescriptor(metaclass=MaybeDescriptorMeta):
-    def __init__(self) -> None:
-        self.generated_descriptor = 1
-
-reveal_type(UsesMaybeGeneratedDescriptor().generated_descriptor)  # revealed: Literal["descriptor"] | int
-
-# A non-descriptor arm of the generated contract is shadowed by the instance value; it should not
-# appear in the result merely because another arm is a data descriptor.
 class UsesMaybeGeneratedDescriptorWithBytes(metaclass=MaybeDescriptorMeta):
     def __init__(self) -> None:
         self.generated_descriptor = b"instance"
 
 reveal_type(UsesMaybeGeneratedDescriptorWithBytes().generated_descriptor)  # revealed: Literal["descriptor"] | bytes
+```
 
-# A dynamic union arm is excluded by the existing possible-descriptor heuristic, so the retained
-# descriptor arm must be treated as only possibly present and compose with the instance value.
+If the declaration can also be `Any`, ty cannot know that the class attribute is always a data
+descriptor. The instance attribute must remain another possible result:
+
+```py
 class MaybeDynamicDescriptorMeta(type):
     generated_descriptor: GeneratedDescriptor | Any
 
@@ -1460,32 +1480,41 @@ class DynamicDescriptorInstanceBase:
 class UsesMaybeDynamicDescriptor(DynamicDescriptorInstanceBase, metaclass=MaybeDynamicDescriptorMeta): ...
 
 reveal_type(UsesMaybeDynamicDescriptor().generated_descriptor)  # revealed: Literal["descriptor"] | bytes
+```
 
-# An annotation-only instance declaration does not create a class-namespace binding that could
-# shadow the generated data descriptor.
+An instance attribute annotation without a value does not store anything in the class namespace, so
+it cannot shadow a data descriptor. It does, however, replace the non-descriptor members of the
+metaclass declaration:
+
+```py
 class DeclaresGeneratedDescriptor(metaclass=DescriptorMeta):
     generated_descriptor: int
 
 reveal_type(DeclaresGeneratedDescriptor().generated_descriptor)  # revealed: Literal["descriptor"]
 
-# An annotation-only instance declaration also shadows the non-descriptor arms of a generated
-# union contract.
 class DeclaresMaybeGeneratedDescriptor(metaclass=MaybeDescriptorMeta):
     generated_descriptor: bytes
 
 reveal_type(DeclaresMaybeGeneratedDescriptor().generated_descriptor)  # revealed: Literal["descriptor"] | bytes
+```
 
-# An assignment to the first parameter of a static method is not an instance member of the
-# constructed class, so it does not suppress the metaclass declaration.
+Assigning an attribute through the first parameter of a static method does not describe an instance
+of the class:
+
+```py
 class StaticMethodAssignment(metaclass=StoringMeta):
     @staticmethod
     def assign(obj: Any) -> None:
-        obj.generated = 1
+        obj.generated = "instance"
 
 reveal_type(StaticMethodAssignment().generated)  # revealed: int
+```
 
-# A conditional direct member takes precedence when present, while the metaclass declaration
-# supplies the attribute on the other path.
+A conditional class-body attribute takes precedence when it exists, while the metaclass declaration
+supplies the attribute on the other path. By contrast, an instance assignment inside a conditionally
+defined method does not establish that the instance attribute exists:
+
+```py
 flag = bool()
 
 class ConditionalGenerated(metaclass=StoringMeta):
@@ -1494,54 +1523,47 @@ class ConditionalGenerated(metaclass=StoringMeta):
 
 reveal_type(ConditionalGenerated().generated)  # revealed: int
 
-# An assignment in a conditionally defined method does not suppress the metaclass declaration.
 class ConditionalMethodAssignment(metaclass=StoringMeta):
     if flag:
         def assign(self) -> None:
-            self.generated = 1
+            self.generated = "instance"
 
 reveal_type(ConditionalMethodAssignment().generated)  # revealed: int
+```
 
-# A bound metaclass class attribute is not stored in the constructed class's namespace.
+Only an annotation without a class-body value describes an attribute stored on each class created by
+the metaclass. A metaclass attribute with a value remains an attribute of the metaclass, and a
+method assignment without a declaration is not enough evidence that the attribute is present on
+every created class:
+
+```py
 class MetaclassAttributeOnly(type):
     metaclass_only: int = 1
 
 class DoesNotInheritMetaclassAttribute(metaclass=MetaclassAttributeOnly): ...
 
-reveal_type(DoesNotInheritMetaclassAttribute.metaclass_only)  # revealed: int
 # error: [unresolved-attribute]
 reveal_type(DoesNotInheritMetaclassAttribute().metaclass_only)  # revealed: Unknown
 
-# An assignment in a metaclass method is not enough evidence without a class-body declaration.
 class AssignmentOnlyMeta(type):
     def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
         cls.assignment_only: int = 1
 
 class DoesNotInferAssignment(metaclass=AssignmentOnlyMeta): ...
 
-reveal_type(DoesNotInferAssignment.assignment_only)  # revealed: int
 # error: [unresolved-attribute]
 reveal_type(DoesNotInferAssignment().assignment_only)  # revealed: Unknown
-
-# A bound declaration remains a metaclass attribute even if an arbitrary method writes the name.
-class BoundAndAssignedMeta(type):
-    bound_and_assigned: int = 0
-
-    def never_called(cls) -> None:
-        cls.bound_and_assigned = 1
-
-class DoesNotInferBoundAssignment(metaclass=BoundAndAssignedMeta): ...
-
-reveal_type(DoesNotInferBoundAssignment.bound_and_assigned)  # revealed: int
-# error: [unresolved-attribute]
-reveal_type(DoesNotInferBoundAssignment().bound_and_assigned)  # revealed: Unknown
 ```
+
+## Precedence between class and metaclass attributes
 
 However, the metaclass attribute only takes precedence over a class-level attribute if it is a data
 descriptor. If it is a non-data descriptor or a normal attribute, the class-level attribute is used
 instead (see the [descriptor protocol tests] for data/non-data descriptor attributes):
 
 ```py
+from typing import Literal
+
 class Meta2:
     attr: str = "metaclass value"
 

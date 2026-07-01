@@ -1779,8 +1779,9 @@ static_assert(is_disjoint_from(FinalFoo, Proto))
 
 A type does not have to be an `Instance` type in order to be a subtype of a protocol. Other
 protocols can be a subtype of a protocol, as can `ModuleLiteral` types, `ClassLiteral` types, and
-others. Another protocol can be a subtype of `HasX` either through "explicit" (nominal) inheritance
-from `HasX`, or by specifying a superset of `HasX`'s interface:
+others. A class object can satisfy the protocol through a declaration on its metaclass. Another
+protocol can be a subtype of `HasX` either through "explicit" (nominal) inheritance from `HasX`, or
+by specifying a superset of `HasX`'s interface:
 
 `module.py`:
 
