@@ -51,8 +51,25 @@ pub(in crate::docstring) fn split_once_unbracketed_colon(line: &str) -> Option<(
     let mut braces = 0usize;
     let mut quote = None;
     let mut escaped = false;
+    let mut code_span_delimiter_len = None;
+    let mut index = 0;
 
-    for (index, char) in line.char_indices() {
+    while index < line.len() {
+        let rest = &line[index..];
+        let char = rest.chars().next()?;
+        if let Some(opening_len) = code_span_delimiter_len {
+            if char == '`' {
+                let delimiter_len = rest.bytes().take_while(|byte| *byte == b'`').count();
+                if opening_len == delimiter_len {
+                    code_span_delimiter_len = None;
+                }
+                index += delimiter_len;
+            } else {
+                index += char.len_utf8();
+            }
+            continue;
+        }
+
         if let Some(quote_char) = quote {
             // Brackets and colons inside a quoted literal are not structural.
             if escaped {
@@ -62,6 +79,14 @@ pub(in crate::docstring) fn split_once_unbracketed_colon(line: &str) -> Option<(
             } else if char == quote_char {
                 quote = None;
             }
+            index += char.len_utf8();
+            continue;
+        }
+
+        if char == '`' {
+            let delimiter_len = rest.bytes().take_while(|byte| *byte == b'`').count();
+            code_span_delimiter_len = Some(delimiter_len);
+            index += delimiter_len;
             continue;
         }
 
@@ -79,6 +104,7 @@ pub(in crate::docstring) fn split_once_unbracketed_colon(line: &str) -> Option<(
             }
             _ => {}
         }
+        index += char.len_utf8();
     }
 
     None
@@ -86,8 +112,21 @@ pub(in crate::docstring) fn split_once_unbracketed_colon(line: &str) -> Option<(
 
 /// Splits a trailing parenthesized type from a parameter display name.
 pub(in crate::docstring) fn parse_parenthesized_type(name: &str) -> (&str, Option<&str>) {
-    if !name.ends_with(')') {
+    let Some((display_name, ty)) = split_parenthesized_suffix(name) else {
         return (name, None);
+    };
+    let display_name = display_name.trim();
+    let ty = ty.trim();
+    if display_name.is_empty() || ty.is_empty() {
+        (name, None)
+    } else {
+        (display_name, Some(ty))
+    }
+}
+
+fn split_parenthesized_suffix(value: &str) -> Option<(&str, &str)> {
+    if !value.ends_with(')') {
+        return None;
     }
 
     let mut depth = 0usize;
@@ -96,7 +135,7 @@ pub(in crate::docstring) fn parse_parenthesized_type(name: &str) -> (&str, Optio
     let mut escaped = false;
 
     // Only a balanced group that closes at the end can be a type suffix.
-    for (index, char) in name.char_indices() {
+    for (index, char) in value.char_indices() {
         if let Some(quote_char) = quote {
             if escaped {
                 escaped = false;
@@ -117,32 +156,120 @@ pub(in crate::docstring) fn parse_parenthesized_type(name: &str) -> (&str, Optio
                 depth += 1;
             }
             ')' => {
-                let Some(new_depth) = depth.checked_sub(1) else {
-                    return (name, None);
-                };
+                let new_depth = depth.checked_sub(1)?;
                 depth = new_depth;
-                if depth == 0 && index + char.len_utf8() == name.len() {
-                    let Some(opening) = opening else {
-                        return (name, None);
-                    };
-                    let display_name = name[..opening].trim();
-                    let ty = name[opening + '('.len_utf8()..index].trim();
-                    return if display_name.is_empty() || ty.is_empty() {
-                        (name, None)
-                    } else {
-                        (display_name, Some(ty))
-                    };
+                if depth == 0 && index + char.len_utf8() == value.len() {
+                    let opening = opening?;
+                    return Some((&value[..opening], &value[opening + '('.len_utf8()..index]));
                 }
             }
             _ => {}
         }
     }
 
-    (name, None)
+    None
+}
+
+pub(in crate::docstring) fn strip_code_span_wrapper(ty: &str) -> &str {
+    let delimiter_len = ty.bytes().take_while(|byte| *byte == b'`').count();
+    let closing_delimiter_len = ty.bytes().rev().take_while(|byte| *byte == b'`').count();
+    if delimiter_len == 0 || delimiter_len != closing_delimiter_len || delimiter_len > ty.len() / 2
+    {
+        return ty;
+    }
+
+    let inner = &ty[delimiter_len..ty.len() - delimiter_len];
+    if inner
+        .split(|character| character != '`')
+        .any(|run| run.len() == delimiter_len)
+    {
+        return ty;
+    }
+
+    let inner = inner.trim();
+    if inner.is_empty() { ty } else { inner }
+}
+
+pub(in crate::docstring) fn is_docstring_type_expression(ty: &str) -> bool {
+    let ty = strip_code_span_wrapper(ty);
+    if !has_docstring_type_expression_characters(ty) {
+        return false;
+    }
+
+    if !ty.chars().any(char::is_whitespace) {
+        return true;
+    }
+
+    // Whitespace makes prose ambiguous, so require syntax that strongly indicates a type.
+    is_subscript_style_docstring_type_expression(ty)
+        || ty.contains('|')
+        || is_call_style_docstring_type_expression(ty)
+        || is_conventional_spaced_docstring_type_expression(ty)
+}
+
+fn is_subscript_style_docstring_type_expression(ty: &str) -> bool {
+    ty.split_once('[')
+        .is_some_and(|(name, _)| is_docstring_type_expression_atom(name) && ty.ends_with(']'))
+}
+
+fn is_call_style_docstring_type_expression(ty: &str) -> bool {
+    split_parenthesized_suffix(ty).is_some_and(|(name, arguments)| {
+        !name.contains(['(', ')'])
+            && is_docstring_type_expression_atom(name)
+            && arguments
+                .split(',')
+                .all(|argument| is_docstring_type_expression_atom(argument.trim()))
+    })
+}
+
+fn is_conventional_spaced_docstring_type_expression(ty: &str) -> bool {
+    let mut tokens = ty.split_whitespace();
+    let Some(first) = tokens.next() else {
+        return false;
+    };
+    if !is_docstring_type_expression_atom(first) {
+        return false;
+    }
+
+    let mut found_connector = false;
+    while let Some(connector) = tokens.next() {
+        if !matches!(connector, "of" | "or") {
+            return false;
+        }
+        let Some(atom) = tokens.next() else {
+            return false;
+        };
+        if !is_docstring_type_expression_atom(atom) {
+            return false;
+        }
+        found_connector = true;
+    }
+
+    found_connector
+}
+
+fn is_docstring_type_expression_atom(atom: &str) -> bool {
+    !atom.chars().any(char::is_whitespace) && has_docstring_type_expression_characters(atom)
+}
+
+fn has_docstring_type_expression_characters(expression: &str) -> bool {
+    expression
+        .chars()
+        .next()
+        .is_some_and(is_docstring_type_expression_start)
+        && expression.chars().all(is_docstring_type_expression_char)
+}
+
+fn is_docstring_type_expression_start(ch: char) -> bool {
+    ch.is_ascii_alphabetic() || matches!(ch, '_' | '~' | ':' | '`' | '(')
+}
+
+fn is_docstring_type_expression_char(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || "_.[](){},|\"':/ `~-".contains(ch)
 }
 
 /// Calculates indentation width, treating tabs like Python does.
-pub(super) fn indentation(line: &str) -> usize {
+pub(in crate::docstring) fn indentation(line: &str) -> usize {
     leading_indentation(line)
         .bytes()
         .fold(0, |column, byte| match byte {

@@ -44,7 +44,7 @@ impl<'a> MarkdownFence<'a> {
 
 /// Recognizes preformatted blocks that may occur within a docstring.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub(super) struct PreformattedBlockScanner<'a> {
+pub(in crate::docstring) struct PreformattedBlockScanner<'a> {
     active_markdown_fence: Option<MarkdownFence<'a>>,
     active_doctest_indent: Option<usize>,
     rest_literal_blocks: RestLiteralBlockScanner,
@@ -57,7 +57,7 @@ const QUOTED_LITERAL_BLOCK_QUOTE_CHARACTERS: &str = r##"!"#$%&'()*+,-./:;<=>?@[\
 
 impl<'a> PreformattedBlockScanner<'a> {
     /// Returns whether the scanner is currently inside an accepted preformatted block.
-    pub(super) fn is_active(&self) -> bool {
+    pub(in crate::docstring) fn is_active(&self) -> bool {
         self.active_markdown_fence.is_some()
             || self.active_doctest_indent.is_some()
             || matches!(
@@ -68,7 +68,7 @@ impl<'a> PreformattedBlockScanner<'a> {
 
     /// Updates internal state to reflect the given line and returns whether or
     /// not the given line is contained within a preformatted block.
-    pub(super) fn consume_preformatted_line(&mut self, line: &'a str) -> bool {
+    pub(in crate::docstring) fn consume_preformatted_line(&mut self, line: &'a str) -> bool {
         if let Some(fence) = self.active_markdown_fence {
             if fence.is_closed_by(line) {
                 self.active_markdown_fence = None;
@@ -105,8 +105,13 @@ impl<'a> PreformattedBlockScanner<'a> {
     }
 
     /// Updates internal state for a line outside of any active preformatted block.
-    pub(super) fn observe_line_outside_preformatted_block(&mut self, line: &str) {
+    pub(in crate::docstring) fn observe_line_outside_preformatted_block(&mut self, line: &str) {
         self.rest_literal_blocks.observe_marker_in_line(line);
+    }
+
+    /// Returns whether the line introduces a reST literal block.
+    pub(in crate::docstring) fn line_starts_rest_literal_block(line: &str) -> bool {
+        RestLiteralBlockScanner::line_starts_literal_block(line.trim_start())
     }
 
     /// Whether or not the given line marks the start of a doctest.
