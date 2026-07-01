@@ -18,7 +18,8 @@
 - Rejected — Model custom-metaclass shadows of builtin `type` descriptors. No builtin descriptor shim is needed for declaration contracts.
 - Rejected — Ignore annotation-only declarations when deciding whether an attribute exists. ty intentionally treats declarations as attribute contracts.
 - Rejected — Inspect higher-order metaclass-populated descriptors. Higher-order runtime namespace reconstruction is outside issue #3535.
-- Fixed — Preserve generated contracts that may be data descriptors. A descriptor union arm must remain possible when instance writes are present.
+- Fixed — Preserve the descriptor result of a generated union contract when instance writes are present.
+- Fixed — Compose only the descriptor arms of a generated union contract with the effective instance member. Normal generated arms remain shadowed by the instance value.
 - Rejected — Add special descriptor handling for direct dynamic types. Dynamic runtime values are outside the declaration-contract lookup.
 - Rejected — Add special descriptor handling for dynamic union arms. Union-valued runtime writes are outside the declaration-contract lookup.
 - Rejected — Distinguish dynamic alternatives from dynamic generic arguments during descriptor screening. Descriptor screening was removed.

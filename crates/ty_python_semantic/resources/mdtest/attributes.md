@@ -1418,6 +1418,14 @@ class UsesMaybeGeneratedDescriptor(metaclass=MaybeDescriptorMeta):
 
 reveal_type(UsesMaybeGeneratedDescriptor().generated_descriptor)  # revealed: Literal["descriptor"] | int
 
+# A non-descriptor arm of the generated contract is shadowed by the instance value; it should not
+# appear in the result merely because another arm is a data descriptor.
+class UsesMaybeGeneratedDescriptorWithBytes(metaclass=MaybeDescriptorMeta):
+    def __init__(self) -> None:
+        self.generated_descriptor = b"instance"
+
+reveal_type(UsesMaybeGeneratedDescriptorWithBytes().generated_descriptor)  # revealed: Literal["descriptor"] | bytes
+
 # An annotation-only instance declaration does not create a class-namespace binding that could
 # shadow the generated data descriptor.
 class DeclaresGeneratedDescriptor(metaclass=DescriptorMeta):
