@@ -169,6 +169,7 @@ class Foo:
         self.x: "int" | "str" = 42
 
 d = {}
+# error: [invalid-type-form]
 d[0]: "int" | "str" = 42
 
 # error: [unsupported-operator]
@@ -280,12 +281,12 @@ reveal_type(Aliases.not_forward)  # revealed: str
 ```py
 a: "int" = 1
 b: "'int'" = 1
-# error: [invalid-syntax-in-forward-annotation] "too many levels of nested string annotations; remove the redundant nested quotes"
+# snapshot
 c: """'"int"'""" = 1
 d: "Foo"
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `Foo`"
 e: "Foo" = 1
-# error: [invalid-syntax-in-forward-annotation] "nested string annotation is too long; remove the redundant nested quotes"
+# snapshot
 f: "'str | int | bool | Foo | Bar'" = 1
 
 class Foo: ...
@@ -298,6 +299,23 @@ reveal_type(c)  # revealed: Literal[1]
 reveal_type(d)  # revealed: Foo
 reveal_type(e)  # revealed: Foo
 reveal_type(f)  # revealed: Literal[1]
+```
+
+```snapshot
+error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
+ --> src/mdtest_snippet.py:4:8
+  |
+4 | c: """'"int"'""" = 1
+  |        ^^^^^ Too many levels of nested string annotations; remove the redundant nested quotes
+  |
+
+
+error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
+ --> src/mdtest_snippet.py:9:5
+  |
+9 | f: "'str | int | bool | Foo | Bar'" = 1
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Nested string annotation is too long; remove the redundant nested quotes
+  |
 ```
 
 ## Parameter
@@ -351,9 +369,9 @@ j: "{i: i for i in range(5)}"
 k: "(i for i in range(5))"
 # error: [invalid-type-form]
 l: "await 1"
-# error: [invalid-syntax-in-forward-annotation]
+# snapshot
 m: "yield 1"
-# error: [invalid-syntax-in-forward-annotation]
+# snapshot
 n: "yield from 1"
 # error: [invalid-type-form]
 o: "1 < 2"
@@ -363,6 +381,51 @@ p: "call()"
 r: "[1, 2]"
 # error: [invalid-type-form] "Tuple literals are not allowed"
 s: "(1, 2)"
+# snapshot
+t: "list[yield from 1]"
+# snapshot
+u: "type]"
+```
+
+```snapshot
+error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
+  --> src/mdtest_snippet.py:43:5
+   |
+43 | m: "yield 1"
+   |     ^^^^^^^ Yield expression cannot be used here
+   |
+help: Did you mean `typing.Literal["yield 1"]`?
+
+
+error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
+  --> src/mdtest_snippet.py:45:5
+   |
+45 | n: "yield from 1"
+   |     ^^^^^^^^^^^^ Yield expression cannot be used here
+   |
+help: Did you mean `typing.Literal["yield from 1"]`?
+
+
+error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
+  --> src/mdtest_snippet.py:55:5
+   |
+55 | t: "list[yield from 1]"
+   |     -----^^^^^^^^^^^^-
+   |          |
+   |          Yield expression cannot be used here
+   |
+help: Did you mean `typing.Literal["list[yield from 1]"]`?
+
+
+error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
+  --> src/mdtest_snippet.py:57:5
+   |
+57 | u: "type]"
+   |     ----^
+   |         |
+   |         Unexpected token at the end of an expression
+   |
+help: Did you mean `typing.Literal["type]"]`?
 ```
 
 ## Multi line annotation
@@ -385,19 +448,57 @@ def valid(
     reveal_type(a2)  # revealed: int | str
 
 def invalid(
-    # error: [invalid-syntax-in-forward-annotation]
+    # snapshot
     a1: """
   int |
 str)
 """,
-    # error: [invalid-syntax-in-forward-annotation]
+    # snapshot
     a2: """
   int) |
 str
 """,
-    # error: [invalid-syntax-in-forward-annotation]
+    # snapshot
     a3: """
       (int)) """,
 ):
     pass
+```
+
+```snapshot
+error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
+  --> src/mdtest_snippet.py:17:12
+   |
+17 |       a1: """
+   |  ____________-
+18 | |   int |
+19 | | str)
+   | |____^-
+   |      |
+   |      Unexpected token at the end of an expression
+   |
+
+
+error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
+  --> src/mdtest_snippet.py:22:12
+   |
+22 |       a2: """
+   |  ____________-
+23 | |   int) |
+   | |      ^ Unexpected token at the end of an expression
+24 | | str
+   | |____-
+   |
+
+
+error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
+  --> src/mdtest_snippet.py:27:12
+   |
+27 |       a3: """
+   |  ____________-
+28 | |       (int)) """,
+   | |____________^-
+   |              |
+   |              Unexpected token at the end of an expression
+   |
 ```

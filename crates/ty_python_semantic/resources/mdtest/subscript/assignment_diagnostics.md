@@ -18,6 +18,18 @@ config: dict[str, int] = {}
 config["retries"] = "three"  # error: [invalid-assignment]
 ```
 
+## Annotated subscript targets
+
+Annotations on subscript targets are ignored, and the assignment is checked against the collection's
+element type.
+
+```py
+numbers: list[int] = []
+# error: [invalid-type-form]
+# error: [invalid-assignment]
+numbers[0]: str = "three"
+```
+
 ## Invalid key type
 
 ### For a `list`

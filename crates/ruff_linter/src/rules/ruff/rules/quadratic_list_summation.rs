@@ -39,7 +39,16 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// joined = sum(lists, [])
 /// ```
 ///
-/// Use instead:
+/// On Python 3.14 and earlier, use instead:
+/// ```python
+/// import functools
+/// import operator
+///
+/// lists = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+/// joined = functools.reduce(operator.iadd, lists, [])
+/// ```
+///
+/// On Python 3.15 and later, use instead:
 /// ```python
 /// lists = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
 /// joined = [*sublist for sublist in lists]

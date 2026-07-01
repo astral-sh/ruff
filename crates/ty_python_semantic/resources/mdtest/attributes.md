@@ -335,7 +335,6 @@ reveal_type(c_instance.d2)  # revealed: str
 ```py
 class C:
     def __init__(self) -> None:
-        # error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to attribute `b` of type `list[Literal[2, 3]]`"
         self.a, *self.b = (1, 2, 3)
 
 c_instance = C()
@@ -555,6 +554,8 @@ reveal_type(C().declared_and_bound)  # revealed: str | None
 class C:
     def __init__(self) -> None:
         this = self
+        # error: [invalid-type-form]
+        # error: [unresolved-attribute]
         this.declared_and_bound: str | None = "a"
 
 # This would ideally be `str | None`, but mypy/pyright don't support this either,
@@ -1015,6 +1016,70 @@ reveal_type(Derived().undeclared)  # revealed: str
 reveal_type(Derived().pure_undeclared)  # revealed: str
 ```
 
+## Allow replacing ordinary methods with compatible functions
+
+An ordinary method can be replaced directly on a class by another function with a compatible
+signature. The replacement remains an ordinary function, so Python binds it to instances in the same
+way as the original method.
+
+A function-literal type identifies a specific function, not just its signature. This makes
+identity-sensitive code unsound: after the assignment below, `Foo.add is original_add` is inferred
+as `Literal[True]`, even though it evaluates to `False` at runtime and the assertion fails. Calls to
+the method itself remain safe because both functions have compatible signatures and the same
+instance-binding behavior.
+
+```py
+from typing import Literal
+
+class Foo:
+    def add(self, x: int, y: int, /) -> int:
+        return x + y
+
+def add_replacement(self: Foo, x: int, y: int, /) -> int:
+    return x * y
+
+original_add = Foo.add
+
+def requires_true(value: Literal[True]) -> None:
+    assert value
+
+Foo.add = add_replacement
+requires_true(Foo.add is original_add)  # accepted; assertion fails at runtime
+
+def incompatible_replacement(self: Foo, x: str, y: str, /) -> str:
+    return x + y
+
+Foo.add = incompatible_replacement  # error: [invalid-assignment]
+```
+
+`staticmethod` and `classmethod` attributes cannot yet be replaced this way. If `static` were
+replaced with a plain function, `DescriptorMethods.static(1)` would pass only `1`, as before, but
+`DescriptorMethods().static(1)` would also pass the instance as the first argument. If `class_` were
+replaced, `DescriptorMethods.class_(1)` would stop passing `DescriptorMethods` as the first
+argument, while `DescriptorMethods().class_(1)` would pass the instance instead of the class.
+Supporting these assignments requires replacements with the corresponding decorator (for example,
+`staticmethod(static_replacement)` or `classmethod(class_replacement)`).
+
+```py
+class DescriptorMethods:
+    @staticmethod
+    def static(x: int) -> str:
+        return str(x)
+
+    @classmethod
+    def class_(cls, x: int) -> str:
+        return str(x)
+
+def static_replacement(x: int) -> str:
+    return str(x)
+
+def class_replacement(cls: type[DescriptorMethods], x: int) -> str:
+    return str(x)
+
+DescriptorMethods.static = static_replacement  # error: [invalid-assignment]
+DescriptorMethods.class_ = class_replacement  # error: [invalid-assignment]
+```
+
 ## Accessing attributes on class objects
 
 When accessing attributes on class objects, they are always looked up on the type of the class
@@ -1029,6 +1094,208 @@ class Meta1:
 class C1(metaclass=Meta1): ...
 
 reveal_type(C1.attr)  # revealed: Literal["metaclass value"]
+```
+
+A dynamically-created metaclass can define methods with the same names as methods in the class it
+creates. These methods can have different roles; in particular, the metaclass's `__new__` creates
+the class object and its `__call__` creates instances, while the class's methods create and operate
+on instances of that class:
+
+```py
+class DynamicallyConstructed(
+    metaclass=type(
+        "DynamicMeta",
+        (type,),
+        {
+            "__new__": lambda mcls, name, bases, namespace: type.__new__(mcls, name, bases, namespace),
+            "__call__": lambda cls: type.__call__(cls),
+        },
+    )
+):
+    def __new__(cls):
+        return super().__new__(cls)
+
+    def __call__(self, value: int) -> int:
+        return value
+
+DynamicallyConstructed()(1)
+```
+
+Assignments in instance methods of a metaclass are also attributes on its class-object instances. In
+particular, a metaclass `__init__` assignment happens after the initial class namespace has been
+converted into a class object, so it shadows an attribute from that namespace:
+
+```py
+class InitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.attr: int = 1
+
+class CCreated(metaclass=InitializingMeta): ...
+
+reveal_type(CCreated.attr)  # revealed: int
+
+class CInitialized(metaclass=InitializingMeta):
+    # error: [invalid-assignment] "Object of type `Literal["initial class value"]` is not assignable to attribute `attr` of type `int`"
+    attr = "initial class value"
+
+reveal_type(CInitialized.attr)  # revealed: int
+CInitialized.attr = 2
+# error: [invalid-assignment] "Object of type `Literal["invalid"]` is not assignable to attribute `attr` of type `int`"
+CInitialized.attr = "invalid"
+
+class LiteralInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.attr: Literal[1] = 1
+
+class CAugmentedInitialized(metaclass=LiteralInitializingMeta):
+    attr = 1
+    attr += 1  # error: [invalid-assignment]
+
+class CLoopInitialized(metaclass=LiteralInitializingMeta):
+    for attr in ("invalid",):  # error: [invalid-assignment]
+        pass
+
+class CNamedInitialized(metaclass=LiteralInitializingMeta):
+    if attr := "invalid":  # error: [invalid-assignment]
+        pass
+
+class InvalidContextManager:
+    def __enter__(self) -> str:
+        return "invalid"
+
+    def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> None:
+        pass
+
+class CWithInitialized(metaclass=LiteralInitializingMeta):
+    with InvalidContextManager() as attr:  # error: [invalid-assignment]
+        pass
+
+class CAnnotatedInitialized(metaclass=InitializingMeta):
+    attr: str = "invalid"  # error: [invalid-assignment]
+
+class CMethodInitialized(metaclass=InitializingMeta):
+    # error: [invalid-assignment]
+    def attr(self) -> None:
+        pass
+
+class CNestedClassInitialized(metaclass=InitializingMeta):
+    # error: [invalid-assignment]
+    class attr:
+        pass
+
+class CImportInitialized(metaclass=InitializingMeta):
+    import sys as attr  # error: [invalid-assignment]
+
+# Exception-handler targets are removed from the namespace on leaving the handler.
+class CExceptionBindingCleared(metaclass=InitializingMeta):
+    try:
+        raise RuntimeError
+    except RuntimeError as attr:
+        pass
+
+class BroadInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        value: object = object()
+        cls.attr = value
+
+class CDeclared(metaclass=BroadInitializingMeta):
+    attr: str  # error: [invalid-assignment]
+
+# A class-body declaration is a contract for an attribute populated by metaclass initialization.
+reveal_type(CDeclared.attr)  # revealed: str
+
+class DeclaredBroadInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.attr: object = object()
+
+class CDeclaredAgainstDeclaredMeta(metaclass=DeclaredBroadInitializingMeta):
+    attr: str  # error: [invalid-assignment]
+
+reveal_type(CDeclaredAgainstDeclaredMeta.attr)  # revealed: str
+
+from collections.abc import Callable
+from typing import ClassVar
+
+class DeclaredCallableMeta(type):
+    factory: Callable[[str], str]
+
+def identity(value: str) -> str:
+    return value
+
+class CStoredDescriptor(metaclass=DeclaredCallableMeta):
+    # A metaclass declaration constrains access without replacing this stored descriptor.
+    factory: ClassVar["staticmethod[[str], str]"] = staticmethod(identity)
+
+class CIncompatibleStoredValue(metaclass=DeclaredCallableMeta):
+    factory: ClassVar[int] = 1  # error: [invalid-assignment]
+
+class CIncompatibleInferredValue(metaclass=DeclaredCallableMeta):
+    factory = 1  # error: [invalid-assignment]
+
+class CIncompatibleDeclaredAccess(metaclass=DeclaredCallableMeta):
+    # TODO: This should be an `invalid-assignment` error, analogous to an incompatible
+    # mutable attribute redeclaration on a subclass.
+    factory: ClassVar[int]
+
+class MethodDeclaredCallableMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.factory: Callable[[str], str]
+
+class CStoredDescriptorAgainstMethodDeclaration(metaclass=MethodDeclaredCallableMeta):
+    factory: ClassVar["staticmethod[[str], str]"] = staticmethod(identity)
+
+class CompatibleInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.attr: int | str = 1
+
+def _(flag: bool):
+    class CConditionallyDeclared(metaclass=CompatibleInitializingMeta):
+        if flag:
+            attr: str = "class value"  # error: [invalid-assignment]
+
+    # On paths without the class-body value, the metaclass-populated value remains available.
+    reveal_type(CConditionallyDeclared.attr)  # revealed: int | str
+
+class ReplacingMethodsMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.factory = lambda: object()
+        cls.arguments = lambda: ()
+
+class MethodsReplacedAtConstruction(metaclass=ReplacingMethodsMeta):
+    def factory(self, value: int) -> str:
+        return ""
+
+    def arguments(self, value: int) -> str:
+        return ""
+
+class TypedReplacingMethodsMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.factory: object = object()
+
+class MethodReplacedByTypedMeta(metaclass=TypedReplacingMethodsMeta):
+    def factory(self) -> str:
+        return ""
+
+class PopulatingMetaclass(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.populated_on_meta: int = 1
+
+class PopulatedMeta(type, metaclass=PopulatingMetaclass): ...
+class ConstructedByPopulatedMeta(metaclass=PopulatedMeta): ...
+
+reveal_type(PopulatedMeta.populated_on_meta)  # revealed: int
+reveal_type(ConstructedByPopulatedMeta.populated_on_meta)  # revealed: int
+
+class DerivedInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.inherited_attr: int = 1
+
+class DeclaringBase:
+    inherited_attr: str
+
+class InitializedDerived(DeclaringBase, metaclass=DerivedInitializingMeta): ...
+
+reveal_type(InitializedDerived.inherited_attr)  # revealed: int
 ```
 
 However, the metaclass attribute only takes precedence over a class-level attribute if it is a data
@@ -1542,8 +1809,8 @@ def f(x: list[int], y: list[int] | None, z: None):
     z.index
 ```
 
-This is also true of type aliases of unions, and of special-case `NewType`s that have a union as a
-base type:
+This is also true of type aliases of unions, special-case `NewType`s that have a union as a base
+type, and type variables with union upper bounds:
 
 ```toml
 [environment]
@@ -1561,6 +1828,10 @@ def g(x: MaybeList, y: FloatNT):
     x.index
     # error: [unresolved-attribute] "Attribute `hex` is not defined on `int` in union `FloatNT`"
     y.hex
+
+def h[T: list[int] | None](x: T):
+    # error: [unresolved-attribute] "Attribute `append` is not defined on `None` in union `list[int] | None`"
+    x.append
 ```
 
 ## Inherited class attributes
@@ -1653,6 +1924,49 @@ def _(a_and_b: Intersection[A, B]):
 def _(a_and_b: Intersection[type[A], type[B]]):
     reveal_type(a_and_b.x)  # revealed: P & Q
     a_and_b.x = R()
+```
+
+### Method binding uses the full intersection type
+
+For `Intersection[A, B]`, member lookup searches `A` and `B` separately to find the method. Once
+found, however, `Self` must be bound using the full `A & B` receiver.
+
+```py
+from typing_extensions import Self
+from ty_extensions import Intersection
+
+class A:
+    def method(self) -> Self:
+        return self
+
+class B: ...
+
+def _(a_and_b: Intersection[A, B]):
+    reveal_type(a_and_b.method())  # revealed: A & B
+```
+
+### Descriptor binding uses the full intersection type
+
+Descriptors found while searching the individual elements of an intersection must also be bound
+using the full intersection as the receiver.
+
+```py
+from typing import TypeVar
+from ty_extensions import Intersection
+
+T = TypeVar(name="T")
+
+class Descriptor:
+    def __get__(self, instance: T, owner: type | None = None, /) -> T:
+        return instance
+
+class A:
+    desc = Descriptor()
+
+class B: ...
+
+def _(a_and_b: Intersection[A, B]):
+    reveal_type(a_and_b.desc)  # revealed: A & B
 ```
 
 ### Negation types
@@ -2366,8 +2680,11 @@ mod.global_symbol = 1
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `global_symbol` of type `str`"
 _, mod.global_symbol = (..., 1)
 
-# TODO: this should be an error, but we do not understand list unpackings yet.
-[_, mod.global_symbol] = [1, 2]
+# error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to attribute `global_symbol` of type `str`"
+[_, mod.global_symbol] = [
+    1,
+    2,
+]
 
 # error: [invalid-assignment] "Object of type `int` is not assignable to attribute `global_symbol` of type `str`"
 for mod.global_symbol in range(3):
@@ -2603,6 +2920,33 @@ class C:
 # TODO: ideally, this would be `str`. Mypy supports this, pyright does not.
 # error: [unresolved-attribute]
 reveal_type(C().x)  # revealed: Unknown
+```
+
+### Non-receiver annotated assignments from nested functions
+
+```py
+class Other:
+    x: str
+
+receiver = Other()
+
+class C:
+    def __init__(self) -> None:
+        def set_shadowed(self: Other, value: str) -> None:
+            # error: [invalid-type-form]
+            self.x: str = value
+
+    @staticmethod
+    def set_static(self: Other) -> None:
+        def nested(value: str) -> None:
+            # error: [invalid-type-form]
+            self.x: str = value
+
+    def set_global(receiver) -> None:
+        def nested(value: str) -> None:
+            global receiver
+            # error: [invalid-type-form]
+            receiver.x: str = value
 ```
 
 ### Accessing attributes on `Never`
@@ -2874,6 +3218,27 @@ class NestedLists2:
         self.x = make_list(self.x)
 
 reveal_type(NestedLists2().x)  # revealed: list[Divergent]
+```
+
+During fixpoint iteration, overloads may fail to resolve correctly and be treated as `Unknown`. Even
+in this case, `Divergent` is propagated, guaranteeing the convergence of type inference. Here is the
+regression test for this scenario (<https://github.com/astral-sh/ty/issues/3614>):
+
+```py
+from typing import Any
+
+class NestedListsConcat:
+    def __init__(self):
+        self.x = [0]
+        self.y = [0]
+
+    def f(self, y: list[Any]):
+        # The overload that fails to resolve is `list.__add__` in both of these cases.
+        self.x = [self.x] + []
+        self.y = [self.y].__add__(y)
+
+reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[Divergent] | Unknown
+reveal_type(NestedListsConcat().y)  # revealed: list[int] | list[Divergent] | Unknown
 ```
 
 ### Builtin types attributes
@@ -3193,14 +3558,14 @@ python-version = "3.14"
 ```
 
 ```py
-from typing import Callable
+from typing import Any, Callable
 
-def f(x: Callable):
+def f(x: Callable[..., Any]):
     x.__name__  # snapshot: unresolved-attribute
 ```
 
 ```snapshot
-error[unresolved-attribute]: Object of type `(...) -> Unknown` has no attribute `__name__`
+error[unresolved-attribute]: Object of type `(...) -> Any` has no attribute `__name__`
  --> src/mdtest_snippet.py:4:5
   |
 4 |     x.__name__  # snapshot: unresolved-attribute
@@ -3211,12 +3576,12 @@ help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/ty
 ```
 
 ```py
-def g(x: Callable):
+def g(x: Callable[..., Any]):
     x.__annotate__  # snapshot: unresolved-attribute
 ```
 
 ```snapshot
-error[unresolved-attribute]: Object of type `(...) -> Unknown` has no attribute `__annotate__`
+error[unresolved-attribute]: Object of type `(...) -> Any` has no attribute `__annotate__`
  --> src/mdtest_snippet.py:6:5
   |
 6 |     x.__annotate__  # snapshot: unresolved-attribute

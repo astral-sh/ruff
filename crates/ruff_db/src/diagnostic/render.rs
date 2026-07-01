@@ -117,7 +117,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
                 FullRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Azure => {
-                AzureRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                AzureRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::Json => {
@@ -130,23 +130,24 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::Rdjson => {
-                rdjson::RdjsonRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                rdjson::RdjsonRenderer::new(self.resolver, self.config)
+                    .render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Pylint => {
-                PylintRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                PylintRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             #[cfg(feature = "junit")]
             DiagnosticFormat::Junit => {
-                junit::JunitRenderer::new(self.resolver, self.config.program)
+                junit::JunitRenderer::new(self.resolver, self.config)
                     .render(f, self.diagnostics)?;
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::Gitlab => {
-                gitlab::GitlabRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                gitlab::GitlabRenderer::new(self.resolver, self.config)
+                    .render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Github => {
-                GithubRenderer::new(self.resolver, self.config.program)
-                    .render(f, self.diagnostics)?;
+                GithubRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
         }
 
@@ -237,18 +238,18 @@ impl<'a> ResolvedDiagnostic<'a> {
             })
             .collect();
 
-        let id = if config.hide_severity {
-            // Either the rule code alone (e.g. `F401`), or the lint id with a colon (e.g.
-            // `invalid-syntax:`). When Ruff gets real severities, we should put the colon back in
-            // `DisplaySet::format_annotation` for both cases, but this is a small hack to improve
-            // the formatting of syntax errors for now. This should also be kept consistent with the
+        let id = if !config.preview
+            && let Some(code) = diag.secondary_code()
+        {
+            code.to_string()
+        } else if config.hide_severity {
+            // When Ruff gets real severities, we should put the colon back in
+            // `DisplaySet::format_annotation` for both cases, but this is a small hack to improve the
+            // formatting of human-readable names for now. This should also be kept consistent with the
             // concise formatting.
-            diag.secondary_code().map_or_else(
-                || format!("{id}:", id = diag.inner.id),
-                |code| code.to_string(),
-            )
+            format!("{id}:", id = diag.id())
         } else {
-            diag.secondary_code_or_id().to_string()
+            diag.id().to_string()
         };
 
         let level = if config.hide_severity {
@@ -2539,6 +2540,33 @@ watermelon
         );
     }
 
+    #[test]
+    fn diagnostics_with_equal_locations_sort_by_concise_message() {
+        let mut env = TestEnvironment::new();
+        env.add("fruits", FRUITS);
+        let mut diagnostics = [
+            env.invalid_syntax("checking mod.py")
+                .primary("fruits", "1", "1", "")
+                .build(),
+            env.invalid_syntax("checking main.py")
+                .primary("fruits", "1", "1", "")
+                .build(),
+        ];
+
+        diagnostics.sort_by(|left, right| {
+            left.rendering_sort_key(&env.db)
+                .cmp(&right.rendering_sort_key(&env.db))
+        });
+
+        assert_eq!(
+            diagnostics
+                .iter()
+                .map(Diagnostic::primary_message)
+                .collect::<Vec<_>>(),
+            ["checking main.py", "checking mod.py"]
+        );
+    }
+
     /// A small harness for setting up an environment specifically for testing
     /// diagnostic rendering.
     pub(super) struct TestEnvironment {
@@ -2563,7 +2591,7 @@ watermelon
 
         /// Set the number of contextual lines to include for each snippet
         /// in diagnostic rendering.
-        fn context(&mut self, lines: usize) {
+        pub(super) fn context(&mut self, lines: usize) {
             // Kind of annoying. I considered making `DisplayDiagnosticConfig`
             // be `Copy` (which it could be, at time of writing, 2025-03-07),
             // but it seems likely to me that it will grow non-`Copy`
@@ -2572,11 +2600,11 @@ watermelon
             self.config = config.context(lines);
         }
 
-        /// Set the "merge window" for annotations in this test.
+        /// Set the "merge window" for annotations and fix diff hunks in this test.
         ///
-        /// If two annotations have fewer than this number of lines between them,
-        /// they will be merged into a single annotation.
-        fn merge_window(&mut self, lines: usize) {
+        /// Nearby annotations or fix edits are rendered in a single source frame even when their
+        /// configured context windows would not otherwise overlap.
+        pub(super) fn merge_window(&mut self, lines: usize) {
             let config = self.config.clone();
             self.config = config.merge_window(lines);
         }

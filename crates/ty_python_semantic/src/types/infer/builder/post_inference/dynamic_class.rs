@@ -5,7 +5,9 @@ use crate::types::{
     diagnostic::{
         IncompatibleBases, report_conflicting_metaclass_from_bases, report_instance_layout_conflict,
     },
-    infer::builder::dynamic_class::report_dynamic_mro_errors,
+    infer::builder::dynamic_class::{
+        report_dynamic_mro_errors, report_inconsistent_dynamic_generic_bases,
+    },
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
 
@@ -46,6 +48,8 @@ pub(crate) fn check_dynamic_class_definition<'db>(
 
     // Check for MRO errors.
     if report_dynamic_mro_errors(context, dynamic_class, call_expr, bases) {
+        report_inconsistent_dynamic_generic_bases(context, dynamic_class, bases);
+
         // MRO succeeded, check for instance-layout-conflict.
         let mut disjoint_bases = IncompatibleBases::default();
         let bases_tuple_elts = bases.as_tuple_expr().map(|tuple| tuple.elts.as_slice());

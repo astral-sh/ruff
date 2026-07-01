@@ -12,16 +12,14 @@ D200 [*] One-line docstring should fit on one line
     | |_______^
     |
 help: Reformat to one line
-126 |         '(found 3)')
-127 | @expect('D212: Multi-line docstring summary should start at the first line')
+    |
 128 | def asdlkfasd():
     -     """
     -     Wrong.
     -     """
 129 +     """Wrong."""
 130 |
-131 |
-132 | @expect('D201: No blank lines allowed before function docstring (found 1)')
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 D200 [*] One-line docstring should fit on one line
@@ -35,16 +33,14 @@ D200 [*] One-line docstring should fit on one line
     | |_____________^
     |
 help: Reformat to one line
-594 |         '(found 3)')
-595 | @expect('D212: Multi-line docstring summary should start at the first line')
+    |
 596 | def one_liner():
     -     """
     -
     -     Wrong."""
 597 +     """Wrong."""
 598 |
-599 |
-600 | @expect('D200: One-line docstring should fit on one line with quotes '
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 D200 [*] One-line docstring should fit on one line
@@ -58,16 +54,14 @@ D200 [*] One-line docstring should fit on one line
     | |_______^
     |
 help: Reformat to one line
-603 |         '(found 3)')
-604 | @expect('D212: Multi-line docstring summary should start at the first line')
+    |
 605 | def one_liner():
     -     r"""Wrong.
     -
     -     """
 606 +     r"""Wrong."""
 607 |
-608 |
-609 | @expect('D200: One-line docstring should fit on one line with quotes '
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 D200 One-line docstring should fit on one line

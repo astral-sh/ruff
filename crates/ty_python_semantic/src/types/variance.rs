@@ -99,6 +99,17 @@ impl TypeVarVariance {
             TypeVarVariance::Contravariant | TypeVarVariance::Bivariant
         )
     }
+
+    /// Returns a human-readable name for this variance, matching the keyword
+    /// argument names used in `TypeVar(covariant=True)` / `TypeVar(contravariant=True)`.
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            TypeVarVariance::Invariant => "invariant",
+            TypeVarVariance::Covariant => "covariant",
+            TypeVarVariance::Contravariant => "contravariant",
+            TypeVarVariance::Bivariant => "bivariant",
+        }
+    }
 }
 
 impl std::iter::FromIterator<Self> for TypeVarVariance {

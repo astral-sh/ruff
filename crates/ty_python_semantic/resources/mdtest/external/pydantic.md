@@ -96,7 +96,7 @@ class User(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def validate_model_before(cls, values: dict) -> dict:
+    def validate_model_before(cls, values: dict[str, object]) -> dict[str, object]:
         reveal_type(cls)  # revealed: type[Self@validate_model_before]
         return values
 

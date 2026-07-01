@@ -19,6 +19,8 @@ use crate::docstrings::Docstring;
 /// the docstring should be placed on the non-decorated definition that contains
 /// the implementation.
 ///
+/// This rule does not apply to stub files, which don't contain implementations.
+///
 /// ## Example
 ///
 /// ```python
@@ -83,6 +85,10 @@ impl Violation for OverloadWithDocstring {
 
 /// D418
 pub(crate) fn if_needed(checker: &Checker, docstring: &Docstring) {
+    if checker.source_type.is_stub() {
+        return;
+    }
+
     let Some(function) = docstring.definition.as_function_def() else {
         return;
     };

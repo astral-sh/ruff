@@ -172,6 +172,7 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_32.pyi"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_33.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_34.pyi"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_34.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.pyi"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"))]
@@ -4488,7 +4489,7 @@ lambda: fu
     }
 
     #[test]
-    fn idiomiatic_typing_guards() {
+    fn idiomatic_typing_guards() {
         // typing.TYPE_CHECKING: python3.5.3+.
         flakes(
             r"

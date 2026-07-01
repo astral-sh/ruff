@@ -375,7 +375,8 @@ class SequenceMatcher(Generic[_T]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
         """
 
 @overload
@@ -602,7 +603,49 @@ if sys.version_info >= (3, 15):
         lineterm: str = "\n",
         *,
         color: bool = False,
-    ) -> Iterator[str]: ...
+    ) -> Iterator[str]:
+        """
+        Compare two sequences of lines; generate the delta as a unified diff.
+
+        Unified diffs are a compact way of showing line changes and a few
+        lines of context.  The number of context lines is set by 'n' which
+        defaults to three.
+
+        By default, the diff control lines (those with ---, +++, or @@) are
+        created with a trailing newline.  This is helpful so that inputs
+        created from file.readlines() result in diffs that are suitable for
+        file.writelines() since both the inputs and outputs have trailing
+        newlines.
+
+        For inputs that do not have trailing newlines, set the lineterm
+        argument to "" so that the output will be uniformly newline free.
+
+        Set 'color' to True to enable output in color, similar to
+        'git diff --color'. Even if enabled, it can be
+        controlled using environment variables such as 'NO_COLOR'.
+
+        The unidiff format normally has a header for filenames and modification
+        times.  Any or all of these may be specified using strings for
+        'fromfile', 'tofile', 'fromfiledate', and 'tofiledate'.
+        The modification times are normally expressed in the ISO 8601 format.
+
+        Example:
+
+        >>> for line in unified_diff('one two three four'.split(),
+        ...             'zero one tree four'.split(), 'Original', 'Current',
+        ...             '2005-01-26 23:30:50', '2010-04-02 10:20:52',
+        ...             lineterm=''):
+        ...     print(line)                 # doctest: +NORMALIZE_WHITESPACE
+        --- Original        2005-01-26 23:30:50
+        +++ Current         2010-04-02 10:20:52
+        @@ -1,4 +1,4 @@
+        +zero
+         one
+        -two
+        -three
+        +tree
+         four
+        """
 
 else:
     def unified_diff(
@@ -760,7 +803,7 @@ class HtmlDiff:
     make_table -- generates HTML for a single side by side table
     make_file -- generates complete HTML file with a single side by side table
 
-    See tools/scripts/diff.py for an example usage of this class.
+    See Doc/includes/diff.py for an example usage of this class.
     """
 
     def __init__(

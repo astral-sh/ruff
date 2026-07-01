@@ -107,6 +107,9 @@ pub enum ParseErrorType {
     /// An unexpected error occurred.
     OtherError(String),
 
+    /// An error specific to stringified annotations occurred.
+    StringAnnotationError(&'static str),
+
     /// An empty slice was found during parsing, e.g `data[]`.
     EmptySlice,
     /// An empty global names list was found during parsing.
@@ -135,6 +138,8 @@ pub enum ParseErrorType {
     InvalidStarredExpressionUsage,
     /// A star pattern was found outside a sequence pattern.
     InvalidStarPatternUsage,
+    /// An underscore was used as a binding target in a match pattern.
+    InvalidMatchPatternTarget,
 
     /// A parameter was found after a vararg.
     ParamAfterVarKeywordParam,
@@ -222,7 +227,8 @@ impl std::error::Error for ParseErrorType {}
 impl std::fmt::Display for ParseErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ParseErrorType::OtherError(msg) => write!(f, "{msg}"),
+            ParseErrorType::OtherError(msg) => f.write_str(msg),
+            ParseErrorType::StringAnnotationError(msg) => f.write_str(msg),
             ParseErrorType::ExpectedToken { found, expected } => {
                 write!(f, "Expected {expected}, found {found}")
             }
@@ -298,6 +304,7 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::InvalidStarPatternUsage => {
                 f.write_str("Star pattern cannot be used here")
             }
+            ParseErrorType::InvalidMatchPatternTarget => f.write_str("cannot use '_' as a target"),
             ParseErrorType::ExpectedRealNumber => {
                 f.write_str("Expected a real number in complex literal pattern")
             }

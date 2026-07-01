@@ -1,7 +1,6 @@
-use std::borrow::Cow;
-
 use lsp_server::ErrorCode;
-use lsp_types::{self as types, request as req};
+use lsp_types::CodeActionResolveRequest;
+use lsp_types::{self as types};
 
 use ruff_linter::codes::Rule;
 
@@ -12,25 +11,44 @@ use crate::server::Result;
 use crate::server::SupportedCodeAction;
 use crate::server::api::LSPResult;
 use crate::session::Client;
-use crate::session::{DocumentQuery, DocumentSnapshot, ResolvedClientCapabilities};
+use crate::session::{DocumentQuery, DocumentSnapshot, ResolvedClientCapabilities, Session};
 
 pub(crate) struct CodeActionResolve;
 
 impl super::RequestHandler for CodeActionResolve {
-    type RequestType = req::CodeActionResolveRequest;
+    type RequestType = CodeActionResolveRequest;
 }
 
-impl super::BackgroundDocumentRequestHandler for CodeActionResolve {
-    fn document_url(params: &types::CodeAction) -> Cow<'_, types::Url> {
-        let uri: lsp_types::Url = serde_json::from_value(params.data.clone().unwrap_or_default())
-            .expect("code actions should have a URI in their data fields");
-        Cow::Owned(uri)
+impl super::BackgroundRequestHandler for CodeActionResolve {
+    type Snapshot = std::result::Result<DocumentSnapshot, String>;
+
+    fn snapshot(session: &Session, action: &types::CodeAction) -> Self::Snapshot {
+        let data = action
+            .data
+            .clone()
+            .ok_or_else(|| "it doesn't contain Ruff's document URI payload".to_string())?;
+
+        let uri: lsp_types::Uri = serde_json::from_value(data)
+            .map_err(|err| format!("its Ruff document URI payload is invalid: {err}"))?;
+
+        session
+            .take_snapshot(uri.clone())
+            .ok_or_else(|| format!("document `{uri}` isn't open"))
     }
+
     fn run_with_snapshot(
-        snapshot: DocumentSnapshot,
+        snapshot: Self::Snapshot,
         _client: &Client,
         mut action: types::CodeAction,
     ) -> Result<types::CodeAction> {
+        let snapshot = match snapshot {
+            Ok(snapshot) => snapshot,
+            Err(err) => {
+                tracing::warn!("Returning code action unchanged because {err}.");
+                return Ok(action);
+            }
+        };
+
         let query = snapshot.query();
 
         let code_actions = SupportedCodeAction::from_kind(

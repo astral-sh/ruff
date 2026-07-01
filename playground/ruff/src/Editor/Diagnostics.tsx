@@ -1,7 +1,14 @@
-import { Diagnostic } from "ruff_wasm";
+import type { Diagnostic, DiagnosticLocation } from "ruff_wasm";
 import classNames from "classnames";
-import { Theme } from "shared";
-import { useMemo } from "react";
+import {
+  type DiagnosticDetail,
+  type DiagnosticDetailLocation,
+  DiagnosticDetailItem,
+  secondaryAnnotationsWithMessages,
+  Theme,
+} from "shared";
+import { useCallback, useMemo } from "react";
+import { PLAYGROUND_FILE_PATH } from "./SourceEditor";
 
 interface Props {
   diagnostics: Diagnostic[];
@@ -31,7 +38,7 @@ export default function Diagnostics({
   return (
     <div
       className={classNames(
-        "flex grow flex-col overflow-hidden",
+        "flex h-full min-h-0 flex-col overflow-hidden",
         theme === "dark" ? "text-white" : null,
       )}
     >
@@ -44,7 +51,7 @@ export default function Diagnostics({
         Diagnostics ({diagnostics.length})
       </div>
 
-      <div className="flex grow p-2 overflow-hidden">
+      <div className="flex min-h-0 grow overflow-hidden p-2">
         <Items diagnostics={diagnostics} onGoTo={onGoTo} />
       </div>
     </div>
@@ -58,6 +65,13 @@ function Items({
   diagnostics: Array<Diagnostic>;
   onGoTo(line: number, column: number): void;
 }) {
+  const handleDetailGoTo = useCallback(
+    (location: DiagnosticDetailLocation) => {
+      onGoTo(location.startLineNumber, location.startColumn);
+    },
+    [onGoTo],
+  );
+
   if (diagnostics.length === 0) {
     return (
       <div className={"flex flex-auto flex-col justify-center  items-center"}>
@@ -69,10 +83,13 @@ function Items({
   const uniqueIds: Map<string, number> = new Map();
 
   return (
-    <ul className="space-y-0.5 grow overflow-y-scroll">
+    <ul className="space-y-0.5 grow overflow-y-auto">
       {diagnostics.map((diagnostic) => {
         const row = diagnostic.start_location.row;
         const column = diagnostic.start_location.column;
+        const secondaryAnnotations = secondaryAnnotationsWithMessages(
+          diagnostic.annotations,
+        );
         const mostlyUniqueId = `${row}:${column}-${diagnostic.code}`;
 
         const disambiguator = uniqueIds.get(mostlyUniqueId) ?? 0;
@@ -90,9 +107,64 @@ function Items({
                 Col {column}]
               </span>
             </button>
+            {/* Some subdiagnostics use whitespace to align types in columns, so
+                we use a monospace font. See
+                https://github.com/astral-sh/ruff/pull/25860#pullrequestreview-4475222305 */}
+            {secondaryAnnotations.length > 0 ||
+            diagnostic.subDiagnostics.length > 0 ? (
+              <ul className="pl-3 font-mono text-gray-500 whitespace-pre-wrap">
+                {secondaryAnnotations.map((annotation, index) => (
+                  <li key={`annotation-${index}`}>
+                    <DiagnosticDetailItem
+                      item={toDisplayDiagnosticDetail(annotation)}
+                      onGoTo={
+                        annotation.location?.path === PLAYGROUND_FILE_PATH
+                          ? handleDetailGoTo
+                          : undefined
+                      }
+                    />
+                  </li>
+                ))}
+                {diagnostic.subDiagnostics.map((subDiagnostic, index) => (
+                  <li key={`sub-diagnostic-${index}`}>
+                    <DiagnosticDetailItem
+                      item={toDisplayDiagnosticDetail(subDiagnostic)}
+                      onGoTo={
+                        subDiagnostic.location?.path === PLAYGROUND_FILE_PATH
+                          ? handleDetailGoTo
+                          : undefined
+                      }
+                    />
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </li>
         );
       })}
     </ul>
   );
+}
+
+function toDisplayDiagnosticDetail(item: {
+  message: string;
+  severity?: string;
+  location: DiagnosticLocation | null;
+}): DiagnosticDetail {
+  const location = item.location;
+
+  return {
+    message: item.message,
+    severity: item.severity,
+    location:
+      location == null
+        ? null
+        : {
+            path: location.path,
+            startLineNumber: location.start_location.row,
+            startColumn: location.start_location.column,
+            endLineNumber: location.end_location.row,
+            endColumn: location.end_location.column,
+          },
+  };
 }

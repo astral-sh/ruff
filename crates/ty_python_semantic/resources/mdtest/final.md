@@ -35,9 +35,10 @@ class H(
 <!-- snapshot-diagnostics -->
 
 ```pyi
-from typing_extensions import final, Callable, TypeVar
+from typing_extensions import Any, Callable, TypeVar, final
 
-def lossy_decorator(fn: Callable) -> Callable: ...
+# Decorator intentionally erases the wrapped signature.
+def lossy_decorator(fn: Callable[..., Any]) -> Callable[..., Any]: ...
 
 class Parent:
     @final
@@ -85,7 +86,7 @@ class Child(Parent):
     @property
     def my_property3(self) -> int: ...  # error: [override-of-final-method]
     @my_property3.deleter
-    def my_proeprty3(self) -> None: ...
+    def my_property3(self) -> None: ...
     @classmethod
     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
     @staticmethod
@@ -1062,7 +1063,7 @@ class ConcreteOrdered(AbstractOrdered): ...  # fine
 # exists in the MRO is abstract!
 @final
 @total_ordering
-class AlsoConreteOrdered(AbstractOrdered):  # error: [abstract-method-in-final-class]
+class AlsoConcreteOrdered(AbstractOrdered):  # error: [abstract-method-in-final-class]
     def __gt__(self, other): ...
 ```
 

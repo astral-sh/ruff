@@ -293,6 +293,7 @@ export const DEFAULT_SETTINGS = JSON.stringify(
       "python-version": "3.14",
     },
     rules: {
+      "experimental-syntax": "ignore",
       "undefined-reveal": "ignore",
     },
   },

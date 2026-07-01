@@ -10,6 +10,7 @@ use crate::{
         SubclassOfType, Type,
         class::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, InstanceMemberResult, MroLookup,
+            typed_dict::typed_dict_fallback_class_member,
         },
         definition_expression_type, extract_fixed_length_iterable_element_types,
         member::Member,
@@ -103,6 +104,42 @@ pub enum DynamicClassAnchor<'db> {
         offset: u32,
         explicit_bases: Box<[Type<'db>]>,
     },
+}
+
+impl<'db> DynamicClassAnchor<'db> {
+    fn recursive_type_normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            Self::Definition(definition) => Some(Self::Definition(*definition)),
+            Self::ScopeOffset {
+                scope,
+                offset,
+                explicit_bases,
+            } => {
+                let explicit_bases = explicit_bases
+                    .iter()
+                    .map(|base| {
+                        let base = base.recursive_type_normalized_impl(db, div, true);
+                        if nested {
+                            base
+                        } else {
+                            Some(base.unwrap_or(div))
+                        }
+                    })
+                    .collect::<Option<Box<_>>>()?;
+
+                Some(Self::ScopeOffset {
+                    scope: *scope,
+                    offset: *offset,
+                    explicit_bases,
+                })
+            }
+        }
+    }
 }
 
 impl get_size2::GetSize for DynamicClassLiteral<'_> {}
@@ -359,7 +396,7 @@ impl<'db> DynamicClassLiteral<'db> {
     ) -> PlaceAndQualifiers<'db> {
         // Check if this dynamic class is dataclass-like (via dataclass_transform inheritance).
         if matches!(
-            CodeGeneratorKind::from_class(db, self.into(), None),
+            CodeGeneratorKind::from_class(db, self.into()),
             Some(CodeGeneratorKind::DataclassLike(_))
         ) {
             if name == "__dataclass_fields__" {
@@ -385,12 +422,8 @@ impl<'db> DynamicClassLiteral<'db> {
 
         match result {
             ClassMemberResult::Done(result) => result.finalize(db),
-            ClassMemberResult::TypedDict => {
-                // Simplified `TypedDict` handling without type mapping.
-                KnownClass::TypedDictFallback
-                    .to_class_literal(db)
-                    .find_name_in_mro_with_policy(db, name, policy)
-                    .expect("Will return Some() when called on class literal")
+            ClassMemberResult::TypedDict(module) => {
+                typed_dict_fallback_class_member(db, module, policy, name)
             }
         }
     }
@@ -412,10 +445,10 @@ impl<'db> DynamicClassLiteral<'db> {
 
     /// Look up an instance member defined directly on this class (not inherited).
     ///
-    /// For dynamic classes, instance members are the same as class members
-    /// since they come from the namespace dict.
-    pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
-        self.own_class_member(db, name)
+    /// Namespace entries are class attributes, not values stored directly on instances.
+    #[expect(clippy::unused_self)]
+    pub(super) fn own_instance_member(self, _db: &'db dyn Db, _name: &str) -> Member<'db> {
+        Member::unbound()
     }
 
     /// Try to compute the MRO for this dynamic class.
@@ -488,12 +521,48 @@ impl<'db> DynamicClassLiteral<'db> {
     ) -> Self {
         Self::new(
             db,
-            self.name(db).clone(),
-            self.anchor(db).clone(),
+            self.name(db),
+            self.anchor(db),
             self.members(db),
             self.has_dynamic_namespace(db),
             dataclass_params,
         )
+    }
+}
+
+impl<'db> DynamicClassLiteral<'db> {
+    /// Normalize types that are part of this dynamic class's interned identity.
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        let anchor = self
+            .anchor(db)
+            .recursive_type_normalized_impl(db, div, nested)?;
+        let members = self
+            .members(db)
+            .iter()
+            .map(|(name, ty)| {
+                let ty = ty.recursive_type_normalized_impl(db, div, true);
+                let ty = if nested { ty? } else { ty.unwrap_or(div) };
+                Some((name.clone(), ty))
+            })
+            .collect::<Option<Box<_>>>()?;
+        let dataclass_params = match self.dataclass_params(db) {
+            Some(params) => Some(params.recursive_type_normalized_impl(db, div, nested)?),
+            None => None,
+        };
+
+        Some(Self::new(
+            db,
+            self.name(db),
+            anchor,
+            members,
+            self.has_dynamic_namespace(db),
+            dataclass_params,
+        ))
     }
 }
 

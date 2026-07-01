@@ -92,9 +92,12 @@ print(1)
 
 
 # Regression tests for https://github.com/astral-sh/ruff/issues/19713,
-# https://github.com/astral-sh/ruff/issues/24186
+# https://github.com/astral-sh/ruff/issues/24186,
+# https://github.com/astral-sh/ruff/issues/25535
 
 # ty: ignore
+# ruff: ignore[ARG001]
+# ruff: file-ignore[ARG001]
 
 # mypy: ignore-errors
 # pyright: ignore-errors

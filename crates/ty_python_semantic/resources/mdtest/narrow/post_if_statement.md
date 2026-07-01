@@ -70,7 +70,7 @@ def _(x: A | B | C):
 
     # Only the if-branch (A) and elif-branch (B) flow through.
     # The else-branch returned, so its narrowing doesn't participate.
-    reveal_type(x)  # revealed: B | (A & ~B)
+    reveal_type(x)  # revealed: B | A
 ```
 
 ## Narrowing is preserved with multiple terminal branches
@@ -92,7 +92,7 @@ def _(x: A | B | C | D):
         return
 
     # Only the elif-B and elif-C branches flow through.
-    reveal_type(x)  # revealed: (C & ~A) | (B & ~A & ~C)
+    reveal_type(x)  # revealed: (C & ~A & ~B) | (B & ~A)
 ```
 
 ## Opaque branch predicates should not manufacture narrowing
@@ -158,6 +158,31 @@ def _(val: int | None):
     if val is None:
         sys.exit()
     reveal_type(val)  # revealed: int
+```
+
+Narrowing from the terminal branch is also preserved when deciding whether a later overloaded call
+returns:
+
+```py
+from typing import Literal, overload
+from typing_extensions import Never
+
+def abort() -> Never:
+    raise RuntimeError
+
+@overload
+def terminal(value: Literal[0]) -> Never: ...
+@overload
+def terminal(value: Literal[1]) -> None: ...
+def terminal(value: Literal[0, 1]) -> None:
+    if value == 0:
+        raise RuntimeError
+
+def _(value: Literal[0, 1]) -> None:
+    if value == 1:
+        abort()
+    terminal(value)
+    return "unreachable"
 ```
 
 This also works when the `NoReturn` function is called in the else branch:

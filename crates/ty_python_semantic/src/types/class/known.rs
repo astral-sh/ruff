@@ -41,6 +41,7 @@ pub enum KnownClass {
     Object,
     Bytes,
     Bytearray,
+    Memoryview,
     Type,
     Int,
     Float,
@@ -48,6 +49,7 @@ pub enum KnownClass {
     Str,
     List,
     Tuple,
+    Range,
     Set,
     FrozenSet,
     Dict,
@@ -55,6 +57,7 @@ pub enum KnownClass {
     Property,
     BaseException,
     Exception,
+    Warning,
     BaseExceptionGroup,
     ExceptionGroup,
     Staticmethod,
@@ -63,6 +66,7 @@ pub enum KnownClass {
     NotImplementedError,
     // enum
     Enum,
+    EnumProperty,
     EnumType,
     Auto,
     Member,
@@ -109,6 +113,7 @@ pub enum KnownClass {
     TypeAliasType,
     NoDefaultType,
     NewType,
+    Hashable,
     SupportsIndex,
     Iterable,
     Iterator,
@@ -117,6 +122,7 @@ pub enum KnownClass {
     Mapping,
     // typing_extensions
     ExtensionsTypeVar, // must be distinct from typing.TypeVar, backports new features
+    ExtensionTypedDictFallback,
     Sentinel,
     // Collections
     ChainMap,
@@ -143,6 +149,10 @@ pub enum KnownClass {
     ConstraintSet,
     GenericContext,
     Specialization,
+    TyExtensionsAsyncIterable,
+    TyExtensionsAsyncIterator,
+    TyExtensionsIterable,
+    TyExtensionsIterator,
 }
 
 impl KnownClass {
@@ -197,6 +207,7 @@ impl KnownClass {
 
             Self::BaseException
             | Self::Exception
+            | Self::Warning
             | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Object
@@ -208,12 +219,15 @@ impl KnownClass {
             | Self::GenericAlias
             | Self::NewType
             | Self::StdlibAlias
+            | Self::Hashable
             | Self::SupportsIndex
             | Self::Set
             | Self::Int
             | Self::Type
             | Self::Bytes
             | Self::Bytearray
+            | Self::Memoryview
+            | Self::Range
             | Self::FrozenSet
             | Self::Property
             | Self::SpecialForm
@@ -226,6 +240,7 @@ impl KnownClass {
             | Self::Deque
             | Self::Float
             | Self::Enum
+            | Self::EnumProperty
             | Self::EnumType
             | Self::Auto
             | Self::Member
@@ -236,7 +251,11 @@ impl KnownClass {
             | Self::IntFlag
             | Self::ABCMeta
             | Self::Iterable
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
             | Self::Iterator
+            | Self::TyExtensionsIterator
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
@@ -259,6 +278,7 @@ impl KnownClass {
             | Self::Specialization
             | Self::ProtocolMeta
             | Self::FunctoolsPartial
+            | Self::ExtensionTypedDictFallback
             | Self::TypedDictFallback => Some(Truthiness::Ambiguous),
 
             Self::Tuple => None,
@@ -273,6 +293,8 @@ impl KnownClass {
             | KnownClass::Object
             | KnownClass::Bytes
             | KnownClass::Bytearray
+            | KnownClass::Memoryview
+            | KnownClass::Range
             | KnownClass::Type
             | KnownClass::Int
             | KnownClass::Float
@@ -288,6 +310,7 @@ impl KnownClass {
             | KnownClass::BaseException
             | KnownClass::NotImplementedError
             | KnownClass::Exception
+            | KnownClass::Warning
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
             | KnownClass::Staticmethod
@@ -298,6 +321,7 @@ impl KnownClass {
             | KnownClass::Deprecated
             | KnownClass::Super
             | KnownClass::Enum
+            | KnownClass::EnumProperty
             | KnownClass::EnumType
             | KnownClass::Auto
             | KnownClass::Member
@@ -331,9 +355,14 @@ impl KnownClass {
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
+            | KnownClass::Hashable
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
+            | KnownClass::TyExtensionsIterable
             | KnownClass::Iterator
+            | KnownClass::TyExtensionsIterator
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
@@ -353,6 +382,7 @@ impl KnownClass {
             | KnownClass::GenericContext
             | KnownClass::Specialization
             | KnownClass::TypedDictFallback
+            | KnownClass::ExtensionTypedDictFallback
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
             | KnownClass::Template
@@ -368,6 +398,8 @@ impl KnownClass {
             | KnownClass::Object
             | KnownClass::Bytes
             | KnownClass::Bytearray
+            | KnownClass::Memoryview
+            | KnownClass::Range
             | KnownClass::Type
             | KnownClass::Int
             | KnownClass::Float
@@ -382,6 +414,7 @@ impl KnownClass {
             | KnownClass::Property
             | KnownClass::BaseException
             | KnownClass::Exception
+            | KnownClass::Warning
             | KnownClass::NotImplementedError
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
@@ -393,6 +426,7 @@ impl KnownClass {
             | KnownClass::Deprecated
             | KnownClass::Super
             | KnownClass::Enum
+            | KnownClass::EnumProperty
             | KnownClass::EnumType
             | KnownClass::Auto
             | KnownClass::Member
@@ -426,9 +460,14 @@ impl KnownClass {
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
+            | KnownClass::Hashable
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
+            | KnownClass::TyExtensionsIterable
             | KnownClass::Iterator
+            | KnownClass::TyExtensionsIterator
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
@@ -448,6 +487,7 @@ impl KnownClass {
             | KnownClass::GenericContext
             | KnownClass::Specialization
             | KnownClass::TypedDictFallback
+            | KnownClass::ExtensionTypedDictFallback
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
             | KnownClass::Template
@@ -464,6 +504,8 @@ impl KnownClass {
             | KnownClass::Object
             | KnownClass::Bytes
             | KnownClass::Bytearray
+            | KnownClass::Memoryview
+            | KnownClass::Range
             | KnownClass::Type
             | KnownClass::Int
             | KnownClass::Float
@@ -477,6 +519,7 @@ impl KnownClass {
             | KnownClass::Property
             | KnownClass::BaseException
             | KnownClass::Exception
+            | KnownClass::Warning
             | KnownClass::NotImplementedError
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
@@ -488,6 +531,7 @@ impl KnownClass {
             | KnownClass::Deprecated
             | KnownClass::Super
             | KnownClass::Enum
+            | KnownClass::EnumProperty
             | KnownClass::EnumType
             | KnownClass::Auto
             | KnownClass::Member
@@ -521,9 +565,14 @@ impl KnownClass {
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
+            | KnownClass::Hashable
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
+            | KnownClass::TyExtensionsIterable
             | KnownClass::Iterator
+            | KnownClass::TyExtensionsIterator
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
@@ -537,6 +586,7 @@ impl KnownClass {
             | KnownClass::Field
             | KnownClass::KwOnly
             | KnownClass::TypedDictFallback
+            | KnownClass::ExtensionTypedDictFallback
             | KnownClass::NamedTupleLike
             | KnownClass::NamedTupleFallback
             | KnownClass::ConstraintSet
@@ -564,9 +614,14 @@ impl KnownClass {
     /// 2. It's probably more performant.
     pub(crate) const fn is_protocol(self) -> bool {
         match self {
-            Self::SupportsIndex
+            Self::Hashable
+            | Self::SupportsIndex
             | Self::Iterable
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
             | Self::Iterator
+            | Self::TyExtensionsIterator
             | Self::AsyncIterator
             | Self::Awaitable
             | Self::NamedTupleLike
@@ -577,6 +632,8 @@ impl KnownClass {
             | Self::Object
             | Self::Bytes
             | Self::Bytearray
+            | Self::Memoryview
+            | Self::Range
             | Self::Tuple
             | Self::Int
             | Self::Float
@@ -592,6 +649,7 @@ impl KnownClass {
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Exception
+            | Self::Warning
             | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Staticmethod
@@ -625,6 +683,7 @@ impl KnownClass {
             | Self::Deque
             | Self::OrderedDict
             | Self::Enum
+            | Self::EnumProperty
             | Self::EnumType
             | Self::Auto
             | Self::Member
@@ -647,6 +706,7 @@ impl KnownClass {
             | Self::GenericContext
             | Self::Specialization
             | Self::TypedDictFallback
+            | Self::ExtensionTypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
             | Self::Template
@@ -668,6 +728,8 @@ impl KnownClass {
             | KnownClass::Object
             | KnownClass::Bytes
             | KnownClass::Bytearray
+            | KnownClass::Memoryview
+            | KnownClass::Range
             | KnownClass::Type
             | KnownClass::Int
             | KnownClass::Float
@@ -682,6 +744,7 @@ impl KnownClass {
             | KnownClass::Property
             | KnownClass::BaseException
             | KnownClass::Exception
+            | KnownClass::Warning
             | KnownClass::NotImplementedError
             | KnownClass::BaseExceptionGroup
             | KnownClass::ExceptionGroup
@@ -689,6 +752,7 @@ impl KnownClass {
             | KnownClass::Classmethod
             | KnownClass::Super
             | KnownClass::Enum
+            | KnownClass::EnumProperty
             | KnownClass::EnumType
             | KnownClass::Auto
             | KnownClass::Member
@@ -730,9 +794,14 @@ impl KnownClass {
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
             | KnownClass::NewType
+            | KnownClass::Hashable
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
+            | KnownClass::TyExtensionsIterable
             | KnownClass::Iterator
+            | KnownClass::TyExtensionsIterator
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
@@ -751,7 +820,9 @@ impl KnownClass {
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
             | KnownClass::Specialization => false,
-            KnownClass::NamedTupleFallback | KnownClass::TypedDictFallback => true,
+            KnownClass::NamedTupleFallback
+            | KnownClass::TypedDictFallback
+            | KnownClass::ExtensionTypedDictFallback => true,
         }
     }
 
@@ -761,7 +832,9 @@ impl KnownClass {
             Self::Object => "object",
             Self::Bytes => "bytes",
             Self::Bytearray => "bytearray",
+            Self::Memoryview => "memoryview",
             Self::Tuple => "tuple",
+            Self::Range => "range",
             Self::Int => "int",
             Self::Float => "float",
             Self::Complex => "complex",
@@ -776,6 +849,7 @@ impl KnownClass {
             Self::BaseException => "BaseException",
             Self::BaseExceptionGroup => "BaseExceptionGroup",
             Self::Exception => "Exception",
+            Self::Warning => "Warning",
             Self::NotImplementedError => "NotImplementedError",
             Self::ExceptionGroup => "ExceptionGroup",
             Self::Staticmethod => "staticmethod",
@@ -804,10 +878,11 @@ impl KnownClass {
             Self::ParamSpecArgs => "ParamSpecArgs",
             Self::ParamSpecKwargs => "ParamSpecKwargs",
             Self::TypeVarTuple => "TypeVarTuple",
-            Self::Sentinel => "Sentinel",
+            Self::Sentinel => "sentinel",
             Self::TypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
             Self::NewType => "NewType",
+            Self::Hashable => "Hashable",
             Self::SupportsIndex => "SupportsIndex",
             Self::ChainMap => "ChainMap",
             Self::Counter => "Counter",
@@ -815,6 +890,7 @@ impl KnownClass {
             Self::Deque => "deque",
             Self::OrderedDict => "OrderedDict",
             Self::Enum => "Enum",
+            Self::EnumProperty => "property",
             Self::EnumType => {
                 if Program::get(db).python_version(db) >= PythonVersion::PY311 {
                     "EnumType"
@@ -832,7 +908,11 @@ impl KnownClass {
             Self::ABCMeta => "ABCMeta",
             Self::Super => "super",
             Self::Iterable => "Iterable",
+            Self::TyExtensionsAsyncIterable => "AsyncIterable",
+            Self::TyExtensionsAsyncIterator => "AsyncIterator",
+            Self::TyExtensionsIterable => "Iterable",
             Self::Iterator => "Iterator",
+            Self::TyExtensionsIterator => "Iterator",
             Self::AsyncIterator => "AsyncIterator",
             Self::Sequence => "Sequence",
             Self::Mapping => "Mapping",
@@ -854,6 +934,7 @@ impl KnownClass {
             Self::GenericContext => "GenericContext",
             Self::Specialization => "Specialization",
             Self::TypedDictFallback => "TypedDictFallback",
+            Self::ExtensionTypedDictFallback => "_TypedDict",
             Self::Template => "Template",
             Self::Path => "Path",
             Self::FunctoolsPartial => "partial",
@@ -1118,6 +1199,8 @@ impl KnownClass {
             | Self::Object
             | Self::Bytes
             | Self::Bytearray
+            | Self::Memoryview
+            | Self::Range
             | Self::Type
             | Self::Int
             | Self::Float
@@ -1131,6 +1214,7 @@ impl KnownClass {
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Exception
+            | Self::Warning
             | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Staticmethod
@@ -1141,6 +1225,7 @@ impl KnownClass {
             Self::VersionInfo => KnownModule::Sys,
             Self::ABCMeta => KnownModule::Abc,
             Self::Enum
+            | Self::EnumProperty
             | Self::EnumType
             | Self::Auto
             | Self::Member
@@ -1176,16 +1261,24 @@ impl KnownClass {
             | Self::Mapping
             | Self::ProtocolMeta
             | Self::ParamSpec
+            | Self::Hashable
             | Self::SupportsIndex => KnownModule::Typing,
             Self::TypeAliasType
             | Self::ExtensionsTypeVar
             | Self::TypeVarTuple
-            | Self::Sentinel
             | Self::ExtensionsParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::Deprecated
+            | Self::ExtensionTypedDictFallback
             | Self::NewType => KnownModule::TypingExtensions,
+            Self::Sentinel => {
+                if Program::get(db).python_version(db) >= PythonVersion::PY315 {
+                    KnownModule::Builtins
+                } else {
+                    KnownModule::TypingExtensions
+                }
+            }
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
 
@@ -1208,7 +1301,11 @@ impl KnownClass {
             Self::NamedTupleLike
             | Self::ConstraintSet
             | Self::GenericContext
-            | Self::Specialization => KnownModule::TyExtensions,
+            | Self::Specialization
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
+            | Self::TyExtensionsIterator => KnownModule::TyExtensions,
             Self::Template => KnownModule::Templatelib,
             Self::Path => KnownModule::Pathlib,
             Self::FunctoolsPartial => KnownModule::Functools,
@@ -1222,7 +1319,6 @@ impl KnownClass {
         match self {
             Self::NoneType
             | Self::NoDefaultType
-            | Self::VersionInfo
             | Self::EllipsisType
             | Self::NotImplementedType => Some(true),
 
@@ -1230,6 +1326,8 @@ impl KnownClass {
             | Self::Object
             | Self::Bytes
             | Self::Bytearray
+            | Self::Memoryview
+            | Self::Range
             | Self::Type
             | Self::Int
             | Self::Float
@@ -1244,6 +1342,7 @@ impl KnownClass {
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Exception
+            | Self::Warning
             | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Staticmethod
@@ -1267,6 +1366,8 @@ impl KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::OrderedDict
+            | Self::VersionInfo
+            | Self::Hashable
             | Self::SupportsIndex
             | Self::StdlibAlias
             | Self::TypeAliasType
@@ -1279,6 +1380,7 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::Sentinel
             | Self::Enum
+            | Self::EnumProperty
             | Self::EnumType
             | Self::Auto
             | Self::Member
@@ -1293,7 +1395,11 @@ impl KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::Iterable
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
             | Self::Iterator
+            | Self::TyExtensionsIterator
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
@@ -1303,6 +1409,7 @@ impl KnownClass {
             | Self::GenericContext
             | Self::Specialization
             | Self::TypedDictFallback
+            | Self::ExtensionTypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
             | Self::Template
@@ -1322,13 +1429,14 @@ impl KnownClass {
             Self::NoneType
             | Self::EllipsisType
             | Self::NoDefaultType
-            | Self::VersionInfo
             | Self::NotImplementedType => true,
 
             Self::Bool
             | Self::Object
             | Self::Bytes
             | Self::Bytearray
+            | Self::Memoryview
+            | Self::Range
             | Self::Tuple
             | Self::Int
             | Self::Float
@@ -1338,6 +1446,7 @@ impl KnownClass {
             | Self::FrozenSet
             | Self::Dict
             | Self::List
+            | Self::VersionInfo
             | Self::Type
             | Self::Slice
             | Self::Property
@@ -1357,10 +1466,12 @@ impl KnownClass {
             | Self::Deque
             | Self::OrderedDict
             | Self::StdlibAlias
+            | Self::Hashable
             | Self::SupportsIndex
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Exception
+            | Self::Warning
             | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::Staticmethod
@@ -1379,6 +1490,7 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::Sentinel
             | Self::Enum
+            | Self::EnumProperty
             | Self::EnumType
             | Self::Auto
             | Self::Member
@@ -1394,7 +1506,11 @@ impl KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::Iterable
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
             | Self::Iterator
+            | Self::TyExtensionsIterator
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
@@ -1404,6 +1520,7 @@ impl KnownClass {
             | Self::GenericContext
             | Self::Specialization
             | Self::TypedDictFallback
+            | Self::ExtensionTypedDictFallback
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
             | Self::Template
@@ -1424,7 +1541,9 @@ impl KnownClass {
             "object" => &[Self::Object],
             "bytes" => &[Self::Bytes],
             "bytearray" => &[Self::Bytearray],
+            "memoryview" => &[Self::Memoryview],
             "tuple" => &[Self::Tuple],
+            "range" => &[Self::Range],
             "type" => &[Self::Type],
             "int" => &[Self::Int],
             "float" => &[Self::Float],
@@ -1435,10 +1554,11 @@ impl KnownClass {
             "dict" => &[Self::Dict],
             "list" => &[Self::List],
             "slice" => &[Self::Slice],
-            "property" => &[Self::Property],
+            "property" => &[Self::Property, Self::EnumProperty],
             "BaseException" => &[Self::BaseException],
             "BaseExceptionGroup" => &[Self::BaseExceptionGroup],
             "Exception" => &[Self::Exception],
+            "Warning" => &[Self::Warning],
             "NotImplementedError" => &[Self::NotImplementedError],
             "ExceptionGroup" => &[Self::ExceptionGroup],
             "staticmethod" => &[Self::Staticmethod],
@@ -1462,16 +1582,17 @@ impl KnownClass {
             "NewType" => &[Self::NewType],
             "TypeAliasType" => &[Self::TypeAliasType],
             "TypeVar" => &[Self::TypeVar, Self::ExtensionsTypeVar],
-            "Iterable" => &[Self::Iterable],
-            "Iterator" => &[Self::Iterator],
-            "AsyncIterator" => &[Self::AsyncIterator],
+            "Iterable" => &[Self::Iterable, Self::TyExtensionsIterable],
+            "Iterator" => &[Self::Iterator, Self::TyExtensionsIterator],
+            "AsyncIterable" => &[Self::TyExtensionsAsyncIterable],
+            "AsyncIterator" => &[Self::AsyncIterator, Self::TyExtensionsAsyncIterator],
             "Sequence" => &[Self::Sequence],
             "Mapping" => &[Self::Mapping],
             "ParamSpec" => &[Self::ParamSpec, Self::ExtensionsParamSpec],
             "ParamSpecArgs" => &[Self::ParamSpecArgs],
             "ParamSpecKwargs" => &[Self::ParamSpecKwargs],
             "TypeVarTuple" => &[Self::TypeVarTuple],
-            "Sentinel" => &[Self::Sentinel],
+            "sentinel" => &[Self::Sentinel],
             "ChainMap" => &[Self::ChainMap],
             "Counter" => &[Self::Counter],
             "defaultdict" => &[Self::DefaultDict],
@@ -1480,6 +1601,7 @@ impl KnownClass {
             "_Alias" => &[Self::StdlibAlias],
             "_SpecialForm" => &[Self::SpecialForm],
             "_NoDefaultType" => &[Self::NoDefaultType],
+            "Hashable" => &[Self::Hashable],
             "SupportsIndex" => &[Self::SupportsIndex],
             "Enum" => &[Self::Enum],
             "EnumMeta" => &[Self::EnumType],
@@ -1512,6 +1634,7 @@ impl KnownClass {
             "Path" => &[Self::Path],
             "partial" => &[Self::FunctoolsPartial],
             "_ProtocolMeta" => &[Self::ProtocolMeta],
+            "_TypedDict" => &[Self::ExtensionTypedDictFallback],
             _ => return None,
         };
 
@@ -1530,6 +1653,8 @@ impl KnownClass {
             | Self::Object
             | Self::Bytes
             | Self::Bytearray
+            | Self::Memoryview
+            | Self::Range
             | Self::Type
             | Self::Int
             | Self::Float
@@ -1553,6 +1678,7 @@ impl KnownClass {
             | Self::VersionInfo
             | Self::BaseException
             | Self::Exception
+            | Self::Warning
             | Self::NotImplementedError
             | Self::ExceptionGroup
             | Self::EllipsisType
@@ -1563,6 +1689,7 @@ impl KnownClass {
             | Self::MethodType
             | Self::MethodWrapperType
             | Self::Enum
+            | Self::EnumProperty
             | Self::EnumType
             | Self::Auto
             | Self::Member
@@ -1584,6 +1711,7 @@ impl KnownClass {
             | Self::KwOnly
             | Self::NamedTupleFallback
             | Self::TypedDictFallback
+            | Self::ExtensionTypedDictFallback
             | Self::TypeVar
             | Self::ExtensionsTypeVar
             | Self::ParamSpec
@@ -1593,6 +1721,10 @@ impl KnownClass {
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
+            | Self::TyExtensionsIterator
             | Self::Awaitable
             | Self::Generator
             | Self::AsyncGenerator
@@ -1603,6 +1735,7 @@ impl KnownClass {
             Self::SpecialForm
             | Self::TypeAliasType
             | Self::NoDefaultType
+            | Self::Hashable
             | Self::SupportsIndex
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
@@ -1648,7 +1781,7 @@ impl KnownClass {
                         };
 
                         // Check if the enclosing class is a `NamedTuple`, which forbids the use of `super()`.
-                        if CodeGeneratorKind::NamedTuple.matches(db, enclosing_class.into(), None) {
+                        if CodeGeneratorKind::NamedTuple.matches(db, enclosing_class.into()) {
                             if let Some(builder) = context
                                 .report_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD, call_expression)
                             {
@@ -1702,11 +1835,7 @@ impl KnownClass {
                     [Some(pivot_class_type), Some(owner_type)] => {
                         // Check if the enclosing class is a `NamedTuple`, which forbids the use of `super()`.
                         if let Some(enclosing_class) = nearest_enclosing_class(db, index, scope) {
-                            if CodeGeneratorKind::NamedTuple.matches(
-                                db,
-                                enclosing_class.into(),
-                                None,
-                            ) {
+                            if CodeGeneratorKind::NamedTuple.matches(db, enclosing_class.into()) {
                                 if let Some(builder) = context
                                     .report_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD, call_expression)
                                 {
@@ -1903,9 +2032,10 @@ mod tests {
                         PythonVersion::PY311
                     }
                     KnownClass::GenericAlias => PythonVersion::PY39,
-                    KnownClass::Member | KnownClass::Nonmember | KnownClass::StrEnum => {
-                        PythonVersion::PY311
-                    }
+                    KnownClass::EnumProperty
+                    | KnownClass::Member
+                    | KnownClass::Nonmember
+                    | KnownClass::StrEnum => PythonVersion::PY311,
                     _ => PythonVersion::PY37,
                 };
                 (class, version_added)

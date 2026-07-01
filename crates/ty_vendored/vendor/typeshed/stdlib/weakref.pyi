@@ -71,7 +71,7 @@ class ReferenceType(Generic[_T]):  # "weakref"
     def __eq__(self, value: object, /) -> bool: ...
     def __hash__(self) -> int: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """Weakrefs are generic over the type of the referenced object."""
 
 ref = ReferenceType
 
@@ -307,5 +307,6 @@ class finalize(Generic[_P, _T]):
     @property
     def alive(self) -> bool:
         """Whether finalizer is alive"""
+
     atexit: bool
     """Whether finalizer should be called at exit"""

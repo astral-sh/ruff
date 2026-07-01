@@ -30,8 +30,8 @@ ignore = ["F401"]
         diagnostics,
         @r#"
     {
-      "kind": "full",
-      "items": []
+      "items": [],
+      "kind": "full"
     }
     "#
     );
@@ -40,7 +40,6 @@ ignore = ["F401"]
         external_diagnostics,
         @r#"
     {
-      "kind": "full",
       "items": [
         {
           "range": {
@@ -59,7 +58,7 @@ ignore = ["F401"]
             "href": "https://docs.astral.sh/ruff/rules/unused-import"
           },
           "source": "Ruff",
-          "message": "`os` imported but unused",
+          "message": "`os` imported but unused\n\nhelp: Remove unused import: `os`",
           "tags": [
             1
           ],
@@ -96,7 +95,27 @@ ignore = ["F401"]
             "title": "Remove unused import: `os`"
           }
         }
-      ]
+      ],
+      "kind": "full"
+    }
+    "#
+    );
+
+    Ok(())
+}
+
+#[test]
+fn unavailable_document_diagnostic_returns_empty_response() -> Result<()> {
+    let mut server = TestServerBuilder::new()?.with_workspace(".")?.build();
+
+    let diagnostics = server.document_diagnostic_request("not-open.py", None);
+
+    assert_json_snapshot!(
+        diagnostics,
+        @r#"
+    {
+      "items": [],
+      "kind": "full"
     }
     "#
     );

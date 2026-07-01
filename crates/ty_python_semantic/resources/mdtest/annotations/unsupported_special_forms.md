@@ -153,7 +153,7 @@ class B(Unpack): ...  # error: [invalid-base]
 class C(TypeGuard): ...  # error: [invalid-base]
 class D(TypeIs): ...  # error: [invalid-base]
 class E(Concatenate): ...  # error: [invalid-base]
-class F(Callable): ...
+class F(Callable): ...  # error: [missing-type-argument]
 class G(Generic): ...  # error: [invalid-base] "Cannot inherit from plain `Generic`"
 
 reveal_mro(F)  # revealed: (<class 'F'>, @Todo(Support for Callable as a base class), <class 'object'>)

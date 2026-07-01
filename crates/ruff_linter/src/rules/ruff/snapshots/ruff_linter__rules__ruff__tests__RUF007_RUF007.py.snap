@@ -11,19 +11,15 @@ RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over succes
 18 | zip(input[:-1], input[1:])
    |
 help: Replace `zip()` with `itertools.pairwise()`
+   |
 1  + import itertools
 2  | input = [1, 2, 3]
-3  | otherInput = [2, 3, 4]
-4  | foo = [1, 2, 3, 4]
 --------------------------------------------------------------------------------
-14 | zip(foo[:-1], foo[1:], foo, strict=True)  # more than 2 inputs
-15 |
 16 | # Errors
    - zip(input, input[1:])
 17 + itertools.pairwise(input)
 18 | zip(input, input[1::1])
-19 | zip(input[:-1], input[1:])
-20 | zip(input[1:], input[2:])
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
@@ -37,19 +33,15 @@ RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over succes
 19 | zip(input[1:], input[2:])
    |
 help: Replace `zip()` with `itertools.pairwise()`
+   |
 1  + import itertools
 2  | input = [1, 2, 3]
-3  | otherInput = [2, 3, 4]
-4  | foo = [1, 2, 3, 4]
 --------------------------------------------------------------------------------
-15 |
-16 | # Errors
 17 | zip(input, input[1:])
    - zip(input, input[1::1])
 18 + itertools.pairwise(input)
 19 | zip(input[:-1], input[1:])
-20 | zip(input[1:], input[2:])
-21 | zip(input[1:-1], input[2:])
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
@@ -63,19 +55,15 @@ RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over succes
 20 | zip(input[1:-1], input[2:])
    |
 help: Replace `zip()` with `itertools.pairwise()`
+   |
 1  + import itertools
 2  | input = [1, 2, 3]
-3  | otherInput = [2, 3, 4]
-4  | foo = [1, 2, 3, 4]
 --------------------------------------------------------------------------------
-16 | # Errors
-17 | zip(input, input[1:])
 18 | zip(input, input[1::1])
    - zip(input[:-1], input[1:])
 19 + itertools.pairwise(input)
 20 | zip(input[1:], input[2:])
-21 | zip(input[1:-1], input[2:])
-22 | list(zip(input, input[1:]))
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
@@ -89,19 +77,15 @@ RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over succes
 21 | list(zip(input, input[1:]))
    |
 help: Replace `zip()` with `itertools.pairwise()`
+   |
 1  + import itertools
 2  | input = [1, 2, 3]
-3  | otherInput = [2, 3, 4]
-4  | foo = [1, 2, 3, 4]
 --------------------------------------------------------------------------------
-17 | zip(input, input[1:])
-18 | zip(input, input[1::1])
 19 | zip(input[:-1], input[1:])
    - zip(input[1:], input[2:])
 20 + itertools.pairwise(input)
 21 | zip(input[1:-1], input[2:])
-22 | list(zip(input, input[1:]))
-23 | list(zip(input[:-1], input[1:]))
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
@@ -115,19 +99,15 @@ RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over succes
 22 | list(zip(input[:-1], input[1:]))
    |
 help: Replace `zip()` with `itertools.pairwise()`
+   |
 1  + import itertools
 2  | input = [1, 2, 3]
-3  | otherInput = [2, 3, 4]
-4  | foo = [1, 2, 3, 4]
 --------------------------------------------------------------------------------
-18 | zip(input, input[1::1])
-19 | zip(input[:-1], input[1:])
 20 | zip(input[1:], input[2:])
    - zip(input[1:-1], input[2:])
 21 + itertools.pairwise(input)
 22 | list(zip(input, input[1:]))
-23 | list(zip(input[:-1], input[1:]))
-24 | zip(foo[:-1], foo[1:], strict=True)
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
@@ -141,19 +121,15 @@ RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over succes
 23 | zip(foo[:-1], foo[1:], strict=True)
    |
 help: Replace `zip()` with `itertools.pairwise()`
+   |
 1  + import itertools
 2  | input = [1, 2, 3]
-3  | otherInput = [2, 3, 4]
-4  | foo = [1, 2, 3, 4]
 --------------------------------------------------------------------------------
-19 | zip(input[:-1], input[1:])
-20 | zip(input[1:], input[2:])
 21 | zip(input[1:-1], input[2:])
    - list(zip(input, input[1:]))
 22 + list(itertools.pairwise(input))
 23 | list(zip(input[:-1], input[1:]))
-24 | zip(foo[:-1], foo[1:], strict=True)
-25 | zip(foo[:-1], foo[1:], strict=False)
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
@@ -167,19 +143,15 @@ RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over succes
 24 | zip(foo[:-1], foo[1:], strict=False)
    |
 help: Replace `zip()` with `itertools.pairwise()`
+   |
 1  + import itertools
 2  | input = [1, 2, 3]
-3  | otherInput = [2, 3, 4]
-4  | foo = [1, 2, 3, 4]
 --------------------------------------------------------------------------------
-20 | zip(input[1:], input[2:])
-21 | zip(input[1:-1], input[2:])
 22 | list(zip(input, input[1:]))
    - list(zip(input[:-1], input[1:]))
 23 + list(itertools.pairwise(input))
 24 | zip(foo[:-1], foo[1:], strict=True)
-25 | zip(foo[:-1], foo[1:], strict=False)
-26 | zip(foo[:-1], foo[1:], strict=bool(foo))
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
@@ -193,18 +165,15 @@ RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over succes
 25 | zip(foo[:-1], foo[1:], strict=bool(foo))
    |
 help: Replace `zip()` with `itertools.pairwise()`
+   |
 1  + import itertools
 2  | input = [1, 2, 3]
-3  | otherInput = [2, 3, 4]
-4  | foo = [1, 2, 3, 4]
 --------------------------------------------------------------------------------
-21 | zip(input[1:-1], input[2:])
-22 | list(zip(input, input[1:]))
 23 | list(zip(input[:-1], input[1:]))
    - zip(foo[:-1], foo[1:], strict=True)
 24 + itertools.pairwise(foo)
 25 | zip(foo[:-1], foo[1:], strict=False)
-26 | zip(foo[:-1], foo[1:], strict=bool(foo))
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
@@ -217,17 +186,15 @@ RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over succes
 25 | zip(foo[:-1], foo[1:], strict=bool(foo))
    |
 help: Replace `zip()` with `itertools.pairwise()`
+   |
 1  + import itertools
 2  | input = [1, 2, 3]
-3  | otherInput = [2, 3, 4]
-4  | foo = [1, 2, 3, 4]
 --------------------------------------------------------------------------------
-22 | list(zip(input, input[1:]))
-23 | list(zip(input[:-1], input[1:]))
 24 | zip(foo[:-1], foo[1:], strict=True)
    - zip(foo[:-1], foo[1:], strict=False)
 25 + itertools.pairwise(foo)
 26 | zip(foo[:-1], foo[1:], strict=bool(foo))
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
@@ -239,14 +206,12 @@ RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over succes
    | ^^^
    |
 help: Replace `zip()` with `itertools.pairwise()`
+   |
 1  + import itertools
 2  | input = [1, 2, 3]
-3  | otherInput = [2, 3, 4]
-4  | foo = [1, 2, 3, 4]
 --------------------------------------------------------------------------------
-23 | list(zip(input[:-1], input[1:]))
-24 | zip(foo[:-1], foo[1:], strict=True)
 25 | zip(foo[:-1], foo[1:], strict=False)
    - zip(foo[:-1], foo[1:], strict=bool(foo))
 26 + itertools.pairwise(foo)
+   |
 note: This is an unsafe fix and may change runtime behavior

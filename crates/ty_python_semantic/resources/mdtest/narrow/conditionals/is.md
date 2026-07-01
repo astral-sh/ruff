@@ -60,6 +60,7 @@ def _(x: None | Literal[1, True]):
 
 ```py
 from enum import Enum
+from typing import Literal
 
 class Answer(Enum):
     NO = 0
@@ -79,6 +80,11 @@ def _(x: Single | int):
         reveal_type(x)  # revealed: Single
     else:
         reveal_type(x)  # revealed: int
+
+def _(x: list[int] | Literal[Answer.NO]):
+    if x is Answer.NO:
+        return
+    reveal_type(x)  # revealed: list[int]
 ```
 
 ## `is` for `EllipsisType`
@@ -129,6 +135,45 @@ def _(a: Literal[1], b: Literal[1, 2], c: Literal[1, 2, 3]):
     if a is b is c:
         reveal_type(b)  # revealed: Literal[1]
         reveal_type(c)  # revealed: Literal[1]
+```
+
+When a generic class object is compared with an exact class object, the exact class object is not
+widened to the generic type. The intersection is retained because it preserves the relationship
+between the class object and `T`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Y:
+    def __init__(self) -> None: ...
+
+class Z(Y):
+    def __init__(self, x: int) -> None: ...
+
+def narrow[T: (Y, Z)](klass: type[T]) -> None:
+    if klass is Y:
+        reveal_type(klass)  # revealed: type[T@narrow] & <class 'Y'>
+        reveal_type(Y)  # revealed: <class 'Y'> & type[T@narrow]
+
+    if klass is Z:
+        reveal_type(klass)  # revealed: <class 'Z'>
+        reveal_type(Z)  # revealed: <class 'Z'>
+
+def construct[T: (Y, Z)](klass: type[T]) -> T:
+    if klass is Y:
+        return Y()
+    raise AssertionError
+
+class Generic[T]: ...
+class Specialized(Generic[int]): ...
+
+def narrow_generic_alias[T: (Generic[int], Specialized)](klass: type[T]) -> None:
+    if klass is Generic[int]:
+        reveal_type(klass)  # revealed: type[T@narrow_generic_alias] & <class 'Generic[int]'>
+        reveal_type(Generic[int])  # revealed: <class 'Generic[int]'>
 ```
 
 ## `is` where the other operand is a call expression

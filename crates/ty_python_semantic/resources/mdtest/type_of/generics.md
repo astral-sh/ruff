@@ -284,6 +284,29 @@ def _[T: (int | str, int)](_: T):
     static_assert(not is_disjoint_from(type[int], type[T]))
 ```
 
+## Type aliases in final upper bounds
+
+A type variable whose upper bound resolves to a final class has only one possible class object:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import final
+from ty_extensions import TypeOf
+
+@final
+class FinalClass: ...
+
+type Alias = FinalClass
+
+def accepts_exact(cls: TypeOf[FinalClass]) -> None: ...
+def bounded[T: Alias](cls: type[T]) -> None:
+    accepts_exact(cls)
+```
+
 ## Metaclass instances
 
 ```py
@@ -459,7 +482,7 @@ from typing import final
 class P[T]:
     x: T
 
-def expects_type_p(x: type[P]):
+def expects_type_p(x: type[P]):  # error: [missing-type-argument]
     pass
 
 def expects_type_p_of_int(x: type[P[int]]):
@@ -519,7 +542,7 @@ This also works with `ParamSpec`:
 @final
 class C[**P]: ...
 
-def expects_type_c(f: type[C]): ...
+def expects_type_c(f: type[C]): ...  # error: [missing-type-argument]
 def expects_type_c_of_int_and_str(x: type[C[int, str]]): ...
 
 # OK, the unspecialized `C` is assignable to `type[C[...]]`

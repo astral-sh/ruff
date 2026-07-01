@@ -101,6 +101,24 @@ class OuterClass(Generic[T]):
 
 # revealed: ty_extensions.GenericContext[T@OuterClass]
 reveal_type(generic_context(OuterClass))
+
+class ParamSpecOuterClass(Generic[P]):
+    # snapshot: shadowed-type-variable
+    class InnerClass(SingleParamSpec[P]): ...
+    # revealed: None
+    reveal_type(generic_context(InnerClass))
+```
+
+```snapshot
+error[shadowed-type-variable]: Generic class `InnerClass` uses ParamSpec `P` already bound by an enclosing scope
+  --> src/mdtest_snippet.py:64:7
+   |
+64 | class ParamSpecOuterClass(Generic[P]):
+   |       ------------------------------- ParamSpec `P` is bound in this enclosing scope
+65 |     # snapshot: shadowed-type-variable
+66 |     class InnerClass(SingleParamSpec[P]): ...
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `P` used in class definition here
+   |
 ```
 
 If you don't specialize a generic base class, we use the default specialization, which maps each
@@ -108,7 +126,7 @@ typevar to its default value or `Any`. Since that base class is fully specialize
 the inheriting class generic.
 
 ```py
-class InheritedGenericDefaultSpecialization(MultipleTypevars): ...
+class InheritedGenericDefaultSpecialization(MultipleTypevars): ...  # error: [missing-type-argument]
 
 reveal_type(generic_context(InheritedGenericDefaultSpecialization))  # revealed: None
 ```
@@ -172,25 +190,32 @@ class Parent4(Grandparent[T1, T2]): ...
 class BadChild3(Parent3[T1, T2], Parent4[T2, T1]): ...
 
 # Implicit specialization is fine:
-class Fine(Parent, Grandparent[T1, T2]): ...
-class AlsoFine(Parent3, Parent4[T1, T2]): ...
+class Fine(Parent, Grandparent[T1, T2]): ...  # error: [missing-type-argument]
+class AlsoFine(Parent3, Parent4[T1, T2]): ...  # error: [missing-type-argument]
+
+# error: [missing-type-argument]
+# error: [missing-type-argument]
+# error: [missing-type-argument]
 class Dandy(Parent, Parent3, Parent4): ...
 
 # Edge cases: the first class is implicitly specialized
 # (or explicitly specialized with `Any`s), but later classes are not:
 
+# error: [missing-type-argument]
 # error: [invalid-generic-class]
 class BadChild4(Parent, Parent3[T1, T2], Parent4[T2, T1]): ...
 
 # error: [invalid-generic-class]
 class BadChild5(Parent[Any, Any], Parent3[T1, T2], Parent4[T2, T1]): ...
 
+# error: [missing-type-argument]
 # error: [invalid-generic-class]
 class BadChild6(Parent[T1, T2], Parent3, Parent4[T2, T1]): ...
 
 # error: [invalid-generic-class]
 class BadChild7(Parent[T1, T2], Parent3[Any, Any], Parent4[T2, T1]): ...
 
+# error: [missing-type-argument]
 # error: [invalid-generic-class]
 class BadChild8(Parent[T1, T2], Parent3[T2, T1], Parent4): ...
 
@@ -301,10 +326,10 @@ class GoodOrder(Generic[WithDefaultT1, WithDefaultT2]): ...
 # error: [invalid-generic-class] "Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`"
 class BadOrder(Generic[WithDefaultT2, WithDefaultT1]): ...
 
-WithDefaultU = TypeVar("WithDefaultU", default=int)
+WithDefaultU2 = TypeVar("WithDefaultU2", default=int)
 
 # error: [invalid-generic-class]
-class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU]): ...
+class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU2]): ...
 ```
 
 A type variable default cannot reference a type variable that is not a type parameter of the class:
@@ -441,6 +466,36 @@ reveal_type(C(1))  # revealed: C[int]
 
 # error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
+```
+
+### Many invariant parameters with dynamic bounds
+
+Treating unrelated classes with `Any` in their MRO as transitive pivots caused inference time to
+grow combinatorially in [ty#3607](https://github.com/astral-sh/ty/issues/3607).
+
+```py
+from typing import Any, Generic, TypeVar
+
+T1 = TypeVar("T1")
+T2 = TypeVar("T2")
+T3 = TypeVar("T3")
+T4 = TypeVar("T4")
+T5 = TypeVar("T5")
+T6 = TypeVar("T6")
+
+class C(Generic[T1, T2, T3, T4, T5, T6]): ...
+
+class W(Generic[T1, T2, T3, T4, T5, T6]):
+    def __init__(self, value: C[T1, T2, T3, T4, T5, T6]) -> None: ...
+
+class A1(Any): ...
+class A2(Any): ...
+class A3(Any): ...
+class A4(Any): ...
+class A5(Any): ...
+class A6(Any): ...
+
+reveal_type(W(C[A1, A2, A3, A4, A5, A6]()))  # revealed: W[A1, A2, A3, A4, A5, A6]
 ```
 
 ### Identical `__new__` and `__init__` signatures
@@ -995,7 +1050,7 @@ reveal_type(Sub)  # revealed: <class 'Sub'>
 U = TypeVar("U")
 
 class Base2(Generic[T, U]): ...
-class Sub2(Base2["Sub2", U]): ...
+class Sub2(Base2["Sub2", U]): ...  # error: [missing-type-argument]
 ```
 
 #### Without string forward references

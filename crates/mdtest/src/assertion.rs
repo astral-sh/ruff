@@ -42,6 +42,8 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use smallvec::SmallVec;
 use std::str::FromStr;
 
+use crate::RunOptions;
+
 /// Diagnostic assertion comments in a single embedded file.
 #[derive(Debug)]
 pub(crate) struct InlineFileAssertions<'s> {
@@ -261,7 +263,10 @@ impl<'a> UnparsedAssertion<'a> {
     }
 
     /// Parse the attempted assertion into a [`ParsedAssertion`] structured representation.
-    pub(crate) fn parse(&self) -> Result<ParsedAssertion<'a>, PragmaParseError<'a>> {
+    pub(crate) fn parse(
+        &self,
+        options: RunOptions,
+    ) -> Result<ParsedAssertion<'_>, PragmaParseError<'_>> {
         match self {
             Self::Revealed(revealed) => {
                 if revealed.is_empty() {
@@ -270,14 +275,29 @@ impl<'a> UnparsedAssertion<'a> {
                     Ok(ParsedAssertion::Revealed(revealed))
                 }
             }
-            Self::Error(error) => ErrorAssertion::from_str(error)
-                .map(ParsedAssertion::Error)
-                .map_err(PragmaParseError::ErrorAssertionParseError),
+            Self::Error(error) => {
+                let parsed = match (error.is_empty(), options.default_error_rule) {
+                    (true, Some(default_rule)) => Ok(ErrorAssertion {
+                        rule: Some(default_rule),
+                        column: None,
+                        message_contains: None,
+                    }),
+                    _ => ErrorAssertion::from_str(error),
+                };
+
+                parsed
+                    .map(|mut parsed| {
+                        parsed.rule = parsed.rule.or(options.default_error_rule);
+                        parsed
+                    })
+                    .map(ParsedAssertion::Error)
+                    .map_err(PragmaParseError::ErrorAssertionParseError)
+            }
             Self::Snapshot(rule) => {
                 if rule.is_empty() {
                     Ok(ParsedAssertion::Snapshot(None))
                 } else {
-                    Ok(ParsedAssertion::Snapshot(Some(rule)))
+                    Ok(ParsedAssertion::Snapshot(Some(*rule)))
                 }
             }
         }

@@ -496,6 +496,7 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
         2231.  Optional language specifies the RFC 2231 language, defaulting
         to the empty string.  Both charset and language should be strings.
         """
+
     # The following two methods are undocumented, but a source code comment states that they are public API
     def set_raw(self, name: str, value: _HeaderParamT_contra) -> None:
         """Store name and value in the model without modification.
@@ -531,6 +532,7 @@ class MIMEPart(Message[_HeaderRegistryT_co, _HeaderRegistryParamT_contra]):
         is called.  If you want to set the payload to a scalar object, use
         set_payload() instead.
         """
+
     # The attachments are created via type(self) in the attach method. It's theoretically
     # possible to sneak other attachment types into a MIMEPart instance, but could cause
     # cause unforseen consequences.

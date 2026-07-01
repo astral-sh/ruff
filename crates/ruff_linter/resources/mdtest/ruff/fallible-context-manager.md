@@ -608,3 +608,79 @@ def good_multiple_yields():
     finally:
         print("cleanup")
 ```
+
+## Yield before `break` in a terminal loop is OK
+
+A `yield` immediately followed by `break` is terminal when the enclosing loop itself sits
+in a terminal position, since `break` exits the loop and no cleanup code can run after.
+
+```py
+from contextlib import contextmanager
+
+
+@contextmanager
+def good_yield_before_break_in_terminal_for():
+    for value in items:
+        yield
+        break
+
+
+@contextmanager
+def good_yield_before_break_in_terminal_while():
+    while condition:
+        yield
+        break
+
+
+@contextmanager
+def good_yield_before_break_in_terminal_for_in_if():
+    if condition:
+        for value in items:
+            yield
+            break
+```
+
+## Yield before `break` in a non-terminal loop
+
+```py
+from contextlib import contextmanager
+
+
+@contextmanager
+def bad_yield_before_break_with_trailing_code():
+    for value in items:
+        yield  # error: [fallible-context-manager]
+        break
+    print("cleanup")
+```
+
+## Yield before `break` from an inner loop
+
+`break` only exits the innermost loop, so a `yield` before `break` inside a nested loop
+is not terminal: control falls through to the rest of the outer loop body.
+
+```py
+from contextlib import contextmanager
+
+
+@contextmanager
+def bad_yield_before_break_in_inner_loop():
+    for outer in items:
+        for inner in stuff:
+            yield  # error: [fallible-context-manager]
+            break
+        cleanup()
+```
+
+## Yield before `continue` is not terminal
+
+```py
+from contextlib import contextmanager
+
+
+@contextmanager
+def bad_yield_before_continue():
+    for value in items:
+        yield  # error: [fallible-context-manager]
+        continue
+```

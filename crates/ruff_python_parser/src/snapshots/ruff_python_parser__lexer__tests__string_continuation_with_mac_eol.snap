@@ -5,18 +5,7 @@ expression: string_continuation_with_eol(MAC_EOL)
 ## Tokens
 ```
 [
-    (
-        String(
-            "abc\\\rdef",
-        ),
-        0..10,
-        TokenFlags(
-            DOUBLE_QUOTES,
-        ),
-    ),
-    (
-        Newline,
-        10..10,
-    ),
+    String 0..10 (flags = DOUBLE_QUOTES),
+    Newline 10..10,
 ]
 ```

@@ -4,7 +4,7 @@ expression: suite
 ---
 ParseError {
     error: OtherError(
-        "cannot mix t-string literals with string or bytes literals",
+        "Cannot mix t-string literals with string or bytes literals",
     ),
     location: 0..31,
 }

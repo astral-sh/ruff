@@ -8,8 +8,11 @@ mod hover;
 mod shutdown;
 
 use super::{
-    define_document_url,
-    traits::{BackgroundDocumentRequestHandler, RequestHandler, SyncRequestHandler},
+    define_document_uri,
+    traits::{
+        BackgroundDocumentRequestHandler, BackgroundRequestHandler, RequestHandler,
+        SyncRequestHandler,
+    },
 };
 pub(super) use code_action::CodeActions;
 pub(super) use code_action_resolve::CodeActionResolve;

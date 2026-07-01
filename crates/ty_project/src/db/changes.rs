@@ -7,11 +7,9 @@ use std::collections::BTreeSet;
 use super::ignore::IgnoreFiles;
 use crate::walk::ProjectFilesWalker;
 use ruff_db::Db as _;
-use ruff_db::file_revision::FileRevision;
-use ruff_db::files::{File, FileRootKind, Files, system_path_to_file};
-use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
+use ruff_db::files::{File, Files, system_path_to_file};
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
-use salsa::Setter;
 use ty_python_core::program::{FallibleStrategy, Program};
 
 /// Represents the result of applying changes to the project database.
@@ -138,35 +136,6 @@ impl ProjectDatabase {
                 ChangeEvent::Changed { path, kind: _ } | ChangeEvent::Opened(path) => {
                     if synced_files.insert(path.to_path_buf()) {
                         File::sync_path_only(self, path);
-                        if let Some(root) = self.files().root(self, path) {
-                            match root.kind_at_time_of_creation(self) {
-                                // When a file inside the root of
-                                // the project is changed, we don't
-                                // want to mark the entire root as
-                                // having changed too. In theory it
-                                // might make sense to, but at time
-                                // of writing, the file root revision
-                                // on a project is used to invalidate
-                                // the submodule files found within a
-                                // directory. If we bumped the revision
-                                // on every change within a project,
-                                // then this caching technique would be
-                                // effectively useless.
-                                //
-                                // It's plausible we should explore
-                                // a more robust cache invalidation
-                                // strategy that models more directly
-                                // what we care about. For example, by
-                                // keeping track of directories and
-                                // their direct children explicitly,
-                                // and then keying the submodule cache
-                                // off of that instead. ---AG
-                                FileRootKind::Project => {}
-                                FileRootKind::LibrarySearchPath => {
-                                    root.set_revision(self).to(FileRevision::now());
-                                }
-                            }
-                        }
                     }
                 }
 
@@ -277,7 +246,7 @@ impl ProjectDatabase {
             }
         }
 
-        Files::sync_all_recursive(self, deduplicate_nested_paths(sync_recursively));
+        Files::sync_all_recursive(self, sync_recursively);
 
         if reload_project {
             // The active project root may have been deleted. Start rediscovery from
@@ -295,14 +264,17 @@ impl ProjectDatabase {
             match new_project_metadata {
                 Ok(mut metadata) => {
                     if let Err(error) = metadata.apply_configuration_files(self.system()) {
+                        let error = anyhow::Error::new(error);
                         tracing::error!(
-                            "Failed to apply configuration files, continuing without applying them: {error}"
+                            "Failed to apply configuration files, continuing without applying them: {error:#}"
                         );
                     }
 
                     if let Some(overrides) = project_options_overrides {
                         metadata.apply_overrides(overrides);
                     }
+
+                    metadata.try_add_project_root(self);
 
                     let program_settings_diagnostics = match metadata.to_program_settings(
                         self.system(),
@@ -356,8 +328,9 @@ impl ProjectDatabase {
                     }
                 }
                 Err(error) => {
+                    let error = anyhow::Error::new(error);
                     tracing::error!(
-                        "Failed to load project, keeping old project configuration: {error}"
+                        "Failed to load project, keeping old project configuration: {error:#}"
                     );
                     if reload_project_files {
                         project.reload_files(self);

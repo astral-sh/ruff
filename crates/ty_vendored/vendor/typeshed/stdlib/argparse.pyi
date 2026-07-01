@@ -232,7 +232,7 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
         - exit_on_error -- Determines whether or not ArgumentParser exits with
             error info when an error occurs
         - suggest_on_error - Enables suggestions for mistyped argument choices
-            and subparser names (default: ``False``)
+            and subparser names (default: ``True``)
         - color - Allow color output in help messages (default: ``False``)
     """
 

@@ -34,7 +34,7 @@ reveal_type("abc".startswith("bc", 1, 3))  # revealed: bool
 reveal_type("abc".startswith(("a", "x")))  # revealed: bool
 ```
 
-And similiarly, we should still infer `bool` if the instance or the prefix are not string literals:
+And similarly, we should still infer `bool` if the instance or the prefix are not string literals:
 
 ```py
 from typing_extensions import LiteralString

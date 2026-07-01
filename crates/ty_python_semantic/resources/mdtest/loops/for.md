@@ -38,6 +38,90 @@ for x in IntIterable():
 reveal_type(x)  # revealed: Literal["foo"] | int
 ```
 
+## With statically non-empty builtin `range`
+
+```py
+for x in range(42):
+    pass
+
+reveal_type(x)  # revealed: int
+
+previous = "foo"
+
+for previous in range(1, 3):
+    pass
+
+reveal_type(previous)  # revealed: int
+
+for descending in range(3, 0, -1):
+    pass
+
+reveal_type(descending)  # revealed: int
+
+count = 42
+
+for from_count in range(count):
+    pass
+
+reveal_type(from_count)  # revealed: int
+```
+
+The emptiness refinement is independent of the order in which range values are assigned:
+
+```py
+def empty_first(flag: bool) -> None:
+    value = range(0)
+    if flag:
+        value = range(1)
+
+    if value:
+        reveal_type(value)  # revealed: range
+
+def non_empty_first(flag: bool) -> None:
+    value = range(1)
+    if flag:
+        value = range(0)
+
+    if value:
+        reveal_type(value)  # revealed: range
+```
+
+Empty ranges all compare equal, but non-empty ranges with the same type refinement may contain
+different values:
+
+```py
+empty_left = range(0)
+empty_right = range(1, 1)
+
+if empty_left == empty_right:
+    reveal_type(empty_left)  # revealed: range
+else:
+    reveal_type(empty_left)  # revealed: Never
+
+non_empty_left = range(1)
+non_empty_right = range(2)
+
+if non_empty_left == non_empty_right:
+    reveal_type(non_empty_left)  # revealed: range
+else:
+    reveal_type(non_empty_left)  # revealed: range
+```
+
+## With shadowed `range`
+
+```py
+def shadowed_range():
+    def range(n: int) -> list[int]:
+        return []
+
+    for x in range(42):
+        pass
+
+    # revealed: int
+    # error: [possibly-unresolved-reference]
+    reveal_type(x)
+```
+
 ## With `else` (no break)
 
 ```py
@@ -128,9 +212,136 @@ def _(color: Color):
 for x in (1, "a", b"foo"):
     pass
 
-# revealed: Literal[1, "a", b"foo"]
-# error: [possibly-unresolved-reference]
-reveal_type(x)
+reveal_type(x)  # revealed: Literal[1, "a", b"foo"]
+```
+
+## With statically non-empty literals
+
+```py
+for x in [1]:
+    pass
+
+reveal_type(x)  # revealed: Literal[1]
+
+for x in {1}:
+    pass
+
+reveal_type(x)  # revealed: int
+
+for x in {"foo": 1}:
+    pass
+
+reveal_type(x)  # revealed: str
+
+for x in "a":
+    pass
+
+reveal_type(x)  # revealed: Literal["a"]
+
+for x in b"a":
+    pass
+
+reveal_type(x)  # revealed: Literal[97]
+```
+
+## With statically empty literals
+
+```py
+value = 1
+
+for _ in ():
+    value = "tuple"
+
+for _ in []:
+    value = "list"
+
+for _ in {}:
+    value = "dict"
+
+for _ in "":
+    value = "str"
+
+for _ in b"":
+    value = "bytes"
+
+reveal_type(value)  # revealed: Literal[1]
+```
+
+## With `else` clauses and statically known literal emptiness
+
+```py
+def empty() -> None:
+    value = "before"
+
+    for _ in []:
+        value = "body"
+    else:
+        reveal_type(value)  # revealed: Literal["before"]
+
+def non_empty() -> None:
+    value = "before"
+
+    for _ in [1]:
+        value = "body"
+    else:
+        reveal_type(value)  # revealed: Literal["body"]
+
+def non_empty_break() -> None:
+    value = "before"
+
+    for _ in [1]:
+        value = "body"
+        break
+    else:
+        value = "else"
+
+    reveal_type(value)  # revealed: Literal["body"]
+```
+
+Starred elements and dictionary unpacking make emptiness ambiguous unless the literal also contains
+a required element:
+
+```py
+def _(items: list[int], mapping: dict[str, int]):
+    for item in [*items]:
+        pass
+
+    # revealed: int
+    # error: [possibly-unresolved-reference]
+    reveal_type(item)
+
+    for key in {**mapping}:
+        pass
+
+    # revealed: str
+    # error: [possibly-unresolved-reference]
+    reveal_type(key)
+
+    for item in [*items, 1]:
+        pass
+
+    reveal_type(item)  # revealed: int
+
+    for key in {**mapping, "c": 2}:
+        pass
+
+    reveal_type(key)  # revealed: str
+```
+
+## With literal list
+
+```py
+for x in ["a", "b"]:
+    reveal_type(x)  # revealed: Literal["a", "b"]
+
+async def _():
+    # error: [not-iterable]
+    async for x in ["a", "b"]:
+        reveal_type(x)  # revealed: Unknown
+
+    # revealed: Unknown
+    # error: [possibly-unresolved-reference]
+    reveal_type(x)
 ```
 
 ## With non-callable iterator
@@ -146,6 +357,10 @@ def _(flag: bool):
     # snapshot: not-iterable
     for x in NotIterable():
         pass
+
+    # revealed: Unknown
+    # error: [possibly-unresolved-reference]
+    reveal_type(x)
 ```
 
 ```snapshot
@@ -156,21 +371,6 @@ error[not-iterable]: Object of type `NotIterable` is not iterable
   |              ^^^^^^^^^^^^^
   |
 info: Its `__iter__` attribute has type `int | None`, which is not callable
-```
-
-```py
-    # revealed: Unknown
-    # snapshot: possibly-unresolved-reference
-    reveal_type(x)
-```
-
-```snapshot
-info[possibly-unresolved-reference]: Name `x` used when possibly not defined
-  --> src/mdtest_snippet.py:13:17
-   |
-13 |     reveal_type(x)
-   |                 ^
-   |
 ```
 
 ## Invalid iterable
@@ -433,6 +633,12 @@ error[not-iterable]: Object of type `Test | Test2` may not be iterable
    |              ^^^^^^^^
    |
 info: Its `__iter__` method returns an object of type `TestIter | int`, which may not have a `__next__` method
+info: element `Test2` of union `Test | Test2` is not assignable to `Iterable[Unknown]`
+info: └── type `Test2` is not assignable to protocol `Iterable[Unknown]`
+info:     └── protocol member `__iter__` is incompatible
+info:         └── incompatible return types: `int` is not assignable to `Iterator[Unknown]`
+info:             └── type `int` is not assignable to protocol `Iterator[Unknown]`
+info:                 └── protocol member `__next__` is not defined on type `int`
 ```
 
 ## Union type as iterable where one union element has a non-callable `__iter__`
@@ -711,6 +917,9 @@ error[not-iterable]: Object of type `Iterable` is not iterable
    |          ^^^^^^^^^^
    |
 info: Its `__iter__` method has an invalid signature
+info: type `Iterable` is not assignable to protocol `Iterable[Unknown]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── unexpected extra parameter `extra_arg`
 info: Expected signature `def __iter__(self): ...`
 ```
 
@@ -785,6 +994,12 @@ error[not-iterable]: Object of type `Iterable1` is not iterable
    |          ^^^^^^^^^^^
    |
 info: Its `__iter__` method returns an object of type `Iterator1`, which has an invalid `__next__` method
+info: type `Iterable1` is not assignable to protocol `Iterable[Unknown]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── incompatible return types: `Iterator1` is not assignable to `Iterator[Unknown]`
+info:         └── type `Iterator1` is not assignable to protocol `Iterator[Unknown]`
+info:             └── protocol member `__next__` is incompatible
+info:                 └── unexpected extra parameter `extra_arg`
 info: Expected signature for `__next__` is `def __next__(self): ...`
 ```
 
@@ -1053,6 +1268,9 @@ error[not-iterable]: Object of type `Iterable1` may not be iterable
    |              ^^^^^^^^^^^
    |
 info: Its `__iter__` method may have an invalid signature
+info: type `Iterable1` is not assignable to protocol `Iterable[Unknown]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── unexpected extra parameter `invalid_extra_arg`
 info: Type of `__iter__` is `(bound method Iterable1.__iter__() -> Iterator) | (bound method Iterable1.__iter__(invalid_extra_arg) -> Iterator)`
 info: Expected signature for `__iter__` is `def __iter__(self): ...`
 ```
@@ -1124,6 +1342,12 @@ error[not-iterable]: Object of type `Iterable1` may not be iterable
    |              ^^^^^^^^^^^
    |
 info: Its `__iter__` method returns an object of type `Iterator1`, which may have an invalid `__next__` method
+info: type `Iterable1` is not assignable to protocol `Iterable[Unknown]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── incompatible return types: `Iterator1` is not assignable to `Iterator[Unknown]`
+info:         └── type `Iterator1` is not assignable to protocol `Iterator[Unknown]`
+info:             └── protocol member `__next__` is incompatible
+info:                 └── unexpected extra parameter `invalid_extra_arg`
 info: Expected signature for `__next__` is `def __next__(self): ...`
 ```
 
@@ -1142,6 +1366,11 @@ error[not-iterable]: Object of type `Iterable2` may not be iterable
    |              ^^^^^^^^^^^
    |
 info: Its `__iter__` method returns an object of type `Iterator2`, which has a `__next__` attribute that may not be callable
+info: type `Iterable2` is not assignable to protocol `Iterable[Unknown]`
+info: └── protocol member `__iter__` is incompatible
+info:     └── incompatible return types: `Iterator2` is not assignable to `Iterator[Unknown]`
+info:         └── type `Iterator2` is not assignable to protocol `Iterator[Unknown]`
+info:             └── protocol member `__next__` is incompatible
 ```
 
 ## Possibly invalid `__getitem__` methods
@@ -1434,10 +1663,13 @@ reveal_type(loop_only)  # revealed: int
 def random() -> bool:
     return False
 
+def iterable() -> list[int]:
+    return []
+
 x = "A"
-for _ in range(1_000_000):
+for _ in iterable():
     reveal_type(x)  # revealed: Literal["A", "D"]
-    for _ in range(1_000_000):
+    for _ in iterable():
         # The "C" binding isn't visible here. It breaks this inner loop, and it always gets
         # overwritten before the end of the outer loop.
         reveal_type(x)  # revealed: Literal["A", "D", "B"]
@@ -1509,8 +1741,11 @@ On the other hand, if `x` is defined before the loop, the `del` makes it a
 `[possibly-unresolved-reference]`:
 
 ```py
+def iterable() -> list[int]:
+    return []
+
 x = 0
-for _ in range(1_000_000):
+for _ in iterable():
     x  # error: [possibly-unresolved-reference]
     x = 42
     del x
@@ -1519,8 +1754,11 @@ for _ in range(1_000_000):
 ### `del` in a loop makes a variable possibly-unbound after the loop
 
 ```py
+def iterable() -> list[int]:
+    return []
+
 x = 0
-for _ in range(1_000_000):
+for _ in iterable():
     # error: [possibly-unresolved-reference]
     del x
 # error: [possibly-unresolved-reference]
@@ -1530,7 +1768,10 @@ x
 ### Bindings in a loop are possibly-unbound after the loop
 
 ```py
-for _ in range(1_000_000):
+def iterable() -> list[int]:
+    return []
+
+for _ in iterable():
     x = 42
 # error: [possibly-unresolved-reference]
 x
@@ -1735,6 +1976,20 @@ for _ in range(1_000_000):
     node = node.next
 reveal_type(node)  # revealed: Node
 reveal_type(node.next)  # revealed: Node | None
+```
+
+### Nested collection cycles do not panic
+
+Regression test for [#3836](https://github.com/astral-sh/ty/issues/3836).
+
+```py
+def distance() -> None:
+    previous = [0]
+    for _ in [0]:
+        row = []
+        for _ in [0]:
+            row.append(previous[0])
+        previous = row
 ```
 
 ### `global` and `nonlocal` keywords in a loop

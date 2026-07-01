@@ -8,7 +8,7 @@ use crate::{
     Program, TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
     place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
-        Type, TypeAndQualifiers,
+        ModuleLiteralType, Type, TypeAndQualifiers,
         diagnostic::{
             POSSIBLY_MISSING_IMPORT, UNRESOLVED_IMPORT,
             hint_if_stdlib_attribute_exists_on_other_versions,
@@ -243,7 +243,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         self.check_deprecated(alias, ty.inner);
                     }
                 }
-                self.extend_definition(inferred);
+                self.extend_definition(*definition, inferred);
             }
         }
     }
@@ -335,7 +335,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        let module_ty = Type::module_literal(db, self.file(), module);
+        let module_literal = ModuleLiteralType::new(
+            db,
+            module,
+            module.kind(db).is_package().then_some(self.file()),
+        );
+        let module_ty = Type::ModuleLiteral(module_literal);
 
         let name = if let Some(star_import) = definition.kind(db).as_star_import() {
             self.index
@@ -352,9 +357,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         //
         // In nested scopes (e.g. function bodies), the module's global-scope definitions
         // are resolved independently, so there is no cycle risk and the lookup is safe.
-        let skip_self_referential_member_lookup = module_ty
-            .as_module_literal()
-            .is_some_and(|module| Some(self.file()) == module.module(db).file(db))
+        let skip_self_referential_member_lookup = Some(self.file())
+            == module_literal.module(db).file(db)
             && self.scope().file_scope_id(db).is_global();
 
         // Although it isn't the runtime semantics, we go to some trouble to prioritize a submodule
@@ -368,10 +372,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Place::Defined(DefinedPlace {
                         ty,
                         definedness: boundness,
+                        provenance: source_provenance,
                         ..
                     }),
                 qualifiers,
-            } = module_ty.member(db, name)
+            } = module_literal.static_member(db, name)
             {
                 if &alias.name != "*" && boundness == Definedness::PossiblyUndefined {
                     // TODO: Consider loading _both_ the attribute and any submodule and unioning them
@@ -386,7 +391,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 if qualifiers.contains(TypeQualifiers::FROM_MODULE_GETATTR) {
-                    from_module_getattr = Some((ty, qualifiers));
+                    from_module_getattr = Some((ty, qualifiers, source_provenance));
                 } else {
                     self.add_declaration_with_binding(
                         alias.into(),
@@ -396,6 +401,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 inner: ty,
                                 origin: TypeOrigin::Declared,
                                 qualifiers,
+                                provenance: source_provenance,
                             },
                             inferred_ty: ty,
                         },
@@ -443,7 +449,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // We've checked for a submodule, so now we can go ahead and use a type from module
         // `__getattr__`.
-        if let Some((ty, qualifiers)) = from_module_getattr {
+        if let Some((ty, qualifiers, source_provenance)) = from_module_getattr {
             self.add_declaration_with_binding(
                 alias.into(),
                 definition,
@@ -452,6 +458,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         inner: ty,
                         origin: TypeOrigin::Declared,
                         qualifiers,
+                        provenance: source_provenance,
                     },
                     inferred_ty: ty,
                 },

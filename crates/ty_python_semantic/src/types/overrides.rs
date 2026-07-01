@@ -4,7 +4,11 @@
 //! [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 
 use bitflags::bitflags;
-use ruff_db::diagnostic::Annotation;
+use ruff_db::{
+    diagnostic::{Annotation, Span},
+    files::FileRange,
+    parsed::ParsedModuleRef,
+};
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_mangled_private;
 use rustc_hash::FxHashSet;
@@ -13,6 +17,7 @@ use crate::{
     Db,
     lint::LintId,
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
+    reachability::ReachabilityConstraintsExtension,
     types::{
         CallableType, ClassBase, ClassLiteral, ClassType, KnownClass, Parameter, Parameters,
         Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
@@ -23,12 +28,13 @@ use crate::{
         diagnostic::{
             INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_OVERRIDE, INVALID_DATACLASS,
             INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE,
-            INVALID_NAMED_TUPLE_OVERRIDE, OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE,
-            report_invalid_method_override, report_overridden_final_method,
-            report_overridden_final_variable,
+            INVALID_NAMED_TUPLE_OVERRIDE, MISSING_OVERRIDE_DECORATOR, OVERRIDE_OF_FINAL_METHOD,
+            OVERRIDE_OF_FINAL_VARIABLE, report_invalid_method_override,
+            report_overridden_final_method, report_overridden_final_variable,
         },
         enums::{EnumMetadata, enum_metadata},
-        function::{FunctionDecorators, FunctionType, KnownFunction},
+        function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
+        infer::infer_definition_types,
         list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
         tuple::Tuple,
     },
@@ -73,6 +79,10 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
     let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
     let enum_info = enum_metadata(db, class.into());
 
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "each class member is checked independently"
+    )]
     for member in own_class_members {
         check_class_declaration(
             context,
@@ -99,8 +109,7 @@ fn conflicting_named_tuple_field_in_mro<'db>(
         let (superclass_literal, superclass_specialization) =
             superclass.class_literal_and_specialization(db);
 
-        if CodeGeneratorKind::NamedTuple.matches(db, superclass_literal, superclass_specialization)
-        {
+        if CodeGeneratorKind::NamedTuple.matches(db, superclass_literal) {
             match superclass_literal {
                 ClassLiteral::Static(superclass_literal) => {
                     if let Some(field) = superclass_literal
@@ -151,10 +160,10 @@ fn check_class_declaration<'db>(
         return;
     };
 
-    let Some((literal, specialization)) = class.static_class_literal(db) else {
+    let Some((literal, _)) = class.static_class_literal(db) else {
         return;
     };
-    let class_kind = CodeGeneratorKind::from_class(db, literal.into(), specialization);
+    let class_kind = CodeGeneratorKind::from_class(db, literal.into());
 
     // Check for prohibited `NamedTuple` attribute overrides.
     //
@@ -252,33 +261,35 @@ fn check_class_declaration<'db>(
             let is_auto = enum_info.auto_members.contains(&member.name);
             let skip_type_check = (context.in_stub() && is_ellipsis)
                 || is_auto
-                || enum_info.custom_enum_metaclass_new;
+                || enum_info.value_construction.metaclass_may_transform_values;
 
             if !skip_type_check {
-                if let Some(new_function) = enum_info.new_function {
-                    check_enum_member_against_constructor_hook(
+                if let Some(new_function) = enum_info.value_construction.new.function() {
+                    check_enum_member_against_constructor_method(
                         context,
                         new_function,
                         Type::from(class),
                         member_value_type,
                         &member.name,
                         *first_reachable_definition,
-                        EnumConstructorHook::New,
+                        EnumConstructorMethod::New,
                     );
                 }
 
-                if let Some(init_function) = enum_info.init_function {
-                    check_enum_member_against_constructor_hook(
+                if let Some(init_function) = enum_info.value_construction.init.function() {
+                    check_enum_member_against_constructor_method(
                         context,
                         init_function,
                         instance_of_class,
                         member_value_type,
                         &member.name,
                         *first_reachable_definition,
-                        EnumConstructorHook::Init,
+                        EnumConstructorMethod::Init,
                     );
-                } else if enum_info.new_function.is_none()
-                    && let Some(expected_type) = enum_info.value_annotation
+                } else if enum_info
+                    .value_construction
+                    .can_validate_with_value_annotation()
+                    && let Some(expected_type) = enum_info.value_annotation_type()
                 {
                     if !member_value_type.is_assignable_to(db, expected_type) {
                         if let Some(builder) = context.report_lint(
@@ -305,6 +316,7 @@ fn check_class_declaration<'db>(
     let mut has_dynamic_superclass = false;
     let mut has_typeddict_in_mro = false;
     let mut liskov_diagnostic_emitted = false;
+    let mut missing_override_target: Option<MissingOverrideTarget<'db>> = None;
     let mut overridden_final_method = None;
     let mut overridden_final_variable: Option<(ClassType<'db>, Option<Definition<'db>>)> = None;
     let is_private_member = is_mangled_private(member.name.as_str());
@@ -320,7 +332,7 @@ fn check_class_declaration<'db>(
         for class_base in class.iter_mro(db).skip(1) {
             let superclass = match class_base {
                 ClassBase::Protocol | ClassBase::Generic => continue,
-                ClassBase::Dynamic(_) => {
+                ClassBase::Any | ClassBase::Dynamic(_) => {
                     has_dynamic_superclass = true;
                     continue;
                 }
@@ -328,7 +340,7 @@ fn check_class_declaration<'db>(
                     has_dynamic_superclass = true;
                     continue;
                 }
-                ClassBase::TypedDict => {
+                ClassBase::TypedDict(_) => {
                     has_typeddict_in_mro = true;
                     continue;
                 }
@@ -359,13 +371,9 @@ fn check_class_declaration<'db>(
                 {
                     continue;
                 }
-                method_kind = CodeGeneratorKind::from_class(
-                    db,
-                    superclass_literal.into(),
-                    superclass_specialization,
-                )
-                .map(MethodKind::Synthesized)
-                .unwrap_or_default();
+                method_kind = CodeGeneratorKind::from_class(db, superclass_literal.into())
+                    .map(MethodKind::Synthesized)
+                    .unwrap_or_default();
             }
 
             let superclass_instance_member =
@@ -380,6 +388,21 @@ fn check_class_declaration<'db>(
             };
 
             subclass_overrides_superclass_declaration = true;
+
+            // Record the first overridden superclass member that is subject to the missing override
+            // decorator check so that we can later confirm that the overriding definition is indeed
+            // marked with the decorator.
+            if configuration.check_missing_overrides()
+                && missing_override_target.is_none()
+                && !is_constructor_like_method(&member.name)
+            {
+                missing_override_target = Some(MissingOverrideTarget::for_superclass(
+                    db,
+                    superclass,
+                    superclass_scope,
+                    superclass_symbol_id,
+                ));
+            }
 
             // Record the first superclass that defines this method as the "immediate parent method"
             if immediate_parent_method.is_none() {
@@ -403,7 +426,7 @@ fn check_class_declaration<'db>(
                         let underlying_functions = extract_underlying_functions(
                             db,
                             own_class_member.ignore_possibly_undefined()?,
-                        )?;
+                        );
 
                         if underlying_functions.iter().any(|function| {
                             function.has_known_decorator(db, FunctionDecorators::FINAL)
@@ -523,10 +546,7 @@ fn check_class_declaration<'db>(
             };
 
             // Constructor methods are not checked for Liskov compliance
-            if matches!(
-                &*member.name,
-                "__init__" | "__new__" | "__post_init__" | "__init_subclass__"
-            ) {
+            if is_constructor_like_method(&member.name) {
                 continue;
             }
 
@@ -607,13 +627,19 @@ fn check_class_declaration<'db>(
         }
     }
 
+    if let Some(target) = missing_override_target
+        && first_reachable_definition.kind(db).is_function_def()
+    {
+        check_missing_overrides(context, member, class_scope, target);
+    }
+
     if !subclass_overrides_superclass_declaration
         && !has_dynamic_superclass
         // accessing `.kind()` here is fine as `definition`
         // will always be a definition in the file currently being checked
         && first_reachable_definition.kind(db).is_function_def()
     {
-        check_explicit_overrides(context, member, class);
+        check_explicit_overrides(context, member, class_scope, class);
     }
 
     if let Some((superclass, superclass_method)) = overridden_final_method {
@@ -928,6 +954,13 @@ pub(super) enum MethodKind<'db> {
     NotSynthesized,
 }
 
+fn is_constructor_like_method(name: &str) -> bool {
+    matches!(
+        name,
+        "__init__" | "__new__" | "__post_init__" | "__init_subclass__"
+    )
+}
+
 bitflags! {
     /// Bitflags representing which override-related rules have been enabled.
     #[derive(Default, Debug, Copy, Clone)]
@@ -941,6 +974,7 @@ bitflags! {
         const INVALID_DATACLASS = 1 << 6;
         const FINAL_VARIABLE_OVERRIDDEN = 1 << 7;
         const INVALID_ENUM_VALUE = 1 << 8;
+        const MISSING_OVERRIDE_DECORATOR = 1 << 9;
     }
 }
 
@@ -959,6 +993,9 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
         }
         if rule_selection.is_enabled(LintId::of(&INVALID_EXPLICIT_OVERRIDE)) {
             config |= OverrideRulesConfig::EXPLICIT_OVERRIDE;
+        }
+        if rule_selection.is_enabled(LintId::of(&MISSING_OVERRIDE_DECORATOR)) {
+            config |= OverrideRulesConfig::MISSING_OVERRIDE_DECORATOR;
         }
         if rule_selection.is_enabled(LintId::of(&OVERRIDE_OF_FINAL_METHOD)) {
             config |= OverrideRulesConfig::FINAL_METHOD_OVERRIDDEN;
@@ -1005,6 +1042,10 @@ impl OverrideRulesConfig {
         self.contains(OverrideRulesConfig::FINAL_METHOD_OVERRIDDEN)
     }
 
+    const fn check_missing_overrides(self) -> bool {
+        self.contains(OverrideRulesConfig::MISSING_OVERRIDE_DECORATOR)
+    }
+
     const fn check_invalid_named_tuple_definitions(self) -> bool {
         self.contains(OverrideRulesConfig::INVALID_NAMED_TUPLE)
     }
@@ -1025,38 +1066,24 @@ impl OverrideRulesConfig {
 fn check_explicit_overrides<'db>(
     context: &InferContext<'db, '_>,
     member: &Member<'db>,
+    subclass_scope: ScopeId<'db>,
     class: ClassType<'db>,
 ) {
     let db = context.db();
-    let underlying_functions = extract_underlying_functions(db, member.ty);
-    let Some(functions) = underlying_functions else {
-        return;
-    };
-    let Some(decorated_function) = functions
-        .iter()
-        .find(|function| function.has_known_decorator(db, FunctionDecorators::OVERRIDE))
+    let Some(definition) = invalid_explicit_override_definition(context, member, subclass_scope)
     else {
         return;
     };
-    let function_literal = if context.in_stub() {
-        decorated_function.first_overload_or_implementation(db)
-    } else {
-        decorated_function.literal(db).last_definition
-    };
 
-    let Some(builder) = context.report_lint(
-        &INVALID_EXPLICIT_OVERRIDE,
-        function_literal.focus_range(db, context.module()),
-    ) else {
+    let Some(builder) = context.report_lint(&INVALID_EXPLICIT_OVERRIDE, definition.focus_range)
+    else {
         return;
     };
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Method `{}` is decorated with `@override` but does not override anything",
         member.name
     ));
-    if let Some(decorator_span) =
-        function_literal.find_known_decorator_span(db, KnownFunction::Override)
-    {
+    if let Some(decorator_span) = definition.focus_override_decorator_span {
         diagnostic.annotate(Annotation::secondary(decorator_span));
     }
     diagnostic.info(format_args!(
@@ -1066,28 +1093,312 @@ fn check_explicit_overrides<'db>(
     ));
 }
 
+/// Facts extracted for one local definition of the member under analysis.
+#[derive(Debug)]
+struct LocalOverrideDefinition {
+    /// Range to use as the primary diagnostic location.
+    ///
+    /// This is usually the function name. For an overloaded function, it points to the
+    /// implementation in a source file, or the first overload in a stub.
+    focus_range: FileRange,
+    /// Whether any overload or implementation in this local function has `@override`.
+    ///
+    /// `invalid-explicit-override` treats `@override` as explicit even when it appears on a
+    /// non-focused overload, for example on the first overload in a source file where the
+    /// diagnostic itself points at the implementation.
+    any_definition_has_override_decorator: bool,
+    /// Whether the definition selected as the diagnostic target has `@override`.
+    ///
+    /// `missing-override-decorator` uses this instead of `any_definition_has_override_decorator`
+    /// so that a misplaced `@override` on another overload still reports an error on the
+    /// implementation.
+    focus_definition_has_override_decorator: bool,
+    /// Span of the `@override` decorator on the focused definition, if present.
+    ///
+    /// This lets `invalid-explicit-override` underline the decorator separately from the function
+    /// name. It is absent when only a non-focused overload has `@override`.
+    focus_override_decorator_span: Option<Span>,
+}
+
+impl LocalOverrideDefinition {
+    fn from_function<'db>(
+        db: &'db dyn Db,
+        function: FunctionType<'db>,
+        in_stub: bool,
+        module: &ParsedModuleRef,
+    ) -> Self {
+        let focus_definition = overriding_definition(db, function, in_stub);
+
+        Self {
+            focus_range: focus_definition.focus_range(db, module),
+            any_definition_has_override_decorator: function
+                .has_known_decorator(db, FunctionDecorators::OVERRIDE),
+            focus_definition_has_override_decorator: focus_definition
+                .has_known_decorator(db, FunctionDecorators::OVERRIDE),
+            focus_override_decorator_span: focus_definition
+                .find_known_decorator_span(db, KnownFunction::Override),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct MissingOverrideTarget<'db> {
+    superclass: ClassType<'db>,
+    /// The source definition for the overridden superclass member, if one is available.
+    definition: Option<Definition<'db>>,
+}
+
+impl<'db> MissingOverrideTarget<'db> {
+    fn for_superclass(
+        db: &'db dyn Db,
+        superclass: ClassType<'db>,
+        superclass_scope: ScopeId<'db>,
+        superclass_symbol_id: Option<ScopedSymbolId>,
+    ) -> Self {
+        let definition =
+            superclass_symbol_id.and_then(|id| symbol_definition(db, superclass_scope, id));
+
+        Self {
+            superclass,
+            definition,
+        }
+    }
+}
+
+fn check_missing_overrides<'db>(
+    context: &InferContext<'db, '_>,
+    member: &Member<'db>,
+    subclass_scope: ScopeId<'db>,
+    target: MissingOverrideTarget<'db>,
+) {
+    let db = context.db();
+
+    let Some(definition) = missing_override_definition(context, member, subclass_scope) else {
+        return;
+    };
+
+    let Some(builder) = context.report_lint(&MISSING_OVERRIDE_DECORATOR, definition.focus_range)
+    else {
+        return;
+    };
+
+    let MissingOverrideTarget {
+        superclass,
+        definition: superclass_definition,
+    } = target;
+    let superclass_name = superclass.name(db);
+    let superclass_member = format!("{superclass_name}.{}", member.name);
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Method `{}` overrides `{superclass_member}` but is not decorated with `@override`",
+        member.name
+    ));
+    diagnostic.info("Decorate the method with `@typing.override` to make the override explicit");
+
+    if let Some(superclass_definition) = superclass_definition
+        && superclass_definition.file(db) == context.file()
+    {
+        diagnostic.annotate(
+            Annotation::secondary(
+                context.span(superclass_definition.focus_range(db, context.module())),
+            )
+            .message(format_args!("`{superclass_member}` defined here")),
+        );
+    }
+}
+
+fn invalid_explicit_override_definition<'db>(
+    context: &InferContext<'db, '_>,
+    member: &Member<'db>,
+    subclass_scope: ScopeId<'db>,
+) -> Option<LocalOverrideDefinition> {
+    extract_local_override_definitions(context, member, subclass_scope)
+        .into_iter()
+        .find(|definition| definition.any_definition_has_override_decorator)
+}
+
+fn missing_override_definition<'db>(
+    context: &InferContext<'db, '_>,
+    member: &Member<'db>,
+    subclass_scope: ScopeId<'db>,
+) -> Option<LocalOverrideDefinition> {
+    extract_local_override_definitions(context, member, subclass_scope)
+        .into_iter()
+        .find(|definition| !definition.focus_definition_has_override_decorator)
+}
+
+/// Extract function definitions that can carry an `@override` decorator for the class member
+/// currently being checked.
+///
+/// Use functions recovered from the member type when possible, because this preserves overload and
+/// property accessor handling. If decorators replaced some subclass definitions with functions from
+/// another class or file, recover the local function type from the binding definition so overload
+/// metadata is still preserved.
+fn extract_local_override_definitions<'db>(
+    context: &InferContext<'db, '_>,
+    member: &Member<'db>,
+    subclass_scope: ScopeId<'db>,
+) -> smallvec::SmallVec<[LocalOverrideDefinition; 1]> {
+    let db = context.db();
+    let in_stub = context.in_stub();
+    let module = context.module();
+    let member_functions =
+        extract_member_functions_from_type(db, member.ty, &member.name, subclass_scope);
+    let mut candidates = smallvec::smallvec![];
+    let mut seen_function_types = smallvec::SmallVec::<[FunctionType<'db>; 1]>::new();
+
+    for definition in end_of_scope_function_definitions(db, subclass_scope, &member.name) {
+        let function = member_functions
+            .iter()
+            .copied()
+            .find(|function| function.contains_definition(db, definition))
+            .or_else(|| infer_definition_types(db, definition).function_type(definition));
+
+        let Some(function) = function else {
+            continue;
+        };
+
+        if seen_function_types.contains(&function) {
+            continue;
+        }
+        candidates.push(LocalOverrideDefinition::from_function(
+            db, function, in_stub, module,
+        ));
+        seen_function_types.push(function);
+    }
+
+    // A property with a setter can keep the getter in the member type even though the setter is the
+    // end-of-scope binding. Preserve any type-derived functions that the syntactic pass did not see.
+    for function in member_functions {
+        if !seen_function_types.contains(&function) {
+            candidates.push(LocalOverrideDefinition::from_function(
+                db, function, in_stub, module,
+            ));
+        }
+    }
+
+    candidates
+}
+
+/// Return reachable function definitions that bind `member_name` at the end of `subclass_scope`.
+fn end_of_scope_function_definitions<'db>(
+    db: &'db dyn Db,
+    subclass_scope: ScopeId<'db>,
+    member_name: &Name,
+) -> smallvec::SmallVec<[Definition<'db>; 1]> {
+    let table = place_table(db, subclass_scope);
+    let Some(symbol_id) = table.symbol_id(member_name) else {
+        return smallvec::smallvec![];
+    };
+
+    let use_def = use_def_map(db, subclass_scope);
+    let predicates = use_def.predicates();
+    let reachability_constraints = use_def.reachability_constraints();
+
+    use_def
+        .end_of_scope_symbol_bindings(symbol_id)
+        .filter_map(|binding| {
+            let definition = binding.binding.definition()?;
+            let reachability =
+                reachability_constraints.evaluate(db, predicates, binding.reachability_constraint);
+            if reachability.is_always_false() || !definition.kind(db).is_function_def() {
+                return None;
+            }
+
+            Some(definition)
+        })
+        .collect()
+}
+
+/// Extract functions represented by a member type that belong to the member currently being
+/// checked. Decorators can replace a function with a function from another class or file, so
+/// callers must not use unfiltered functions as diagnostic anchors.
+///
+/// The same is true for property accessors: a setter or deleter can reuse a getter defined by
+/// another class, but override diagnostics should only point at accessors defined by the subclass
+/// member under analysis.
+fn extract_member_functions_from_type<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    member_name: &Name,
+    member_scope: ScopeId<'db>,
+) -> smallvec::SmallVec<[FunctionType<'db>; 1]> {
+    let mut functions = smallvec::SmallVec::<[FunctionType<'db>; 1]>::new();
+    let mut types: smallvec::SmallVec<[Type<'db>; 1]> = smallvec::smallvec![ty];
+    let mut index = 0;
+
+    while let Some(ty) = types.get(index).copied() {
+        index += 1;
+        match ty {
+            Type::PropertyInstance(property) => {
+                for accessor in [
+                    property.getter(db),
+                    property.setter(db),
+                    property.deleter(db),
+                ]
+                .into_iter()
+                .flatten()
+                {
+                    functions.extend(extract_underlying_functions(db, accessor));
+                }
+            }
+            Type::Union(union) => {
+                types.extend(union.elements(db).iter().copied());
+            }
+            _ => functions.extend(extract_underlying_functions(db, ty)),
+        }
+    }
+
+    functions
+        .into_iter()
+        .filter(|function| is_local_member_function(db, *function, member_name, member_scope))
+        .collect()
+}
+
+fn is_local_member_function<'db>(
+    db: &'db dyn Db,
+    function: FunctionType<'db>,
+    member_name: &Name,
+    member_scope: ScopeId<'db>,
+) -> bool {
+    function.file(db) == member_scope.file(db)
+        && function.definition(db).scope(db) == member_scope
+        && function.name(db) == member_name
+}
+
+fn overriding_definition<'db>(
+    db: &'db dyn Db,
+    function: FunctionType<'db>,
+    in_stub: bool,
+) -> OverloadLiteral<'db> {
+    let (_, implementation) = function.overloads_and_implementation(db);
+    if !in_stub && let Some(implementation) = implementation {
+        implementation
+    } else {
+        function.first_overload_or_implementation(db)
+    }
+}
+
+/// Extract callable functions represented by a type.
+/// These may be defined in files other than the one being checked.
 fn extract_underlying_functions<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
-) -> Option<smallvec::SmallVec<[FunctionType<'db>; 1]>> {
+) -> smallvec::SmallVec<[FunctionType<'db>; 1]> {
     match ty {
-        Type::FunctionLiteral(function) => Some(smallvec::smallvec_inline![function]),
-        Type::BoundMethod(method) => Some(smallvec::smallvec_inline![method.function(db)]),
-        Type::PropertyInstance(property) => extract_underlying_functions(db, property.getter(db)?),
+        Type::FunctionLiteral(function) => smallvec::smallvec_inline![function],
+        Type::BoundMethod(method) => smallvec::smallvec_inline![method.function(db)],
+        Type::PropertyInstance(property) => property.getter(db).map_or_else(
+            || smallvec::smallvec![],
+            |getter| extract_underlying_functions(db, getter),
+        ),
         Type::Union(union) => {
             let mut functions = smallvec::smallvec![];
             for member in union.elements(db) {
-                if let Some(mut member_functions) = extract_underlying_functions(db, *member) {
-                    functions.append(&mut member_functions);
-                }
+                functions.extend(extract_underlying_functions(db, *member));
             }
-            if functions.is_empty() {
-                None
-            } else {
-                Some(functions)
-            }
+            functions
         }
-        _ => None,
+        _ => smallvec::smallvec![],
     }
 }
 
@@ -1163,12 +1474,12 @@ fn check_post_init_signature<'db>(
 }
 
 #[derive(Clone, Copy, Debug)]
-enum EnumConstructorHook {
+enum EnumConstructorMethod {
     New,
     Init,
 }
 
-impl EnumConstructorHook {
+impl EnumConstructorMethod {
     fn name(self) -> &'static str {
         match self {
             Self::New => "__new__",
@@ -1177,20 +1488,20 @@ impl EnumConstructorHook {
     }
 }
 
-/// Validates an enum member value against an enum construction hook signature.
+/// Validates an enum member value against an enum constructor method signature.
 ///
 /// The enum metaclass unpacks tuple values as positional arguments to `__new__` and `__init__`,
 /// and passes non-tuple values as a single argument. This function synthesizes
 /// a call with the appropriate arguments and reports a diagnostic
 /// if the call would fail.
-fn check_enum_member_against_constructor_hook<'db>(
+fn check_enum_member_against_constructor_method<'db>(
     context: &InferContext<'db, '_>,
     function: FunctionType<'db>,
     bound_self_type: Type<'db>,
     member_value_type: Type<'db>,
     member_name: &Name,
     definition: Definition<'db>,
-    hook: EnumConstructorHook,
+    method: EnumConstructorMethod,
 ) {
     let db = context.db();
 
@@ -1228,7 +1539,7 @@ fn check_enum_member_against_constructor_hook<'db>(
         ) {
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Enum member `{member_name}` is incompatible with `{}`",
-                hook.name(),
+                method.name(),
             ));
             diagnostic.info(format_args!(
                 "Expected compatible arguments for `{}`",

@@ -5,9 +5,10 @@ use clap::builder::styling::{AnsiColor, Effects};
 use clap::error::ErrorKind;
 use clap::{ArgAction, ArgMatches, Error, Parser};
 use ruff_db::system::SystemPathBuf;
+use ruff_ranged_value::{RangedValue, ValueSource};
 use ty_combine::Combine;
 use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions, TerminalOptions};
-use ty_project::metadata::value::{RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource};
+use ty_project::metadata::value::{RelativeGlobPattern, RelativePathBuf};
 use ty_python_semantic::lint;
 use ty_static::EnvVars;
 
@@ -158,12 +159,22 @@ pub(crate) struct CheckCommand {
     pub(crate) output_format: Option<OutputFormat>,
 
     /// Use exit code 1 if there are any warning-level diagnostics.
+    ///
+    /// Cannot be used in combination with `--exit-zero` or `--exit-zero-on-warning`.
     #[arg(long, conflicts_with = "exit_zero", default_missing_value = "true", num_args=0..1)]
     pub(crate) error_on_warning: Option<bool>,
 
     /// Always use exit code 0, even when there are error-level diagnostics.
+    ///
+    /// Cannot be used in combination with `--error-on-warning`.
     #[arg(long)]
     pub(crate) exit_zero: bool,
+
+    /// Use exit code 0 if there are no error-level diagnostics.
+    ///
+    /// Cannot be used in combination with `--error-on-warning`.
+    #[arg(long, conflicts_with = "error_on_warning")]
+    pub(crate) exit_zero_on_warning: bool,
 
     /// Watch files for changes and recheck files related to the changed files.
     #[arg(long, short = 'W')]
@@ -240,6 +251,10 @@ impl CheckCommand {
             .no_respect_ignore_files
             .then_some(false)
             .or(self.respect_ignore_files);
+        let error_on_warning = self
+            .exit_zero_on_warning
+            .then_some(false)
+            .or(self.error_on_warning);
         let options = Options {
             environment: Some(EnvironmentOptions {
                 python_version: self.python_version.map(Into::into).map(RangedValue::cli),
@@ -260,7 +275,7 @@ impl CheckCommand {
                 output_format: self
                     .output_format
                     .map(|output_format| RangedValue::cli(output_format.into())),
-                error_on_warning: self.error_on_warning,
+                error_on_warning,
             }),
             src: Some(SrcOptions {
                 respect_ignore_files,

@@ -3,7 +3,6 @@ use std::io::Write;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, anyhow};
-use ruff_db::Db as _;
 use ruff_db::files::{File, FileError, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{
@@ -11,13 +10,14 @@ use ruff_db::system::{
     file_time_now,
 };
 use ruff_python_ast::PythonVersion;
+use ruff_ranged_value::RangedValue;
 use ty_module_resolver::{Module, ModuleName, resolve_module_confident};
 use ty_project::metadata::options::{
     EnvironmentOptions, Options, ProjectOptionsOverrides, SrcOptions,
 };
 use ty_project::metadata::pyproject::{PyProject, Tool};
 use ty_project::metadata::python_version::SupportedPythonVersion;
-use ty_project::metadata::value::{RangedValue, RelativeGlobPattern, RelativePathBuf};
+use ty_project::metadata::value::{RelativeGlobPattern, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
 use ty_project::{ChangeResult, Db, ProjectDatabase, ProjectMetadata};
 use ty_python_core::platform::PythonPlatform;
@@ -555,6 +555,52 @@ fn new_file() -> anyhow::Result<()> {
 }
 
 #[test]
+fn new_directory_with_python_files() -> anyhow::Result<()> {
+    let mut case = setup([("bar.py", "")])?;
+    let bar_path = case.project_path("bar.py");
+    let bar_file = case.system_file(&bar_path).unwrap();
+    let package_path = case.project_path("package");
+    let init_path = package_path.join("__init__.py");
+    let module_path = package_path.join("module.py");
+
+    case.assert_indexed_project_files([bar_file]);
+    assert!(
+        resolve_module_confident(
+            case.db(),
+            &ModuleName::new_static("package.module").unwrap()
+        )
+        .is_none()
+    );
+
+    std::fs::create_dir(package_path.as_std_path())?;
+    std::fs::write(init_path.as_std_path(), "")?;
+    std::fs::write(module_path.as_std_path(), "")?;
+
+    let changes = case.stop_watch(|event: &ChangeEvent| {
+        matches!(
+            event.file_name(),
+            Some("package" | "__init__.py" | "module.py")
+        )
+    });
+
+    case.apply_changes(&changes, None);
+
+    let init = case.system_file(&init_path).expect("__init__.py to exist");
+    let module = case.system_file(&module_path).expect("module.py to exist");
+
+    case.assert_indexed_project_files([bar_file, init, module]);
+    assert!(
+        resolve_module_confident(
+            case.db(),
+            &ModuleName::new_static("package.module").unwrap()
+        )
+        .is_some()
+    );
+
+    Ok(())
+}
+
+#[test]
 fn new_non_python_file_is_not_indexed() -> anyhow::Result<()> {
     let mut case = setup([("bar.py", "")])?;
     let bar_path = case.project_path("bar.py");
@@ -880,6 +926,7 @@ fn deleted_file() -> anyhow::Result<()> {
     let foo = case.system_file(&foo_path)?;
 
     assert!(foo.exists(case.db()));
+    assert!(resolve_module_confident(case.db(), &ModuleName::new_static("foo").unwrap()).is_some());
     case.assert_indexed_project_files([foo]);
 
     std::fs::remove_file(foo_path.as_std_path())?;
@@ -889,6 +936,7 @@ fn deleted_file() -> anyhow::Result<()> {
     case.apply_changes(&changes, None);
 
     assert!(!foo.exists(case.db()));
+    assert!(resolve_module_confident(case.db(), &ModuleName::new_static("foo").unwrap()).is_none());
     case.assert_indexed_project_files([]);
 
     Ok(())
@@ -1524,7 +1572,7 @@ fn hard_links_in_project() -> anyhow::Result<()> {
 /// ```
 ///
 /// # Linux
-/// inotiyf doesn't support observing changes to hard linked files.
+/// inotify doesn't support observing changes to hard linked files.
 ///
 /// > Note: when monitoring a directory, events are not generated for
 /// > the files inside the directory when the events are performed via
@@ -2167,28 +2215,19 @@ fn rename_files_casing_only() -> anyhow::Result<()> {
         "Expected `Lib` module not to exist"
     );
 
-    // Now rename `lib.py` to `Lib.py`
-    if case.db().system().case_sensitivity().is_case_sensitive() {
-        std::fs::rename(
-            case.project_path("lib.py").as_std_path(),
-            case.project_path("Lib.py").as_std_path(),
-        )
-        .context("Failed to rename `lib.py` to `Lib.py`")?;
-    } else {
-        // On case-insensitive file systems, renaming a file to a different casing is a no-op.
-        // Rename to a different name first
-        std::fs::rename(
-            case.project_path("lib.py").as_std_path(),
-            case.project_path("temp.py").as_std_path(),
-        )
-        .context("Failed to rename `lib.py` to `temp.py`")?;
+    // On case-insensitive file systems, renaming a file to a different casing is a no-op.
+    // Rename to a different name first.
+    std::fs::rename(
+        case.project_path("lib.py").as_std_path(),
+        case.project_path("temp.py").as_std_path(),
+    )
+    .context("Failed to rename `lib.py` to `temp.py`")?;
 
-        std::fs::rename(
-            case.project_path("temp.py").as_std_path(),
-            case.project_path("Lib.py").as_std_path(),
-        )
-        .context("Failed to rename `temp.py` to `Lib.py`")?;
-    }
+    std::fs::rename(
+        case.project_path("temp.py").as_std_path(),
+        case.project_path("Lib.py").as_std_path(),
+    )
+    .context("Failed to rename `temp.py` to `Lib.py`")?;
 
     let changes = case.stop_watch(event_for_file("Lib.py"));
     case.apply_changes(&changes, None);

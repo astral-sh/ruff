@@ -31,12 +31,13 @@ impl SourceMarker {
 /// Sourcemaps are used to map positions in the original source to positions in
 /// the transformed code. Here, only the boundaries of edits are tracked instead
 /// of every single character.
+///
+/// This mapping maintains the invariant that markers are in source order.
 #[derive(Default, PartialEq, Eq)]
 pub struct SourceMap(Vec<SourceMarker>);
 
 impl SourceMap {
-    /// Returns a slice of all the markers in the sourcemap in the order they
-    /// were added.
+    /// Returns a slice of all the markers in the sourcemap in source order.
     pub fn markers(&self) -> &[SourceMarker] {
         &self.0
     }
@@ -45,6 +46,10 @@ impl SourceMap {
     ///
     /// The `output_length` is the length of the transformed string before the
     /// edit is applied.
+    ///
+    /// ## Panics
+    ///
+    /// If the start of `edit` is less than previous markers.
     pub fn push_start_marker(&mut self, edit: &Edit, output_length: TextSize) {
         self.push_marker(edit.start(), output_length);
     }
@@ -53,6 +58,10 @@ impl SourceMap {
     ///
     /// The `output_length` is the length of the transformed string after the
     /// edit has been applied.
+    ///
+    /// ## Panics
+    ///
+    /// If `edit` falls before previous markers.
     pub fn push_end_marker(&mut self, edit: &Edit, output_length: TextSize) {
         if edit.is_insertion() {
             self.push_marker(edit.start(), output_length);
@@ -63,7 +72,16 @@ impl SourceMap {
     }
 
     /// Push a new marker to the sourcemap.
+    ///
+    /// ## Panics
+    ///
+    /// If `offset` is less than previous markers.
     pub fn push_marker(&mut self, offset: TextSize, output_length: TextSize) {
+        assert!(
+            self.0.last().is_none_or(|last| offset >= last.source),
+            "Markers must be pushed in source order",
+        );
+
         self.0.push(SourceMarker {
             source: offset,
             dest: output_length,

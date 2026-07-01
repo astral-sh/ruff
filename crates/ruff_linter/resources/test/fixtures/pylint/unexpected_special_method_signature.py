@@ -8,7 +8,7 @@ class TestClass:
     def __bool__(self, x=1):  # additional optional args OK
         ...
 
-    def __bool__():  # ignored; should be caughty by E0211/N805
+    def __bool__():  # ignored; should be caught by E0211/N805
         ...
 
     @staticmethod

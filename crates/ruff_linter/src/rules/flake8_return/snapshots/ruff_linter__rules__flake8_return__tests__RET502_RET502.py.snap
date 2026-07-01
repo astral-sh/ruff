@@ -11,10 +11,9 @@ RET502 [*] Do not implicitly `return None` in function able to return non-`None`
 4 |     return 1
   |
 help: Add explicit `None` return value
-1 | def x(y):
+  |
 2 |     if not y:
   -         return  # error
 3 +         return None  # error
 4 |     return 1
-5 |
-6 |
+  |

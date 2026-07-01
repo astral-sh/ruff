@@ -27,9 +27,11 @@ class TestLoader:
     suiteClass: _SuiteClass
     def loadTestsFromTestCase(self, testCaseClass: type[unittest.case.TestCase]) -> unittest.suite.TestSuite:
         """Return a suite of all test cases contained in testCaseClass"""
+
     if sys.version_info >= (3, 12):
         def loadTestsFromModule(self, module: ModuleType, *, pattern: str | None = None) -> unittest.suite.TestSuite:
             """Return a suite of all test cases contained in the given module"""
+
     else:
         def loadTestsFromModule(self, module: ModuleType, *args: Any, pattern: str | None = None) -> unittest.suite.TestSuite:
             """Return a suite of all test cases contained in the given module"""

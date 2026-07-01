@@ -8,7 +8,7 @@ use ruff_index::{Idx, IndexVec};
 use rustc_hash::FxHashMap;
 
 use crate::predicate::ScopedPredicateId;
-use crate::rank::RankBitBox;
+use crate::rank::{RankBitBox, RankBitBoxVec};
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
 /// is just like a boolean formula, but with `Ambiguous` as a third potential result. See the
@@ -144,7 +144,9 @@ pub struct ReachabilityConstraints {
     /// A bit vector indicating which interior TDD nodes were marked as used. This is indexed by
     /// the node's [`ScopedReachabilityConstraintId`]. The rank of the corresponding bit gives the
     /// index of that node in the `used_interiors` vector.
-    used_indices: RankBitBox,
+    ///
+    /// If all interior nodes were retained, the original ID can be used directly instead.
+    used_indices: Option<RankBitBox>,
 }
 
 impl ReachabilityConstraints {
@@ -152,27 +154,27 @@ impl ReachabilityConstraints {
     pub fn get_interior_node(&self, id: ScopedReachabilityConstraintId) -> InteriorNode {
         debug_assert!(!id.is_terminal());
         let raw_index = id.as_u32() as usize;
-        debug_assert!(
-            self.used_indices().get_bit(raw_index).unwrap_or(false),
-            "all used reachability constraints should have been marked as used",
-        );
-        let index = self.used_indices().rank(raw_index) as usize;
-        self.used_interiors()[index]
+        if let Some(used_indices) = &self.used_indices {
+            debug_assert!(
+                used_indices.get_bit(raw_index).unwrap_or(false),
+                "all used reachability constraints should have been marked as used",
+            );
+            let index = used_indices.rank(raw_index) as usize;
+            self.used_interiors[index]
+        } else {
+            self.used_interiors[raw_index]
+        }
     }
 
     pub fn used_interiors(&self) -> &[InteriorNode] {
         &self.used_interiors
-    }
-
-    pub fn used_indices(&self) -> &RankBitBox {
-        &self.used_indices
     }
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct ReachabilityConstraintsBuilder {
     interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
-    interior_used: IndexVec<ScopedReachabilityConstraintId, bool>,
+    interior_used: RankBitBoxVec,
     interior_cache: FxHashMap<InteriorNode, ScopedReachabilityConstraintId>,
     not_cache: FxHashMap<ScopedReachabilityConstraintId, ScopedReachabilityConstraintId>,
     and_cache: FxHashMap<
@@ -193,14 +195,21 @@ pub struct ReachabilityConstraintsBuilder {
 
 impl ReachabilityConstraintsBuilder {
     pub(crate) fn build(self) -> ReachabilityConstraints {
-        let used_indices = RankBitBox::from_bits(self.interior_used.iter().copied());
-        let used_interiors = (self.interiors.into_iter())
-            .zip(self.interior_used)
-            .filter_map(|(interior, used)| used.then_some(interior))
-            .collect();
-        ReachabilityConstraints {
-            used_interiors,
-            used_indices,
+        if self.interior_used.first_zero().is_none() {
+            ReachabilityConstraints {
+                used_interiors: self.interiors.raw.into_boxed_slice(),
+                used_indices: None,
+            }
+        } else {
+            let used_interiors = (self.interiors.into_iter())
+                .zip(&self.interior_used)
+                .filter_map(|(interior, used)| used.then_some(interior))
+                .collect();
+            let used_indices = RankBitBox::from_bits(self.interior_used);
+            ReachabilityConstraints {
+                used_interiors,
+                used_indices: Some(used_indices),
+            }
         }
     }
 
@@ -208,8 +217,8 @@ impl ReachabilityConstraintsBuilder {
     /// only calculated for intermediate values, and which don't need to be included in the final
     /// built result.
     pub(crate) fn mark_used(&mut self, node: ScopedReachabilityConstraintId) {
-        if !node.is_terminal() && !self.interior_used[node] {
-            self.interior_used[node] = true;
+        if !node.is_terminal() && !self.interior_used[node.index()] {
+            self.interior_used.set(node.index(), true);
             let node = self.interiors[node];
             self.mark_used(node.if_true);
             self.mark_used(node.if_ambiguous);

@@ -1,8 +1,8 @@
 use crate::metadata::options::Options;
 use crate::metadata::python_version::SupportedPythonVersion;
-use crate::metadata::value::{RangedValue, ValueSource, ValueSourceGuard};
 use pep440_rs::{Version, VersionSpecifiers, release_specifiers_to_ranges};
 use ruff_python_ast::PythonVersion;
+use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::Bound;
 use std::ops::Deref;

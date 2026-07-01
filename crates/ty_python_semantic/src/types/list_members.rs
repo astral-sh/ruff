@@ -19,7 +19,6 @@ use crate::{
     types::{
         ClassBase, ClassLiteral, KnownClass, KnownInstanceType, StaticClassLiteral,
         SubclassOfInner, Type, TypeVarBoundOrConstraints, class::CodeGeneratorKind,
-        generics::Specialization,
     },
 };
 use ty_python_core::{
@@ -207,18 +206,13 @@ impl<'db> AllMembers<'db> {
 
             Type::NominalInstance(instance) => {
                 let class = instance.class(db);
-                if let Some((class_literal, specialization)) = class.static_class_literal(db) {
+                if let Some((class_literal, _)) = class.static_class_literal(db) {
                     self.extend_with_instance_members(db, ty, class_literal);
-                    self.extend_with_synthetic_members(
-                        db,
-                        ty,
-                        ClassLiteral::Static(class_literal),
-                        specialization,
-                    );
+                    self.extend_with_synthetic_members(db, ty, ClassLiteral::Static(class_literal));
                 } else {
                     // For dynamic classes, we can't enumerate instance members (requires body scope),
                     // but we can still add synthetic members for dataclass-like classes.
-                    self.extend_with_synthetic_members(db, ty, class.class_literal(db), None);
+                    self.extend_with_synthetic_members(db, ty, class.class_literal(db));
                 }
             }
 
@@ -240,24 +234,15 @@ impl<'db> AllMembers<'db> {
 
             Type::ClassLiteral(class_literal) => {
                 self.extend_with_class_members(db, ty, class_literal);
-                self.extend_with_synthetic_members(db, ty, class_literal, None);
-                if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
-                    self.extend_with_class_members(db, ty, metaclass);
-                }
+                self.extend_with_synthetic_members(db, ty, class_literal);
+                self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
             }
 
             Type::GenericAlias(generic_alias) => {
                 let class_literal = generic_alias.origin(db);
                 self.extend_with_class_members(db, ty, ClassLiteral::Static(class_literal));
-                self.extend_with_synthetic_members(
-                    db,
-                    ty,
-                    ClassLiteral::Static(class_literal),
-                    None,
-                );
-                if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
-                    self.extend_with_class_members(db, ty, metaclass);
-                }
+                self.extend_with_synthetic_members(db, ty, ClassLiteral::Static(class_literal));
+                self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
             }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
@@ -266,9 +251,7 @@ impl<'db> AllMembers<'db> {
                 }
                 _ => {
                     if let Some(class_type) = subclass_of_type.subclass_of().into_class(db) {
-                        if let Some((class_literal, specialization)) =
-                            class_type.static_class_literal(db)
-                        {
+                        if let Some((class_literal, _)) = class_type.static_class_literal(db) {
                             self.extend_with_class_members(
                                 db,
                                 ty,
@@ -278,11 +261,8 @@ impl<'db> AllMembers<'db> {
                                 db,
                                 ty,
                                 ClassLiteral::Static(class_literal),
-                                specialization,
                             );
-                            if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
-                                self.extend_with_class_members(db, ty, metaclass);
-                            }
+                            self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
                         }
                     }
                 }
@@ -292,7 +272,8 @@ impl<'db> AllMembers<'db> {
             | Type::Divergent(_)
             | Type::Never
             | Type::AlwaysTruthy
-            | Type::AlwaysFalsy => {
+            | Type::AlwaysFalsy
+            | Type::TypeForm(_) => {
                 self.extend_with_type(db, Type::object());
             }
 
@@ -367,7 +348,7 @@ impl<'db> AllMembers<'db> {
 
             Type::ModuleLiteral(literal) => {
                 // Looking up `__file__` on `types.ModuleType` will not give as precise a type
-                // as we infer in type inference, but it's confuisng if autocomplete etc.
+                // as we infer in type inference, but it's confusing if autocomplete etc.
                 // shows a different type in the tooltip to the one inferred by the type checker.
                 let dunder_file_type = if literal.module(db).file(db).is_some() {
                     KnownClass::Str.to_instance(db)
@@ -495,6 +476,26 @@ impl<'db> AllMembers<'db> {
         }
     }
 
+    /// Extend a class object's members with members set by its metaclass.
+    ///
+    /// A static metaclass can also assign attributes onto the class objects that it creates,
+    /// so those implicit instance members are available on the class object as well.
+    fn extend_with_metaclass_members(
+        &mut self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        metaclass: Type<'db>,
+    ) {
+        let Some(metaclass) = metaclass.to_class_type(db) else {
+            return;
+        };
+
+        self.extend_with_class_members(db, ty, metaclass.class_literal(db));
+        if let Some((metaclass, _)) = metaclass.static_class_literal(db) {
+            self.extend_with_instance_members(db, ty, metaclass);
+        }
+    }
+
     /// Extend with instance members from a single class (not its MRO).
     fn extend_with_instance_members_for_class(
         &mut self,
@@ -560,9 +561,8 @@ impl<'db> AllMembers<'db> {
         db: &'db dyn Db,
         ty: Type<'db>,
         class_literal: ClassLiteral<'db>,
-        specialization: Option<Specialization<'db>>,
     ) {
-        match CodeGeneratorKind::from_class(db, class_literal, specialization) {
+        match CodeGeneratorKind::from_class(db, class_literal) {
             Some(CodeGeneratorKind::NamedTuple) => {
                 if ty.is_nominal_instance() {
                     self.extend_with_type(db, KnownClass::NamedTupleFallback.to_instance(db));

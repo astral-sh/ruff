@@ -2,8 +2,11 @@ use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 
 use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
+use ruff_python_ast::ExprRef;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::Tokens;
+use ruff_python_trivia::TriviaRanges;
+use ruff_text_size::Ranged;
 
 use crate::PyFormatOptions;
 use crate::comments::Comments;
@@ -13,6 +16,7 @@ pub struct PyFormatContext<'a> {
     options: PyFormatOptions,
     contents: &'a str,
     comments: Comments<'a>,
+    trivia: &'a TriviaRanges,
     tokens: &'a Tokens,
     node_level: NodeLevel,
     indent_level: IndentLevel,
@@ -34,12 +38,14 @@ impl<'a> PyFormatContext<'a> {
         options: PyFormatOptions,
         contents: &'a str,
         comments: Comments<'a>,
+        trivia: &'a TriviaRanges,
         tokens: &'a Tokens,
     ) -> Self {
         Self {
             options,
             contents,
             comments,
+            trivia,
             tokens,
             node_level: NodeLevel::TopLevel(TopLevelStatementPosition::Other),
             indent_level: IndentLevel::new(0),
@@ -72,8 +78,16 @@ impl<'a> PyFormatContext<'a> {
         &self.comments
     }
 
+    pub(crate) fn trivia(&self) -> &'a TriviaRanges {
+        self.trivia
+    }
+
     pub(crate) fn tokens(&self) -> &'a Tokens {
         self.tokens
+    }
+
+    pub(crate) fn is_expression_parenthesized(&self, expression: ExprRef) -> bool {
+        self.trivia.parenthesized().contains(expression.range())
     }
 
     /// Returns a non-None value only if the formatter is running on a code

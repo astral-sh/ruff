@@ -50,20 +50,34 @@ question when considering a typevar, by translating the desired relationship int
 
 ```py
 from typing import Any
-from ty_extensions import ConstraintSet, is_assignable_to, is_subtype_of, static_assert
+from ty_extensions import ConstraintSet, is_assignable_to, is_constraint_set_assignable_to, is_subtype_of, static_assert
 
 def assignability[T]():
+    # TODO: is_assignable_to should eventually work the way is_constraint_set_assignable_to does
+    # below.
     constraints = is_assignable_to(T, bool)
-    # TODO: expected = ConstraintSet.range(Never, T, bool)
     expected = ConstraintSet.never()
     static_assert(constraints == expected)
 
+    constraints = is_constraint_set_assignable_to(T, bool)
+    expected = ConstraintSet.range(Never, T, bool)
+    static_assert(constraints == expected)
+
+    # TODO: is_assignable_to should eventually work the way is_constraint_set_assignable_to does
+    # below.
     constraints = is_assignable_to(T, int)
-    # TODO: expected = ConstraintSet.range(Never, T, int)
     expected = ConstraintSet.never()
+    static_assert(constraints == expected)
+
+    constraints = is_constraint_set_assignable_to(T, int)
+    expected = ConstraintSet.range(Never, T, int)
     static_assert(constraints == expected)
 
     constraints = is_assignable_to(T, object)
+    expected = ConstraintSet.always()
+    static_assert(constraints == expected)
+
+    constraints = is_constraint_set_assignable_to(T, object)
     expected = ConstraintSet.always()
     static_assert(constraints == expected)
 
@@ -522,8 +536,6 @@ def identity2[T](t: T) -> T:
 
     static_assert(constraints.implies_subtype_of(TypeOf[identity2], Callable[[int], int]))
     static_assert(constraints.implies_subtype_of(TypeOf[identity2], Callable[[str], str]))
-    # TODO: no error
-    # error: [static-assert-error]
     static_assert(not constraints.implies_subtype_of(TypeOf[identity2], Callable[[str], int]))
     static_assert(constraints.implies_subtype_of(TypeOf[identity2], GenericIdentity[int]))
     static_assert(constraints.implies_subtype_of(TypeOf[identity2], GenericIdentity[str]))
@@ -535,6 +547,41 @@ def identity2[T](t: T) -> T:
     static_assert(not constraints.implies_subtype_of(GenericIdentity[str], TypeOf[identity2]))
 
     return t
+```
+
+Invariant generic classes in a generic callable's return type should preserve cross-typevar
+constraints that remain after the callable's own typevars are quantified away. Here, `listify` can
+be used as a `Callable[[U], list[V]]` when the surrounding constraints imply `U ≤ V`.
+
+```py
+from typing import Callable
+from ty_extensions import ConstraintSet, TypeOf, static_assert
+
+def listify[T](t: T) -> list[T]:
+    return [t]
+
+def constrained_by_other_typevars[U, V]() -> None:
+    ok = ConstraintSet.range(bool, U, int) & ConstraintSet.range(int, V, int)
+    # TODO: no error
+    # This does not depend on combining constraints from multiple call arguments. The callable
+    # relation introduces constraints involving listify's fresh typevar and then existentially
+    # reduces that typevar away. That reduction is lossy for invariant generic classes: in general,
+    # there may not be a derived constraint over only the remaining typevars that fully captures the
+    # invariant specialization relationship.
+    # error: [static-assert-error]
+    static_assert(ok.implies_subtype_of(TypeOf[listify], Callable[[U], list[V]]))
+
+    bad = ConstraintSet.range(str, U, str) & ConstraintSet.range(int, V, int)
+    static_assert(not bad.implies_subtype_of(TypeOf[listify], Callable[[U], list[V]]))
+
+def recursive_listify[T](t: T) -> list[T]:
+    constraints = ConstraintSet.range(bool, T, int)
+
+    static_assert(constraints.implies_subtype_of(TypeOf[recursive_listify], Callable[[int], list[int]]))
+    static_assert(constraints.implies_subtype_of(TypeOf[recursive_listify], Callable[[str], list[str]]))
+    static_assert(not constraints.implies_subtype_of(TypeOf[recursive_listify], Callable[[str], list[int]]))
+
+    return [t]
 ```
 
 ## Transitivity

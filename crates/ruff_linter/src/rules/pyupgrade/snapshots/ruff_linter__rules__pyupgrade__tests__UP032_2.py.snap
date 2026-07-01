@@ -11,12 +11,12 @@ UP032 [*] Use f-string instead of `format` call
 4 | "{a.real}".format(a=1)
   |
 help: Convert to f-string
+  |
 1 | # Errors
   - "{.real}".format(1)
 2 + f"{(1).real}"
 3 | "{0.real}".format(1)
-4 | "{a.real}".format(a=1)
-5 |
+  |
 
 UP032 [*] Use f-string instead of `format` call
  --> UP032_2.py:3:1
@@ -28,13 +28,12 @@ UP032 [*] Use f-string instead of `format` call
 4 | "{a.real}".format(a=1)
   |
 help: Convert to f-string
-1 | # Errors
+  |
 2 | "{.real}".format(1)
   - "{0.real}".format(1)
 3 + f"{(1).real}"
 4 | "{a.real}".format(a=1)
-5 |
-6 | "{.real}".format(1.0)
+  |
 
 UP032 [*] Use f-string instead of `format` call
  --> UP032_2.py:4:1
@@ -47,14 +46,12 @@ UP032 [*] Use f-string instead of `format` call
 6 | "{.real}".format(1.0)
   |
 help: Convert to f-string
-1 | # Errors
-2 | "{.real}".format(1)
+  |
 3 | "{0.real}".format(1)
   - "{a.real}".format(a=1)
 4 + f"{(1).real}"
 5 |
-6 | "{.real}".format(1.0)
-7 | "{0.real}".format(1.0)
+  |
 
 UP032 [*] Use f-string instead of `format` call
  --> UP032_2.py:6:1
@@ -67,14 +64,12 @@ UP032 [*] Use f-string instead of `format` call
 8 | "{a.real}".format(a=1.0)
   |
 help: Convert to f-string
-3 | "{0.real}".format(1)
-4 | "{a.real}".format(a=1)
+  |
 5 |
   - "{.real}".format(1.0)
 6 + f"{1.0.real}"
 7 | "{0.real}".format(1.0)
-8 | "{a.real}".format(a=1.0)
-9 |
+  |
 
 UP032 [*] Use f-string instead of `format` call
  --> UP032_2.py:7:1
@@ -85,14 +80,12 @@ UP032 [*] Use f-string instead of `format` call
 8 | "{a.real}".format(a=1.0)
   |
 help: Convert to f-string
-4  | "{a.real}".format(a=1)
-5  |
-6  | "{.real}".format(1.0)
-   - "{0.real}".format(1.0)
-7  + f"{1.0.real}"
-8  | "{a.real}".format(a=1.0)
-9  |
-10 | "{.real}".format(1j)
+  |
+6 | "{.real}".format(1.0)
+  - "{0.real}".format(1.0)
+7 + f"{1.0.real}"
+8 | "{a.real}".format(a=1.0)
+  |
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:8:1
@@ -105,14 +98,12 @@ UP032 [*] Use f-string instead of `format` call
 10 | "{.real}".format(1j)
    |
 help: Convert to f-string
-5  |
-6  | "{.real}".format(1.0)
-7  | "{0.real}".format(1.0)
-   - "{a.real}".format(a=1.0)
-8  + f"{1.0.real}"
-9  |
-10 | "{.real}".format(1j)
-11 | "{0.real}".format(1j)
+  |
+7 | "{0.real}".format(1.0)
+  - "{a.real}".format(a=1.0)
+8 + f"{1.0.real}"
+9 |
+  |
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:10:1
@@ -125,14 +116,12 @@ UP032 [*] Use f-string instead of `format` call
 12 | "{a.real}".format(a=1j)
    |
 help: Convert to f-string
-7  | "{0.real}".format(1.0)
-8  | "{a.real}".format(a=1.0)
+   |
 9  |
    - "{.real}".format(1j)
 10 + f"{1j.real}"
 11 | "{0.real}".format(1j)
-12 | "{a.real}".format(a=1j)
-13 |
+   |
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:11:1
@@ -143,14 +132,12 @@ UP032 [*] Use f-string instead of `format` call
 12 | "{a.real}".format(a=1j)
    |
 help: Convert to f-string
-8  | "{a.real}".format(a=1.0)
-9  |
+   |
 10 | "{.real}".format(1j)
    - "{0.real}".format(1j)
 11 + f"{1j.real}"
 12 | "{a.real}".format(a=1j)
-13 |
-14 | "{.real}".format(0b01)
+   |
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:12:1
@@ -163,14 +150,12 @@ UP032 [*] Use f-string instead of `format` call
 14 | "{.real}".format(0b01)
    |
 help: Convert to f-string
-9  |
-10 | "{.real}".format(1j)
+   |
 11 | "{0.real}".format(1j)
    - "{a.real}".format(a=1j)
 12 + f"{1j.real}"
 13 |
-14 | "{.real}".format(0b01)
-15 | "{0.real}".format(0b01)
+   |
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:14:1
@@ -183,14 +168,12 @@ UP032 [*] Use f-string instead of `format` call
 16 | "{a.real}".format(a=0b01)
    |
 help: Convert to f-string
-11 | "{0.real}".format(1j)
-12 | "{a.real}".format(a=1j)
+   |
 13 |
    - "{.real}".format(0b01)
 14 + f"{0b01.real}"
 15 | "{0.real}".format(0b01)
-16 | "{a.real}".format(a=0b01)
-17 |
+   |
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:15:1
@@ -201,14 +184,12 @@ UP032 [*] Use f-string instead of `format` call
 16 | "{a.real}".format(a=0b01)
    |
 help: Convert to f-string
-12 | "{a.real}".format(a=1j)
-13 |
+   |
 14 | "{.real}".format(0b01)
    - "{0.real}".format(0b01)
 15 + f"{0b01.real}"
 16 | "{a.real}".format(a=0b01)
-17 |
-18 | "{}".format(1 + 2)
+   |
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:16:1
@@ -221,14 +202,12 @@ UP032 [*] Use f-string instead of `format` call
 18 | "{}".format(1 + 2)
    |
 help: Convert to f-string
-13 |
-14 | "{.real}".format(0b01)
+   |
 15 | "{0.real}".format(0b01)
    - "{a.real}".format(a=0b01)
 16 + f"{0b01.real}"
 17 |
-18 | "{}".format(1 + 2)
-19 | "{}".format([1, 2])
+   |
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:18:1
@@ -241,14 +220,12 @@ UP032 [*] Use f-string instead of `format` call
 20 | "{}".format({1, 2})
    |
 help: Convert to f-string
-15 | "{0.real}".format(0b01)
-16 | "{a.real}".format(a=0b01)
+   |
 17 |
    - "{}".format(1 + 2)
 18 + f"{1 + 2}"
 19 | "{}".format([1, 2])
-20 | "{}".format({1, 2})
-21 | "{}".format({1: 2, 3: 4})
+   |
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:19:1
@@ -260,14 +237,12 @@ UP032 [*] Use f-string instead of `format` call
 21 | "{}".format({1: 2, 3: 4})
    |
 help: Convert to f-string
-16 | "{a.real}".format(a=0b01)
-17 |
+   |
 18 | "{}".format(1 + 2)
    - "{}".format([1, 2])
 19 + f"{[1, 2]}"
 20 | "{}".format({1, 2})
-21 | "{}".format({1: 2, 3: 4})
-22 | "{}".format((i for i in range(2)))
+   |
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:20:1
@@ -280,14 +255,12 @@ UP032 [*] Use f-string instead of `format` call
 22 | "{}".format((i for i in range(2)))
    |
 help: Convert to f-string
-17 |
-18 | "{}".format(1 + 2)
+   |
 19 | "{}".format([1, 2])
    - "{}".format({1, 2})
 20 + f"{({1, 2})}"
 21 | "{}".format({1: 2, 3: 4})
-22 | "{}".format((i for i in range(2)))
-23 |
+   |
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:21:1
@@ -299,14 +272,12 @@ UP032 [*] Use f-string instead of `format` call
 22 | "{}".format((i for i in range(2)))
    |
 help: Convert to f-string
-18 | "{}".format(1 + 2)
-19 | "{}".format([1, 2])
+   |
 20 | "{}".format({1, 2})
    - "{}".format({1: 2, 3: 4})
 21 + f"{({1: 2, 3: 4})}"
 22 | "{}".format((i for i in range(2)))
-23 |
-24 | "{.real}".format(1 + 2)
+   |
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:22:1
@@ -319,14 +290,12 @@ UP032 [*] Use f-string instead of `format` call
 24 | "{.real}".format(1 + 2)
    |
 help: Convert to f-string
-19 | "{}".format([1, 2])
-20 | "{}".format({1, 2})
+   |
 21 | "{}".format({1: 2, 3: 4})
    - "{}".format((i for i in range(2)))
 22 + f"{(i for i in range(2))}"
 23 |
-24 | "{.real}".format(1 + 2)
-25 | "{.real}".format([1, 2])
+   |
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:24:1
@@ -339,14 +308,12 @@ UP032 [*] Use f-string instead of `format` call
 26 | "{.real}".format({1, 2})
    |
 help: Convert to f-string
-21 | "{}".format({1: 2, 3: 4})
-22 | "{}".format((i for i in range(2)))
+   |
 23 |
    - "{.real}".format(1 + 2)
 24 + f"{(1 + 2).real}"
 25 | "{.real}".format([1, 2])
-26 | "{.real}".format({1, 2})
-27 | "{.real}".format({1: 2, 3: 4})
+   |
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:25:1
@@ -358,14 +325,12 @@ UP032 [*] Use f-string instead of `format` call
 27 | "{.real}".format({1: 2, 3: 4})
    |
 help: Convert to f-string
-22 | "{}".format((i for i in range(2)))
-23 |
+   |
 24 | "{.real}".format(1 + 2)
    - "{.real}".format([1, 2])
 25 + f"{[1, 2].real}"
 26 | "{.real}".format({1, 2})
-27 | "{.real}".format({1: 2, 3: 4})
-28 | "{}".format((i for i in range(2)))
+   |
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:26:1
@@ -378,14 +343,12 @@ UP032 [*] Use f-string instead of `format` call
 28 | "{}".format((i for i in range(2)))
    |
 help: Convert to f-string
-23 |
-24 | "{.real}".format(1 + 2)
+   |
 25 | "{.real}".format([1, 2])
    - "{.real}".format({1, 2})
 26 + f"{({1, 2}).real}"
 27 | "{.real}".format({1: 2, 3: 4})
-28 | "{}".format((i for i in range(2)))
-29 |
+   |
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:27:1
@@ -397,14 +360,12 @@ UP032 [*] Use f-string instead of `format` call
 28 | "{}".format((i for i in range(2)))
    |
 help: Convert to f-string
-24 | "{.real}".format(1 + 2)
-25 | "{.real}".format([1, 2])
+   |
 26 | "{.real}".format({1, 2})
    - "{.real}".format({1: 2, 3: 4})
 27 + f"{({1: 2, 3: 4}).real}"
 28 | "{}".format((i for i in range(2)))
-29 |
-30 | # https://github.com/astral-sh/ruff/issues/21017
+   |
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:28:1
@@ -417,14 +378,12 @@ UP032 [*] Use f-string instead of `format` call
 30 | # https://github.com/astral-sh/ruff/issues/21017
    |
 help: Convert to f-string
-25 | "{.real}".format([1, 2])
-26 | "{.real}".format({1, 2})
+   |
 27 | "{.real}".format({1: 2, 3: 4})
    - "{}".format((i for i in range(2)))
 28 + f"{(i for i in range(2))}"
 29 |
-30 | # https://github.com/astral-sh/ruff/issues/21017
-31 | "{.real}".format(1_2)
+   |
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:31:1
@@ -436,13 +395,12 @@ UP032 [*] Use f-string instead of `format` call
 33 | "{a.real}".format(a=1_2)
    |
 help: Convert to f-string
-28 | "{}".format((i for i in range(2)))
-29 |
+   |
 30 | # https://github.com/astral-sh/ruff/issues/21017
    - "{.real}".format(1_2)
 31 + f"{(1_2).real}"
 32 | "{0.real}".format(1_2)
-33 | "{a.real}".format(a=1_2)
+   |
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:32:1
@@ -454,12 +412,12 @@ UP032 [*] Use f-string instead of `format` call
 33 | "{a.real}".format(a=1_2)
    |
 help: Convert to f-string
-29 |
-30 | # https://github.com/astral-sh/ruff/issues/21017
+   |
 31 | "{.real}".format(1_2)
    - "{0.real}".format(1_2)
 32 + f"{(1_2).real}"
 33 | "{a.real}".format(a=1_2)
+   |
 
 UP032 [*] Use f-string instead of `format` call
   --> UP032_2.py:33:1
@@ -470,8 +428,8 @@ UP032 [*] Use f-string instead of `format` call
    | ^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Convert to f-string
-30 | # https://github.com/astral-sh/ruff/issues/21017
-31 | "{.real}".format(1_2)
+   |
 32 | "{0.real}".format(1_2)
    - "{a.real}".format(a=1_2)
 33 + f"{(1_2).real}"
+   |

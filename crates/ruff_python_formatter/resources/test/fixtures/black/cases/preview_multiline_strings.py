@@ -102,7 +102,7 @@ test_vectors = [
     "two\nliner\n",
     """expressed
 as a three line
-mulitline string""",
+multiline string""",
 ]
 
 _wat = re.compile(

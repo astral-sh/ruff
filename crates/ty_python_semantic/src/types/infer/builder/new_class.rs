@@ -8,7 +8,9 @@ use crate::types::diagnostic::{
 };
 use crate::types::infer::builder::{
     ArgumentsIter, TypeInferenceBuilder,
-    dynamic_class::{DynamicClassKind, report_dynamic_mro_errors},
+    dynamic_class::{
+        DynamicClassKind, report_dynamic_mro_errors, report_inconsistent_dynamic_generic_bases,
+    },
 };
 use crate::types::{KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type};
 use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex};
@@ -145,7 +147,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let has_exec_body = exec_body_arg.is_some_and(|arg| !arg.is_none_literal_expr());
         let members: Box<[(ast::name::Name, Type<'db>)]> = Box::new([]);
         let dynamic_class =
-            DynamicClassLiteral::new(db, name.clone(), anchor, members, has_exec_body, None);
+            DynamicClassLiteral::new(db, &name, anchor, members, has_exec_body, None);
 
         // For dangling calls, validate bases eagerly. For assigned calls, validation is
         // deferred along with bases inference.
@@ -160,6 +162,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             );
 
             if report_dynamic_mro_errors(&self.context, dynamic_class, call_expr, bases_arg) {
+                report_inconsistent_dynamic_generic_bases(&self.context, dynamic_class, bases_arg);
+
                 // MRO succeeded, check for instance-layout-conflict.
                 disjoint_bases.remove_redundant_entries(db);
                 if disjoint_bases.len() > 1 {

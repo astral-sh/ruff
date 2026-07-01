@@ -36,7 +36,7 @@ env:
   RUST_BACKTRACE: 1
   # Line-tables-only debug info: faster builds, backtraces still work.
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
-  CONFORMANCE_SUITE_COMMIT: 5a701a037b5243df1f39622b642893d865f06205
+  CONFORMANCE_SUITE_COMMIT: f9664d894c8cbfca8fba44624bdedef09add1aa7
   PYTHON_VERSION: 3.12
 
 jobs:
@@ -45,7 +45,7 @@ jobs:
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           path: ruff
           persist-credentials: false
@@ -54,7 +54,7 @@ jobs:
       - name: Fetch full history without tags
         run: git -C ruff fetch --no-tags --filter=blob:none --unshallow origin
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: python/typing
           ref: ${{ env.CONFORMANCE_SUITE_COMMIT }}

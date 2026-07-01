@@ -14,6 +14,7 @@ SIM108 [*] Use ternary operator `b = c if a else d` instead of `if`-`else`-block
 7 |   # OK
   |
 help: Replace `if`-`else`-block with `b = c if a else d`
+  |
 1 | # SIM108
   - if a:
   -     b = c
@@ -21,8 +22,7 @@ help: Replace `if`-`else`-block with `b = c if a else d`
   -     b = d
 2 + b = c if a else d
 3 |
-4 | # OK
-5 | b = c if a else d
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 SIM108 [*] Use ternary operator `b = 1 if a else 2` instead of `if`-`else`-block
@@ -37,8 +37,7 @@ SIM108 [*] Use ternary operator `b = 1 if a else 2` instead of `if`-`else`-block
    | |_____________^
    |
 help: Replace `if`-`else`-block with `b = 1 if a else 2`
-27 | if True:
-28 |     pass
+   |
 29 | else:
    -     if a:
    -         b = 1
@@ -46,8 +45,7 @@ help: Replace `if`-`else`-block with `b = 1 if a else 2`
    -         b = 2
 30 +     b = 1 if a else 2
 31 |
-32 |
-33 | import sys
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 SIM108 Use ternary operator `abc = x if x > 0 else -x` instead of `if`-`else`-block
@@ -75,8 +73,7 @@ SIM108 [*] Use ternary operator `b = "cccccccccccccccccccccccccccccccccß" if a 
    | |_____________________________________________^
    |
 help: Replace `if`-`else`-block with `b = "cccccccccccccccccccccccccccccccccß" if a else "ddddddddddddddddddddddddddddddddd💣"`
-79 |
-80 |
+   |
 81 | # SIM108
    - if a:
    -     b = "cccccccccccccccccccccccccccccccccß"
@@ -84,8 +81,7 @@ help: Replace `if`-`else`-block with `b = "cccccccccccccccccccccccccccccccccß" 
    -     b = "ddddddddddddddddddddddddddddddddd💣"
 82 + b = "cccccccccccccccccccccccccccccccccß" if a else "ddddddddddddddddddddddddddddddddd💣"
 83 |
-84 |
-85 | # OK (too long)
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 SIM108 Use ternary operator `exitcode = 0 if True else 1` instead of `if`-`else`-block
@@ -136,8 +132,7 @@ SIM108 [*] Use binary operator `z = cond or other_cond` instead of `if`-`else`-b
 146 |   # SIM108 - should suggest
     |
 help: Replace `if`-`else`-block with `z = cond or other_cond`
-138 |
-139 | # SIM108 - should suggest
+    |
 140 | # z = cond or other_cond
     - if cond:
     -     z = cond 
@@ -145,8 +140,7 @@ help: Replace `if`-`else`-block with `z = cond or other_cond`
     -     z = other_cond
 141 + z = cond or other_cond
 142 |
-143 | # SIM108 - should suggest
-144 | # z = cond and other_cond
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 SIM108 [*] Use binary operator `z = cond and other_cond` instead of `if`-`else`-block
@@ -163,8 +157,7 @@ SIM108 [*] Use binary operator `z = cond and other_cond` instead of `if`-`else`-
 153 |   # SIM108 - should suggest
     |
 help: Replace `if`-`else`-block with `z = cond and other_cond`
-145 |
-146 | # SIM108 - should suggest
+    |
 147 | # z = cond and other_cond
     - if not cond:
     -     z = cond
@@ -172,8 +165,7 @@ help: Replace `if`-`else`-block with `z = cond and other_cond`
     -     z = other_cond
 148 + z = cond and other_cond
 149 |
-150 | # SIM108 - should suggest
-151 | # z = not cond and other_cond
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 SIM108 [*] Use binary operator `z = not cond and other_cond` instead of `if`-`else`-block
@@ -190,8 +182,7 @@ SIM108 [*] Use binary operator `z = not cond and other_cond` instead of `if`-`el
 160 |   # SIM108 does not suggest
     |
 help: Replace `if`-`else`-block with `z = not cond and other_cond`
-152 |
-153 | # SIM108 - should suggest
+    |
 154 | # z = not cond and other_cond
     - if cond:
     -     z = not cond
@@ -199,8 +190,7 @@ help: Replace `if`-`else`-block with `z = not cond and other_cond`
     -     z = other_cond
 155 + z = not cond and other_cond
 156 |
-157 | # SIM108 does not suggest
-158 | # a binary option in these cases,
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 SIM108 [*] Use ternary operator `z = 1 if True else other` instead of `if`-`else`-block
@@ -217,8 +207,7 @@ SIM108 [*] Use ternary operator `z = 1 if True else other` instead of `if`-`else
 172 |   if False:
     |
 help: Replace `if`-`else`-block with `z = 1 if True else other`
-164 | # so, e.g. `True == 1`.
-165 | # (Of course, these specific expressions 
+    |
 166 | # should be simplified for other reasons...)
     - if True:
     -     z = 1
@@ -226,8 +215,7 @@ help: Replace `if`-`else`-block with `z = 1 if True else other`
     -     z = other
 167 + z = 1 if True else other
 168 |
-169 | if False:
-170 |     z = 1
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 SIM108 [*] Use ternary operator `z = 1 if False else other` instead of `if`-`else`-block
@@ -244,8 +232,7 @@ SIM108 [*] Use ternary operator `z = 1 if False else other` instead of `if`-`els
 177 |   if 1:
     |
 help: Replace `if`-`else`-block with `z = 1 if False else other`
-169 | else:
-170 |     z = other
+    |
 171 |
     - if False:
     -     z = 1
@@ -253,8 +240,7 @@ help: Replace `if`-`else`-block with `z = 1 if False else other`
     -     z = other
 172 + z = 1 if False else other
 173 |
-174 | if 1:
-175 |     z = True
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 SIM108 [*] Use ternary operator `z = True if 1 else other` instead of `if`-`else`-block
@@ -271,8 +257,7 @@ SIM108 [*] Use ternary operator `z = True if 1 else other` instead of `if`-`else
 182 |   # SIM108 does not suggest a binary option in this
     |
 help: Replace `if`-`else`-block with `z = True if 1 else other`
-174 | else:
-175 |     z = other
+    |
 176 |
     - if 1:
     -     z = True
@@ -280,8 +265,7 @@ help: Replace `if`-`else`-block with `z = True if 1 else other`
     -     z = other
 177 + z = True if 1 else other
 178 |
-179 | # SIM108 does not suggest a binary option in this
-180 | # case, since we'd be reducing the number of calls
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 SIM108 [*] Use ternary operator `z = foo() if foo() else other` instead of `if`-`else`-block
@@ -298,8 +282,7 @@ SIM108 [*] Use ternary operator `z = foo() if foo() else other` instead of `if`-
 190 |   # SIM108 does not suggest a binary option in this
     |
 help: Replace `if`-`else`-block with `z = foo() if foo() else other`
-182 | # SIM108 does not suggest a binary option in this
-183 | # case, since we'd be reducing the number of calls
+    |
 184 | # from Two to one.
     - if foo():
     -     z = foo()
@@ -307,8 +290,7 @@ help: Replace `if`-`else`-block with `z = foo() if foo() else other`
     -     z = other
 185 + z = foo() if foo() else other
 186 |
-187 | # SIM108 does not suggest a binary option in this
-188 | # case, since we'd be reducing the number of calls
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 SIM108 [*] Use ternary operator `z = not foo() if foo() else other` instead of `if`-`else`-block
@@ -323,8 +305,7 @@ SIM108 [*] Use ternary operator `z = not foo() if foo() else other` instead of `
     | |_____________^
     |
 help: Replace `if`-`else`-block with `z = not foo() if foo() else other`
-190 | # SIM108 does not suggest a binary option in this
-191 | # case, since we'd be reducing the number of calls
+    |
 192 | # from Two to one.
     - if foo():
     -     z = not foo()
@@ -332,8 +313,7 @@ help: Replace `if`-`else`-block with `z = not foo() if foo() else other`
     -     z = other
 193 + z = not foo() if foo() else other
 194 |
-195 |
-196 | # These two cases double as tests for f-string quote preservation. The first
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 SIM108 [*] Use ternary operator `var = "str" if cond else f"{first}-{second}"` instead of `if`-`else`-block
@@ -350,8 +330,7 @@ SIM108 [*] Use ternary operator `var = "str" if cond else f"{first}-{second}"` i
 207 |   if cond:
     |
 help: Replace `if`-`else`-block with `var = "str" if cond else f"{first}-{second}"`
-199 | # These two cases double as tests for f-string quote preservation. The first
-200 | # f-string should preserve its double quotes, and the second should preserve
+    |
 201 | # single quotes
     - if cond:
     -     var = "str"
@@ -359,8 +338,7 @@ help: Replace `if`-`else`-block with `var = "str" if cond else f"{first}-{second
     -     var = f"{first}-{second}"
 202 + var = "str" if cond else f"{first}-{second}"
 203 |
-204 | if cond:
-205 |     var = "str"
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 SIM108 [*] Use ternary operator `var = "str" if cond else f'{first}-{second}'` instead of `if`-`else`-block
@@ -375,12 +353,12 @@ SIM108 [*] Use ternary operator `var = "str" if cond else f'{first}-{second}'` i
     | |_____________________________^
     |
 help: Replace `if`-`else`-block with `var = "str" if cond else f'{first}-{second}'`
-204 | else:
-205 |     var = f"{first}-{second}"
+    |
 206 |
     - if cond:
     -     var = "str"
     - else:
     -     var = f'{first}-{second}'
 207 + var = "str" if cond else f'{first}-{second}'
+    |
 note: This is an unsafe fix and may change runtime behavior

@@ -88,11 +88,9 @@ If two tuples contain types that do not support comparison, the result may be `U
 a = (1, 2)
 b = (1, "hello")
 
-# TODO: should be Literal[False], once we implement (in)equality for mismatched literals
-reveal_type(a == b)  # revealed: bool
+reveal_type(a == b)  # revealed: Literal[False]
 
-# TODO: should be Literal[True], once we implement (in)equality for mismatched literals
-reveal_type(a != b)  # revealed: bool
+reveal_type(a != b)  # revealed: Literal[True]
 
 # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Literal[1], Literal["hello"]]`"
 reveal_type(a < b)  # revealed: Unknown
@@ -325,10 +323,8 @@ c = (1, 2, 3)
 reveal_type(a is (1, 2))  # revealed: bool
 reveal_type(a is not (1, 2))  # revealed: bool
 
-# TODO should be Literal[False] once we implement comparison of mismatched literal types
-reveal_type(a is b)  # revealed: bool
-# TODO should be Literal[True] once we implement comparison of mismatched literal types
-reveal_type(a is not b)  # revealed: bool
+reveal_type(a is b)  # revealed: Literal[False]
+reveal_type(a is not b)  # revealed: Literal[True]
 
 reveal_type(a is c)  # revealed: Literal[False]
 reveal_type(a is not c)  # revealed: Literal[True]

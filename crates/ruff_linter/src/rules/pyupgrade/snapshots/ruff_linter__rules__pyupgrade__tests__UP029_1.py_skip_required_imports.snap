@@ -8,6 +8,8 @@ UP029 [*] Unnecessary builtin import: `int`
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Remove unnecessary builtin import
+  |
   - from builtins import str, int
 1 + from builtins import str
+  |
 note: This is an unsafe fix and may change runtime behavior

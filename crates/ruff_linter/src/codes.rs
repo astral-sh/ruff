@@ -9,7 +9,6 @@ use serde::Serialize;
 use strum_macros::EnumIter;
 
 use crate::registry::Linter;
-use crate::rule_selector::is_single_rule_selector;
 use crate::rules;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -24,6 +23,10 @@ impl NoqaCode {
     /// Return the suffix for the [`NoqaCode`], e.g., `101` for `SIM101`.
     pub fn suffix(&self) -> &str {
         self.1
+    }
+
+    pub(crate) const fn into_parts(self) -> (&'static str, &'static str) {
+        (self.0, self.1)
     }
 }
 
@@ -340,6 +343,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Async, "110") => rules::flake8_async::rules::AsyncBusyWait,
         (Flake8Async, "115") => rules::flake8_async::rules::AsyncZeroSleep,
         (Flake8Async, "116") => rules::flake8_async::rules::LongSleepNotForever,
+        (Flake8Async, "119") => rules::flake8_async::rules::YieldInContextManagerInAsyncGenerator,
         (Flake8Async, "210") => rules::flake8_async::rules::BlockingHttpCallInAsyncFunction,
         (Flake8Async, "212") => rules::flake8_async::rules::BlockingHttpCallHttpxInAsyncFunction,
         (Flake8Async, "220") => rules::flake8_async::rules::CreateSubprocessInAsyncFunction,
@@ -635,6 +639,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pydocstyle, "418") => rules::pydocstyle::rules::OverloadWithDocstring,
         (Pydocstyle, "419") => rules::pydocstyle::rules::EmptyDocstring,
         (Pydocstyle, "420") => rules::pydocstyle::rules::IncorrectSectionOrder,
+        (Pydocstyle, "421") => rules::pydocstyle::rules::PropertyDocstringStartsWithVerb,
 
         // pep8-naming
         (PEP8Naming, "801") => rules::pep8_naming::rules::InvalidClassName,
@@ -820,7 +825,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "029") => rules::flake8_pyi::rules::StrOrReprDefinedInStub,
         (Flake8Pyi, "030") => rules::flake8_pyi::rules::UnnecessaryLiteralUnion,
         (Flake8Pyi, "032") => rules::flake8_pyi::rules::AnyEqNeAnnotation,
-        (Flake8Pyi, "033") => rules::flake8_pyi::rules::TypeCommentInStub,
+        (Flake8Pyi, "033") => rules::flake8_pyi::rules::LegacyTypeComment,
         (Flake8Pyi, "034") => rules::flake8_pyi::rules::NonSelfReturnType,
         (Flake8Pyi, "035") => rules::flake8_pyi::rules::UnassignedSpecialVariableInStub,
         (Flake8Pyi, "036") => rules::flake8_pyi::rules::BadExitAnnotation,
@@ -1076,6 +1081,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "073") => rules::ruff::rules::FStringPercentFormat,
         (Ruff, "074") => rules::ruff::rules::IncorrectDecoratorOrder,
         (Ruff, "075") => rules::ruff::rules::FallibleContextManager,
+        (Ruff, "076") => rules::ruff::rules::PytestFixtureAutouse,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,
@@ -1223,4 +1229,10 @@ impl std::fmt::Display for Rule {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         f.write_str(self.into())
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum FromNameError {
+    #[error("unknown rule name")]
+    Unknown,
 }

@@ -14,12 +14,13 @@ use crate::types::diagnostic::{
 use crate::types::infer::builder::DeferredExpressionState;
 use crate::types::special_form::TypeQualifier;
 use crate::types::typed_dict::{
-    TypedDictSchema, collect_guaranteed_keyword_keys, functional_typed_dict_field,
-    infer_unpacked_keyword_types, typed_dict_with_relaxed_keys, validate_typed_dict_constructor,
-    validate_typed_dict_dict_literal,
+    TypedDictOpenness, TypedDictSchema, collect_guaranteed_keyword_keys,
+    functional_typed_dict_field, infer_unpacked_keyword_types, typed_dict_with_relaxed_keys,
+    validate_typed_dict_constructor, validate_typed_dict_dict_literal,
 };
 use crate::types::{
-    IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictType,
+    IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictModule,
+    TypedDictType,
 };
 use ty_python_core::definition::Definition;
 
@@ -72,6 +73,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         call_expr: &ast::ExprCall,
         definition: Option<Definition<'db>>,
+        typed_dict_module: TypedDictModule,
     ) -> Type<'db> {
         let db = self.db();
 
@@ -142,6 +144,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         let mut total = true;
+        let mut closed = false;
+        let mut extra_items = None;
 
         for kw in keywords {
             let Some(arg) = &kw.arg else {
@@ -151,9 +155,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             match &**arg {
                 arg_name @ ("total" | "closed") => {
                     let kw_type = self.infer_expression(&kw.value, TypeContext::default());
-                    if kw_type
-                        .as_literal_value()
-                        .is_none_or(|literal| !literal.is_bool())
+                    if !kw.value.is_boolean_literal_expr()
                         && let Some(builder) =
                             self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
                     {
@@ -172,11 +174,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         } else if !kw_type.bool(db).is_always_true() {
                             total = true;
                         }
+                    } else {
+                        closed = kw_type.bool(db).is_always_true();
                     }
                 }
                 "extra_items" => {
                     if definition.is_none() {
-                        self.infer_extra_items_kwarg(&kw.value);
+                        let annotation = self.infer_extra_items_kwarg(&kw.value);
+                        extra_items = Some(TypedDictOpenness::extra(
+                            db,
+                            annotation.inner_type(),
+                            annotation.qualifiers().contains(TypeQualifiers::READ_ONLY),
+                        ));
                     }
                 }
                 unknown_kwarg => {
@@ -188,6 +197,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
             }
+        }
+
+        if let Some(extra_items_kwarg) = call_expr.arguments.find_keyword("extra_items")
+            && call_expr.arguments.find_keyword("closed").is_some()
+            && let Some(builder) = self
+                .context
+                .report_lint(&INVALID_ARGUMENT_TYPE, extra_items_kwarg)
+        {
+            builder.into_diagnostic("`closed` and `extra_items` cannot both be specified");
         }
 
         if !starred_arguments.is_empty() || !double_starred_arguments.is_empty() {
@@ -289,11 +307,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     scope,
                     offset: call_u32 - anchor_u32,
                     schema,
+                    openness: extra_items.unwrap_or(if closed {
+                        TypedDictOpenness::Closed
+                    } else {
+                        TypedDictOpenness::ImplicitlyOpen
+                    }),
                 }
             }
         };
 
-        let typeddict = DynamicTypedDictLiteral::new(db, name, anchor);
+        let typeddict = DynamicTypedDictLiteral::new(db, name, anchor, typed_dict_module);
         Type::ClassLiteral(ClassLiteral::DynamicTypedDict(typeddict))
     }
 
@@ -309,7 +332,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             items,
         } = dict;
 
-        let typed_dict_items = typed_dict.items(self.db());
         let key_tcx =
             TypeContext::new(self.typed_dict_key_expected_type(Type::TypedDict(typed_dict)));
 
@@ -321,9 +343,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             let value_ty = if let Some(key_ty) = key_ty
                 && let Some(key) = key_ty.as_string_literal()
-                && let Some(field) = typed_dict_items.get(key.value(self.db()))
+                && let Some(field) = typed_dict.item(self.db(), key.value(self.db()))
             {
                 self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)))
+            } else if key_ty.is_some_and(|key_ty| {
+                key_ty.is_assignable_to(self.db(), KnownClass::Str.to_instance(self.db()))
+            }) && let Some(value_ty) =
+                typed_dict.arbitrary_key_initialization_type(self.db())
+            {
+                self.infer_expression(&item.value, TypeContext::new(Some(value_ty)))
             } else {
                 self.infer_expression(&item.value, TypeContext::default())
             };
@@ -423,12 +451,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         typed_dict: TypedDictType<'db>,
         arguments: &ast::Arguments,
     ) {
-        let items = typed_dict.items(self.db());
         for keyword in &arguments.keywords {
             let value_tcx = keyword
                 .arg
                 .as_ref()
-                .and_then(|arg_name| items.get(arg_name.id.as_str()))
+                .and_then(|arg_name| typed_dict.item(self.db(), arg_name.id.as_str()))
                 .map(|field| TypeContext::new(Some(field.declared_ty)))
                 .unwrap_or_default();
             self.get_or_infer_expression(&keyword.value, value_tcx);
@@ -446,19 +473,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         typed_dict: TypedDictType<'db>,
         dict_expr: &ast::ExprDict,
     ) {
-        let items = typed_dict.items(self.db());
         let key_tcx =
             TypeContext::new(self.typed_dict_key_expected_type(Type::TypedDict(typed_dict)));
 
         for item in &dict_expr.items {
-            let value_tcx = item
+            let key_ty = item
                 .key
                 .as_ref()
-                .map(|key| self.get_or_infer_expression(key, key_tcx))
-                .and_then(Type::as_string_literal)
-                .and_then(|key| items.get(key.value(self.db())))
-                .map(|field| TypeContext::new(Some(field.declared_ty)))
-                .unwrap_or_default();
+                .map(|key| self.get_or_infer_expression(key, key_tcx));
+            let value_tcx = if let Some(key) = key_ty.and_then(Type::as_string_literal)
+                && let Some(field) = typed_dict.item(self.db(), key.value(self.db()))
+            {
+                TypeContext::new(Some(field.declared_ty))
+            } else if key_ty.is_some_and(|key_ty| {
+                key_ty.is_assignable_to(self.db(), KnownClass::Str.to_instance(self.db()))
+            }) {
+                TypeContext::new(typed_dict.arbitrary_key_initialization_type(self.db()))
+            } else {
+                TypeContext::default()
+            };
             self.get_or_infer_expression(&item.value, value_tcx);
         }
     }

@@ -306,6 +306,7 @@ impl DisplaySet<'_> {
         line: &DisplayRawLine<'_>,
         lineno_width: usize,
         stylesheet: &Stylesheet,
+        anonymized_line_numbers: bool,
         buffer: &mut StyledBuffer,
     ) -> fmt::Result {
         match line {
@@ -327,7 +328,11 @@ impl DisplaySet<'_> {
                         buffer.append(line_offset, &format!("cell {cell}"), stylesheet.none);
                     }
                     buffer.append(line_offset, ":", stylesheet.none);
-                    buffer.append(line_offset, row.to_string().as_str(), stylesheet.none);
+                    if anonymized_line_numbers {
+                        buffer.append(line_offset, ANONYMIZED_LINE_NUM, stylesheet.none);
+                    } else {
+                        buffer.append(line_offset, row.to_string().as_str(), stylesheet.none);
+                    }
                     buffer.append(line_offset, ":", stylesheet.none);
                     buffer.append(line_offset, col.to_string().as_str(), stylesheet.none);
                 }
@@ -834,9 +839,14 @@ impl DisplaySet<'_> {
                 }
                 Ok(())
             }
-            DisplayLine::Raw(line) => {
-                self.format_raw_line(line_offset, line, lineno_width, stylesheet, buffer)
-            }
+            DisplayLine::Raw(line) => self.format_raw_line(
+                line_offset,
+                line,
+                lineno_width,
+                stylesheet,
+                anonymized_line_numbers,
+                buffer,
+            ),
         }
     }
 }
@@ -1266,12 +1276,6 @@ fn format_snippet<'m>(
     body
 }
 
-#[inline]
-// TODO: option_zip
-fn zip_opt<A, B>(a: Option<A>, b: Option<B>) -> Option<(A, B)> {
-    a.and_then(|a| b.map(|b| (a, b)))
-}
-
 fn format_header<'a>(
     origin: Option<&'a str>,
     main_range: Option<usize>,
@@ -1285,7 +1289,7 @@ fn format_header<'a>(
         DisplayHeaderType::Continuation
     };
 
-    if let Some((main_range, path)) = zip_opt(main_range, origin) {
+    if let Some((main_range, path)) = main_range.zip(origin) {
         let mut col = 1;
         let mut line_offset = 1;
 

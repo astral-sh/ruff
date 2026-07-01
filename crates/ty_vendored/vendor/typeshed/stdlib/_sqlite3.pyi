@@ -242,11 +242,6 @@ if sys.version_info >= (3, 12):
 
         You can use ":memory:" to open a database connection to a database that
         resides in RAM instead of on disk.
-
-        Note: Passing more than 1 positional argument to _sqlite3.connect() is
-        deprecated. Parameters 'timeout', 'detect_types', 'isolation_level',
-        'check_same_thread', 'factory', 'cached_statements' and 'uri' will
-        become keyword-only parameters in Python 3.15.
         """
     @overload
     def connect(

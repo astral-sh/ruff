@@ -14,7 +14,7 @@ use regex::bytes::Regex;
 
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
-use ty_ide::Completion;
+use ty_ide::{Completion, CompletionCapabilities};
 use ty_module_resolver::ModuleName;
 use ty_project::metadata::Options;
 use ty_project::metadata::options::EnvironmentOptions;
@@ -329,7 +329,13 @@ impl Task {
                 self.cursor.offset
             )
         })?;
-        let completions = ty_ide::completion(&self.db, &self.settings, file, offset);
+        let completions = ty_ide::completion(
+            &self.db,
+            &self.settings,
+            CompletionCapabilities::default(),
+            file,
+            offset,
+        );
         Ok(completions)
     }
 
@@ -377,6 +383,7 @@ impl From<&CompletionSettings> for ty_ide::CompletionSettings {
     fn from(x: &CompletionSettings) -> ty_ide::CompletionSettings {
         ty_ide::CompletionSettings {
             auto_import: x.auto_import,
+            ..ty_ide::CompletionSettings::default()
         }
     }
 }

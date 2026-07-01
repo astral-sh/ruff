@@ -802,8 +802,9 @@ class _Environ(MutableMapping[AnyStr, AnyStr], Generic[AnyStr]):
 
     @overload
     def pop(self, key: AnyStr) -> AnyStr:
-        """D.pop(k[,d]) -> v, remove specified key and return the corresponding value.
-        If key is not found, d is returned if given, otherwise KeyError is raised.
+        """D.pop(k[,d]) -> v, remove specified key and return the corresponding
+        value.  If key is not found, d is returned if given, otherwise
+        KeyError is raised.
         """
     @overload
     def pop(self, key: AnyStr, default: AnyStr) -> AnyStr: ...
@@ -888,7 +889,7 @@ class stat_result(structseq[float], tuple[int, int, int, int, int, int, int, flo
 
     This object may be accessed either as a tuple of
       (mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime)
-    or via the attributes st_mode, st_ino, st_dev, st_nlink, st_uid, and so on.
+    or via the attributes st_mode, st_ino, st_dev, st_nlink, and so on.
 
     Posix/windows: If your platform supports st_blksize, st_blocks, st_rdev,
     or st_flags, they are available as attributes only.
@@ -943,6 +944,7 @@ class stat_result(structseq[float], tuple[int, int, int, int, int, int, int, flo
     @property
     def st_mtime(self) -> float:  # time of most recent content modification,
         """time of last modification"""
+
     # platform dependent (time of most recent metadata change on Unix, or the time of creation on Windows)
     if sys.version_info >= (3, 12) and sys.platform == "win32":
         @property
@@ -963,10 +965,12 @@ In the future, this property will contain the last metadata change time.""")
     @property
     def st_mtime_ns(self) -> int:  # time of most recent content modification in nanoseconds
         """time of last modification in nanoseconds"""
+
     # platform dependent (time of most recent metadata change on Unix, or the time of creation on Windows) in nanoseconds
     @property
     def st_ctime_ns(self) -> int:
         """time of last change in nanoseconds"""
+
     if sys.platform == "win32":
         @property
         def st_file_attributes(self) -> int:
@@ -975,6 +979,7 @@ In the future, this property will contain the last metadata change time.""")
         @property
         def st_reparse_tag(self) -> int:
             """Windows reparse tag"""
+
         if sys.version_info >= (3, 12):
             @property
             def st_birthtime(self) -> float:  # time of file creation in seconds
@@ -983,6 +988,7 @@ In the future, this property will contain the last metadata change time.""")
             @property
             def st_birthtime_ns(self) -> int:  # time of file creation in nanoseconds
                 """time of creation in nanoseconds"""
+
     else:
         @property
         def st_blocks(self) -> int:  # number of blocks allocated for file
@@ -995,6 +1001,7 @@ In the future, this property will contain the last metadata change time.""")
         @property
         def st_rdev(self) -> int:  # type of device if an inode device
             """device type (if inode device)"""
+
         if sys.platform != "linux":
             # These properties are available on MacOS, but not Ubuntu.
             # On other Unix systems (such as FreeBSD), the following attributes may be
@@ -1006,10 +1013,12 @@ In the future, this property will contain the last metadata change time.""")
             @property
             def st_birthtime(self) -> float:  # time of file creation in seconds
                 """time of creation"""
+
     if sys.platform == "darwin":
         @property
         def st_flags(self) -> int:  # user defined flags for file
             """user defined flags for file"""
+
     # Attributes documented as sometimes appearing, but deliberately omitted from the stub: `st_creator`, `st_rsize`, `st_type`.
     # See https://github.com/python/typeshed/pull/6560#issuecomment-991253327
 
@@ -1029,17 +1038,17 @@ class PathLike(ABC, Protocol[AnyStr_co]):  # type: ignore[misc]  # pyright: igno
 def listdir(path: StrPath | None = None) -> list[str]:
     """Return a list containing the names of the files in the directory.
 
-path can be specified as either str, bytes, or a path-like object.  If path is bytes,
-  the filenames returned will also be bytes; in all other circumstances
-  the filenames returned will be str.
-If path is None, uses the path='.'.
-On some platforms, path may also be specified as an open file descriptor;\\
-  the file descriptor must refer to a directory.
-  If this functionality is unavailable, using it raises NotImplementedError.
+    path can be specified as either str, bytes, or a path-like object.  If
+    path is bytes, the filenames returned will also be bytes; in all other
+    circumstances the filenames returned will be str.
+    If path is None, uses the path='.'.
+    On some platforms, path may also be specified as an open file
+    descriptor; the file descriptor must refer to a directory.  If this
+    functionality is unavailable, using it raises NotImplementedError.
 
-The list is in arbitrary order.  It does not include the special
-entries '.' and '..' even if they are present in the directory.
-"""
+    The list is in arbitrary order.  It does not include the special
+    entries '.' and '..' even if they are present in the directory.
+    """
 @overload
 def listdir(path: BytesPath) -> list[bytes]: ...
 @overload
@@ -1056,7 +1065,9 @@ class DirEntry(Generic[AnyStr]):
 
     @property
     def path(self) -> AnyStr:
-        """the entry's full path name; equivalent to os.path.join(scandir_path, entry.name)"""
+        """the entry's full path name; equivalent to
+        os.path.join(scandir_path, entry.name)
+        """
 
     def inode(self) -> int:
         """Return inode of the entry; cached per entry."""
@@ -1077,7 +1088,8 @@ class DirEntry(Generic[AnyStr]):
         """Returns the path for the entry."""
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """DirEntry is generic over the type of the path (str or bytes)"""
+
     if sys.version_info >= (3, 12):
         def is_junction(self) -> bool:
             """Return True if the entry is a junction; cached per entry."""
@@ -1148,9 +1160,9 @@ def fsdecode(filename: StrOrBytesPath) -> str:
 def fspath(path: str) -> str:
     """Return the file system path representation of the object.
 
-    If the object is str or bytes, then allow it to pass through as-is. If the
-    object defines __fspath__(), then return the result of that method. All other
-    types raise a TypeError.
+    If the object is str or bytes, then allow it to pass through as-is.  If
+    the object defines __fspath__(), then return the result of that method.
+    All other types raise a TypeError.
     """
 @overload
 def fspath(path: bytes) -> bytes: ...
@@ -1175,7 +1187,8 @@ def getppid() -> int:
     """Return the parent's process id.
 
     If the parent process has already exited, Windows machines will still
-    return its id; others systems will return the id of the 'init' process (1).
+    return its id; others systems will return the id of the 'init' proces
+    (1).
     """
 
 def strerror(code: int, /) -> str:
@@ -1245,9 +1258,9 @@ if sys.platform != "win32":
     def initgroups(username: str, gid: int, /) -> None:
         """Initialize the group access list.
 
-        Call the system initgroups() to initialize the group access list with all of
-        the groups of which the specified username is a member, plus the specified
-        group id.
+        Call the system initgroups() to initialize the group access list with
+        all of the groups of which the specified username is a member, plus the
+        specified group id.
         """
 
     def getpgid(pid: int) -> int:
@@ -1261,6 +1274,7 @@ if sys.platform != "win32":
 
     def setpriority(which: int, who: int, priority: int) -> None:
         """Set program scheduling priority."""
+
     if sys.platform != "darwin":
         def getresuid() -> tuple[int, int, int]:
             """Return a tuple of the current process's real, effective, and saved user ids."""
@@ -1291,6 +1305,7 @@ if sys.platform != "win32":
 
     def setregid(rgid: int, egid: int, /) -> None:
         """Set the current process's real and effective group ids."""
+
     if sys.platform != "darwin":
         def setresgid(rgid: int, egid: int, sgid: int, /) -> None:
             """Set the current process's real, effective, and saved group ids."""
@@ -1491,7 +1506,8 @@ if sys.version_info >= (3, 11):
             - SEEK_CUR: seek from the current file position.
             - SEEK_END: seek from the end of the file.
 
-        The return value is the number of bytes relative to the beginning of the file.
+        The return value is the number of bytes relative to the beginning of
+        the file.
         """
 
 else:
@@ -1505,10 +1521,11 @@ else:
 def open(path: StrOrBytesPath, flags: int, mode: int = 0o777, *, dir_fd: int | None = None) -> int:
     """Open a file for low level IO.  Returns a file descriptor (integer).
 
-    If dir_fd is not None, it should be a file descriptor open to a directory,
-      and path should be relative; path will then be relative to that directory.
-    dir_fd may not be implemented on your platform.
-      If it is unavailable, using it will raise a NotImplementedError.
+    If dir_fd is not None, it should be a file descriptor open to
+    a directory, and path should be relative; path will then be relative to
+    that directory.
+    dir_fd may not be implemented on your platform.  If it is unavailable,
+    using it will raise a NotImplementedError.
     """
 
 def pipe() -> tuple[int, int]:
@@ -1571,6 +1588,7 @@ if sys.platform != "win32":
         Return a tuple of (master_fd, slave_fd) containing open file descriptors
         for both the master and slave ends.
         """
+
     if sys.platform != "darwin":
         def fdatasync(fd: FileDescriptorLike) -> None:
             """Force write of fd to disk without forcing update of metadata."""
@@ -1589,14 +1607,15 @@ if sys.platform != "win32":
             """Ensure a file has allocated at least a particular number of bytes on disk.
 
             Ensure that the file specified by fd encompasses a range of bytes
-            starting at offset bytes from the beginning and continuing for length bytes.
+            starting at offset bytes from the beginning and continuing for length
+            bytes.
             """
 
         def posix_fadvise(fd: int, offset: int, length: int, advice: int, /) -> None:
             """Announce an intention to access data in a specific pattern.
 
-            Announce an intention to access data in a specific pattern, thus allowing
-            the kernel to make optimizations.
+            Announce an intention to access data in a specific pattern, thus
+            allowing the kernel to make optimizations.
             The advice applies to the region of the file specified by fd starting at
             offset and continuing for length bytes.
             advice is one of POSIX_FADV_NORMAL, POSIX_FADV_SEQUENTIAL,
@@ -1618,21 +1637,24 @@ if sys.platform != "win32":
         the file.  Returns the number of bytes written.  Does not change the
         current file offset.
         """
+
     # In CI, stubtest sometimes reports that these are available on MacOS, sometimes not
     def preadv(fd: int, buffers: SupportsLenAndGetItem[WriteableBuffer], offset: int, flags: int = 0, /) -> int:
         """Reads from a file descriptor into a number of mutable bytes-like objects.
 
-        Combines the functionality of readv() and pread(). As readv(), it will
-        transfer data into each buffer until it is full and then move on to the next
-        buffer in the sequence to hold the rest of the data. Its fourth argument,
-        specifies the file offset at which the input operation is to be performed. It
-        will return the total number of bytes read (which can be less than the total
-        capacity of all the objects).
+        Combines the functionality of readv() and pread().  As readv(), it will
+        transfer data into each buffer until it is full and then move on to the
+        next buffer in the sequence to hold the rest of the data.  Its fourth
+        argument, specifies the file offset at which the input operation is to
+        be performed.  It will return the total number of bytes read (which can
+        be less than the total capacity of all the objects).
 
-        The flags argument contains a bitwise OR of zero or more of the following flags:
+        The flags argument contains a bitwise OR of zero or more of the
+        following flags:
 
         - RWF_HIPRI
         - RWF_NOWAIT
+        - RWF_DONTCACHE
 
         Using non-zero flags requires Linux 4.6 or newer.
         """
@@ -1640,21 +1662,26 @@ if sys.platform != "win32":
     def pwritev(fd: int, buffers: SupportsLenAndGetItem[ReadableBuffer], offset: int, flags: int = 0, /) -> int:
         """Writes the contents of bytes-like objects to a file descriptor at a given offset.
 
-        Combines the functionality of writev() and pwrite(). All buffers must be a sequence
-        of bytes-like objects. Buffers are processed in array order. Entire contents of first
-        buffer is written before proceeding to second, and so on. The operating system may
-        set a limit (sysconf() value SC_IOV_MAX) on the number of buffers that can be used.
-        This function writes the contents of each object to the file descriptor and returns
-        the total number of bytes written.
+        Combines the functionality of writev() and pwrite(). All buffers must be
+        a sequence of bytes-like objects.  Buffers are processed in array order.
+        Entire contents of first buffer is written before proceeding to second,
+        and so on. The operating system may set a limit (sysconf() value
+        SC_IOV_MAX) on the number of buffers that can be used.
+        This function writes the contents of each object to the file descriptor
+        and returns the total number of bytes written.
 
-        The flags argument contains a bitwise OR of zero or more of the following flags:
+        The flags argument contains a bitwise OR of zero or more of the
+        following flags:
 
         - RWF_DSYNC
         - RWF_SYNC
         - RWF_APPEND
+        - RWF_DONTCACHE
+        - RWF_ATOMIC
 
         Using non-zero flags requires Linux 4.7 or newer.
         """
+
     if sys.platform != "darwin":
         RWF_APPEND: Final[int]
         RWF_DSYNC: Final[int]
@@ -1665,6 +1692,7 @@ if sys.platform != "win32":
     if sys.platform == "linux":
         def sendfile(out_fd: FileDescriptor, in_fd: FileDescriptor, offset: int | None, count: int) -> int:
             """Copy count bytes from file descriptor in_fd to file descriptor out_fd."""
+
     else:
         def sendfile(
             out_fd: FileDescriptor,
@@ -1700,15 +1728,15 @@ if sys.version_info >= (3, 14):
     def readinto(fd: int, buffer: ReadableBuffer, /) -> int:
         """Read into a buffer object from a file descriptor.
 
-        The buffer should be mutable and bytes-like. On success, returns the number of
-        bytes read. Less bytes may be read than the size of the buffer. The underlying
-        system call will be retried when interrupted by a signal, unless the signal
-        handler raises an exception. Other errors will not be retried and an error will
-        be raised.
+        The buffer should be mutable and bytes-like.  On success, returns the
+        number of bytes read.  Less bytes may be read than the size of the
+        buffer.  The underlying system call will be retried when interrupted by
+        a signal, unless the signal handler raises an exception.  Other errors
+        will not be retried and an error will be raised.
 
-        Returns 0 if *fd* is at end of file or if the provided *buffer* has length 0
-        (which can be used to check for errors without reading data). Never returns
-        negative.
+        Returns 0 if *fd* is at end of file or if the provided *buffer* has
+        length 0 (which can be used to check for errors without reading data).
+        Never returns negative.
         """
 
 @final
@@ -1799,16 +1827,16 @@ def access(
       NotImplementedError.
 
     Note that most operations will use the effective uid/gid, therefore this
-      routine can be used in a suid/sgid environment to test if the invoking user
-      has the specified access to the path.
+      routine can be used in a suid/sgid environment to test if the invoking
+      user has the specified access to the path.
     """
 
 def chdir(path: FileDescriptorOrPath) -> None:
     """Change the current working directory to the specified path.
 
-    path may always be specified as a string.
-    On some platforms, path may also be specified as an open file descriptor.
-    If this functionality is unavailable, using it raises an exception.
+    path may always be specified as a string.  On some platforms, path may
+    also be specified as an open file descriptor.  If this functionality is
+    unavailable, using it raises an exception.
     """
 
 if sys.platform != "win32":
@@ -1829,14 +1857,15 @@ def chmod(path: FileDescriptorOrPath, mode: int, *, dir_fd: int | None = None, f
     """Change the access permissions of a file.
 
       path
-        Path to be modified.  May always be specified as a str, bytes, or a path-like object.
-        On some platforms, path may also be specified as an open file descriptor.
-        If this functionality is unavailable, using it raises an exception.
+        Path to be modified.  May always be specified as a str, bytes, or
+        a path-like object.  On some platforms, path may also be specified
+        as an open file descriptor.  If this functionality is unavailable,
+        using it raises an exception.
       mode
         Operating-system mode bitfield.
-        Be careful when using number literals for *mode*. The conventional UNIX notation for
-        numeric modes uses an octal base, which needs to be indicated with a ``0o`` prefix in
-        Python.
+        Be careful when using number literals for *mode*. The conventional
+        UNIX notation for numeric modes uses an octal base, which needs to
+        be indicated with a ``0o`` prefix in Python.
       dir_fd
         If not None, it should be a file descriptor open to a directory,
         and path should be relative; path will then be relative to that
@@ -1856,9 +1885,9 @@ if sys.platform != "win32" and sys.platform != "linux":
     def chflags(path: StrOrBytesPath, flags: int, follow_symlinks: bool = True) -> None:  # some flavors of Unix
         """Set file flags.
 
-        If follow_symlinks is False, and the last element of the path is a symbolic
-          link, chflags will change flags on the symbolic link itself instead of the
-          file the link points to.
+        If follow_symlinks is False, and the last element of the path is
+        a symbolic link, chflags() will change flags on the symbolic link itself
+        instead of the file the link points to.
         follow_symlinks may not be implemented on your platform.  If it is
         unavailable, using it will raise a NotImplementedError.
         """
@@ -1875,32 +1904,34 @@ if sys.platform != "win32":
         """Change root directory to path."""
 
     def chown(path: FileDescriptorOrPath, uid: int, gid: int, *, dir_fd: int | None = None, follow_symlinks: bool = True) -> None:
-        """Change the owner and group id of path to the numeric uid and gid.\\
+        """Change the owner and group id of path to the numeric uid and gid.
 
-  path
-    Path to be examined; can be string, bytes, a path-like object, or open-file-descriptor int.
-  dir_fd
-    If not None, it should be a file descriptor open to a directory,
-    and path should be relative; path will then be relative to that
-    directory.
-  follow_symlinks
-    If False, and the last element of the path is a symbolic link,
-    stat will examine the symbolic link itself instead of the file
-    the link points to.
+          path
+            Path to be examined; can be string, bytes, a path-like object, or
+            open-file-descriptor int.
+          dir_fd
+            If not None, it should be a file descriptor open to a directory,
+            and path should be relative; path will then be relative to that
+            directory.
+          follow_symlinks
+            If False, and the last element of the path is a symbolic link,
+            stat will examine the symbolic link itself instead of the file
+            the link points to.
 
-path may always be specified as a string.
-On some platforms, path may also be specified as an open file descriptor.
-  If this functionality is unavailable, using it raises an exception.
-If dir_fd is not None, it should be a file descriptor open to a directory,
-  and path should be relative; path will then be relative to that directory.
-If follow_symlinks is False, and the last element of the path is a symbolic
-  link, chown will modify the symbolic link itself instead of the file the
-  link points to.
-It is an error to use dir_fd or follow_symlinks when specifying path as
-  an open file descriptor.
-dir_fd and follow_symlinks may not be implemented on your platform.
-  If they are unavailable, using them will raise a NotImplementedError.
-"""
+        path may always be specified as a string.  On some platforms, path may
+        also be specified as an open file descriptor.  If this functionality is
+        unavailable, using it raises an exception.
+        If dir_fd is not None, it should be a file descriptor open to
+        a directory, and path should be relative; path will then be relative to
+        that directory.
+        If follow_symlinks is False, and the last element of the path is
+        a symbolic link, chown will modify the symbolic link itself instead of
+        the file the link points to.
+        It is an error to use dir_fd or follow_symlinks when specifying path as
+        an open file descriptor.
+        dir_fd and follow_symlinks may not be implemented on your platform.  If
+        they are unavailable, using them will raise a NotImplementedError.
+        """
 
     def lchown(path: StrOrBytesPath, uid: int, gid: int) -> None:
         """Change the owner and group id of path to the numeric uid and gid.
@@ -1920,14 +1951,15 @@ def link(
     """Create a hard link to a file.
 
     If either src_dir_fd or dst_dir_fd is not None, it should be a file
-      descriptor open to a directory, and the respective path string (src or dst)
-      should be relative; the path will then be relative to that directory.
+    descriptor open to a directory, and the respective path string (src or
+    dst) should be relative; the path will then be relative to that
+    directory.
     If follow_symlinks is False, and the last element of src is a symbolic
-      link, link will create a link to the symbolic link itself instead of the
-      file the link points to.
-    src_dir_fd, dst_dir_fd, and follow_symlinks may not be implemented on your
-      platform.  If they are unavailable, using them will raise a
-      NotImplementedError.
+    link, link will create a link to the symbolic link itself instead of the
+    file the link points to.
+    src_dir_fd, dst_dir_fd, and follow_symlinks may not be implemented on
+    your platform.  If they are unavailable, using them will raise
+    a NotImplementedError.
     """
 
 def lstat(path: StrOrBytesPath, *, dir_fd: int | None = None) -> stat_result:
@@ -1940,51 +1972,70 @@ def lstat(path: StrOrBytesPath, *, dir_fd: int | None = None) -> stat_result:
 def mkdir(path: StrOrBytesPath, mode: int = 0o777, *, dir_fd: int | None = None) -> None:
     """Create a directory.
 
-    If dir_fd is not None, it should be a file descriptor open to a directory,
-      and path should be relative; path will then be relative to that directory.
-    dir_fd may not be implemented on your platform.
-      If it is unavailable, using it will raise a NotImplementedError.
+    If dir_fd is not None, it should be a file descriptor open to
+    a directory, and path should be relative; path will then be relative to
+    that directory.
+    dir_fd may not be implemented on your platform.  If it is unavailable,
+    using it will raise a NotImplementedError.
 
-    The mode argument is ignored on Windows. Where it is used, the current umask
-    value is first masked out.
+    The mode argument is ignored on Windows.  Where it is used, the current
+    umask value is first masked out.
     """
 
 if sys.platform != "win32":
     def mkfifo(path: StrOrBytesPath, mode: int = 0o666, *, dir_fd: int | None = None) -> None:  # Unix only
         """Create a "fifo" (a POSIX named pipe).
 
-        If dir_fd is not None, it should be a file descriptor open to a directory,
-          and path should be relative; path will then be relative to that directory.
-        dir_fd may not be implemented on your platform.
-          If it is unavailable, using it will raise a NotImplementedError.
+        If dir_fd is not None, it should be a file descriptor open to
+        a directory, and path should be relative; path will then be relative to
+        that directory.
+        dir_fd may not be implemented on your platform.  If it is unavailable,
+        using it will raise a NotImplementedError.
         """
 
-def makedirs(name: StrOrBytesPath, mode: int = 0o777, exist_ok: bool = False) -> None:
-    """makedirs(name [, mode=0o777][, exist_ok=False])
+if sys.version_info >= (3, 15):
+    def makedirs(name: StrOrBytesPath, mode: int = 0o777, exist_ok: bool = False, *, parent_mode: int | None = None) -> None:
+        """makedirs(name [, mode=0o777][, exist_ok=False][, parent_mode=None])
 
-    Super-mkdir; create a leaf directory and all intermediate ones.  Works like
-    mkdir, except that any intermediate path segment (not just the rightmost)
-    will be created if it does not exist. If the target directory already
-    exists, raise an OSError if exist_ok is False. Otherwise no exception is
-    raised.  This is recursive.
+        Super-mkdir; create a leaf directory and all intermediate ones.  Works
+        like mkdir, except that any intermediate path segment (not just the
+        rightmost) will be created if it does not exist.  If the target
+        directory already exists, raise an OSError if exist_ok is False.
+        Otherwise no exception is raised.  If parent_mode is not None, it will
+        be used as the mode for any newly-created, intermediate-level
+        directories. Otherwise, intermediate directories are created with the
+        default permissions (respecting umask).  This is recursive.
 
-    """
+        """
+
+else:
+    def makedirs(name: StrOrBytesPath, mode: int = 0o777, exist_ok: bool = False) -> None:
+        """makedirs(name [, mode=0o777][, exist_ok=False])
+
+        Super-mkdir; create a leaf directory and all intermediate ones.  Works
+        like mkdir, except that any intermediate path segment (not just the
+        rightmost) will be created if it does not exist.  If the target
+        directory already exists, raise an OSError if exist_ok is False.
+        Otherwise no exception is raised.  This is recursive.
+
+        """
 
 if sys.platform != "win32":
     def mknod(path: StrOrBytesPath, mode: int = 0o600, device: int = 0, *, dir_fd: int | None = None) -> None:
         """Create a node in the file system.
 
-        Create a node in the file system (file, device special file or named pipe)
-        at path.  mode specifies both the permissions to use and the
+        Create a node in the file system (file, device special file or named
+        pipe) at path.  mode specifies both the permissions to use and the
         type of node to be created, being combined (bitwise OR) with one of
-        S_IFREG, S_IFCHR, S_IFBLK, and S_IFIFO.  If S_IFCHR or S_IFBLK is set on mode,
-        device defines the newly created device special file (probably using
-        os.makedev()).  Otherwise device is ignored.
+        S_IFREG, S_IFCHR, S_IFBLK, and S_IFIFO.  If S_IFCHR or S_IFBLK is set
+        on mode, device defines the newly created device special file (probably
+        using os.makedev()).  Otherwise device is ignored.
 
-        If dir_fd is not None, it should be a file descriptor open to a directory,
-          and path should be relative; path will then be relative to that directory.
-        dir_fd may not be implemented on your platform.
-          If it is unavailable, using it will raise a NotImplementedError.
+        If dir_fd is not None, it should be a file descriptor open to
+        a directory, and path should be relative; path will then be relative
+        to that directory.
+        dir_fd may not be implemented on your platform.  If it is unavailable,
+        using it will raise a NotImplementedError.
         """
 
     def major(device: int, /) -> int:
@@ -2000,15 +2051,17 @@ if sys.platform != "win32":
         """Return the configuration limit name for the file or directory path.
 
         If there is no limit, return -1.
-        On some platforms, path may also be specified as an open file descriptor.
-          If this functionality is unavailable, using it raises an exception.
+        On some platforms, path may also be specified as an open file
+        descriptor.  If this functionality is unavailable, using it raises
+        an exception.
         """
 
 def readlink(path: GenericPath[AnyStr], *, dir_fd: int | None = None) -> AnyStr:
     """Return a string representing the path to which the symbolic link points.
 
-    If dir_fd is not None, it should be a file descriptor open to a directory,
-    and path should be relative; path will then be relative to that directory.
+    If dir_fd is not None, it should be a file descriptor open to
+    a directory, and path should be relative; path will then be relative to
+    that directory.
 
     dir_fd may not be implemented on your platform.  If it is unavailable,
     using it will raise a NotImplementedError.
@@ -2017,10 +2070,11 @@ def readlink(path: GenericPath[AnyStr], *, dir_fd: int | None = None) -> AnyStr:
 def remove(path: StrOrBytesPath, *, dir_fd: int | None = None) -> None:
     """Remove a file (same as unlink()).
 
-    If dir_fd is not None, it should be a file descriptor open to a directory,
-      and path should be relative; path will then be relative to that directory.
+    If dir_fd is not None, it should be a file descriptor open to
+    a directory, and path should be relative; path will then be relative
+    to that directory.
     dir_fd may not be implemented on your platform.
-      If it is unavailable, using it will raise a NotImplementedError.
+    If it is unavailable, using it will raise a NotImplementedError.
     """
 
 def removedirs(name: StrOrBytesPath) -> None:
@@ -2039,10 +2093,11 @@ def rename(src: StrOrBytesPath, dst: StrOrBytesPath, *, src_dir_fd: int | None =
     """Rename a file or directory.
 
     If either src_dir_fd or dst_dir_fd is not None, it should be a file
-      descriptor open to a directory, and the respective path string (src or dst)
-      should be relative; the path will then be relative to that directory.
+    descriptor open to a directory, and the respective path string (src or
+    dst) should be relative; the path will then be relative to that
+    directory.
     src_dir_fd and dst_dir_fd, may not be implemented on your platform.
-      If they are unavailable, using them will raise a NotImplementedError.
+    If they are unavailable, using them will raise a NotImplementedError.
     """
 
 def renames(old: StrOrBytesPath, new: StrOrBytesPath) -> None:
@@ -2065,19 +2120,21 @@ def replace(src: StrOrBytesPath, dst: StrOrBytesPath, *, src_dir_fd: int | None 
     """Rename a file or directory, overwriting the destination.
 
     If either src_dir_fd or dst_dir_fd is not None, it should be a file
-      descriptor open to a directory, and the respective path string (src or dst)
-      should be relative; the path will then be relative to that directory.
+    descriptor open to a directory, and the respective path string (src or
+    dst) should be relative; the path will then be relative to that
+    directory.
     src_dir_fd and dst_dir_fd, may not be implemented on your platform.
-      If they are unavailable, using them will raise a NotImplementedError.
+    If they are unavailable, using them will raise a NotImplementedError.
     """
 
 def rmdir(path: StrOrBytesPath, *, dir_fd: int | None = None) -> None:
     """Remove a directory.
 
-    If dir_fd is not None, it should be a file descriptor open to a directory,
-      and path should be relative; path will then be relative to that directory.
+    If dir_fd is not None, it should be a file descriptor open to
+    a directory, and path should be relative; path will then be relative
+    to that directory.
     dir_fd may not be implemented on your platform.
-      If it is unavailable, using it will raise a NotImplementedError.
+    If it is unavailable, using it will raise a NotImplementedError.
     """
 
 @final
@@ -2094,9 +2151,9 @@ class _ScandirIterator(Generic[AnyStr]):
 def scandir(path: None = None) -> _ScandirIterator[str]:
     """Return an iterator of DirEntry objects for given path.
 
-    path can be specified as either str, bytes, or a path-like object.  If path
-    is bytes, the names of yielded DirEntry objects will also be bytes; in
-    all other circumstances they will be str.
+    path can be specified as either str, bytes, or a path-like object.  If
+    path is bytes, the names of yielded DirEntry objects will also be bytes;
+    in all other circumstances they will be str.
 
     If path is None, uses the path='.'.
     """
@@ -2133,8 +2190,9 @@ if sys.platform != "win32":
         """Perform a statvfs system call on the given path.
 
         path may always be specified as a string.
-        On some platforms, path may also be specified as an open file descriptor.
-          If this functionality is unavailable, using it raises an exception.
+        On some platforms, path may also be specified as an open file
+        descriptor.  If this functionality is unavailable, using it raises
+        an exception.
         """
 
 if sys.platform == "linux" and sys.version_info >= (3, 15):
@@ -2205,14 +2263,15 @@ def symlink(src: StrOrBytesPath, dst: StrOrBytesPath, target_is_directory: bool 
     """Create a symbolic link pointing to src named dst.
 
     target_is_directory is required on Windows if the target is to be
-      interpreted as a directory.  (On Windows, symlink requires
-      Windows 6.0 or greater, and raises a NotImplementedError otherwise.)
-      target_is_directory is ignored on non-Windows platforms.
+    interpreted as a directory.  (On Windows, symlink requires Windows 6.0
+    or greater, and raises a NotImplementedError otherwise.)
+    target_is_directory is ignored on non-Windows platforms.
 
-    If dir_fd is not None, it should be a file descriptor open to a directory,
-      and path should be relative; path will then be relative to that directory.
-    dir_fd may not be implemented on your platform.
-      If it is unavailable, using it will raise a NotImplementedError.
+    If dir_fd is not None, it should be a file descriptor open to
+    a directory, and path should be relative; path will then be relative
+    to that directory.
+    dir_fd may not be implemented on your platform.  If it is unavailable,
+    using it will raise a NotImplementedError.
     """
 
 if sys.platform != "win32":
@@ -2222,17 +2281,19 @@ if sys.platform != "win32":
 def truncate(path: FileDescriptorOrPath, length: int) -> None:  # Unix only up to version 3.4
     """Truncate a file, specified by path, to a specific length.
 
-    On some platforms, path may also be specified as an open file descriptor.
-      If this functionality is unavailable, using it raises an exception.
+    On some platforms, path may also be specified as an open file
+    descriptor.  If this functionality is unavailable, using it raises
+    an exception.
     """
 
 def unlink(path: StrOrBytesPath, *, dir_fd: int | None = None) -> None:
     """Remove a file (same as remove()).
 
-    If dir_fd is not None, it should be a file descriptor open to a directory,
-      and path should be relative; path will then be relative to that directory.
+    If dir_fd is not None, it should be a file descriptor open to
+    a directory, and path should be relative; path will then be relative to
+    that directory.
     dir_fd may not be implemented on your platform.
-      If it is unavailable, using it will raise a NotImplementedError.
+    If it is unavailable, using it will raise a NotImplementedError.
     """
 
 def utime(
@@ -2245,27 +2306,28 @@ def utime(
 ) -> None:
     """Set the access and modified time of path.
 
-    path may always be specified as a string.
-    On some platforms, path may also be specified as an open file descriptor.
-      If this functionality is unavailable, using it raises an exception.
+    path may always be specified as a string.  On some platforms, path may
+    also be specified as an open file descriptor.  If this functionality is
+    unavailable, using it raises an exception.
 
     If times is not None, it must be a tuple (atime, mtime);
-        atime and mtime should be expressed as float seconds since the epoch.
+    atime and mtime should be expressed as float seconds since the epoch.
     If ns is specified, it must be a tuple (atime_ns, mtime_ns);
-        atime_ns and mtime_ns should be expressed as integer nanoseconds
-        since the epoch.
+    atime_ns and mtime_ns should be expressed as integer nanoseconds
+    since the epoch.
     If times is None and ns is unspecified, utime uses the current time.
     Specifying tuples for both times and ns is an error.
 
-    If dir_fd is not None, it should be a file descriptor open to a directory,
-      and path should be relative; path will then be relative to that directory.
-    If follow_symlinks is False, and the last element of the path is a symbolic
-      link, utime will modify the symbolic link itself instead of the file the
-      link points to.
-    It is an error to use dir_fd or follow_symlinks when specifying path
-      as an open file descriptor.
+    If dir_fd is not None, it should be a file descriptor open to
+    a directory, and path should be relative; path will then be relative to
+    that directory.
+    If follow_symlinks is False, and the last element of the path is
+    a symbolic link, utime will modify the symbolic link itself instead of
+    the file the link points to.
+    It is an error to use dir_fd or follow_symlinks when specifying path as
+    an open file descriptor.
     dir_fd and follow_symlinks may not be available on your platform.
-      If they are unavailable, using them will raise a NotImplementedError.
+    If they are unavailable, using them will raise a NotImplementedError.
     """
 
 _OnError: TypeAlias = Callable[[OSError], object]
@@ -2281,12 +2343,12 @@ def walk(
         dirpath, dirnames, filenames
 
     dirpath is a string, the path to the directory.  dirnames is a list of
-    the names of the subdirectories in dirpath (including symlinks to directories,
-    and excluding '.' and '..').
+    the names of the subdirectories in dirpath (including symlinks to
+    directories, and excluding '.' and '..').
     filenames is a list of the names of the non-directory files in dirpath.
-    Note that the names in the lists are just names, with no path components.
-    To get a full path (which begins with top) to a file or directory in
-    dirpath, do os.path.join(dirpath, name).
+    Note that the names in the lists are just names, with no path
+    components.  To get a full path (which begins with top) to a file or
+    directory in dirpath, do os.path.join(dirpath, name).
 
     If optional arg 'topdown' is true or not specified, the triple for a
     directory is generated before the triples for any of its subdirectories
@@ -2296,13 +2358,13 @@ def walk(
 
     When topdown is true, the caller can modify the dirnames list in-place
     (e.g., via del or slice assignment), and walk will only recurse into the
-    subdirectories whose names remain in dirnames; this can be used to prune the
-    search, or to impose a specific order of visiting.  Modifying dirnames when
-    topdown is false has no effect on the behavior of os.walk(), since the
-    directories in dirnames have already been generated by the time dirnames
-    itself is generated. No matter the value of topdown, the list of
-    subdirectories is retrieved before the tuples for the directory and its
-    subdirectories are generated.
+    subdirectories whose names remain in dirnames; this can be used to prune
+    the search, or to impose a specific order of visiting.  Modifying
+    dirnames when topdown is false has no effect on the behavior of
+    os.walk(), since the directories in dirnames have already been generated
+    by the time dirnames itself is generated. No matter the value of
+    topdown, the list of subdirectories is retrieved before the tuples for
+    the directory and its subdirectories are generated.
 
     By default errors from the os.scandir() call are ignored.  If
     optional arg 'onerror' is specified, it should be a function; it
@@ -2355,9 +2417,9 @@ if sys.platform != "win32":
         The advantage of fwalk() over walk() is that it's safe against symlink
         races (when follow_symlinks is False).
 
-        If dir_fd is not None, it should be a file descriptor open to a directory,
-          and top should be relative; top will then be relative to that directory.
-          (dir_fd is always supported for fwalk.)
+        If dir_fd is not None, it should be a file descriptor open to
+        a directory, and top should be relative; top will then be relative to
+        that directory.  (dir_fd is always supported for fwalk.)
 
         Caution:
         Since fwalk() yields file descriptors, those are only valid until the
@@ -2389,29 +2451,32 @@ if sys.platform != "win32":
         def getxattr(path: FileDescriptorOrPath, attribute: StrOrBytesPath, *, follow_symlinks: bool = True) -> bytes:
             """Return the value of extended attribute attribute on path.
 
-            path may be either a string, a path-like object, or an open file descriptor.
-            If follow_symlinks is False, and the last element of the path is a symbolic
-              link, getxattr will examine the symbolic link itself instead of the file
-              the link points to.
+            path may be either a string, a path-like object, or an open file
+            descriptor.
+            If follow_symlinks is False, and the last element of the path is
+            a symbolic link, getxattr will examine the symbolic link itself
+            instead of the file the link points to.
             """
 
         def listxattr(path: FileDescriptorOrPath | None = None, *, follow_symlinks: bool = True) -> list[str]:
             """Return a list of extended attributes on path.
 
-            path may be either None, a string, a path-like object, or an open file descriptor.
-            if path is None, listxattr will examine the current directory.
-            If follow_symlinks is False, and the last element of the path is a symbolic
-              link, listxattr will examine the symbolic link itself instead of the file
-              the link points to.
+            path may be either None, a string, a path-like object, or an open file
+            descriptor.  If path is None, listxattr will examine the current
+            directory.
+            If follow_symlinks is False, and the last element of the path is
+            a symbolic link, listxattr will examine the symbolic link itself instead
+            of the file the link points to.
             """
 
         def removexattr(path: FileDescriptorOrPath, attribute: StrOrBytesPath, *, follow_symlinks: bool = True) -> None:
             """Remove extended attribute attribute on path.
 
-            path may be either a string, a path-like object, or an open file descriptor.
-            If follow_symlinks is False, and the last element of the path is a symbolic
-              link, removexattr will modify the symbolic link itself instead of the file
-              the link points to.
+            path may be either a string, a path-like object, or an open file
+            descriptor.
+            If follow_symlinks is False, and the last element of the path is
+            a symbolic link, removexattr will modify the symbolic link itself
+            instead of the file the link points to.
             """
 
         def setxattr(
@@ -2424,17 +2489,18 @@ if sys.platform != "win32":
         ) -> None:
             """Set extended attribute attribute on path to value.
 
-            path may be either a string, a path-like object,  or an open file descriptor.
-            If follow_symlinks is False, and the last element of the path is a symbolic
-              link, setxattr will modify the symbolic link itself instead of the file
-              the link points to.
+            path may be either a string, a path-like object,  or an open file
+            descriptor.
+            If follow_symlinks is False, and the last element of the path is
+            a symbolic link, setxattr will modify the symbolic link itself instead
+            of the file the link points to.
             """
 
 def abort() -> NoReturn:
     """Abort the interpreter immediately.
 
-    This function 'dumps core' or otherwise fails in the hardest way possible
-    on the hosting operating system.  This function never returns.
+    This function 'dumps core' or otherwise fails in the hardest way
+    possible on the hosting operating system.  This function never returns.
     """
 
 # These are defined as execl(file, *args) but the first *arg is mandatory.
@@ -2547,6 +2613,7 @@ if sys.platform != "win32":
         Like fork(), return pid of 0 to the child process,
         and pid of child to the parent process.
         To both, return fd of newly opened pseudo-terminal.
+        The master_fd is non-inheritable.
         """
 
     def killpg(pgid: int, signal: int, /) -> None:
@@ -2554,6 +2621,7 @@ if sys.platform != "win32":
 
     def nice(increment: int, /) -> int:
         """Add increment to the priority of process and return the new priority."""
+
     if sys.platform != "darwin" and sys.platform != "linux":
         def plock(op: int, /) -> None: ...
 
@@ -2786,6 +2854,7 @@ else:
         Returns a tuple of information about the child process:
             (pid, status)
         """
+
     # Added to MacOS in 3.13
     if sys.platform != "darwin" or sys.version_info >= (3, 13):
         @final
@@ -2823,9 +2892,10 @@ else:
                 Constructed from the ORing of one or more of WEXITED, WSTOPPED
                 or WCONTINUED and additionally may be ORed with WNOHANG or WNOWAIT.
 
-            Returns either waitid_result or None if WNOHANG is specified and there are
-            no children in a waitable state.
+            Returns either waitid_result or None if WNOHANG is specified and there
+            are no children in a waitable state.
             """
+
     from resource import struct_rusage
 
     def wait3(options: int) -> tuple[int, int, struct_rusage]:
@@ -2869,6 +2939,7 @@ else:
 
     def WTERMSIG(status: int) -> int:
         """Return the signal that terminated the process that provided the status value."""
+
     if sys.version_info >= (3, 15):
         def posix_spawn(
             path: StrOrBytesPath,
@@ -2883,7 +2954,32 @@ else:
             setsigmask: Iterable[int] = (),
             setsigdef: Iterable[int] = (),
             scheduler: tuple[Any, sched_param] | None = None,  # None allowed starting in 3.15
-        ) -> int: ...
+        ) -> int:
+            """Execute the program specified by path in a new process.
+
+            path
+              Path of executable file.
+            argv
+              Tuple or list of strings.
+            env
+              Dictionary of strings mapping to strings.
+            file_actions
+              A sequence of file action tuples.
+            setpgroup
+              The pgroup to use with the POSIX_SPAWN_SETPGROUP flag.
+            resetids
+              If the value is `true` the POSIX_SPAWN_RESETIDS will be activated.
+            setsid
+              If the value is `true` the POSIX_SPAWN_SETSID or POSIX_SPAWN_SETSID_NP
+              will be activated.
+            setsigmask
+              The sigmask to use with the POSIX_SPAWN_SETSIGMASK flag.
+            setsigdef
+              The sigmask to use with the POSIX_SPAWN_SETSIGDEF flag.
+            scheduler
+              A tuple with the scheduler policy (optional) and parameters.
+            """
+
         def posix_spawnp(
             path: StrOrBytesPath,
             argv: _ExecVArgs,
@@ -2897,7 +2993,32 @@ else:
             setsigmask: Iterable[int] = (),
             setsigdef: Iterable[int] = (),
             scheduler: tuple[Any, sched_param] | None = None,  # None allowed starting in 3.15
-        ) -> int: ...
+        ) -> int:
+            """Execute the program specified by path in a new process.
+
+            path
+              Path of executable file.
+            argv
+              Tuple or list of strings.
+            env
+              Dictionary of strings mapping to strings.
+            file_actions
+              A sequence of file action tuples.
+            setpgroup
+              The pgroup to use with the POSIX_SPAWN_SETPGROUP flag.
+            resetids
+              If the value is `True` the POSIX_SPAWN_RESETIDS will be activated.
+            setsid
+              If the value is `True` the POSIX_SPAWN_SETSID or POSIX_SPAWN_SETSID_NP
+              will be activated.
+            setsigmask
+              The sigmask to use with the POSIX_SPAWN_SETSIGMASK flag.
+            setsigdef
+              The sigmask to use with the POSIX_SPAWN_SETSIGDEF flag.
+            scheduler
+              A tuple with the scheduler policy (optional) and parameters.
+            """
+
     elif sys.version_info >= (3, 13):
         def posix_spawn(
             path: StrOrBytesPath,
@@ -2928,7 +3049,8 @@ else:
             resetids
               If the value is `true` the POSIX_SPAWN_RESETIDS will be activated.
             setsid
-              If the value is `true` the POSIX_SPAWN_SETSID or POSIX_SPAWN_SETSID_NP will be activated.
+              If the value is `true` the POSIX_SPAWN_SETSID or POSIX_SPAWN_SETSID_NP
+              will be activated.
             setsigmask
               The sigmask to use with the POSIX_SPAWN_SETSIGMASK flag.
             setsigdef
@@ -2966,7 +3088,8 @@ else:
             resetids
               If the value is `True` the POSIX_SPAWN_RESETIDS will be activated.
             setsid
-              If the value is `True` the POSIX_SPAWN_SETSID or POSIX_SPAWN_SETSID_NP will be activated.
+              If the value is `True` the POSIX_SPAWN_SETSID or POSIX_SPAWN_SETSID_NP
+              will be activated.
             setsigmask
               The sigmask to use with the POSIX_SPAWN_SETSIGMASK flag.
             setsigdef
@@ -2974,6 +3097,7 @@ else:
             scheduler
               A tuple with the scheduler policy (optional) and parameters.
             """
+
     else:
         def posix_spawn(
             path: StrOrBytesPath,
@@ -3050,6 +3174,7 @@ else:
             scheduler
               A tuple with the scheduler policy (optional) and parameters.
             """
+
     POSIX_SPAWN_OPEN: Final = 0
     POSIX_SPAWN_CLOSE: Final = 1
     POSIX_SPAWN_DUP2: Final = 2
@@ -3078,6 +3203,7 @@ if sys.platform != "win32":
 
     def sched_yield() -> None:  # some flavors of Unix
         """Voluntarily relinquish the CPU."""
+
     if sys.platform != "darwin":
         def sched_setscheduler(pid: int, policy: int, param: sched_param, /) -> None:  # some flavors of Unix
             """Set the scheduling policy for the process identified by pid.
@@ -3141,6 +3267,7 @@ if sys.version_info >= (3, 13):
             Return the number of logical CPUs usable by the calling thread of the
             current process. Return None if indeterminable.
             """
+
     else:
         def process_cpu_count() -> int | None:
             """Return the number of logical CPUs in the system.
@@ -3259,8 +3386,8 @@ def waitstatus_to_exitcode(status: int) -> int:
     On Windows, return status shifted right by 8 bits.
 
     On Unix, if the process is being traced or if waitpid() was called with
-    WUNTRACED option, the caller must first check if WIFSTOPPED(status) is true.
-    This function must not be called if WIFSTOPPED(status) is true.
+    WUNTRACED option, the caller must first check if WIFSTOPPED(status) is
+    true.  This function must not be called if WIFSTOPPED(status) is true.
     """
 
 if sys.platform == "linux":
@@ -3373,8 +3500,8 @@ if sys.version_info >= (3, 13) and sys.platform != "win32":
         """Open and return a file descriptor for a master pseudo-terminal device.
 
         Performs a posix_openpt() C function call. The oflag argument is used to
-        set file status flags and file access modes as specified in the manual page
-        of posix_openpt() of your system.
+        set file status flags and file access modes as specified in the manual
+        page of posix_openpt() of your system.
         """
 
     def grantpt(fd: FileDescriptorLike, /) -> None:
@@ -3483,9 +3610,9 @@ if sys.version_info >= (3, 13) or sys.platform != "win32":
             The file descriptor of the file to be modified.
           mode
             Operating-system mode bitfield.
-            Be careful when using number literals for *mode*. The conventional UNIX notation for
-            numeric modes uses an octal base, which needs to be indicated with a ``0o`` prefix in
-            Python.
+            Be careful when using number literals for *mode*.  The conventional
+            UNIX notation for numeric modes uses an octal base, which needs to
+            be indicated with a ``0o`` prefix in Python.
 
         Equivalent to os.chmod(fd, mode).
         """
@@ -3496,6 +3623,6 @@ if sys.platform != "linux":
         def lchmod(path: StrOrBytesPath, mode: int) -> None:
             """Change the access permissions of a file, without following symbolic links.
 
-            If path is a symlink, this affects the link itself rather than the target.
-            Equivalent to chmod(path, mode, follow_symlinks=False)."
+            If path is a symlink, this affects the link itself rather than the
+            target.  Equivalent to chmod(path, mode, follow_symlinks=False).
             """

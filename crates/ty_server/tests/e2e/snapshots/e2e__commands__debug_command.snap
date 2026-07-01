@@ -22,6 +22,7 @@ Settings: WorkspaceSettings {
     },
     completions: CompletionSettings {
         auto_import: true,
+        complete_function_parentheses: false,
     },
     overrides: None,
 }
@@ -39,7 +40,7 @@ Settings: Settings {
     rules: <RULES>,
     terminal: TerminalSettings {
         output_format: Full,
-        error_on_warning: false,
+        error_on_warning: true,
     },
     src: SrcSettings {
         respect_ignore_files: true,

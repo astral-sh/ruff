@@ -275,6 +275,18 @@ Self-referential defaults should not crash type inference:
 type A[T = A] = A[int]
 ```
 
+An explicit alias specialization overrides the alias type parameter's default:
+
+```py
+type ExplicitAlias[
+    FirstT = ExplicitAlias[int, str],
+    SecondT = FirstT,
+] = list[SecondT]
+
+def explicit_alias_default(x: ExplicitAlias):
+    reveal_type(x)  # revealed: list[ExplicitAlias[int, str]]
+```
+
 A self-referential default that does not reference itself in the alias body should also not crash,
 even when the default is evaluated (e.g., by omitting the type argument):
 
@@ -597,6 +609,22 @@ class Y:
 def h(x: X.GenAlias[int], y: Y.GenAlias[int]) -> None:
     # error: [invalid-assignment] "Object of type `mdtest_snippet.Y.GenAlias[int]` is not assignable to `mdtest_snippet.X.GenAlias[int]`"
     a: X.GenAlias[int] = y
+```
+
+## Different specializations of the same generic type alias
+
+Different specializations of the same generic type alias refer to the same definition, so they
+should not be qualified:
+
+```py
+class Box[T]:
+    item: T
+
+type RefBox[T] = Box[T]
+
+def transmute_inner[T, V](x: RefBox[T]) -> RefBox[V]:
+    # error: [invalid-return-type] "Return type does not match returned value: expected `RefBox[V@transmute_inner]`, found `RefBox[T@transmute_inner]`"
+    return x
 ```
 
 ## Non-ambiguous type aliases should not be qualified

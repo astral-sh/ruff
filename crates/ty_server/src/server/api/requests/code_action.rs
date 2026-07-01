@@ -1,13 +1,13 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use lsp_types::{self as types, NumberOrString, TextEdit, Url, request as req};
+use lsp_types::{self as types, Code, CodeActionRequest, CodeActionResponse, TextEdit, Uri};
 use ruff_db::files::File;
 use ruff_diagnostics::Edit;
 use ruff_text_size::Ranged;
 use ty_ide::code_actions;
 use ty_project::ProjectDatabase;
-use types::{CodeActionKind, CodeActionOrCommand};
+use types::CodeActionKind;
 
 use crate::db::Db;
 use crate::document::{RangeExt, ToRangeExt};
@@ -22,11 +22,11 @@ use crate::{DIAGNOSTIC_NAME, PositionEncoding};
 pub(crate) struct CodeActionRequestHandler;
 
 impl RequestHandler for CodeActionRequestHandler {
-    type RequestType = req::CodeActionRequest;
+    type RequestType = CodeActionRequest;
 }
 
 impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
-    fn document_url(params: &types::CodeActionParams) -> Cow<'_, Url> {
+    fn document_uri(params: &types::CodeActionParams) -> Cow<'_, Uri> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -35,7 +35,7 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
         snapshot: &DocumentSnapshot,
         _client: &Client,
         params: types::CodeActionParams,
-    ) -> Result<Option<types::CodeActionResponse>> {
+    ) -> Result<Option<Vec<CodeActionResponse>>> {
         let diagnostics = params.context.diagnostics;
 
         let Some(file) = snapshot.to_notebook_or_file(db) else {
@@ -47,6 +47,11 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
             diagnostic.source.as_deref() == Some(DIAGNOSTIC_NAME)
                 && range_intersect(&diagnostic.range, &params.range)
         }) {
+            let mut diagnostic_id = match &diagnostic.code {
+                Some(Code::String(diagnostic_id)) => Some(Cow::Borrowed(diagnostic_id)),
+                _ => None,
+            };
+
             // If the diagnostic includes fixes, offer those up as options.
             if let Some(data) = diagnostic.data.take() {
                 let data: DiagnosticData = match serde_json::from_value(data) {
@@ -57,20 +62,31 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
                     }
                 };
 
-                actions.push(CodeActionOrCommand::CodeAction(lsp_types::CodeAction {
-                    title: data.fix_title,
-                    kind: Some(CodeActionKind::QUICKFIX),
-                    diagnostics: Some(vec![diagnostic.clone()]),
-                    edit: Some(lsp_types::WorkspaceEdit {
-                        changes: Some(data.edits),
-                        document_changes: None,
-                        change_annotations: None,
-                    }),
-                    is_preferred: Some(true),
-                    command: None,
-                    disabled: None,
-                    data: None,
-                }));
+                let fix = match data {
+                    DiagnosticData::Full(full_diagnostic) => {
+                        diagnostic_id = Some(Cow::Owned(full_diagnostic.diagnostic_id));
+                        full_diagnostic.fix
+                    }
+                    DiagnosticData::Fix(fix) => Some(fix),
+                };
+
+                if let Some(fix) = fix {
+                    actions.push(CodeActionResponse::CodeAction(lsp_types::CodeAction {
+                        title: fix.fix_title,
+                        kind: Some(CodeActionKind::QuickFix),
+                        diagnostics: Some(vec![diagnostic.clone()]),
+                        edit: Some(lsp_types::WorkspaceEdit {
+                            changes: Some(fix.edits),
+                            document_changes: None,
+                            change_annotations: None,
+                        }),
+                        is_preferred: Some(true),
+                        command: None,
+                        disabled: None,
+                        data: None,
+                        tags: None,
+                    }));
+                }
             }
 
             // Try to find other applicable actions.
@@ -78,15 +94,15 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
             // This is only for actions that are messy to compute at the time of the diagnostic.
             // For instance, suggesting imports requires finding symbols for the entire project,
             // which is dubious when you're in the middle of resolving symbols.
-            let url = snapshot.url();
+            let uri = snapshot.uri();
             let encoding = snapshot.encoding();
-            if let Some(NumberOrString::String(diagnostic_id)) = &diagnostic.code
-                && let Some(range) = diagnostic.range.to_text_range(db, file, url, encoding)
+            if let Some(diagnostic_id) = diagnostic_id
+                && let Some(range) = diagnostic.range.to_text_range(db, file, uri, encoding)
             {
-                for action in code_actions(db, file, range, diagnostic_id) {
-                    actions.push(CodeActionOrCommand::CodeAction(lsp_types::CodeAction {
+                for action in code_actions(db, file, range, &diagnostic_id) {
+                    actions.push(CodeActionResponse::CodeAction(lsp_types::CodeAction {
                         title: action.title,
-                        kind: Some(CodeActionKind::QUICKFIX),
+                        kind: Some(CodeActionKind::QuickFix),
                         diagnostics: Some(vec![diagnostic.clone()]),
                         edit: Some(lsp_types::WorkspaceEdit {
                             changes: to_lsp_edits(db, file, encoding, action.edits),
@@ -97,6 +113,7 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
                         command: None,
                         disabled: None,
                         data: None,
+                        tags: None,
                     }));
                 }
             }
@@ -115,8 +132,8 @@ fn to_lsp_edits(
     file: File,
     encoding: PositionEncoding,
     edits: Vec<Edit>,
-) -> Option<HashMap<Url, Vec<TextEdit>>> {
-    let mut lsp_edits: HashMap<Url, Vec<lsp_types::TextEdit>> = HashMap::new();
+) -> Option<HashMap<Uri, Vec<TextEdit>>> {
+    let mut lsp_edits: HashMap<Uri, Vec<lsp_types::TextEdit>> = HashMap::new();
 
     for edit in edits {
         let location = edit
