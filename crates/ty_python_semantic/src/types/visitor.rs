@@ -334,9 +334,9 @@ enum RecursionGuardVisit {
 
 /// Guards recursive type walks.
 ///
-/// [`TypeCollector`] only de-duplicates exact `Type` values. Recursive aliases must be detected by
-/// identity, so this wrapper keeps an active stack of [`TypeIdentity`] values in addition to the
-/// collected full types.
+/// [`TypeCollector`] only de-duplicates exact `Type` values. Recursive aliases, `NewType`s, and
+/// functions must also be detected by identity, because they can re-enter with a different type
+/// structure. Other type kinds stay on the exact-type path to keep common type walks cheap.
 #[derive(Default, Debug)]
 pub(crate) struct RecursionGuard<'db> {
     collected_types: TypeCollector<'db>,
@@ -344,27 +344,46 @@ pub(crate) struct RecursionGuard<'db> {
 }
 
 impl<'db> RecursionGuard<'db> {
+    /// Reduce costs by tracking only recursive types.
+    fn active_identity(db: &'db dyn Db, ty: Type<'db>) -> Option<TypeIdentity<'db>> {
+        match ty {
+            Type::FunctionLiteral(function) => {
+                Some(TypeIdentity::FunctionLiteral(function.literal(db)))
+            }
+            Type::NewTypeInstance(newtype) => {
+                Some(TypeIdentity::NewTypeInstance(newtype.definition(db)))
+            }
+            Type::TypeAlias(alias) => Some(TypeIdentity::TypeAlias(alias.definition(db))),
+            _ => None,
+        }
+    }
+
     fn begin_visit(&self, db: &'db dyn Db, ty: Type<'db>) -> RecursionGuardVisit {
-        // Collect the exact type before checking for identity recursion. A recursive alias keeps
-        // the same identity across different specializations, but callers still need each distinct
-        // specialized type to be collected.
+        // Collect the exact type before checking for identity recursion. A recursive type keeps
+        // the same identity across different expansions, but callers still need each distinct
+        // expanded type to be collected.
         let was_collected = self.collected_types.collect_type(ty);
 
-        let identity = ty.to_type_identity(db);
-        if self.active_identities.borrow().contains(&identity) {
-            return RecursionGuardVisit::Cycle;
+        let active_identity = Self::active_identity(db, ty);
+        if let Some(identity) = active_identity {
+            if self.active_identities.borrow().contains(&identity) {
+                return RecursionGuardVisit::Cycle;
+            }
         }
         if !was_collected {
             return RecursionGuardVisit::AlreadyCollected;
         }
 
-        self.active_identities.borrow_mut().push(identity);
+        if let Some(identity) = active_identity {
+            self.active_identities.borrow_mut().push(identity);
+        }
         RecursionGuardVisit::Pending
     }
 
     fn finish_visit(&self, db: &'db dyn Db, ty: Type<'db>) {
-        let identity = ty.to_type_identity(db);
-        debug_assert_eq!(self.active_identities.borrow_mut().pop(), Some(identity));
+        if let Some(identity) = Self::active_identity(db, ty) {
+            debug_assert_eq!(self.active_identities.borrow_mut().pop(), Some(identity));
+        }
     }
 }
 
