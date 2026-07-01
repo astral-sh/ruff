@@ -274,8 +274,8 @@ impl<'a> Checker<'a> {
         let semantic = SemanticModel::new(
             &settings.typing_modules,
             &settings.builtins,
-            target_version.linter_version().minor,
-            source_type.is_ipynb(),
+            target_version.linter_version(),
+            source_type,
             path,
             module,
         );
@@ -2291,6 +2291,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 node_index: _,
             }) => {
                 if let Some(name) = name {
+                    // Materialize the builtin before looking up the exception target's previous
+                    // binding. Otherwise, `except Exception as len` records no previous binding
+                    // and later treats `len` as undefined instead of resolving to the builtin.
                     self.semantic.ensure_builtin_binding(name.as_str());
 
                     // Store the existing binding, if any.

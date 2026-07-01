@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_python_ast::helpers::{from_relative_import, map_subscript};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::{self as ast, Expr, ExprContext, PySourceType, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprContext, PySourceType, PythonVersion, Stmt};
 use ruff_python_stdlib::builtins::{is_python_builtin, python_builtins, python_magic_globals};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -32,8 +32,8 @@ pub mod all;
 pub struct SemanticModel<'a> {
     typing_modules: &'a [String],
     custom_builtins: &'a [String],
-    python_minor_version: u8,
-    is_notebook: bool,
+    target_version: PythonVersion,
+    source_type: PySourceType,
     module: Module<'a>,
 
     /// Stack of all AST nodes in the program.
@@ -154,16 +154,16 @@ impl<'a> SemanticModel<'a> {
     pub fn new(
         typing_modules: &'a [String],
         custom_builtins: &'a [String],
-        python_minor_version: u8,
-        is_notebook: bool,
+        target_version: PythonVersion,
+        source_type: PySourceType,
         path: &Path,
         module: Module<'a>,
     ) -> Self {
         let mut semantic = Self {
             typing_modules,
             custom_builtins,
-            python_minor_version,
-            is_notebook,
+            target_version,
+            source_type,
             module,
             nodes: Nodes::default(),
             node_id: None,
@@ -186,8 +186,8 @@ impl<'a> SemanticModel<'a> {
             resolved_names: FxHashMap::default(),
         };
 
-        let builtin_count = python_builtins(python_minor_version, is_notebook).count()
-            + python_magic_globals(python_minor_version).count()
+        let builtin_count = python_builtins(target_version.minor, source_type.is_ipynb()).count()
+            + python_magic_globals(target_version.minor).count()
             + custom_builtins.len();
         // Match the capacity that repeated `push` calls would reach while avoiding the
         // intermediate allocations.
@@ -252,12 +252,28 @@ impl<'a> SemanticModel<'a> {
             .chain(self.typing_modules.iter().map(String::as_str))
     }
 
+    /// Returns `true` if `name` is provided by the configured Python runtime.
+    ///
+    /// This includes version- and source-type-specific builtins, magic globals, and custom
+    /// builtins. It does not account for bindings that shadow the name in a scope.
     fn is_builtin_name(&self, name: &str) -> bool {
-        is_python_builtin(name, self.python_minor_version, self.is_notebook)
-            || python_magic_globals(self.python_minor_version).any(|builtin| builtin == name)
+        is_python_builtin(name, self.target_version.minor, self.source_type.is_ipynb())
+            || python_magic_globals(self.target_version.minor).any(|builtin| builtin == name)
             || self.custom_builtins.iter().any(|builtin| builtin == name)
     }
 
+    /// Returns `true` if `name` is a builtin with no binding in `scope` or its ancestors.
+    ///
+    /// This recognizes builtins that have not yet been materialized in the global scope. For
+    /// example, `len` is unshadowed in the module but shadowed in `f`:
+    ///
+    /// ```python
+    /// print(len)
+    ///
+    /// def f():
+    ///     len = 0
+    ///     print(len)
+    /// ```
     fn is_unshadowed_builtin(&self, name: &str, scope: ScopeId) -> bool {
         self.is_builtin_name(name)
             && self
@@ -266,7 +282,11 @@ impl<'a> SemanticModel<'a> {
                 .all(|scope_id| !self.scopes[scope_id].has(name))
     }
 
-    /// Creates the builtin binding for `name` if it has not been needed before.
+    /// Creates a concrete binding for `name` if it is an unmaterialized builtin.
+    ///
+    /// Loads create builtin bindings as they are resolved. Operations that need a [`BindingId`]
+    /// before any load, such as recording what a binding shadows or attaching a reference, must
+    /// call this first.
     pub fn ensure_builtin_binding(&mut self, name: &'a str) {
         if self.global_scope().has(name) || !self.is_builtin_name(name) {
             return;
@@ -1676,6 +1696,9 @@ impl<'a> SemanticModel<'a> {
         // ```
         if !self.at_top_level() {
             for (name, range) in globals.iter() {
+                // Global pre-scanning synthesizes an assignment when no global binding exists.
+                // Materialize builtins first so `global range` doesn't replace the builtin with
+                // that synthetic assignment.
                 self.ensure_builtin_binding(name);
                 if self
                     .global_scope()
