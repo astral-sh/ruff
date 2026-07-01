@@ -4,6 +4,7 @@
 - Rejected — Infer arbitrary metaclass method writes as constructed-class attributes. A method-only assignment is deliberately insufficient without a class-body declaration.
 - Fixed — Reject bound metaclass declarations even when an arbitrary method writes the same name. Only unbound declarations describe constructed-class attributes.
 - Fixed — Let a metaclass declaration shadow inherited class attributes. The contract represents a value stored directly in the constructed class namespace.
+- Fixed — Preserve instance members declared or initialized directly on the constructed class. They remain authoritative over the metaclass contract.
 - Rejected — Screen inferred writes against data descriptors. The narrow implementation does not infer writes, so descriptor interception is not part of this change.
 - Rejected — Model custom-metaclass shadows of builtin `type` descriptors. No builtin descriptor shim is needed for declaration contracts.
 - Rejected — Ignore annotation-only declarations when deciding whether an attribute exists. ty intentionally treats declarations as attribute contracts.

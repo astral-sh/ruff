@@ -2861,10 +2861,14 @@ impl<'db> Type<'db> {
         let class_attr = self.find_name_in_mro_with_policy(db, name, policy).expect(
             "Calling `class_namespace_member` on a class literal should always find an MRO",
         );
-        if self
-            .to_class_type(db)
-            .is_some_and(|class| !class.own_class_member(db, None, name).is_undefined())
-        {
+        let own_class = match self {
+            Type::SubclassOf(subclass_of) => subclass_of.subclass_of().into_class(db),
+            _ => self.to_class_type(db),
+        };
+        if own_class.is_some_and(|class| {
+            !class.own_class_member(db, None, name).is_undefined()
+                || class.has_own_instance_member(db, name)
+        }) {
             return class_attr;
         }
         let metaclass_declaration = self

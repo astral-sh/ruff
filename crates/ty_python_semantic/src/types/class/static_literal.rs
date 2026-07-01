@@ -2574,6 +2574,24 @@ impl<'db> StaticClassLiteral<'db> {
         self.own_instance_member(db, name)
     }
 
+    /// Return whether this class directly declares or assigns an instance member named `name`.
+    pub(super) fn has_own_instance_member(self, db: &'db dyn Db, name: &str) -> bool {
+        let body_scope = self.body_scope(db);
+        let has_declaration =
+            place_table(db, body_scope)
+                .symbol_id(name)
+                .is_some_and(|symbol_id| {
+                    use_def_map(db, body_scope)
+                        .end_of_scope_symbol_declarations(symbol_id)
+                        .next()
+                        .is_some()
+                });
+        has_declaration
+            || implicit_attribute_names(db, body_scope)
+                .binary_search_by(|candidate| candidate.as_str().cmp(name))
+                .is_ok()
+    }
+
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
     pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
