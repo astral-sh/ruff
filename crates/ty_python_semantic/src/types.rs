@@ -2881,6 +2881,12 @@ impl<'db> Type<'db> {
         let class_attr = self.find_name_in_mro_with_policy(db, name, policy).expect(
             "Calling `class_namespace_member` on a class literal should always find an MRO",
         );
+        if self
+            .to_class_type(db)
+            .is_some_and(|class| !class.own_class_member(db, None, name).is_undefined())
+        {
+            return class_attr;
+        }
         let metaclass_declaration = self
             .to_meta_type(db)
             .to_instance(db)
@@ -2888,7 +2894,7 @@ impl<'db> Type<'db> {
             .map_or_else(PlaceAndQualifiers::default, |metaclass| {
                 metaclass.own_declared_instance_member(db, name).inner
             });
-        class_attr.or_fall_back_to(db, || metaclass_declaration)
+        metaclass_declaration.or_fall_back_to(db, || class_attr)
     }
 
     /// This function roughly corresponds to looking up an attribute in the `__dict__` of an object.
