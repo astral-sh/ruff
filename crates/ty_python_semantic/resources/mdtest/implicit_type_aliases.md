@@ -1727,7 +1727,7 @@ from typing import Union
 Recursive = list[Union["Recursive", None]]
 
 def _(r: Recursive):
-    reveal_type(r)  # revealed: list[<class 'list[Divergent | None]'> | None]
+    reveal_type(r)  # revealed: list[Divergent | None]
 ```
 
 ### New union syntax
@@ -1755,12 +1755,47 @@ def _(
     recursive_dict3: RecursiveDict3,
     recursive_dict4: RecursiveDict4,
 ):
-    reveal_type(recursive_list1)  # revealed: list[<class 'list[Divergent | None]'> | None]
-    reveal_type(recursive_list2)  # revealed: list[<class 'list[Divergent | None]'> | None]
-    reveal_type(recursive_dict1)  # revealed: dict[str, <class 'dict[str, Divergent | None]'> | None]
-    reveal_type(recursive_dict2)  # revealed: dict[str, <class 'dict[str, Divergent | None]'> | None]
-    reveal_type(recursive_dict3)  # revealed: dict[<class 'dict[Divergent, int]'>, int]
-    reveal_type(recursive_dict4)  # revealed: dict[<class 'dict[Divergent, int]'>, int]
+    reveal_type(recursive_list1)  # revealed: list[Divergent | None]
+    reveal_type(recursive_list2)  # revealed: list[Divergent | None]
+    reveal_type(recursive_dict1)  # revealed: dict[str, Divergent | None]
+    reveal_type(recursive_dict2)  # revealed: dict[str, Divergent | None]
+    reveal_type(recursive_dict3)  # revealed: dict[Divergent, int]
+    reveal_type(recursive_dict4)  # revealed: dict[Divergent, int]
+```
+
+### ClassInfo-like recursive implicit type aliases
+
+Implicit aliases can contain the same recursive tuple shape as `isinstance`'s accepted class-info
+type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from types import UnionType
+
+RecursiveTuple = tuple["RecursiveTuple", ...]
+
+def _(recursive_tuple: RecursiveTuple):
+    reveal_type(recursive_tuple)  # revealed: tuple[Divergent, ...]
+
+ClassInfo = type | UnionType | tuple["ClassInfo", ...]
+reveal_type(ClassInfo)  # revealed: <types.UnionType special-form 'type | UnionType | tuple[Divergent, ...]'>
+
+def my_isinstance(obj: object, classinfo: ClassInfo) -> bool:
+    reveal_type(classinfo)  # revealed: type | UnionType | tuple[Divergent, ...]
+    return isinstance(obj, classinfo)
+
+my_isinstance(1, int)
+my_isinstance(1, (int,))
+# error: [invalid-argument-type] "Argument to function `my_isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal[1]`"
+my_isinstance(1, 1)
+my_isinstance(1, (int, int | str))
+my_isinstance(1, (int, (int,)))
+# error: [invalid-argument-type] "Argument to function `my_isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `tuple[<class 'int'>, tuple[Literal[1]]]`"
+my_isinstance(1, (int, (1,)))
 ```
 
 ### Self-referential generic implicit type aliases
@@ -1777,8 +1812,8 @@ def _(
     nested_dict_int: NestedDict[int],
     nested_list_str: NestedList[str],
 ):
-    reveal_type(nested_dict_int)  # revealed: dict[str, <class 'dict[str, Divergent | int]'> | int]
-    reveal_type(nested_list_str)  # revealed: list[<class 'list[Divergent | None]'> | None]
+    reveal_type(nested_dict_int)  # revealed: dict[str, Divergent | int]
+    reveal_type(nested_list_str)  # revealed: list[Divergent | None]
 ```
 
 ### Materialization of self-referential generic implicit type aliases

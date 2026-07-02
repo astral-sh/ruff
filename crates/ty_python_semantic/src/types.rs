@@ -1316,9 +1316,15 @@ impl<'db> Type<'db> {
                 .fold(db, recursive)
                 .replace_recursive_with_binder(db, recursive);
 
-            let semantic_view =
-                previous_semantic_view.or_else(|| previous.type_expression_semantic_view(db));
-            if let Some(Type::Recursive(semantic_recursive)) = semantic_view
+            if let Some(Type::Recursive(semantic_recursive)) = previous_semantic_view
+                && semantic_recursive.binder(db).same_marker(binder)
+                && semantic_recursive != recursive
+            {
+                // This semantic view is not a runtime substructure of `current_body`;
+                // use it only as an extra boundary for binder replacement.
+                current_body = current_body.replace_recursive_with_binder(db, semantic_recursive);
+            } else if let Some(Type::Recursive(semantic_recursive)) =
+                previous.type_expression_semantic_view(db)
                 && semantic_recursive.binder(db).same_marker(binder)
                 && semantic_recursive != recursive
             {
@@ -6187,18 +6193,15 @@ impl<'db> Type<'db> {
                 if let Some(body) = recursive.body(db).type_expression_semantic_view(db) {
                     Ok(Type::recursive(db, recursive.binder(db), body))
                 } else {
-                    recursive.map_or_else(
+                    // Interpret the body under the same binder. Unfolding here would re-inject
+                    // the recursive type itself into structures that are already type expressions.
+                    let body = recursive.body(db).in_type_expression(
                         db,
-                        || Ok(*self),
-                        |unfolded| {
-                            unfolded.in_type_expression(
-                                db,
-                                scope_id,
-                                typevar_binding_context,
-                                inference_flags,
-                            )
-                        },
-                    )
+                        scope_id,
+                        typevar_binding_context,
+                        inference_flags,
+                    )?;
+                    Ok(Type::recursive(db, recursive.binder(db), body))
                 }
             }
 
@@ -6494,9 +6497,8 @@ impl<'db> Type<'db> {
                 TypeMapping::UnnestRecursive { binder }
                     if recursive.binder(db).same_marker(*binder) =>
                 {
-                    recursive
-                        .body(db)
-                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                    // Same-binder nesting denotes a recursive occurrence in the outer type.
+                    Type::Divergent(*binder)
                 }
                 TypeMapping::ReplaceRecursiveWithBinder { recursive: target }
                     if recursive == *target =>
