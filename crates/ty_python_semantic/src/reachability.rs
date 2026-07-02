@@ -1,3 +1,4 @@
+//! Dummy
 //! # Reachability evaluation
 //!
 //! During semantic index building, we record so-called reachability constraints that keep track
