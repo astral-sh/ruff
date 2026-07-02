@@ -1391,12 +1391,17 @@ impl<'db> DefinitionInference<'db> {
             if let Some(collection_class) = known_collection
                 .and_then(|known_collection| known_collection.try_to_class_literal(db))
             {
+                let Type::Recursive(recursive) = cycle_recovery else {
+                    unreachable!("cycle initial type should be recursive");
+                };
                 let divergent_collection = collection_class
                     .apply_specialization(db, |generic_context| {
-                        generic_context.repeat_specialization(db, cycle_recovery)
+                        generic_context.repeat_specialization(db, recursive.body(db))
                     });
+                let body = Type::instance(db, divergent_collection);
+                let recursive = Type::recursive(db, recursive.binder(db), body);
 
-                types = DefinitionTypes::Binding(Type::instance(db, divergent_collection));
+                types = DefinitionTypes::Binding(recursive);
             }
         }
 

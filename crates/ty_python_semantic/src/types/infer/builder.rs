@@ -7510,22 +7510,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 let statement_use_types = infer_statement_types(self.db(), statement);
 
-                if let Some(divergent) = statement_use_types
+                if let Some(recursive) = statement_use_types
                     .expression_type(use_expression)
-                    .as_divergent()
+                    .as_recursive()
+                    && recursive.is_identity(self.db())
                 {
                     // Infer `collection[Divergent]` for the initial cycle result.
                     let divergent_instance = collection_alias
                         .origin(self.db())
                         .apply_specialization(self.db(), |generic_context| {
                             generic_context
-                                .repeat_specialization(self.db(), Type::Divergent(divergent))
+                                .repeat_specialization(self.db(), recursive.body(self.db()))
                         });
+                    let body = Type::instance(self.db(), divergent_instance);
 
                     builder
                         .infer(
                             identity_instance,
-                            Type::instance(self.db(), divergent_instance),
+                            Type::recursive(self.db(), recursive.binder(self.db()), body),
                         )
                         .ok()?;
                 } else if let Some(constraints) =

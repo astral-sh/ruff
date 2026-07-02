@@ -1076,9 +1076,9 @@ impl<'db> Type<'db> {
         matches!(self, Type::Divergent(_))
     }
 
-    pub(crate) const fn as_divergent(self) -> Option<DivergentType> {
+    pub(crate) const fn as_recursive(self) -> Option<RecursiveType<'db>> {
         match self {
-            Type::Divergent(divergent) => Some(divergent),
+            Type::Recursive(recursive) => Some(recursive),
             _ => None,
         }
     }
@@ -1622,6 +1622,9 @@ impl<'db> Type<'db> {
             }
             Type::LiteralValue(literal) => literal.fallback_instance(db).nominal_class(db),
             Type::PropertyInstance(property) => property.instance_fallback(db).nominal_class(db),
+            Type::Recursive(recursive) => {
+                recursive.map_or(db, None, |unfolded| unfolded.nominal_class(db))
+            }
             _ => None,
         }
     }
@@ -1741,8 +1744,14 @@ impl<'db> Type<'db> {
     /// underlying value type. Otherwise, returns `self` unchanged.
     pub(crate) fn resolve_type_alias(self, db: &'db dyn Db) -> Type<'db> {
         let mut ty = self;
+        if let Type::Recursive(recursive) = ty {
+            ty = recursive.unfold(db);
+        }
         while let Type::TypeAlias(alias) = ty {
             ty = alias.value_type(db);
+            if let Type::Recursive(recursive) = ty {
+                ty = recursive.unfold(db);
+            }
         }
         ty
     }
@@ -2733,6 +2742,9 @@ impl<'db> Type<'db> {
             Type::TypeForm(_) => false,
 
             Type::TypeAlias(alias) => alias.value_type(db).is_single_valued(db),
+            Type::Recursive(recursive) => {
+                recursive.map_or_else(db, || false, |unfolded| unfolded.is_single_valued(db))
+            }
 
             Type::Dynamic(_)
             | Type::Divergent(_)
@@ -2745,9 +2757,6 @@ impl<'db> Type<'db> {
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_) => false,
-            Type::Recursive(recursive) => {
-                recursive.map_or_else(db, || false, |unfolded| unfolded.is_single_valued(db))
-            }
 
             Type::Intersection(intersection) => intersection
                 .enum_complement(db)
@@ -8320,6 +8329,11 @@ impl<'db> RecursiveType<'db> {
             false,
             |ty| matches!(ty, Type::Divergent(divergent) if divergent.same_marker(binder)),
         )
+    }
+
+    /// Whether this recursive type is identity, i.e. `μa.a`.
+    pub(crate) fn is_identity(self, db: &'db dyn Db) -> bool {
+        self.body(db) == Type::Divergent(self.binder(db))
     }
 }
 

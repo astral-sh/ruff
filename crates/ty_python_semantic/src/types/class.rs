@@ -14,8 +14,9 @@ pub(crate) use self::static_literal::{
 };
 pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use super::{
-    BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType, SubclassOfType, Type,
-    TypeQualifiers, class_base::ClassBase, function::FunctionType,
+    BoundTypeVarInstance, Foldable, MemberLookupPolicy, MroIterator, RecursiveType,
+    SpecialFormType, SubclassOfType, Type, TypeQualifiers, class_base::ClassBase,
+    function::FunctionType,
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, Provenance, TypeOrigin};
@@ -307,6 +308,18 @@ impl<'db> GenericAlias<'db> {
 
     pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
         self.origin(db).is_typed_dict(db)
+    }
+}
+
+impl<'db> Foldable<'db> for GenericAlias<'db> {
+    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        let original_specialization = self.specialization(db);
+        let specialization = original_specialization.fold(db, recursive);
+        if specialization == original_specialization {
+            self
+        } else {
+            Self::new(db, self.origin(db), specialization)
+        }
     }
 }
 
@@ -2167,6 +2180,15 @@ impl<'db> ClassType<'db> {
 impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
     fn from(generic: GenericAlias<'db>) -> ClassType<'db> {
         ClassType::Generic(generic)
+    }
+}
+
+impl<'db> Foldable<'db> for ClassType<'db> {
+    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        match self {
+            Self::NonGeneric(_) => self,
+            Self::Generic(generic) => Self::Generic(generic.fold(db, recursive)),
+        }
     }
 }
 

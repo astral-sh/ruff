@@ -2167,6 +2167,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     !self.is_inferable_typevar_artifact(target, *element)
                 })
             }
+            Type::Recursive(recursive) => recursive.map_type(self.db, |unfolded| {
+                self.remove_inferable_typevar_artifacts_from_lower_bound(target, unfolded)
+            }),
             _ => ty,
         }
     }
@@ -2190,6 +2193,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     }
                 })
             }
+            Type::Recursive(recursive) => recursive.map_type(self.db, |unfolded| {
+                self.remove_inferable_typevar_artifacts_from_upper_bound(target, unfolded)
+            }),
             _ => ty,
         }
     }
@@ -2360,6 +2366,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     resolving.remove(&ty);
                     result
                 }
+                Type::Recursive(recursive) => {
+                    if !resolving.insert(ty) {
+                        return false;
+                    }
+                    let result = recursive.map_or(db, false, |unfolded| {
+                        collect_typed_dicts(db, unfolded, resolving, completed, typed_dicts)
+                    });
+                    resolving.remove(&ty);
+                    result
+                }
                 _ => false,
             };
             completed.insert(ty, result);
@@ -2499,6 +2515,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // This is necessary for solving generics like `def head[T](my_list: MyList[T]) -> T`.
             (Type::TypeAlias(alias), _) => {
                 return self.infer_map_impl(alias.value_type(self.db), actual, polarity, seen);
+            }
+            (Type::Recursive(recursive), _) => {
+                return recursive.map_or(self.db, Ok(()), |unfolded| {
+                    self.infer_map_impl(unfolded, actual, polarity, seen)
+                });
             }
 
             (Type::TypeForm(formal_typeform), Type::TypeForm(actual_typeform)) => {
@@ -3049,6 +3070,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // e.g., `reveal_type(alias)` should reveal the type alias, not its value type.
             (formal, Type::TypeAlias(alias)) => {
                 return self.infer_map_impl(formal, alias.value_type(self.db), polarity, seen);
+            }
+            (_, Type::Recursive(recursive)) => {
+                return recursive.map_or(self.db, Ok(()), |unfolded| {
+                    self.infer_map_impl(formal, unfolded, polarity, seen)
+                });
             }
 
             // TODO: Add more forms that we can structurally induct into: type[C], callables

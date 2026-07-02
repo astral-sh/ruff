@@ -953,21 +953,21 @@ reveal_type(dict_result)  # revealed: dict[str, int | str]
 
 def make_list() -> list[str]:
     result = list()
-    result.append(1)  # error: [invalid-argument-type]
-    reveal_type(result)  # revealed: list[str]
-    return result
+    result.append(1)
+    reveal_type(result)  # revealed: list[int | str]
+    return result  # error: [invalid-return-type]
 
 def make_set() -> set[str]:
     result = set()
-    result.add(1)  # error: [invalid-argument-type]
-    reveal_type(result)  # revealed: set[str]
-    return result
+    result.add(1)
+    reveal_type(result)  # revealed: set[int | str]
+    return result  # error: [invalid-return-type]
 
 def make_dict() -> dict[str, str]:
     result = dict()
-    result["x"] = 1  # error: [invalid-assignment]
-    reveal_type(result)  # revealed: dict[str, str]
-    return result
+    result["x"] = 1
+    reveal_type(result)  # revealed: dict[str, int | str]
+    return result  # error: [invalid-return-type]
 
 set_alias = set
 aliased_result = set_alias()
@@ -1158,16 +1158,12 @@ reveal_type(x20)  # revealed: dict[str, int | str]
 
 ```py
 x21 = []
-_: list[int] = x21  # error: [invalid-assignment]
+_: list[int] = x21
 
-# TODO: We should error on this `append` instead of the assignment and not union
-# later constraints after the element type has been fully constrained above, to
-# avoid confusing error messages where the type of the collection may be unexpectedly
-# influenced by uses later in the scope.
+# error: [invalid-argument-type] "Argument to bound method `list.append` is incorrect: Expected `int`, found `Literal["a"]`"
 x21.append("a")
 
-# TODO: This would then reveal `list[int]`.
-reveal_type(x21)  # revealed: list[int | str]
+reveal_type(x21)  # revealed: list[int]
 ```
 
 ```py
