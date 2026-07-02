@@ -2864,6 +2864,9 @@ impl<'db> Type<'db> {
     ///
     /// Ordinary class bindings and instance members shadow a normal generated attribute. A
     /// generated data descriptor retains descriptor precedence over instance storage.
+    ///
+    /// Only annotation-only declarations directly on the concrete metaclass participate.
+    /// Inherited declarations and declarations with a class-body binding are excluded.
     fn class_namespace_member(
         self,
         db: &'db dyn Db,
