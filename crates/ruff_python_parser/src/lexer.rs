@@ -144,8 +144,7 @@ impl<'src> Lexer<'src> {
 
     /// Lex the next token.
     pub fn next_token(&mut self) -> TokenKind {
-        // `lex_token` marks the token start as late as each path permits. Marking it here would be
-        // redundant for the common case where the next token has no leading whitespace.
+        self.cursor.start_token();
         self.current_flags = TokenFlags::empty();
         self.current_kind = self.lex_token();
         // For `Unknown` token, the `push_error` method updates the current range.
@@ -158,7 +157,6 @@ impl<'src> Lexer<'src> {
     fn lex_token(&mut self) -> TokenKind {
         if let Some(interpolated_string) = self.interpolated_strings.current() {
             if !interpolated_string.is_in_interpolation(self.nesting) {
-                self.cursor.start_token();
                 if let Some(token) = self.lex_interpolated_string_middle_or_end() {
                     if token.is_interpolated_string_end() {
                         self.interpolated_strings.pop();
@@ -169,7 +167,6 @@ impl<'src> Lexer<'src> {
         }
         // Return dedent tokens until the current indentation level matches the indentation of the next token.
         else if let Some(indentation) = self.pending_indentation.take() {
-            self.cursor.start_token();
             match self.indentations.current().try_compare(indentation) {
                 Ok(Ordering::Greater) => {
                     self.pending_indentation = Some(indentation);
@@ -191,19 +188,23 @@ impl<'src> Lexer<'src> {
             }
         }
 
-        if self.state.is_after_newline() {
-            self.cursor.start_token();
+        let skipped_whitespace = if self.state.is_after_newline() {
+            let token_start = self.offset();
             if let Some(indentation) = self.eat_indentation() {
                 return indentation;
             }
-        } else {
-            if let Err(error) = self.skip_whitespace() {
-                return self.push_error(error);
-            }
-        }
 
-        // The lexer might've skipped whitespaces, so update the start offset
-        self.cursor.start_token();
+            self.offset() != token_start
+        } else {
+            match self.skip_whitespace() {
+                Ok(skipped) => skipped,
+                Err(error) => return self.push_error(error),
+            }
+        };
+
+        if skipped_whitespace {
+            self.cursor.start_token();
+        }
 
         if let Some(c) = self.cursor.bump() {
             if c.is_ascii() {
@@ -350,22 +351,21 @@ impl<'src> Lexer<'src> {
         }
     }
 
-    fn skip_whitespace(&mut self) -> Result<(), LexicalError> {
-        if matches!(self.cursor.first(), ' ' | '\t' | '\\' | '\x0C') {
-            self.cursor.start_token();
-        } else {
-            return Ok(());
-        }
+    fn skip_whitespace(&mut self) -> Result<bool, LexicalError> {
+        let mut skipped = false;
 
         loop {
             match self.cursor.first() {
                 ' ' => {
+                    skipped = true;
                     self.cursor.bump();
                 }
                 '\t' => {
+                    skipped = true;
                     self.cursor.bump();
                 }
                 '\\' => {
+                    skipped = true;
                     self.cursor.bump();
                     if self.cursor.eat_char('\r') {
                         self.cursor.eat_char('\n');
@@ -381,13 +381,14 @@ impl<'src> Lexer<'src> {
                 }
                 // Form feed
                 '\x0C' => {
+                    skipped = true;
                     self.cursor.bump();
                 }
                 _ => break,
             }
         }
 
-        Ok(())
+        Ok(skipped)
     }
 
     // Dispatch based on the given character.
