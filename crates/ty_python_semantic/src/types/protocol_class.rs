@@ -583,7 +583,7 @@ impl<'db> ProtocolMemberKind<'db> {
                 Self::Other(curr.cycle_normalized(db, *prev, cycle))
             }
             _ => {
-                debug_assert!(matches!(previous, Self::Other(ty) if ty.is_divergent()));
+                debug_assert!(matches!(previous, Self::Other(ty) if ty.is_identity_recursive(db)));
                 *self
             }
         }
