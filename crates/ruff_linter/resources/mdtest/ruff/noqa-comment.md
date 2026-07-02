@@ -1,0 +1,178 @@
+# `noqa-comment` (`RUF105`)
+
+```toml
+[lint]
+preview = true
+select = ["noqa-comment", "F401", "F402", "F403"]
+```
+
+## File-level comments
+
+### Single code
+
+```py
+# snapshot: noqa-comment
+# ruff: noqa: F401
+import math
+```
+
+```snapshot
+error[RUF105]: `ruff: noqa` comment used instead of `ruff:file-ignore`
+ --> src/mdtest_snippet.py:2:1
+  |
+2 | # ruff: noqa: F401
+  | ^^^^^^^^^^^^^^^^^^
+  |
+help: Use `ruff:file-ignore` instead
+  |
+1 | # snapshot: noqa-comment
+  - # ruff: noqa: F401
+2 + # ruff:file-ignore[F401]
+3 | import math
+  |
+```
+
+### Multiple codes
+
+```py
+# snapshot: noqa-comment
+# ruff: noqa: F401, F402, F403
+import math
+import os
+from module import *
+for os in []:
+    pass
+```
+
+```snapshot
+error[RUF105]: `ruff: noqa` comment used instead of `ruff:file-ignore`
+ --> src/mdtest_snippet.py:2:1
+  |
+2 | # ruff: noqa: F401, F402, F403
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Use `ruff:file-ignore` instead
+  |
+1 | # snapshot: noqa-comment
+  - # ruff: noqa: F401, F402, F403
+2 + # ruff:file-ignore[F401, F402, F403]
+3 | import math
+  |
+```
+
+### Multiple codes followed by a reason
+
+```py
+# snapshot: noqa-comment
+# ruff: noqa: F401, F402, F403 for some reason
+import math
+import os
+from module import *
+for os in []:
+    pass
+```
+
+```snapshot
+error[RUF105]: `ruff: noqa` comment used instead of `ruff:file-ignore`
+ --> src/mdtest_snippet.py:2:1
+  |
+2 | # ruff: noqa: F401, F402, F403 for some reason
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Use `ruff:file-ignore` instead
+  |
+1 | # snapshot: noqa-comment
+  - # ruff: noqa: F401, F402, F403 for some reason
+2 + # ruff:file-ignore[F401, F402, F403] for some reason
+3 | import math
+  |
+```
+
+### Multiple codes followed by a nested (pragma) comment
+
+```py
+# snapshot: noqa-comment
+# ruff: noqa: F401, F402, F403 # fmt:skip
+import math
+import os
+from module import *
+for os in []:
+    pass
+```
+
+```snapshot
+error[RUF105]: `ruff: noqa` comment used instead of `ruff:file-ignore`
+ --> src/mdtest_snippet.py:2:1
+  |
+2 | # ruff: noqa: F401, F402, F403 # fmt:skip
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Use `ruff:file-ignore` instead
+  |
+1 | # snapshot: noqa-comment
+  - # ruff: noqa: F401, F402, F403 # fmt:skip
+2 + # ruff:file-ignore[F401, F402, F403] # fmt:skip
+3 | import math
+  |
+```
+
+### A single invalid code disables the rule
+
+```py
+# ruff: noqa: UNK001
+```
+
+### Any unmatched code disables the rule
+
+This leaves an unused `noqa` comment to be cleaned up by `RUF100` instead, which can be especially
+important in the case of a standalone `noqa` comment, which has no effect (in almost all cases), but
+could become an effectful own-line `ruff:ignore` comment if `RUF105` applied.
+
+```py
+# ruff: noqa: F401, F402
+import math
+```
+
+### Flake8 comments are ignored
+
+```py
+# flake8: noqa: F401
+import math
+```
+
+## Inline comments
+
+```py
+# snapshot: noqa-comment
+import math  # noqa: F401
+
+import os  # noqa: F401, F402
+```
+
+```snapshot
+error[RUF105]: `noqa` comment used instead of `ruff:ignore`
+ --> src/mdtest_snippet.py:2:14
+  |
+2 | import math  # noqa: F401
+  |              ^^^^^^^^^^^^
+  |
+help: Use `ruff:ignore` instead
+  |
+1 | # snapshot: noqa-comment
+  - import math  # noqa: F401
+2 + import math  # ruff:ignore[F401]
+3 |
+  |
+```
+
+## Inline self-suppression
+
+```toml
+[lint]
+preview = true
+select = ["noqa-comment", "unused-noqa"]
+```
+
+```py
+value = 1  # noqa: RUF105
+```

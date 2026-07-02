@@ -63,6 +63,15 @@ pub(crate) enum Directive<'a> {
     Codes(Codes<'a>),
 }
 
+impl Ranged for Directive<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            Directive::All(all) => all.range(),
+            Directive::Codes(codes) => codes.range(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct All {
     range: TextRange,
