@@ -4814,6 +4814,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.context
                 .inference_flags
                 .remove(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS);
+            self.record_cycle_recovery_semantic_view(definition, inferred_ty);
 
             let inferred_ty = if target
                 .as_name_expr()
