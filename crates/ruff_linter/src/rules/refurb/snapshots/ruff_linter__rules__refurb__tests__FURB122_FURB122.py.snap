@@ -373,4 +373,22 @@ help: Replace with `f.writelines`
     -         for line in ((1,) if True else (2,)):
     -             f.write(f"{line}")
 215 +         f.writelines(f"{line}" for line in ((1,) if True else (2,)))
+216 |
+    |
+
+FURB122 [*] Use of `f.write` in a for loop
+   --> FURB122.py:246:9
+    |
+244 |   def _():
+245 |       with open("file", "w") as f:
+246 | /         for line in src:
+247 | |             f.write(other := line.upper())
+    | |__________________________________________^
+    |
+help: Replace with `f.writelines`
+    |
+245 |     with open("file", "w") as f:
+    -         for line in src:
+    -             f.write(other := line.upper())
+246 +         f.writelines(other := line.upper() for line in src)
     |
