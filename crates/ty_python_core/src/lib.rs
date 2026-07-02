@@ -27,6 +27,7 @@ use builder::SemanticIndexBuilder;
 use definition::{Definition, DefinitionNodeKey, Definitions};
 use expression::Expression;
 use narrowing_constraints::ScopedNarrowingConstraint;
+use node_key::NodeIndexMap;
 pub use place::{PlaceExprRef, PlaceTable};
 pub use reachability_constraints::ReachabilityConstraintsBuilder;
 pub use scope::FileScopeId;
@@ -237,7 +238,7 @@ pub enum EnclosingSnapshotResult<'map, 'db> {
 
 #[derive(Debug, PartialEq, Eq, Update, get_size2::GetSize)]
 struct DefinitionsByNode<'db> {
-    single: FrozenMap<DefinitionNodeKey, Definition<'db>>,
+    single: NodeIndexMap<Definition<'db>>,
     non_single: FrozenMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
 }
 
@@ -263,14 +264,18 @@ impl<'db> DefinitionsByNode<'db> {
         }
 
         Self {
-            single: FrozenMap::from_entries(single),
+            single: NodeIndexMap::from_entries(
+                single
+                    .into_iter()
+                    .map(|(key, definition)| (key.index(), definition)),
+            ),
             non_single: FrozenMap::from_entries(non_single),
         }
     }
 
     fn get(&self, key: DefinitionNodeKey) -> Option<&[Definition<'db>]> {
         self.single
-            .get(&key)
+            .get(key.index())
             .map(std::slice::from_ref)
             .or_else(|| self.non_single.get(&key).map(AsRef::as_ref))
     }
@@ -292,13 +297,13 @@ pub struct SemanticIndex<'db> {
     definitions_by_node: DefinitionsByNode<'db>,
 
     /// Map from a standalone expression to its [`Expression`] ingredient.
-    expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
+    expressions_by_node: NodeIndexMap<Expression<'db>>,
 
     /// Map from an unpacking target to its [`unpack::Unpack`] ingredient.
     unpacks_by_target: FrozenMap<ExpressionNodeKey, unpack::Unpack<'db>>,
 
     /// Map from a standalone statement to its [`Statement`] ingredient.
-    statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
+    statements_by_node: NodeIndexMap<Statement<'db>>,
 
     /// Map from nodes that create a scope to the scope they create.
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
@@ -634,9 +639,10 @@ impl<'db> SemanticIndex<'db> {
         &self,
         definition_key: impl Into<DefinitionNodeKey>,
     ) -> Option<Definition<'db>> {
+        let definition_key = definition_key.into();
         self.definitions_by_node
             .single
-            .get(&definition_key.into())
+            .get(definition_key.index())
             .copied()
     }
 
@@ -646,7 +652,7 @@ impl<'db> SemanticIndex<'db> {
     /// `SemanticIndexBuilder`.
     #[track_caller]
     pub fn expression(&self, expression_key: impl Into<ExpressionNodeKey>) -> Expression<'db> {
-        self.expressions_by_node[&expression_key.into()]
+        self.expressions_by_node[expression_key.into().index()]
     }
 
     pub fn try_expression(
@@ -654,7 +660,7 @@ impl<'db> SemanticIndex<'db> {
         expression_key: impl Into<ExpressionNodeKey>,
     ) -> Option<Expression<'db>> {
         self.expressions_by_node
-            .get(&expression_key.into())
+            .get(expression_key.into().index())
             .copied()
     }
 
@@ -665,14 +671,16 @@ impl<'db> SemanticIndex<'db> {
 
     pub fn is_standalone_expression(&self, expression_key: impl Into<ExpressionNodeKey>) -> bool {
         self.expressions_by_node
-            .contains_key(&expression_key.into())
+            .contains_key(expression_key.into().index())
     }
 
     pub fn try_statement(
         &self,
         statement_key: impl Into<StatementNodeKey>,
     ) -> Option<Statement<'db>> {
-        self.statements_by_node.get(&statement_key.into()).copied()
+        self.statements_by_node
+            .get(statement_key.into().index())
+            .copied()
     }
 
     /// Returns the id of the scope that `node` creates.

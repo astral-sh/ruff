@@ -140,6 +140,12 @@ pub(crate) mod node_key {
     )]
     pub struct ExpressionNodeKey(NodeKey);
 
+    impl ExpressionNodeKey {
+        pub(crate) fn index(self) -> ast::NodeIndex {
+            self.0.index()
+        }
+    }
+
     impl From<ast::ExprRef<'_>> for ExpressionNodeKey {
         fn from(value: ast::ExprRef<'_>) -> Self {
             Self(NodeKey::from_node(value))

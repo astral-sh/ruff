@@ -1604,6 +1604,10 @@ pub struct NestedBindingsDefinitionKind {
 pub struct DefinitionNodeKey(NodeKey);
 
 impl DefinitionNodeKey {
+    pub(crate) fn index(self) -> ast::NodeIndex {
+        self.0.index()
+    }
+
     pub(crate) fn from_node_ref(node: ast::AnyNodeRef<'_>) -> Self {
         match node {
             ast::AnyNodeRef::ParameterWithDefault(parameter) => parameter.into(),
