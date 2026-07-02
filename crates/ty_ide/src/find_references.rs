@@ -1260,6 +1260,125 @@ TD(f<CURSOR>=1)
     }
 
     #[test]
+    fn references_typeddict_field_from_class_definition() {
+        let test = cursor_test(
+            r#"
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title<CURSOR>: str
+
+movie: Movie = {"title": "Alien"}
+print(movie["title"])
+"#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Found 3 references
+         --> main.py:5:5
+          |
+        5 |     title: str
+          |     -----
+        6 |
+        7 | movie: Movie = {"title": "Alien"}
+          |                 -------
+        8 | print(movie["title"])
+          |             -------
+          |
+        "#);
+    }
+
+    #[test]
+    fn references_typeddict_field_from_string_literal_key() {
+        let test = cursor_test(
+            r#"
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title: str
+
+movie: Movie = {"title": "Alien"}
+print(movie["ti<CURSOR>tle"])
+"#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Found 3 references
+         --> main.py:5:5
+          |
+        5 |     title: str
+          |     -----
+        6 |
+        7 | movie: Movie = {"title": "Alien"}
+          |                 -------
+        8 | print(movie["title"])
+          |             -------
+          |
+        "#);
+    }
+
+    #[test]
+    fn references_typeddict_field_from_dict_literal_key() {
+        let test = cursor_test(
+            r#"
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title: str
+
+movie: Movie = {"ti<CURSOR>tle": "Alien"}
+print(movie["title"])
+"#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Found 3 references
+         --> main.py:5:5
+          |
+        5 |     title: str
+          |     -----
+        6 |
+        7 | movie: Movie = {"title": "Alien"}
+          |                 -------
+        8 | print(movie["title"])
+          |             -------
+          |
+        "#);
+    }
+
+    #[test]
+    fn references_typeddict_field_ignores_plain_dict_key() {
+        let test = cursor_test(
+            r#"
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title<CURSOR>: str
+
+movie: Movie = {"title": "Alien"}
+plain = {"title": "Aliens"}
+print(movie["title"])
+print(plain["title"])
+"#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Found 3 references
+         --> main.py:5:5
+          |
+        5 |     title: str
+          |     -----
+        6 |
+        7 | movie: Movie = {"title": "Alien"}
+          |                 -------
+        8 | plain = {"title": "Aliens"}
+        9 | print(movie["title"])
+          |             -------
+          |
+        "#);
+    }
+
+    #[test]
     fn references_keyword_argument_namedtuple_field() {
         let test = cursor_test(
             "
@@ -1283,6 +1402,139 @@ NT(f=1)
         7 |
         8 | NT(f=1)
           |    -
+          |
+        ");
+    }
+
+    #[test]
+    fn references_namedtuple_field_from_class_definition() {
+        let test = cursor_test(
+            "
+from typing import NamedTuple
+
+class Point(NamedTuple):
+    x<CURSOR>: int
+    y: int
+
+point = Point(x=1, y=2)
+print(point.x)
+print(point[0])
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 4 references
+          --> main.py:5:5
+           |
+         5 |     x: int
+           |     -
+         6 |     y: int
+         7 |
+         8 | point = Point(x=1, y=2)
+           |               -
+         9 | print(point.x)
+           |             -
+        10 | print(point[0])
+           |             -
+           |
+        ");
+    }
+
+    #[test]
+    fn references_namedtuple_field_from_index() {
+        let test = cursor_test(
+            "
+from typing import NamedTuple
+
+class Point(NamedTuple):
+    x: int
+    y: int
+
+point = Point(x=1, y=2)
+print(point.x)
+print(point[0<CURSOR>])
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 4 references
+          --> main.py:5:5
+           |
+         5 |     x: int
+           |     -
+         6 |     y: int
+         7 |
+         8 | point = Point(x=1, y=2)
+           |               -
+         9 | print(point.x)
+           |             -
+        10 | print(point[0])
+           |             -
+           |
+        ");
+    }
+
+    #[test]
+    fn references_namedtuple_field_from_negative_index() {
+        let test = cursor_test(
+            "
+from typing import NamedTuple
+
+class Point(NamedTuple):
+    x: int
+    y: int
+
+point = Point(x=1, y=2)
+print(point.y)
+print(point[-1<CURSOR>])
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 4 references
+          --> main.py:6:5
+           |
+         6 |     y: int
+           |     -
+         7 |
+         8 | point = Point(x=1, y=2)
+           |                    -
+         9 | print(point.y)
+           |             -
+        10 | print(point[-1])
+           |             --
+           |
+        ");
+    }
+
+    #[test]
+    fn references_namedtuple_field_ignores_out_of_bounds_index() {
+        let test = cursor_test(
+            "
+from typing import NamedTuple
+
+class Point(NamedTuple):
+    x<CURSOR>: int
+    y: int
+
+point = Point(x=1, y=2)
+print(point.x)
+print(point[2])
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 3 references
+         --> main.py:5:5
+          |
+        5 |     x: int
+          |     -
+        6 |     y: int
+        7 |
+        8 | point = Point(x=1, y=2)
+          |               -
+        9 | print(point.x)
+          |             -
           |
         ");
     }
