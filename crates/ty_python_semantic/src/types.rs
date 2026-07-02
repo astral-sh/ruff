@@ -2967,7 +2967,7 @@ impl<'db> Type<'db> {
             if generated_may_be_data_descriptor {
                 return generated_data_descriptors();
             }
-            return class.instance_member(db, name);
+            return Place::Undefined.into();
         }
         metaclass_declaration.or_fall_back_to(db, || class_attr)
     }

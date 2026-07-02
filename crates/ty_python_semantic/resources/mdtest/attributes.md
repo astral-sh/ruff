@@ -1372,6 +1372,24 @@ class InheritsGenerated(InitializesInheritedGenerated, metaclass=StoringMeta): .
 reveal_type(InheritsGenerated().generated)  # revealed: str
 ```
 
+A function is a descriptor when stored on a class, but not when stored directly on an instance. The
+instance attribute is therefore returned without descriptor binding:
+
+```py
+class CallableStoringMeta(type):
+    generated_callable: Callable[[int], str]
+
+    def __new__(mcls, name: str, bases: tuple[type, ...], namespace: dict[str, object]):
+        namespace["generated_callable"] = lambda value: str(value)
+        return super().__new__(mcls, name, bases, namespace)
+
+class StoresInstanceCallable(metaclass=CallableStoringMeta):
+    def __init__(self) -> None:
+        self.generated_callable = lambda value: str(value)
+
+reveal_type(StoresInstanceCallable().generated_callable(1))  # revealed: str
+```
+
 A dynamic base may provide an instance attribute of any type, so a regular attribute stored by the
 metaclass does not remove that uncertainty:
 
