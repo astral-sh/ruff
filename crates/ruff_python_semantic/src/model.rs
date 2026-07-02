@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::path::Path;
 
 use bitflags::bitflags;
@@ -144,6 +145,22 @@ pub struct SemanticModel<'a> {
     /// Map from [`ast::ExprName`] node (represented as a [`NameId`]) to the [`Binding`] to which
     /// it resolved (represented as a [`BindingId`]).
     resolved_names: FxHashMap<NameId, BindingId>,
+
+    /// A scoped cache for repeated qualified-name resolution.
+    resolved_qualified_name: RefCell<Option<(usize, Option<QualifiedName<'static>>)>>,
+}
+
+/// Restores the previous scoped qualified-name cache when dropped.
+#[must_use]
+pub struct QualifiedNameCacheGuard<'model> {
+    cache: &'model RefCell<Option<(usize, Option<QualifiedName<'static>>)>>,
+    previous: Option<(usize, Option<QualifiedName<'static>>)>,
+}
+
+impl Drop for QualifiedNameCacheGuard<'_> {
+    fn drop(&mut self) {
+        self.cache.replace(self.previous.take());
+    }
 }
 
 impl<'a> SemanticModel<'a> {
@@ -170,6 +187,7 @@ impl<'a> SemanticModel<'a> {
             seen: Modules::empty(),
             handled_exceptions: Vec::default(),
             resolved_names: FxHashMap::default(),
+            resolved_qualified_name: RefCell::default(),
         }
     }
 
@@ -1022,6 +1040,10 @@ impl<'a> SemanticModel<'a> {
     /// ```
     ///
     /// ...then `resolve_qualified_name(${python_version})` will resolve to `sys.version_info`.
+    #[expect(
+        unsafe_code,
+        reason = "the scoped cache erases and then restores the semantic model's AST lifetime"
+    )]
     pub fn resolve_qualified_name<'name, 'expr: 'name>(
         &self,
         value: &'expr Expr,
@@ -1037,6 +1059,22 @@ impl<'a> SemanticModel<'a> {
                 _ => None,
             }
         }
+
+        let address = std::ptr::from_ref(value).addr();
+        let cached = self.resolved_qualified_name.borrow();
+        if let Some((cached_address, qualified_name)) = cached.as_ref()
+            && *cached_address == address
+        {
+            // SAFETY: `cache_qualified_name` only accepts an expression with the semantic model's
+            // `'a` lifetime, so every segment in the cached name remains valid for `'a`. `'a`
+            // outlives the shorter `'name` lifetime returned by this method.
+            return unsafe {
+                std::mem::transmute::<Option<QualifiedName<'static>>, Option<QualifiedName<'name>>>(
+                    qualified_name.clone(),
+                )
+            };
+        }
+        drop(cached);
 
         // If the name was already resolved, look it up; otherwise, search for the symbol.
         let head = match_head(value)?;
@@ -1135,6 +1173,32 @@ impl<'a> SemanticModel<'a> {
                 }
             }
             _ => None,
+        }
+    }
+
+    /// Cache the qualified name for `value` until the returned guard is dropped.
+    #[expect(
+        unsafe_code,
+        reason = "the scoped cache erases and then restores the semantic model's AST lifetime"
+    )]
+    pub fn cache_qualified_name(&self, value: &'a Expr) -> QualifiedNameCacheGuard<'_> {
+        let address = std::ptr::from_ref(value).addr();
+        let qualified_name: Option<QualifiedName<'a>> = self.resolve_qualified_name(value);
+        // SAFETY: `value` has the same lifetime as the semantic model. The cached name is removed
+        // by the guard, and even a deliberately leaked guard cannot outlive the model that owns
+        // the cache, so its borrowed segments remain valid for as long as the cached value exists.
+        let qualified_name = unsafe {
+            std::mem::transmute::<Option<QualifiedName<'a>>, Option<QualifiedName<'static>>>(
+                qualified_name,
+            )
+        };
+        let previous = self
+            .resolved_qualified_name
+            .replace(Some((address, qualified_name)));
+
+        QualifiedNameCacheGuard {
+            cache: &self.resolved_qualified_name,
+            previous,
         }
     }
 

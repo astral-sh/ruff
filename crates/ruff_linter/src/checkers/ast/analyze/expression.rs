@@ -23,7 +23,25 @@ use crate::rules::{
 use ruff_python_ast::PythonVersion;
 
 /// Run lint rules over an [`Expr`] syntax node.
-pub(crate) fn expression(expr: &Expr, checker: &Checker) {
+pub(crate) fn expression<'a>(expr: &'a Expr, checker: &Checker<'a>) {
+    let qualified_name = match expr {
+        Expr::Call(call)
+            if checker.is_rule_enabled(Rule::CallDatetimeToday)
+                && checker.is_rule_enabled(Rule::CallDatetimeUtcnow) =>
+        {
+            Some(call.func.as_ref())
+        }
+        Expr::Attribute(_) | Expr::Name(_)
+            if checker.is_rule_enabled(Rule::NumpyDeprecatedTypeAlias)
+                && checker.is_rule_enabled(Rule::NumpyDeprecatedFunction) =>
+        {
+            Some(expr)
+        }
+        _ => None,
+    };
+    let _qualified_name_cache = qualified_name
+        .map(|qualified_name| checker.semantic().cache_qualified_name(qualified_name));
+
     match expr {
         Expr::Subscript(subscript @ ast::ExprSubscript { value, slice, .. }) => {
             // Ex) Optional[...], Union[...]
