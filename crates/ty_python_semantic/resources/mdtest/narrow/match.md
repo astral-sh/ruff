@@ -150,6 +150,14 @@ def gradual_member_pattern_is_exhaustive(value: Box[Any] | int) -> None:
         case _:
             assert_never(value)
 
+def gradual_member_pattern_narrows_subject_fallthrough(value: Box[Any] | int) -> int:
+    match value:
+        case Box(value=_):
+            return 0
+        case _:
+            reveal_type(value)  # revealed: int
+            return value + 1
+
 def nested_gradual_pattern_is_exhaustive(
     value: tuple[Mapping[str, Any]] | int,
 ) -> None:
