@@ -13,14 +13,5 @@ name = "ruff_spo_address"
 [dependencies]
 ruff_spo_triplet = { workspace = true }
 
-[dev-dependencies]
-# The C# frontend's validated loader — used by the `medcare_probe` example to
-# drive the real Roslyn-harvested ndjson through the brick-1→2 seam.
-ruff_csharp_spo = { path = "../ruff_csharp_spo" }
-
 [lints]
 workspace = true
-
-[[example]]
-name = "medcare_probe"
-path = "examples/medcare_probe.rs"

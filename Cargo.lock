@@ -2037,7 +2037,6 @@ dependencies = [
 [[package]]
 name = "lsp-types"
 version = "0.95.1"
-source = "git+https://github.com/astral-sh/lsp-types.git?rev=e15db0593f0ecbbd80599c3f5880e4bf5da1ca0c#e15db0593f0ecbbd80599c3f5880e4bf5da1ca0c"
 dependencies = [
  "bitflags 1.3.2",
  "serde",
@@ -3102,6 +3101,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruff_csharp_spo"
+version = "0.1.0"
+dependencies = [
+ "ruff_spo_triplet",
+]
+
+[[package]]
 name = "ruff_db"
 version = "0.0.0"
 dependencies = [
@@ -3666,7 +3672,6 @@ dependencies = [
 name = "ruff_spo_address"
 version = "0.1.0"
 dependencies = [
- "ruff_csharp_spo",
  "ruff_spo_triplet",
 ]
 

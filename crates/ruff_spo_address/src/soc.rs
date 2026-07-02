@@ -1,8 +1,8 @@
 //! `soc` — the "256-cap-is-a-lint" separation-of-concerns check.
 //!
-//! Promoted from the `medcare_probe` example's §[G] falsifier (`fn main()`)
-//! into a **reusable library function** so it can run in `ruff check` / CI
-//! instead of by hand (the first step of TD-23 / the `OGAR-SOC` lint).
+//! Promoted from a one-off real-corpus falsifier (`fn main()`) into a
+//! **reusable library function** so it can run in `ruff check` / CI instead
+//! of by hand (the first step of TD-23 / the `OGAR-SOC` lint).
 //!
 //! The law: every class whose sibling set overflows the per-tier cascade rank
 //! is a DESIGN smell, never a storage limit, and is one (or both) of:
@@ -76,11 +76,12 @@ pub struct SocFinding {
 
 /// Classify every class whose sibling set exceeds [`MAX_SIBLINGS_PER_TIER`].
 ///
-/// Mirrors the `medcare_probe` §[G] logic, with two corrections over the
-/// example: `funcs` is derived from the `has_function` predicate (not the
-/// untyped-data complement, which would false-positive on `has_field` members
-/// whose type lives only in the IR, e.g. `cpp_field`), and the overflow
-/// threshold is `> u8::MAX` siblings (the representable rank count).
+/// Mirrors the original real-corpus falsifier's logic, with two corrections
+/// over that one-off script: `funcs` is derived from the `has_function`
+/// predicate (not the untyped-data complement, which would false-positive on
+/// `has_field` members whose type lives only in the IR, e.g. `cpp_field`),
+/// and the overflow threshold is `> u8::MAX` siblings (the representable
+/// rank count).
 #[must_use]
 pub fn soc_findings(triples: &[Triple]) -> Vec<SocFinding> {
     let field_type: BTreeMap<&str, &str> = triples

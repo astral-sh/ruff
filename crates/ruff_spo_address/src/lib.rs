@@ -38,20 +38,22 @@
 //! iron-rule clean per `I-VSA-IDENTITIES` (it encodes *identity positions* —
 //! which class, which base, which slot — never bundles content).
 //!
-//! **The budget is real and measured.** Each tier is one `u8`, so a node with
-//! more than **255 siblings** at some tier saturates to rank 255 and is flagged
-//! in [`Mint::truncated`]; once two nodes share a saturated rank at every tier
-//! their facets collide. The `medcare_probe` example (a real Roslyn harvest of
-//! the MedCare C# corpus — 9 199 nodes) makes the failure concrete: **730
-//! collisions and 8 525 truncations**, caused by two structures that exceed the
-//! cap — WinForms God-classes (`MainForm`, 330 members; a sono form, 640) on the
-//! part_of axis, and **flat is_a roots** (`ogit:Property` with 6 272 children,
-//! `ogit:Function` with 2 748) on the is_a axis. So "exact" holds for a class
-//! graph whose every sibling set is ≤ 255 and depth ≤ 6 — NOT for arbitrary
-//! real corpora. The flat-is_a-root explosion is the dominant cause and is
-//! addressable: a member's *kind* (Property/Function) belongs in its
-//! `facet_classid`, not in a 6-tier sibling rank under a mega-root (see the
-//! `medcare_probe` [F] and [G] measurements).
+//! **The budget is real and measured, not just asymptotic.** Each tier is one
+//! `u8`, so a node with more than **255 siblings** at some tier saturates to
+//! rank 255 and is flagged in [`Mint::truncated`]; once two nodes share a
+//! saturated rank at every tier their facets collide. Verified against a real
+//! multi-thousand-node corpus, the failure has two distinct causes: **God-
+//! classes** (a single class with hundreds of fields, e.g. a large UI form)
+//! overflowing the part_of axis, and **flat is_a roots** (a kind-discriminator
+//! type with thousands of direct children, e.g. every "Property" or "Function"
+//! node parented straight under one root) overflowing the is_a axis. So
+//! "exact" holds for a class graph whose every sibling set is ≤ 255 and depth
+//! ≤ 6 — NOT for arbitrary real corpora. The flat-is_a-root case is the
+//! dominant one and is addressable: a member's *kind* (e.g. Property/Function)
+//! belongs in its `facet_classid`, not in a 6-tier sibling rank under a
+//! mega-root. [`mint_factored`] is the corrected minter that fixes both
+//! failure modes (base-255 positional part_of paths + is_a built from
+//! `inherits_from` only, kind moved to a bounded leaf enum).
 //!
 //! # `facet_classid`
 //!
@@ -180,6 +182,110 @@ impl Mint {
     }
 }
 
+/// Which chain a [`RadixCodebook`] is ordered by — the two prefix-routable axes
+/// of a [`Facet`] (`5+2t` bytes = part_of / hi; `4+2t` bytes = is_a / lo).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Axis {
+    /// part_of (mereology / containment) — the `documentSymbol` axis (`hi_chain`).
+    PartOf,
+    /// is_a (taxonomy / inheritance) — the `typeHierarchy` axis (`lo_chain`).
+    IsA,
+}
+
+/// A cheap, **on-demand** radix-trie codebook over one [`Axis`] of a [`Mint`].
+///
+/// "Radix trie" without the pointers: the 6-byte chains are sorted, so nodes
+/// sharing an ancestor are *contiguous*, and a prefix query is a binary-search
+/// range over cache-resident bytes — no trie-node allocation, no SPO re-walk.
+/// This is the materialized form of the `(part_of:is_a)` address kept from the
+/// `4+2t` / `5+2t` packing, built only when a prefix-query workload needs it.
+///
+/// # When to build it (PROS) — modest-cardinality, readable, prefix-query work
+///
+/// The Odoo / Redmine / MedCare *app-concept* scale (hundreds–thousands of nodes):
+///
+/// - **O(log n + k) prefix queries.** `documentSymbol(class)` /
+///   `typeHierarchy(base)` become a range scan; no graph traversal.
+/// - **Cache-resident, zero standing cost.** The sorted chain bytes *are* the
+///   radix order; built from facets you already hold, dropped when the workload
+///   ends. Nothing is stored in the layout — the gate is "call the method", not
+///   "feature-flag the address".
+/// - **Readable.** Each key is the legible part_of/is_a address, not a hash — you
+///   route, group, and reason on it without decoding a value.
+///
+/// # When NOT to build it (CONS)
+///
+/// - **Derived view.** Rebuild (O(n log n)) if the mint changes; it is a query
+///   accelerator, not a store.
+/// - **Memory ∝ nodes.** For cardinalities you would never enumerate (genome
+///   scale — ~3.2 B alleles), do **not** materialize a codebook: address
+///   *positionally* (the chain IS the coordinate — compute, don't look up). The
+///   codebook is for the regime where a table is affordable AND the structure is
+///   worth keeping readable; past that it is the wrong tool.
+/// - **One axis per codebook.** part_of and is_a sort differently; build both
+///   only if you need both query directions.
+pub struct RadixCodebook {
+    axis: Axis,
+    /// `(chain, node)` sorted by `chain` — the implicit radix order.
+    entries: Vec<([u8; TIERS], String)>,
+}
+
+impl RadixCodebook {
+    /// The axis this codebook is ordered by.
+    #[must_use]
+    pub fn axis(&self) -> Axis {
+        self.axis
+    }
+
+    /// Number of `(chain, node)` entries.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the codebook is empty.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Every `(chain, node)` whose chain shares `prefix`'s first `depth` tiers —
+    /// the contiguous range under that ancestor. `documentSymbol` (PartOf) /
+    /// `typeHierarchy` (IsA) in `O(log n + k)`, no graph walk. `depth = 0`
+    /// returns the whole codebook.
+    #[must_use]
+    pub fn under_prefix(&self, prefix: [u8; TIERS], depth: usize) -> &[([u8; TIERS], String)] {
+        let d = depth.min(TIERS);
+        let lo = self.entries.partition_point(|(c, _)| c[..d] < prefix[..d]);
+        let hi = lo + self.entries[lo..].partition_point(|(c, _)| c[..d] == prefix[..d]);
+        &self.entries[lo..hi]
+    }
+}
+
+impl Mint {
+    /// Build a cheap radix-trie codebook over one [`Axis`], **on demand**. The
+    /// gate for "store the trie vs resolve it" is this method call — see
+    /// [`RadixCodebook`] for the PROS/CONS that decide whether you want it for a
+    /// given workload (yes for app-concept scale; no for genome-scale — address
+    /// positionally there).
+    #[must_use]
+    pub fn radix_codebook(&self, axis: Axis) -> RadixCodebook {
+        let mut entries: Vec<([u8; TIERS], String)> = self
+            .facets
+            .iter()
+            .map(|(n, f)| {
+                let chain = match axis {
+                    Axis::PartOf => f.part_of_chain(),
+                    Axis::IsA => f.is_a_chain(),
+                };
+                (chain, n.clone())
+            })
+            .collect();
+        entries.sort_unstable();
+        RadixCodebook { axis, entries }
+    }
+}
+
 /// Mint `(part_of:is_a)` facets with `facet_classid = 0` (the bare address).
 #[must_use]
 pub fn mint(triples: &[Triple]) -> Mint {
@@ -252,6 +358,164 @@ pub fn mint_with_classid(triples: &[Triple], classid_of: impl Fn(&str) -> u32) -
         }
     }
     out
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Factored mint — the 256-cap-is-a-lint law turned into a correct address.
+// ─────────────────────────────────────────────────────────────────────────
+
+/// Mint injective `(part_of:is_a)` facets that respect the per-tier 255 cap by
+/// **cascading deeper instead of saturating** (the OGAR canon: "scale = the
+/// next cascade level, never field-widening").
+///
+/// The naive [`mint`] ranks each sibling set into one `u8` tier, so a parent
+/// with > 255 children (a God-class, or an `rdf:type` kind mega-root)
+/// saturates and collides (see the crate-level docs' "budget is real and
+/// measured" section). This minter fixes both failure modes the 256-cap law
+/// names:
+///
+/// - **duplication** (a kind-discriminator mega-root, e.g. every `Property` /
+///   `Function` node parented straight under one root): is_a is built from
+///   `inherits_from` **only** (the real inheritance fan-out stays far below
+///   255, so it never explodes); a member's *kind* becomes a bounded leaf enum
+///   (`field` = 1, `fn` = 2), not a ranked child of a many-thousand-wide root.
+/// - **conflation** (a class with > 255 members): the part_of address is a
+///   **base-255 positional path** — each generation consumes
+///   `ceil(log255(sibling_count))` tiers, so no tier exceeds 255 and the address
+///   stays injective and prefix-routable (a child's chain extends its parent's).
+///
+/// Digits are `1..=255`; `0` stays reserved as the "unused tier" sentinel, so
+/// [`Facet::part_of_chain`]'s leading-non-zero prefix still means "address
+/// depth." Truncation (a node whose path needs > 6 tiers) is still reported in
+/// [`Mint::truncated`], but for class graphs it does not occur (root classes →
+/// 2 tiers, members → 2 tiers, total ≤ 4).
+#[must_use]
+pub fn mint_factored(triples: &[Triple]) -> Mint {
+    // ── 1. part_of forest (member → owning class) + is_a from inherits ONLY. ──
+    let mut po_parent: BTreeMap<&str, &str> = BTreeMap::new();
+    let mut ia_inherit: BTreeMap<&str, &str> = BTreeMap::new();
+    let mut kind: BTreeMap<&str, u8> = BTreeMap::new(); // 1=field/Property 2=fn/Function 3=ObjectType
+    let mut nodes: BTreeSet<&str> = BTreeSet::new();
+
+    for t in triples {
+        let (s, p, o) = (t.s.as_str(), t.p.as_str(), t.o.as_str());
+        match p {
+            "has_field" => {
+                po_parent.insert(o, s);
+                nodes.insert(s);
+                nodes.insert(o);
+                kind.entry(o).or_insert(1);
+            }
+            "has_function" => {
+                po_parent.insert(o, s);
+                nodes.insert(s);
+                nodes.insert(o);
+                kind.entry(o).or_insert(2);
+            }
+            "inherits_from" => {
+                ia_inherit.insert(s, o);
+                nodes.insert(s);
+                nodes.insert(o);
+            }
+            "rdf:type" => {
+                let k = match o {
+                    "ogit:Property" => 1,
+                    "ogit:Function" => 2,
+                    _ => 3,
+                };
+                kind.insert(s, k);
+                nodes.insert(s);
+            }
+            _ => {
+                nodes.insert(s);
+            }
+        }
+    }
+
+    let (po_children, po_roots) = forest(&nodes, &po_parent);
+    let (ia_children, ia_roots) = forest(&nodes, &ia_inherit);
+
+    // ── 2. part_of: base-255 positional spread from the virtual root. ──
+    let mut part_of: BTreeMap<&str, [u8; TIERS]> = BTreeMap::new();
+    let mut truncated: BTreeSet<&str> = BTreeSet::new();
+    assign_b255(&po_roots, &po_children, [0; TIERS], 0, &mut part_of, &mut truncated);
+
+    // ── 3. is_a: inherits lineage for classes; bounded kind enum for members. ──
+    let mut is_a: BTreeMap<&str, [u8; TIERS]> = BTreeMap::new();
+    assign_b255(&ia_roots, &ia_children, [0; TIERS], 0, &mut is_a, &mut truncated);
+    // Members (no inherits edge) carry their kind in is_a tier-0 instead of an
+    // inherits-tree position — the masked, never-exploding kind discriminator.
+    for &n in &nodes {
+        if !ia_inherit.contains_key(n) && !ia_children.contains_key(n) {
+            let mut chain = [0u8; TIERS];
+            chain[0] = *kind.get(n).unwrap_or(&0);
+            is_a.insert(n, chain);
+        }
+    }
+
+    // ── 4. pack. ──
+    let mut out = Mint::default();
+    for &n in &nodes {
+        let po = part_of.get(n).copied().unwrap_or([0; TIERS]);
+        let ia = is_a.get(n).copied().unwrap_or([0; TIERS]);
+        out.facets.insert(n.to_owned(), Facet::from_parts(0, po, ia));
+    }
+    out.truncated = truncated.into_iter().map(str::to_owned).collect();
+    out
+}
+
+/// Smallest number of base-255 digits (each `1..=255`) needed to index a sibling
+/// set of `n` members (`0` is reserved as the unused-tier sentinel, so one tier
+/// holds 255 distinct siblings, not 256).
+const fn b255_width(n: usize) -> usize {
+    let mut w = 1;
+    let mut cap = 255usize;
+    while cap < n {
+        cap = cap.saturating_mul(255);
+        w += 1;
+    }
+    w
+}
+
+/// Write the base-255 digits of 0-based sibling index `idx` into
+/// `out[at..at+w]`, big-endian, each digit `1..=255`.
+fn b255_write(idx: usize, w: usize, out: &mut [u8; TIERS], at: usize) {
+    let mut x = idx;
+    for k in (0..w).rev() {
+        if at + k < TIERS {
+            out[at + k] = ((x % 255) as u8) + 1;
+        }
+        x /= 255;
+    }
+}
+
+/// Assign a base-255 positional chain to every node in a forest: each node's
+/// chain extends its parent's by `ceil(log255(sibling_count))` digit-tiers.
+/// Nodes whose path would exceed [`TIERS`] are added to `truncated`.
+fn assign_b255<'a>(
+    siblings: &[&'a str],
+    children: &BTreeMap<&'a str, Vec<&'a str>>,
+    parent_chain: [u8; TIERS],
+    tier: usize,
+    out: &mut BTreeMap<&'a str, [u8; TIERS]>,
+    truncated: &mut BTreeSet<&'a str>,
+) {
+    if siblings.is_empty() {
+        return;
+    }
+    let w = b255_width(siblings.len());
+    for (i, &node) in siblings.iter().enumerate() {
+        let mut chain = parent_chain;
+        if tier + w > TIERS {
+            truncated.insert(node);
+        } else {
+            b255_write(i, w, &mut chain, tier);
+        }
+        out.insert(node, chain);
+        if let Some(kids) = children.get(node) {
+            assign_b255(kids, children, chain, tier + w, out, truncated);
+        }
+    }
 }
 
 /// Build `(parent → sorted children, sorted roots)` for one forest.
@@ -416,6 +680,90 @@ mod tests {
         }
         // This small corpus fits in 6 tiers — nothing truncated.
         assert!(m.truncated().is_empty());
+    }
+
+    /// A class with > 255 members is exactly what makes naive [`mint`] collide
+    /// (the per-tier `u8` saturates). [`mint_factored`] must stay injective by
+    /// cascading the address into a second tier.
+    #[test]
+    fn factored_mint_is_injective_past_the_255_cap() {
+        // One class, 300 fields — over the single-tier cap.
+        let mut tr = vec![Triple {
+            s: "m:Big".into(),
+            p: "rdf:type".into(),
+            o: "ogit:ObjectType".into(),
+            f: 1.0,
+            c: 0.9,
+        }];
+        for i in 0..300 {
+            let field = format!("m:Big.f{i:03}");
+            tr.push(Triple { s: "m:Big".into(), p: "has_field".into(), o: field.clone(), f: 1.0, c: 0.9 });
+            tr.push(Triple { s: field, p: "rdf:type".into(), o: "ogit:Property".into(), f: 1.0, c: 0.9 });
+        }
+
+        // Naive mint collides (the 300 members past index 255 saturate to 255).
+        let naive = mint(&tr);
+        let naive_distinct: BTreeSet<_> = naive.iter().map(|(_, f)| f).collect();
+        assert!(
+            naive_distinct.len() < naive.len(),
+            "naive mint should collide past the 255 cap (this is the bug factored fixes)"
+        );
+
+        // Factored mint is injective and truncates nothing (2 tiers suffice).
+        let m = mint_factored(&tr);
+        let distinct: BTreeSet<_> = m.iter().map(|(_, f)| f).collect();
+        assert_eq!(distinct.len(), m.len(), "factored mint must be injective past 255");
+        assert!(m.truncated().is_empty(), "300 members fit in 2 base-255 tiers");
+
+        // The members extend the class's part_of prefix (still prefix-routable).
+        let big = m.facet("m:Big").unwrap().part_of_chain();
+        let f000 = m.facet("m:Big.f000").unwrap().part_of_chain();
+        let big_depth = big.iter().take_while(|&&b| b != 0).count();
+        assert_eq!(&f000[..big_depth], &big[..big_depth], "member extends class prefix");
+        // is_a tier-0 carries the bounded kind enum (1 = field), never a mega-root rank.
+        assert_eq!(m.facet("m:Big.f000").unwrap().is_a_chain()[0], 1);
+    }
+
+    #[test]
+    fn radix_codebook_answers_prefix_queries_without_a_graph_walk() {
+        // 300-member class — the factored mint keeps it injective + prefix-routable.
+        let mut tr = vec![Triple {
+            s: "m:Big".into(),
+            p: "rdf:type".into(),
+            o: "ogit:ObjectType".into(),
+            f: 1.0,
+            c: 0.9,
+        }];
+        for i in 0..300 {
+            let field = format!("m:Big.f{i:03}");
+            tr.push(Triple { s: "m:Big".into(), p: "has_field".into(), o: field.clone(), f: 1.0, c: 0.9 });
+            tr.push(Triple { s: field, p: "rdf:type".into(), o: "ogit:Property".into(), f: 1.0, c: 0.9 });
+        }
+        let m = mint_factored(&tr);
+        let cb = m.radix_codebook(Axis::PartOf);
+        assert_eq!(cb.axis(), Axis::PartOf);
+        assert_eq!(cb.len(), m.len());
+
+        // documentSymbol(Big) = the range under Big's part_of prefix = its 300
+        // members (Big itself is at the shallower prefix, excluded by going one
+        // tier deeper).
+        let big = m.facet("m:Big").unwrap().part_of_chain();
+        let big_depth = big.iter().take_while(|&&b| b != 0).count();
+        let members = cb.under_prefix(big, big_depth);
+        // Big + its 300 members all share Big's prefix; the members extend it.
+        assert_eq!(members.len(), 301, "Big and its 300 members share the prefix");
+        // depth 0 returns the whole codebook.
+        assert_eq!(cb.under_prefix([0; TIERS], 0).len(), m.len());
+    }
+
+    #[test]
+    fn b255_width_cascades_at_the_cap() {
+        assert_eq!(b255_width(1), 1);
+        assert_eq!(b255_width(255), 1); // 255 siblings fit one tier (digit 1..255)
+        assert_eq!(b255_width(256), 2); // 256 needs a second tier
+        assert_eq!(b255_width(640), 2);
+        assert_eq!(b255_width(65025), 2); // 255^2
+        assert_eq!(b255_width(65026), 3);
     }
 
     #[test]

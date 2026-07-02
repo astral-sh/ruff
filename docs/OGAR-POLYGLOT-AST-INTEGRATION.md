@@ -106,10 +106,9 @@ Every cap is a structural-quality signal, on both axes:
 "reference another class" / "paginate via class hierarchy" (grow a limb) —
 already canon (`CLASSVIEW-MATERIALIZATION-PLAN.md` §5, `≤64` enforced by
 `field_basis_fits_in_one_u64_mask`), never widen. The law already exists as a
-falsifier
-(`ruff_spo_address/examples/medcare_probe.rs` §[G] "the 256-cap-is-a-lint
-law", classifying overflow as DUPLICATION and/or CONFLATION) but is **not**
-wired as a diagnostic — see Phase 2.
+reusable check (`ruff_spo_address::soc`, "the 256-cap-is-a-lint law",
+classifying overflow as DUPLICATION and/or CONFLATION) but is **not** wired
+as a diagnostic — see Phase 2.
 
 ---
 

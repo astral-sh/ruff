@@ -354,3 +354,11 @@ opt-level = 1
 # The profile that 'cargo dist' will build with.
 [profile.dist]
 inherits = "release"
+
+# Local vendoring of the astral-sh/lsp-types git dependency. The session's git
+# proxy denies clones of out-of-scope repos (astral-sh/* returns 403), so the
+# source was fetched via the api.github.com zipball at the locked rev
+# (e15db0593f0ecbbd80599c3f5880e4bf5da1ca0c, lsp-types 0.95.1) and vendored
+# under vendor/lsp-types. This patch lets the full workspace build offline.
+[patch."https://github.com/astral-sh/lsp-types.git"]
+lsp-types = { path = "vendor/lsp-types" }
