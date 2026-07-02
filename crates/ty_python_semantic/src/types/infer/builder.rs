@@ -1477,7 +1477,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let PlaceExprRef::Symbol(symbol) = &place
                 && scope.is_global()
             {
-                module_type_implicit_global_symbol(self.db(), symbol.name())
+                module_type_implicit_global_symbol(self.db(), self.file(), symbol.name())
             } else {
                 Place::Undefined.into()
             }
@@ -1531,9 +1531,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if file_scope_id.is_global() {
                     let place_table = self.index.place_table(file_scope_id);
                     let place = place_table.place(definition.place(self.db()));
+                    let file = self.file();
                     if let Some(module_type_implicit_declaration) = place
                         .as_symbol()
-                        .map(|symbol| module_type_implicit_global_symbol(self.db(), symbol.name()))
+                        .map(|symbol| {
+                            module_type_implicit_global_symbol(self.db(), file, symbol.name())
+                        })
                         .and_then(|place| place.place.ignore_possibly_undefined())
                     {
                         let declared_type = declared_ty.inner_type();
@@ -5464,7 +5467,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     continue;
                 }
             }
-            if !module_type_implicit_global_symbol(self.db(), name)
+            if !module_type_implicit_global_symbol(self.db(), self.file(), name)
                 .place
                 .is_undefined()
             {
@@ -9552,7 +9555,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
             // These are looked up as attributes on `types.ModuleType`.
             .or_fall_back_to(db, || {
-                module_type_implicit_global_symbol(db, symbol_name).map_type(|ty| {
+                module_type_implicit_global_symbol(db, self.file(), symbol_name).map_type(|ty| {
                     self.narrow_place_with_applicable_constraints(
                         PlaceExprRef::from(&expr),
                         ty,
