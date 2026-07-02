@@ -129,10 +129,6 @@ pub(super) fn infer_binary_type_comparison<'db>(
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     let db = context.db();
 
-    // Note: identity (is, is not) for equal builtin types is unreliable and not part of the
-    // language spec.
-    // - `[ast::CompOp::Is]`: return `false` if unequal, `bool` if equal
-    // - `[ast::CompOp::IsNot]`: return `true` if unequal, `bool` if equal
     let try_dunder = |policy: MemberLookupPolicy| {
         let rich_comparison = |op| infer_rich_comparison(db, left, right, op, policy);
         let membership_test_comparison = |op, range: TextRange| {
@@ -170,6 +166,39 @@ pub(super) fn infer_binary_type_comparison<'db>(
             }
         }
     };
+
+    let same_typevar = matches!(
+        (
+            left.resolve_type_alias(db),
+            right.resolve_type_alias(db)
+        ),
+        (Type::TypeVar(left), Type::TypeVar(right)) if left.is_same_typevar_as(db, right)
+    );
+    if !same_typevar && matches!(op, ast::CmpOp::Is | ast::CmpOp::IsNot) {
+        // `NewType` is an identity function at runtime, so distinct NewTypes can still contain the
+        // same object:
+        //
+        // UserId = NewType("UserId", int)
+        // OrderId = NewType("OrderId", int)
+        // user_id is order_id  # possibly true
+        //
+        // Project both operands before using the ordinary comparison logic. Keeping the usual
+        // recursive dispatch preserves facts carried by unions and intersections after projection.
+        let left_identity = left.identity_comparison_type(db);
+        let right_identity = right.identity_comparison_type(db);
+        if left_identity != left || right_identity != right {
+            return visitor.visit((left, op, right), || {
+                infer_binary_type_comparison(
+                    context,
+                    left_identity,
+                    op,
+                    right_identity,
+                    range,
+                    visitor,
+                )
+            });
+        }
+    }
 
     let comparison_truthiness = match op {
         ast::CmpOp::Eq => equality_truthiness(db, left, right),

@@ -92,17 +92,45 @@ def _(x: int):
 
 ### Identity comparisons
 
-```py
-class A: ...
+The type `~None` excludes the `None` object, so its identity comparisons with `None` have definite
+results.
 
+```py
 def _(o: object):
-    a = A()
     n = None
 
     if o is not None:
-        reveal_type(o)  # revealed:  ~None
+        reveal_type(o)  # revealed: ~None
         reveal_type(o is n)  # revealed: Literal[False]
         reveal_type(o is not n)  # revealed: Literal[True]
+```
+
+A single-member enum contains only one object. A value excluded from `E` cannot be `E.ONLY`, so the
+branch below is unreachable and must not emit an attribute error.
+
+```py
+from enum import Enum
+from ty_extensions import Not
+
+class E(Enum):
+    ONLY = 1
+
+def f(value: Not[E]) -> None:
+    if value is E.ONLY:
+        value.missing
+```
+
+After `not isinstance(value, B)`, `value` cannot be identical to a `B` instance. This remains true
+when `value` has also been narrowed to `A`, so the inner branch is unreachable.
+
+```py
+class A: ...
+class B: ...
+
+def f(value: object, other_b: B) -> None:
+    if isinstance(value, A) and not isinstance(value, B):
+        if value is other_b:
+            value.missing
 ```
 
 ## Diagnostics

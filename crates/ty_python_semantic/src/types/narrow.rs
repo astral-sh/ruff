@@ -2757,14 +2757,81 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
         match op {
             ast::CmpOp::IsNot => {
-                if rhs_ty.is_singleton(self.db) {
-                    Some(rhs_ty.negate(self.db))
+                let rhs_identity_ty = rhs_ty.identity_comparison_type(self.db);
+                // Prefer a singleton runtime representation when all constraints collapse to the
+                // same object. Otherwise, keep a singleton-constrained `TypeVar` symbolic so that
+                // another occurrence refers to the same specialization.
+                let rhs_constraint = if rhs_identity_ty.is_singleton(self.db) {
+                    rhs_identity_ty
+                } else if matches!(rhs_ty.resolve_type_alias(self.db), Type::TypeVar(_))
+                    && rhs_ty.is_singleton(self.db)
+                {
+                    rhs_ty
                 } else {
-                    // Non-singletons cannot be safely narrowed using `is not`
-                    None
-                }
+                    return None;
+                };
+                Some(rhs_constraint.negate(self.db))
             }
-            ast::CmpOp::Is => Some(rhs_ty),
+            ast::CmpOp::Is => {
+                // Preserve the nominal RHS constraint for ordinary overlaps. If a `NewType`
+                // creates additional runtime-only overlap, retain the corresponding part of the
+                // LHS as well so that applying the constraint does not erase that possibility.
+                let mut builder = UnionBuilder::new(self.db).add(rhs_ty);
+                let rhs_resolved = rhs_ty.resolve_type_alias(self.db);
+                let rhs_identity_ty = rhs_ty.identity_comparison_type(self.db);
+                let add_runtime_overlap = |builder: UnionBuilder<'db>, element: Type<'db>| {
+                    let overlaps_only_at_runtime = |rhs_element| {
+                        element.is_disjoint_from(self.db, rhs_element)
+                            && !element.is_disjoint_from_for_identity(self.db, rhs_element)
+                    };
+                    let has_runtime_only_overlap = match rhs_resolved {
+                        Type::Union(union) => union
+                            .elements(self.db)
+                            .iter()
+                            .copied()
+                            .any(overlaps_only_at_runtime),
+                        Type::TypeVar(typevar) => {
+                            match typevar.typevar(self.db).bound_or_constraints(self.db) {
+                                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                                    overlaps_only_at_runtime(bound)
+                                }
+                                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                                    constraints
+                                        .elements(self.db)
+                                        .iter()
+                                        .copied()
+                                        .any(overlaps_only_at_runtime)
+                                }
+                                None => overlaps_only_at_runtime(rhs_ty),
+                            }
+                        }
+                        rhs_ty => overlaps_only_at_runtime(rhs_ty),
+                    };
+                    if !has_runtime_only_overlap {
+                        builder
+                    } else {
+                        let runtime_overlap =
+                            IntersectionType::from_two_elements(self.db, element, rhs_identity_ty);
+                        builder.add(if runtime_overlap.is_never() {
+                            element
+                        } else {
+                            runtime_overlap
+                        })
+                    }
+                };
+
+                if let Type::Union(union) = lhs_ty.resolve_type_alias(self.db) {
+                    builder = union
+                        .elements(self.db)
+                        .iter()
+                        .copied()
+                        .fold(builder, add_runtime_overlap);
+                } else {
+                    builder = add_runtime_overlap(builder, lhs_ty);
+                }
+
+                Some(builder.build())
+            }
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
             ast::CmpOp::NotIn => self.evaluate_expr_not_in(rhs_ty),
             _ => None,
@@ -2896,6 +2963,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         //         if t[0] is not None:
         //             reveal_type(t)  # tuple[int, int]
         if matches!(&**ops, [ast::CmpOp::Is | ast::CmpOp::IsNot])
+            && let is_positive_check = is_positive == (ops[0] == ast::CmpOp::Is)
             && let ast::Expr::Subscript(subscript) = left.expression_value()
             && let Type::Union(union) = inference
                 .expression_type(&*subscript.value)
@@ -2906,9 +2974,13 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 .as_int_literal()
             && let Ok(index) = i32::try_from(index)
             && let rhs_ty = inference.expression_type(&comparators[0])
-            && rhs_ty.is_singleton(self.db)
+            && let rhs_identity_ty = rhs_ty.identity_comparison_type(self.db)
+            && let rhs_identity_is_singleton = rhs_identity_ty.is_singleton(self.db)
+            && let rhs_is_correlated_singleton = (!rhs_identity_is_singleton
+                && matches!(rhs_ty.resolve_type_alias(self.db), Type::TypeVar(_))
+                && rhs_ty.is_singleton(self.db))
+            && (is_positive_check || rhs_is_correlated_singleton || rhs_identity_is_singleton)
         {
-            let is_positive_check = is_positive == (ops[0] == ast::CmpOp::Is);
             let filtered = union.filter(self.db, |elem| {
                 elem.as_nominal_instance()
                     .and_then(|inst| inst.tuple_spec(self.db))
@@ -2916,10 +2988,16 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     .is_none_or(|el_ty| {
                         if is_positive_check {
                             // `is X` context: keep tuples where element could be X
-                            !el_ty.is_disjoint_from(self.db, rhs_ty)
+                            !el_ty.is_disjoint_from_for_identity(self.db, rhs_ty)
+                        } else if rhs_is_correlated_singleton {
+                            // Preserve the shared specialization instead of excluding every
+                            // constraint in the projected union.
+                            !el_ty.is_subtype_of(self.db, rhs_ty)
                         } else {
                             // `is not X` context: keep tuples where element is not always X
-                            !el_ty.is_subtype_of(self.db, rhs_ty)
+                            !el_ty
+                                .identity_comparison_type(self.db)
+                                .is_subtype_of(self.db, rhs_identity_ty)
                         }
                     })
             });
