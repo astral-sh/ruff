@@ -236,7 +236,7 @@ use ty_python_core::{
 /// rebuilding it from the union of all preceding patterns, which can repeatedly distribute the
 /// same intersections.
 #[salsa::tracked(
-    cycle_initial = |_, id, _, _| Type::divergent(id),
+    cycle_initial = |db, id, _, _| Type::identity_recursive(db, id),
     cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
         result.cycle_normalized(db, *previous, cycle)
     },
@@ -265,7 +265,7 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
 ///
 /// This result is also the preceding-pattern prefix for the next unguarded case.
 #[salsa::tracked(
-    cycle_initial = |_, id, _, _| Type::divergent(id),
+    cycle_initial = |db, id, _, _| Type::identity_recursive(db, id),
     cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
         result.cycle_normalized(db, *previous, cycle)
     },

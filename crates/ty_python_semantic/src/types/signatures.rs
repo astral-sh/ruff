@@ -146,7 +146,7 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn cycle_initial(db: &'db dyn Db, id: salsa::Id) -> Self {
         Self::single(Signature::new(
             Parameters::bottom(),
-            Type::divergent(id).bottom_materialization(db),
+            Type::identity_recursive(db, id).bottom_materialization(db),
         ))
     }
 
