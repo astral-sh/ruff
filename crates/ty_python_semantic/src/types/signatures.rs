@@ -451,6 +451,7 @@ impl<'db> CallableSignature<'db> {
         db: &'db dyn Db,
         other: &Self,
         constraints: &'c ConstraintSetBuilder<'db>,
+        preserve_source_transitive: bool,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
@@ -463,7 +464,12 @@ impl<'db> CallableSignature<'db> {
             &signature_relation_visitor,
             &materialization_visitor,
         );
-        checker.check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
+        checker.check_callable_signature_pair_inner(
+            db,
+            &self.overloads,
+            &other.overloads,
+            preserve_source_transitive,
+        )
     }
 }
 
@@ -817,6 +823,29 @@ impl<'db> Signature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        let remaining: FxHashSet<BoundTypeVarIdentity<'db>>;
+        let nested_mapping;
+        let nested_visitor;
+        let (type_mapping, visitor) = if let TypeMapping::ReplaceEscapingTypevars(typevars) =
+            type_mapping
+            && let Some(generic_context) = self.generic_context
+        {
+            remaining = typevars
+                .iter()
+                .copied()
+                .filter(|typevar| !generic_context.contains(db, *typevar))
+                .collect();
+            if remaining.len() == typevars.len() {
+                (type_mapping, visitor)
+            } else {
+                nested_mapping = TypeMapping::ReplaceEscapingTypevars(&remaining);
+                nested_visitor = ApplyTypeMappingVisitor::default();
+                (&nested_mapping, &nested_visitor)
+            }
+        } else {
+            (type_mapping, visitor)
+        };
+
         Self {
             generic_context: self
                 .generic_context
@@ -1287,7 +1316,7 @@ impl<'db> Signature<'db> {
         );
 
         let is_consistent = checker
-            .check_signature_pair(db, &implementation, &overload)
+            .check_signature_pair(db, &implementation, &overload, false)
             .is_always_satisfied(db);
 
         if is_consistent {
@@ -1336,6 +1365,7 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         other: &CallableSignature<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
+        preserve_source_transitive: bool,
     ) -> ConstraintSet<'db, 'c> {
         // If this signature is a paramspec, bind it to the entire overloaded other callable.
         if let Some(self_bound_typevar) = self.parameters.as_paramspec()
@@ -1377,15 +1407,21 @@ impl<'db> Signature<'db> {
             .overloads
             .iter()
             .when_all(db, constraints, |other_signature| {
-                self.when_constraint_set_assignable_to(db, other_signature, constraints)
+                self.when_constraint_set_assignable_to_inner(
+                    db,
+                    other_signature,
+                    constraints,
+                    preserve_source_transitive,
+                )
             })
     }
 
-    fn when_constraint_set_assignable_to<'c>(
+    fn when_constraint_set_assignable_to_inner<'c>(
         &self,
         db: &'db dyn Db,
         other: &Self,
         constraints: &'c ConstraintSetBuilder<'db>,
+        preserve_source_transitive: bool,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
@@ -1398,7 +1434,7 @@ impl<'db> Signature<'db> {
             &signature_relation_visitor,
             &materialization_visitor,
         );
-        checker.check_signature_pair(db, self, other)
+        checker.check_signature_pair(db, self, other, preserve_source_transitive)
     }
 
     /// Create a new signature with the given definition.
@@ -1551,7 +1587,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &CallableSignature<'db>,
         target: &CallableSignature<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.check_callable_signature_pair_inner(db, &source.overloads, &target.overloads)
+        self.check_callable_signature_pair_inner(db, &source.overloads, &target.overloads, false)
     }
 
     /// Implementation of subtyping and assignability between two, possible overloaded, callable
@@ -1561,6 +1597,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source_overloads: &[Signature<'db>],
         target_overloads: &[Signature<'db>],
+        preserve_source_transitive: bool,
     ) -> ConstraintSet<'db, 'c> {
         if self.typevar_evaluation == TypeVarEvaluation::Lazy {
             // TODO: Oof, maybe ParamSpec needs to live at CallableSignature, not Signature?
@@ -1684,7 +1721,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 {
                     self.check_signature_pair_inner(db, source_signature, target_signature)
                 } else {
-                    self.check_signature_pair(db, source_signature, target_signature)
+                    self.check_signature_pair(
+                        db,
+                        source_signature,
+                        target_signature,
+                        preserve_source_transitive,
+                    )
                 }
             }
 
@@ -1708,6 +1750,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 db,
                                 std::slice::from_ref(self_signature),
                                 target_overloads,
+                                preserve_source_transitive,
                             )
                         })
                 })
@@ -1722,6 +1765,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             db,
                             source_overloads,
                             std::slice::from_ref(target_signature),
+                            preserve_source_transitive,
                         )
                     })
             }
@@ -1734,6 +1778,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         db,
                         source_overloads,
                         std::slice::from_ref(target_signature),
+                        preserve_source_transitive,
                     )
                 }),
         }
@@ -1745,6 +1790,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source: &Signature<'db>,
         target: &Signature<'db>,
+        preserve_source_transitive: bool,
     ) -> ConstraintSet<'db, 'c> {
         // If either signature is generic, freshen that signature's typevars before considering
         // them inferable for this relation. The relation only needs to find one specialization of
@@ -1790,10 +1836,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // we produce, we reduce it back down to the inferable set that the caller asked about.
         // If we introduced new inferable typevars, those will be existentially quantified away
         // before returning.
+        let source_to_remove = if preserve_source_transitive {
+            // Function-like callables can reach additional typevars through a directly bound
+            // variable's bounds. Quantify the direct variables, but leave those transitive
+            // dependencies available to the caller's specialization inference.
+            Either::Left(
+                source
+                    .generic_context
+                    .into_iter()
+                    .flat_map(|context| context.variables(db))
+                    .map(|typevar| typevar.identity(db)),
+            )
+        } else {
+            Either::Right(source_inferable.iter(db))
+        };
         when.reduce_inferable(
             db,
             self.constraints,
-            source_inferable.iter(db).chain(target_inferable.iter(db)),
+            source_to_remove.chain(target_inferable.iter(db)),
         )
     }
 
