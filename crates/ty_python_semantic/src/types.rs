@@ -1054,7 +1054,7 @@ impl<'db> Type<'db> {
         Self::Divergent(DivergentType::new(id))
     }
 
-    pub(crate) fn recursive_cycle_initial(db: &'db dyn Db, id: salsa::Id) -> Self {
+    pub(crate) fn identity_recursive(db: &'db dyn Db, id: salsa::Id) -> Self {
         let binder = DivergentType::new(id);
         Self::recursive(db, binder, Self::Divergent(binder))
     }
@@ -1090,6 +1090,13 @@ impl<'db> Type<'db> {
             (Type::Divergent(left), Type::Divergent(right)) => left.same_marker(right),
             _ => false,
         }
+    }
+
+    pub(crate) fn is_identity_recursive(self, db: &'db dyn Db) -> bool {
+        matches!(
+            self,
+            Type::Recursive(recursive) if Type::Divergent(recursive.binder(db)) == recursive.body(db)
+        )
     }
 
     /// If `self` is a materialized `Divergent` type, returns the concrete type it should
@@ -2932,7 +2939,7 @@ impl<'db> Type<'db> {
     }
 
     #[salsa::tracked(
-        cycle_initial=|db, id, _, _, _| Place::bound(Type::recursive_cycle_initial(db, id)).into(),
+        cycle_initial=|db, id, _, _, _| Place::bound(Type::identity_recursive(db, id)).into(),
         cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
             member.cycle_normalized(db, *previous, cycle)
         },
@@ -3309,7 +3316,7 @@ impl<'db> Type<'db> {
 
             // A recursive member lookup can yield the internal cycle marker. It does not
             // represent a concrete descriptor method and must not escape through the access.
-            if concrete_descr_get.is_divergent() {
+            if concrete_descr_get.is_identity_recursive(db) {
                 return None;
             }
 
@@ -3753,7 +3760,7 @@ impl<'db> Type<'db> {
     ) -> PlaceAndQualifiers<'db> {
         #[salsa::tracked(
             cycle_initial=|db, id, _, _, _, _| {
-                Place::bound(Type::recursive_cycle_initial(db, id)).into()
+                Place::bound(Type::identity_recursive(db, id)).into()
             },
             cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _, _| {
                 member.cycle_normalized(db, *previous, cycle)
@@ -6409,7 +6416,7 @@ impl<'db> Type<'db> {
     }
 
     #[salsa::tracked(
-        cycle_initial=|db, id, _, _| Type::recursive_cycle_initial(db, id),
+        cycle_initial=|db, id, _, _| Type::identity_recursive(db, id),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, _| {
             value.cycle_normalized(db, *previous, cycle)
         },
@@ -7193,7 +7200,7 @@ impl<'db> Type<'db> {
 
     #[allow(clippy::used_underscore_binding)]
     #[salsa::tracked(
-        cycle_initial=|db, id, _, ()| Type::recursive_cycle_initial(db, id),
+        cycle_initial=|db, id, _, ()| Type::identity_recursive(db, id),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, ()| {
             value.cycle_normalized(db, *previous, cycle)
         },

@@ -961,7 +961,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             (Place::Defined(prev), Place::Undefined) => {
                 if cycle
                     .head_ids()
-                    .any(|id| prev.ty == Type::recursive_cycle_initial(db, id))
+                    .any(|id| prev.ty == Type::identity_recursive(db, id))
                 {
                     Place::Undefined
                 } else {
@@ -985,7 +985,7 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
 }
 
 #[salsa::tracked(
-    cycle_initial=|db, id, _, _, _, _| Place::bound(Type::recursive_cycle_initial(db, id)).into(),
+    cycle_initial=|db, id, _, _, _, _| Place::bound(Type::identity_recursive(db, id)).into(),
     cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, _, _, _, _| {
         place.cycle_normalized(db, *previous, cycle)
     },

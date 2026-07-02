@@ -2298,7 +2298,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     let narrowed = self.infer_type_expression(arguments_slice);
                     let expanded = narrowed.expand_eagerly(self.db());
 
-                    if expanded.is_divergent() {
+                    if expanded.is_identity_recursive(self.db()) {
                         expanded
                     } else {
                         TypeIsType::from_type_expression(self.db(), narrowed)
