@@ -126,6 +126,7 @@ mod constraints;
 mod context;
 mod context_manager;
 mod cyclic;
+mod dedicated;
 mod diagnostic;
 mod display;
 mod enums;

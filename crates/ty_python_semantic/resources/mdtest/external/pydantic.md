@@ -20,7 +20,7 @@ class User(BaseModel):
     id: int
     name: str
 
-reveal_type(User.__init__)  # revealed: (self: User, *, id: int, name: str) -> None
+reveal_type(User.__init__)  # revealed: (self: User, *, id: int, name: str, **extra: Any) -> None
 
 user = User(id=1, name="John Doe")
 reveal_type(user.id)  # revealed: int
@@ -43,7 +43,8 @@ class Product(BaseModel):
     tags: list[str] = Field(default_factory=list)
     internal_price_cent: int = Field(gt=0, alias="price_cent")
 
-reveal_type(Product.__init__)  # revealed: (self: Product, *, name: str, tags: list[str] = ..., price_cent: int) -> None
+# revealed: (self: Product, *, name: str, tags: list[str] = ..., price_cent: int, **extra: Any) -> None
+reveal_type(Product.__init__)
 
 product = Product(name="Laptop", price_cent=999_00)
 ```
@@ -69,9 +70,7 @@ Using the internal field name is not possible (the argument will be accepted, bu
 missing):
 
 ```py
-# TODO: This should ideally only report `missing-argument`, not `unknown-argument` (since extra fields are allowed by default)
 # error: [missing-argument]
-# error: [unknown-argument]
 Product(name="Laptop", internal_price_cent=999_00)
 ```
 
@@ -210,9 +209,7 @@ class DefaultOnlyAlias(BaseModel):
     name: int = Field(alias="alias")
 
 DefaultOnlyAlias(alias=1)
-# TODO: This should ideally only report `missing-argument`, not `unknown-argument` (since extra fields are allowed by default)
 # error: [missing-argument]
-# error: [unknown-argument]
 DefaultOnlyAlias(name=1)
 ```
 
@@ -226,7 +223,6 @@ class AliasAndName(BaseModel):
 
 AliasAndName(alias=1)
 # TODO: no errors here
-# error: [unknown-argument]
 # error: [missing-argument]
 AliasAndName(name=1)
 ```
@@ -250,7 +246,6 @@ class OnlyName(BaseModel):
 # TODO: this should be an error
 OnlyName(alias=1)
 # TODO: no errors here
-# error: [unknown-argument]
 # error: [missing-argument]
 OnlyName(name=1)
 ```
@@ -265,8 +260,6 @@ from pydantic import BaseModel, ConfigDict
 class Person(BaseModel):
     name: str
 
-# TODO: no error here
-# error: [unknown-argument]
 Person(name="Alice", something_else=7)
 ```
 
@@ -278,7 +271,24 @@ class PersonWithoutExtras(BaseModel):
 
     name: str
 
-PersonWithoutExtras(name="Alice", something_else=7)  # error: [unknown-argument]
+# TODO: this should be an error once we support `extra="forbid"`
+PersonWithoutExtras(name="Alice", something_else=7)
+```
+
+## Field named `extra`
+
+The variadic keyword parameter uses a collision-free name when the model already has a field named
+`extra`:
+
+```py
+from pydantic import BaseModel
+
+class PersonWithExtraField(BaseModel):
+    extra: int
+
+# revealed: (self: PersonWithExtraField, *, extra: int, **extra_: Any) -> None
+reveal_type(PersonWithExtraField.__init__)
+PersonWithExtraField(extra=1, something_else=2)
 ```
 
 ## Frozen models and fields
@@ -386,6 +396,9 @@ class Settings(BaseSettings):
 # TODO: no error here
 # error: [missing-argument]
 Settings()
+
+# `BaseSettings` defines a specialized constructor and forbids extra values by default.
+Settings(host="localhost", port=8000, something_else=7)  # error: [unknown-argument]
 ```
 
 ## Pydantic dataclasses
@@ -407,6 +420,7 @@ reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int = 0
 
 Person(name="Alice")
 Person(name="Alice", age=20)
+Person(name="Alice", something_else=7)  # error: [unknown-argument]
 ```
 
 ## Inherited `ModelMetaclass`
@@ -424,10 +438,11 @@ class User(BaseModel, metaclass=RegistryMeta):
     name: str
     age: int = 0
 
-reveal_type(User.__init__)  # revealed: (self: User, *, name: str, age: int = 0) -> None
+reveal_type(User.__init__)  # revealed: (self: User, *, name: str, age: int = 0, **extra: Any) -> None
 
 User(name="alice")
 User(name="alice", age=1)
+User(name="alice", extra=1)
 
 # error: [missing-argument]
 User()
@@ -470,4 +485,39 @@ class User(BaseModel):
     def validate_model_after(self) -> "User":
         reveal_type(self)  # revealed: Self@validate_model_after
         return self
+```
+
+## First-party modules named `pydantic`
+
+A first-party module that happens to use Pydantic's module and class names should not receive
+Pydantic-specific behavior.
+
+`/src/pydantic/__init__.py`:
+
+```py
+from .main import BaseModel as BaseModel
+```
+
+`/src/pydantic/main.py`:
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(kw_only_default=True)
+class ModelMetaclass(type): ...
+
+class BaseModel(metaclass=ModelMetaclass): ...
+```
+
+`/src/main.py`:
+
+```py
+from pydantic import BaseModel
+
+class Person(BaseModel):
+    name: str
+
+reveal_type(Person.__init__)  # revealed: (self: Person, *, name: str) -> None
+Person(name="Alice")
+Person(name="Alice", something_else=7)  # error: [unknown-argument]
 ```

@@ -606,6 +606,18 @@ impl SearchPath {
         matches!(&*self.0, SearchPathInner::SitePackages(_))
     }
 
+    /// Is the module on a search path for installed third-party code?
+    pub(crate) fn is_third_party(&self) -> bool {
+        match &*self.0 {
+            SearchPathInner::SitePackages(_) | SearchPathInner::Editable(_) => true,
+            SearchPathInner::Extra(_)
+            | SearchPathInner::FirstParty(_)
+            | SearchPathInner::StandardLibraryCustom(_)
+            | SearchPathInner::StandardLibraryVendored(_)
+            | SearchPathInner::StandardLibraryReal(_) => false,
+        }
+    }
+
     fn is_valid_extension(&self, extension: &str) -> bool {
         if self.is_standard_library() {
             extension == "pyi"
