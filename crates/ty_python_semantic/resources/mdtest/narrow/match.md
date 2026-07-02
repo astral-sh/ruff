@@ -97,7 +97,8 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import assert_never
+from collections.abc import Mapping
+from typing import Any, assert_never
 
 class Covariant[T]:
     def get(self) -> T:
@@ -110,6 +111,64 @@ def f(x: Covariant[int]):
         case _:
             reveal_type(x)  # revealed: Never
             assert_never(x)
+
+class Box[T]:
+    value: T
+
+def gradual_mapping_order_is_exhaustive(value: Mapping[str, Any] | int) -> None:
+    match value:
+        case Mapping():
+            pass
+        case int():
+            pass
+        case _:
+            assert_never(value)
+
+    match value:
+        case int():
+            pass
+        case Mapping():
+            pass
+        case _:
+            assert_never(value)
+
+def gradual_dict_match_self_is_exhaustive(value: dict[str, Any] | int) -> None:
+    match value:
+        case dict(_):
+            pass
+        case int():
+            pass
+        case _:
+            assert_never(value)
+
+def gradual_member_pattern_is_exhaustive(value: Box[Any] | int) -> None:
+    match value:
+        case Box(value=_):
+            pass
+        case int():
+            pass
+        case _:
+            assert_never(value)
+
+def nested_gradual_pattern_is_exhaustive(
+    value: tuple[Mapping[str, Any]] | int,
+) -> None:
+    match value:
+        case [Mapping()]:
+            pass
+        case int():
+            pass
+        case _:
+            assert_never(value)
+
+def gradual_member_pattern_can_be_refutable(value: Box[Any] | int) -> None:
+    match value:
+        case Box(value=int()):
+            pass
+        case int():
+            pass
+        case _:
+            assert_never(value)  # error: [type-assertion-failure]
 ```
 
 ## Class patterns with generic `@final` classes

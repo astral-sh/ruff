@@ -482,10 +482,24 @@ fn pattern_is_exhaustive_for_subject(
     pattern: &PatternPredicateKind<'_>,
     subject_ty: Type<'_>,
 ) -> bool {
-    subject_ty.is_subtype_of(
+    definite_match_type_exhausts_subject(
         db,
+        subject_ty,
         definite_match_pattern_type_for_subject(db, pattern, subject_ty),
     )
+}
+
+/// Return whether a definite-match under-approximation covers the complete subject.
+///
+/// Equivalence is required because gradual types are not subtypes of themselves.
+fn definite_match_type_exhausts_subject(
+    db: &dyn Db,
+    subject_ty: Type<'_>,
+    definitely_matched: Type<'_>,
+) -> bool {
+    subject_ty == definitely_matched
+        || subject_ty.is_subtype_of(db, definitely_matched)
+        || subject_ty.is_equivalent_to(db, definitely_matched)
 }
 
 /// Return whether every value in `subject_ty` is guaranteed to match a mapping pattern.
@@ -682,7 +696,7 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
 pub(crate) fn pattern_fallthrough_type<'db>(
     db: &'db dyn Db,
     kind: &PatternPredicateKind<'db>,
-    subject_ty: Type<'db>,
+    mut subject_ty: Type<'db>,
 ) -> Type<'db> {
     if let PatternPredicateKind::Value(value) = kind {
         let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
@@ -707,11 +721,34 @@ pub(crate) fn pattern_fallthrough_type<'db>(
         }
     }
 
+    // Remove union elements that are guaranteed to match before constructing a subject-dependent
+    // complement. A gradual type does not cancel with its own negation, but an exhaustive pattern
+    // still makes the corresponding union element unreachable.
+    if subject_independent_definite_match_pattern_type(db, kind).is_none()
+        && let Type::Union(union) = subject_ty.resolve_type_alias(db)
+    {
+        let mut removed_element = false;
+        let remaining = union.map(db, |element| {
+            if pattern_is_exhaustive_for_subject(db, kind, *element) {
+                removed_element = true;
+                Type::Never
+            } else {
+                *element
+            }
+        });
+        if removed_element {
+            subject_ty = remaining;
+        }
+    }
+
+    let definitely_matched = definite_match_pattern_type_for_subject(db, kind, subject_ty);
+    if definite_match_type_exhausts_subject(db, subject_ty, definitely_matched) {
+        return Type::Never;
+    }
+
     IntersectionBuilder::new(db)
         .add_positive(subject_ty)
-        .add_negative(definite_match_pattern_type_for_subject(
-            db, kind, subject_ty,
-        ))
+        .add_negative(definitely_matched)
         .build()
 }
 
