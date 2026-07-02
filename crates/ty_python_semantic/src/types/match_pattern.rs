@@ -482,24 +482,7 @@ fn pattern_is_exhaustive_for_subject(
     pattern: &PatternPredicateKind<'_>,
     subject_ty: Type<'_>,
 ) -> bool {
-    definite_match_type_exhausts_subject(
-        db,
-        subject_ty,
-        definite_match_pattern_type_for_subject(db, pattern, subject_ty),
-    )
-}
-
-/// Return whether a definite-match under-approximation covers the complete subject.
-///
-/// Equivalence is required because gradual types are not subtypes of themselves.
-fn definite_match_type_exhausts_subject(
-    db: &dyn Db,
-    subject_ty: Type<'_>,
-    definitely_matched: Type<'_>,
-) -> bool {
-    subject_ty == definitely_matched
-        || subject_ty.is_subtype_of(db, definitely_matched)
-        || subject_ty.is_equivalent_to(db, definitely_matched)
+    pattern_coverage_for_subject(db, pattern, subject_ty).exhausts_subject()
 }
 
 /// Return whether every value in `subject_ty` is guaranteed to match a mapping pattern.
@@ -571,14 +554,39 @@ fn sequence_pattern_is_exhaustive_for_subject(
         .all(|(element, pattern)| pattern_is_exhaustive_for_subject(db, pattern, *element))
 }
 
-/// Return the values that are statically guaranteed to match `kind`, using `subject_ty` when the
-/// answer depends on the subject.
+/// The statically known coverage of a pattern for a specific subject type.
+#[derive(Clone, Copy)]
+pub(crate) struct PatternCoverage<'db> {
+    definitely_matched_ty: Type<'db>,
+    exhausts_subject: bool,
+}
+
+impl<'db> PatternCoverage<'db> {
+    fn new(definitely_matched_ty: Type<'db>, exhausts_subject: bool) -> Self {
+        Self {
+            definitely_matched_ty,
+            exhausts_subject,
+        }
+    }
+
+    pub(crate) fn definitely_matched_ty(self) -> Type<'db> {
+        self.definitely_matched_ty
+    }
+
+    pub(crate) fn exhausts_subject(self) -> bool {
+        self.exhausts_subject
+    }
+}
+
+/// Return the values that are statically guaranteed to match `kind` and whether they cover the
+/// complete subject.
 ///
-/// This is an under-approximation used for negative narrowing and ordered alternatives: callers
-/// may subtract the result from `subject_ty`. A subject-independent pattern can return a type wider
-/// than `subject_ty`; for example, `case Base()` returns `Base` even for a `Child` subject. Class
-/// patterns need the current subject type when member extraction depends on the subject's statically
-/// known members.
+/// The definite-match type is an under-approximation used for negative narrowing and ordered
+/// alternatives: callers may subtract it from `subject_ty`. Exhaustiveness is tracked separately
+/// because gradual types are not subtypes of themselves. A subject-independent pattern can return a
+/// type wider than `subject_ty`; for example, `case Base()` returns `Base` even for a `Child`
+/// subject. Class patterns need the current subject type when member extraction depends on the
+/// subject's statically known members.
 /// A subject-independent pattern can return its context-free definite-match type directly. A
 /// mapping pattern can use required `TypedDict` fields to establish that every subject value
 /// contains its keys.
@@ -596,24 +604,34 @@ fn sequence_pattern_is_exhaustive_for_subject(
 /// # For a `tuple[Child]` subject, this checks `x` on `Child`, not only on `Base`.
 /// case [Base(x=_)]: ...
 /// ```
-pub(crate) fn definite_match_pattern_type_for_subject<'db>(
+pub(crate) fn pattern_coverage_for_subject<'db>(
     db: &'db dyn Db,
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
-) -> Type<'db> {
+) -> PatternCoverage<'db> {
     if let Some(subject_independent_ty) = subject_independent_definite_match_pattern_type(db, kind)
     {
-        return subject_independent_ty;
+        return PatternCoverage::new(
+            subject_independent_ty,
+            subject_ty.is_subtype_of(db, subject_independent_ty),
+        );
     }
 
     let resolved_subject_ty = subject_ty.resolve_type_alias(db);
     if let Type::Union(union) = resolved_subject_ty {
-        return UnionType::from_elements(
-            db,
-            union
-                .elements(db)
-                .iter()
-                .map(|element| definite_match_pattern_type_for_subject(db, kind, *element)),
+        let coverages = union
+            .elements(db)
+            .iter()
+            .map(|element| pattern_coverage_for_subject(db, kind, *element))
+            .collect::<Vec<_>>();
+        return PatternCoverage::new(
+            UnionType::from_elements(
+                db,
+                coverages
+                    .iter()
+                    .map(|coverage| coverage.definitely_matched_ty()),
+            ),
+            coverages.iter().all(|coverage| coverage.exhausts_subject()),
         );
     }
 
@@ -621,61 +639,87 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
         PatternPredicateKind::Value(value) => {
             let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
             if equality_truthiness(db, resolved_subject_ty, value_ty) == Truthiness::AlwaysTrue {
-                return subject_ty;
+                return PatternCoverage::new(subject_ty, true);
             }
         }
         PatternPredicateKind::Class(kind) => {
             let class_ty = infer_same_file_expression_type(db, kind.class, TypeContext::default());
             match class_ty {
                 Type::ClassLiteral(class) => {
-                    if class_pattern_is_exhaustive(db, class, resolved_subject_ty, kind) {
-                        return subject_ty;
+                    let exhausts_subject =
+                        class_pattern_is_exhaustive(db, class, resolved_subject_ty, kind);
+                    if kind.is_empty() {
+                        let class_instance_ty = Type::instance(db, class.top_materialization(db));
+                        let definitely_matched_ty =
+                            if is_typed_dict_pattern_domain(db, resolved_subject_ty)
+                                && typed_dict_matches_class_pattern(db, class)
+                            {
+                                UnionType::from_two_elements(db, class_instance_ty, subject_ty)
+                            } else {
+                                class_instance_ty
+                            };
+                        return PatternCoverage::new(definitely_matched_ty, exhausts_subject);
+                    }
+                    if exhausts_subject {
+                        return PatternCoverage::new(subject_ty, true);
                     }
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
                     if kind.is_empty()
                         && subject_ty.is_subtype_of(db, callable_pattern_type(db)) =>
                 {
-                    return callable_pattern_type(db);
+                    return PatternCoverage::new(callable_pattern_type(db), true);
                 }
                 _ => {}
             }
         }
         PatternPredicateKind::Sequence(kind) => {
             return if sequence_pattern_is_exhaustive_for_subject(db, kind, resolved_subject_ty) {
-                subject_ty
+                PatternCoverage::new(subject_ty, true)
             } else {
                 // A nested subject-dependent pattern rejected the context-free approximation.
                 // Reusing that approximation for the surrounding sequence would reintroduce the
                 // values that the recursive analysis deliberately excluded.
-                Type::Never
+                PatternCoverage::new(Type::Never, false)
             };
         }
         PatternPredicateKind::Mapping(kind) => {
             return if mapping_pattern_is_exhaustive(db, kind, resolved_subject_ty) {
-                subject_ty
+                PatternCoverage::new(subject_ty, true)
             } else {
-                Type::Never
+                PatternCoverage::new(Type::Never, false)
             };
         }
         PatternPredicateKind::Or(patterns) => {
-            return UnionType::from_elements(
-                db,
-                patterns.iter().map(|pattern| {
-                    definite_match_pattern_type_for_subject(db, pattern, subject_ty)
-                }),
+            let mut remaining_subject_ty = subject_ty;
+            let mut definitely_matched = Vec::with_capacity(patterns.len());
+            for pattern in patterns {
+                let coverage = pattern_coverage_for_subject(db, pattern, remaining_subject_ty);
+                definitely_matched.push(coverage.definitely_matched_ty());
+                if coverage.exhausts_subject() {
+                    remaining_subject_ty = Type::Never;
+                    break;
+                }
+                remaining_subject_ty = pattern_fallthrough_type(db, pattern, remaining_subject_ty);
+            }
+            return PatternCoverage::new(
+                UnionType::from_elements(db, definitely_matched),
+                remaining_subject_ty.is_never(),
             );
         }
         PatternPredicateKind::As(Some(pattern), _) => {
-            return definite_match_pattern_type_for_subject(db, pattern, subject_ty);
+            return pattern_coverage_for_subject(db, pattern, subject_ty);
         }
-        _ => return Type::Never,
+        _ => return PatternCoverage::new(Type::Never, false),
     }
 
-    IntersectionBuilder::new(db)
-        .add_positive(subject_ty)
-        .add_positive(definite_match_pattern_type(db, kind))
-        .build()
+    PatternCoverage::new(
+        IntersectionBuilder::new(db)
+            .add_positive(subject_ty)
+            .add_positive(definite_match_pattern_type(db, kind))
+            .build(),
+        false,
+    )
 }
 
 /// Return the part of `subject_ty` that can reach a later alternative after `kind` fails.
@@ -729,7 +773,10 @@ pub(crate) fn pattern_fallthrough_type<'db>(
     {
         let mut removed_element = false;
         let remaining = union.map(db, |element| {
-            if pattern_is_exhaustive_for_subject(db, kind, *element) {
+            let coverage = pattern_coverage_for_subject(db, kind, *element);
+            if coverage.exhausts_subject()
+                && !element.is_subtype_of(db, coverage.definitely_matched_ty())
+            {
                 removed_element = true;
                 Type::Never
             } else {
@@ -741,14 +788,14 @@ pub(crate) fn pattern_fallthrough_type<'db>(
         }
     }
 
-    let definitely_matched = definite_match_pattern_type_for_subject(db, kind, subject_ty);
-    if definite_match_type_exhausts_subject(db, subject_ty, definitely_matched) {
+    let coverage = pattern_coverage_for_subject(db, kind, subject_ty);
+    if coverage.exhausts_subject() {
         return Type::Never;
     }
 
     IntersectionBuilder::new(db)
         .add_positive(subject_ty)
-        .add_negative(definitely_matched)
+        .add_negative(coverage.definitely_matched_ty())
         .build()
 }
 

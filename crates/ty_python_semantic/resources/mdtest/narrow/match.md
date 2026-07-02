@@ -132,6 +132,13 @@ def gradual_mapping_order_is_exhaustive(value: Mapping[str, Any] | int) -> None:
         case _:
             assert_never(value)
 
+def gradual_mapping_uses_runtime_class_domain(value: Mapping[str, Any] | int) -> None:
+    match value:
+        case Mapping():
+            pass
+        case _:
+            reveal_type(value)  # revealed: int & ~Top[Mapping[Unknown, object]]
+
 def gradual_dict_match_self_is_exhaustive(value: dict[str, Any] | int) -> None:
     match value:
         case dict(_):
@@ -1708,7 +1715,8 @@ truthiness-narrowed intersection or a type variable bounded by or constrained to
 
 ```py
 from collections.abc import Mapping
-from typing import TypeVar, TypedDict
+from typing import Any, TypeVar, TypedDict
+from typing_extensions import assert_never
 
 class Movie(TypedDict):
     title: str
@@ -1718,6 +1726,9 @@ class OptionalMovie(TypedDict, total=False):
 
 class Series(TypedDict):
     seasons: int
+
+class DynamicMovie(TypedDict):
+    metadata: Any
 
 T = TypeVar("T", bound=Movie)
 U = TypeVar("U", Movie, Series)
@@ -1753,6 +1764,15 @@ def constrained_typed_dict_pattern_is_exhaustive(value: U) -> int:
     match value:
         case dict():
             return 1
+
+def typed_dict_runtime_domain_is_exhaustive(value: DynamicMovie | int) -> None:
+    match value:
+        case dict():
+            pass
+        case int():
+            pass
+        case _:
+            assert_never(value)
 ```
 
 ## Required `TypedDict` keys
