@@ -716,7 +716,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             member.name,
                             Place::Undefined.into(),
                             InstanceFallbackShadowsNonDataDescriptor::No,
-                            MemberLookupPolicy::default(),
+                            // The undefined fallback excludes instance members. Keep the class
+                            // member lookup from reintroducing them.
+                            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                         )
                         .place
                     else {

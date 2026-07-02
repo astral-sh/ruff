@@ -2775,6 +2775,13 @@ impl<'db> Type<'db> {
                 }
             }
 
+            Type::NominalInstance(instance) => self.to_meta_type(db).class_namespace_member(
+                db,
+                instance.class(db),
+                name.as_str(),
+                policy,
+            ),
+
             Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => self
                 .to_meta_type(db)
                 .class_object_member(db, name.as_str(), policy),
@@ -2841,6 +2848,111 @@ impl<'db> Type<'db> {
         } else {
             metaclass_attr.or_fall_back_to(db, || class_attr)
         }
+    }
+
+    /// Look up attributes that a metaclass declaration promises to store in each constructed
+    /// class's namespace.
+    ///
+    /// ```python
+    /// class Meta(type):
+    ///     generated: int
+    ///
+    /// class C(metaclass=Meta): ...
+    ///
+    /// reveal_type(C().generated)  # int
+    /// ```
+    ///
+    /// Ordinary class bindings and instance members shadow a normal generated attribute. A
+    /// generated data descriptor retains descriptor precedence over instance storage.
+    ///
+    /// Only annotation-only declarations directly on the concrete metaclass participate.
+    /// Inherited declarations and declarations with a class-body binding are excluded.
+    fn class_namespace_member(
+        self,
+        db: &'db dyn Db,
+        class: ClassType<'db>,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        let class_attr = self
+            .find_name_in_mro_with_policy(db, name, policy)
+            .expect("The meta-type of a nominal instance should always have an MRO");
+        let Some(metaclass) = self
+            .to_meta_type(db)
+            .to_instance(db)
+            .and_then(|metaclass| metaclass.nominal_class(db))
+        else {
+            return class_attr;
+        };
+        let metaclass_declaration = metaclass.own_declared_instance_member(db, name).inner;
+        if metaclass_declaration.is_undefined() {
+            return class_attr;
+        }
+        let own_class_member_is_defined = !class.own_class_member(db, None, name).is_undefined();
+        if policy.no_instance_fallback() {
+            return if own_class_member_is_defined {
+                class_attr.or_fall_back_to(db, || metaclass_declaration)
+            } else {
+                metaclass_declaration.or_fall_back_to(db, || class_attr)
+            };
+        }
+        let generated_may_be_data_descriptor = metaclass_declaration
+            .ignore_possibly_undefined()
+            .is_some_and(|ty| ty.may_be_data_descriptor(db));
+        let generated_data_descriptors = || match metaclass_declaration {
+            PlaceAndQualifiers {
+                place: Place::Defined(declaration),
+                qualifiers,
+            } => {
+                let all_arms_are_possible_data_descriptors = declaration
+                    .ty
+                    .resolve_type_alias(db)
+                    .as_union()
+                    .is_none_or(|union| {
+                        union
+                            .elements(db)
+                            .iter()
+                            .all(|ty| ty.may_be_data_descriptor(db))
+                    });
+                Place::Defined(DefinedPlace {
+                    ty: declaration
+                        .ty
+                        .filter_union(db, |ty| ty.may_be_data_descriptor(db)),
+                    definedness: if all_arms_are_possible_data_descriptors {
+                        declaration.definedness
+                    } else {
+                        Definedness::PossiblyUndefined
+                    },
+                    ..declaration
+                })
+                .with_qualifiers(qualifiers)
+            }
+            _ => metaclass_declaration,
+        };
+        let has_own_unbound_instance_declaration =
+            class.has_own_unbound_instance_declaration(db, name);
+        let generated_attribute_is_shadowed = if generated_may_be_data_descriptor {
+            !has_own_unbound_instance_declaration && own_class_member_is_defined
+        } else {
+            own_class_member_is_defined || class.has_own_instance_declaration(db, name)
+        };
+        if generated_attribute_is_shadowed {
+            return class_attr.or_fall_back_to(db, || metaclass_declaration);
+        }
+        if class.has_dynamic_instance_fallback(db) {
+            return if generated_may_be_data_descriptor {
+                generated_data_descriptors().or_fall_back_to(db, || class_attr)
+            } else {
+                class_attr
+            };
+        }
+        if class.has_instance_member(db, name) {
+            if generated_may_be_data_descriptor {
+                return generated_data_descriptors();
+            }
+            return Place::Undefined.into();
+        }
+        metaclass_declaration.or_fall_back_to(db, || class_attr)
     }
 
     /// This function roughly corresponds to looking up an attribute in the `__dict__` of an object.
