@@ -2705,4 +2705,180 @@ DC(f=1)
           |
         "#);
     }
+
+    #[test]
+    fn rename_attribute_updates_slots_tuple() {
+        let test = cursor_test(
+            r#"
+class C:
+    __slots__ = ("value", "other")
+
+    def __init__(self):
+        self.va<CURSOR>lue = 1
+"#,
+        );
+
+        assert_snapshot!(test.rename("amount"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:3:19
+          |
+        3 |     __slots__ = ("value", "other")
+          |                   ^^^^^
+        4 |
+        5 |     def __init__(self):
+        6 |         self.value = 1
+          |              -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_attribute_updates_slots_list() {
+        let test = cursor_test(
+            r#"
+class C:
+    __slots__ = ["value", "other"]
+
+    def __init__(self):
+        self.va<CURSOR>lue = 1
+"#,
+        );
+
+        assert_snapshot!(test.rename("amount"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:3:19
+          |
+        3 |     __slots__ = ["value", "other"]
+          |                   ^^^^^
+        4 |
+        5 |     def __init__(self):
+        6 |         self.value = 1
+          |              -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_attribute_updates_slots_set() {
+        let test = cursor_test(
+            r#"
+class C:
+    __slots__ = {"value", "other"}
+
+    def __init__(self):
+        self.va<CURSOR>lue = 1
+"#,
+        );
+
+        assert_snapshot!(test.rename("amount"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:3:19
+          |
+        3 |     __slots__ = {"value", "other"}
+          |                   ^^^^^
+        4 |
+        5 |     def __init__(self):
+        6 |         self.value = 1
+          |              -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_attribute_updates_slots_dict_key() {
+        let test = cursor_test(
+            r#"
+class C:
+    __slots__ = {"value": "doc", "other": "doc"}
+
+    def __init__(self):
+        self.va<CURSOR>lue = 1
+"#,
+        );
+
+        assert_snapshot!(test.rename("amount"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:3:19
+          |
+        3 |     __slots__ = {"value": "doc", "other": "doc"}
+          |                   ^^^^^
+        4 |
+        5 |     def __init__(self):
+        6 |         self.value = 1
+          |              -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_cannot_start_from_slot_string() {
+        // Renaming is driven from the attribute; the `__slots__` string itself
+        // is not a renameable symbol, so starting a rename on it is rejected.
+        let test = cursor_test(
+            r#"
+class C:
+    __slots__ = ("va<CURSOR>lue",)
+
+    def __init__(self):
+        self.value = 1
+"#,
+        );
+
+        assert_snapshot!(test.rename("amount"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_attribute_does_not_touch_other_class_slots() {
+        let test = cursor_test(
+            r#"
+class C:
+    __slots__ = ("value",)
+
+    def __init__(self):
+        self.va<CURSOR>lue = 1
+
+class D:
+    __slots__ = ("value",)
+"#,
+        );
+
+        assert_snapshot!(test.rename("amount"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:3:19
+          |
+        3 |     __slots__ = ("value",)
+          |                   ^^^^^
+        4 |
+        5 |     def __init__(self):
+        6 |         self.value = 1
+          |              -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_attribute_does_not_touch_slots_dict_value() {
+        let test = cursor_test(
+            r#"
+class C:
+    __slots__ = {"value": "value"}
+
+    def __init__(self):
+        self.va<CURSOR>lue = 1
+"#,
+        );
+
+        assert_snapshot!(test.rename("amount"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:3:19
+          |
+        3 |     __slots__ = {"value": "value"}
+          |                   ^^^^^
+        4 |
+        5 |     def __init__(self):
+        6 |         self.value = 1
+          |              -----
+          |
+        "#);
+    }
 }

@@ -225,6 +225,26 @@ fn is_ascii_identifier_continue(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'_'
 }
 
+/// Returns whether `node` is an assignment whose (sole) target is the name
+/// `__slots__`, e.g. `__slots__ = (...)` or `__slots__: tuple = (...)`.
+fn is_slots_assignment(node: AnyNodeRef<'_>) -> bool {
+    match node {
+        AnyNodeRef::StmtAssign(assign) => {
+            matches!(
+                assign.targets.as_slice(),
+                [ast::Expr::Name(name)] if name.id.as_str() == "__slots__"
+            )
+        }
+        AnyNodeRef::StmtAnnAssign(assign) => {
+            matches!(
+                assign.target.as_ref(),
+                ast::Expr::Name(name) if name.id.as_str() == "__slots__"
+            )
+        }
+        _ => false,
+    }
+}
+
 /// Find all references to a local symbol within the current file.
 /// The behavior depends on the provided mode.
 fn references_for_file(
@@ -452,6 +472,11 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                 self.check_declaration_identifier(&param_var.name);
             }
             AnyNodeRef::ExprStringLiteral(string_expr) => {
+                // A string literal listed in a class's `__slots__` names an
+                // instance attribute, so renaming that attribute should rename
+                // the matching slot string too.
+                self.check_slots_string_literal(string_expr);
+
                 // Highlight the sub-AST of a string annotation
                 if let Some((sub_ast, sub_model)) = self.model.enter_string_annotation(string_expr)
                 {
@@ -587,6 +612,129 @@ impl<'a> LocalReferencesFinder<'a> {
             kind.to_reference_kind(),
         );
         self.references.push(target);
+    }
+
+    /// Checks a string literal that may be an entry in a class's `__slots__`.
+    ///
+    /// `__slots__` entries are plain strings, but they name instance
+    /// attributes of the enclosing class. When the rename target is one of
+    /// those attributes, the matching slot string should be renamed as well.
+    /// We only do this when the attribute belongs to the same class that
+    /// declares the `__slots__`, so unrelated classes that happen to use the
+    /// same slot name are left untouched.
+    fn check_slots_string_literal(&mut self, string_expr: &'a ast::ExprStringLiteral) {
+        // Quick text-based check first. We only handle single-part string
+        // literals; implicitly concatenated strings ("a" "b") can't name a
+        // single attribute, so they never match an identifier here.
+        if string_expr.value.is_implicit_concatenated() {
+            return;
+        }
+        let [part] = string_expr.value.as_slice() else {
+            return;
+        };
+        if part.value.as_ref() != self.target_text {
+            return;
+        }
+
+        // The literal must sit directly inside a tuple/list/set container, or
+        // be a key in a dict, that is the value of a `__slots__` assignment in
+        // a class body.
+        let Some(class) = self.enclosing_slots_class() else {
+            return;
+        };
+
+        // Only rename the slot if the target attribute belongs to this class.
+        if !self.target_belongs_to_class(class) {
+            return;
+        }
+
+        // Rename the inner content of the string, leaving the quotes intact.
+        let content_range = ast::StringLikePart::String(part).content_range();
+        let target = ReferenceTarget::new(self.model.file(), content_range, ReferenceKind::Other);
+        self.references.push(target);
+    }
+
+    /// Returns the class definition whose `__slots__` assignment contains the
+    /// string literal currently being visited, if the ancestor chain matches
+    /// one of the supported `__slots__` shapes.
+    ///
+    /// Supported shapes (v1):
+    /// - `__slots__ = ("a", "b")` / `["a", "b"]` / `{"a", "b"}`
+    /// - `__slots__ = {"a": ..., "b": ...}` (dict keys only)
+    fn enclosing_slots_class(&self) -> Option<&'a ast::StmtClassDef> {
+        // `self.ancestors` ends with the string literal itself. Walk outward.
+        let mut ancestors = self.ancestors.iter().rev();
+
+        // The string is either a direct element of a tuple/list/set, or a key
+        // of a dict. Skip the immediate container node.
+        match ancestors.next()? {
+            AnyNodeRef::ExprStringLiteral(_) => {}
+            _ => return None,
+        }
+        match ancestors.next()? {
+            AnyNodeRef::ExprTuple(_) | AnyNodeRef::ExprList(_) | AnyNodeRef::ExprSet(_) => {}
+            // For a dict, both keys and values have the `ExprDict` as their
+            // direct parent, so `is_dict_key` checks that this string is one of
+            // the keys before we treat it as a slot name.
+            AnyNodeRef::ExprDict(dict) => {
+                if !self.is_dict_key(dict) {
+                    return None;
+                }
+            }
+            _ => return None,
+        }
+
+        // The container must be the value of an assignment to `__slots__`.
+        let assignment = ancestors.next()?;
+        if !is_slots_assignment(*assignment) {
+            return None;
+        }
+
+        // That assignment must live directly in a class body.
+        match ancestors.next()? {
+            AnyNodeRef::StmtClassDef(class) => Some(class),
+            _ => None,
+        }
+    }
+
+    /// Returns whether the string literal currently being visited is a *key*
+    /// of `dict`, as opposed to one of its values.
+    fn is_dict_key(&self, dict: &'a ast::ExprDict) -> bool {
+        let Some(AnyNodeRef::ExprStringLiteral(string_expr)) = self.ancestors.last() else {
+            return false;
+        };
+        dict.items.iter().any(|item| {
+            item.key
+                .as_ref()
+                .is_some_and(|key| key.range() == string_expr.range())
+        })
+    }
+
+    /// Returns whether any of the rename target's definitions belongs to
+    /// `class` (i.e. the class scope is an ancestor of the definition's scope).
+    fn target_belongs_to_class(&self, class: &'a ast::StmtClassDef) -> bool {
+        let db = self.model.db();
+        let file = self.model.file();
+        let class_range = class.range();
+        let module = ruff_db::parsed::parsed_module(db, file).load(db);
+        let index = ty_python_core::semantic_index(db, file);
+
+        self.target_definitions.iter().any(|resolved| {
+            let Some(definition) = resolved.definition() else {
+                return false;
+            };
+            if definition.file(db) != file {
+                return false;
+            }
+            index
+                .ancestor_scopes(definition.file_scope(db))
+                .any(|(_, scope)| match scope.node() {
+                    ty_python_core::scope::NodeWithScopeKind::Class(node) => {
+                        node.node(&module).range() == class_range
+                    }
+                    _ => false,
+                })
+        })
     }
 
     fn is_declaration(&self, covering_node: &CoveringNode<'_>) -> bool {
