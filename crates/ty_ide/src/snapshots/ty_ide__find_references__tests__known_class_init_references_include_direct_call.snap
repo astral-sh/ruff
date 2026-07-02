@@ -1,0 +1,14 @@
+---
+source: crates/ty_ide/src/find_references.rs
+expression: test.references()
+---
+info[references]: Found 3 references
+ --> main.py:5:21
+  |
+5 | explicit = property.__init__
+  |                     --------
+6 | direct = property()
+  |          --------
+7 | inherited = PropertySubclass()
+  |             ----------------
+  |

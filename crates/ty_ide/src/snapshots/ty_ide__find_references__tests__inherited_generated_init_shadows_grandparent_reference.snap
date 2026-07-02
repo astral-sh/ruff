@@ -1,0 +1,15 @@
+---
+source: crates/ty_ide/src/find_references.rs
+expression: test.references()
+---
+info[references]: Found 2 references
+  --> main.py:5:9
+   |
+ 5 |     def __init__(self) -> None: pass
+   |         --------
+   |
+  ::: main.py:14:1
+   |
+14 | Base()
+   | ----
+   |

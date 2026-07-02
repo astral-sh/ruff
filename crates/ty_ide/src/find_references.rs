@@ -1628,6 +1628,853 @@ func<CURSOR>_alias()
     }
 
     #[test]
+    fn constructor_references_include_class_and_explicit_calls() {
+        let test = cursor_test(
+            "
+class Foo:
+    def __in<CURSOR>it__(self) -> None:
+        pass
+
+Foo()
+Foo.__init__(object.__new__(Foo))
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 3 references
+         --> main.py:3:9
+          |
+        3 |     def __init__(self) -> None:
+          |         --------
+        4 |         pass
+        5 |
+        6 | Foo()
+          | ---
+        7 | Foo.__init__(object.__new__(Foo))
+          |     --------
+          |
+        ");
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 2 references
+         --> main.py:6:1
+          |
+        6 | Foo()
+          | ---
+        7 | Foo.__init__(object.__new__(Foo))
+          |     --------
+          |
+        ");
+    }
+
+    #[test]
+    fn class_references_keep_class_call_target() {
+        let test = cursor_test(
+            "
+class F<CURSOR>oo:
+    def __init__(self) -> None:
+        pass
+
+Foo()
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> main.py:2:7
+          |
+        2 | class Foo:
+          |       ---
+        3 |     def __init__(self) -> None:
+        4 |         pass
+        5 |
+        6 | Foo()
+          | ---
+          |
+        ");
+    }
+
+    #[test]
+    fn constructor_references_include_cross_file_alias_and_inherited_calls() {
+        let test = CursorTest::builder()
+            .source(
+                "model.py",
+                "
+class Box:
+    def __in<CURSOR>it__(self) -> None:
+        pass
+
+class Child(Box):
+    pass
+
+Alias = Box
+",
+            )
+            .source(
+                "caller.py",
+                "
+import model
+from model import Alias, Box as ImportedBox, Child
+
+model.Box()
+ImportedBox()
+Alias()
+Child()
+",
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 5 references
+         --> caller.py:5:7
+          |
+        5 | model.Box()
+          |       ---
+        6 | ImportedBox()
+          | -----------
+        7 | Alias()
+          | -----
+        8 | Child()
+          | -----
+          |
+         ::: model.py:3:9
+          |
+        3 |     def __init__(self) -> None:
+          |         --------
+          |
+        ");
+    }
+
+    #[test]
+    fn new_references_include_class_call() {
+        let test = cursor_test(
+            "
+class Foo:
+    def __ne<CURSOR>w__(cls):
+        return super().__new__(cls)
+
+Foo()
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> main.py:3:9
+          |
+        3 |     def __new__(cls):
+          |         -------
+        4 |         return super().__new__(cls)
+        5 |
+        6 | Foo()
+          | ---
+          |
+        ");
+    }
+
+    #[test]
+    fn init_references_include_calls_when_new_has_same_signature() {
+        let test = cursor_test(
+            r#"
+from typing import Self
+
+class Foo:
+    def __new__(cls, value: int) -> Self:
+        return object.__new__(cls)
+
+    def __in<CURSOR>it__(self, value: int) -> None:
+        pass
+
+Foo(1)
+"#,
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+          --> main.py:8:9
+           |
+         8 |     def __init__(self, value: int) -> None:
+           |         --------
+         9 |         pass
+        10 |
+        11 | Foo(1)
+           | ---
+           |
+        ");
+    }
+
+    #[test]
+    fn known_class_new_references_include_direct_call() {
+        let test = cursor_test(
+            r#"
+class TupleSubclass(tuple):
+    pass
+
+explicit = tuple.__ne<CURSOR>w__
+direct = tuple()
+inherited = TupleSubclass()
+"#,
+        );
+
+        assert_snapshot!(test.references());
+    }
+
+    #[test]
+    fn known_class_init_references_include_direct_call() {
+        let test = cursor_test(
+            r#"
+class PropertySubclass(property):
+    pass
+
+explicit = property.__in<CURSOR>it__
+direct = property()
+inherited = PropertySubclass()
+"#,
+        );
+
+        assert_snapshot!(test.references());
+    }
+
+    #[test]
+    fn polymorphic_class_calls_reference_constructor() {
+        let test = cursor_test(
+            r#"
+class Foo:
+    def __in<CURSOR>it__(self) -> None: pass
+
+class Bar:
+    def __init__(self) -> None: pass
+
+def from_subclass(cls: type[Foo]) -> None:
+    cls()
+
+def from_typevar[T: Foo](cls: type[T]) -> T:
+    return cls()
+
+def from_union(flag: bool) -> None:
+    constructor = Foo if flag else Bar
+    constructor()
+"#,
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 4 references
+          --> main.py:3:9
+           |
+         3 |     def __init__(self) -> None: pass
+           |         --------
+           |
+          ::: main.py:9:5
+           |
+         9 |     cls()
+           |     ---
+        10 |
+        11 | def from_typevar[T: Foo](cls: type[T]) -> T:
+        12 |     return cls()
+           |            ---
+        13 |
+        14 | def from_union(flag: bool) -> None:
+        15 |     constructor = Foo if flag else Bar
+        16 |     constructor()
+           |     -----------
+           |
+        ");
+    }
+
+    #[test]
+    fn possibly_reached_init_is_a_constructor_reference() {
+        let test = cursor_test(
+            r#"
+from typing import Self
+
+class Foo:
+    def __new__(cls, flag: bool) -> Self | int:
+        return object.__new__(cls) if flag else 1
+
+    def __in<CURSOR>it__(self, flag: bool) -> None: pass
+
+Foo(True)
+Foo("invalid")
+"#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Found 3 references
+          --> main.py:8:9
+           |
+         8 |     def __init__(self, flag: bool) -> None: pass
+           |         --------
+         9 |
+        10 | Foo(True)
+           | ---
+        11 | Foo("invalid")
+           | ---
+           |
+        "#);
+    }
+
+    #[test]
+    fn generated_init_preserves_inherited_new_reference() {
+        let test = cursor_test(
+            r#"
+from dataclasses import dataclass
+from typing import Self
+
+class Base:
+    def __ne<CURSOR>w__(cls, value: int) -> Self:
+        return object.__new__(cls)
+
+@dataclass
+class Child(Base):
+    value: int
+
+Child(1)
+"#,
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+          --> main.py:6:9
+           |
+         6 |     def __new__(cls, value: int) -> Self:
+           |         -------
+           |
+          ::: main.py:13:1
+           |
+        13 | Child(1)
+           | -----
+           |
+        ");
+    }
+
+    #[test]
+    fn inherited_generated_init_shadows_grandparent_reference() {
+        let test = cursor_test(
+            r#"
+from dataclasses import dataclass
+
+class Base:
+    def __in<CURSOR>it__(self) -> None: pass
+
+@dataclass
+class Generated(Base):
+    value: int
+
+class Child(Generated):
+    pass
+
+Base()
+Generated(1)
+Child(1)
+"#,
+        );
+
+        assert_snapshot!(test.references());
+    }
+
+    #[test]
+    fn short_circuited_dispatch_does_not_reference_init() {
+        let test = cursor_test(
+            r#"
+class Base:
+    def __in<CURSOR>it__(self) -> None: pass
+
+class ForeignNew(Base):
+    def __new__(cls) -> int: return 1
+
+class Meta(type):
+    def __call__(cls) -> object: return object()
+
+class MetaFactory(Base, metaclass=Meta): pass
+
+Base()
+ForeignNew()
+MetaFactory()
+"#,
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+          --> main.py:3:9
+           |
+         3 |     def __init__(self) -> None: pass
+           |         --------
+           |
+          ::: main.py:13:1
+           |
+        13 | Base()
+           | ----
+           |
+        ");
+    }
+
+    #[test]
+    fn constructor_dispatch_uses_matching_overload_return() {
+        let test = cursor_test(
+            r#"
+from typing import Self, overload
+
+class Foo:
+    @overload
+    def __new__(cls, value: int) -> int: ...
+    @overload
+    def __new__(cls, value: str) -> Self: ...
+    def __new__(cls, value: int | str) -> Self | int:
+        return 1 if isinstance(value, int) else object.__new__(cls)
+
+    def __in<CURSOR>it__(self, value: object) -> None: pass
+
+Foo(1)
+Foo("one")
+"#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Found 2 references
+          --> main.py:12:9
+           |
+        12 |     def __init__(self, value: object) -> None: pass
+           |         --------
+        13 |
+        14 | Foo(1)
+        15 | Foo("one")
+           | ---
+           |
+        "#);
+    }
+
+    #[test]
+    fn metaclass_call_short_circuits_new_reference() {
+        let test = cursor_test(
+            r#"
+class Base:
+    def __ne<CURSOR>w__(cls): return object.__new__(cls)
+
+class Meta(type):
+    def __call__(cls) -> object: return object()
+
+class MetaFactory(Base, metaclass=Meta): pass
+
+Base()
+MetaFactory()
+"#,
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+          --> main.py:3:9
+           |
+         3 |     def __new__(cls): return object.__new__(cls)
+           |         -------
+           |
+          ::: main.py:10:1
+           |
+        10 | Base()
+           | ----
+           |
+        ");
+    }
+
+    #[test]
+    fn foreign_returning_new_is_still_referenced() {
+        let test = cursor_test(
+            r#"
+class Foo:
+    def __ne<CURSOR>w__(cls) -> int: return 1
+    def __init__(self) -> None: pass
+
+Foo()
+"#,
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> main.py:3:9
+          |
+        3 |     def __new__(cls) -> int: return 1
+          |         -------
+        4 |     def __init__(self) -> None: pass
+        5 |
+        6 | Foo()
+          | ---
+          |
+        ");
+    }
+
+    #[test]
+    fn enum_lookup_does_not_reference_custom_new() {
+        let test = cursor_test(
+            r#"
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+
+    def __ne<CURSOR>w__(cls, value: int):
+        member = object.__new__(cls)
+        member._value_ = value
+        return member
+
+Color(1)
+"#,
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 1 references
+         --> main.py:7:9
+          |
+        7 |     def __new__(cls, value: int):
+          |         -------
+          |
+        ");
+    }
+
+    #[test]
+    fn dunder_named_classes_are_constructor_references() {
+        let test = cursor_test(
+            r#"
+class __init__:
+    def __in<CURSOR>it__(self) -> None:
+        pass
+
+__init__()
+Alias = __init__
+Alias()
+"#,
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 3 references
+         --> main.py:3:9
+          |
+        3 |     def __init__(self) -> None:
+          |         --------
+        4 |         pass
+        5 |
+        6 | __init__()
+          | --------
+        7 | Alias = __init__
+        8 | Alias()
+          | -----
+          |
+        ");
+    }
+
+    #[test]
+    fn compound_explicit_method_call_has_one_reference_per_method() {
+        let test = cursor_test(
+            r#"
+class Foo:
+    def __in<CURSOR>it__(self) -> None:
+        pass
+
+class Bar:
+    def __init__(self) -> None:
+        pass
+
+flag = True
+(Foo.__init__ if flag else Bar.__init__)(object.__new__(Foo))
+"#,
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+          --> main.py:3:9
+           |
+         3 |     def __init__(self) -> None:
+           |         --------
+           |
+          ::: main.py:11:6
+           |
+        11 | (Foo.__init__ if flag else Bar.__init__)(object.__new__(Foo))
+           |      --------
+           |
+        ");
+    }
+
+    #[test]
+    fn decorated_init_references_include_class_call() {
+        let test = cursor_test(
+            r#"
+def preserve[T](value: T) -> T: return value
+class Foo:
+    @preserve
+    def __in<CURSOR>it__(self) -> None: pass
+Foo()
+"#,
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> main.py:5:9
+          |
+        5 |     def __init__(self) -> None: pass
+          |         --------
+        6 | Foo()
+          | ---
+          |
+        ");
+    }
+
+    #[test]
+    fn decorated_new_references_include_class_call() {
+        let test = cursor_test(
+            r#"
+from typing import Self
+def preserve[T](value: T) -> T: return value
+class Foo:
+    @staticmethod
+    @preserve
+    def __ne<CURSOR>w__(cls) -> Self: return object.__new__(cls)
+Foo()
+"#,
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> main.py:7:9
+          |
+        7 |     def __new__(cls) -> Self: return object.__new__(cls)
+          |         -------
+        8 | Foo()
+          | ---
+          |
+        ");
+    }
+
+    #[test]
+    fn any_decorated_new_references_include_class_call() {
+        let test = cursor_test(
+            r#"
+from typing import Any, Self
+
+def opaque(value: object) -> Any: return value
+
+class Foo:
+    @opaque
+    def __ne<CURSOR>w__(cls) -> Self: return object.__new__(cls)
+
+    def __init__(self) -> None: pass
+
+Foo()
+"#,
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+          --> main.py:8:9
+           |
+         8 |     def __new__(cls) -> Self: return object.__new__(cls)
+           |         -------
+         9 |
+        10 |     def __init__(self) -> None: pass
+        11 |
+        12 | Foo()
+           | ---
+           |
+        ");
+    }
+
+    #[test]
+    fn constructor_references_require_explicit_call_expressions() {
+        let test = cursor_test(
+            r#"
+class Decorator:
+    def __in<CURSOR>it__(self, decorated: object | None = None) -> None:
+        pass
+
+    def __call__(self, decorated: object) -> object:
+        return decorated
+
+@Decorator
+def bare():
+    pass
+
+@Decorator()
+def called():
+    pass
+
+def factory() -> type[Decorator]:
+    return Decorator
+
+@factory()
+def returned_class():
+    pass
+"#,
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+          --> main.py:3:9
+           |
+         3 |     def __init__(self, decorated: object | None = None) -> None:
+           |         --------
+           |
+          ::: main.py:13:2
+           |
+        13 | @Decorator()
+           |  ---------
+           |
+        ");
+    }
+
+    #[test]
+    fn string_annotations_do_not_create_constructor_references() {
+        let test = cursor_test(
+            r#"
+class Foo:
+    def __in<CURSOR>it__(self) -> None:
+        pass
+
+annotation: "Foo()"
+Foo()
+"#,
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> main.py:3:9
+          |
+        3 |     def __init__(self) -> None:
+          |         --------
+          |
+         ::: main.py:7:1
+          |
+        7 | Foo()
+          | ---
+          |
+        ");
+    }
+
+    #[test]
+    fn assigned_constructor_implementation_does_not_include_class_call() {
+        let test = cursor_test(
+            "
+class Foo:
+    def constr<CURSOR>uct(self) -> None: pass
+    __init__ = construct
+
+Foo()
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> main.py:3:9
+          |
+        3 |     def construct(self) -> None: pass
+          |         ---------
+        4 |     __init__ = construct
+          |                ---------
+          |
+        ");
+    }
+
+    #[test]
+    fn assigned_constructor_binding_does_not_include_class_call() {
+        let test = cursor_test(
+            "
+def constructor(self) -> None: pass
+
+class Foo:
+    __in<CURSOR>it__ = constructor
+
+Foo()
+Foo.__init__(object.__new__(Foo))
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> main.py:5:5
+          |
+        5 |     __init__ = constructor
+          |     --------
+        6 |
+        7 | Foo()
+        8 | Foo.__init__(object.__new__(Foo))
+          |     --------
+          |
+        ");
+    }
+
+    #[test]
+    fn non_source_constructors_shadow_inherited_function() {
+        let test = cursor_test(
+            "
+from dataclasses import dataclass
+
+def replacement(self) -> None: pass
+
+class Base:
+    def __in<CURSOR>it__(self) -> None: pass
+
+class Child(Base):
+    __init__ = replacement
+
+@dataclass
+class Generated(Base):
+    value: int
+
+Dynamic = type(\"Dynamic\", (Base,), {\"__init__\": replacement})
+class DynamicChild(Dynamic): pass
+Base()
+Child()
+Generated(1)
+Dynamic()
+DynamicChild()
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+          --> main.py:7:9
+           |
+         7 |     def __init__(self) -> None: pass
+           |         --------
+           |
+          ::: main.py:18:1
+           |
+        18 | Base()
+           | ----
+           |
+        ");
+    }
+
+    #[test]
+    fn call_references_do_not_include_implicit_dunder_call_invocation() {
+        let test = cursor_test(
+            "
+class Callable:
+    def __ca<CURSOR>ll__(self) -> None: pass
+
+Callable()()
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 1 references
+         --> main.py:3:9
+          |
+        3 |     def __call__(self) -> None: pass
+          |         --------
+          |
+        ");
+    }
+
+    #[test]
+    fn references_from_call_parentheses_do_not_include_constructor_calls() {
+        let test = cursor_test(
+            "
+class Foo:
+    def __init__(self) -> None: pass
+
+Foo(<CURSOR>)
+",
+        );
+
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
     fn import_alias() {
         let test = CursorTest::builder()
             .source(

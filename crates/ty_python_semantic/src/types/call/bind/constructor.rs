@@ -1,10 +1,10 @@
-use super::{Binding, Bindings, CallableBinding, CallableItem};
+use super::{Binding, Bindings, CallableBinding, CallableItem, DownstreamConstructorPolicy};
 use crate::db::Db;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::generics::Specialization;
 use crate::types::signatures::Parameter;
-use crate::types::{BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext};
+use crate::types::{BoundTypeVarInstance, ClassLiteral, ClassType, DynamicType, Type, TypeContext};
 
 /// Bindings for a constructor call.
 ///
@@ -20,8 +20,8 @@ use crate::types::{BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeCo
 pub(super) struct ConstructorBinding<'db> {
     /// The `CallableBinding` for this individual constructor method.
     pub(super) entry: CallableBinding<'db>,
-    /// Context for the constructor callable: the instance type being constructed and the kind of
-    /// constructor method.
+    /// Context for the constructor callable: the instance type being constructed, its source
+    /// class when known, and the kind of constructor method.
     pub(super) constructor_context: ConstructorContext<'db>,
     /// The next downstream constructor method, if any, to be (conditionally) checked after this
     /// one.
@@ -60,6 +60,11 @@ impl<'db> ConstructorBinding<'db> {
         self.constructor_context = self.constructor_context.with_instance_type(instance_type);
     }
 
+    /// Retains the class that supplied this constructor chain for source navigation.
+    pub(super) fn set_source_class(&mut self, class: ClassType<'db>) {
+        self.constructor_context = self.constructor_context.with_source_class(class);
+    }
+
     pub(super) fn set_downstream_constructor(&mut self, bindings: Bindings<'db>) {
         self.downstream_constructor = Some(Box::new(bindings));
     }
@@ -84,6 +89,7 @@ impl<'db> ConstructorBinding<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
+        downstream_policy: DownstreamConstructorPolicy,
     ) {
         /// For constructors which may have downstreams (that is, metaclass `__call__` or `__new__`),
         /// analyze their overloads to determine whether to check downstream constructors.
@@ -95,6 +101,7 @@ impl<'db> ConstructorBinding<'db> {
         fn should_check_downstream<'db>(
             binding: &ConstructorBinding<'db>,
             db: &'db dyn Db,
+            downstream_policy: DownstreamConstructorPolicy,
         ) -> bool {
             let constructor_kind = binding.constructor_kind();
             if constructor_kind.is_init() || binding.downstream_constructor().is_none() {
@@ -103,21 +110,44 @@ impl<'db> ConstructorBinding<'db> {
 
             let callable = binding.callable();
 
-            if callable.as_result().is_err() {
+            if downstream_policy == DownstreamConstructorPolicy::RequireInstanceReturn
+                && callable.as_result().is_err()
+            {
                 return false;
             }
 
             let constructed_instance_type = binding.constructed_instance_type();
             let constructor_class_literal = binding.constructed_class_literal(db);
 
-            // If any matching overload returns the constructed instance type itself, or an instance of
-            // the constructed class, we need to check downstream constructors.
-            callable.matching_overloads().any(|(_, overload)| {
+            let reaches_downstream = |overload: &Binding<'db>| {
                 overload.return_ty == constructed_instance_type
-                    || constructor_class_literal.is_some_and(|class_literal| {
-                        constructor_returns_instance(db, class_literal, overload.return_ty)
-                    })
-            })
+                    || constructor_class_literal.is_some_and(
+                        |class_literal| match downstream_policy {
+                            DownstreamConstructorPolicy::RequireInstanceReturn => {
+                                constructor_returns_instance(db, class_literal, overload.return_ty)
+                            }
+                            DownstreamConstructorPolicy::AllowPossibleInstanceReturn => {
+                                constructor_may_return_instance(
+                                    db,
+                                    class_literal,
+                                    overload.return_ty,
+                                )
+                            }
+                        },
+                    )
+            };
+
+            // Prefer the overloads selected for this call. An invalid call may not select any;
+            // reference analysis then keeps every path that any declared overload could invoke.
+            let mut matching_overloads = callable.matching_overloads();
+            if matching_overloads.clone().next().is_some() {
+                matching_overloads.any(|(_, overload)| reaches_downstream(overload))
+            } else if downstream_policy == DownstreamConstructorPolicy::AllowPossibleInstanceReturn
+            {
+                callable.overloads().iter().any(reaches_downstream)
+            } else {
+                false
+            }
         }
 
         self.entry
@@ -125,7 +155,7 @@ impl<'db> ConstructorBinding<'db> {
 
         // Now that we've fully checked our own callable, we can determine whether downstream
         // constructors should be checked or not.
-        if !should_check_downstream(self, db) {
+        if !should_check_downstream(self, db, downstream_policy) {
             // If not, we can discard the downstream constructor bindings entirely.
             self.downstream_constructor = None;
         }
@@ -139,16 +169,18 @@ impl<'db> ConstructorBinding<'db> {
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
         dataclass_field_specifiers: &[Type<'db>],
+        downstream_policy: DownstreamConstructorPolicy,
     ) {
         if let Some(downstream) = self.downstream_constructor_mut() {
             // We discard the result here, but that's fine; it's `report_diagnostics` and
             // `as_result` that ultimately matter.
-            let _ = downstream.check_types_impl(
+            let _ = downstream.check_types_impl_with_downstream_policy(
                 db,
                 constraints,
                 argument_types,
                 call_expression_tcx,
                 dataclass_field_specifiers,
+                downstream_policy,
             );
         }
     }
@@ -488,11 +520,28 @@ impl<'db> ConstructorBinding<'db> {
         )
     }
 
-    fn constructed_class_literal(&self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
+    fn constructed_class(&self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         self.constructed_instance_type()
             .as_nominal_instance()
-            // TODO may need to handle `Type::KnownInstance` here as well?
-            .map(|instance| instance.class(db).class_literal(db))
+            .map(|instance| instance.class(db))
+    }
+
+    fn constructed_class_literal(&self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
+        // TODO may need to handle `Type::KnownInstance` here as well?
+        self.constructed_class(db)
+            .map(|class| class.class_literal(db))
+    }
+
+    /// Returns the source class and the role of this step in its constructor chain.
+    pub(super) fn source_class_and_kind(
+        &self,
+        db: &'db dyn Db,
+    ) -> Option<(ClassType<'db>, ConstructorCallableKind)> {
+        let class = self
+            .constructor_context
+            .source_class()
+            .or_else(|| self.constructed_class(db))?;
+        Some((class, self.constructor_kind()))
     }
 
     fn constructor_kind(&self) -> ConstructorCallableKind {
@@ -503,6 +552,7 @@ impl<'db> ConstructorBinding<'db> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct ConstructorContext<'db> {
     instance_type: Type<'db>,
+    source_class: Option<ClassType<'db>>,
     kind: ConstructorCallableKind,
 }
 
@@ -510,6 +560,7 @@ impl<'db> ConstructorContext<'db> {
     pub(super) fn new(instance_type: Type<'db>, kind: ConstructorCallableKind) -> Self {
         Self {
             instance_type,
+            source_class: None,
             kind,
         }
     }
@@ -521,8 +572,19 @@ impl<'db> ConstructorContext<'db> {
         }
     }
 
+    fn with_source_class(self, source_class: ClassType<'db>) -> Self {
+        Self {
+            source_class: Some(source_class),
+            ..self
+        }
+    }
+
     fn instance_type(self) -> Type<'db> {
         self.instance_type
+    }
+
+    fn source_class(self) -> Option<ClassType<'db>> {
+        self.source_class
     }
 
     fn kind(self) -> ConstructorCallableKind {
@@ -581,6 +643,25 @@ fn constructor_returns_instance<'db>(
         // type, or it will return an explicit annotation of the protocol type itself, in which
         // case we shouldn't (and don't) consider it an instance of the subclass.
         _ => false,
+    }
+}
+
+/// Returns whether the annotated constructor result can take the instance-returning path.
+///
+/// Reference analysis treats unions and gradual types conservatively because the downstream
+/// constructor can still run for at least one runtime result.
+fn constructor_may_return_instance<'db>(
+    db: &'db dyn Db,
+    class_literal: ClassLiteral<'db>,
+    return_ty: Type<'db>,
+) -> bool {
+    match return_ty.resolve_type_alias(db) {
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .any(|element| constructor_may_return_instance(db, class_literal, *element)),
+        Type::Dynamic(_) => true,
+        return_ty => constructor_returns_instance(db, class_literal, return_ty),
     }
 }
 

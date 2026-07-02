@@ -1,0 +1,14 @@
+---
+source: crates/ty_ide/src/find_references.rs
+expression: test.references()
+---
+info[references]: Found 3 references
+ --> main.py:5:18
+  |
+5 | explicit = tuple.__new__
+  |                  -------
+6 | direct = tuple()
+  |          -----
+7 | inherited = TupleSubclass()
+  |             -------------
+  |

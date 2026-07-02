@@ -20,8 +20,9 @@ use ruff_python_ast::{
     visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
 use ruff_text_size::Ranged;
-use ty_python_core::definition::{Definition, DefinitionState};
+use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::scope::ScopeKind;
+use ty_python_semantic::types::ide_support::constructor_definitions_for_call;
 use ty_python_semantic::{ImportAliasResolution, ResolvedDefinition, SemanticModel};
 
 /// Mode for references search behavior
@@ -87,9 +88,18 @@ pub(crate) fn references(
 
     // Extract the target text from the goto target for fast comparison
     let target_text = goto_target.to_string()?;
+    let search_constructor_calls =
+        should_search_constructor_calls(db, &target_definitions, &target_text, mode);
 
     // Find all of the references to the symbol within this file
-    let mut references = references_for_file(db, file, &target_definitions, &target_text, mode);
+    let mut references = references_for_file(
+        db,
+        file,
+        &target_definitions,
+        &target_text,
+        search_constructor_calls,
+        mode,
+    );
 
     // Check if we should search across files based on the mode
     let search_across_files = matches!(
@@ -127,15 +137,25 @@ pub(crate) fn references(
                     s.spawn(move |_| {
                         let db = &*db;
 
-                        // First do a simple text search to see if there is a potential match in the file
+                        // First do a simple text search to see if there is a potential match in the
+                        // file. Constructor searches must skip this prefilter because `Foo()` can
+                        // reference `Foo.__init__` or `Foo.__new__` without containing either
+                        // method name.
                         let source = ruff_db::source::source_text(db, other_file);
-                        if !contains_identifier(&source, needle) {
+                        if !search_constructor_calls && !contains_identifier(&source, needle) {
                             return;
                         }
 
-                        // If the target text is found, do the more expensive semantic analysis
+                        // Perform the more expensive semantic analysis after the prefilter.
                         let references = if is_externally_visible_symbol {
-                            references_for_file(db, other_file, target_definitions, needle, mode)
+                            references_for_file(
+                                db,
+                                other_file,
+                                target_definitions,
+                                needle,
+                                search_constructor_calls,
+                                mode,
+                            )
                         } else {
                             references_for_keyword_arguments_in_file(
                                 db,
@@ -187,6 +207,7 @@ fn references_for_keyword_arguments_in_file(
         references: &mut references,
         mode,
         target_text,
+        search_constructor_calls: false,
         ancestors: Vec::new(),
     });
 
@@ -232,6 +253,7 @@ fn references_for_file(
     file: File,
     target_definitions: &Definitions<'_>,
     target_text: &str,
+    search_constructor_calls: bool,
     mode: ReferencesMode,
 ) -> Vec<ReferenceTarget> {
     let parsed = ruff_db::parsed::parsed_module(db, file);
@@ -246,6 +268,7 @@ fn references_for_file(
         mode,
         tokens: module.tokens(),
         target_text,
+        search_constructor_calls,
         ancestors: Vec::new(),
     };
 
@@ -339,6 +362,31 @@ fn parameter_owner_is_externally_visible_for_target(
     matches!(owner, Some(AnyNodeRef::StmtFunctionDef(_)))
 }
 
+/// Returns whether finding references should also search class calls such as `Foo()`.
+///
+/// A call to `Foo()` can invoke `Foo.__init__` or `Foo.__new__`, even though the call site contains
+/// neither method name. The additional search is only needed when finding references to an
+/// `__init__` or `__new__` method defined on a class.
+fn should_search_constructor_calls(
+    db: &dyn Db,
+    target_definitions: &Definitions<'_>,
+    target_text: &str,
+    mode: ReferencesMode,
+) -> bool {
+    matches!(
+        mode,
+        ReferencesMode::References | ReferencesMode::ReferencesSkipDeclaration
+    ) && matches!(target_text, "__init__" | "__new__")
+        && target_definitions.iter().any(|resolved| {
+            let Some(definition) = resolved.definition() else {
+                return false;
+            };
+            matches!(*definition.kind(db), DefinitionKind::Function(_))
+                && definition.scope(db).scope(db).kind() == ScopeKind::Class
+                && definition.name(db).is_some_and(|name| name == target_text)
+        })
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum OccurrenceKind {
     /// An identifier that references a symbol.
@@ -376,6 +424,7 @@ struct LocalReferencesFinder<'a> {
     references: &'a mut Vec<ReferenceTarget>,
     mode: ReferencesMode,
     target_text: &'a str,
+    search_constructor_calls: bool,
     ancestors: Vec<AnyNodeRef<'a>>,
 }
 
@@ -384,6 +433,11 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
         self.ancestors.push(node);
 
         match node {
+            AnyNodeRef::ExprCall(call) => {
+                if self.search_constructor_calls {
+                    self.check_constructor_call(call);
+                }
+            }
             AnyNodeRef::ExprName(name_expr) => {
                 // If the name doesn't match our target text, this isn't a match
                 if name_expr.id.as_str() != self.target_text {
@@ -462,6 +516,8 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                         mode: self.mode,
                         tokens: sub_ast.tokens(),
                         target_text: self.target_text,
+                        // Parsed string annotations do not execute their expressions.
+                        search_constructor_calls: false,
                         ancestors: Vec::new(),
                     };
                     sub_finder.visit_expr(sub_ast.expr());
@@ -557,6 +613,27 @@ impl<'a> LocalReferencesFinder<'a> {
             .goto_declaration(self.model, &goto_target)?;
 
         Some(definitions)
+    }
+
+    /// Records a constructor-method reference for an explicit class call.
+    fn check_constructor_call(&mut self, call: &'a ast::ExprCall) {
+        let matches_target = constructor_definitions_for_call(self.model, call)
+            .into_iter()
+            .any(|current| {
+                self.target_definitions
+                    .iter()
+                    .any(|target| target.definition() == Some(current))
+            });
+        if !matches_target {
+            return;
+        }
+
+        let range = match &*call.func {
+            ast::Expr::Attribute(attribute) => attribute.attr.range,
+            expression => expression.range(),
+        };
+        let target = ReferenceTarget::new(self.model.file(), range, ReferenceKind::Read);
+        self.references.push(target);
     }
 
     fn check_covering_node(&mut self, covering_node: &CoveringNode<'_>, kind: OccurrenceKind) {

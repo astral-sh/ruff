@@ -3,9 +3,11 @@ use std::collections::HashMap;
 use crate::FxIndexSet;
 use crate::place::builtins_module_scope;
 use crate::reachability::is_range_reachable;
+use crate::types::call::bind::ConstructorCallableKind;
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
 use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::member::class_member;
 use crate::types::signatures::{ParametersKind, Signature};
 use crate::types::{
     CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownFunction,
@@ -781,6 +783,123 @@ pub fn call_signature_details<'db>(
     }
 }
 
+/// Returns the source-backed constructor-method definitions reached by a class call.
+///
+/// Checked constructor bindings provide every possible class target and omit downstream methods
+/// that `__new__` or metaclass `__call__` cannot reach. Source declarations are resolved directly
+/// from those classes, independently of their decorated callable types. Assignment-defined
+/// constructors and calls to ordinary functions or methods return no definitions.
+pub fn constructor_definitions_for_call<'db>(
+    model: &SemanticModel<'db>,
+    call_expr: &ast::ExprCall,
+) -> Vec<Definition<'db>> {
+    let db = model.db();
+    let Some(called_type) = call_expr.func.inferred_type(model) else {
+        return Vec::new();
+    };
+
+    let bindings = called_type.bindings(db);
+    if !bindings.has_constructor_bindings(db) {
+        return Vec::new();
+    }
+
+    let bindings = full_bindings_for_call(
+        model,
+        bindings,
+        call_expr,
+        FullBindingPurpose::ConstructorReferences,
+    );
+    let mut definitions = FxIndexSet::default();
+    bindings.visit_reachable_constructors(db, &mut |class, kind| {
+        match kind {
+            ConstructorCallableKind::MetaclassCall => {}
+            ConstructorCallableKind::New => {
+                definitions.extend(source_constructor_definitions(db, class, "__new__"));
+            }
+            ConstructorCallableKind::Init => {
+                // Reaching `__init__` also proves that the preceding class-construction stage was
+                // not short-circuited. Resolve `__new__` directly in case a decorator erased its
+                // callable type from the binding graph.
+                definitions.extend(source_constructor_definitions(db, class, "__new__"));
+                definitions.extend(source_constructor_definitions(db, class, "__init__"));
+            }
+        }
+    });
+    definitions.into_iter().collect()
+}
+
+fn source_constructor_definitions<'db>(
+    db: &'db dyn Db,
+    class: ClassType<'db>,
+    name: &str,
+) -> Vec<Definition<'db>> {
+    if KnownClass::Enum
+        .to_class_literal(db)
+        .as_class_literal()
+        .is_some_and(|enum_class| class.is_subtype_of_class_literal(db, enum_class))
+    {
+        return Vec::new();
+    }
+
+    let Some((class_literal, _)) = class.static_class_literal(db) else {
+        return Vec::new();
+    };
+
+    constructor_function_definitions(db, ClassLiteral::Static(class_literal), name)
+}
+
+fn constructor_function_definitions<'db>(
+    db: &'db dyn Db,
+    class_literal: ClassLiteral<'db>,
+    name: &str,
+) -> Vec<Definition<'db>> {
+    for class in class_literal.iter_mro(db).filter_map(ClassBase::into_class) {
+        // A dynamic class can shadow source-backed declarations later in the MRO.
+        let Some((ancestor, specialization)) = class.static_class_literal(db) else {
+            return Vec::new();
+        };
+
+        if ancestor.is_known(db, KnownClass::Object) {
+            break;
+        }
+
+        if class_member(db, ancestor.body_scope(db), name).is_undefined()
+            && ancestor
+                .own_synthesized_member(db, specialization, None, name)
+                .is_some()
+        {
+            return Vec::new();
+        }
+
+        let scope = ancestor.body_scope(db);
+        let place_table = ty_python_core::place_table(db, scope);
+        let Some(place_id) = place_table.symbol_id(name) else {
+            continue;
+        };
+        let use_def = use_def_map(db, scope);
+        let definitions = reachable_definitions(
+            db,
+            use_def
+                .reachable_symbol_declarations(place_id)
+                .filter_map(|declaration| declaration.declaration.definition())
+                .chain(
+                    use_def
+                        .reachable_symbol_bindings(place_id)
+                        .filter_map(|binding| binding.binding.definition()),
+                ),
+        );
+
+        if !definitions.is_empty() {
+            return definitions
+                .into_iter()
+                .filter(|definition| matches!(*definition.kind(db), DefinitionKind::Function(_)))
+                .collect();
+        }
+    }
+
+    Vec::new()
+}
+
 /// Resolve overloads for a callable type using call arguments,
 /// returning the single matching signature if exactly one matches.
 fn resolve_single_overload<'db>(
@@ -825,15 +944,22 @@ pub enum CallArgumentForm {
     Type,
 }
 
-/// Fully binds and type-checks a call expression against the given callee type.
+#[derive(Debug, Clone, Copy)]
+enum FullBindingPurpose {
+    CallArgumentForms,
+    ConstructorReferences,
+}
+
+/// Fully binds and type-checks a call expression against the called expression's type.
 ///
-/// This is the expensive path for call-argument form analysis: it matches call-site arguments to
-/// parameters, checks argument types, and preserves the resulting bindings even when the call is
-/// invalid so IDE features can inspect the best available binding information.
-fn full_type_bindings_for_call<'db>(
+/// The selected purpose controls whether downstream constructor steps must be confirmed by type
+/// checking or are retained whenever they may run. Invalid calls preserve their binding details so
+/// IDE features can inspect the best available information.
+fn full_bindings_for_call<'db>(
     model: &SemanticModel<'db>,
-    func_type: Type<'db>,
+    bindings: crate::types::call::Bindings<'db>,
     call_expr: &ast::ExprCall,
+    purpose: FullBindingPurpose,
 ) -> crate::types::call::Bindings<'db> {
     let db = model.db();
     let call_arguments =
@@ -844,17 +970,25 @@ fn full_type_bindings_for_call<'db>(
         });
     let constraints = ConstraintSetBuilder::new();
 
-    func_type
-        .bindings(db)
-        .match_parameters(db, &call_arguments)
-        .check_types(
+    let bindings = bindings.match_parameters(db, &call_arguments);
+    let checked = match purpose {
+        FullBindingPurpose::CallArgumentForms => bindings.check_types(
             db,
             &constraints,
             &call_arguments,
             TypeContext::default(),
             &[],
-        )
-        .unwrap_or_else(|CallError(_, bindings)| *bindings)
+        ),
+        FullBindingPurpose::ConstructorReferences => bindings
+            .check_types_for_constructor_references(
+                db,
+                &constraints,
+                &call_arguments,
+                TypeContext::default(),
+                &[],
+            ),
+    };
+    checked.unwrap_or_else(|CallError(_, bindings)| *bindings)
 }
 
 // These are the callables whose arguments were historically classified as type expressions.
@@ -913,15 +1047,20 @@ pub fn call_argument_forms(
     let db = model.db();
 
     // Ordinary callables have only value-form arguments for IDE purposes, so skip full binding.
-    if !func_type
-        .bindings(db)
+    let bindings = func_type.bindings(db);
+    if !bindings
         .iter_flat()
         .any(|binding| known_type_form_parameter_index(db, binding.callable_type).is_some())
     {
         return vec![CallArgumentForm::Value; argument_count];
     }
 
-    let bindings = full_type_bindings_for_call(model, func_type, call_expr);
+    let bindings = full_bindings_for_call(
+        model,
+        bindings,
+        call_expr,
+        FullBindingPurpose::CallArgumentForms,
+    );
 
     let mut argument_forms = vec![CallArgumentForm::Unknown; argument_count];
 
