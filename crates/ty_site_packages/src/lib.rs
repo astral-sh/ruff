@@ -1151,11 +1151,27 @@ impl SystemEnvironment {
         &self,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<SitePackagesPaths> {
-        let site_packages_directories = site_packages_directories_from_sys_prefix(
-            self.path.sys_prefix(),
-            self.path.interpreter_layout().unwrap_or_default(),
-            system,
-        )?;
+        let mut layout = self.path.interpreter_layout().unwrap_or_default();
+        let site_packages_directories =
+            site_packages_directories_from_sys_prefix(self.path.sys_prefix(), layout, system)?;
+
+        if layout.version.is_none()
+            && let Some(version) = site_packages_directories.python_version_from_layout()
+        {
+            layout.version = Some(version.version);
+        }
+
+        let user_sites = user_site_packages_directories(layout, system);
+        let site_packages_directories = if user_sites.is_empty() {
+            site_packages_directories
+        } else {
+            let mut directories = SitePackagesPaths::default();
+            for path in user_sites {
+                directories.insert_with_settings_diagnostic_path(path, None);
+            }
+            directories.extend(site_packages_directories);
+            directories
+        };
 
         tracing::debug!(
             "Resolved site-packages directories for this environment are: {site_packages_directories}"
@@ -1181,6 +1197,92 @@ impl SystemEnvironment {
         );
         Ok(stdlib_directory)
     }
+}
+
+fn user_site_packages_directories(
+    layout: PythonInterpreterLayout,
+    system: &dyn System,
+) -> Vec<SystemPathBuf> {
+    if system
+        .env_var("PYTHONNOUSERSITE")
+        .is_ok_and(|value| !value.is_empty())
+    {
+        return Vec::new();
+    }
+
+    let Some(version) = layout.version else {
+        return Vec::new();
+    };
+
+    let is_pypy = matches!(layout.implementation, PythonImplementation::PyPy);
+
+    // The implementation component of the user-site directory name. PyPy uses `pypy`/`PyPy`;
+    // other implementations follows CPython's `python`/`Python` layout.
+    let (implementation_lower, implementation_capitalized) = if is_pypy {
+        ("pypy", "PyPy")
+    } else {
+        ("python", "Python")
+    };
+
+    // The free-threaded ABI suffix only applies to CPython.
+    let free_threaded_suffix = if layout.implementation.is_cpython() {
+        layout.variant.suffix()
+    } else {
+        ""
+    };
+
+    let mut result = Vec::new();
+    let mut push_if_dir = |path: SystemPathBuf| {
+        if system.is_directory(&path) {
+            result.push(path);
+        }
+    };
+
+    // The path from a user base directory to its `site-packages` directory.
+    let user_site_relative = if cfg!(windows) {
+        format!(
+            "{implementation_capitalized}{major}{minor}{free_threaded_suffix}\\site-packages",
+            major = version.major,
+            minor = version.minor,
+        )
+    } else {
+        format!("lib/{implementation_lower}{version}{free_threaded_suffix}/site-packages")
+    };
+
+    // `PYTHONUSERBASE` overrides the default user base directory entirely.
+    if let Ok(userbase) = system.env_var("PYTHONUSERBASE")
+        && !userbase.is_empty()
+    {
+        push_if_dir(SystemPath::new(&userbase).join(&user_site_relative));
+        return result;
+    }
+
+    if cfg!(windows) {
+        if let Ok(appdata) = system.env_var("APPDATA") {
+            push_if_dir(
+                SystemPathBuf::from(appdata)
+                    .join(implementation_capitalized)
+                    .join(&user_site_relative),
+            );
+        }
+    } else if let Ok(home) = system.env_var("HOME") {
+        let home = SystemPathBuf::from(home);
+        push_if_dir(home.join(".local").join(&user_site_relative));
+
+        // Framework builds of CPython add a second, framework-specific user-site directory.
+        if cfg!(target_os = "macos") && !is_pypy {
+            let framework = if free_threaded_suffix.is_empty() {
+                "Python"
+            } else {
+                "PythonT"
+            };
+            push_if_dir(home.join(format!(
+                "Library/{framework}/{version}/lib/python/site-packages"
+            )));
+        }
+    }
+
+    result
 }
 
 /// Enumeration of ways in which `site-packages` discovery can fail.
@@ -2626,6 +2728,290 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
+    fn finds_user_site_packages_for_system_environment() {
+        let system = TestSystem::default();
+        system.set_env_var("HOME", "/home/user");
+        let memory_fs = system.memory_file_system();
+        memory_fs
+            .write_file_all("/Python3.12/bin/python3.12", "")
+            .unwrap();
+        memory_fs
+            .create_directory_all("/Python3.12/lib/python3.12/site-packages")
+            .unwrap();
+        memory_fs
+            .create_directory_all("/home/user/.local/lib/python3.12/site-packages")
+            .unwrap();
+
+        let env = PythonEnvironment::new(
+            "/Python3.12/bin/python3.12",
+            SysPrefixPathOrigin::PythonCliFlag,
+            &system,
+        )
+        .unwrap();
+        let site_packages = env.site_packages_paths(&system).unwrap();
+
+        assert_eq!(
+            site_packages,
+            [
+                SystemPathBuf::from("/home/user/.local/lib/python3.12/site-packages"),
+                SystemPathBuf::from("/Python3.12/lib/python3.12/site-packages"),
+            ]
+            .as_slice()
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn finds_user_site_packages_with_custom_pythonuserbase() {
+        let system = TestSystem::default();
+        system.set_env_var("HOME", "/home/user");
+        system.set_env_var("PYTHONUSERBASE", "/custom/base");
+        let memory_fs = system.memory_file_system();
+        memory_fs
+            .write_file_all("/Python3.12/bin/python3.12", "")
+            .unwrap();
+        memory_fs
+            .create_directory_all("/Python3.12/lib/python3.12/site-packages")
+            .unwrap();
+        memory_fs
+            .create_directory_all("/custom/base/lib/python3.12/site-packages")
+            .unwrap();
+
+        let env = PythonEnvironment::new(
+            "/Python3.12/bin/python3.12",
+            SysPrefixPathOrigin::PythonCliFlag,
+            &system,
+        )
+        .unwrap();
+        let site_packages = env.site_packages_paths(&system).unwrap();
+
+        assert_eq!(
+            site_packages,
+            [
+                SystemPathBuf::from("/custom/base/lib/python3.12/site-packages"),
+                SystemPathBuf::from("/Python3.12/lib/python3.12/site-packages"),
+            ]
+            .as_slice()
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn finds_user_site_packages_for_pypy() {
+        let system = TestSystem::default();
+        system.set_env_var("HOME", "/home/user");
+        let memory_fs = system.memory_file_system();
+        memory_fs
+            .write_file_all("/PyPy3.11/bin/pypy3.11", "")
+            .unwrap();
+        memory_fs
+            .create_directory_all("/PyPy3.11/lib/pypy3.11/site-packages")
+            .unwrap();
+        // PyPy uses a `pypy`-prefixed user-site directory, not `python`.
+        memory_fs
+            .create_directory_all("/home/user/.local/lib/pypy3.11/site-packages")
+            .unwrap();
+
+        let env = PythonEnvironment::new(
+            "/PyPy3.11/bin/pypy3.11",
+            SysPrefixPathOrigin::PythonCliFlag,
+            &system,
+        )
+        .unwrap();
+        let site_packages = env.site_packages_paths(&system).unwrap();
+
+        assert_eq!(
+            site_packages,
+            [
+                SystemPathBuf::from("/home/user/.local/lib/pypy3.11/site-packages"),
+                SystemPathBuf::from("/PyPy3.11/lib/pypy3.11/site-packages"),
+            ]
+            .as_slice()
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn finds_user_site_packages_for_system_environment_macos() {
+        let system = TestSystem::default();
+        system.set_env_var("HOME", "/Users/me");
+        let memory_fs = system.memory_file_system();
+        memory_fs
+            .write_file_all("/Python3.12/bin/python3.12", "")
+            .unwrap();
+        memory_fs
+            .create_directory_all("/Python3.12/lib/python3.12/site-packages")
+            .unwrap();
+        memory_fs
+            .create_directory_all("/Users/me/.local/lib/python3.12/site-packages")
+            .unwrap();
+        memory_fs
+            .create_directory_all("/Users/me/Library/Python/3.12/lib/python/site-packages")
+            .unwrap();
+
+        let env = PythonEnvironment::new(
+            "/Python3.12/bin/python3.12",
+            SysPrefixPathOrigin::PythonCliFlag,
+            &system,
+        )
+        .unwrap();
+        let site_packages = env.site_packages_paths(&system).unwrap();
+
+        assert_eq!(
+            site_packages,
+            [
+                SystemPathBuf::from("/Users/me/.local/lib/python3.12/site-packages"),
+                SystemPathBuf::from("/Users/me/Library/Python/3.12/lib/python/site-packages"),
+                SystemPathBuf::from("/Python3.12/lib/python3.12/site-packages"),
+            ]
+            .as_slice()
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn finds_user_site_packages_for_free_threaded_framework_build_macos() {
+        let system = TestSystem::default();
+        system.set_env_var("HOME", "/Users/me");
+        let memory_fs = system.memory_file_system();
+        memory_fs
+            .write_file_all("/Python3.13/bin/python3.13t", "")
+            .unwrap();
+        memory_fs
+            .create_directory_all("/Python3.13/lib/python3.13t/site-packages")
+            .unwrap();
+        memory_fs
+            .create_directory_all("/Users/me/.local/lib/python3.13t/site-packages")
+            .unwrap();
+        // Free-threaded framework builds live under a `PythonT` framework, not `Python/3.13t`.
+        memory_fs
+            .create_directory_all("/Users/me/Library/PythonT/3.13/lib/python/site-packages")
+            .unwrap();
+
+        let env = PythonEnvironment::new(
+            "/Python3.13/bin/python3.13t",
+            SysPrefixPathOrigin::PythonCliFlag,
+            &system,
+        )
+        .unwrap();
+        let site_packages = env.site_packages_paths(&system).unwrap();
+
+        assert_eq!(
+            site_packages,
+            [
+                SystemPathBuf::from("/Users/me/.local/lib/python3.13t/site-packages"),
+                SystemPathBuf::from("/Users/me/Library/PythonT/3.13/lib/python/site-packages"),
+                SystemPathBuf::from("/Python3.13/lib/python3.13t/site-packages"),
+            ]
+            .as_slice()
+        );
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn finds_user_site_packages_for_system_environment_windows() {
+        let system = TestSystem::default();
+        system.set_env_var("APPDATA", r"C:\Users\me\AppData\Roaming");
+        let memory_fs = system.memory_file_system();
+        memory_fs
+            .write_file_all(r"\Python3.12\python3.12.exe", "")
+            .unwrap();
+        memory_fs
+            .create_directory_all(r"\Python3.12\Lib\site-packages")
+            .unwrap();
+        memory_fs
+            .create_directory_all(r"C:\Users\me\AppData\Roaming\Python\Python312\site-packages")
+            .unwrap();
+
+        let env = PythonEnvironment::new(
+            r"\Python3.12\python3.12.exe",
+            SysPrefixPathOrigin::PythonCliFlag,
+            &system,
+        )
+        .unwrap();
+        let site_packages = env.site_packages_paths(&system).unwrap();
+
+        assert_eq!(
+            site_packages,
+            [
+                SystemPathBuf::from(r"C:\Users\me\AppData\Roaming\Python\Python312\site-packages"),
+                SystemPathBuf::from(r"\Python3.12\Lib\site-packages"),
+            ]
+            .as_slice()
+        );
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn finds_user_site_packages_for_pypy_windows() {
+        let system = TestSystem::default();
+        system.set_env_var("APPDATA", r"C:\Users\me\AppData\Roaming");
+        let memory_fs = system.memory_file_system();
+        memory_fs
+            .write_file_all(r"\PyPy3.11\pypy3.11.exe", "")
+            .unwrap();
+        memory_fs
+            .create_directory_all(r"\PyPy3.11\Lib\site-packages")
+            .unwrap();
+        // PyPy's Windows user base is `%APPDATA%\PyPy`, with a `PyPy`-prefixed version directory.
+        memory_fs
+            .create_directory_all(r"C:\Users\me\AppData\Roaming\PyPy\PyPy311\site-packages")
+            .unwrap();
+
+        let env = PythonEnvironment::new(
+            r"\PyPy3.11\pypy3.11.exe",
+            SysPrefixPathOrigin::PythonCliFlag,
+            &system,
+        )
+        .unwrap();
+        let site_packages = env.site_packages_paths(&system).unwrap();
+
+        assert_eq!(
+            site_packages,
+            [
+                SystemPathBuf::from(r"C:\Users\me\AppData\Roaming\PyPy\PyPy311\site-packages"),
+                SystemPathBuf::from(r"\PyPy3.11\Lib\site-packages"),
+            ]
+            .as_slice()
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn does_not_find_user_site_packages_when_disabled() {
+        let system = TestSystem::default();
+        system.set_env_var("HOME", "/home/user");
+        system.set_env_var("PYTHONNOUSERSITE", "1");
+        let memory_fs = system.memory_file_system();
+        memory_fs
+            .write_file_all("/Python3.12/bin/python3.12", "")
+            .unwrap();
+        memory_fs
+            .create_directory_all("/Python3.12/lib/python3.12/site-packages")
+            .unwrap();
+        memory_fs
+            .create_directory_all("/home/user/.local/lib/python3.12/site-packages")
+            .unwrap();
+
+        let env = PythonEnvironment::new(
+            "/Python3.12/bin/python3.12",
+            SysPrefixPathOrigin::PythonCliFlag,
+            &system,
+        )
+        .unwrap();
+        let site_packages = env.site_packages_paths(&system).unwrap();
+
+        assert_eq!(
+            site_packages,
+            [SystemPathBuf::from(
+                "/Python3.12/lib/python3.12/site-packages"
+            )]
+            .as_slice()
+        );
+    }
+
+    #[test]
     fn can_find_site_packages_directory_no_virtual_env_freethreaded() {
         // Shouldn't be converted to an mdtest because mdtest automatically creates a
         // pyvenv.cfg file for you if it sees you creating a `site-packages` directory.
@@ -3888,7 +4274,8 @@ mod tests {
     fn distinguishes_unsuffixed_default_from_free_threaded_executable() {
         let temp_dir = tempfile::tempdir().unwrap();
         let root = SystemPath::from_std_path(temp_dir.path()).unwrap();
-        let system = OsSystem::new(root);
+        let system = TestSystem::new(OsSystem::new(root));
+        system.set_env_var("PYTHONNOUSERSITE", "1");
 
         let prefix = root.join("prefix");
         let bin = prefix.join("bin");
@@ -3920,7 +4307,8 @@ mod tests {
     fn identifies_free_threaded_hard_links() {
         let temp_dir = tempfile::tempdir().unwrap();
         let root = SystemPath::from_std_path(temp_dir.path()).unwrap();
-        let system = OsSystem::new(root);
+        let system = TestSystem::new(OsSystem::new(root));
+        system.set_env_var("PYTHONNOUSERSITE", "1");
 
         for executable_name in ["python3.14t", "python3.14td"] {
             let prefix = root.join(executable_name);
@@ -3960,7 +4348,8 @@ mod tests {
     fn uses_symlink_target_layout() {
         let temp_dir = tempfile::tempdir().unwrap();
         let root = SystemPath::from_std_path(temp_dir.path()).unwrap();
-        let system = OsSystem::new(root);
+        let system = TestSystem::new(OsSystem::new(root));
+        system.set_env_var("PYTHONNOUSERSITE", "1");
 
         let prefix = root.join("prefix");
         let bin = prefix.join("bin");
