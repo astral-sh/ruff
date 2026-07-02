@@ -1045,7 +1045,7 @@ def combine[T](first: T, second: T, third: T) -> T:
     });
 }
 
-/// Benchmark for narrowing a large union type through multiple match statements.
+/// Generate a large union narrowed through multiple match cases.
 ///
 /// This is extracted from egglog-python's `pretty.py`, where a ~30-class union type
 /// (`AllDecls`) is narrowed by exhaustive match statements.
@@ -1068,11 +1068,9 @@ def combine[T](first: T, second: T, third: T) -> T:
 ///         ...
 ///         case _: pass
 /// ```
-fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
+fn large_union_narrowing_code(destructure: bool) -> String {
     const NUM_CLASSES: usize = 30;
     const NUM_MATCH_BRANCHES: usize = 29;
-
-    setup_rayon();
 
     let mut code =
         "from __future__ import annotations\nfrom dataclasses import dataclass\n\n".to_string();
@@ -1092,11 +1090,63 @@ fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
 
     code.push_str("def process(decl: AllDecls) -> None:\n    match decl:\n");
     for i in 0..NUM_MATCH_BRANCHES {
-        writeln!(&mut code, "        case C{i}():\n            pass").ok();
+        if destructure {
+            writeln!(
+                &mut code,
+                "        case C{i}(value):\n            assert value == decl.value"
+            )
+            .ok();
+        } else {
+            writeln!(&mut code, "        case C{i}():\n            pass").ok();
+        }
     }
     code.push_str("        case _:\n            pass\n\n");
 
+    if destructure {
+        code.push_str("@dataclass\nclass Holder:\n    decl: AllDecls\n\n");
+        code.push_str("def process_attribute(holder: Holder) -> None:\n    match holder.decl:\n");
+        for i in 0..NUM_MATCH_BRANCHES {
+            writeln!(
+                &mut code,
+                "        case C{i}(value):\n            assert value == holder.decl.value"
+            )
+            .ok();
+        }
+        code.push_str("        case _:\n            pass\n\n");
+    }
+
+    code
+}
+
+/// Benchmark subject-independent class patterns over a large union.
+fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = large_union_narrowing_code(false);
+
     criterion.bench_function("ty_micro[large_union_narrowing]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Benchmark subject-dependent class patterns over a large union.
+///
+/// Destructuring each class and using both name and attribute subjects in the case bodies exercises
+/// the prefix-aware negative and related-place constraints used by ordered match cases.
+fn benchmark_large_union_destructuring_narrowing(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = large_union_narrowing_code(true);
+
+    criterion.bench_function("ty_micro[large_union_destructuring_narrowing]", |b| {
         b.iter_batched_ref(
             || setup_micro_case(&code),
             |case| {
@@ -1801,6 +1851,7 @@ criterion_group!(
     benchmark_typevar_mapping_small_accumulations,
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,
+    benchmark_large_union_destructuring_narrowing,
     benchmark_large_isinstance_narrowing,
     benchmark_literal_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,

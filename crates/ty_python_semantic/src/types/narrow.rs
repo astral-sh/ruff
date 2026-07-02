@@ -1202,16 +1202,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::Singleton(singleton) => PatternNarrowingResult::Possible(
                 self.evaluate_match_pattern_singleton(subject, *singleton, is_positive),
             ),
-            PatternPredicateKind::Class(kind) => {
-                PatternNarrowingResult::Possible(self.evaluate_match_pattern_class(
-                    subject,
-                    kind.class,
-                    pattern_predicate_kind,
-                    is_positive,
-                ))
-            }
+            PatternPredicateKind::Class(kind) => PatternNarrowingResult::Possible(
+                self.evaluate_match_pattern_class(subject, kind.class, is_positive),
+            ),
             PatternPredicateKind::Mapping(_) => PatternNarrowingResult::Possible(
-                self.evaluate_match_pattern_mapping(subject, pattern_predicate_kind, is_positive),
+                self.evaluate_match_pattern_mapping(subject, is_positive),
             ),
             PatternPredicateKind::Sequence(kind) => {
                 self.evaluate_match_pattern_sequence(subject, kind, is_positive)
@@ -1238,8 +1233,65 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> Option<NarrowingConstraints<'db>> {
         let kind = pattern.kind(self.db);
         let subject = pattern.subject(self.db);
+        let subject_node = subject.node_ref(self.db).node(self.module);
+        if !is_positive && let Some(subject_place) = PlaceExpr::try_from_expr(subject_node) {
+            let mut constraints = if matches!(subject_place, PlaceExpr::Member(_)) {
+                self.evaluate_negative_pattern_related_places(kind, subject)
+            } else {
+                None
+            };
+
+            let subject_ty =
+                infer_same_file_expression_type(self.db, subject, TypeContext::default());
+            let subject_ty = type_narrowed_by_previous_patterns(self.db, pattern, subject_ty);
+            let fallthrough_ty = pattern_binding_fallthrough_type(self.db, kind, subject_ty);
+            if fallthrough_ty != subject_ty {
+                constraints.get_or_insert_default().insert(
+                    self.expect_place(&subject_place),
+                    NarrowingConstraint::replacement(fallthrough_ty),
+                );
+            }
+
+            return constraints;
+        }
+
         self.evaluate_pattern_predicate_kind(kind, subject, is_positive)
             .into_constraints()
+    }
+
+    /// Return negative-pattern constraints on places related to `subject`, excluding the direct
+    /// constraint on `subject` itself.
+    fn evaluate_negative_pattern_related_places(
+        &mut self,
+        kind: &PatternPredicateKind<'db>,
+        subject: Expression<'db>,
+    ) -> Option<NarrowingConstraints<'db>> {
+        match kind {
+            PatternPredicateKind::Value(value) => {
+                let value_ty =
+                    infer_same_file_expression_type(self.db, *value, TypeContext::default());
+                let constraints =
+                    self.evaluate_match_pattern_value_related_places(subject, value_ty, false);
+                (!constraints.is_empty()).then_some(constraints)
+            }
+            PatternPredicateKind::Or(patterns) => {
+                patterns.iter().fold(None, |constraints, pattern| {
+                    Self::merge_optional_constraints_and(
+                        constraints,
+                        self.evaluate_negative_pattern_related_places(pattern, subject),
+                    )
+                })
+            }
+            PatternPredicateKind::As(Some(pattern), _) => {
+                self.evaluate_negative_pattern_related_places(pattern, subject)
+            }
+            PatternPredicateKind::As(None, _)
+            | PatternPredicateKind::Class(_)
+            | PatternPredicateKind::Mapping(_)
+            | PatternPredicateKind::Sequence(_)
+            | PatternPredicateKind::Singleton(_)
+            | PatternPredicateKind::Star(_) => None,
+        }
     }
 }
 
@@ -3410,11 +3462,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         &mut self,
         subject: Expression<'db>,
         cls: Expression<'db>,
-        pattern: &PatternPredicateKind<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         if !is_positive {
-            return self.evaluate_negative_match_pattern(subject, pattern);
+            return None;
         }
 
         let subject_place = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
@@ -3431,11 +3482,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     fn evaluate_match_pattern_mapping(
         &mut self,
         subject: Expression<'db>,
-        pattern: &PatternPredicateKind<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         if !is_positive {
-            return self.evaluate_negative_match_pattern(subject, pattern);
+            return None;
         }
 
         let subject_place = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
@@ -3449,25 +3499,6 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         Some(NarrowingConstraints::from_iter([(
             place,
             NarrowingConstraint::intersection(mapping_type),
-        )]))
-    }
-
-    fn evaluate_negative_match_pattern(
-        &self,
-        subject: Expression<'db>,
-        pattern: &PatternPredicateKind<'db>,
-    ) -> Option<NarrowingConstraints<'db>> {
-        let subject_place = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
-        let place = self.expect_place(&subject_place);
-        let subject_ty = infer_same_file_expression_type(self.db, subject, TypeContext::default());
-        let fallthrough_ty = pattern_binding_fallthrough_type(self.db, pattern, subject_ty);
-        if fallthrough_ty == subject_ty {
-            return None;
-        }
-
-        Some(NarrowingConstraints::from_iter([(
-            place,
-            NarrowingConstraint::intersection(fallthrough_ty),
         )]))
     }
 
@@ -3637,6 +3668,24 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             })
             .unwrap_or_default();
 
+        constraints.extend(self.evaluate_match_pattern_value_related_places(
+            subject,
+            value_ty,
+            is_positive,
+        ));
+
+        Some(constraints)
+    }
+
+    fn evaluate_match_pattern_value_related_places(
+        &mut self,
+        subject: Expression<'db>,
+        value_ty: Type<'db>,
+        is_positive: bool,
+    ) -> NarrowingConstraints<'db> {
+        let subject_node = subject.node_ref(self.db).node(self.module);
+        let mut constraints = NarrowingConstraints::default();
+
         // Narrow tagged unions of `TypedDict`s with `Literal` keys, for example:
         //
         //     class Foo(TypedDict):
@@ -3683,7 +3732,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             }
         }
 
-        Some(constraints)
+        constraints
     }
 
     fn evaluate_match_pattern_or(

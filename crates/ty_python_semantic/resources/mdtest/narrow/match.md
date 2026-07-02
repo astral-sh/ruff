@@ -156,6 +156,36 @@ def gradual_member_pattern_narrows_subject_fallthrough(value: Box[Any] | int) ->
             reveal_type(value)  # revealed: int
             return value + 1
 
+def gradual_member_pattern_preserves_previous_fallthrough(
+    value: Box[Any] | int | str,
+) -> None:
+    match value:
+        case Box(value=_):
+            pass
+        case int():
+            pass
+        case _:
+            reveal_type(value)  # revealed: str
+
+    match value:
+        case int():
+            pass
+        case Box(value=_):
+            pass
+        case _:
+            reveal_type(value)  # revealed: str
+
+def wrapped_sequence_pattern_preserves_previous_fallthrough(
+    value: tuple[Box[Any]] | int | str,
+) -> None:
+    match value:
+        case int():
+            pass
+        case [Box(value=_)] as matched:
+            reveal_type(matched)  # revealed: tuple[Box[Any]]
+        case _:
+            reveal_type(value)  # revealed: str
+
 def nested_gradual_pattern_is_exhaustive(
     value: tuple[Mapping[str, Any]] | int,
 ) -> None:
@@ -1764,6 +1794,25 @@ def typed_dict_runtime_domain_is_exhaustive(value: DynamicMovie | int) -> None:
             pass
         case _:
             assert_never(value)
+
+def typed_dict_runtime_domain_preserves_previous_fallthrough(
+    value: DynamicMovie | int | str,
+) -> None:
+    match value:
+        case dict():
+            pass
+        case int():
+            pass
+        case _:
+            reveal_type(value)  # revealed: str
+
+    match value:
+        case int():
+            pass
+        case Mapping():
+            pass
+        case _:
+            reveal_type(value)  # revealed: str & ~Top[Mapping[Unknown, object]]
 ```
 
 ## Required `TypedDict` keys
