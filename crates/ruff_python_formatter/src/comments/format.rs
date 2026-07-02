@@ -509,7 +509,7 @@ fn normalize_comment<'a>(
             Ok(Cow::Owned(std::format!("# {}", &content["\u{A0}".len()..])))
         }
     } else {
-        Ok(Cow::Owned(std::format!("# {}", content.trim_start())))
+        Ok(Cow::Owned(std::format!("# {content}")))
     }
 }
 
