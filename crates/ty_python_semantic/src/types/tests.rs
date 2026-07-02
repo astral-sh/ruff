@@ -96,7 +96,7 @@ fn will_execute_query_names(db: &TestDb, events: &[salsa::Event]) -> Vec<String>
         .collect()
 }
 
-fn box_alias<'db>(db: &'db TestDb) -> GenericAlias<'db> {
+fn box_alias(db: &TestDb) -> GenericAlias<'_> {
     let file = system_path_to_file(db, "/src/box.py").expect("test file should exist");
     let Type::ClassLiteral(class) = global_symbol(db, file, "Box").place.expect_type() else {
         panic!("Box should be inferred as a class literal");

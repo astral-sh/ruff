@@ -1373,6 +1373,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let current_typevar_binding_context = self.typevar_binding_context;
         let current_inference_flags = self.inference_flags();
 
+        let recursive_generic_implicit_alias =
+            value_ty.is_recursive_generic_implicit_alias(self.db());
+
         // TODO
         // If we explicitly specialize a recursive generic (PEP-613 or implicit) type alias,
         // we currently miscount the number of type variables. For example, for a nested
@@ -1381,7 +1384,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // instead of two. So until we properly support these, specialize all remaining type
         // variables with a `@Todo` type (since we don't know which of the type arguments
         // belongs to the remaining type variables).
-        if any_over_type(self.db(), value_ty, true, |ty| ty.is_divergent()) {
+        if !recursive_generic_implicit_alias
+            && any_over_type(self.db(), value_ty, true, |ty| ty.is_divergent())
+        {
             let value_ty = value_ty.apply_specialization(
                 db,
                 generic_context.specialize(
@@ -1447,6 +1452,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             slice,
             ctx: _,
         } = subscript;
+
+        if let Some(ty) = self.infer_current_generic_implicit_alias_subscript(value_ty, subscript) {
+            return ty;
+        }
 
         match value_ty {
             Type::Never => {
@@ -1765,6 +1774,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
             Type::GenericAlias(_) => {
+                self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
+            }
+            Type::Recursive(_) if value_ty.is_recursive_generic_implicit_alias(self.db()) => {
                 self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
             }
             Type::LiteralValue(literal) if literal.is_string() => {

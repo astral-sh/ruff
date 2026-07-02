@@ -110,7 +110,7 @@ use crate::types::{
     extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
     is_discarded_dict_key_assignment, todo_type,
 };
-use crate::{AnalysisSettings, Db, FxIndexSet, Program};
+use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
 use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
@@ -349,6 +349,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// Type-expression views computed during inference for recursive implicit aliases.
     cycle_recovery_semantic_views: VecMap<Definition<'db>, Type<'db>>,
 
+    /// Generic contexts found while inferring recursive generic implicit aliases.
+    cycle_recovery_generic_contexts: VecMap<Definition<'db>, GenericContext<'db>>,
+
     /// If the inference region refers to a definition, whether synthesized dictionary-key
     /// assignments derived from its right-hand side should be discarded.
     discards_dict_key_assignments: bool,
@@ -399,6 +402,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             undecorated_type: None,
             cycle_recovery: None,
             cycle_recovery_semantic_views: VecMap::default(),
+            cycle_recovery_generic_contexts: VecMap::default(),
             discards_dict_key_assignments: false,
             dataclass_field_specifiers: SmallVec::new(),
         }
@@ -474,6 +478,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .insert(definition, semantic_view);
     }
 
+    pub(super) fn generic_context_from_typevars(&self, ty: Type<'db>) -> GenericContext<'db> {
+        let db = self.db();
+        let mut variables = FxOrderSet::default();
+        ty.bind_and_find_all_legacy_typevars(db, self.typevar_binding_context, &mut variables);
+        GenericContext::from_typevar_instances(db, variables)
+    }
+
+    pub(super) fn record_cycle_recovery_generic_context(
+        &mut self,
+        definition: Definition<'db>,
+        generic_context: GenericContext<'db>,
+    ) {
+        let db = self.db();
+        if generic_context.len(db) == 0 {
+            return;
+        }
+
+        if let Some((_, existing)) = self
+            .cycle_recovery_generic_contexts
+            .0
+            .iter_mut()
+            .find(|(existing, _)| *existing == definition)
+        {
+            *existing = existing.merge(db, generic_context);
+        } else {
+            self.cycle_recovery_generic_contexts
+                .insert(definition, generic_context);
+        }
+    }
+
     fn extend_definition(
         &mut self,
         definition: Definition<'db>,
@@ -523,6 +557,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.extend_cycle_recovery(extra.cycle_recovery);
                     self.cycle_recovery_semantic_views
                         .extend(extra.cycle_recovery_semantic_views.iter().copied());
+                    self.cycle_recovery_generic_contexts
+                        .extend(extra.cycle_recovery_generic_contexts.iter().copied());
                     self.context.extend(&extra.diagnostics);
                     self.deferred.extend(extra.deferred.iter().copied());
                     self.string_annotations
@@ -11046,6 +11082,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred,
             cycle_recovery,
             cycle_recovery_semantic_views: _,
+            cycle_recovery_generic_contexts: _,
             dataclass_field_specifiers: _,
 
             // Ignored; only relevant to definition regions
@@ -11128,6 +11165,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred,
             cycle_recovery,
             cycle_recovery_semantic_views: _,
+            cycle_recovery_generic_contexts: _,
             called_functions,
             mut return_types_and_ranges,
 
@@ -11249,6 +11287,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             region: _,
             cycle_recovery: _,
             cycle_recovery_semantic_views: _,
+            cycle_recovery_generic_contexts: _,
             qualifiers: _,
             type_expression_flags: _,
         } = self;
@@ -11286,6 +11325,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred,
             cycle_recovery,
             cycle_recovery_semantic_views,
+            cycle_recovery_generic_contexts,
             undecorated_type,
             discards_dict_key_assignments,
             called_functions,
@@ -11311,6 +11351,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             + usize::from(!type_expression_flags.is_empty())
             + usize::from(cycle_recovery.is_some())
             + usize::from(!cycle_recovery_semantic_views.is_empty())
+            + usize::from(!cycle_recovery_generic_contexts.is_empty())
             + usize::from(!deferred.is_empty())
             + usize::from(!diagnostics.is_empty())
             + usize::from(discards_dict_key_assignments)
@@ -11368,6 +11409,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     type_expression_flags: FrozenMap::from(type_expression_flags),
                     cycle_recovery,
                     cycle_recovery_semantic_views: cycle_recovery_semantic_views.into_boxed_slice(),
+                    cycle_recovery_generic_contexts: cycle_recovery_generic_contexts
+                        .into_boxed_slice(),
                     deferred: deferred.into_boxed_slice(),
                     diagnostics,
                     undecorated_type,
@@ -11420,6 +11463,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             scope,
             cycle_recovery,
             cycle_recovery_semantic_views: _,
+            cycle_recovery_generic_contexts: _,
             qualifiers,
 
             // Ignored, never leaked into other scopes
@@ -11487,6 +11531,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             index,
             cycle_recovery,
             cycle_recovery_semantic_views: _,
+            cycle_recovery_generic_contexts: _,
             deferred_state,
             typevar_binding_context,
             ref expression_cache,
@@ -11556,6 +11601,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred,
             cycle_recovery,
             cycle_recovery_semantic_views,
+            cycle_recovery_generic_contexts,
             dataclass_field_specifiers: _,
 
             // Ignored; only relevant to definition regions
@@ -11591,6 +11637,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.extend_cycle_recovery(cycle_recovery);
         self.cycle_recovery_semantic_views
             .extend(cycle_recovery_semantic_views.into_vec());
+        self.cycle_recovery_generic_contexts
+            .extend(cycle_recovery_generic_contexts.into_vec());
         self.string_annotations
             .extend(string_annotations.iter().copied());
         self.expected_types.extend(expected_types.iter());
