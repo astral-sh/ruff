@@ -97,7 +97,8 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import assert_never
+from collections.abc import Mapping
+from typing import Any, assert_never
 
 class Covariant[T]:
     def get(self) -> T:
@@ -110,6 +111,60 @@ def f(x: Covariant[int]):
         case _:
             reveal_type(x)  # revealed: Never
             assert_never(x)
+
+class Box[T]:
+    value: T
+
+def exhaustive_gradual_class_pattern(value: Box[Any] | int) -> None:
+    match value:
+        case Box(value=_):
+            reveal_type(value)  # revealed: Box[Any] | (int & Top[Box[Unknown]])
+        case int():
+            reveal_type(value)  # revealed: int & ~Top[Box[Any]]
+        case _:
+            assert_never(value)
+
+def exhaustive_gradual_mapping_pattern(value: Mapping[str, Any] | int) -> None:
+    match value:
+        case Mapping():
+            pass
+        case int():
+            pass
+        case _:
+            assert_never(value)
+
+def exhaustive_subject_specific_gradual_class_pattern(
+    value: Box[Mapping[str, Any]] | int,
+) -> None:
+    match value:
+        case Box(value=Mapping()):
+            pass
+        case int():
+            pass
+        case _:
+            reveal_type(value)  # revealed: Never
+            assert_never(value)
+
+def subject_specific_gradual_class_pattern_preserves_other_specializations(
+    value: Box[Mapping[str, Any]] | Box[int],
+) -> None:
+    match value:
+        case Box(value=Mapping()):
+            pass
+        case _:
+            reveal_type(value)  # revealed: Box[int]
+
+def exhaustive_sequence_wrapped_gradual_class_pattern(
+    value: tuple[Mapping[str, Any]] | int,
+) -> None:
+    match value:
+        case [Mapping()]:
+            pass
+        case int():
+            pass
+        case _:
+            reveal_type(value)  # revealed: Never
+            assert_never(value)
 ```
 
 ## Class patterns with generic `@final` classes
