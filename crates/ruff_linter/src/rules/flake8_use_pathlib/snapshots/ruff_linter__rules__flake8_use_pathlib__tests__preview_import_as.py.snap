@@ -315,7 +315,7 @@ help: Replace with `Path(...).readlink()`
 24 | foo.stat(p)
    |
 
-PTH116 `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
+PTH116 [*] `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
   --> import_as.py:23:1
    |
 21 | bbbbb = foo_p.islink(p)
@@ -324,6 +324,17 @@ PTH116 `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path
    | ^^^^^^^^
 24 | foo_p.isabs(p)
 25 | foo_p.join(p, q)
+   |
+help: Replace with `Path(...).stat()`
+   |
+2  | import os.path as foo_p
+3  + import pathlib
+4  |
+--------------------------------------------------------------------------------
+23 | foo.readlink(p)
+   - foo.stat(p)
+24 + pathlib.Path(p).stat()
+25 | foo_p.isabs(p)
    |
 
 PTH117 [*] `os.path.isabs()` should be replaced by `Path.is_absolute()`
