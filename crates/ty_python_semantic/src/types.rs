@@ -1716,13 +1716,6 @@ impl<'db> Type<'db> {
         any_over_type(db, self, false, |ty| ty.is_dynamic())
     }
 
-    pub(crate) const fn as_special_form(self) -> Option<SpecialFormType> {
-        match self {
-            Type::SpecialForm(special_form) => Some(special_form),
-            _ => None,
-        }
-    }
-
     pub const fn as_property_instance(self) -> Option<PropertyInstanceType<'db>> {
         match self {
             Type::PropertyInstance(property) => Some(property),

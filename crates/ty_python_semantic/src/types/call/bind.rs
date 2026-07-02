@@ -7312,6 +7312,39 @@ impl<'db> BindingError<'db> {
                 provided_ty,
                 provenance,
             } => {
+                fn is_valid_runtime_classinfo<'db>(
+                    db: &'db dyn Db,
+                    function: KnownFunction,
+                    ty: Type<'db>,
+                ) -> bool {
+                    match ty {
+                        Type::ClassLiteral(_)
+                        | Type::KnownInstance(KnownInstanceType::UnionType(_)) => true,
+                        Type::SpecialForm(special_form) => {
+                            special_form.is_valid_isinstance_target()
+                                || matches!(
+                                    (function, special_form),
+                                    (KnownFunction::IsSubclass, SpecialFormType::Any)
+                                )
+                        }
+                        Type::NominalInstance(instance) => {
+                            instance.tuple_spec(db).is_some_and(|tuple_spec| {
+                                tuple_spec.iter_all_elements().all(|element| {
+                                    is_valid_runtime_classinfo(db, function, element)
+                                })
+                            })
+                        }
+                        Type::Union(union) => union
+                            .elements(db)
+                            .iter()
+                            .all(|element| is_valid_runtime_classinfo(db, function, *element)),
+                        Type::Recursive(recursive) => recursive.map_or(db, false, |unfolded| {
+                            is_valid_runtime_classinfo(db, function, unfolded)
+                        }),
+                        _ => false,
+                    }
+                }
+
                 // Certain special forms in the typing module are aliases for classes
                 // elsewhere in the standard library. These special forms are not instances of `type`,
                 // and you cannot use them in place of their aliased classes in *all* situations:
@@ -7324,15 +7357,11 @@ impl<'db> BindingError<'db> {
                 // error-prone, due to the fact that they are annotated with recursive type aliases.
                 if parameter.index == 1
                     && *argument_index == Some(1)
-                    && matches!(
+                    && let Some(function @ (KnownFunction::IsInstance | KnownFunction::IsSubclass)) =
                         callable_ty
                             .as_function_literal()
-                            .and_then(|function| function.known(context.db())),
-                        Some(KnownFunction::IsInstance | KnownFunction::IsSubclass)
-                    )
-                    && provided_ty
-                        .as_special_form()
-                        .is_some_and(SpecialFormType::is_valid_isinstance_target)
+                            .and_then(|function| function.known(context.db()))
+                    && is_valid_runtime_classinfo(context.db(), function, *provided_ty)
                 {
                     return;
                 }
