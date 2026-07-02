@@ -144,7 +144,8 @@ impl<'src> Lexer<'src> {
 
     /// Lex the next token.
     pub fn next_token(&mut self) -> TokenKind {
-        self.cursor.start_token();
+        // `lex_token` marks the token start as late as each path permits. Marking it here would be
+        // redundant for the common case where the next token has no leading whitespace.
         self.current_flags = TokenFlags::empty();
         self.current_kind = self.lex_token();
         // For `Unknown` token, the `push_error` method updates the current range.
@@ -157,6 +158,7 @@ impl<'src> Lexer<'src> {
     fn lex_token(&mut self) -> TokenKind {
         if let Some(interpolated_string) = self.interpolated_strings.current() {
             if !interpolated_string.is_in_interpolation(self.nesting) {
+                self.cursor.start_token();
                 if let Some(token) = self.lex_interpolated_string_middle_or_end() {
                     if token.is_interpolated_string_end() {
                         self.interpolated_strings.pop();
@@ -167,6 +169,7 @@ impl<'src> Lexer<'src> {
         }
         // Return dedent tokens until the current indentation level matches the indentation of the next token.
         else if let Some(indentation) = self.pending_indentation.take() {
+            self.cursor.start_token();
             match self.indentations.current().try_compare(indentation) {
                 Ok(Ordering::Greater) => {
                     self.pending_indentation = Some(indentation);
@@ -189,6 +192,7 @@ impl<'src> Lexer<'src> {
         }
 
         if self.state.is_after_newline() {
+            self.cursor.start_token();
             if let Some(indentation) = self.eat_indentation() {
                 return indentation;
             }
@@ -347,6 +351,12 @@ impl<'src> Lexer<'src> {
     }
 
     fn skip_whitespace(&mut self) -> Result<(), LexicalError> {
+        if matches!(self.cursor.first(), ' ' | '\t' | '\\' | '\x0C') {
+            self.cursor.start_token();
+        } else {
+            return Ok(());
+        }
+
         loop {
             match self.cursor.first() {
                 ' ' => {
@@ -626,19 +636,24 @@ impl<'src> Lexer<'src> {
     /// Lex an identifier. Also used for keywords and string/bytes literals with a prefix.
     fn lex_identifier(&mut self, first: char) -> TokenKind {
         // Detect potential string like rb'' b'' f'' t'' u'' r''
-        let quote = match (first, self.cursor.first()) {
-            (_, quote @ ('\'' | '"')) => self.try_single_char_prefix(first).then(|| {
-                self.cursor.bump();
-                quote
-            }),
-            (_, second) if is_quote(self.cursor.second()) => {
-                self.try_double_char_prefix([first, second]).then(|| {
+        let quote = if let Some(prefix) = single_char_prefix(first) {
+            match self.cursor.first() {
+                quote @ ('\'' | '"') => {
+                    self.current_flags |= prefix;
                     self.cursor.bump();
-                    // SAFETY: Safe because of the `is_quote` check in this match arm's guard
-                    self.cursor.bump().unwrap()
-                })
+                    Some(quote)
+                }
+                second if is_quote(self.cursor.second()) => {
+                    self.try_double_char_prefix([first, second]).then(|| {
+                        self.cursor.bump();
+                        // SAFETY: Safe because of the `is_quote` check in this match arm's guard
+                        self.cursor.bump().unwrap()
+                    })
+                }
+                _ => None,
             }
-            _ => None,
+        } else {
+            None
         };
 
         if let Some(quote) = quote {
@@ -717,21 +732,6 @@ impl<'src> Lexer<'src> {
             b"yield" => TokenKind::Yield,
             _ => TokenKind::Name,
         }
-    }
-
-    /// Try lexing the single character string prefix, updating the token flags accordingly.
-    /// Returns `true` if it matches.
-    fn try_single_char_prefix(&mut self, first: char) -> bool {
-        match first {
-            'f' | 'F' => self.current_flags |= TokenFlags::F_STRING,
-            't' | 'T' => self.current_flags |= TokenFlags::T_STRING,
-            'u' | 'U' => self.current_flags |= TokenFlags::UNICODE_STRING,
-            'b' | 'B' => self.current_flags |= TokenFlags::BYTE_STRING,
-            'r' => self.current_flags |= TokenFlags::RAW_STRING_LOWERCASE,
-            'R' => self.current_flags |= TokenFlags::RAW_STRING_UPPERCASE,
-            _ => return false,
-        }
-        true
     }
 
     /// Try lexing the double character string prefix, updating the token flags accordingly.
@@ -1569,6 +1569,18 @@ struct RadixRun {
 
 const fn is_quote(c: char) -> bool {
     matches!(c, '\'' | '"')
+}
+
+fn single_char_prefix(c: char) -> Option<TokenFlags> {
+    Some(match c {
+        'f' | 'F' => TokenFlags::F_STRING,
+        't' | 'T' => TokenFlags::T_STRING,
+        'u' | 'U' => TokenFlags::UNICODE_STRING,
+        'b' | 'B' => TokenFlags::BYTE_STRING,
+        'r' => TokenFlags::RAW_STRING_LOWERCASE,
+        'R' => TokenFlags::RAW_STRING_UPPERCASE,
+        _ => return None,
+    })
 }
 
 const fn is_ascii_identifier_start(c: char) -> bool {
