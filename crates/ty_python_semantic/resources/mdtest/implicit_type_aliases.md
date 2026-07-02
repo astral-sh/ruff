@@ -1807,13 +1807,19 @@ T = TypeVar("T")
 
 NestedDict = dict[str, "NestedDict[T] | T"]
 NestedList = list["NestedList[T] | None"]
+AnnotatedNestedList: object = list[T | "AnnotatedNestedList[T]"]
+AnnotatedNestedTuple: object = tuple[T, "AnnotatedNestedTuple[T]"]
 
 def _(
     nested_dict_int: NestedDict[int],
     nested_list_str: NestedList[str],
+    annotated_nested_list_int: AnnotatedNestedList[int],
+    annotated_nested_tuple_str: AnnotatedNestedTuple[str],
 ):
     reveal_type(nested_dict_int)  # revealed: dict[str, Divergent | int]
     reveal_type(nested_list_str)  # revealed: list[Divergent | None]
+    reveal_type(annotated_nested_list_int)  # revealed: list[int | Divergent]
+    reveal_type(annotated_nested_tuple_str)  # revealed: tuple[str, Divergent]
 ```
 
 ### Materialization of self-referential generic implicit type aliases

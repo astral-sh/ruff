@@ -33,7 +33,7 @@ use crate::types::{
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::SemanticIndex;
-use ty_python_core::definition::Definition;
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
 use ty_python_core::scope::FileScopeId;
 
@@ -438,11 +438,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Option<Type<'db>> {
         let db = self.db();
         let definition = self.recursive_type_expression_definition()?;
-        let assignment = definition.kind(db).as_unannotated_assignment()?;
         let ast::Expr::Name(name) = &*subscript.value else {
             return None;
         };
-        let target = assignment.target(self.module());
+        let kind = definition.kind(db);
+        let target = match &kind {
+            DefinitionKind::Assignment(assignment) => assignment.target(self.module()),
+            DefinitionKind::AnnotatedAssignment(assignment) => assignment.target(self.module()),
+            _ => return None,
+        };
         if target
             .as_name_expr()
             .is_none_or(|target_name| target_name.id != name.id)
