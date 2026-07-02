@@ -6,9 +6,12 @@ use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
-use crate::types::callable::CallableTypeKind;
+use crate::place::Provenance::SingleDefinition;
+use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
+use crate::types::list_members::all_members;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
-use crate::types::{TypeContext, UpcastPolicy};
+use crate::types::signatures::CallableSignature;
+use crate::types::{KnownClass, TypeContext, UpcastPolicy};
 use crate::{
     Db, FxOrderSet,
     place::{
@@ -702,12 +705,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // 3. Looking up `__call__` on the meta-type of a class-literal, generic-alias or subclass-of type is
                 //    unfortunately not sufficient to obtain the `Callable` supertypes of these types, due to the
                 //    complex interaction between `__new__`, `__init__` and metaclass `__call__`.
-                let attribute_type = if member.name == "__call__" {
-                    ty
+                let (attribute_type, provenance) = if member.name == "__call__" {
+                    (ty, None)
                 } else {
                     let Place::Defined(DefinedPlace {
                         ty: attribute_type,
                         definedness: Definedness::AlwaysDefined,
+                        provenance: attribute_provenance,
                         ..
                     }) = ty
                         .invoke_descriptor_protocol(
@@ -726,8 +730,28 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         });
                         return self.never();
                     };
-                    attribute_type
+                    (attribute_type, Some(attribute_provenance))
                 };
+
+                // `__getattribute__` checks if the type doesn't define an explicit definition of
+                // it own. If it's just using `object`'s default, instead check if the type's fields
+                // would be valid for the protocol's `__getattribute__`'s name parameter's Literal
+                // values and return types for each signature
+                if member.name == "__getattribute__"
+                    && let Some(SingleDefinition(definition)) = provenance
+                    // If the current definition is the same as object.__getattr__, then this hasn't
+                    // overridden it so can use the check-each-field logic
+                    && let Place::Defined(DefinedPlace {
+                                              provenance: SingleDefinition(obj_definition),
+                                              ..
+                                          }) = KnownClass::Object
+                    .to_instance(db)
+                    .member(db, member.name)
+                    .place
+                    && obj_definition == definition
+                {
+                    return self.type_satisfies_protocol_getattribute(db, *method, ty);
+                }
 
                 // TODO: Instances of `typing.Self` in the protocol member should specialize to the
                 // type that we are checking. Without this, we will treat `Self` as an inferable
@@ -795,6 +819,65 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             });
         }
         result
+    }
+
+    fn type_satisfies_protocol_getattribute(
+        &self,
+        db: &'db dyn Db,
+        method: CallableType<'db>,
+        ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        // `__getattr__` can also be used by `__getattribute__`, so we need to copy the overloads
+        // from these definitions to append to our synthetic getattribute
+        let getattr_signatures = if let Place::Defined(DefinedPlace { ty: getattr_ty, .. }) =
+            ty.member(db, "__getattr__").place
+        {
+            match getattr_ty {
+                Type::FunctionLiteral(func) => Some(func.signature(db)),
+                Type::Callable(callable) => Some(callable.signatures(db)),
+                _ => None,
+            }
+        } else {
+            None
+        }
+        .into_iter()
+        .flat_map(|s| s.overloads.iter().cloned());
+
+        // Construct an overload per field mapping each field to what resultant value is expected
+        let signature = CallableSignature::from_overloads(
+            all_members(db, ty)
+                .into_iter()
+                .map(|m| {
+                    Signature::new(
+                        Parameters::new(
+                            db,
+                            [
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(ty),
+                                Parameter::positional_only(Some(Name::new_static("name")))
+                                    .with_annotated_type(Type::string_literal(db, m.name.as_str())),
+                            ],
+                        ),
+                        m.ty,
+                    )
+                })
+                // We add the `__getattr__` overloads at the end since they are a fallback
+                .chain(getattr_signatures),
+        );
+
+        let synthetic_getattr = CallableType::new(
+            db,
+            signature,
+            CallableTypeKind::FunctionLike,
+            CallableFunctionProvenance::ExplicitReturn,
+        );
+        let constraints = self.check_callable_pair(db, synthetic_getattr, method);
+        if constraints.is_never_satisfied(db) {
+            self.provide_context(|| ErrorContext::ProtocolMemberIncompatible {
+                member_name: "__getattribute__".into(),
+            });
+        }
+        constraints
     }
 
     pub(super) fn check_protocol_interface_pair(
