@@ -188,18 +188,18 @@ impl<'db> CallableSignature<'db> {
     ) -> Self {
         Self::single(Signature::new(
             Parameters::bottom(),
-            Type::identity_recursive(db, env, id).bottom_materialization(db, env),
+            Type::identity_recursive(db, env, id),
         ))
     }
 
-    fn is_cycle_initial(&self) -> bool {
+    fn is_cycle_initial(&self, db: &'db dyn Db) -> bool {
         matches!(
             self.overloads.as_slice(),
             [signature]
                 if signature.generic_context.is_none()
                     && signature.definition.is_none()
                     && signature.parameters == Parameters::bottom()
-                    && signature.return_ty.is_divergent()
+                    && signature.return_ty.is_identity_recursive(db)
         )
     }
 
@@ -291,7 +291,7 @@ impl<'db> CallableSignature<'db> {
                     .collect(),
             }
         } else {
-            debug_assert!(previous.is_cycle_initial());
+            debug_assert!(previous.is_cycle_initial(db));
             self.clone()
         }
     }
