@@ -1,5 +1,5 @@
 use super::context::InferContext;
-use super::{ClassType, Signature, Type, TypeContext, UnionType};
+use super::{ClassType, Foldable, RecursiveType, Signature, Type, TypeContext, UnionType};
 use crate::Db;
 use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
@@ -455,6 +455,32 @@ impl<'db> CallDunderError<'db> {
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
         self.return_type(db, env).unwrap_or(Type::unknown())
+    }
+}
+
+impl<'db> Foldable<'db> for CallDunderError<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        match self {
+            Self::CallError(kind, bindings, provenance) => Self::CallError(
+                kind,
+                Box::new((*bindings).fold(db, env, recursive)),
+                provenance,
+            ),
+            Self::PossiblyUnbound {
+                bindings,
+                unbound_on,
+            } => Self::PossiblyUnbound {
+                bindings: Box::new((*bindings).fold(db, env, recursive)),
+                unbound_on: unbound_on
+                    .map(|types| types.into_vec().fold(db, env, recursive).into_boxed_slice()),
+            },
+            Self::MethodNotAvailable => Self::MethodNotAvailable,
+        }
     }
 }
 

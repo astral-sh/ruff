@@ -69,11 +69,12 @@ use crate::types::visitor::{
 };
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
-    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeContext,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder,
-    UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
+    ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, Foldable,
+    GenericAlias, InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
+    RecursiveType, SpecialFormType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
+    is_property_method, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -434,6 +435,20 @@ impl<'db> CallableItem<'db> {
     }
 }
 
+impl<'db> Foldable<'db> for CallableItem<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        match self {
+            Self::Regular(binding) => Self::Regular(binding.fold(db, env, recursive)),
+            Self::Constructor(binding) => Self::Constructor(binding.fold(db, env, recursive)),
+        }
+    }
+}
+
 /// A single element in a union of callables.
 /// This could be a single callable or an intersection of callables.
 /// If there are multiple items, they form an intersection.
@@ -561,6 +576,24 @@ impl<'db> BindingsElement<'db> {
     /// Returns true if any binding in this element is callable.
     fn is_callable(&self) -> bool {
         self.items.iter().any(CallableItem::is_callable)
+    }
+}
+
+impl<'db> Foldable<'db> for BindingsElement<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        Self {
+            callable_type: self.callable_type.fold(db, env, recursive),
+            items: self
+                .items
+                .into_iter()
+                .map(|item| item.fold(db, env, recursive))
+                .collect(),
+        }
     }
 }
 
@@ -3216,6 +3249,27 @@ impl<'db> Bindings<'db> {
     }
 }
 
+impl<'db> Foldable<'db> for Bindings<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        Self {
+            callable_type: self.callable_type.fold(db, env, recursive),
+            implicit_dunder_new_is_possibly_unbound: self.implicit_dunder_new_is_possibly_unbound,
+            implicit_dunder_init_is_possibly_unbound: self.implicit_dunder_init_is_possibly_unbound,
+            elements: self
+                .elements
+                .into_iter()
+                .map(|element| element.fold(db, env, recursive))
+                .collect(),
+            enclosing_binding_contexts: self.enclosing_binding_contexts,
+        }
+    }
+}
+
 impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
     fn from(from: CallableBinding<'db>) -> Bindings<'db> {
         Bindings {
@@ -4688,6 +4742,29 @@ impl<'a, 'db> IntoIterator for &'a CallableBinding<'db> {
     }
 }
 
+impl<'db> Foldable<'db> for CallableBinding<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        Self {
+            callable_type: self.callable_type.fold(db, env, recursive),
+            signature_type: self.signature_type.fold(db, env, recursive),
+            dunder_call_is_possibly_unbound: self.dunder_call_is_possibly_unbound,
+            bound_type: self.bound_type.fold(db, env, recursive),
+            overload_call_return_type: self.overload_call_return_type.fold(db, env, recursive),
+            matching_overload_before_type_checking: self.matching_overload_before_type_checking,
+            overloads: self
+                .overloads
+                .into_iter()
+                .map(|binding| binding.fold(db, env, recursive))
+                .collect(),
+        }
+    }
+}
+
 impl<'db> IntoIterator for CallableBinding<'db> {
     type Item = Binding<'db>;
     type IntoIter = smallvec::IntoIter<[Binding<'db>; 1]>;
@@ -4702,6 +4779,25 @@ enum OverloadCallReturnType<'db> {
     ArgumentTypeExpansion(Type<'db>),
     ArgumentTypeExpansionLimitReached(usize),
     Ambiguous,
+}
+
+impl<'db> Foldable<'db> for OverloadCallReturnType<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        match self {
+            Self::ArgumentTypeExpansion(ty) => {
+                Self::ArgumentTypeExpansion(ty.fold(db, env, recursive))
+            }
+            Self::ArgumentTypeExpansionLimitReached(limit) => {
+                Self::ArgumentTypeExpansionLimitReached(limit)
+            }
+            Self::Ambiguous => Self::Ambiguous,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -7057,6 +7153,40 @@ impl<'db> MatchedArgument<'db> {
     }
 }
 
+impl<'db> Foldable<'db> for MatchedArgument<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        Self {
+            parameters: self
+                .parameters
+                .into_iter()
+                .map(|parameter| parameter.fold(db, env, recursive))
+                .collect(),
+            matched: self.matched,
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for MatchedParameter<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        Self {
+            index: self.index,
+            argument_type: self.argument_type.fold(db, env, recursive),
+            expected_type: self.expected_type.fold(db, env, recursive),
+            provenance: self.provenance,
+        }
+    }
+}
+
 /// The type context to use when inferring a call-site argument, for a given binding.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ArgumentTypeContext<'db> {
@@ -8247,6 +8377,43 @@ impl<'db> Binding<'db> {
     }
 }
 
+impl<'db> Foldable<'db> for Binding<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        Self {
+            signature: self.signature.fold(db, env, recursive),
+            source_overload_index: self.source_overload_index,
+            source_parameter_index_offset: self.source_parameter_index_offset,
+            callable_type: self.callable_type.fold(db, env, recursive),
+            signature_type: self.signature_type.fold(db, env, recursive),
+            return_ty: self.return_ty.fold(db, env, recursive),
+            constructor_context: self.constructor_context.fold(db, env, recursive),
+            inferable_typevars: self.inferable_typevars,
+            inference: self.inference,
+            is_partial_application: self.is_partial_application,
+            argument_matches: self
+                .argument_matches
+                .into_vec()
+                .into_iter()
+                .map(|argument| argument.fold(db, env, recursive))
+                .collect(),
+            variadic_argument_matched_to_variadic_parameter: self
+                .variadic_argument_matched_to_variadic_parameter,
+            parameter_tys: self
+                .parameter_tys
+                .into_vec()
+                .into_iter()
+                .map(|ty| ty.fold(db, env, recursive))
+                .collect(),
+            errors: self.errors.fold(db, env, recursive),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 struct BindingSnapshot<'db> {
     return_ty: Type<'db>,
@@ -8843,6 +9010,115 @@ impl BindingError<'_> {
     /// number of arguments in the original call that were matched before the `ParamSpec` component.
     fn apply_argument_index_offset(&mut self, offset: usize) {
         self.map_argument_indices(|argument_index| argument_index.map(|index| index + offset));
+    }
+}
+
+impl<'db> Foldable<'db> for BindingError<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        match self {
+            Self::InvalidArgumentType {
+                parameter,
+                argument_index,
+                last_argument_index,
+                expected_ty,
+                provided_ty,
+                provenance,
+                parameter_source,
+            } => Self::InvalidArgumentType {
+                parameter,
+                argument_index,
+                last_argument_index,
+                expected_ty: expected_ty.fold(db, env, recursive),
+                provided_ty: provided_ty.fold(db, env, recursive),
+                provenance,
+                parameter_source,
+            },
+            Self::InvalidKeyType {
+                argument_index,
+                provided_ty,
+            } => Self::InvalidKeyType {
+                argument_index,
+                provided_ty: provided_ty.fold(db, env, recursive),
+            },
+            Self::MissingArguments {
+                parameters,
+                paramspec,
+            } => Self::MissingArguments {
+                parameters,
+                paramspec,
+            },
+            Self::UnknownArgument {
+                argument_name,
+                argument_index,
+            } => Self::UnknownArgument {
+                argument_name,
+                argument_index,
+            },
+            Self::UnknownKeywordVariadicArgument { argument_index } => {
+                Self::UnknownKeywordVariadicArgument { argument_index }
+            }
+            Self::PositionalOnlyParameterAsKwarg {
+                argument_index,
+                parameter,
+            } => Self::PositionalOnlyParameterAsKwarg {
+                argument_index,
+                parameter,
+            },
+            Self::TooManyPositionalArguments {
+                first_excess_argument_index,
+                expected_positional_count,
+                provided_positional_count,
+            } => Self::TooManyPositionalArguments {
+                first_excess_argument_index,
+                expected_positional_count,
+                provided_positional_count,
+            },
+            Self::ParameterAlreadyAssigned {
+                argument_index,
+                parameter,
+            } => Self::ParameterAlreadyAssigned {
+                argument_index,
+                parameter,
+            },
+            Self::SpecializationError {
+                error,
+                argument_index,
+            } => Self::SpecializationError {
+                error: error.fold(db, env, recursive),
+                argument_index,
+            },
+            Self::PropertyHasNoSetter(property) => {
+                Self::PropertyHasNoSetter(property.fold(db, env, recursive))
+            }
+            Self::PropertyHasNoDeleter(property) => {
+                Self::PropertyHasNoDeleter(property.fold(db, env, recursive))
+            }
+            Self::PropertyHasNoGetter(property) => {
+                Self::PropertyHasNoGetter(property.fold(db, env, recursive))
+            }
+            Self::PropertyGetterCallError(error) => {
+                Self::PropertyGetterCallError(PropertyAccessorCallError {
+                    bindings: Box::new((*error.bindings).fold(db, env, recursive)),
+                    argument_index_offset: error.argument_index_offset,
+                })
+            }
+            Self::PropertySetterCallError(error) => {
+                Self::PropertySetterCallError(PropertyAccessorCallError {
+                    bindings: Box::new((*error.bindings).fold(db, env, recursive)),
+                    argument_index_offset: error.argument_index_offset,
+                })
+            }
+            Self::InternalCallError(message) => Self::InternalCallError(message),
+            Self::UnmatchedOverload => Self::UnmatchedOverload,
+            Self::CalledTopCallable(ty) => Self::CalledTopCallable(ty.fold(db, env, recursive)),
+            Self::InvalidDataclassApplication(target) => Self::InvalidDataclassApplication(target),
+            Self::InvalidDataclassArgument(argument) => Self::InvalidDataclassArgument(argument),
+        }
     }
 }
 

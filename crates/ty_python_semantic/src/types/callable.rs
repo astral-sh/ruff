@@ -7,8 +7,8 @@ use crate::{
     place::Place,
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
-        FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
+        Foldable, FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, RecursiveType, Signature,
         SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         known_instance::FunctoolsPartialInstance,
@@ -102,6 +102,16 @@ impl<'db> Type<'db> {
                 db,
                 Signature::dynamic(self),
             ))),
+
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                env,
+                || None,
+                |unfolded| {
+                    unfolded
+                        .try_upcast_to_callable_with_policy_and_context(db, env, policy, context)
+                },
+            ),
 
             Type::FunctionLiteral(function_literal)
                 if context.is_recursive_reference(db, function_literal) =>
@@ -708,6 +718,33 @@ impl<'db> CallableTypes<'db> {
             CallableTypeKind::Regular,
         )
         .into_precise_functools_partial_instance(db, wrapped)
+    }
+}
+
+impl<'db> Foldable<'db> for CallableType<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::FoldRecursive { recursive },
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::new(env),
+        )
+    }
+}
+
+impl<'db> Foldable<'db> for CallableTypes<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        self.map(|callable| callable.fold(db, env, recursive))
     }
 }
 

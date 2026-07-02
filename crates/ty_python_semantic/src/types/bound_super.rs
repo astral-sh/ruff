@@ -9,9 +9,9 @@ use crate::{
     Db, DisplaySettings,
     place::{Place, PlaceAndQualifiers},
     types::{
-        BoundTypeVarInstance, ClassBase, ClassType, DivergentType, DynamicType,
+        BoundTypeVarInstance, ClassBase, ClassType, DivergentType, DynamicType, Foldable,
         IntersectionBuilder, KnownClass, MemberLookupErrorKind, MemberLookupPolicy,
-        MemberLookupResult, SpecialFormType, SubclassOfInner, SubclassOfType, Type,
+        MemberLookupResult, RecursiveType, SpecialFormType, SubclassOfInner, SubclassOfType, Type,
         TypeVarBoundOrConstraints, UnionBuilder,
         constraints::ConstraintSet,
         context::InferContext,
@@ -234,6 +234,40 @@ impl<'db> BoundSuperError<'db> {
                 ));
                 constraints.as_type(db, env)
             }
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for BoundSuperError<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        match self {
+            Self::AbstractOwnerType {
+                owner_type,
+                pivot_class,
+                typevar_context,
+            } => Self::AbstractOwnerType {
+                owner_type: owner_type.fold(db, env, recursive),
+                pivot_class: pivot_class.fold(db, env, recursive),
+                typevar_context,
+            },
+            Self::InvalidPivotClassType { pivot_class } => Self::InvalidPivotClassType {
+                pivot_class: pivot_class.fold(db, env, recursive),
+            },
+            Self::FailingConditionCheck {
+                pivot_class,
+                owner,
+                typevar_context,
+            } => Self::FailingConditionCheck {
+                pivot_class: pivot_class.fold(db, env, recursive),
+                owner: owner.fold(db, env, recursive),
+                typevar_context,
+            },
+            Self::UnavailableImplicitArguments => Self::UnavailableImplicitArguments,
         }
     }
 }
@@ -643,6 +677,20 @@ impl<'db> BoundSuperType<'db> {
             Type::Never => SuperOwnerKind::Dynamic(DynamicType::Unknown),
             Type::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
             Type::Divergent(divergent) => SuperOwnerKind::Divergent(divergent),
+            Type::Recursive(recursive) => {
+                return recursive.map_or_else(
+                    db,
+                    env,
+                    || {
+                        Err(BoundSuperError::AbstractOwnerType {
+                            owner_type,
+                            pivot_class: pivot_class_type,
+                            typevar_context: None,
+                        })
+                    },
+                    |unfolded| delegate_to(unfolded),
+                );
+            }
             Type::ClassLiteral(class) => SuperOwnerKind::Resolved(Self::resolve_class_super_owner(
                 db,
                 pivot_class,

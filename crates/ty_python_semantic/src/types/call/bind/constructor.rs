@@ -9,8 +9,8 @@ use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::Parameter;
 use crate::types::typevar::TypeVarNonceGenerator;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext,
-    TypeMapping,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, DynamicType, Foldable,
+    RecursiveType, Type, TypeContext, TypeMapping,
 };
 
 /// Bindings for a constructor call.
@@ -661,6 +661,23 @@ impl<'db> ConstructorBinding<'db> {
     }
 }
 
+impl<'db> Foldable<'db> for ConstructorBinding<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        Self {
+            entry: self.entry.fold(db, env, recursive),
+            constructor_context: self.constructor_context.fold(db, env, recursive),
+            downstream_constructor: self
+                .downstream_constructor
+                .map(|bindings| Box::new(bindings.fold(db, env, recursive))),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct ConstructorContext<'db> {
     instance_type: Type<'db>,
@@ -688,6 +705,20 @@ impl<'db> ConstructorContext<'db> {
 
     pub(super) fn kind(self) -> ConstructorCallableKind {
         self.kind
+    }
+}
+
+impl<'db> Foldable<'db> for ConstructorContext<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        Self {
+            instance_type: self.instance_type.fold(db, env, recursive),
+            kind: self.kind,
+        }
     }
 }
 

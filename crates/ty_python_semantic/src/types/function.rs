@@ -1268,7 +1268,9 @@ impl<'db> FunctionType<'db> {
                     | ApplySpecialization::TypeAlias(_),
                 ..
             }
-        ) {
+        ) || type_mapping
+            .used_in_cycle_recovery()
+        {
             (
                 self.updated_signature(db).map(|signature| {
                     signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
@@ -2043,6 +2045,12 @@ fn is_instance_truthiness<'db>(
         }
 
         Type::TypeAlias(alias) => is_instance_truthiness(db, env, alias.value_type(db), class),
+        Type::Recursive(recursive) => recursive.map_or_else(
+            db,
+            env,
+            || Truthiness::Ambiguous,
+            |unfolded| is_instance_truthiness(db, env, unfolded, class),
+        ),
 
         Type::TypeVar(bound_typevar) => {
             match bound_typevar.typevar(db).bound_or_constraints(db, env) {

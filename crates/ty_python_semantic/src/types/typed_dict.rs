@@ -18,9 +18,9 @@ use super::diagnostic::{
 };
 use super::infer::{TypeExpressionFlags, infer_deferred_types};
 use super::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, ErrorContext, IntersectionType, Type,
-    TypeMapping, TypeQualifiers, TypeVarVariance, UnionBuilder, VarianceInferable,
-    definition_expression_annotation, definition_expression_type, visitor,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, ErrorContext, Foldable, IntersectionType,
+    RecursiveType, Type, TypeMapping, TypeQualifiers, TypeVarVariance, UnionBuilder,
+    VarianceInferable, definition_expression_annotation, definition_expression_type, visitor,
 };
 use crate::types::TypeContext;
 use crate::types::TypeDefinition;
@@ -181,6 +181,34 @@ pub struct TypedDictExtraItems<'db> {
 impl TypedDictExtraItems<'_> {
     pub(crate) const fn is_read_only(self) -> bool {
         self.is_read_only
+    }
+}
+
+impl<'db> Foldable<'db> for TypedDictExtraItems<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        Self {
+            declared_ty: self.declared_ty.fold(db, env, recursive),
+            is_read_only: self.is_read_only,
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for TypedDictOpenness<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        match self {
+            Self::ImplicitlyOpen | Self::Closed => self,
+            Self::Extra(extra_items) => Self::Extra(extra_items.fold(db, env, recursive)),
+        }
     }
 }
 
@@ -1725,6 +1753,39 @@ pub(crate) struct UnpackedTypedDict<'db> {
     pub(crate) openness: TypedDictOpenness<'db>,
 }
 
+impl<'db> Foldable<'db> for UnpackedTypedDictKey<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        Self {
+            value_ty: self.value_ty.fold(db, env, recursive),
+            is_required: self.is_required,
+            definition: self.definition,
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for UnpackedTypedDict<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        Self {
+            keys: self
+                .keys
+                .into_iter()
+                .map(|(name, key)| (name, key.fold(db, env, recursive)))
+                .collect(),
+            openness: self.openness.fold(db, env, recursive),
+        }
+    }
+}
+
 /// Combines the openness policies of intersected `TypedDict`-shaped values.
 ///
 /// An intersection must satisfy every constituent, so `Closed` dominates, `ImplicitlyOpen` adds no
@@ -1980,6 +2041,12 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
         Type::TypeAlias(alias) => {
             extract_unpacked_typed_dict_from_value_type(db, env, alias.value_type(db))
         }
+        Type::Recursive(recursive) => recursive.map_or_else(
+            db,
+            env,
+            || None,
+            |unfolded| extract_unpacked_typed_dict_from_value_type(db, env, unfolded),
+        ),
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)
         | Type::Divergent(_)

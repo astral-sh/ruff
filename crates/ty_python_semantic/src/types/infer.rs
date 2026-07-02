@@ -126,8 +126,13 @@ fn extend_collection_use_constraints<'db>(
 /// Use when resolving a place use or public type of a place.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+    cycle_initial=|db: &'db dyn Db, id, definition: Definition<'db>| {
+        let env = ProgramEnvironment::from_file(definition.program_file(db));
+        DefinitionInference::cycle_initial(
+            db,
+            definition,
+            Type::recursive_cycle_initial(db, &env, id),
+        )
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
         inference.cycle_normalized(db, previous, cycle, definition)
@@ -278,8 +283,13 @@ impl<'db> FunctionDecoratorInference<'db> {
 /// Function parameter defaults are inferred separately by [`infer_function_default_types`].
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+    cycle_initial=|db: &'db dyn Db, id, definition: Definition<'db>| {
+        let env = ProgramEnvironment::from_file(definition.program_file(db));
+        DefinitionInference::cycle_initial(
+            db,
+            definition,
+            Type::recursive_cycle_initial(db, &env, id),
+        )
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
         inference.cycle_normalized(db, previous, cycle, definition)
@@ -398,7 +408,11 @@ pub(crate) fn infer_scope_types<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, _| ScopeInference::cycle_initial(Type::divergent(id)),
+    cycle_initial=|db, id, input: InferScope<'db>| {
+        let (scope, _) = input.into_inner(db);
+        let env = ProgramEnvironment::from_scope(scope);
+        ScopeInference::cycle_initial(Type::recursive_cycle_initial(db, &env, id))
+    },
     cycle_fn=|db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, input: InferScope<'db>| {
         let (scope, _) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(scope);
@@ -497,7 +511,8 @@ fn expression_cycle_initial<'db>(
     input: InferExpression<'db>,
 ) -> ExpressionInference<'db> {
     let (expression, _) = input.into_inner(db);
-    let cycle_recovery = Type::divergent(id);
+    let env = ProgramEnvironment::from_scope(expression.scope(db));
+    let cycle_recovery = Type::recursive_cycle_initial(db, &env, id);
     ExpressionInference::cycle_initial(expression.scope(db), cycle_recovery)
 }
 
@@ -532,7 +547,11 @@ pub(crate) fn infer_expression_type<'db>(
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, id, _| Type::divergent(id),
+    cycle_initial=|db, id, input: InferExpression<'db>| {
+        let (expression, _) = input.into_inner(db);
+        let env = ProgramEnvironment::from_scope(expression.scope(db));
+        Type::recursive_cycle_initial(db, &env, id)
+    },
     cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, input: InferExpression<'db>| {
         let (expression, _) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(expression.scope(db));
@@ -572,8 +591,12 @@ pub(super) fn infer_statement_types<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, statement: StatementInner<'db>| {
-        StatementInferenceInner::cycle_initial(statement.scope(db), Type::divergent(id))
+    cycle_initial=|db: &'db dyn Db, id, statement: StatementInner<'db>| {
+        let env = ProgramEnvironment::from_file(statement.program_file(db));
+        StatementInferenceInner::cycle_initial(
+            statement.scope(db),
+            Type::recursive_cycle_initial(db, &env, id),
+        )
     },
     cycle_fn=|db, cycle, previous: &StatementInferenceInner<'db>, inference: StatementInferenceInner<'db>, statement: StatementInner<'db>| {
         let env = ProgramEnvironment::from_file(statement.program_file(db));
@@ -768,7 +791,10 @@ impl<'db> From<Type<'db>> for TypeContext<'db> {
 /// during this unpacking.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, _| UnpackResult::cycle_initial(Type::divergent(id)),
+    cycle_initial=|db, id, unpack: Unpack<'db>| {
+        let env = ProgramEnvironment::from_file(unpack.program_file(db));
+        UnpackResult::cycle_initial(Type::recursive_cycle_initial(db, &env, id))
+    },
     cycle_fn=|db, cycle, previous: &UnpackResult<'db>, result: UnpackResult<'db>, unpack: Unpack<'db>| {
         let env = ProgramEnvironment::from_file(unpack.program_file(db));
         result.cycle_normalized(db, &env, previous, cycle)

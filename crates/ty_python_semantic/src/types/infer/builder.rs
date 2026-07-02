@@ -3059,6 +3059,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 emit_diagnostics,
             ),
 
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                env,
+                || false,
+                |unfolded| {
+                    self.validate_attribute_deletion(target, unfolded, attribute, emit_diagnostics)
+                },
+            ),
+
             Type::NominalInstance(..)
             | Type::ProtocolInstance(_)
             | Type::LiteralValue(..)
@@ -5456,6 +5465,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::TypeAlias(alias) => {
                     propagate_callable_kind(db, env, alias.value_type(db), kind)
                 }
+                Type::Recursive(recursive) => recursive.map_or_else(
+                    db,
+                    env,
+                    || None,
+                    |unfolded| propagate_callable_kind(db, env, unfolded, kind),
+                ),
                 // Intersections are currently not handled here because that would require
                 // the decorator to be explicitly annotated as returning an intersection.
                 Type::Intersection(_) | Type::EnumComplement(_) => None,
@@ -10954,6 +10969,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (_, Type::TypeAlias(alias)) => {
                 self.infer_unary_expression_type(op, alias.value_type(db), unary)
             }
+            (_, Type::Recursive(recursive)) => recursive.map_or_else(
+                self.db(),
+                env,
+                || operand_type,
+                |unfolded| self.infer_unary_expression_type(op, unfolded, unary),
+            ),
 
             (ast::UnaryOp::UAdd, Type::LiteralValue(literal)) => match literal.kind() {
                 LiteralValueTypeKind::Int(value) => Type::int_literal(value.as_i64()),

@@ -1389,45 +1389,49 @@ impl<'db> Specialization<'db> {
         let mut new_materialization_kind = self.materialization_kind(db);
         let types = self.map_types(db, |i, typevar, ty| {
             let tcx = TypeContext::new(tcx.get(i).copied());
-            match (typevar.variance(db), type_mapping) {
-                (
-                    TypeVarVariance::Invariant,
-                    TypeMapping::ApplySpecializationWithMaterialization {
-                        specialization,
-                        materialization_kind,
-                    },
-                ) => {
-                    let env = visitor.env;
-                    // An invariant type argument cannot be materialized in isolation. Keep the
-                    // specialized argument and record the materialization on this specialization.
-                    // Comparing both mappings distinguishes substituted gradual types from
-                    // unrelated gradual types already present in the argument. Use separate
-                    // visitors because their transformation caches are keyed only by type.
-                    let specialized = ty.apply_type_mapping_impl(
-                        db,
-                        &TypeMapping::ApplySpecialization(*specialization),
-                        tcx,
-                        &ApplyTypeMappingVisitor::new(env),
-                    );
-
-                    if new_materialization_kind.is_none() {
-                        let materialized = ty.apply_type_mapping_impl(
+            if type_mapping.used_in_cycle_recovery() {
+                ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+            } else {
+                match (typevar.variance(db), type_mapping) {
+                    (
+                        TypeVarVariance::Invariant,
+                        TypeMapping::ApplySpecializationWithMaterialization {
+                            specialization,
+                            materialization_kind,
+                        },
+                    ) => {
+                        let env = visitor.env;
+                        // An invariant type argument cannot be materialized in isolation. Keep the
+                        // specialized argument and record the materialization on this specialization.
+                        // Comparing both mappings distinguishes substituted gradual types from
+                        // unrelated gradual types already present in the argument. Use separate
+                        // visitors because their transformation caches are keyed only by type.
+                        let specialized = ty.apply_type_mapping_impl(
                             db,
-                            type_mapping,
+                            &TypeMapping::ApplySpecialization(*specialization),
                             tcx,
                             &ApplyTypeMappingVisitor::new(env),
                         );
-                        if specialized != materialized {
-                            new_materialization_kind = Some(*materialization_kind);
-                        }
-                    }
 
-                    specialized
+                        if new_materialization_kind.is_none() {
+                            let materialized = ty.apply_type_mapping_impl(
+                                db,
+                                type_mapping,
+                                tcx,
+                                &ApplyTypeMappingVisitor::new(env),
+                            );
+                            if specialized != materialized {
+                                new_materialization_kind = Some(*materialization_kind);
+                            }
+                        }
+
+                        specialized
+                    }
+                    (variance, _) if variance.is_covariant() => {
+                        ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                    }
+                    _ => ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
                 }
-                (variance, _) if variance.is_covariant() => {
-                    ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                }
-                _ => ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
             }
         });
 

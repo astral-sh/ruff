@@ -257,6 +257,14 @@ pub(super) fn attribute_write_requirement<'db>(
         Type::TypeAlias(alias) => {
             attribute_write_requirement(db, env, alias.value_type(db), attribute)
         }
+        Type::Recursive(recursive) => {
+            let unfolded = recursive.unfold(db, env);
+            if unfolded == object_ty {
+                AttributeWriteRequirement::Unconstrained
+            } else {
+                attribute_write_requirement(db, env, unfolded, attribute)
+            }
+        }
 
         Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
             AttributeWriteRequirement::CannotAssign
@@ -853,6 +861,7 @@ pub(super) fn assignment_attribute_members<'db>(
             Type::Union(..)
             | Type::Intersection(..)
             | Type::TypeAlias(..)
+            | Type::Recursive(_)
             | Type::Dynamic(..)
             | Type::Divergent(_)
             | Type::Never

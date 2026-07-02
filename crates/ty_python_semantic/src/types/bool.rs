@@ -3,9 +3,10 @@ use crate::ProgramEnvironment;
 use ruff_db::diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::types::Foldable;
 use crate::types::{
     CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, PropertyInstanceClass, SubclassOfInner, Type, TypeContext,
+    LiteralValueTypeKind, PropertyInstanceClass, RecursiveType, SubclassOfInner, Type, TypeContext,
     TypeVarBoundOrConstraints, UnionType, call::CallErrorKind, constraints::ConstraintSetBuilder,
     context::InferContext, diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
 };
@@ -251,6 +252,13 @@ impl<'db> Type<'db> {
             | Type::TypeGuard(_)
             | Type::TypeForm(_) => Truthiness::Ambiguous,
 
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                env,
+                || Ok(Truthiness::Ambiguous),
+                |unfolded| unfolded.try_bool_impl(db, env, allow_short_circuit, visitor),
+            )?,
+
             Type::TypedDict(td) => {
                 if td.items(db).values().any(TypedDictField::is_required) {
                     Truthiness::AlwaysTrue
@@ -386,6 +394,47 @@ impl<'db> Type<'db> {
         };
 
         Ok(truthiness)
+    }
+}
+
+impl<'db> Foldable<'db> for BoolError<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        match self {
+            Self::NotCallable { not_boolable_type } => Self::NotCallable {
+                not_boolable_type: not_boolable_type.fold(db, env, recursive),
+            },
+            Self::IncorrectArguments {
+                not_boolable_type,
+                truthiness,
+            } => Self::IncorrectArguments {
+                not_boolable_type: not_boolable_type.fold(db, env, recursive),
+                truthiness,
+            },
+            Self::IncorrectReturnType {
+                not_boolable_type,
+                return_type,
+            } => Self::IncorrectReturnType {
+                not_boolable_type: not_boolable_type.fold(db, env, recursive),
+                return_type: return_type.fold(db, env, recursive),
+            },
+            Self::Union { union, truthiness } => {
+                let folded = Type::Union(union).fold(db, env, recursive);
+                let Type::Union(union) = folded else {
+                    return Self::Other {
+                        not_boolable_type: folded,
+                    };
+                };
+                Self::Union { union, truthiness }
+            }
+            Self::Other { not_boolable_type } => Self::Other {
+                not_boolable_type: not_boolable_type.fold(db, env, recursive),
+            },
+        }
     }
 }
 
