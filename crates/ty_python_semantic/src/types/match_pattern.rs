@@ -578,6 +578,33 @@ impl<'db> PatternCoverage<'db> {
     }
 }
 
+/// Accumulate coverage for ordered `or` alternatives without reanalyzing nested `or` subtrees.
+fn extend_or_pattern_coverage<'db>(
+    db: &'db dyn Db,
+    patterns: &[PatternPredicateKind<'db>],
+    remaining_subject_ty: &mut Type<'db>,
+    definitely_matched: &mut Vec<Type<'db>>,
+) {
+    for pattern in patterns {
+        if remaining_subject_ty.is_never() {
+            break;
+        }
+
+        if let PatternPredicateKind::Or(nested) = pattern {
+            extend_or_pattern_coverage(db, nested, remaining_subject_ty, definitely_matched);
+            continue;
+        }
+
+        let coverage = pattern_coverage_for_subject(db, pattern, *remaining_subject_ty);
+        definitely_matched.push(coverage.definitely_matched_ty());
+        if coverage.exhausts_subject() {
+            *remaining_subject_ty = Type::Never;
+        } else {
+            *remaining_subject_ty = pattern_fallthrough_type(db, pattern, *remaining_subject_ty);
+        }
+    }
+}
+
 /// Return the values that are statically guaranteed to match `kind` and whether they cover the
 /// complete subject.
 ///
@@ -693,15 +720,12 @@ pub(crate) fn pattern_coverage_for_subject<'db>(
         PatternPredicateKind::Or(patterns) => {
             let mut remaining_subject_ty = subject_ty;
             let mut definitely_matched = Vec::with_capacity(patterns.len());
-            for pattern in patterns {
-                let coverage = pattern_coverage_for_subject(db, pattern, remaining_subject_ty);
-                definitely_matched.push(coverage.definitely_matched_ty());
-                if coverage.exhausts_subject() {
-                    remaining_subject_ty = Type::Never;
-                    break;
-                }
-                remaining_subject_ty = pattern_fallthrough_type(db, pattern, remaining_subject_ty);
-            }
+            extend_or_pattern_coverage(
+                db,
+                patterns,
+                &mut remaining_subject_ty,
+                &mut definitely_matched,
+            );
             return PatternCoverage::new(
                 UnionType::from_elements(db, definitely_matched),
                 remaining_subject_ty.is_never(),

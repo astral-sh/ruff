@@ -2988,6 +2988,15 @@ def _(color: Color):
         case _:
             reveal_type(color)  # revealed: Literal[Color.GREEN, Color.BLUE]
 
+def nested_or_fallthrough(
+    value: Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+) -> None:
+    match value:
+        case ((((((((((((((((0 | 1) | 2) | 3) | 4) | 5) | 6) | 7) | 8) | 9) | 10) | 11) | 12) | 13) | 14) | 15) | 16) | 17:
+            pass
+        case _:
+            reveal_type(value)  # revealed: Literal[18]
+
 class A: ...
 class B: ...
 class C: ...
