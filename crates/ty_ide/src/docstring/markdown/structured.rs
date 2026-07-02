@@ -2,9 +2,9 @@ use std::borrow::Cow;
 
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
 
 use super::general;
+use crate::docstring::document::SectionKind;
 use crate::docstring::document::preformatted::MarkdownFence;
 
 mod rst;
@@ -248,32 +248,6 @@ impl SectionItem {
                     }
                 }
             }
-        }
-    }
-}
-
-/// Canonical docstring sections shared by supported formats.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
-enum SectionKind {
-    Parameters,
-    KeywordArguments,
-    OtherParameters,
-    Attributes,
-    Returns,
-    Yields,
-    Raises,
-}
-
-impl SectionKind {
-    const fn heading(self) -> &'static str {
-        match self {
-            SectionKind::Parameters => "Parameters",
-            SectionKind::KeywordArguments => "Keyword Arguments",
-            SectionKind::OtherParameters => "Other Parameters",
-            SectionKind::Attributes => "Attributes",
-            SectionKind::Returns => "Returns",
-            SectionKind::Yields => "Yields",
-            SectionKind::Raises => "Raises",
         }
     }
 }
