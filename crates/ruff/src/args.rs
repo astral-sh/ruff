@@ -446,10 +446,12 @@ pub struct CheckCommand {
         conflicts_with = "watch",
     )]
     pub statistics: bool,
-    /// Enable automatic additions of `noqa` directives to failing lines.
+    /// Enable automatic additions of suppression directives to failing lines.
+    /// Uses `ruff:ignore` in preview mode and `noqa` otherwise.
     /// Optionally provide a reason to append after the codes.
     #[arg(
         long,
+        visible_alias = "add-ignore",
         value_name = "REASON",
         default_missing_value = "",
         num_args = 0..=1,

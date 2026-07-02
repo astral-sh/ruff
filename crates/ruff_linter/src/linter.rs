@@ -25,7 +25,7 @@ use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
 use crate::noqa::add_noqa;
 use crate::package::PackageRoot;
-use crate::preview::is_py315_support_enabled;
+use crate::preview::{is_human_readable_names_enabled, is_py315_support_enabled};
 use crate::registry::Rule;
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TEST_RULES, TestRule};
@@ -33,7 +33,7 @@ use crate::settings::types::UnsafeFixes;
 use crate::settings::{LinterSettings, TargetVersion, flags};
 use crate::source_kind::SourceKind;
 use crate::suppression::Suppressions;
-use crate::{Locator, directives, fs, warn_user_once};
+use crate::{Locator, SuppressionKind, directives, fs, warn_user_once};
 
 pub(crate) mod float;
 
@@ -371,7 +371,7 @@ pub fn check_path(
 
 const MAX_ITERATIONS: usize = 100;
 
-/// Add any missing `# noqa` pragmas to the source code at the given `Path`.
+/// Add any missing suppression comments to the source code at the given `Path`.
 pub fn add_noqa_to_path(
     path: &Path,
     package: Option<PackageRoot<'_>>,
@@ -422,8 +422,13 @@ pub fn add_noqa_to_path(
         &suppressions,
     );
 
-    // Add any missing `# noqa` pragmas.
+    // Add any missing suppression comments.
     // TODO(dhruvmanila): Add support for Jupyter Notebooks
+    let suppression_kind = if is_human_readable_names_enabled(settings.preview) {
+        SuppressionKind::Ignore
+    } else {
+        SuppressionKind::Noqa
+    };
     add_noqa(
         path,
         &diagnostics,
@@ -434,6 +439,7 @@ pub fn add_noqa_to_path(
         stylist.line_ending(),
         reason,
         &suppressions,
+        suppression_kind,
     )
 }
 

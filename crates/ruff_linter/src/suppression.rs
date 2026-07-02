@@ -75,13 +75,19 @@ pub(crate) struct SuppressionComment {
 
 impl SuppressionComment {
     /// Return the suppressed codes as strings
-    fn codes_as_str<'src>(&self, source: &'src str) -> impl Iterator<Item = &'src str> {
+    pub(crate) fn codes_as_str<'src>(&self, source: &'src str) -> impl Iterator<Item = &'src str> {
         self.codes.iter().map(|range| source.slice(range))
     }
 
     /// Return whether the comment is nested within a wider comment token.
     fn is_nested(&self) -> bool {
         self.token_range != self.range
+    }
+}
+
+impl Ranged for SuppressionComment {
+    fn range(&self) -> TextRange {
+        self.range
     }
 }
 
@@ -138,6 +144,20 @@ impl Suppression {
                 ..
             })
         )
+    }
+
+    /// Returns whether the suppression's range applies to a diagnostic.
+    ///
+    /// `ruff:ignore` comments only need to contain the start of the diagnostic range (or its
+    /// parent), while range suppression comments must contain the entire diagnostic range.
+    fn applies_to_diagnostic(&self, range: TextRange, parent: Option<TextSize>) -> bool {
+        if self.is_ignore() {
+            self.range.contains(range.start())
+                || range.is_empty() && self.range.end() == range.start()
+                || parent.is_some_and(|parent| self.range.contains(parent))
+        } else {
+            self.range.contains_range(range)
+        }
     }
 
     /// Return the [`Rule`] associated with this suppression.
@@ -266,6 +286,21 @@ impl Suppressions {
         self.valid.is_empty() && self.invalid.is_empty() && self.errors.is_empty()
     }
 
+    pub(crate) fn find_applicable_ignore(
+        &self,
+        diagnostic: &Diagnostic,
+    ) -> Option<&SuppressionComment> {
+        let range = diagnostic.primary_span()?.range()?;
+
+        self.valid
+            .iter()
+            .find(|suppression| {
+                suppression.is_ignore()
+                    && suppression.applies_to_diagnostic(range, diagnostic.parent())
+            })
+            .map(|suppression| suppression.comments.first())
+    }
+
     /// Check if a diagnostic is suppressed by any known range suppressions.
     ///
     /// A suppression applies for the given diagnostic if it fully contains the diagnostic's range.
@@ -325,20 +360,7 @@ impl Suppressions {
                 continue;
             }
 
-            // For `ruff:ignore` comments, only require that the start of the diagnostic range (or
-            // its parent) is covered by the suppression. Range suppression comments must fully
-            // contain the diagnostic range.
-            let suppressed = if suppression.is_ignore() {
-                suppression.range.contains(range.start())
-                    || range.is_empty() && suppression.range.end() == range.start()
-                    || diagnostic
-                        .parent()
-                        .is_some_and(|parent| suppression.range.contains(parent))
-            } else {
-                suppression.range.contains_range(range)
-            };
-
-            if suppressed {
+            if suppression.applies_to_diagnostic(range, diagnostic.parent()) {
                 suppression.used.set(true);
                 return true;
             }
