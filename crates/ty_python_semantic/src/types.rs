@@ -8665,6 +8665,13 @@ impl<'db> Type<'db> {
 
             Type::Recursive(recursive) => match type_mapping {
                 TypeMapping::UnfoldRecursive { recursive: target } if recursive == *target => self,
+                TypeMapping::UnnestRecursive { binder }
+                    if recursive.binder(db).same_marker(*binder) =>
+                {
+                    recursive
+                        .body(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                }
                 TypeMapping::ReplaceRecursiveWithBinder { recursive: target }
                     if recursive == *target =>
                 {
@@ -8949,6 +8956,7 @@ impl<'db> Type<'db> {
                 match type_mapping {
                     TypeMapping::UnfoldRecursive { .. }
                     | TypeMapping::FoldRecursive { .. }
+                    | TypeMapping::UnnestRecursive { .. }
                     | TypeMapping::ReplaceRecursiveWithBinder { .. } => self,
                     TypeMapping::Materialize(_) if alias.materialization_kind(db).is_some() => self,
                     TypeMapping::EagerExpansion if alias.materialization_kind(db).is_some() => {
@@ -9025,6 +9033,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::UnfoldRecursive { .. }
                 | TypeMapping::FoldRecursive { .. }
+                | TypeMapping::UnnestRecursive { .. }
                 | TypeMapping::ReplaceRecursiveWithBinder { .. }
                 | TypeMapping::BindLegacyTypevars(_)
                 | TypeMapping::FreshenBoundTypeVars { .. }
@@ -9050,6 +9059,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::UnfoldRecursive { .. }
                 | TypeMapping::FoldRecursive { .. }
+                | TypeMapping::UnnestRecursive { .. }
                 | TypeMapping::ReplaceRecursiveWithBinder { .. }
                 | TypeMapping::BindLegacyTypevars(_)
                 | TypeMapping::FreshenBoundTypeVars { .. }
@@ -10291,6 +10301,8 @@ pub enum TypeMapping<'a, 'db> {
     UnfoldRecursive { recursive: RecursiveType<'db> },
     /// Replaces an unfolded recursive type occurrence with the recursive type itself.
     FoldRecursive { recursive: RecursiveType<'db> },
+    /// Expands nested recursive types with the same binder as the recursive type being built.
+    UnnestRecursive { binder: DivergentType },
     /// Replaces a recursive type occurrence with its binder.
     ReplaceRecursiveWithBinder { recursive: RecursiveType<'db> },
     /// Converts retained runtime type-expression values to their type-expression meaning.
@@ -10377,6 +10389,7 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::Promote(..)
             | TypeMapping::UnfoldRecursive { .. }
             | TypeMapping::FoldRecursive { .. }
+            | TypeMapping::UnnestRecursive { .. }
             | TypeMapping::ReplaceRecursiveWithBinder { .. }
             | TypeMapping::SemanticViewInInference
             | TypeMapping::BindLegacyTypevars(_)
@@ -10426,6 +10439,7 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::ApplySpecialization(_)
             | TypeMapping::UnfoldRecursive { .. }
             | TypeMapping::FoldRecursive { .. }
+            | TypeMapping::UnnestRecursive { .. }
             | TypeMapping::ReplaceRecursiveWithBinder { .. }
             | TypeMapping::SemanticViewInInference
             | TypeMapping::BindLegacyTypevars(_)
@@ -10446,6 +10460,7 @@ impl<'db> TypeMapping<'_, 'db> {
             self,
             TypeMapping::UnfoldRecursive { .. }
                 | TypeMapping::FoldRecursive { .. }
+                | TypeMapping::UnnestRecursive { .. }
                 | TypeMapping::ReplaceRecursiveWithBinder { .. }
         )
     }
@@ -10730,6 +10745,13 @@ impl<'db> RecursiveType<'db> {
         origin: RecursiveTypeOrigin<'db>,
         mut body: Type<'db>,
     ) -> Type<'db> {
+        body = body.apply_type_mapping(
+            db,
+            env,
+            &TypeMapping::UnnestRecursive { binder },
+            TypeContext::default(),
+        );
+
         if let Type::Union(union) = body {
             let mut builder = UnionBuilder::new(db, env)
                 .unpack_aliases(false)
