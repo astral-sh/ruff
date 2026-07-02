@@ -89,6 +89,14 @@ pub(crate) fn lazy_import_immediately_resolved(checker: &Checker, name: &ExprNam
         return;
     };
 
+    // Suppress the diagnostic when the `require-lazy` policy requires this import to stay lazy.
+    // `lazy-import-mismatch` (TID254) runs first on the same statement and would re-insert `lazy`
+    // into the eager import this rule's fix produces, so the two fixes would oscillate forever.
+    // Deferring to TID254 keeps the rules mutually exclusive: a required-lazy import remains lazy.
+    if super::lazy_import_mismatch::requires_lazy(checker, import) {
+        return;
+    }
+
     let fix_range = if is_single_member_import(import) {
         lazy_import_prefix_range(import, checker.source_tokens())
     } else {

@@ -100,6 +100,45 @@ pub(crate) fn lazy_import_mismatch(checker: &Checker, stmt: &Stmt) {
     }
 }
 
+/// Shared core deciding whether the `require-lazy` policy requires `stmt` to be a `lazy` import.
+///
+/// This is the single source of truth for "does TID254 want this eager import to be lazy?" It is
+/// kept in lock-step with TID254's reporting path above (which inserts `lazy` for exactly the
+/// statements where this returns `true`), and `lazy-import-immediately-resolved` (TID255) calls it
+/// as its suppression guard, so the two rules can never drift apart on which imports are required
+/// to be lazy.
+///
+/// It applies every gate TID254 applies before it would insert `lazy`:
+/// - the Python 3.15 (`lazy import` syntax) target-version gate,
+/// - the lazy-import-context gate (no `lazy` inside an already-deferred context),
+/// - the `__future__` / `from ... import *` exclusions for `ImportFrom`,
+/// - the `require-lazy` selector match against **every** import node — both the module node
+///   (`MatchNameOrParent`, e.g. `require-lazy = ["pkg"]`) and each per-alias member node
+///   (`MatchName`, e.g. `require-lazy = ["pkg.thing"]`), exactly like TID254's named path.
+///
+/// Note it keys only on `require-lazy`: `ban-lazy` removes `lazy` and so can never re-add it,
+/// hence is irrelevant to the oscillation this guards against.
+pub(crate) fn requires_lazy(checker: &Checker, stmt: &Stmt) -> bool {
+    if checker.target_version() < PythonVersion::PY315 || checker.lazy_import_context().is_some() {
+        return false;
+    }
+
+    if let Stmt::ImportFrom(StmtImportFrom { module, names, .. }) = stmt {
+        if matches!(module.as_deref(), Some("__future__"))
+            || names.iter().any(|alias| alias.name.as_str() == "*")
+        {
+            return false;
+        }
+    } else if !matches!(stmt, Stmt::Import(_)) {
+        return false;
+    }
+
+    let selector = &checker.settings().flake8_tidy_imports.require_lazy;
+    (&BannedModuleImportPolicies::new(stmt, checker))
+        .into_iter()
+        .any(|(import_policy, _)| selector.find(&import_policy).is_some())
+}
+
 fn lazy_import_policy(checker: &Checker, stmt: &Stmt) -> Option<LazyImportPolicy> {
     if checker.target_version() < PythonVersion::PY315 || checker.lazy_import_context().is_some() {
         return None;
