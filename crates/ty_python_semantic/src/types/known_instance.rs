@@ -388,6 +388,7 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::RescopeReturnCallables(_)
                 | TypeMapping::UnfoldRecursive { .. }
                 | TypeMapping::FoldRecursive { .. }
+                | TypeMapping::UnnestRecursive { .. }
                 | TypeMapping::ReplaceRecursiveWithBinder { .. }
                 | TypeMapping::SemanticViewInInference => Type::KnownInstance(self),
             },

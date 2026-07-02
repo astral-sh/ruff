@@ -5186,7 +5186,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     )
                 })
             }
-
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                || target_type,
+                |unfolded| {
+                    self.infer_augmented_op(assignment, unfolded, value_expr, infer_value_ty)
+                },
+            ),
             _ => {
                 if let Some(typed_dict_update_ty) = self
                     .try_infer_typed_dict_pep_584_augmented_assignment(
