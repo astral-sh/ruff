@@ -1991,6 +1991,9 @@ impl<'db> ClassType<'db> {
 
     /// Return whether this class or any of its bases declares or assigns an instance member named
     /// `name`.
+    ///
+    /// Dynamic bases are excluded; use [`Self::has_dynamic_instance_fallback`] to account for
+    /// instance members they may provide.
     pub(super) fn has_instance_member(self, db: &'db dyn Db, name: &str) -> bool {
         self.iter_mro(db)
             .filter_map(ClassBase::into_class)
