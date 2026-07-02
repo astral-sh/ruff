@@ -32,7 +32,8 @@ use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
-    IntersectionType, Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
+    Foldable, IntersectionType, RecursiveType, Type, TypeContext, TypeMapping, UnionBuilder,
+    UnionType,
 };
 use crate::{Db, FxOrderSet, Program};
 use ty_python_core::Truthiness;
@@ -2292,6 +2293,17 @@ impl<'db> Tuple<Type<'db>> {
             release_level_ty,
             int_instance_ty,
         ])
+    }
+}
+
+impl<'db> Foldable<'db> for TupleSpec<'db> {
+    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::FoldRecursive { recursive },
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
     }
 }
 

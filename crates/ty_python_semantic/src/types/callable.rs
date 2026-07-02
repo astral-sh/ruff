@@ -8,8 +8,9 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
         FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
-        SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
+        Foldable, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, RecursiveType,
+        Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+        UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
@@ -92,6 +93,14 @@ impl<'db> Type<'db> {
                 db,
                 Signature::dynamic(self),
             ))),
+
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                || None,
+                |unfolded| {
+                    unfolded.try_upcast_to_callable_with_policy_and_context(db, policy, context)
+                },
+            ),
 
             Type::FunctionLiteral(function_literal)
                 if context.is_recursive_reference(db, function_literal) =>
@@ -703,6 +712,23 @@ impl<'db> CallableTypes<'db> {
             CallableFunctionProvenance::None,
         )
         .into_precise_functools_partial_instance(db, wrapped)
+    }
+}
+
+impl<'db> Foldable<'db> for CallableType<'db> {
+    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::FoldRecursive { recursive },
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
+    }
+}
+
+impl<'db> Foldable<'db> for CallableTypes<'db> {
+    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.map(|callable| callable.fold(db, recursive))
     }
 }
 

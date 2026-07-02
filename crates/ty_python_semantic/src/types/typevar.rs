@@ -1171,7 +1171,10 @@ impl<'db> BoundTypeVarInstance<'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion
-            | TypeMapping::RescopeReturnCallables(_) => Type::TypeVar(self),
+            | TypeMapping::RescopeReturnCallables(_)
+            | TypeMapping::UnfoldRecursive { .. }
+            | TypeMapping::FoldRecursive { .. }
+            | TypeMapping::ReplaceRecursiveWithBinder { .. } => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {
                 Type::TypeVar(self.materialize_impl(db, *materialization_kind, visitor))
             }

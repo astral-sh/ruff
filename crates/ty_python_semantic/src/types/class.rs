@@ -275,11 +275,14 @@ impl<'db> GenericAlias<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        let tcx = tcx
-            .annotation
-            .and_then(|ty| ty.specialization_of(db, self.origin(db)))
-            .map(|specialization| specialization.types(db))
-            .unwrap_or(&[]);
+        let tcx = if type_mapping.used_in_cycle_recovery() {
+            &[]
+        } else {
+            tcx.annotation
+                .and_then(|ty| ty.specialization_of(db, self.origin(db)))
+                .map(|specialization| specialization.types(db))
+                .unwrap_or(&[])
+        };
 
         let original_specialization = self.specialization(db);
         let specialization =

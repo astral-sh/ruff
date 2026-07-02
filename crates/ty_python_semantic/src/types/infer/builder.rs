@@ -2883,6 +2883,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 emit_diagnostics,
             ),
 
+            Type::Recursive(recursive) => {
+                let unfolded = recursive.unfold(db);
+                if unfolded == Type::Recursive(recursive) {
+                    infer_value_ty(self, TypeContext::default());
+                    false
+                } else {
+                    self.validate_attribute_assignment(
+                        target,
+                        unfolded,
+                        attribute,
+                        infer_value_ty,
+                        emit_diagnostics,
+                    )
+                }
+            }
+
             // Super instances do not allow attribute assignment
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
                 infer_value_ty(self, TypeContext::default());
@@ -3535,6 +3551,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 emit_diagnostics,
             ),
 
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                || false,
+                |unfolded| {
+                    self.validate_attribute_deletion(target, unfolded, attribute, emit_diagnostics)
+                },
+            ),
+
             Type::NominalInstance(..)
             | Type::ProtocolInstance(_)
             | Type::LiteralValue(..)
@@ -3724,6 +3748,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::NewTypeInstance(_) => object_ty.instance_member(db, attribute),
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                     object_ty.class_object_member(db, attribute, MemberLookupPolicy::default())
+                }
+                Type::Recursive(recursive) => {
+                    return recursive.map_or_else(
+                        db,
+                        || None,
+                        |unfolded| self.assignment_attribute_members(unfolded, attribute),
+                    );
                 }
                 Type::Union(..)
                 | Type::Intersection(..)
@@ -5532,6 +5563,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::TypeAlias(alias) => {
                     propagate_callable_kind(db, alias.value_type(db), kind, provenance)
                 }
+                Type::Recursive(recursive) => recursive.map_or_else(
+                    db,
+                    || None,
+                    |unfolded| propagate_callable_kind(db, unfolded, kind, provenance),
+                ),
                 // Intersections are currently not handled here because that would require
                 // the decorator to be explicitly annotated as returning an intersection.
                 Type::Intersection(_) | Type::EnumComplement(_) => None,
@@ -10601,6 +10637,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (_, Type::TypeAlias(alias)) => {
                 self.infer_unary_expression_type(op, alias.value_type(self.db()), unary)
             }
+            (_, Type::Recursive(recursive)) => recursive.map_or_else(
+                self.db(),
+                || operand_type,
+                |unfolded| self.infer_unary_expression_type(op, unfolded, unary),
+            ),
 
             (ast::UnaryOp::UAdd, Type::LiteralValue(literal)) => match literal.kind() {
                 LiteralValueTypeKind::Int(value) => Type::int_literal(value.as_i64()),

@@ -461,6 +461,11 @@ impl ClassInfoConstraintFunction {
             Type::TypeAlias(alias) => {
                 self.generate_constraint(db, alias.value_type(db), is_positive)
             }
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                || None,
+                |unfolded| self.generate_constraint(db, unfolded, is_positive),
+            ),
             Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => {
                 // We can't narrow negatively from a `SubclassOf` type. `if !isinstance(x, y)`
@@ -3975,6 +3980,11 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
             .iter()
             .any(|union_member_ty| is_or_contains_typeddict(db, *union_member_ty)),
         Type::TypeAlias(alias) => is_or_contains_typeddict(db, alias.value_type(db)),
+        Type::Recursive(recursive) => recursive.map_or_else(
+            db,
+            || false,
+            |unfolded| is_or_contains_typeddict(db, unfolded),
+        ),
 
         Type::Dynamic(_)
         | Type::Divergent(_)
@@ -4146,6 +4156,11 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         Type::TypeAlias(alias) => {
             all_matching_typeddict_fields_have_literal_types(db, alias.value_type(db), field_name)
         }
+        Type::Recursive(recursive) => recursive.map_or_else(
+            db,
+            || false,
+            |unfolded| all_matching_typeddict_fields_have_literal_types(db, unfolded, field_name),
+        ),
         Type::Intersection(intersection) => {
             intersection
                 .positive(db)

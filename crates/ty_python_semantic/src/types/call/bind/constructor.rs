@@ -4,7 +4,9 @@ use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::generics::Specialization;
 use crate::types::signatures::Parameter;
-use crate::types::{BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext};
+use crate::types::{
+    BoundTypeVarInstance, ClassLiteral, DynamicType, Foldable, RecursiveType, Type, TypeContext,
+};
 
 /// Bindings for a constructor call.
 ///
@@ -500,6 +502,18 @@ impl<'db> ConstructorBinding<'db> {
     }
 }
 
+impl<'db> Foldable<'db> for ConstructorBinding<'db> {
+    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            entry: self.entry.fold(db, recursive),
+            constructor_context: self.constructor_context.fold(db, recursive),
+            downstream_constructor: self
+                .downstream_constructor
+                .map(|bindings| Box::new(bindings.fold(db, recursive))),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct ConstructorContext<'db> {
     instance_type: Type<'db>,
@@ -527,6 +541,15 @@ impl<'db> ConstructorContext<'db> {
 
     fn kind(self) -> ConstructorCallableKind {
         self.kind
+    }
+}
+
+impl<'db> Foldable<'db> for ConstructorContext<'db> {
+    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        Self {
+            instance_type: self.instance_type.fold(db, recursive),
+            kind: self.kind,
+        }
     }
 }
 

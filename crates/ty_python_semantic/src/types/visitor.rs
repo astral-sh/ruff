@@ -130,6 +130,10 @@ pub(crate) trait TypeVisitor<'db> {
     fn visit_newtype_instance_type(&self, db: &'db dyn Db, newtype: NewType<'db>) {
         walk_newtype_instance_type(db, newtype, self);
     }
+
+    fn visit_recursive_type(&self, db: &'db dyn Db, recursive: super::RecursiveType<'db>) {
+        self.visit_type(db, recursive.body(db));
+    }
 }
 
 /// Enumeration of types that may contain other types, such as unions, intersections, and generics.
@@ -155,6 +159,7 @@ pub(super) enum NonAtomicType<'db> {
     ProtocolInstance(ProtocolInstanceType<'db>),
     TypedDict(TypedDictType<'db>),
     TypeAlias(TypeAliasType<'db>),
+    Recursive(super::RecursiveType<'db>),
     NewTypeInstance(NewType<'db>),
 }
 
@@ -226,6 +231,9 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
                 TypeKind::NonAtomic(NonAtomicType::TypedDict(typed_dict))
             }
             Type::TypeAlias(alias) => TypeKind::NonAtomic(NonAtomicType::TypeAlias(alias)),
+            Type::Recursive(recursive) => {
+                TypeKind::NonAtomic(NonAtomicType::Recursive(recursive))
+            }
             Type::NewTypeInstance(newtype) => {
                 TypeKind::NonAtomic(NonAtomicType::NewTypeInstance(newtype))
             }
@@ -274,6 +282,9 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         NonAtomicType::TypedDict(typed_dict) => visitor.visit_typed_dict_type(db, typed_dict),
         NonAtomicType::TypeAlias(alias) => {
             visitor.visit_type_alias_type(db, alias);
+        }
+        NonAtomicType::Recursive(recursive) => {
+            visitor.visit_recursive_type(db, recursive);
         }
         NonAtomicType::NewTypeInstance(newtype) => {
             visitor.visit_newtype_instance_type(db, newtype);

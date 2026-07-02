@@ -281,6 +281,7 @@ impl<'db> Type<'db> {
              => true,
             Type::Dynamic(_)
             | Type::Divergent(_)
+            | Type::Recursive(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
             | Type::GenericAlias(_)
@@ -1124,6 +1125,28 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // "too many cycle iterations" panics).
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
                 ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
+            }
+
+            (Type::Recursive(source_recursive), _) => {
+                let source_unfolded = source_recursive.unfold(db);
+                if source_unfolded == source {
+                    ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
+                } else {
+                    self.with_recursion_guard(source, target, || {
+                        self.check_type_pair(db, source_unfolded, target)
+                    })
+                }
+            }
+
+            (_, Type::Recursive(target_recursive)) => {
+                let target_unfolded = target_recursive.unfold(db);
+                if target_unfolded == target {
+                    ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
+                } else {
+                    self.with_recursion_guard(source, target, || {
+                        self.check_type_pair(db, source, target_unfolded)
+                    })
+                }
             }
 
             // Instances of classes that inherit from an explicit `Any` base retain their nominal
@@ -2537,6 +2560,28 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
+
+            (Type::Recursive(left_recursive), _) => {
+                let left_unfolded = left_recursive.unfold(db);
+                if left_unfolded == left {
+                    self.never()
+                } else {
+                    self.with_recursion_guard(left, right, || {
+                        self.check_type_pair(db, left_unfolded, right)
+                    })
+                }
+            }
+
+            (_, Type::Recursive(right_recursive)) => {
+                let right_unfolded = right_recursive.unfold(db);
+                if right_unfolded == right {
+                    self.never()
+                } else {
+                    self.with_recursion_guard(left, right, || {
+                        self.check_type_pair(db, left, right_unfolded)
+                    })
+                }
+            }
 
             (Type::TypeAlias(alias), _) => {
                 let left_alias_ty = alias.value_type(db);

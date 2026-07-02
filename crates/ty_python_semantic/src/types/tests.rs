@@ -1,10 +1,12 @@
 use super::*;
-use crate::db::tests::{TestDbBuilder, setup_db};
-use crate::place::{typing_extensions_symbol, typing_symbol};
+use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
+use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
 use crate::types::type_alias::PEP695TypeAliasType;
+use ruff_db::files::system_path_to_file;
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
+use salsa::Database;
 use test_case::test_case;
 
 /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
@@ -48,6 +50,64 @@ fn list_alias<'db>(db: &'db dyn Db, argument: Type<'db>) -> GenericAlias<'db> {
         .expect("`list` should accept one type argument")
         .into_generic_alias()
         .expect("a specialized `list` should be a generic alias")
+}
+
+fn list_instance<'db>(db: &'db dyn Db, argument: Type<'db>) -> Type<'db> {
+    Type::instance(db, ClassType::from(list_alias(db, argument)))
+}
+
+fn recursive_int_list<'db>(db: &'db dyn Db) -> RecursiveType<'db> {
+    let binder = DivergentType::new(salsa::plumbing::Id::from_bits(1));
+    let recursive_var = Type::Divergent(binder);
+    let element_ty = UnionType::from_elements(db, [KnownClass::Int.to_instance(db), recursive_var]);
+    let body = list_instance(db, element_ty);
+
+    let Type::Recursive(recursive) = Type::recursive(db, binder, body) else {
+        panic!("the recursive variable occurs in the body");
+    };
+
+    recursive
+}
+
+fn events_include_query(db: &TestDb, events: &[salsa::Event], suffix: &str) -> bool {
+    events.iter().any(|event| {
+        let salsa::EventKind::WillExecute { database_key } = event.kind else {
+            return false;
+        };
+
+        db.ingredient_debug_name(database_key.ingredient_index())
+            .contains(suffix)
+    })
+}
+
+fn will_execute_query_names(db: &TestDb, events: &[salsa::Event]) -> Vec<String> {
+    events
+        .iter()
+        .filter_map(|event| {
+            let salsa::EventKind::WillExecute { database_key } = event.kind else {
+                return None;
+            };
+
+            Some(
+                db.ingredient_debug_name(database_key.ingredient_index())
+                    .to_string(),
+            )
+        })
+        .collect()
+}
+
+fn box_alias<'db>(db: &'db TestDb) -> GenericAlias<'db> {
+    let file = system_path_to_file(db, "/src/box.py").expect("test file should exist");
+    let Type::ClassLiteral(class) = global_symbol(db, file, "Box").place.expect_type() else {
+        panic!("Box should be inferred as a class literal");
+    };
+    let class = class.apply_specialization(db, |generic_context| {
+        generic_context.specialize_partial(db, [Some(KnownClass::Int.to_instance(db))])
+    });
+
+    class
+        .into_generic_alias()
+        .expect("specializing Box should produce a generic alias")
 }
 
 fn oscillating_generic_alias_cycle_recover<'db>(
@@ -338,6 +398,134 @@ fn divergent_type() {
 
     let intersection = IntersectionType::from_elements(&db, [div, Type::Never]);
     assert_eq!(intersection.display(&db).to_string(), "Never");
+}
+
+#[test]
+fn recursive_type_constructor_simplifies_non_recursive_bodies() {
+    let db = setup_db();
+    let binder = DivergentType::new(salsa::plumbing::Id::from_bits(1));
+    let recursive_var = Type::Divergent(binder);
+    let int = KnownClass::Int.to_instance(&db);
+
+    assert_eq!(Type::recursive(&db, binder, int), int);
+    assert!(matches!(
+        Type::recursive(&db, binder, recursive_var),
+        Type::Recursive(_)
+    ));
+
+    let top_level_identity =
+        UnionType::from_elements(&db, [KnownClass::Int.to_instance(&db), recursive_var]);
+    assert_eq!(Type::recursive(&db, binder, top_level_identity), int);
+
+    let nested_identity = list_instance(&db, top_level_identity);
+    let Type::Recursive(recursive) = Type::recursive(&db, binder, nested_identity) else {
+        panic!("the nested recursive variable should keep the type recursive");
+    };
+    assert_eq!(
+        recursive.body(&db).display(&db).to_string(),
+        "list[int | Divergent]"
+    );
+}
+
+#[test]
+fn recursive_type_unfold_and_fold_are_inverse() {
+    let db = setup_db();
+    let recursive = recursive_int_list(&db);
+
+    let unfolded = recursive.unfold(&db);
+    assert_eq!(
+        unfolded.display(&db).to_string(),
+        "list[int | list[int | Divergent]]"
+    );
+
+    let folded = unfolded.fold(&db, recursive);
+    assert_eq!(folded, Type::Recursive(recursive));
+
+    assert!(Type::Recursive(recursive).is_equivalent_to(&db, unfolded));
+    assert!(unfolded.is_equivalent_to(&db, Type::Recursive(recursive)));
+}
+
+#[test]
+fn recursive_type_map_folds_only_unfolded_body() {
+    let db = setup_db();
+    let recursive = recursive_int_list(&db);
+
+    let projected = recursive.map_type(&db, |unfolded| {
+        unfolded
+            .subscript(&db, Type::int_literal(0), ast::ExprContext::Load)
+            .expect("the unfolded recursive list should be subscriptable")
+    });
+    assert_eq!(projected.display(&db).to_string(), "int | list[int | Divergent]");
+
+    let constructed = recursive.map_type(&db, |unfolded| {
+        list_instance(&db, unfolded)
+    });
+    assert_eq!(constructed.display(&db).to_string(), "list[list[int | Divergent]]");
+
+    let Type::NominalInstance(instance) = constructed else {
+        panic!("list construction should produce a nominal instance");
+    };
+    let ClassType::Generic(alias) = instance.class(&db) else {
+        panic!("a specialized list instance should have a generic class");
+    };
+    assert_eq!(
+        alias.specialization(&db).types(&db),
+        &[Type::Recursive(recursive)]
+    );
+}
+
+#[test]
+fn recursive_fold_does_not_invoke_variance_queries() {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/box.py",
+        r#"
+        class Box[T]:
+            value: T
+        "#,
+    )
+    .unwrap();
+    db.clear_salsa_events();
+    {
+        let recursive = recursive_int_list(&db);
+        let box_ty = Type::GenericAlias(box_alias(&db));
+        let _ = box_ty.apply_type_mapping(
+            &db,
+            &TypeMapping::FoldRecursive { recursive },
+            TypeContext::default(),
+        );
+    }
+    let events = db.take_salsa_events();
+    assert!(
+        !events_include_query(&db, &events, "variance_of"),
+        "{:#?}",
+        will_execute_query_names(&db, &events)
+    );
+
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/box.py",
+        r#"
+        class Box[T]:
+            value: T
+        "#,
+    )
+    .unwrap();
+    db.clear_salsa_events();
+    {
+        let box_ty = Type::GenericAlias(box_alias(&db));
+        let _ = box_ty.apply_type_mapping(
+            &db,
+            &TypeMapping::ReplaceParameterDefaults,
+            TypeContext::default(),
+        );
+    }
+    let events = db.take_salsa_events();
+    assert!(
+        events_include_query(&db, &events, "variance_of"),
+        "{:#?}",
+        will_execute_query_names(&db, &events)
+    );
 }
 
 #[test]

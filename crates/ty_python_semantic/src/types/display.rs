@@ -957,6 +957,10 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 write!(f.with_type(self.ty), "{dynamic}")
             }
             Type::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
+            Type::Recursive(recursive) => recursive
+                .body(self.db)
+                .display_with(self.db, self.settings.clone())
+                .fmt_detailed(f),
             Type::Never => f.with_type(self.ty).write_str("Never"),
             Type::NominalInstance(instance) => {
                 let class = instance.class(self.db);

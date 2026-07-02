@@ -176,6 +176,9 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
             (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => {
                 left.definition(db) == right.definition(db)
             }
+            (Type::Recursive(left), Type::Recursive(right)) => {
+                left.binder(db).same_marker(right.binder(db))
+            }
             _ => false,
         }
     }

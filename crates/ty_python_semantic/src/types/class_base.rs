@@ -3,9 +3,9 @@ use crate::types::generics::{ApplySpecialization, Specialization};
 use crate::types::mro::MroIterator;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassLiteral, ClassType, DivergentType, DynamicType, KnownClass,
-    KnownInstanceType, MaterializationKind, SpecialFormType, StaticMroError, Type, TypeContext,
-    TypeMapping, TypedDictModule, todo_type,
+    ApplyTypeMappingVisitor, ClassLiteral, ClassType, DivergentType, DynamicType, Foldable,
+    KnownClass, KnownInstanceType, MaterializationKind, RecursiveType, SpecialFormType,
+    StaticMroError, Type, TypeContext, TypeMapping, TypedDictModule, todo_type,
 };
 use crate::{Db, DisplaySettings};
 
@@ -139,6 +139,11 @@ impl<'db> ClassBase<'db> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
             Type::Divergent(divergent) => Some(Self::Divergent(divergent)),
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                || None,
+                |unfolded| Self::try_from_type(db, unfolded, subclass),
+            ),
             Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)
@@ -515,6 +520,25 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
 impl<'db> From<&ClassBase<'db>> for Type<'db> {
     fn from(value: &ClassBase<'db>) -> Self {
         Self::from(*value)
+    }
+}
+
+impl<'db> Foldable<'db> for ClassBase<'db> {
+    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        match self {
+            Self::Class(class) => Self::Class(class.apply_type_mapping_impl(
+                db,
+                &TypeMapping::FoldRecursive { recursive },
+                TypeContext::default(),
+                &ApplyTypeMappingVisitor::default(),
+            )),
+            Self::Any
+            | Self::Dynamic(_)
+            | Self::Divergent(_)
+            | Self::Protocol
+            | Self::Generic
+            | Self::TypedDict(_) => self,
+        }
     }
 }
 
