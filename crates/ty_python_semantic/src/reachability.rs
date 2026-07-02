@@ -241,7 +241,10 @@ use ty_python_core::{
 /// same intersections.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, id, _, _| Type::divergent(id),
+    cycle_initial = |db: &'db dyn Db, id, predicate: PatternPredicate<'db>, _| {
+        let env = ProgramEnvironment::from_scope(predicate.subject(db).scope(db));
+        Type::identity_recursive(db, &env, id)
+    },
     cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
         let env = ProgramEnvironment::from_scope(predicate.subject(db).scope(db));
         result.cycle_normalized(db, &env, *previous, cycle)
@@ -272,7 +275,10 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
 /// This result is also the preceding-pattern prefix for the next unguarded case.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, id, _, _| Type::divergent(id),
+    cycle_initial = |db: &'db dyn Db, id, predicate: PatternPredicate<'db>, _| {
+        let env = ProgramEnvironment::from_scope(predicate.subject(db).scope(db));
+        Type::identity_recursive(db, &env, id)
+    },
     cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
         let env = ProgramEnvironment::from_scope(predicate.subject(db).scope(db));
         result.cycle_normalized(db, &env, *previous, cycle)

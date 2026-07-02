@@ -147,7 +147,10 @@ impl<'db> PEP695TypeAliasType<'db> {
     /// Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_initial=|db, id, alias: PEP695TypeAliasType<'db>| {
+            let env = ProgramEnvironment::from_scope(alias.rhs_scope(db));
+            Type::identity_recursive(db, &env, id)
+        },
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: PEP695TypeAliasType<'db>| {
             let env = ProgramEnvironment::from_scope(alias.rhs_scope(db));
             value.cycle_normalized(db, &env, *previous, cycle)
@@ -264,7 +267,10 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     /// struct's identity. Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_initial=|db, id, alias: ManualPEP695TypeAliasType<'db>| {
+            let env = ProgramEnvironment::from_definition(alias.definition(db));
+            Type::identity_recursive(db, &env, id)
+        },
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: ManualPEP695TypeAliasType<'db>| {
             let env = ProgramEnvironment::from_definition(alias.definition(db));
             value.cycle_normalized(db, &env, *previous, cycle)

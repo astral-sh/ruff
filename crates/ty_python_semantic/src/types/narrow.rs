@@ -427,7 +427,10 @@ struct PatternSuccessAnalyzer<'db> {
 /// ```
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, _| PatternSuccessTypes::cycle_initial(Type::divergent(id)),
+    cycle_initial=|db: &'db dyn Db, id, pattern: PatternPredicate<'db>| {
+        let env = ProgramEnvironment::from_scope(pattern.subject(db).scope(db));
+        PatternSuccessTypes::cycle_initial(Type::identity_recursive(db, &env, id))
+    },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &PatternSuccessTypes<'db>, result: PatternSuccessTypes<'db>, pattern: PatternPredicate<'db>| {
         let env = ProgramEnvironment::from_scope(pattern.subject(db).scope(db));
         result.cycle_normalized(db, &env, previous, cycle)

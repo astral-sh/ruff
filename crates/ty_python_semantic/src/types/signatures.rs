@@ -188,7 +188,7 @@ impl<'db> CallableSignature<'db> {
     ) -> Self {
         Self::single(Signature::new(
             Parameters::bottom(),
-            Type::divergent(id).bottom_materialization(db, env),
+            Type::identity_recursive(db, env, id).bottom_materialization(db, env),
         ))
     }
 
@@ -5813,7 +5813,10 @@ impl<'db> ParameterDefault<'db> {
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, id, _| Type::divergent(id),
+    cycle_initial=|db, id, parameter: Definition<'db>| {
+        let env = ProgramEnvironment::from_definition(parameter);
+        Type::identity_recursive(db, &env, id)
+    },
     cycle_fn=|db, cycle, previous: &Type<'db>, ty: Type<'db>, parameter: Definition<'db>| {
         ty.cycle_normalized(db, &ProgramEnvironment::from_definition(parameter), *previous, cycle)
     },

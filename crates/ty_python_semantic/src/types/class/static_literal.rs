@@ -3532,12 +3532,13 @@ fn explicit_bases_cycle_initial<'db>(
     id: salsa::Id,
     literal: StaticClassLiteral<'db>,
 ) -> Box<[Type<'db>]> {
+    let env = ProgramEnvironment::from_scope(literal.body_scope(db));
     let module = parsed_module(db, literal.python_file(db)).load(db);
     let class_stmt = literal.node(db, &module);
     // Try to produce a list of `Divergent` types of the right length. However, if one or more of
     // the bases is a starred expression, we don't know how many entries that will eventually
     // expand to.
-    vec![Type::divergent(id); class_stmt.bases().len()].into_boxed_slice()
+    vec![Type::identity_recursive(db, &env, id); class_stmt.bases().len()].into_boxed_slice()
 }
 
 fn explicit_bases_cycle_fn<'db>(

@@ -188,7 +188,10 @@ fn oscillating_generic_alias_cycle_recover<'db>(
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, id, _| Type::divergent(id),
+    cycle_initial=|db, id, program: Program<'db>| {
+        let env = ProgramEnvironment::from_program(program);
+        Type::identity_recursive(db, &env, id)
+    },
     cycle_fn=oscillating_generic_alias_cycle_recover,
 )]
 fn oscillating_generic_alias<'db>(db: &'db dyn Db, program: Program<'db>) -> Type<'db> {

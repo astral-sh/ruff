@@ -85,7 +85,10 @@ impl<'db> UnionType<'db> {
     ) -> Type<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_initial=|db, id, types: TypePair<'db>| {
+                let env = ProgramEnvironment::from_program(types.program(db));
+                Type::identity_recursive(db, &env, id)
+            },
             cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
                 result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
             },
@@ -959,7 +962,10 @@ impl<'db> IntersectionType<'db> {
     ) -> Type<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_initial=|db, id, types: TypePair<'db>| {
+                let env = ProgramEnvironment::from_program(types.program(db));
+                Type::identity_recursive(db, &env, id)
+            },
             cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
                 result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
             },

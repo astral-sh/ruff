@@ -81,11 +81,14 @@ impl<'db> StaticClassLiteral<'db> {
     #[salsa::tracked(
         returns(copy),
         cycle_fn=implicit_attribute_cycle_recover,
-        cycle_initial=|_, id, _| ImplicitAttribute {
-            member: Member {
-                inner: Place::bound(Type::divergent(id)).into(),
-            },
-            augmented_bindings: None,
+        cycle_initial=|db, id, attribute: ImplicitAttributeName<'db>| {
+            let env = ProgramEnvironment::from_scope(attribute.class_body_scope(db));
+            ImplicitAttribute {
+                member: Member {
+                    inner: Place::bound(Type::identity_recursive(db, &env, id)).into(),
+                },
+                augmented_bindings: None,
+            }
         },
         heap_size=ruff_memory_usage::heap_size,
     )]
