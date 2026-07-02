@@ -688,7 +688,7 @@ impl<'db> BoundSuperType<'db> {
                             typevar_context: None,
                         })
                     },
-                    |unfolded| delegate_to(unfolded),
+                    delegate_to,
                 );
             }
             Type::ClassLiteral(class) => SuperOwnerKind::Resolved(Self::resolve_class_super_owner(
