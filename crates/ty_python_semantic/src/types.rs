@@ -52,12 +52,11 @@ pub(crate) use self::match_pattern::{
     typed_dict_matches_class_pattern,
 };
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
-use self::set_theoretic::KnownUnion;
-use self::set_theoretic::NegativeIntersectionElements;
 pub(crate) use self::set_theoretic::builder::{
     IntersectionBuilder, UnionAccumulator, UnionBuilder,
 };
 pub use self::set_theoretic::{IntersectionType, UnionType};
+use self::set_theoretic::{KnownUnion, NegativeIntersectionElements, RecursivelyDefined};
 pub(crate) use self::signatures::Signature;
 pub use self::signatures::{ParameterDefault, ParameterKind};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
@@ -10772,6 +10771,7 @@ impl<'db> RecursiveType<'db> {
             }
 
             if removed_binder && retained {
+                builder = builder.recursively_defined(RecursivelyDefined::Yes);
                 body = builder.build();
             }
         }
