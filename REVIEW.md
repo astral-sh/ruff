@@ -56,3 +56,4 @@
 - Fixed — Honor `NO_INSTANCE_FALLBACK` for generated namespace members. Implicit special-method lookup must not select an attribute stored on the instance.
 - Rejected — Replace an inherited fallback behind a conditional direct class binding with the metaclass contract. The merge base and this branch produce the same inherited union; making that lookup path-sensitive would expand the feature rather than prevent a regression.
 - Fixed — Preserve dynamic instance fallbacks for mixed descriptor contracts. Descriptor arms retain precedence, while ordinary arms remain shadowable by an arbitrary instance attribute from the dynamic base.
+- Fixed — Keep instance-stored callables out of class-side lookup. Instance values are supplied only as the outer fallback, so their descriptor protocol is not invoked.
