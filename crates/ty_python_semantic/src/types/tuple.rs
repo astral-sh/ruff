@@ -28,7 +28,7 @@ use crate::subscript::{
 };
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
+use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
@@ -201,6 +201,18 @@ impl<'db> TupleType<'db> {
         }
     }
 
+    /// Packs a `TypeVarTuple` into the tuple value used for generic specialization relations.
+    pub(crate) fn unpacked_typevartuple(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> Self {
+        debug_assert!(typevar.is_typevartuple(db));
+        TupleType::new_internal(
+            db,
+            VariableLengthTuple::mixed([], Type::TypeVar(typevar), []),
+        )
+    }
+
     // N.B. If this method is not Salsa-tracked, we take 10 minutes to check
     // `static-frame` as part of the ecosystem analysis. This is because it's called
     // from `NominalInstanceType::class()`, which is a very hot method.
@@ -363,6 +375,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }
                 }
 
+                if self.typevar_evaluation == TypeVarEvaluation::Lazy
+                    && let Type::TypeVar(typevartuple) = target.variable()
+                    && typevartuple.is_typevartuple(db)
+                {
+                    let packed = Type::heterogeneous_tuple(db, source_iter.copied());
+                    return result.and(db, self.constraints, || {
+                        self.check_type_pair(db, packed, Type::TypeVar(typevartuple))
+                    });
+                }
+
                 // In addition, any remaining elements in this tuple must satisfy the
                 // variable-length portion of the other tuple.
                 result.and(db, self.constraints, || {
@@ -431,6 +453,44 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
 
             Tuple::Variable(target) => {
+                if self.typevar_evaluation == TypeVarEvaluation::Lazy
+                    && let Type::TypeVar(typevartuple) = target.variable()
+                    && typevartuple.is_typevartuple(db)
+                {
+                    let source_prefix = source.prefix_elements();
+                    let source_suffix = source.suffix_elements();
+                    let target_prefix = target.prefix_elements();
+                    let target_suffix = target.suffix_elements();
+                    if source_prefix.len() < target_prefix.len()
+                        || source_suffix.len() < target_suffix.len()
+                    {
+                        return self.never();
+                    }
+
+                    let source_suffix_start = source_suffix.len() - target_suffix.len();
+                    let boundary_constraints = source_prefix
+                        .iter()
+                        .zip(target_prefix)
+                        .chain(
+                            source_suffix[source_suffix_start..]
+                                .iter()
+                                .zip(target_suffix),
+                        )
+                        .when_all(db, self.constraints, |(&source_ty, &target_ty)| {
+                            self.check_type_pair(db, source_ty, target_ty)
+                        });
+
+                    let packed = Type::tuple(TupleType::mixed(
+                        db,
+                        source_prefix[target_prefix.len()..].iter().copied(),
+                        source.variable(),
+                        source_suffix[..source_suffix_start].iter().copied(),
+                    ));
+                    return boundary_constraints.and(db, self.constraints, || {
+                        self.check_type_pair(db, packed, Type::TypeVar(typevartuple))
+                    });
+                }
+
                 // When prenormalizing below, we assume that a dynamic variable-length portion of
                 // one tuple materializes to the variable-length portion of the other tuple.
                 let source_prenormalize_variable = match source.variable() {
@@ -1876,16 +1936,33 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> TupleSpec<'db> {
-        Self::mixed(
-            self.prefix_elements()
-                .iter()
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
-            self.variable()
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            self.suffix_elements()
-                .iter()
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
-        )
+        let prefix = self
+            .prefix_elements()
+            .iter()
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+        let variable = self.variable();
+        let mapped_variable = variable.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+        let suffix = self
+            .suffix_elements()
+            .iter()
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+
+        if let Type::TypeVar(typevar) = variable
+            && typevar.is_typevartuple(db)
+            && let Some(mapped_tuple) = mapped_variable.exact_tuple_instance_spec(db)
+        {
+            let mut builder = TupleSpecBuilder::with_capacity(self.elements.len());
+            for element in prefix {
+                builder.push(element);
+            }
+            builder = builder.concat(db, &mapped_tuple);
+            for element in suffix {
+                builder.push(element);
+            }
+            return builder.build();
+        }
+
+        Self::mixed(prefix, mapped_variable, suffix)
     }
 
     fn find_legacy_typevars_impl(
@@ -2451,6 +2528,17 @@ impl<'db> TupleSpecBuilder<'db> {
             TupleSpecBuilder::Fixed(elements) => elements.push(element),
             TupleSpecBuilder::Variable { suffix, .. } => suffix.push(element),
         }
+    }
+
+    /// Concatenates an unpacked `TypeVarTuple` as the variable-length portion of this tuple.
+    pub(crate) fn concat_variadic_typevar(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> Self {
+        debug_assert!(typevar.is_typevartuple(db));
+        let other = VariableLengthTuple::mixed([], Type::TypeVar(typevar), []);
+        self.concat(db, &other)
     }
 
     /// Concatenates another tuple to the end of this tuple, returning a new tuple.

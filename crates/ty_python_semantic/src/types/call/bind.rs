@@ -5107,11 +5107,29 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         {
             for matched_parameter in self.argument_matches[argument_index].iter() {
                 let parameter_index = matched_parameter.index;
+                let parameter = &parameters[parameter_index];
+                let declared_type = parameter.annotated_type();
+                // TODO: Infer a `TypeVarTuple` from all matched positional arguments as a single
+                // tuple. Until then, skip per-argument inference.
+                if parameter.has_starred_annotation()
+                    && (matches!(
+                        declared_type,
+                        Type::TypeVar(typevar) if typevar.is_typevartuple(self.db)
+                    ) || matches!(
+                        declared_type.exact_tuple_instance_spec(self.db).as_deref(),
+                        Some(TupleSpec::Variable(variable))
+                            if matches!(
+                                variable.variable(),
+                                Type::TypeVar(typevar) if typevar.is_typevartuple(self.db)
+                            )
+                    ))
+                {
+                    continue;
+                }
                 if self.is_gradual_variadic_parameter(parameter_index) {
                     continue;
                 }
 
-                let declared_type = parameters[parameter_index].annotated_type();
                 let argument_type = argument_types.get_for_declared_type(declared_type);
                 let specialization_result = builder.infer(
                     declared_type,

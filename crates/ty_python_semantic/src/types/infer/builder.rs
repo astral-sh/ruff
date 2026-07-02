@@ -1206,6 +1206,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DefinitionKind::ParamSpec(paramspec) => {
                 self.infer_paramspec_deferred(paramspec.node(self.module()));
             }
+            DefinitionKind::TypeVarTuple(typevartuple) => {
+                self.infer_typevartuple_deferred(typevartuple.node(self.module()));
+            }
             DefinitionKind::Assignment(assignment) => {
                 self.infer_assignment_deferred(
                     assignment.target(self.module()),
@@ -1887,6 +1890,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Check that no type parameter with a default follows a TypeVarTuple
         // in the type alias's PEP 695 type parameter list.
         if let Some(type_params) = type_alias.type_params.as_deref() {
+            post_inference::type_param_validation::check_single_typevar_tuple_pep695(
+                &self.context,
+                type_params,
+            );
             post_inference::type_param_validation::check_no_default_after_typevar_tuple_pep695(
                 &self.context,
                 type_params,
@@ -3939,6 +3946,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 definition,
                                 paramspec_class,
                             ),
+                            Some(
+                                typevartuple_class @ (KnownClass::TypeVarTuple
+                                | KnownClass::ExtensionsTypeVarTuple),
+                            ) => self.infer_legacy_typevartuple(
+                                target,
+                                call_expr,
+                                definition,
+                                typevartuple_class,
+                            ),
                             Some(KnownClass::NewType) => {
                                 self.infer_newtype_expression(target, call_expr, definition)
                             }
@@ -4256,6 +4272,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         if let Some(default) = arguments.find_keyword("default") {
             if matches!(
+                known_class,
+                Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple)
+            ) {
+                self.infer_typevartuple_default(&default.value, None);
+            } else if matches!(
                 known_class,
                 Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec)
             ) {
@@ -8984,6 +9005,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                 }
+                Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple) => {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
+                    {
+                        builder.into_diagnostic(
+                            "A `TypeVarTuple` definition must be a simple variable assignment",
+                        );
+                    }
+                }
                 Some(KnownClass::NewType) => {
                     if let Some(builder) =
                         self.context.report_lint(&INVALID_NEWTYPE, call_expression)
@@ -9247,6 +9278,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let iterable_type = self.infer_expression(value, tcx);
+        let typevartuple = match iterable_type {
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                if typevar.is_typevartuple(db) =>
+            {
+                bind_typevar(
+                    db,
+                    self.index,
+                    self.scope().file_scope_id(db),
+                    self.typevar_binding_context,
+                    typevar,
+                )
+            }
+            Type::TypeVar(typevar) if typevar.is_typevartuple(db) => Some(typevar),
+            _ => None,
+        };
+        if let Some(typevartuple) = typevartuple {
+            return Type::tuple(TupleType::new(
+                db,
+                &TupleSpecBuilder::with_capacity(0)
+                    .concat_variadic_typevar(db, typevartuple)
+                    .build(),
+            ));
+        }
         iterable_type
             .try_iterate(db)
             .map(|spec| Type::tuple(TupleType::new(db, &spec)))

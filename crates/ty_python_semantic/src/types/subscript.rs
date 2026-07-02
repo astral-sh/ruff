@@ -22,8 +22,8 @@ use super::infer::TypeContext;
 use super::instance::SliceLiteral;
 use super::special_form::SpecialFormType;
 use super::{
-    DynamicType, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
-    TypedDictType, UnionBuilder, UnionType, todo_type,
+    IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType, TypedDictType,
+    UnionBuilder, UnionType, todo_type,
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
@@ -774,7 +774,7 @@ impl<'db> Type<'db> {
             }
 
             (Type::SpecialForm(SpecialFormType::Unpack), _) => {
-                Some(Ok(Type::Dynamic(DynamicType::TodoUnpack)))
+                Some(Ok(Type::unknown()))
             }
 
             (Type::SpecialForm(SpecialFormType::TypeQualifier(TypeQualifier::InitVar)), _) => {
