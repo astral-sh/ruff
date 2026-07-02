@@ -16,8 +16,8 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass,
     Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext,
-    TypeVarBoundOrConstraints, TypedDictType, UnionType, binding_type, equality_truthiness,
-    infer_same_file_expression_type,
+    TypeVarBoundOrConstraints, TypedDictType, UnionBuilder, UnionType, binding_type,
+    equality_truthiness, infer_same_file_expression_type,
 };
 
 pub(crate) fn singleton_pattern_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
@@ -482,7 +482,9 @@ pub(crate) fn pattern_is_exhaustive_for_subject(
     pattern: &PatternPredicateKind<'_>,
     subject_ty: Type<'_>,
 ) -> bool {
-    pattern_coverage_for_subject(db, pattern, subject_ty).exhausts_subject
+    pattern_outcome_for_subject(db, pattern, subject_ty)
+        .residual
+        .is_exhausted()
 }
 
 /// Return whether every value in `subject_ty` is guaranteed to match a mapping pattern.
@@ -554,115 +556,341 @@ fn sequence_pattern_is_exhaustive_for_subject(
         .all(|(element, pattern)| pattern_is_exhaustive_for_subject(db, pattern, *element))
 }
 
-/// The statically known coverage of a pattern for a specific subject type.
+/// The values that can reach a later pattern after this pattern fails.
 ///
-/// `definitely_matched_ty` is an under-approximation that is safe to subtract from the subject.
-/// `exhausts_subject` records the stronger subject-specific proof separately because a gradual type
-/// such as `Mapping[str, Any]` is not a subtype of itself even though `case Mapping()` matches every
-/// value it represents.
+/// A shared complement stays symbolic so a union of subjects produces one intersection instead of
+/// a union of independently intersected arms. Equality patterns sometimes require a materialized
+/// residual because Python equality can match values outside the definite-match type.
 #[derive(Clone, Copy)]
-struct PatternCoverage<'db> {
-    definitely_matched_ty: Type<'db>,
-    exhausts_subject: bool,
+enum PatternResidual<'db> {
+    Exhausted,
+    SharedComplement {
+        base: Type<'db>,
+        /// A global under-approximation of values guaranteed to match the pattern wherever they
+        /// overlap `base`. This makes it safe to merge exclusions from separate union arms.
+        excluded: Type<'db>,
+    },
+    Materialized(Type<'db>),
 }
 
-impl<'db> PatternCoverage<'db> {
-    fn new(definitely_matched_ty: Type<'db>, exhausts_subject: bool) -> Self {
+impl<'db> PatternResidual<'db> {
+    fn materialized(subject_ty: Type<'db>) -> Self {
+        if subject_ty.is_never() {
+            Self::Exhausted
+        } else {
+            Self::Materialized(subject_ty)
+        }
+    }
+
+    fn is_exhausted(self) -> bool {
+        matches!(self, Self::Exhausted)
+    }
+
+    fn materialize(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Self::Exhausted => Type::Never,
+            Self::SharedComplement { base, excluded } => IntersectionBuilder::new(db)
+                .add_positive(base)
+                .add_negative(excluded)
+                .build(),
+            Self::Materialized(subject_ty) => subject_ty,
+        }
+    }
+}
+
+/// The statically known outcome of applying a pattern to a specific subject type.
+///
+/// `definitely_matched_ty` is a global under-approximation of values guaranteed to match. The
+/// residual separately records values that may fail, because gradual types cannot use `S & ~S` as
+/// proof that an exhaustive pattern leaves no fallthrough.
+#[derive(Clone, Copy)]
+struct PatternOutcome<'db> {
+    definitely_matched_ty: Type<'db>,
+    residual: PatternResidual<'db>,
+}
+
+impl<'db> PatternOutcome<'db> {
+    fn exhaustive(definitely_matched_ty: Type<'db>) -> Self {
         Self {
             definitely_matched_ty,
-            exhausts_subject,
+            residual: PatternResidual::Exhausted,
+        }
+    }
+
+    fn subtracting(base: Type<'db>, definitely_matched_ty: Type<'db>) -> Self {
+        Self {
+            definitely_matched_ty,
+            residual: PatternResidual::SharedComplement {
+                base,
+                excluded: definitely_matched_ty,
+            },
+        }
+    }
+
+    fn materialized(definitely_matched_ty: Type<'db>, remaining_subject_ty: Type<'db>) -> Self {
+        Self {
+            definitely_matched_ty,
+            residual: PatternResidual::materialized(remaining_subject_ty),
         }
     }
 }
 
-/// Accumulate coverage for ordered `or` alternatives without reanalyzing nested `or` subtrees.
-///
-/// Parenthesized patterns such as `case ((1 | 2) | 3)` retain nested `Or` nodes. Traversing those
-/// nodes into the same accumulator preserves left-to-right fallthrough while keeping analysis
-/// linear in the number of alternatives.
-fn extend_or_pattern_coverage<'db>(
-    db: &'db dyn Db,
-    patterns: &[PatternPredicateKind<'db>],
-    remaining_subject_ty: &mut Type<'db>,
-    definitely_matched: &mut Vec<Type<'db>>,
-) {
-    for pattern in patterns {
-        if remaining_subject_ty.is_never() {
-            break;
-        }
-
-        if let PatternPredicateKind::Or(nested) = pattern {
-            extend_or_pattern_coverage(db, nested, remaining_subject_ty, definitely_matched);
-            continue;
-        }
-
-        let coverage = pattern_coverage_for_subject(db, pattern, *remaining_subject_ty);
-        definitely_matched.push(coverage.definitely_matched_ty);
-        if coverage.exhausts_subject {
-            *remaining_subject_ty = Type::Never;
-        } else {
-            *remaining_subject_ty = pattern_fallthrough_type(db, pattern, *remaining_subject_ty);
-        }
-    }
-}
-
-/// Return the values that are statically guaranteed to match `kind` and whether they cover the
-/// complete subject.
-///
-/// The definite-match type is an under-approximation used for negative narrowing and ordered
-/// alternatives: callers may subtract it from `subject_ty`. Exhaustiveness is tracked separately
-/// because gradual types are not subtypes of themselves. A subject-independent pattern can return a
-/// type wider than `subject_ty`; for example, `case Base()` returns `Base` even for a `Child`
-/// subject. Class patterns need the current subject type when member extraction depends on the
-/// subject's statically known members.
-/// A subject-independent pattern can return its context-free definite-match type directly. A
-/// mapping pattern can use required `TypedDict` fields to establish that every subject value
-/// contains its keys.
-/// This treats access to a definitely bound descriptor as successful even though the descriptor
-/// could raise at runtime. The same rule is propagated through nested sequence, `or`, and `as`
-/// patterns.
-///
-/// ```python
-/// class Base:
-///     x: int
-///
-/// class Child(Base):
-///     pass
-///
-/// # For a `tuple[Child]` subject, this checks `x` on `Child`, not only on `Base`.
-/// case [Base(x=_)]: ...
-/// ```
-fn pattern_coverage_for_subject<'db>(
+/// Return the values guaranteed to match a value pattern and whether they cover the subject.
+fn value_pattern_coverage_for_subject<'db>(
     db: &'db dyn Db,
     kind: &PatternPredicateKind<'db>,
+    value_ty: Type<'db>,
     subject_ty: Type<'db>,
-) -> PatternCoverage<'db> {
-    if let Some(subject_independent_ty) = subject_independent_definite_match_pattern_type(db, kind)
-    {
-        return PatternCoverage::new(
-            subject_independent_ty,
-            subject_ty.is_subtype_of(db, subject_independent_ty),
-        );
-    }
-
+) -> (Type<'db>, bool) {
     let resolved_subject_ty = subject_ty.resolve_type_alias(db);
     if let Type::Union(union) = resolved_subject_ty {
         let mut exhausts_subject = true;
         let definitely_matched_ty = union.map(db, |element| {
-            let coverage = pattern_coverage_for_subject(db, kind, *element);
-            exhausts_subject &= coverage.exhausts_subject;
-            coverage.definitely_matched_ty
+            let (definitely_matched_ty, exhausts_element) =
+                value_pattern_coverage_for_subject(db, kind, value_ty, *element);
+            exhausts_subject &= exhausts_element;
+            definitely_matched_ty
         });
-        return PatternCoverage::new(definitely_matched_ty, exhausts_subject);
+        return (definitely_matched_ty, exhausts_subject);
+    }
+
+    if equality_truthiness(db, resolved_subject_ty, value_ty) == Truthiness::AlwaysTrue {
+        return (subject_ty, true);
+    }
+
+    (
+        IntersectionBuilder::new(db)
+            .add_positive(subject_ty)
+            .add_positive(definite_match_pattern_type(db, kind))
+            .build(),
+        false,
+    )
+}
+
+/// Return a specialized value-pattern residual when Python equality can determine one directly.
+///
+/// Keeping this separate from definite-match coverage lets ordinary fallthrough narrowing avoid a
+/// second per-member traversal of large literal unions.
+fn value_pattern_residual_for_subject<'db>(
+    db: &'db dyn Db,
+    value_ty: Type<'db>,
+    subject_ty: Type<'db>,
+) -> Option<PatternResidual<'db>> {
+    // A subject confined to the same enum cannot contain cross-type values that compare equal to
+    // the pattern, so a shared complement avoids repeated equality evaluation for large enums.
+    if let Some(enum_literal) = value_ty.as_enum_literal()
+        && is_same_enum_pattern_domain(db, subject_ty, enum_literal)
+        && equality_truthiness(db, value_ty, value_ty) == Truthiness::AlwaysTrue
+    {
+        return Some(PatternResidual::SharedComplement {
+            base: subject_ty,
+            excluded: value_ty,
+        });
+    }
+
+    if let Some(constraint) = evaluate_type_equality(db, subject_ty, value_ty, false) {
+        let remaining_subject_ty = IntersectionBuilder::new(db)
+            .add_positive(subject_ty)
+            .add_positive(constraint)
+            .build();
+        return Some(PatternResidual::materialized(remaining_subject_ty));
+    }
+
+    None
+}
+
+/// Analyze a value pattern without losing Python equality semantics.
+fn value_pattern_outcome_for_subject<'db>(
+    db: &'db dyn Db,
+    kind: &PatternPredicateKind<'db>,
+    value_ty: Type<'db>,
+    subject_ty: Type<'db>,
+) -> PatternOutcome<'db> {
+    let (definitely_matched_ty, exhausts_subject) =
+        value_pattern_coverage_for_subject(db, kind, value_ty, subject_ty);
+    if exhausts_subject {
+        return PatternOutcome::exhaustive(definitely_matched_ty);
+    }
+
+    if let Some(residual) = value_pattern_residual_for_subject(db, value_ty, subject_ty) {
+        return PatternOutcome {
+            definitely_matched_ty,
+            residual,
+        };
+    }
+
+    PatternOutcome::subtracting(subject_ty, definitely_matched_ty)
+}
+
+/// Accumulate ordered `or` alternatives without reanalyzing nested `or` subtrees.
+fn extend_or_pattern_outcome<'db>(
+    db: &'db dyn Db,
+    patterns: &[PatternPredicateKind<'db>],
+    residual: &mut PatternResidual<'db>,
+    definitely_matched: &mut Vec<Type<'db>>,
+) {
+    for pattern in patterns {
+        if residual.is_exhausted() {
+            break;
+        }
+
+        if let PatternPredicateKind::Or(nested) = pattern {
+            extend_or_pattern_outcome(db, nested, residual, definitely_matched);
+            continue;
+        }
+
+        let remaining_subject_ty = residual.materialize(db);
+        if remaining_subject_ty.is_never() {
+            *residual = PatternResidual::Exhausted;
+            break;
+        }
+        let outcome = pattern_outcome_for_subject(db, pattern, remaining_subject_ty);
+        definitely_matched.push(outcome.definitely_matched_ty);
+        *residual = outcome.residual;
+    }
+}
+
+/// Apply ordered alternatives to the residual left by each preceding `or` pattern.
+fn or_pattern_outcome_for_subject<'db>(
+    db: &'db dyn Db,
+    patterns: &[PatternPredicateKind<'db>],
+    subject_ty: Type<'db>,
+) -> PatternOutcome<'db> {
+    let mut residual = PatternResidual::materialized(subject_ty);
+    let mut definitely_matched = Vec::with_capacity(patterns.len());
+    extend_or_pattern_outcome(db, patterns, &mut residual, &mut definitely_matched);
+    if residual.materialize(db).is_never() {
+        residual = PatternResidual::Exhausted;
+    }
+    PatternOutcome {
+        definitely_matched_ty: UnionType::from_elements(db, definitely_matched),
+        residual,
+    }
+}
+
+/// Merge outcomes for a subject-dependent pattern over a union without materializing each arm.
+fn union_pattern_outcome<'db>(
+    db: &'db dyn Db,
+    kind: &PatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+    union: UnionType<'db>,
+) -> PatternOutcome<'db> {
+    let recursively_defined = union.recursively_defined(db);
+    let new_union_builder = || {
+        UnionBuilder::new(db)
+            .unpack_aliases(false)
+            .recursively_defined(recursively_defined)
+    };
+    let mut definitely_matched = new_union_builder();
+    let mut shared_bases = new_union_builder();
+    let mut shared_exclusions = new_union_builder();
+    let mut materialized = new_union_builder();
+    let mut all_exhaustive = true;
+    let mut preserve_original_base = true;
+    let mut definitely_matched_unchanged = true;
+    let mut shared_exclusions_unchanged = true;
+
+    for element in union.elements(db) {
+        let outcome = pattern_outcome_for_subject(db, kind, *element);
+        definitely_matched_unchanged &= outcome.definitely_matched_ty == *element;
+        definitely_matched.add_in_place(outcome.definitely_matched_ty);
+
+        match outcome.residual {
+            PatternResidual::Exhausted => {
+                preserve_original_base = false;
+                shared_exclusions_unchanged = false;
+            }
+            PatternResidual::SharedComplement { base, excluded } => {
+                all_exhaustive = false;
+                preserve_original_base &= base == *element;
+                shared_exclusions_unchanged &= excluded == *element;
+                shared_bases.add_in_place(base);
+                shared_exclusions.add_in_place(excluded);
+            }
+            PatternResidual::Materialized(remaining_subject_ty) => {
+                all_exhaustive = false;
+                preserve_original_base = false;
+                shared_exclusions_unchanged = false;
+                materialized.add_in_place(remaining_subject_ty);
+            }
+        }
+    }
+
+    let definitely_matched_ty = if definitely_matched_unchanged {
+        Type::Union(union)
+    } else {
+        definitely_matched.build()
+    };
+    if all_exhaustive {
+        return PatternOutcome::exhaustive(definitely_matched_ty);
+    }
+
+    let shared_base = if preserve_original_base {
+        subject_ty
+    } else {
+        shared_bases.build()
+    };
+    let shared_excluded = if shared_exclusions_unchanged {
+        Type::Union(union)
+    } else {
+        shared_exclusions.build()
+    };
+    let shared_residual = PatternResidual::SharedComplement {
+        base: shared_base,
+        excluded: shared_excluded,
+    };
+
+    if !materialized.is_empty() {
+        materialized.add_in_place(shared_residual.materialize(db));
+        PatternOutcome::materialized(definitely_matched_ty, materialized.build())
+    } else {
+        PatternOutcome {
+            definitely_matched_ty,
+            residual: shared_residual,
+        }
+    }
+}
+
+/// Return the pattern's definite matches and a symbolic plan for its fallthrough values.
+///
+/// Class patterns need the current subject when member extraction depends on statically known
+/// members. A mapping pattern can use required `TypedDict` fields to establish complete coverage.
+/// Access to a definitely bound descriptor is treated as successful even though it could raise at
+/// runtime; the same rule propagates through nested sequence, `or`, and `as` patterns.
+fn pattern_outcome_for_subject<'db>(
+    db: &'db dyn Db,
+    kind: &PatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+) -> PatternOutcome<'db> {
+    if let Some(subject_independent_ty) = subject_independent_definite_match_pattern_type(db, kind)
+    {
+        return if subject_ty.is_subtype_of(db, subject_independent_ty) {
+            PatternOutcome::exhaustive(subject_independent_ty)
+        } else {
+            PatternOutcome::subtracting(subject_ty, subject_independent_ty)
+        };
     }
 
     match kind {
         PatternPredicateKind::Value(value) => {
             let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
-            if equality_truthiness(db, resolved_subject_ty, value_ty) == Truthiness::AlwaysTrue {
-                return PatternCoverage::new(subject_ty, true);
-            }
+            return value_pattern_outcome_for_subject(db, kind, value_ty, subject_ty);
         }
+        PatternPredicateKind::Or(patterns) => {
+            return or_pattern_outcome_for_subject(db, patterns, subject_ty);
+        }
+        PatternPredicateKind::As(Some(pattern), _) => {
+            return pattern_outcome_for_subject(db, pattern, subject_ty);
+        }
+        _ => {}
+    }
+
+    let resolved_subject_ty = subject_ty.resolve_type_alias(db);
+    if let Type::Union(union) = resolved_subject_ty {
+        return union_pattern_outcome(db, kind, subject_ty, union);
+    }
+
+    match kind {
         PatternPredicateKind::Class(kind) => {
             let class_ty = infer_same_file_expression_type(db, kind.class, TypeContext::default());
             match class_ty {
@@ -679,65 +907,50 @@ fn pattern_coverage_for_subject<'db>(
                             } else {
                                 class_instance_ty
                             };
-                        return PatternCoverage::new(definitely_matched_ty, exhausts_subject);
+                        return if exhausts_subject {
+                            PatternOutcome::exhaustive(definitely_matched_ty)
+                        } else {
+                            PatternOutcome::subtracting(subject_ty, definitely_matched_ty)
+                        };
                     }
                     if exhausts_subject {
-                        return PatternCoverage::new(subject_ty, true);
+                        return PatternOutcome::exhaustive(subject_ty);
                     }
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
                     if kind.is_empty()
                         && subject_ty.is_subtype_of(db, callable_pattern_type(db)) =>
                 {
-                    return PatternCoverage::new(callable_pattern_type(db), true);
+                    return PatternOutcome::exhaustive(callable_pattern_type(db));
                 }
                 _ => {}
             }
         }
         PatternPredicateKind::Sequence(kind) => {
             return if sequence_pattern_is_exhaustive_for_subject(db, kind, resolved_subject_ty) {
-                PatternCoverage::new(subject_ty, true)
+                PatternOutcome::exhaustive(subject_ty)
             } else {
                 // A nested subject-dependent pattern rejected the context-free approximation.
                 // Reusing that approximation for the surrounding sequence would reintroduce the
                 // values that the recursive analysis deliberately excluded.
-                PatternCoverage::new(Type::Never, false)
+                PatternOutcome::subtracting(subject_ty, Type::Never)
             };
         }
         PatternPredicateKind::Mapping(kind) => {
             return if mapping_pattern_is_exhaustive(db, kind, resolved_subject_ty) {
-                PatternCoverage::new(subject_ty, true)
+                PatternOutcome::exhaustive(subject_ty)
             } else {
-                PatternCoverage::new(Type::Never, false)
+                PatternOutcome::subtracting(subject_ty, Type::Never)
             };
         }
-        PatternPredicateKind::Or(patterns) => {
-            let mut remaining_subject_ty = subject_ty;
-            let mut definitely_matched = Vec::with_capacity(patterns.len());
-            extend_or_pattern_coverage(
-                db,
-                patterns,
-                &mut remaining_subject_ty,
-                &mut definitely_matched,
-            );
-            return PatternCoverage::new(
-                UnionType::from_elements(db, definitely_matched),
-                remaining_subject_ty.is_never(),
-            );
-        }
-        PatternPredicateKind::As(Some(pattern), _) => {
-            return pattern_coverage_for_subject(db, pattern, subject_ty);
-        }
-        _ => return PatternCoverage::new(Type::Never, false),
+        _ => return PatternOutcome::subtracting(subject_ty, Type::Never),
     }
 
-    PatternCoverage::new(
-        IntersectionBuilder::new(db)
-            .add_positive(subject_ty)
-            .add_positive(definite_match_pattern_type(db, kind))
-            .build(),
-        false,
-    )
+    let definitely_matched_ty = IntersectionBuilder::new(db)
+        .add_positive(subject_ty)
+        .add_positive(definite_match_pattern_type(db, kind))
+        .build();
+    PatternOutcome::subtracting(subject_ty, definitely_matched_ty)
 }
 
 /// Return the part of `subject_ty` that can reach a later alternative after `kind` fails.
@@ -758,63 +971,18 @@ fn pattern_coverage_for_subject<'db>(
 pub(crate) fn pattern_fallthrough_type<'db>(
     db: &'db dyn Db,
     kind: &PatternPredicateKind<'db>,
-    mut subject_ty: Type<'db>,
+    subject_ty: Type<'db>,
 ) -> Type<'db> {
     if let PatternPredicateKind::Value(value) = kind {
         let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
-        // A subject confined to the same enum cannot contain cross-type values that compare equal
-        // to the pattern, so direct subtraction avoids repeated equality evaluation in large enum
-        // matches. This includes narrowed intersections containing `Self` or another type variable
-        // whose upper bound is that enum.
-        if let Some(enum_literal) = value_ty.as_enum_literal()
-            && is_same_enum_pattern_domain(db, subject_ty, enum_literal)
-            && equality_truthiness(db, value_ty, value_ty) == Truthiness::AlwaysTrue
-        {
-            return IntersectionBuilder::new(db)
-                .add_positive(subject_ty)
-                .add_negative(value_ty)
-                .build();
-        }
-        if let Some(constraint) = evaluate_type_equality(db, subject_ty, value_ty, false) {
-            return IntersectionBuilder::new(db)
-                .add_positive(subject_ty)
-                .add_positive(constraint)
-                .build();
+        if let Some(residual) = value_pattern_residual_for_subject(db, value_ty, subject_ty) {
+            return residual.materialize(db);
         }
     }
 
-    // Remove union elements that are guaranteed to match before constructing a subject-dependent
-    // complement. A gradual type does not cancel with its own negation, but an exhaustive pattern
-    // still makes the corresponding union element unreachable.
-    if subject_independent_definite_match_pattern_type(db, kind).is_none()
-        && let Type::Union(union) = subject_ty.resolve_type_alias(db)
-    {
-        let mut removed_element = false;
-        let remaining = union.map(db, |element| {
-            let coverage = pattern_coverage_for_subject(db, kind, *element);
-            if coverage.exhausts_subject
-                && !element.is_subtype_of(db, coverage.definitely_matched_ty)
-            {
-                removed_element = true;
-                Type::Never
-            } else {
-                *element
-            }
-        });
-        if removed_element {
-            subject_ty = remaining;
-        }
-    }
-
-    let coverage = pattern_coverage_for_subject(db, kind, subject_ty);
-    if coverage.exhausts_subject {
-        return Type::Never;
-    }
-
-    IntersectionBuilder::new(db)
-        .add_positive(subject_ty)
-        .add_negative(coverage.definitely_matched_ty)
-        .build()
+    pattern_outcome_for_subject(db, kind, subject_ty)
+        .residual
+        .materialize(db)
 }
 
 /// Return the fallthrough type for a binding that can reach a later match case.

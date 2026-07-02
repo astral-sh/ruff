@@ -3677,6 +3677,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         Some(constraints)
     }
 
+    /// Return constraints that a value pattern induces on the container or receiver of `subject`.
+    ///
+    /// The direct constraint on `subject` is handled by the caller. This handles tagged tuple and
+    /// `TypedDict` subscripts and nominal attributes whose owners can be narrowed by the match.
     fn evaluate_match_pattern_value_related_places(
         &mut self,
         subject: Expression<'db>,

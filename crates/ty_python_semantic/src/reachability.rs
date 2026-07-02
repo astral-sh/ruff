@@ -494,7 +494,7 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
     }
 
     let truthiness =
-        analyze_single_pattern_predicate_kind(db, predicate.kind(db), narrowed_subject_ty, None);
+        analyze_single_pattern_predicate_kind(db, predicate.kind(db), narrowed_subject_ty, false);
 
     if truthiness == Truthiness::AlwaysTrue && predicate.guard(db).is_some() {
         // Fall back to ambiguous, the guard might change the result.
@@ -1110,7 +1110,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
     db: &'db dyn Db,
     predicate_kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
-    precomputed_exhaustiveness: Option<bool>,
+    known_non_exhaustive: bool,
 ) -> Truthiness {
     match predicate_kind {
         PatternPredicateKind::Value(value) => {
@@ -1146,12 +1146,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
                         if pattern_is_exhaustive_for_subject(db, p, narrowed_subject_ty) {
                             Truthiness::AlwaysTrue
                         } else {
-                            analyze_single_pattern_predicate_kind(
-                                db,
-                                p,
-                                narrowed_subject_ty,
-                                Some(false),
-                            )
+                            analyze_single_pattern_predicate_kind(db, p, narrowed_subject_ty, true)
                         };
 
                     remaining_subject_ty =
@@ -1182,11 +1177,9 @@ fn analyze_single_pattern_predicate_kind<'db>(
                     }
                     _ => return Truthiness::Ambiguous,
                 };
-            let exhausts_subject = precomputed_exhaustiveness.unwrap_or_else(|| {
-                pattern_is_exhaustive_for_subject(db, predicate_kind, subject_ty)
-            });
-
-            if exhausts_subject {
+            if !known_non_exhaustive
+                && pattern_is_exhaustive_for_subject(db, predicate_kind, subject_ty)
+            {
                 Truthiness::AlwaysTrue
             } else if subject_ty.is_disjoint_from(db, class_ty) {
                 Truthiness::AlwaysFalse
@@ -1224,9 +1217,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
         }
         PatternPredicateKind::As(pattern, _) => pattern
             .as_deref()
-            .map(|p| {
-                analyze_single_pattern_predicate_kind(db, p, subject_ty, precomputed_exhaustiveness)
-            })
+            .map(|p| analyze_single_pattern_predicate_kind(db, p, subject_ty, known_non_exhaustive))
             .unwrap_or(Truthiness::AlwaysTrue),
         PatternPredicateKind::Star(_) => Truthiness::AlwaysTrue,
     }

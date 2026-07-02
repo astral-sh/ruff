@@ -205,6 +205,18 @@ def gradual_member_pattern_can_be_refutable(value: Box[Any] | int) -> None:
             pass
         case _:
             assert_never(value)  # error: [type-assertion-failure]
+
+class RecursiveBox[T]:
+    value: T
+
+type RecursiveValue = int | RecursiveBox[RecursiveValue]
+
+def recursive_alias_survives_unchanged_residual(value: RecursiveValue) -> None:
+    match value:
+        case RecursiveBox(value=int()):
+            pass
+        case _:
+            reveal_type(value)  # revealed: int | RecursiveBox[RecursiveValue]
 ```
 
 ## Class patterns with generic `@final` classes
