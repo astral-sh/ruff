@@ -3,6 +3,7 @@ use std::sync::LazyLock;
 use proc_macro2::TokenStream;
 use quote::quote;
 use regex::Regex;
+use syn::spanned::Spanned;
 use syn::{Attribute, DeriveInput, Error, Lit, LitStr, Meta, meta::ParseNestedMeta};
 
 pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream> {
@@ -77,35 +78,38 @@ fn get_docs(attrs: &[Attribute]) -> syn::Result<String> {
 /// The result is returned as a `TokenStream` so that the version string literal can be combined
 /// with the proper `RuleGroup` variant, e.g. `RuleGroup::Stable` for `stable_since` above.
 fn get_rule_status(attrs: &[Attribute]) -> syn::Result<Option<TokenStream>> {
-    let mut group = None;
+    let mut group: Option<(TokenStream, proc_macro2::Span)> = None;
     for attr in attrs {
         if attr.path().is_ident("violation_metadata") {
             attr.parse_nested_meta(|meta| {
-                if meta.path.is_ident("stable_since") {
+                let status = if meta.path.is_ident("stable_since") {
                     let lit: LitStr = parse_version(&meta)?;
-                    group = Some(quote!(RuleGroup::Stable { since: #lit }));
-                    return Ok(());
+                    quote!(RuleGroup::Stable { since: #lit })
                 } else if meta.path.is_ident("preview_since") {
                     let lit: LitStr = parse_version(&meta)?;
-                    group = Some(quote!(RuleGroup::Preview { since: #lit }));
-                    return Ok(());
+                    quote!(RuleGroup::Preview { since: #lit })
                 } else if meta.path.is_ident("deprecated_since") {
                     let lit: LitStr = parse_version(&meta)?;
-                    group = Some(quote!(RuleGroup::Deprecated { since: #lit }));
-                    return Ok(());
+                    quote!(RuleGroup::Deprecated { since: #lit })
                 } else if meta.path.is_ident("removed_since") {
                     let lit: LitStr = parse_version(&meta)?;
-                    group = Some(quote!(RuleGroup::Removed { since: #lit }));
-                    return Ok(());
+                    quote!(RuleGroup::Removed { since: #lit })
+                } else {
+                    return Err(meta.error("unimplemented violation metadata option"));
+                };
+
+                if let Some((_, first_span)) = &group {
+                    let mut error = meta.error("multiple rule statuses are not allowed");
+                    error.combine(Error::new(*first_span, "first rule status specified here"));
+                    return Err(error);
                 }
-                Err(Error::new_spanned(
-                    attr,
-                    "unimplemented violation metadata option",
-                ))
+
+                group = Some((status, meta.path.span()));
+                Ok(())
             })?;
         }
     }
-    Ok(group)
+    Ok(group.map(|(status, _)| status))
 }
 
 fn parse_attr<'a, const LEN: usize>(

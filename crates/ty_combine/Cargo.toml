@@ -20,5 +20,8 @@ ruff_ranged_value = { workspace = true }
 
 ordermap = { workspace = true }
 
+[dev-dependencies]
+ruff_macros = { workspace = true }
+
 [lints]
 workspace = true

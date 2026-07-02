@@ -1,10 +1,12 @@
-use proc_macro2::{TokenStream, TokenTree};
+use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::meta::ParseNestedMeta;
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{
     AngleBracketedGenericArguments, Attribute, Data, DataStruct, DeriveInput, ExprLit, Field,
-    Fields, Lit, LitStr, Meta, Path, PathArguments, PathSegment, Type, TypePath,
+    Fields, GenericArgument, Lit, LitStr, Meta, Path, PathArguments, PathSegment, Token, Type,
+    TypePath,
 };
 
 use ruff_python_trivia::textwrap::dedent;
@@ -14,6 +16,7 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<TokenStream> {
         ident,
         data,
         attrs: struct_attributes,
+        generics,
         ..
     } = input;
 
@@ -37,25 +40,13 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<TokenStream> {
                     .any(|attr| attr.path().is_ident("option_group"))
                 {
                     output.push(handle_option_group(field)?);
-                } else if let Some(serde) = field
-                    .attrs
-                    .iter()
-                    .find(|attr| attr.path().is_ident("serde"))
-                {
+                } else if has_serde_flatten(field)? {
                     // If a field has the `serde(flatten)` attribute, flatten the options into the parent
-                    // by calling `Type::record` instead of `visitor.visit_set`
-                    if let (Type::Path(ty), Meta::List(list)) = (&field.ty, &serde.meta) {
-                        for token in list.tokens.clone() {
-                            if let TokenTree::Ident(ident) = token {
-                                if ident == "flatten" {
-                                    output.push(quote_spanned!(
-                                        ty.span() => (<#ty>::record(visit))
-                                    ));
-
-                                    break;
-                                }
-                            }
-                        }
+                    // by calling `Type::record` instead of `visitor.visit_set`.
+                    if let Type::Path(ty) = &field.ty {
+                        output.push(quote_spanned!(
+                            ty.span() => (<#ty as ruff_options_metadata::OptionsMetadata>::record(visit))
+                        ));
                     }
                 }
             }
@@ -84,9 +75,11 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<TokenStream> {
                 ))
             };
 
+            let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
             Ok(quote! {
                 #[automatically_derived]
-                impl ruff_options_metadata::OptionsMetadata for #ident {
+                impl #impl_generics ruff_options_metadata::OptionsMetadata for #ident #ty_generics #where_clause {
                     fn record(visit: &mut dyn ruff_options_metadata::Visit) {
                         #(#output);*
                     }
@@ -100,6 +93,25 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<TokenStream> {
             "Can only derive ConfigurationOptions from structs with named fields.",
         )),
     }
+}
+
+fn has_serde_flatten(field: &Field) -> syn::Result<bool> {
+    for attribute in field
+        .attrs
+        .iter()
+        .filter(|attribute| attribute.path().is_ident("serde"))
+    {
+        let metadata =
+            attribute.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
+        if metadata
+            .iter()
+            .any(|meta| matches!(meta, Meta::Path(path) if path.is_ident("flatten")))
+        {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
 
 /// For a field with type `Option<Foobar>` where `Foobar` itself is a struct
@@ -121,11 +133,18 @@ fn handle_option_group(field: &Field) -> syn::Result<proc_macro2::TokenStream> {
                 arguments:
                     PathArguments::AngleBracketed(AngleBracketedGenericArguments { args, .. }),
             }) if type_ident == "Option" => {
-                let path = &args[0];
+                let mut args = args.iter();
+                let (Some(GenericArgument::Type(option_type)), None) = (args.next(), args.next())
+                else {
+                    return Err(syn::Error::new_spanned(
+                        &field.ty,
+                        "Expected `Option<T>` with exactly one type argument.",
+                    ));
+                };
                 let kebab_name = LitStr::new(&ident.to_string().replace('_', "-"), ident.span());
 
                 Ok(quote_spanned!(
-                    ident.span() => (visit.record_set(#kebab_name, ruff_options_metadata::OptionSet::of::<#path>()))
+                    ident.span() => (visit.record_set(#kebab_name, ruff_options_metadata::OptionSet::of::<#option_type>()))
                 ))
             }
             _ => Err(syn::Error::new(
@@ -300,6 +319,16 @@ fn parse_field_attributes(attribute: &Attribute) -> syn::Result<FieldAttributes>
 }
 
 fn parse_deprecated_attribute(attribute: &Attribute) -> syn::Result<DeprecatedAttribute> {
+    if matches!(&attribute.meta, Meta::Path(_)) {
+        return Ok(DeprecatedAttribute::default());
+    }
+    if !matches!(&attribute.meta, Meta::List(_)) {
+        return Err(syn::Error::new_spanned(
+            attribute,
+            "Expected `deprecated` or `deprecated(...)` attribute.",
+        ));
+    }
+
     let mut deprecated = DeprecatedAttribute::default();
     attribute.parse_nested_meta(|meta| {
         if meta.path.is_ident("note") {

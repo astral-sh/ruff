@@ -24,6 +24,7 @@ proc-macro2 = { workspace = true }
 quote = { workspace = true }
 regex = { workspace = true }
 syn = { workspace = true, features = ["derive", "parsing", "extra-traits", "full"] }
+synstructure = { workspace = true }
 
 [lints]
 workspace = true

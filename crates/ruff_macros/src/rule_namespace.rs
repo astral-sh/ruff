@@ -9,6 +9,7 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
     let DeriveInput {
         ident,
         data: Data::Enum(DataEnum { variants, .. }),
+        generics,
         ..
     } = input
     else {
@@ -110,9 +111,11 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
         }});
     }
 
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
     Ok(quote! {
         #[automatically_derived]
-        impl crate::registry::RuleNamespace for #ident {
+        impl #impl_generics crate::registry::RuleNamespace for #ident #ty_generics #where_clause {
             fn parse_code(code: &str) -> Option<(Self, &str)> {
                 #if_statements
                 None
