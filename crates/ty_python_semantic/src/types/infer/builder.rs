@@ -39,7 +39,7 @@ use crate::place::{
 };
 use crate::reachability::{ReachabilityEvaluationCache, evaluate_reachability_with_cache};
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
-use crate::types::call::bind::MatchingOverloadIndex;
+use crate::types::call::bind::{ArgumentTypeContextParams, MatchingOverloadIndex};
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::class::{ClassLiteral, CodeGeneratorKind, MethodDecorator};
@@ -5906,6 +5906,106 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             add_overloads_from_binding(&mut overloads_with_binding, binding);
         });
 
+        // Generic callable argument context can depend on type variables solved by other arguments,
+        // regardless of source order. Seed only arguments matched to parameters that mention a
+        // type variable used by a callable context, and only when that callable context is needed
+        // for a lambda argument. The callable argument itself is inferred later with the
+        // specialized context.
+        let mut has_specializable_callable_context = false;
+        let mut should_seed_default = Vec::with_capacity(arguments_types.len());
+        if overloads_with_binding
+            .iter()
+            .any(|(overload, _)| overload.signature.generic_context.is_some())
+        {
+            let callable_context_typevars: Vec<_> = overloads_with_binding
+                .iter()
+                .map(|(overload, _)| overload.callable_parameter_context_typevars(db))
+                .collect();
+            let overload_has_eligible_callable_context: Vec<_> = overloads_with_binding
+                .iter()
+                .map(|(overload, binding)| {
+                    ast_arguments
+                        .clone()
+                        .enumerate()
+                        .any(|(argument_index, ast_argument)| {
+                            !ast_argument.is_variadic()
+                                && matches!(ast_argument.value(), ast::Expr::Lambda(_))
+                                && overload.has_specializable_callable_parameter_context(
+                                    db,
+                                    binding,
+                                    argument_index,
+                                )
+                        })
+                })
+                .collect();
+            has_specializable_callable_context = overload_has_eligible_callable_context
+                .iter()
+                .any(|eligible| *eligible);
+
+            for (argument_index, ast_argument) in ast_arguments.clone().enumerate() {
+                if ast_argument.is_variadic() {
+                    // Splatted arguments are inferred before parameter matching to determine
+                    // their length, so there is no default expression type to pre-seed here.
+                    should_seed_default.push(false);
+                    continue;
+                }
+
+                let has_default_type = matches!(
+                    arguments_types.argument_types(argument_index),
+                    Some(argument_types) if argument_types.get_default().is_some()
+                );
+                let mut can_seed_any_overload = false;
+
+                for (
+                    ((overload, binding), callable_context_typevars),
+                    has_eligible_callable_context,
+                ) in overloads_with_binding
+                    .iter()
+                    .zip(&callable_context_typevars)
+                    .zip(&overload_has_eligible_callable_context)
+                {
+                    let can_specialize_callable_context = overload
+                        .can_specialize_callable_parameter_context(
+                            db,
+                            binding,
+                            argument_index,
+                            callable_context_typevars,
+                        );
+
+                    can_seed_any_overload |= !has_default_type
+                        && *has_eligible_callable_context
+                        && can_specialize_callable_context
+                        && !overload.is_paramspec_component_argument(binding, argument_index);
+                }
+
+                should_seed_default.push(can_seed_any_overload);
+            }
+        }
+
+        if has_specializable_callable_context {
+            let teardown = self.setup_expression_cache();
+
+            for (argument_index, ast_argument) in ast_arguments.clone().enumerate() {
+                // In an overloaded call, the same source argument can be forwarded through
+                // `P.args` for one overload and still solve an ordinary `T` for another. Only skip
+                // pre-seeding when no candidate overload can use the argument as a normal solver.
+                if !should_seed_default[argument_index] {
+                    continue;
+                }
+
+                let mut speculative_builder = self.speculate_without_diagnostics();
+                let inferred_ty = infer_argument_ty(
+                    &mut speculative_builder,
+                    (argument_index, ast_argument.value(), TypeContext::default()),
+                );
+                arguments_types.insert_type(argument_index, TypeContext::default(), inferred_ty);
+            }
+
+            if teardown {
+                self.teardown_expression_cache();
+            }
+        }
+
         // A keyword argument matched to `**P.kwargs` can appear before the keyword argument that
         // binds `P`, e.g. `wrapper(TagSet=[...], func=put_object)`. Seed those binder argument
         // types first so the normal ParamSpec context path below is not source-order dependent.
@@ -5951,14 +6051,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let parameter_tcx = |overload: &'bindings Binding<'db>,
                                  binding: &CallableBinding<'db>| {
-                overload.argument_type_context(
+                let mut argument_specialization = |overload: &Binding<'db>| {
+                    overload.inferred_specialization_from_arguments(
+                        db,
+                        &constraints,
+                        binding,
+                        arguments_types,
+                        call_expression_tcx,
+                    )
+                };
+
+                overload.argument_type_context(ArgumentTypeContextParams {
                     db,
-                    &constraints,
+                    constraints: &constraints,
                     binding,
                     arguments_types,
                     argument_index,
                     call_expression_tcx,
-                )
+                    prefer_single_callable_context: matches!(ast_argument, ast::Expr::Lambda(_)),
+                    argument_specialization: &mut argument_specialization,
+                })
             };
 
             // If there is only a single binding and overload, we can infer the argument directly with
