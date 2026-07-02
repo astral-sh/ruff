@@ -953,16 +953,23 @@ impl<'db> Signature<'db> {
     }
 
     pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
-        let mut parameters = self.parameters.iter().cloned().peekable();
-        let removed_receiver = parameters.peek().is_some_and(Parameter::is_positional);
+        let removed_receiver = self.parameters.get(0).is_some_and(Parameter::is_positional);
 
         // TODO: Theoretically, for a signature like `f(*args: *tuple[MyClass, int, *tuple[str, ...]])` with
         // a variadic first parameter, we should also "skip the first parameter" by modifying the tuple type.
-        if removed_receiver {
-            parameters.next();
-        }
-
-        let mut parameters = Parameters::new(db, parameters);
+        let mut parameters = if removed_receiver {
+            let remaining = self.parameters.iter().skip(1).cloned();
+            if self.parameters.is_standard() {
+                // Whether `*args: Any, **kwargs: Any` is gradual is determined from the original
+                // annotations. A standard generic signature must remain standard if specialization
+                // later replaces both annotations with `Any`.
+                Parameters::from_parts(remaining.collect::<Box<[_]>>(), ParametersKind::Standard)
+            } else {
+                Parameters::new(db, remaining)
+            }
+        } else {
+            self.parameters.clone()
+        };
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
         if let Some(self_type) = self_type
