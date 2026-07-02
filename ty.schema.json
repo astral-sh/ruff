@@ -360,6 +360,16 @@
             }
           ]
         },
+        "blanket-ignore-comment": {
+          "title": "detects blanket `ty: ignore` comments",
+          "description": "## What it does\n\nChecks for `ty: ignore` comments that don't specify which rules to ignore.\n\nUnused blanket comments aren't reported by this rule because they don't suppress\nany diagnostics. Enable `unused-ignore-comment` to report them separately.\n\n## Why is this bad?\n\nA blanket `ty: ignore` comment suppresses every type-checking diagnostic on the\napplicable line or file. Specifying rule codes documents which diagnostics are\nexpected and prevents the comment from hiding unrelated errors.\n\n## Examples\n\n```py\n# error\nvalue = unknown  # ty: ignore\n```\n\nUse instead:\n\n```py\nvalue = unknown  # ty: ignore[unresolved-reference]\n```",
+          "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "call-abstract-method": {
           "title": "detects calls to abstract methods with trivial bodies on class objects",
           "description": "## What it does\n\nChecks for calls to abstract `@classmethod`s or `@staticmethod`s\nwith \"trivial bodies\" when accessed on the class object itself.\n\n\"Trivial bodies\" are bodies that solely consist of `...`, `pass`,\na docstring, and/or `raise NotImplementedError`.\n\n## Why is this bad?\n\nAn abstract method with a trivial body has no concrete implementation\nto execute, so calling such a method directly on the class will probably\nnot have the desired effect.\n\nIt is also unsound to call these methods directly on the class. Unlike\nother methods, ty permits abstract methods with trivial bodies to have\nnon-`None` return types even though they always return `None` at runtime.\nThis is because it is expected that these methods will always be\noverridden rather than being called directly. As a result of this\nexception to the normal rule, ty may infer an incorrect type if one of\nthese methods is called directly, which may then mean that type errors\nelsewhere in your code go undetected by ty.\n\nCalling abstract classmethods or staticmethods via `type[X]` is allowed,\nsince the actual runtime type could be a concrete subclass with an implementation.\n\n## Example\n\n```python\nfrom abc import ABC, abstractmethod\n\n\nclass Foo(ABC):\n    @classmethod\n    @abstractmethod\n    def method(cls) -> int: ...\n\n\n# cannot call abstract classmethod\nFoo.method()  # error\n```",
