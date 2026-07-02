@@ -3139,6 +3139,38 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         target: BoundTypeVarInstance<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
+        let ty = self.remove_inferable_typevar_artifacts_from_lower_bound(target, ty);
+        self.remove_inferable_typevar_artifacts_from_upper_bound(target, ty)
+    }
+
+    fn remove_inferable_typevar_artifacts_from_lower_bound(
+        &self,
+        target: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
+        match ty {
+            Type::Union(union)
+                if union
+                    .elements(self.db)
+                    .iter()
+                    .any(|element| !self.is_inferable_typevar_artifact(target, *element)) =>
+            {
+                union.filter(self.db, |element| {
+                    !self.is_inferable_typevar_artifact(target, *element)
+                })
+            }
+            Type::Recursive(recursive) => recursive.map_type(self.db, self.env, |unfolded| {
+                self.remove_inferable_typevar_artifacts_from_lower_bound(target, unfolded)
+            }),
+            _ => ty,
+        }
+    }
+
+    fn remove_inferable_typevar_artifacts_from_upper_bound(
+        &self,
+        target: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
         let db = self.db;
         match ty {
             Type::Intersection(intersection)
@@ -3154,20 +3186,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     }
                 })
             }
-            Type::Union(union)
-                if union
-                    .elements(db)
-                    .iter()
-                    .any(|element| !self.is_inferable_typevar_artifact(target, *element)) =>
-            {
-                union.map(db, self.env, |element| {
-                    if self.is_inferable_typevar_artifact(target, *element) {
-                        Type::Never
-                    } else {
-                        self.remove_inferable_typevar_artifacts_from_solution(target, *element)
-                    }
-                })
-            }
+            Type::Recursive(recursive) => recursive.map_type(self.db, self.env, |unfolded| {
+                self.remove_inferable_typevar_artifacts_from_upper_bound(target, unfolded)
+            }),
             _ => ty,
         }
     }
@@ -3599,6 +3620,24 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     other_types.insert(ty);
                     true
                 }
+                Type::Recursive(recursive) => {
+                    if !resolving.insert(ty) {
+                        return false;
+                    }
+                    let result = recursive.map_or(db, env, false, |unfolded| {
+                        collect_typed_dicts(
+                            db,
+                            env,
+                            unfolded,
+                            resolving,
+                            completed,
+                            typed_dicts,
+                            other_types,
+                        )
+                    });
+                    resolving.remove(&ty);
+                    result
+                }
                 _ => false,
             };
             completed.insert(ty, result);
@@ -3831,6 +3870,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // This is necessary for solving generics like `def head[T](my_list: MyList[T]) -> T`.
             (Type::TypeAlias(alias), _) => {
                 return self.infer_map_impl(alias.value_type(db), actual, polarity, seen);
+            }
+            (Type::Recursive(recursive), _) => {
+                return recursive.map_or(self.db, self.env, Ok(()), |unfolded| {
+                    self.infer_map_impl(unfolded, actual, polarity, seen)
+                });
             }
 
             (Type::TypeForm(formal_typeform), Type::TypeForm(actual_typeform)) => {
@@ -4513,6 +4557,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // e.g., `reveal_type(alias)` should reveal the type alias, not its value type.
             (formal, Type::TypeAlias(alias)) => {
                 return self.infer_map_impl(formal, alias.value_type(db), polarity, seen);
+            }
+            (_, Type::Recursive(recursive)) => {
+                return recursive.map_or(self.db, self.env, Ok(()), |unfolded| {
+                    self.infer_map_impl(formal, unfolded, polarity, seen)
+                });
             }
 
             // TODO: Add more forms that we can structurally induct into: type[C], callables

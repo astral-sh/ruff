@@ -1553,16 +1553,18 @@ impl<'db> DefinitionInference<'db> {
                 _ => None,
             };
 
-            if let Some(known_collection) = known_collection {
-                if let Some(collection_class) = known_collection.try_to_class_literal(db, &env) {
-                    let divergent_collection = collection_class
-                        .apply_specialization(db, |generic_context| {
-                            generic_context.repeat_specialization(db, cycle_recovery)
-                        });
+            if let Some(collection_class) = known_collection
+                .and_then(|known_collection| known_collection.try_to_class_literal(db, &env))
+                && let Type::Recursive(recursive) = cycle_recovery
+            {
+                let divergent_collection =
+                    collection_class.apply_specialization(db, |generic_context| {
+                        generic_context.repeat_specialization(db, *recursive.body(db))
+                    });
+                let body = Type::instance(db, &env, divergent_collection);
+                let recursive = Type::recursive(db, &env, *recursive.binder(db), body);
 
-                    types =
-                        DefinitionTypes::Binding(Type::instance(db, &env, divergent_collection));
-                }
+                types = DefinitionTypes::Binding(recursive);
             }
         } else if let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) {
             let program_file = definition.program_file(db);

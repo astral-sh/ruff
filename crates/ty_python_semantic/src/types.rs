@@ -1939,9 +1939,9 @@ impl<'db> Type<'db> {
         matches!(self, Type::Divergent(_))
     }
 
-    const fn as_divergent(self) -> Option<DivergentType> {
+    pub(crate) const fn as_recursive(self) -> Option<RecursiveType<'db>> {
         match self {
-            Type::Divergent(divergent) => Some(divergent),
+            Type::Recursive(recursive) => Some(recursive),
             _ => None,
         }
     }
@@ -2519,6 +2519,9 @@ impl<'db> Type<'db> {
             Type::SlotDescriptor(_) => KnownClass::MemberDescriptorType
                 .to_instance(db, env)
                 .nominal_class(db, env),
+            Type::Recursive(recursive) => {
+                recursive.map_or(db, env, None, |unfolded| unfolded.nominal_class(db, env))
+            }
             _ => None,
         }
     }
@@ -10857,6 +10860,11 @@ impl<'db> RecursiveType<'db> {
             false,
             |ty| matches!(ty, Type::Divergent(divergent) if divergent.same_marker(binder)),
         )
+    }
+
+    /// Whether this recursive type is identity, i.e. `μa.a`.
+    pub(crate) fn is_identity(self, db: &'db dyn Db) -> bool {
+        *self.body(db) == Type::Divergent(*self.binder(db))
     }
 }
 
