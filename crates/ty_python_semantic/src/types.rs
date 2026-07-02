@@ -1923,7 +1923,17 @@ impl<'db> Type<'db> {
         binder: DivergentType,
         body: Type<'db>,
     ) -> Self {
-        RecursiveType::build(db, env, binder, body)
+        Self::recursive_with_origin(db, env, binder, RecursiveTypeOrigin::Structural, body)
+    }
+
+    pub(crate) fn recursive_with_origin(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        binder: DivergentType,
+        origin: RecursiveTypeOrigin<'db>,
+        body: Type<'db>,
+    ) -> Self {
+        RecursiveType::build(db, env, binder, origin, body)
     }
 
     pub(crate) const fn is_divergent(&self) -> bool {
@@ -2083,6 +2093,25 @@ impl<'db> Type<'db> {
         previous_semantic_view: Option<Self>,
         cycle: &salsa::Cycle,
     ) -> Self {
+        self.cycle_normalized_with_semantic_view_and_origin(
+            db,
+            env,
+            previous,
+            previous_semantic_view,
+            None,
+            cycle,
+        )
+    }
+
+    pub(crate) fn cycle_normalized_with_semantic_view_and_origin(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: Self,
+        previous_semantic_view: Option<Self>,
+        origin: Option<RecursiveTypeOrigin<'db>>,
+        cycle: &salsa::Cycle,
+    ) -> Self {
         let self_degraded_by_overload =
             any_over_type(db, env, self, false, |ty| {
                 matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
@@ -2136,6 +2165,7 @@ impl<'db> Type<'db> {
                 cycle,
                 id,
                 include_previous,
+                origin,
             )
         })
     }
@@ -2163,6 +2193,7 @@ impl<'db> Type<'db> {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn cycle_fold_recursive(
         self,
         db: &'db dyn Db,
@@ -2172,6 +2203,7 @@ impl<'db> Type<'db> {
         cycle: &salsa::Cycle,
         id: salsa::Id,
         include_previous: bool,
+        origin: Option<RecursiveTypeOrigin<'db>>,
     ) -> Self {
         let binder = DivergentType::new(id);
         let previous_recursive = match previous {
@@ -2210,7 +2242,11 @@ impl<'db> Type<'db> {
             current_body
         };
 
-        Type::recursive(db, env, binder, body)
+        let origin = origin
+            .or_else(|| previous_recursive.map(|recursive| *recursive.origin(db)))
+            .unwrap_or(RecursiveTypeOrigin::Structural);
+
+        Type::recursive_with_origin(db, env, binder, origin, body)
     }
 
     /// Returns the scope-independent type-expression meaning of a retained runtime
@@ -2223,7 +2259,13 @@ impl<'db> Type<'db> {
         match self {
             Type::Recursive(recursive) => {
                 let body = recursive.body(db).type_expression_semantic_view(db, env)?;
-                Some(Type::recursive(db, env, *recursive.binder(db), body))
+                Some(Type::recursive_with_origin(
+                    db,
+                    env,
+                    *recursive.binder(db),
+                    *recursive.origin(db),
+                    body,
+                ))
             }
             Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => Some(Type::tuple(
                 TupleType::new(db, env, alias.specialization(db).tuple(db)?),
@@ -2291,6 +2333,13 @@ impl<'db> Type<'db> {
 
     pub const fn is_generic_alias(&self) -> bool {
         matches!(self, Type::GenericAlias(_))
+    }
+
+    pub(crate) fn is_recursive_generic_implicit_alias(self, db: &'db dyn Db) -> bool {
+        matches!(
+            self,
+            Type::Recursive(recursive) if recursive.origin(db).generic_context().is_some()
+        )
     }
 
     /// Returns whether this type represents a specialization of a generic type.
@@ -3365,7 +3414,15 @@ impl<'db> Type<'db> {
             Type::Recursive(recursive) => recursive
                 .body(db)
                 .recursive_type_normalized_impl(db, env, div, nested)
-                .map(|body| RecursiveType::build(db, env, *recursive.binder(db), body)),
+                .map(|body| {
+                    RecursiveType::build(
+                        db,
+                        env,
+                        *recursive.binder(db),
+                        *recursive.origin(db),
+                        body,
+                    )
+                }),
             Type::ClassLiteral(class) => class
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Type::ClassLiteral),
@@ -8618,7 +8675,13 @@ impl<'db> Type<'db> {
                         recursive
                             .body(db)
                             .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-                    RecursiveType::build(db, visitor.env, *recursive.binder(db), body)
+                    RecursiveType::build(
+                        db,
+                        visitor.env,
+                        *recursive.binder(db),
+                        *recursive.origin(db),
+                        body,
+                    )
                 }
             },
 
@@ -9118,6 +9181,14 @@ impl<'db> Type<'db> {
             Type::Divergent(_) => {}
 
             Type::Recursive(recursive) => visitor.visit(db, self, || {
+                if let Some(generic_context) = recursive.origin(db).generic_context() {
+                    for variable in generic_context.variables(db) {
+                        if let Some(variable) = matching_typevar(&variable) {
+                            typevars.insert(variable);
+                        }
+                    }
+                }
+
                 recursive.map_or_else(
                     db,
                     env,
@@ -10619,10 +10690,32 @@ impl<'db> Foldable<'db> for PropertyInstanceType<'db> {
     }
 }
 
+/// Where an anonymous recursive type was introduced.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub enum RecursiveTypeOrigin<'db> {
+    Structural,
+    GenericImplicitAlias {
+        definition: Definition<'db>,
+        generic_context: GenericContext<'db>,
+    },
+}
+
+impl<'db> RecursiveTypeOrigin<'db> {
+    pub(crate) const fn generic_context(self) -> Option<GenericContext<'db>> {
+        match self {
+            Self::GenericImplicitAlias {
+                generic_context, ..
+            } => Some(generic_context),
+            Self::Structural => None,
+        }
+    }
+}
+
 /// An anonymous recursive type introduced by structural type inference.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveType<'db> {
     pub(crate) binder: DivergentType,
+    pub(crate) origin: RecursiveTypeOrigin<'db>,
     pub(crate) body: Type<'db>,
 }
 
@@ -10634,6 +10727,7 @@ impl<'db> RecursiveType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         binder: DivergentType,
+        origin: RecursiveTypeOrigin<'db>,
         mut body: Type<'db>,
     ) -> Type<'db> {
         if let Type::Union(union) = body {
@@ -10662,7 +10756,7 @@ impl<'db> RecursiveType<'db> {
             return body;
         }
 
-        Type::Recursive(Self::new(db, binder, body))
+        Type::Recursive(Self::new(db, binder, origin, body))
     }
 
     pub(crate) fn unfold(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {

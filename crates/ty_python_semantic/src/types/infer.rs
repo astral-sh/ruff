@@ -59,7 +59,8 @@ use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
+    ClassLiteral, GenericContext, KnownClass, RecursiveTypeOrigin, StaticClassLiteral, Type,
+    TypeAndQualifiers, TypeQualifiers,
 };
 use crate::{Db, FxIndexSet};
 
@@ -102,6 +103,7 @@ struct TypeAndRange<'db> {
 
 type CollectionUseConstraints<'db> = FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>;
 type CycleRecoverySemanticViews<'db> = Box<[(Definition<'db>, Type<'db>)]>;
+type CycleRecoveryGenericContexts<'db> = Box<[(Definition<'db>, GenericContext<'db>)]>;
 
 fn cycle_recovery_semantic_view<'db>(
     views: &[(Definition<'db>, Type<'db>)],
@@ -110,6 +112,15 @@ fn cycle_recovery_semantic_view<'db>(
     views
         .iter()
         .find_map(|(candidate, ty)| (*candidate == definition).then_some(*ty))
+}
+
+fn cycle_recovery_generic_context<'db>(
+    contexts: &[(Definition<'db>, GenericContext<'db>)],
+    definition: Definition<'db>,
+) -> Option<GenericContext<'db>> {
+    contexts
+        .iter()
+        .find_map(|(candidate, context)| (*candidate == definition).then_some(*context))
 }
 
 /// Extends the current collection-use constraints with those from the previous cycle iteration.
@@ -1166,22 +1177,32 @@ impl<'db> DefinitionTypes<'db> {
             .find_map(|(candidate, ty)| (candidate == definition).then_some(ty))
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn normalize_binding(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         previous: &DefinitionTypes<'db>,
         previous_semantic_views: &[(Definition<'db>, Type<'db>)],
+        current_generic_contexts: &[(Definition<'db>, GenericContext<'db>)],
         cycle: &salsa::Cycle,
         owner: Definition<'db>,
         definition: Definition<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
+        let origin = cycle_recovery_generic_context(current_generic_contexts, definition).map(
+            |generic_context| RecursiveTypeOrigin::GenericImplicitAlias {
+                definition,
+                generic_context,
+            },
+        );
+
         if let Some(previous_ty) = previous.binding_type(owner, definition) {
-            ty.cycle_normalized_with_semantic_view(
+            ty.cycle_normalized_with_semantic_view_and_origin(
                 db,
                 env,
                 previous_ty,
                 cycle_recovery_semantic_view(previous_semantic_views, definition),
+                origin,
                 cycle,
             )
         } else {
@@ -1220,6 +1241,7 @@ impl<'db> DefinitionTypes<'db> {
         env: &ProgramEnvironment<'db>,
         previous: &DefinitionTypes<'db>,
         previous_semantic_views: &[(Definition<'db>, Type<'db>)],
+        current_generic_contexts: &[(Definition<'db>, GenericContext<'db>)],
         cycle: &salsa::Cycle,
         owner: Definition<'db>,
     ) -> Self {
@@ -1230,6 +1252,7 @@ impl<'db> DefinitionTypes<'db> {
                 env,
                 previous,
                 previous_semantic_views,
+                current_generic_contexts,
                 cycle,
                 owner,
                 owner,
@@ -1251,6 +1274,7 @@ impl<'db> DefinitionTypes<'db> {
                     env,
                     previous,
                     previous_semantic_views,
+                    current_generic_contexts,
                     cycle,
                     owner,
                     owner,
@@ -1283,6 +1307,7 @@ impl<'db> DefinitionTypes<'db> {
                         env,
                         previous,
                         previous_semantic_views,
+                        current_generic_contexts,
                         cycle,
                         owner,
                         *definition,
@@ -1413,6 +1438,9 @@ struct OtherDefinitionInferenceExtra<'db> {
     /// Type-expression views computed during inference for recursive implicit aliases.
     cycle_recovery_semantic_views: CycleRecoverySemanticViews<'db>,
 
+    /// Generic contexts found while inferring recursive generic implicit aliases.
+    cycle_recovery_generic_contexts: CycleRecoveryGenericContexts<'db>,
+
     /// The definitions that have some deferred parts.
     deferred: Box<[Definition<'db>]>,
 
@@ -1491,6 +1519,13 @@ impl<'db> DefinitionInferenceExtra<'db> {
     fn cycle_recovery_semantic_views(&self) -> &[(Definition<'db>, Type<'db>)] {
         match self {
             Self::Other(extra) => &extra.cycle_recovery_semantic_views,
+            _ => &[],
+        }
+    }
+
+    fn cycle_recovery_generic_contexts(&self) -> &[(Definition<'db>, GenericContext<'db>)] {
+        match self {
+            Self::Other(extra) => &extra.cycle_recovery_generic_contexts,
             _ => &[],
         }
     }
@@ -1592,6 +1627,9 @@ impl<'db> DefinitionInference<'db> {
             .map_or(&[] as &[(Definition<'db>, Type<'db>)], |extra| {
                 extra.cycle_recovery_semantic_views()
             });
+        let current_generic_contexts = self.extra.as_deref().map_or_else(Vec::new, |extra| {
+            extra.cycle_recovery_generic_contexts().to_vec()
+        });
         let semantic_view_for_previous_type = |previous_ty| {
             previous_semantic_views
                 .iter()
@@ -1624,6 +1662,7 @@ impl<'db> DefinitionInference<'db> {
             &env,
             &previous_inference.types,
             previous_semantic_views,
+            &current_generic_contexts,
             cycle,
             definition,
         );
@@ -1649,10 +1688,11 @@ impl<'db> DefinitionInference<'db> {
                         previous_semantic_views,
                         *semantic_view_definition,
                     );
-                    semantic_view.cycle_normalized(
+                    semantic_view.cycle_normalized_with_semantic_view(
                         db,
                         &env,
                         previous_semantic_view.unwrap_or(previous_ty),
+                        None,
                         cycle,
                     )
                 } else {

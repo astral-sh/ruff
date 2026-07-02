@@ -159,7 +159,7 @@ fn will_execute_query_names(db: &TestDb, events: &[salsa::Event]) -> Vec<String>
         .collect()
 }
 
-fn box_alias<'db>(db: &'db TestDb) -> GenericAlias<'db> {
+fn box_alias(db: &TestDb) -> GenericAlias<'_> {
     let file = system_path_to_file(db, "/src/box.py").expect("test file should exist");
     let env = db.program_environment();
     let file = ProgramFile::new(db, file, env.program(db));

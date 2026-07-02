@@ -35,7 +35,7 @@ use crate::types::{
     UnionType, UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
-use ty_python_core::definition::Definition;
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::PlaceExpr;
 use ty_python_core::scope::FileScopeId;
 use ty_python_core::{SemanticIndex, place_table};
@@ -179,7 +179,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If we have an implicit type alias like `MyList = list[T]`, and if `MyList` is being
         // used in another implicit type alias like `Numbers = MyList[int]`, then we infer the
         // right hand side as a value expression, and need to handle the specialization here.
-        if value_ty.is_generic_alias() {
+        if value_ty.is_generic_alias() || value_ty.is_recursive_generic_implicit_alias(self.db()) {
             return Ok(self.infer_explicit_type_alias_specialization(subscript, value_ty, false));
         }
 
@@ -490,6 +490,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &constraint_keys,
                 )
             })
+    }
+
+    pub(super) fn infer_current_generic_implicit_alias_subscript(
+        &mut self,
+        value_ty: Type<'db>,
+        subscript: &ast::ExprSubscript,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+        let definition = self.recursive_type_expression_definition()?;
+        let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+            return None;
+        };
+        let ast::Expr::Name(name) = &*subscript.value else {
+            return None;
+        };
+        let target = assignment.target(self.module());
+        if target
+            .as_name_expr()
+            .is_none_or(|target_name| target_name.id != name.id)
+        {
+            return None;
+        }
+
+        let slice_ty = self.infer_expression(&subscript.slice, TypeContext::default());
+        let generic_context = self.generic_context_from_typevars(slice_ty);
+        self.record_cycle_recovery_generic_context(definition, generic_context);
+        Some(value_ty)
     }
 
     pub(super) fn infer_explicit_class_specialization(
