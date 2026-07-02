@@ -153,6 +153,8 @@ pub enum KnownClass {
     TyExtensionsAsyncIterator,
     TyExtensionsIterable,
     TyExtensionsIterator,
+    // Pydantic
+    PydanticBaseModel,
 }
 
 impl KnownClass {
@@ -279,7 +281,8 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::FunctoolsPartial
             | Self::ExtensionTypedDictFallback
-            | Self::TypedDictFallback => Some(Truthiness::Ambiguous),
+            | Self::TypedDictFallback
+            | Self::PydanticBaseModel => Some(Truthiness::Ambiguous),
 
             Self::Tuple => None,
         }
@@ -387,7 +390,8 @@ impl KnownClass {
             | KnownClass::ProtocolMeta
             | KnownClass::Template
             | KnownClass::Path
-            | KnownClass::FunctoolsPartial => false,
+            | KnownClass::FunctoolsPartial
+            | KnownClass::PydanticBaseModel => false,
         }
     }
 
@@ -492,7 +496,8 @@ impl KnownClass {
             | KnownClass::ProtocolMeta
             | KnownClass::Template
             | KnownClass::Path
-            | KnownClass::FunctoolsPartial => false,
+            | KnownClass::FunctoolsPartial
+            | KnownClass::PydanticBaseModel => false,
         }
     }
 
@@ -596,7 +601,8 @@ impl KnownClass {
             | KnownClass::ProtocolMeta
             | KnownClass::Template
             | KnownClass::Path
-            | KnownClass::FunctoolsPartial => false,
+            | KnownClass::FunctoolsPartial
+            | KnownClass::PydanticBaseModel => false,
         }
     }
 
@@ -713,7 +719,8 @@ impl KnownClass {
             | Self::Path
             | Self::FunctoolsPartial
             | Self::Mapping
-            | Self::Sequence => false,
+            | Self::Sequence
+            | Self::PydanticBaseModel => false,
         }
     }
 
@@ -819,7 +826,8 @@ impl KnownClass {
             | KnownClass::FunctoolsPartial
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
-            | KnownClass::Specialization => false,
+            | KnownClass::Specialization
+            | KnownClass::PydanticBaseModel => false,
             KnownClass::NamedTupleFallback
             | KnownClass::TypedDictFallback
             | KnownClass::ExtensionTypedDictFallback => true,
@@ -939,6 +947,7 @@ impl KnownClass {
             Self::Path => "Path",
             Self::FunctoolsPartial => "partial",
             Self::ProtocolMeta => "_ProtocolMeta",
+            Self::PydanticBaseModel => "BaseModel",
         }
     }
 
@@ -966,10 +975,11 @@ impl KnownClass {
         KnownClassDisplay { db, class: self }
     }
 
-    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing all possible instances of
-    /// the class. If this class is generic, this will use the default specialization.
+    /// Look up a [`KnownClass`] in its canonical module and return a [`Type`] representing all
+    /// possible instances of the class. If this class is generic, this will use the default
+    /// specialization.
     ///
-    /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
+    /// If the class cannot be found, a debug-level log message will be emitted stating this.
     #[track_caller]
     pub fn to_instance(self, db: &dyn Db) -> Type<'_> {
         debug_assert_ne!(
@@ -997,11 +1007,11 @@ impl KnownClass {
             .unwrap_or_else(Type::unknown)
     }
 
-    /// Lookup a generic [`KnownClass`] in typeshed and return a [`Type`]
-    /// representing a specialization of that class.
+    /// Look up a generic [`KnownClass`] in its canonical module and return a [`Type`] representing a
+    /// specialization of that class.
     ///
-    /// If the class cannot be found in typeshed, or if you provide a specialization with the wrong
-    /// number of types, a debug-level log message will be emitted stating this.
+    /// If the class cannot be found, or if you provide a specialization with the wrong number of
+    /// types, a debug-level log message will be emitted stating this.
     pub(crate) fn to_specialized_class_type<'t, 'db, T>(
         self,
         db: &'db dyn Db,
@@ -1050,11 +1060,11 @@ impl KnownClass {
         ))
     }
 
-    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
-    /// representing all possible instances of the generic class with a specialization.
+    /// Look up a [`KnownClass`] in its canonical module and return a [`Type`] representing all
+    /// possible instances of the generic class with a specialization.
     ///
-    /// If the class cannot be found in typeshed, or if you provide a specialization with the wrong
-    /// number of types, a debug-level log message will be emitted stating this.
+    /// If the class cannot be found, or if you provide a specialization with the wrong number of
+    /// types, a debug-level log message will be emitted stating this.
     #[track_caller]
     pub(crate) fn to_specialized_instance<'t, 'db, T>(
         self,
@@ -1075,15 +1085,18 @@ impl KnownClass {
             .unwrap_or_else(Type::unknown)
     }
 
-    /// Attempt to lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
+    /// Attempt to look up a [`KnownClass`] in its canonical module and return a [`Type`]
+    /// representing that class literal.
     ///
-    /// Return an error if the symbol cannot be found in the expected typeshed module,
-    /// or if the symbol is not a class definition, or if the symbol is possibly unbound.
+    /// Return an error if the symbol cannot be found in the expected module, if the symbol is not a
+    /// class definition, or if the symbol is possibly unbound.
     fn try_to_class_literal_without_logging(
         self,
         db: &dyn Db,
     ) -> Result<StaticClassLiteral<'_>, KnownClassLookupError<'_>> {
-        let symbol = known_module_symbol(db, self.canonical_module(db), self.name(db)).place;
+        let module = self.canonical_module(db);
+        let third_party = module.is_third_party();
+        let symbol = known_module_symbol(db, module, self.name(db)).place;
         match symbol {
             Place::Defined(DefinedPlace {
                 ty: Type::ClassLiteral(ClassLiteral::Static(class_literal)),
@@ -1094,17 +1107,24 @@ impl KnownClass {
                 ty: Type::ClassLiteral(ClassLiteral::Static(class_literal)),
                 definedness: Definedness::PossiblyUndefined,
                 ..
-            }) => Err(KnownClassLookupError::ClassPossiblyUnbound { class_literal }),
+            }) => Err(KnownClassLookupError::ClassPossiblyUnbound {
+                class_literal,
+                third_party,
+            }),
             Place::Defined(DefinedPlace { ty: found_type, .. }) => {
-                Err(KnownClassLookupError::SymbolNotAClass { found_type })
+                Err(KnownClassLookupError::SymbolNotAClass {
+                    found_type,
+                    third_party,
+                })
             }
-            Place::Undefined => Err(KnownClassLookupError::ClassNotFound),
+            Place::Undefined => Err(KnownClassLookupError::ClassNotFound { third_party }),
         }
     }
 
-    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
+    /// Look up a [`KnownClass`] in its canonical module and return a [`Type`] representing that
+    /// class literal.
     ///
-    /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
+    /// If the class cannot be found, a debug-level log message will be emitted stating this.
     pub(crate) fn try_to_class_literal(self, db: &dyn Db) -> Option<StaticClassLiteral<'_>> {
         #[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
         struct KnownClassArgument {
@@ -1146,19 +1166,20 @@ impl KnownClass {
         known_class_to_class_literal(db, KnownClassArgument::new(db, self))
     }
 
-    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
+    /// Look up a [`KnownClass`] in its canonical module and return a [`Type`] representing that
+    /// class literal.
     ///
-    /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
+    /// If the class cannot be found, a debug-level log message will be emitted stating this.
     pub(crate) fn to_class_literal(self, db: &dyn Db) -> Type<'_> {
         self.try_to_class_literal(db)
             .map(|class| Type::ClassLiteral(ClassLiteral::Static(class)))
             .unwrap_or_else(Type::unknown)
     }
 
-    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
-    /// representing that class and all possible subclasses of the class.
+    /// Look up a [`KnownClass`] in its canonical module and return a [`Type`] representing that class
+    /// and all possible subclasses of the class.
     ///
-    /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
+    /// If the class cannot be found, a debug-level log message will be emitted stating this.
     pub fn to_subclass_of(self, db: &dyn Db) -> Type<'_> {
         self.to_class_literal(db)
             .to_class_type(db)
@@ -1176,8 +1197,8 @@ impl KnownClass {
             .unwrap_or_else(SubclassOfType::subclass_of_unknown)
     }
 
-    /// Return `true` if this symbol can be resolved to a class definition `class` in typeshed,
-    /// *and* `class` is a subclass of `other`.
+    /// Return `true` if this symbol can be resolved to a class definition `class` in its canonical
+    /// module, *and* `class` is a subclass of `other`.
     pub(crate) fn is_subclass_of<'db>(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
         self.try_to_class_literal_without_logging(db)
             .is_ok_and(|class| class.is_subclass_of(db, None, other))
@@ -1309,6 +1330,7 @@ impl KnownClass {
             Self::Template => KnownModule::Templatelib,
             Self::Path => KnownModule::Pathlib,
             Self::FunctoolsPartial => KnownModule::Functools,
+            Self::PydanticBaseModel => KnownModule::PydanticMain,
         }
     }
 
@@ -1415,7 +1437,8 @@ impl KnownClass {
             | Self::Template
             | Self::Path
             | Self::UnionType
-            | Self::FunctoolsPartial => Some(false),
+            | Self::FunctoolsPartial
+            | Self::PydanticBaseModel => Some(false),
 
             Self::Tuple => None,
         }
@@ -1525,7 +1548,8 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::Template
             | Self::Path
-            | Self::FunctoolsPartial => false,
+            | Self::FunctoolsPartial
+            | Self::PydanticBaseModel => false,
         }
     }
 
@@ -1635,6 +1659,7 @@ impl KnownClass {
             "partial" => &[Self::FunctoolsPartial],
             "_ProtocolMeta" => &[Self::ProtocolMeta],
             "_TypedDict" => &[Self::ExtensionTypedDictFallback],
+            "BaseModel" => &[Self::PydanticBaseModel],
             _ => return None,
         };
 
@@ -1730,7 +1755,8 @@ impl KnownClass {
             | Self::AsyncGenerator
             | Self::Template
             | Self::Path
-            | Self::FunctoolsPartial => module == self.canonical_module(db),
+            | Self::FunctoolsPartial
+            | Self::PydanticBaseModel => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
             | Self::TypeAliasType
@@ -1894,22 +1920,33 @@ impl KnownClass {
     }
 }
 
-/// Enumeration of ways in which looking up a [`KnownClass`] in typeshed could fail.
+/// Enumeration of ways in which looking up a [`KnownClass`] in its canonical module could fail.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum KnownClassLookupError<'db> {
-    /// There is no symbol by that name in the expected typeshed module.
-    ClassNotFound,
-    /// There is a symbol by that name in the expected typeshed module,
-    /// but it's not a class.
-    SymbolNotAClass { found_type: Type<'db> },
-    /// There is a symbol by that name in the expected typeshed module,
-    /// and it's a class definition, but it's possibly unbound.
+    /// There is no symbol by that name in the expected module.
+    ClassNotFound { third_party: bool },
+    /// There is a symbol by that name in the expected module, but it's not a class.
+    SymbolNotAClass {
+        found_type: Type<'db>,
+        third_party: bool,
+    },
+    /// There is a symbol by that name in the expected module, and it's a class definition, but it's
+    /// possibly unbound.
     ClassPossiblyUnbound {
         class_literal: StaticClassLiteral<'db>,
+        third_party: bool,
     },
 }
 
 impl<'db> KnownClassLookupError<'db> {
+    const fn is_third_party(self) -> bool {
+        match self {
+            Self::ClassNotFound { third_party }
+            | Self::SymbolNotAClass { third_party, .. }
+            | Self::ClassPossiblyUnbound { third_party, .. } => third_party,
+        }
+    }
+
     fn display(&self, db: &'db dyn Db, class: KnownClass) -> impl std::fmt::Display + 'db {
         struct ErrorDisplay<'db> {
             db: &'db dyn Db,
@@ -1923,22 +1960,27 @@ impl<'db> KnownClassLookupError<'db> {
 
                 let class = class.display(db);
                 let python_version = Program::get(db).python_version(db);
+                let location = if error.is_third_party() {
+                    ""
+                } else {
+                    " in typeshed"
+                };
 
                 match error {
-                    KnownClassLookupError::ClassNotFound => write!(
+                    KnownClassLookupError::ClassNotFound { .. } => write!(
                         f,
-                        "Could not find class `{class}` in typeshed on Python {python_version}",
+                        "Could not find class `{class}`{location} on Python {python_version}",
                     ),
-                    KnownClassLookupError::SymbolNotAClass { found_type } => write!(
+                    KnownClassLookupError::SymbolNotAClass { found_type, .. } => write!(
                         f,
-                        "Error looking up `{class}` in typeshed: expected to find a class definition \
+                        "Error looking up `{class}`{location}: expected to find a class definition \
                         on Python {python_version}, but found a symbol of type `{found_type}` instead",
                         found_type = found_type.display(db),
                     ),
                     KnownClassLookupError::ClassPossiblyUnbound { .. } => write!(
                         f,
-                        "Error looking up `{class}` in typeshed on Python {python_version}: \
-                        expected to find a fully bound symbol, but found one that is possibly unbound",
+                        "Error looking up `{class}`{location} on Python {python_version}: expected \
+                        to find a fully bound symbol, but found one that is possibly unbound",
                     ),
                 }
             }
@@ -1971,6 +2013,9 @@ mod tests {
                 source: PythonVersionSource::default(),
             });
         for class in KnownClass::iter() {
+            if class.canonical_module(&db).is_third_party() {
+                continue;
+            }
             let class_name = class.name(&db);
             let class_module =
                 resolve_module_confident(&db, &class.canonical_module(&db).name()).unwrap();
@@ -1999,6 +2044,9 @@ mod tests {
             });
 
         for class in KnownClass::iter() {
+            if class.canonical_module(&db).is_third_party() {
+                continue;
+            }
             // Check the class can be looked up successfully
             class.try_to_class_literal_without_logging(&db).unwrap();
 
@@ -2024,6 +2072,7 @@ mod tests {
         // This makes the test far faster as it minimizes the number of times
         // we need to change the Python version in the loop.
         let mut classes: Vec<(KnownClass, PythonVersion)> = KnownClass::iter()
+            .filter(|class| !class.canonical_module(&db).is_third_party())
             .map(|class| {
                 let version_added = match class {
                     KnownClass::Template => PythonVersion::PY314,

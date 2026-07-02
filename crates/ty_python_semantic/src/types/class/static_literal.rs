@@ -34,6 +34,7 @@ use crate::{
             typed_dict::{TypedDictFields, synthesize_typed_dict_method, typed_dict_class_member},
         },
         context::InferContext,
+        dedicated::pydantic,
         definition_expression_type, determine_upper_bound,
         diagnostic::INVALID_DATACLASS_OVERRIDE,
         enums::{enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value},
@@ -1463,6 +1464,11 @@ impl<'db> StaticClassLiteral<'db> {
             // In the event that we have a mix of keyword-only and positional parameters, we need to sort them
             // so that the keyword-only parameters appear after positional parameters.
             parameters.sort_by_key(Parameter::is_keyword_only);
+
+            if name == "__init__" && pydantic::uses_base_model_init(db, self) {
+                let extra = pydantic::extra_parameter(&parameters);
+                parameters.push(extra);
+            }
 
             let signature = match name {
                 "__new__" | "__init__" => Signature::new_generic(
