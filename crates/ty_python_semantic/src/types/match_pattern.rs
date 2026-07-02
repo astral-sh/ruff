@@ -477,12 +477,12 @@ fn member_pattern_is_exhaustive(
 }
 
 /// Return whether `pattern` is statically guaranteed to match every value in `subject_ty`.
-fn pattern_is_exhaustive_for_subject(
+pub(crate) fn pattern_is_exhaustive_for_subject(
     db: &dyn Db,
     pattern: &PatternPredicateKind<'_>,
     subject_ty: Type<'_>,
 ) -> bool {
-    pattern_coverage_for_subject(db, pattern, subject_ty).exhausts_subject()
+    pattern_coverage_for_subject(db, pattern, subject_ty).exhausts_subject
 }
 
 /// Return whether every value in `subject_ty` is guaranteed to match a mapping pattern.
@@ -555,8 +555,13 @@ fn sequence_pattern_is_exhaustive_for_subject(
 }
 
 /// The statically known coverage of a pattern for a specific subject type.
+///
+/// `definitely_matched_ty` is an under-approximation that is safe to subtract from the subject.
+/// `exhausts_subject` records the stronger subject-specific proof separately because a gradual type
+/// such as `Mapping[str, Any]` is not a subtype of itself even though `case Mapping()` matches every
+/// value it represents.
 #[derive(Clone, Copy)]
-pub(crate) struct PatternCoverage<'db> {
+struct PatternCoverage<'db> {
     definitely_matched_ty: Type<'db>,
     exhausts_subject: bool,
 }
@@ -568,17 +573,13 @@ impl<'db> PatternCoverage<'db> {
             exhausts_subject,
         }
     }
-
-    pub(crate) fn definitely_matched_ty(self) -> Type<'db> {
-        self.definitely_matched_ty
-    }
-
-    pub(crate) fn exhausts_subject(self) -> bool {
-        self.exhausts_subject
-    }
 }
 
 /// Accumulate coverage for ordered `or` alternatives without reanalyzing nested `or` subtrees.
+///
+/// Parenthesized patterns such as `case ((1 | 2) | 3)` retain nested `Or` nodes. Traversing those
+/// nodes into the same accumulator preserves left-to-right fallthrough while keeping analysis
+/// linear in the number of alternatives.
 fn extend_or_pattern_coverage<'db>(
     db: &'db dyn Db,
     patterns: &[PatternPredicateKind<'db>],
@@ -596,8 +597,8 @@ fn extend_or_pattern_coverage<'db>(
         }
 
         let coverage = pattern_coverage_for_subject(db, pattern, *remaining_subject_ty);
-        definitely_matched.push(coverage.definitely_matched_ty());
-        if coverage.exhausts_subject() {
+        definitely_matched.push(coverage.definitely_matched_ty);
+        if coverage.exhausts_subject {
             *remaining_subject_ty = Type::Never;
         } else {
             *remaining_subject_ty = pattern_fallthrough_type(db, pattern, *remaining_subject_ty);
@@ -631,7 +632,7 @@ fn extend_or_pattern_coverage<'db>(
 /// # For a `tuple[Child]` subject, this checks `x` on `Child`, not only on `Base`.
 /// case [Base(x=_)]: ...
 /// ```
-pub(crate) fn pattern_coverage_for_subject<'db>(
+fn pattern_coverage_for_subject<'db>(
     db: &'db dyn Db,
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
@@ -646,20 +647,13 @@ pub(crate) fn pattern_coverage_for_subject<'db>(
 
     let resolved_subject_ty = subject_ty.resolve_type_alias(db);
     if let Type::Union(union) = resolved_subject_ty {
-        let coverages = union
-            .elements(db)
-            .iter()
-            .map(|element| pattern_coverage_for_subject(db, kind, *element))
-            .collect::<Vec<_>>();
-        return PatternCoverage::new(
-            UnionType::from_elements(
-                db,
-                coverages
-                    .iter()
-                    .map(|coverage| coverage.definitely_matched_ty()),
-            ),
-            coverages.iter().all(|coverage| coverage.exhausts_subject()),
-        );
+        let mut exhausts_subject = true;
+        let definitely_matched_ty = union.map(db, |element| {
+            let coverage = pattern_coverage_for_subject(db, kind, *element);
+            exhausts_subject &= coverage.exhausts_subject;
+            coverage.definitely_matched_ty
+        });
+        return PatternCoverage::new(definitely_matched_ty, exhausts_subject);
     }
 
     match kind {
@@ -798,8 +792,8 @@ pub(crate) fn pattern_fallthrough_type<'db>(
         let mut removed_element = false;
         let remaining = union.map(db, |element| {
             let coverage = pattern_coverage_for_subject(db, kind, *element);
-            if coverage.exhausts_subject()
-                && !element.is_subtype_of(db, coverage.definitely_matched_ty())
+            if coverage.exhausts_subject
+                && !element.is_subtype_of(db, coverage.definitely_matched_ty)
             {
                 removed_element = true;
                 Type::Never
@@ -813,13 +807,13 @@ pub(crate) fn pattern_fallthrough_type<'db>(
     }
 
     let coverage = pattern_coverage_for_subject(db, kind, subject_ty);
-    if coverage.exhausts_subject() {
+    if coverage.exhausts_subject {
         return Type::Never;
     }
 
     IntersectionBuilder::new(db)
         .add_positive(subject_ty)
-        .add_negative(coverage.definitely_matched_ty())
+        .add_negative(coverage.definitely_matched_ty)
         .build()
 }
 

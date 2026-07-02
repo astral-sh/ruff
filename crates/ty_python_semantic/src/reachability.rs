@@ -201,11 +201,10 @@ use crate::{
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
         ActiveRecursionDetector, CallableTypes, EnumClassLiteral, KnownInstanceType,
-        NarrowingConstraint, PatternCoverage, SpecialFormType, Type, TypeContext, UnionType,
-        callable_pattern_type, definite_match_pattern_type, equality_truthiness, expand_type,
-        infer_narrowing_constraints, infer_same_file_expression_type, mapping_pattern_type,
-        pattern_binding_fallthrough_type, pattern_coverage_for_subject,
-        sequence_pattern_type_builder, singleton_pattern_type,
+        NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType, callable_pattern_type,
+        definite_match_pattern_type, equality_truthiness, expand_type, infer_narrowing_constraints,
+        infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
+        pattern_is_exhaustive_for_subject, sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
 use ruff_index::{Idx, IndexSlice};
@@ -1111,7 +1110,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
     db: &'db dyn Db,
     predicate_kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
-    precomputed_coverage: Option<PatternCoverage<'db>>,
+    precomputed_exhaustiveness: Option<bool>,
 ) -> Truthiness {
     match predicate_kind {
         PatternPredicateKind::Value(value) => {
@@ -1143,18 +1142,17 @@ fn analyze_single_pattern_predicate_kind<'db>(
                 .map(|p| {
                     let narrowed_subject_ty = remaining_subject_ty;
 
-                    let coverage = pattern_coverage_for_subject(db, p, narrowed_subject_ty);
-
-                    let truthiness = if coverage.exhausts_subject() {
-                        Truthiness::AlwaysTrue
-                    } else {
-                        analyze_single_pattern_predicate_kind(
-                            db,
-                            p,
-                            narrowed_subject_ty,
-                            Some(coverage),
-                        )
-                    };
+                    let truthiness =
+                        if pattern_is_exhaustive_for_subject(db, p, narrowed_subject_ty) {
+                            Truthiness::AlwaysTrue
+                        } else {
+                            analyze_single_pattern_predicate_kind(
+                                db,
+                                p,
+                                narrowed_subject_ty,
+                                Some(false),
+                            )
+                        };
 
                     remaining_subject_ty =
                         pattern_binding_fallthrough_type(db, p, narrowed_subject_ty);
@@ -1184,10 +1182,11 @@ fn analyze_single_pattern_predicate_kind<'db>(
                     }
                     _ => return Truthiness::Ambiguous,
                 };
-            let coverage = precomputed_coverage
-                .unwrap_or_else(|| pattern_coverage_for_subject(db, predicate_kind, subject_ty));
+            let exhausts_subject = precomputed_exhaustiveness.unwrap_or_else(|| {
+                pattern_is_exhaustive_for_subject(db, predicate_kind, subject_ty)
+            });
 
-            if coverage.exhausts_subject() {
+            if exhausts_subject {
                 Truthiness::AlwaysTrue
             } else if subject_ty.is_disjoint_from(db, class_ty) {
                 Truthiness::AlwaysFalse
@@ -1225,7 +1224,9 @@ fn analyze_single_pattern_predicate_kind<'db>(
         }
         PatternPredicateKind::As(pattern, _) => pattern
             .as_deref()
-            .map(|p| analyze_single_pattern_predicate_kind(db, p, subject_ty, precomputed_coverage))
+            .map(|p| {
+                analyze_single_pattern_predicate_kind(db, p, subject_ty, precomputed_exhaustiveness)
+            })
             .unwrap_or(Truthiness::AlwaysTrue),
         PatternPredicateKind::Star(_) => Truthiness::AlwaysTrue,
     }

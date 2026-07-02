@@ -35,9 +35,9 @@ pub(crate) use self::infer::{
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
 pub(crate) use self::match_pattern::{
-    ClassPatternPositionalSource, PatternCoverage, callable_pattern_type,
-    class_pattern_positional_sources, definite_match_pattern_type, exact_sequence_pattern_type,
-    mapping_pattern_type, pattern_binding_fallthrough_type, pattern_coverage_for_subject,
+    ClassPatternPositionalSource, callable_pattern_type, class_pattern_positional_sources,
+    definite_match_pattern_type, exact_sequence_pattern_type, mapping_pattern_type,
+    pattern_binding_fallthrough_type, pattern_is_exhaustive_for_subject,
     sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
     typed_dict_matches_class_pattern,
 };
