@@ -44,6 +44,17 @@
         "null"
       ]
     },
+    "docstring-convention": {
+      "description": "The docstring convention to use globally across all tools that\ninspect docstrings (e.g., `pydocstyle`).\n\nThis is the tool-agnostic equivalent of\n[`lint.pydocstyle.convention`](#lint_pydocstyle_convention). When both\nare set, the more specific `lint.pydocstyle.convention` takes\nprecedence.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Convention"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "dummy-variable-rgx": {
       "description": "A regular expression used to identify \"dummy\" variables, or those which\nshould be ignored when enforcing (e.g.) unused-variable rules. The\ndefault expression matches `_`, `__`, and `_var`, but not `_var_`.",
       "type": [
