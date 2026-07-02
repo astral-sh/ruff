@@ -635,6 +635,239 @@ class ProtocolWithClassVarImpl(ProtocolBase):
     instance_attr = 0
 ```
 
+## Inherited method conflicts in multiple inheritance
+
+When a class directly inherits from two or more statically known classes, the method selected by
+Python's MRO must be compatible with the effective method inherited through each base.
+
+### Basic conflicts
+
+`IncompatibleReturns.method` comes from `ReturnsStr`, but its `str` return type does not satisfy the
+contract inherited from `ReturnsInt`. Returning `bool` is compatible because `bool` is a subtype of
+`int`.
+
+```pyi
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
+class ReturnsBool:
+    def method(self) -> bool: ...
+
+class IncompatibleReturns(ReturnsStr, ReturnsInt): ...  # snapshot: invalid-method-override
+class CompatibleReturns(ReturnsBool, ReturnsInt): ...
+```
+
+```snapshot
+error[invalid-method-override]: Base classes for class `IncompatibleReturns` define method `method` incompatibly
+  --> src/mdtest_snippet.pyi:2:9
+   |
+ 2 |     def method(self) -> str: ...
+   |         ------ `ReturnsStr.method` defined here
+ 3 |
+ 4 | class ReturnsInt:
+ 5 |     def method(self) -> int: ...
+   |         ------ `ReturnsInt.method` defined here
+ 6 |
+ 7 | class ReturnsBool:
+ 8 |     def method(self) -> bool: ...
+ 9 |
+10 | class IncompatibleReturns(ReturnsStr, ReturnsInt): ...  # snapshot: invalid-method-override
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ReturnsStr.method` is incompatible with `ReturnsInt.method`
+   |
+info: incompatible return types: `str` is not assignable to `int`
+info: This violates the Liskov Substitution Principle
+```
+
+### Methods inherited by a direct base
+
+A direct base does not need to define the method itself. Its effective method can come from an
+ancestor.
+
+```pyi
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class Intermediate(ReturnsStr): ...
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
+class Child(Intermediate, ReturnsInt): ...  # error: [invalid-method-override]
+```
+
+### Unreachable definitions do not shadow inherited methods
+
+An assignment in an unreachable branch does not replace the method inherited from `ReturnsStr`.
+
+```pyi
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class UnreachableShadow(ReturnsStr):
+    if False:
+        method = 0
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
+class Child(ReturnsInt, UnreachableShadow): ...  # error: [invalid-method-override]
+```
+
+### Generic bases
+
+Methods inherited from a specialized generic base use the specialization selected by the subclass.
+The legacy `Generic[T]` base does not participate in method selection, but it must not prevent us
+from checking the other bases.
+
+```pyi
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
+class GenericReturn(Generic[T]):
+    def method(self) -> T: ...
+
+class SpecializedConflict(ReturnsStr, GenericReturn[int]): ...  # error: [invalid-method-override]
+class GenericBaseConflict(Generic[T], ReturnsStr, ReturnsInt): ...  # error: [invalid-method-override]
+```
+
+### Special methods
+
+Ordinary special methods participate in the same compatibility check as named methods.
+
+```pyi
+from typing import Iterator
+
+class IteratesStr:
+    def __iter__(self) -> Iterator[str]: ...
+
+class IteratesInt:
+    def __iter__(self) -> Iterator[int]: ...
+
+class Child(IteratesStr, IteratesInt): ...  # error: [invalid-method-override]
+```
+
+### Classmethods use the final class as their receiver
+
+A classmethod overload can depend on the concrete class through which the method is accessed. The
+inherited contracts are therefore bound to `Final` rather than to the classes that define them.
+
+```pyi
+from typing import overload
+
+class ReceiverBase:
+    @overload
+    @classmethod
+    def selected(cls: type[Final]) -> int: ...
+    @overload
+    @classmethod
+    def selected(cls) -> str: ...
+
+class Left(ReceiverBase): ...
+
+class Right(ReceiverBase):
+    @classmethod
+    def selected(cls) -> str: ...
+
+class Final(Left, Right): ...  # error: [invalid-method-override]
+```
+
+### Method kinds
+
+Instance methods, classmethods, and staticmethods are bound differently when accessed, even when
+their callable signatures are otherwise identical. All three pairings are checked in both base
+orders because changing the order changes the method selected by the MRO.
+
+```pyi
+class InstanceMethod:
+    def kind(self, value: int) -> int: ...
+
+class StaticMethod:
+    @staticmethod
+    def kind(value: int) -> int: ...
+
+class ClassMethod:
+    @classmethod
+    def kind(cls, value: int) -> int: ...
+
+class InstanceStaticConflict(InstanceMethod, StaticMethod): ...  # error: [invalid-method-override]
+class StaticInstanceConflict(StaticMethod, InstanceMethod): ...  # error: [invalid-method-override]
+class InstanceClassConflict(InstanceMethod, ClassMethod): ...  # error: [invalid-method-override]
+class ClassInstanceConflict(ClassMethod, InstanceMethod): ...  # snapshot: invalid-method-override
+class StaticClassConflict(StaticMethod, ClassMethod): ...  # error: [invalid-method-override]
+class ClassStaticConflict(ClassMethod, StaticMethod): ...  # error: [invalid-method-override]
+```
+
+```snapshot
+error[invalid-method-override]: Base classes for class `ClassInstanceConflict` define method `kind` incompatibly
+  --> src/mdtest_snippet.pyi:10:9
+   |
+10 |     def kind(cls, value: int) -> int: ...
+   |         ---- `ClassMethod.kind` defined here
+11 |
+12 | class InstanceStaticConflict(InstanceMethod, StaticMethod): ...  # error: [invalid-method-override]
+13 | class StaticInstanceConflict(StaticMethod, InstanceMethod): ...  # error: [invalid-method-override]
+14 | class InstanceClassConflict(InstanceMethod, ClassMethod): ...  # error: [invalid-method-override]
+15 | class ClassInstanceConflict(ClassMethod, InstanceMethod): ...  # snapshot: invalid-method-override
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ClassMethod.kind` is incompatible with `InstanceMethod.kind`
+   |
+  ::: src/mdtest_snippet.pyi:2:9
+   |
+ 2 |     def kind(self, value: int) -> int: ...
+   |         ---- `InstanceMethod.kind` defined here
+   |
+info: `ClassMethod.kind` is a classmethod but `InstanceMethod.kind` is an instance method
+info: This violates the Liskov Substitution Principle
+```
+
+### The implicit `object` base is not a competing contract
+
+Every class eventually inherits from `object`, but that shared tail of the MRO is not a separate
+method contract from an otherwise empty base. `InvalidStr` receives the ordinary override error;
+`Child` should not receive a second error.
+
+```pyi
+class Empty: ...
+
+class InvalidStr:
+    def __str__(self) -> int: ...  # error: [invalid-method-override]
+
+class Child(Empty, InvalidStr): ...
+```
+
+### Metaclass descriptors do not replace classmethod contracts
+
+Looking up a classmethod by name on a class object can invoke a same-named descriptor on its
+metaclass. The inherited contract comes from the source-defined classmethod, not that metaclass
+descriptor.
+
+```pyi
+from typing import Any
+
+class Meta(type):
+    @property
+    def class_method(cls) -> Any: ...
+
+class ReturnsInt(metaclass=Meta):
+    @classmethod
+    def class_method(cls) -> int: ...
+
+class ReturnsStr:
+    @classmethod
+    def class_method(cls) -> str: ...
+
+class Child(ReturnsInt, ReturnsStr): ...  # error: [invalid-method-override]
+```
+
 ## The entire class hierarchy is checked
 
 If a child class's method definition is Liskov-compatible with the method definition on its parent
