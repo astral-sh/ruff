@@ -637,12 +637,13 @@ impl<'src> Lexer<'src> {
     /// Lex an identifier. Also used for keywords and string/bytes literals with a prefix.
     fn lex_identifier(&mut self, first: char) -> TokenKind {
         // Detect potential string like rb'' b'' f'' t'' u'' r''
-        let quote = if single_char_prefix(first).is_some() {
+        let quote = if let Some(prefix) = single_char_prefix(first) {
             match self.cursor.first() {
-                quote @ ('\'' | '"') => self.try_single_char_prefix(first).then(|| {
+                quote @ ('\'' | '"') => {
+                    self.current_flags |= prefix;
                     self.cursor.bump();
-                    quote
-                }),
+                    Some(quote)
+                }
                 second if is_quote(self.cursor.second()) => {
                     self.try_double_char_prefix([first, second]).then(|| {
                         self.cursor.bump();
@@ -732,16 +733,6 @@ impl<'src> Lexer<'src> {
             b"yield" => TokenKind::Yield,
             _ => TokenKind::Name,
         }
-    }
-
-    /// Try lexing the single character string prefix, updating the token flags accordingly.
-    /// Returns `true` if it matches.
-    fn try_single_char_prefix(&mut self, first: char) -> bool {
-        let Some(prefix) = single_char_prefix(first) else {
-            return false;
-        };
-        self.current_flags |= prefix;
-        true
     }
 
     /// Try lexing the double character string prefix, updating the token flags accordingly.
