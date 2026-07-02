@@ -165,6 +165,18 @@ def exhaustive_sequence_wrapped_gradual_class_pattern(
         case _:
             reveal_type(value)  # revealed: Never
             assert_never(value)
+
+def exhaustive_sequence_preserves_previous_exclusions(
+    value: tuple[Box[Any]] | int | str,
+) -> None:
+    match value:
+        case int():
+            pass
+        case [Box(value=_)]:
+            reveal_type(value)  # revealed: tuple[Box[Any]]
+        case _:
+            reveal_type(value)  # revealed: str
+            len(value)  # fine
 ```
 
 ## Class patterns with generic `@final` classes
