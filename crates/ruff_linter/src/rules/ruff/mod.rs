@@ -668,6 +668,19 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn ruf100_8_ruff_ignore_self_suppression() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF100_8.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedVariable])
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
     #[test_case(Path::new("ruff/RUF102.py"))]
     #[test_case(Path::new("ruff/RUF102_1.py"))]
     fn invalid_rule_code_external_rules(path: &Path) -> Result<()> {
