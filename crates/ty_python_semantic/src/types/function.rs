@@ -1111,7 +1111,8 @@ impl<'db> FunctionType<'db> {
                     | ApplySpecialization::TypeAlias(_),
                 ..
             }
-        ) || type_mapping.used_in_cycle_recovery()
+        ) || type_mapping
+            .used_in_cycle_recovery()
         {
             (
                 self.updated_signature(db).map(|signature| {

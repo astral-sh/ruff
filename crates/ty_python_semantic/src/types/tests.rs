@@ -56,7 +56,7 @@ fn list_instance<'db>(db: &'db dyn Db, argument: Type<'db>) -> Type<'db> {
     Type::instance(db, ClassType::from(list_alias(db, argument)))
 }
 
-fn recursive_int_list<'db>(db: &'db dyn Db) -> RecursiveType<'db> {
+fn recursive_int_list(db: &dyn Db) -> RecursiveType<'_> {
     let binder = DivergentType::new(salsa::plumbing::Id::from_bits(1));
     let recursive_var = Type::Divergent(binder);
     let element_ty = UnionType::from_elements(db, [KnownClass::Int.to_instance(db), recursive_var]);
@@ -455,12 +455,16 @@ fn recursive_type_map_folds_only_unfolded_body() {
             .subscript(&db, Type::int_literal(0), ast::ExprContext::Load)
             .expect("the unfolded recursive list should be subscriptable")
     });
-    assert_eq!(projected.display(&db).to_string(), "int | list[int | Divergent]");
+    assert_eq!(
+        projected.display(&db).to_string(),
+        "int | list[int | Divergent]"
+    );
 
-    let constructed = recursive.map_type(&db, |unfolded| {
-        list_instance(&db, unfolded)
-    });
-    assert_eq!(constructed.display(&db).to_string(), "list[list[int | Divergent]]");
+    let constructed = recursive.map_type(&db, |unfolded| list_instance(&db, unfolded));
+    assert_eq!(
+        constructed.display(&db).to_string(),
+        "list[list[int | Divergent]]"
+    );
 
     let Type::NominalInstance(instance) = constructed else {
         panic!("list construction should produce a nominal instance");
@@ -489,11 +493,7 @@ fn recursive_fold_does_not_invoke_variance_queries() {
     {
         let recursive = recursive_int_list(&db);
         let box_ty = Type::GenericAlias(box_alias(&db));
-        let _ = box_ty.apply_type_mapping(
-            &db,
-            &TypeMapping::FoldRecursive { recursive },
-            TypeContext::default(),
-        );
+        let _ = box_ty.fold(&db, recursive);
     }
     let events = db.take_salsa_events();
     assert!(

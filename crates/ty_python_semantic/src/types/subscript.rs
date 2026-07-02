@@ -22,8 +22,8 @@ use super::infer::TypeContext;
 use super::instance::SliceLiteral;
 use super::special_form::SpecialFormType;
 use super::{
-    DynamicType, Foldable, IntersectionBuilder, IntersectionType, KnownInstanceType,
-    RecursiveType, Type, TypeAliasType, TypedDictType, UnionBuilder, UnionType, todo_type,
+    DynamicType, Foldable, IntersectionBuilder, IntersectionType, KnownInstanceType, RecursiveType,
+    Type, TypeAliasType, TypedDictType, UnionBuilder, UnionType, todo_type,
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
@@ -208,12 +208,10 @@ impl<'db> Foldable<'db> for SubscriptErrorKind<'db> {
             },
             Self::SliceStepSizeZero => Self::SliceStepSizeZero,
             Self::NonGenericTypeAlias { alias } => Self::NonGenericTypeAlias { alias },
-            Self::DunderPossiblyUnbound { method, value_ty } => {
-                Self::DunderPossiblyUnbound {
-                    method,
-                    value_ty: value_ty.fold(db, recursive),
-                }
-            }
+            Self::DunderPossiblyUnbound { method, value_ty } => Self::DunderPossiblyUnbound {
+                method,
+                value_ty: value_ty.fold(db, recursive),
+            },
             Self::DunderCallError {
                 method,
                 value_ty,
@@ -254,9 +252,7 @@ impl<'db> Foldable<'db> for SubscriptErrorKind<'db> {
                 origin,
                 typevar_name,
             },
-            Self::TypeVarTupleNotUnpacked { origin } => {
-                Self::TypeVarTupleNotUnpacked { origin }
-            }
+            Self::TypeVarTupleNotUnpacked { origin } => Self::TypeVarTupleNotUnpacked { origin },
         }
     }
 }

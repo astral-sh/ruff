@@ -1183,6 +1183,16 @@ impl<'db> Type<'db> {
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
+        self.cycle_normalized_with_semantic_view(db, previous, None, cycle)
+    }
+
+    pub(crate) fn cycle_normalized_with_semantic_view(
+        self,
+        db: &'db dyn Db,
+        previous: Self,
+        previous_semantic_view: Option<Self>,
+        cycle: &salsa::Cycle,
+    ) -> Self {
         let self_degraded_by_overload =
             any_over_type(db, self, false, |ty| {
                 matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
@@ -1202,7 +1212,8 @@ impl<'db> Type<'db> {
         // So we avoid unioning in the first couple iterations, and just use the later iteration's
         // result directly. We still ensure monotonicity after the first couple iterations, which
         // still ensures convergence in cases that are prone to oscillation.
-        let include_previous = cycle.iteration() > crate::TAINTED_CYCLES || self_degraded_by_overload;
+        let include_previous =
+            cycle.iteration() > crate::TAINTED_CYCLES || self_degraded_by_overload;
 
         let stabilized = if cycle.iteration() <= crate::TAINTED_CYCLES {
             // Generally, the precision of type inference improves with each iteration.
@@ -1227,14 +1238,42 @@ impl<'db> Type<'db> {
         };
 
         cycle.head_ids().fold(stabilized, |current, id| {
-            current.cycle_fold_recursive(db, previous, cycle, id, include_previous)
+            current.cycle_fold_recursive(
+                db,
+                previous,
+                previous_semantic_view,
+                cycle,
+                id,
+                include_previous,
+            )
         })
+    }
+
+    fn replace_recursive_with_binder(
+        self,
+        db: &'db dyn Db,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::ReplaceRecursiveWithBinder { recursive },
+            TypeContext::default(),
+        )
+    }
+
+    fn semantic_view_in_inference(self, db: &'db dyn Db) -> Self {
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::SemanticViewInInference,
+            TypeContext::default(),
+        )
     }
 
     fn cycle_fold_recursive(
         self,
         db: &'db dyn Db,
         previous: Self,
+        previous_semantic_view: Option<Self>,
         cycle: &salsa::Cycle,
         id: salsa::Id,
         include_previous: bool,
@@ -1248,24 +1287,19 @@ impl<'db> Type<'db> {
         };
 
         let current_body = if let Some(recursive) = previous_recursive {
-            let mut current_body = self.apply_type_mapping(
-                db,
-                &TypeMapping::ReplaceRecursiveWithBinder { recursive },
-                TypeContext::default(),
-            );
+            let mut current_body = self
+                .fold(db, recursive)
+                .replace_recursive_with_binder(db, recursive);
 
-            if let Some(Type::Recursive(semantic_recursive)) =
-                previous.type_expression_semantic_view(db)
+            let semantic_view =
+                previous_semantic_view.or_else(|| previous.type_expression_semantic_view(db));
+            if let Some(Type::Recursive(semantic_recursive)) = semantic_view
                 && semantic_recursive.binder(db).same_marker(binder)
                 && semantic_recursive != recursive
             {
-                current_body = current_body.apply_type_mapping(
-                    db,
-                    &TypeMapping::ReplaceRecursiveWithBinder {
-                        recursive: semantic_recursive,
-                    },
-                    TypeContext::default(),
-                );
+                current_body = current_body
+                    .fold(db, semantic_recursive)
+                    .replace_recursive_with_binder(db, semantic_recursive);
             }
 
             current_body
@@ -1298,6 +1332,26 @@ impl<'db> Type<'db> {
                 instance.union_type(db).as_ref().ok().copied()
             }
             _ => None,
+        }
+    }
+
+    /// Returns a type-expression view while the owning inference query is still running.
+    ///
+    /// This may use normal inference-time conversions such as `Type::instance`; do not call it
+    /// from salsa cycle recovery functions.
+    pub(crate) fn type_expression_semantic_view_in_inference(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<Self> {
+        match self {
+            Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
+                let union_type = instance.union_type(db).as_ref().ok().copied()?;
+                Some(union_type.semantic_view_in_inference(db))
+            }
+            _ => {
+                let semantic_view = self.semantic_view_in_inference(db);
+                (semantic_view != self).then_some(semantic_view)
+            }
         }
     }
 
@@ -4418,11 +4472,11 @@ impl<'db> Type<'db> {
 
         match self {
             Type::Recursive(recursive) => {
-                return recursive.map_or_else(
+                recursive.map_or_else(
                     db,
                     || Binding::single(self, Signature::dynamic(self)).into(),
                     |unfolded| unfolded.bindings(db),
-                );
+                )
             }
 
             Type::Callable(callable) => {
@@ -6092,14 +6146,18 @@ impl<'db> Type<'db> {
                 if let Some(body) = recursive.body(db).type_expression_semantic_view(db) {
                     Ok(Type::recursive(db, recursive.binder(db), body))
                 } else {
-                    recursive.map_or_else(db, || Ok(*self), |unfolded| {
-                        unfolded.in_type_expression(
-                            db,
-                            scope_id,
-                            typevar_binding_context,
-                            inference_flags,
-                        )
-                    })
+                    recursive.map_or_else(
+                        db,
+                        || Ok(*self),
+                        |unfolded| {
+                            unfolded.in_type_expression(
+                                db,
+                                scope_id,
+                                typevar_binding_context,
+                                inference_flags,
+                            )
+                        },
+                    )
                 }
             }
 
@@ -6360,6 +6418,12 @@ impl<'db> Type<'db> {
         {
             return Type::Recursive(*recursive);
         }
+        // Cycle recovery compares against recursive types through their transparent body.
+        if let TypeMapping::ReplaceRecursiveWithBinder { recursive } = type_mapping
+            && self == recursive.body(db)
+        {
+            return Type::Divergent(recursive.binder(db));
+        }
 
         // Recursive singleton promotion only recurses into `NominalInstance` types (tuples
         // and specialized generics). For all other types, return early.
@@ -6499,6 +6563,12 @@ impl<'db> Type<'db> {
             Type::Callable(callable) => visitor.visit(db, self, type_mapping, || {
                 Type::Callable(callable.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }),
+
+            Type::GenericAlias(generic) if matches!(type_mapping, TypeMapping::SemanticViewInInference) => {
+                let generic =
+                    generic.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor);
+                Type::instance(db, ClassType::from(generic))
+            }
 
             Type::GenericAlias(generic) => {
                 Type::GenericAlias(generic.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
@@ -6690,6 +6760,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) |
+                TypeMapping::SemanticViewInInference |
                 TypeMapping::Promote(PromotionMode::Off, _) |
                 TypeMapping::Promote(
                     PromotionMode::On,
@@ -6712,6 +6783,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) => self,
+                TypeMapping::SemanticViewInInference => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
                     MaterializationKind::Bottom => Type::Never,
@@ -6819,12 +6891,7 @@ impl<'db> Type<'db> {
                     db,
                     || (),
                     |unfolded| {
-                        unfolded.find_legacy_typevars_impl(
-                            db,
-                            binding_context,
-                            typevars,
-                            visitor,
-                        );
+                        unfolded.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
                     },
                 );
             }),
@@ -7778,6 +7845,8 @@ pub enum TypeMapping<'a, 'db> {
     FoldRecursive { recursive: RecursiveType<'db> },
     /// Replaces a recursive type occurrence with its binder.
     ReplaceRecursiveWithBinder { recursive: RecursiveType<'db> },
+    /// Converts retained runtime type-expression values to their type-expression meaning.
+    SemanticViewInInference,
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     Promote(PromotionMode, PromotionKind),
@@ -7847,6 +7916,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::UnfoldRecursive { .. }
             | TypeMapping::FoldRecursive { .. }
             | TypeMapping::ReplaceRecursiveWithBinder { .. }
+            | TypeMapping::SemanticViewInInference
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
@@ -7894,6 +7964,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::UnfoldRecursive { .. }
             | TypeMapping::FoldRecursive { .. }
             | TypeMapping::ReplaceRecursiveWithBinder { .. }
+            | TypeMapping::SemanticViewInInference
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)
@@ -7963,7 +8034,6 @@ impl<'db, T: Foldable<'db>, E: Foldable<'db>> Foldable<'db> for Result<T, E> {
 
 impl<'db> Foldable<'db> for () {
     fn fold(self, _db: &'db dyn Db, _recursive: RecursiveType<'db>) -> Self {
-        self
     }
 }
 
@@ -8145,9 +8215,12 @@ impl<'db> RecursiveType<'db> {
     }
 
     fn contains_binder(db: &'db dyn Db, body: Type<'db>, binder: DivergentType) -> bool {
-        any_over_type(db, body, false, |ty| {
-            matches!(ty, Type::Divergent(divergent) if divergent.same_marker(binder))
-        })
+        any_over_type(
+            db,
+            body,
+            false,
+            |ty| matches!(ty, Type::Divergent(divergent) if divergent.same_marker(binder)),
+        )
     }
 }
 

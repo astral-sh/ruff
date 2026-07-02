@@ -60,8 +60,8 @@ use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
-    Foldable, InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass,
+    ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, Foldable,
+    GenericAlias, InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass,
     KnownInstanceType, LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
     RecursiveType, SpecialFormType, TypeAliasType, TypeContext, TypeMapping,
     TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
@@ -2778,8 +2778,7 @@ impl<'db> Foldable<'db> for Bindings<'db> {
         Self {
             callable_type: self.callable_type.fold(db, recursive),
             implicit_dunder_new_is_possibly_unbound: self.implicit_dunder_new_is_possibly_unbound,
-            implicit_dunder_init_is_possibly_unbound: self
-                .implicit_dunder_init_is_possibly_unbound,
+            implicit_dunder_init_is_possibly_unbound: self.implicit_dunder_init_is_possibly_unbound,
             elements: self
                 .elements
                 .into_iter()

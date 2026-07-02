@@ -334,11 +334,9 @@ impl<'db> CallDunderError<'db> {
 impl<'db> Foldable<'db> for CallDunderError<'db> {
     fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
         match self {
-            Self::CallError(kind, bindings, provenance) => Self::CallError(
-                kind,
-                Box::new((*bindings).fold(db, recursive)),
-                provenance,
-            ),
+            Self::CallError(kind, bindings, provenance) => {
+                Self::CallError(kind, Box::new((*bindings).fold(db, recursive)), provenance)
+            }
             Self::PossiblyUnbound {
                 bindings,
                 unbound_on,

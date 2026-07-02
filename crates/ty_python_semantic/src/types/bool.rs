@@ -1,6 +1,7 @@
 use ruff_db::diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::types::Foldable;
 use crate::{
     Db,
     types::{
@@ -11,7 +12,6 @@ use crate::{
         diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
     },
 };
-use crate::types::Foldable;
 use ty_python_core::Truthiness;
 
 impl<'db> Type<'db> {

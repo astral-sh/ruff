@@ -2,9 +2,8 @@ use crate::{
     Db,
     types::{
         AwaitError, Bindings, CallArguments, CallDunderError, Foldable, KnownClass,
-        LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind, RecursiveType,
-        Type, TypeContext,
-        TypeVarBoundOrConstraints, UnionType,
+        LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind, RecursiveType, Type,
+        TypeContext, TypeVarBoundOrConstraints, UnionType,
         call::CallErrorKind,
         context::InferContext,
         diagnostic::NOT_ITERABLE,
