@@ -413,8 +413,7 @@ t = int if flag() else str
 if issubclass(t, "str"):
     reveal_type(t)  # revealed: <class 'int'> | <class 'str'>
 
-# TODO: this should cause us to emit a diagnostic during
-# type checking
+# error: [invalid-argument-type]
 if issubclass(t, (bytes, "str")):
     reveal_type(t)  # revealed: <class 'int'> | <class 'str'>
 

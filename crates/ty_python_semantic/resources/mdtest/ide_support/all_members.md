@@ -114,21 +114,21 @@ were available before the cycle was introduced:
 ```py
 from ty_extensions import has_member, static_assert
 
-class Base:
-    def flip(self) -> "Base":
-        return Base()
+class MemberBase:
+    def flip(self) -> "MemberBase":
+        return MemberBase()
 
-class Sub(Base):
+class MemberSub(MemberBase):
     pass
 
 class C:
-    def __init__(self, x: Sub):
+    def __init__(self, x: MemberSub):
         self.x = [x]
 
     def replace_with(self, other: "C"):
         self.x = [self.x[0].flip()]
 
-static_assert(has_member(C(Sub()).x[0], "flip"))
+static_assert(has_member(C(MemberSub()).x[0], "flip"))
 ```
 
 ### Class objects

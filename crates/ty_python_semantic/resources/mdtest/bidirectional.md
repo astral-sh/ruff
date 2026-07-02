@@ -953,21 +953,21 @@ reveal_type(dict_result)  # revealed: dict[str, int | str]
 
 def make_list() -> list[str]:
     result = list()
-    result.append(1)
-    reveal_type(result)  # revealed: list[int | str]
-    return result  # error: [invalid-return-type]
+    result.append(1)  # error: [invalid-argument-type]
+    reveal_type(result)  # revealed: list[str]
+    return result
 
 def make_set() -> set[str]:
     result = set()
-    result.add(1)
-    reveal_type(result)  # revealed: set[int | str]
-    return result  # error: [invalid-return-type]
+    result.add(1)  # error: [invalid-argument-type]
+    reveal_type(result)  # revealed: set[str]
+    return result
 
 def make_dict() -> dict[str, str]:
     result = dict()
-    result["x"] = 1
-    reveal_type(result)  # revealed: dict[str, int | str]
-    return result  # error: [invalid-return-type]
+    result["x"] = 1  # error: [invalid-assignment]
+    reveal_type(result)  # revealed: dict[str, str]
+    return result
 
 set_alias = set
 aliased_result = set_alias()
