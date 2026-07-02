@@ -6,6 +6,7 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
+use crate::types::cyclic::HasIdentity;
 use crate::{
     Db, TypeQualifiers,
     place::{
@@ -19,7 +20,7 @@ use crate::{
         any_over_type, binding_type, definition_expression_type,
         tuple::Tuple,
         variance::VarianceInferable,
-        visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
+        visitor::{self, RecursionGuard, TypeVisitor, walk_type_with_recursion_guard},
     },
 };
 use ty_python_core::{
@@ -274,7 +275,7 @@ impl<'db> TypeVarInstance<'db> {
         db: &'db dyn Db,
         visitor: &TypeVarDefaultVisitor<'db>,
     ) -> Option<Type<'db>> {
-        visitor.visit(self, || {
+        visitor.visit(db, self, || {
             self._default(db).and_then(|default| match default {
                 TypeVarDefaultEvaluation::Eager(ty) => Some(ty),
                 TypeVarDefaultEvaluation::Lazy => self.lazy_default_impl(db, visitor),
@@ -787,7 +788,7 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
 ) -> Option<TypeVarNonce> {
     struct MatchingFreshnessCollector<'db> {
         base_identities: FxHashSet<BoundTypeVarIdentity<'db>>,
-        recursion_guard: TypeCollector<'db>,
+        recursion_guard: RecursionGuard<'db>,
         max_freshness: Cell<Option<TypeVarNonce>>,
     }
 
@@ -803,7 +804,7 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
                 .collect();
             Self {
                 base_identities,
-                recursion_guard: TypeCollector::default(),
+                recursion_guard: RecursionGuard::default(),
                 max_freshness: Cell::default(),
             }
         }
@@ -1770,5 +1771,13 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
 
 /// A [`CycleDetector`] that is used in `TypeVarInstance::default_type`.
 pub(crate) type TypeVarDefaultVisitor<'db> =
-    CycleDetector<VisitTypeVarDefault, TypeVarInstance<'db>, Option<Type<'db>>, 6>;
+    CycleDetector<'db, VisitTypeVarDefault, TypeVarInstance<'db>, Option<Type<'db>>, 6>;
 pub(crate) struct VisitTypeVarDefault;
+
+impl<'db> HasIdentity<'db> for TypeVarInstance<'db> {
+    type Id = TypeVarInstance<'db>;
+
+    fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
+        *self
+    }
+}

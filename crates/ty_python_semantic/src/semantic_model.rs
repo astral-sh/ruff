@@ -530,6 +530,7 @@ impl<'db> SemanticModel<'db> {
     ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
         struct StringLiteralCandidates;
         type StringLiteralCandidatesVisitor<'db> = CycleDetector<
+            'db,
             StringLiteralCandidates,
             Type<'db>,
             Vec<ExpectedStringLiteralCompletion<'db>>,
@@ -563,7 +564,7 @@ impl<'db> SemanticModel<'db> {
                     .flat_map(|element| collect(db, *element, visitor))
                     .collect(),
                 Type::TypeAlias(alias) => {
-                    visitor.visit(ty, || collect(db, alias.value_type(db), visitor))
+                    visitor.visit(db, ty, || collect(db, alias.value_type(db), visitor))
                 }
                 _ => Vec::new(),
             }
