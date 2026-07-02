@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/pyspark/mod.rs
+---
+PSP001 Don't use `.withColumn` method in a loop
+  --> PSP001.py:14:10
+   |
+13 | for col in df.columns:
+14 |     df = df.withColumn(col, F.col(col).cast("string"))
+   |          ^^^^^^^^^^^^^
+15 |
+16 | i = 0
+   |
+
+PSP001 Don't use `.withColumn` method in a loop
+  --> PSP001.py:18:10
+   |
+16 | i = 0
+17 | while i < 5:
+18 |     df = df.withColumn(f"col_{i}", F.lit(i))
+   |          ^^^^^^^^^^^^^
+19 |     i += 1
+   |
