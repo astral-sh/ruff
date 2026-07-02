@@ -1145,13 +1145,28 @@ impl Session {
 
     /// Creates a snapshot of the current state of the [`Session`].
     pub(crate) fn snapshot_session(&self) -> SessionSnapshot {
+        // Keep workspace context in the same order as the cloned databases. The databases remain
+        // in their own final field so they are dropped after the snapshot's other shared state.
+        let (project_contexts, projects) = self
+            .projects
+            .iter()
+            .map(|(workspace_root, project)| {
+                let settings = self
+                    .workspaces
+                    .settings_for_path(workspace_root)
+                    .or_else(|| self.workspaces.settings_virtual_fallback())
+                    .unwrap_or_default();
+                (
+                    ProjectSnapshotContext {
+                        workspace_root: workspace_root.clone(),
+                        language_services_disabled: settings.is_language_services_disabled(),
+                    },
+                    project.db.clone(),
+                )
+            })
+            .unzip();
+
         SessionSnapshot {
-            projects: self
-                .projects
-                .values()
-                .map(|project| &project.db)
-                .cloned()
-                .collect(),
             index: self.index.clone().unwrap(),
             global_settings: self.global_settings.clone(),
             position_encoding: self.position_encoding,
@@ -1159,6 +1174,8 @@ impl Session {
             resolved_client_capabilities: self.resolved_client_capabilities,
             revision: self.revision,
             client_name: self.client_name,
+            project_contexts,
+            projects,
         }
     }
 
@@ -1437,6 +1454,8 @@ pub(crate) struct SessionSnapshot {
     in_test: bool,
     revision: u64,
     client_name: ClientName,
+    /// Workspace roots and settings, in the same order as `projects`.
+    project_contexts: Vec<ProjectSnapshotContext>,
 
     /// IMPORTANT: It's important that the databases come last, or at least,
     /// after any `Arc` that we try to extract or mutate in-place using `Arc::into_inner`
@@ -1453,6 +1472,29 @@ pub(crate) struct SessionSnapshot {
 impl SessionSnapshot {
     pub(crate) fn projects(&self) -> &[ProjectDatabase] {
         &self.projects
+    }
+
+    /// Returns the project owned by the closest enclosing workspace, falling back to the first.
+    pub(crate) fn project_index_for_path(&self, path: &SystemPath) -> Option<usize> {
+        self.enclosing_project_index_for_path(path)
+            .or_else(|| (!self.projects.is_empty()).then_some(0))
+    }
+
+    /// Returns the project owned by the closest enclosing workspace, without a fallback.
+    pub(crate) fn enclosing_project_index_for_path(&self, path: &SystemPath) -> Option<usize> {
+        self.project_contexts
+            .iter()
+            .enumerate()
+            .filter(|(_, context)| path.starts_with(&context.workspace_root))
+            .max_by_key(|(_, context)| context.workspace_root.as_str().len())
+            .map(|(index, _)| index)
+    }
+
+    /// Returns whether language services are disabled for `project_index`.
+    pub(crate) fn language_services_disabled(&self, project_index: usize) -> bool {
+        self.project_contexts
+            .get(project_index)
+            .is_none_or(|context| context.language_services_disabled)
     }
 
     pub(crate) fn index(&self) -> &Index {
@@ -1514,6 +1556,14 @@ impl ClientName {
             ClientName::Other => "Please refer to the logs for more details.",
         }
     }
+}
+
+/// Workspace information kept alongside each project database in a session snapshot.
+struct ProjectSnapshotContext {
+    /// The workspace directory used to decide which project owns a path.
+    workspace_root: SystemPathBuf,
+    /// Whether this workspace permits language-service requests.
+    language_services_disabled: bool,
 }
 
 #[derive(Debug, Default)]
