@@ -9216,6 +9216,63 @@ impl<'db> BindingError<'db> {
                 provenance,
                 parameter_source,
             } => {
+                fn is_valid_runtime_classinfo<'db>(
+                    db: &'db dyn Db,
+                    env: &ProgramEnvironment<'db>,
+                    function: KnownFunction,
+                    ty: Type<'db>,
+                ) -> bool {
+                    match ty {
+                        Type::ClassLiteral(_)
+                        | Type::KnownInstance(KnownInstanceType::UnionType(_)) => true,
+                        Type::SpecialForm(special_form) => {
+                            special_form.is_valid_isinstance_target()
+                                || matches!(
+                                    (function, special_form),
+                                    (KnownFunction::IsSubclass, SpecialFormType::Any)
+                                )
+                        }
+                        Type::NominalInstance(instance) => {
+                            instance.tuple_spec(db, env).is_some_and(|tuple_spec| {
+                                tuple_spec.iter_element_types(db).all(|element| {
+                                    is_valid_runtime_classinfo(db, env, function, element)
+                                })
+                            })
+                        }
+                        Type::Union(union) => union
+                            .elements(db)
+                            .iter()
+                            .all(|element| is_valid_runtime_classinfo(db, env, function, *element)),
+                        Type::Recursive(recursive) => {
+                            recursive.map_or(db, env, false, |unfolded| {
+                                is_valid_runtime_classinfo(db, env, function, unfolded)
+                            })
+                        }
+                        _ => false,
+                    }
+                }
+
+                // Certain special forms in the typing module are aliases for classes
+                // elsewhere in the standard library. These special forms are not instances of `type`,
+                // and you cannot use them in place of their aliased classes in *all* situations:
+                // for example, `dict()` succeeds at runtime, but `typing.Dict()` fails. However,
+                // they *can* all be used as the second argument to `isinstance` and `issubclass`.
+                // We model that specific aspect of their behaviour here.
+                //
+                // This is implemented as a special case in call-binding machinery because overriding
+                // typeshed's signatures for `isinstance()` and `issubclass()` would be complex and
+                // error-prone, due to the fact that they are annotated with recursive type aliases.
+                if parameter.signature_parameter_index == 1
+                    && *argument_index == Some(1)
+                    && let Some(function @ (KnownFunction::IsInstance | KnownFunction::IsSubclass)) =
+                        callable_ty
+                            .as_function_literal()
+                            .and_then(|function| function.known(context.db()))
+                    && is_valid_runtime_classinfo(context.db(), env, function, *provided_ty)
+                {
+                    return;
+                }
+
                 // TODO: Ideally we would not emit diagnostics for `TypedDict` literal arguments
                 // here (see `diagnostic::is_invalid_typed_dict_literal`). However, we may have
                 // silenced diagnostics during overload evaluation, and rely on the assignability
