@@ -1516,7 +1516,7 @@
           ]
         },
         "runtime-evaluated-base-classes": {
-          "description": "Exempt classes that list any of the enumerated classes as a base class\nfrom needing to be moved into type-checking blocks.\n\nCommon examples include Pydantic's `pydantic.BaseModel` and SQLAlchemy's\n`sqlalchemy.orm.DeclarativeBase`, but can also support user-defined\nclasses that inherit from those base classes. For example, if you define\na common `DeclarativeBase` subclass that's used throughout your project\n(e.g., `class Base(DeclarativeBase) ...` in `base.py`), you can add it to\nthis list (`runtime-evaluated-base-classes = [\"base.Base\"]`) to exempt\nmodels from being moved into type-checking blocks.",
+          "description": "Exempt classes that list any of the enumerated classes as a base class\nfrom needing to be moved into type-checking blocks.\n\nCommon examples include Pydantic's `pydantic.BaseModel` and SQLAlchemy's\n`sqlalchemy.orm.DeclarativeBase`, but can also support user-defined\nclasses that inherit from those base classes. For example, if you define\na common `DeclarativeBase` subclass that's used throughout your project\n(e.g., `class Base(DeclarativeBase) ...` in `base.py`), you can add it to\nthis list (`runtime-evaluated-base-classes = [\"base.Base\"]`) to exempt\nmodels from being moved into type-checking blocks.\n\nFor some use-cases like SQLAlchemy's `Mapped` it makes more sense to\nmark the class as runtime-ambiguous, by prefixing the qualified name with\na tilde (`~`). This way ruff will assume the annotations already contain\nall of the correct forward references, and will not attempt to move related\nimports and/or quote annotations.",
           "type": [
             "array",
             "null"
@@ -1526,7 +1526,7 @@
           }
         },
         "runtime-evaluated-decorators": {
-          "description": "Exempt classes and functions decorated with any of the enumerated\ndecorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator\n(for functions) and attrs' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI's `fastapi.FastAPI.get`\nwhich will work across assignments in the same module.\n\nFor example:\n```python\nfrom fastapi import FastAPI\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\")\ndef home() -> str: ...\n```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.",
+          "description": "Exempt classes and functions decorated with any of the enumerated\ndecorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator\n(for functions) and attrs' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI's `fastapi.FastAPI.get`\nwhich will work across assignments in the same module.\n\nFor example:\n```python\nfrom fastapi import FastAPI\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\")\ndef home() -> str: ...\n```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.\n\nJust like with `runtime-evaluated-base-classes` it's possible to mark\ndecorators as runtime-ambiguous by prefixing them with a tilde (`~`).",
           "type": [
             "array",
             "null"

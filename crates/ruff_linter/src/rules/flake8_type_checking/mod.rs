@@ -276,6 +276,10 @@ mod tests {
         Path::new("runtime_evaluated_base_classes_4.py")
     )]
     #[test_case(
+        Rule::RuntimeImportInTypeCheckingBlock,
+        Path::new("runtime_evaluated_base_classes_4.py")
+    )]
+    #[test_case(
         Rule::TypingOnlyThirdPartyImport,
         Path::new("runtime_evaluated_base_classes_5.py")
     )]
@@ -285,8 +289,8 @@ mod tests {
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
-                    runtime_required_base_classes: vec![
-                        "pydantic.BaseModel".to_string(),
+                    runtime_required_base_classes: vec!["pydantic.BaseModel".to_string()],
+                    runtime_ambiguous_base_classes: vec![
                         "sqlalchemy.orm.DeclarativeBase".to_string(),
                     ],
                     ..Default::default()
@@ -310,6 +314,14 @@ mod tests {
         Rule::TypingOnlyStandardLibraryImport,
         Path::new("runtime_evaluated_decorators_3.py")
     )]
+    #[test_case(
+        Rule::TypingOnlyStandardLibraryImport,
+        Path::new("runtime_evaluated_decorators_4.py")
+    )]
+    #[test_case(
+        Rule::RuntimeImportInTypeCheckingBlock,
+        Path::new("runtime_evaluated_decorators_4.py")
+    )]
     fn runtime_evaluated_decorators(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -321,6 +333,7 @@ mod tests {
                         "attrs.frozen".to_string(),
                         "pydantic.validate_call".to_string(),
                     ],
+                    runtime_ambiguous_decorators: vec!["sqlalchemy.orm.declared_attr".to_string()],
                     ..Default::default()
                 },
                 ..settings::LinterSettings::for_rule(rule_code)
