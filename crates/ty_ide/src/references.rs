@@ -704,14 +704,32 @@ impl<'a> LocalReferencesFinder<'a> {
         })
     }
 
-    /// Returns whether any of the rename target's definitions belongs to
-    /// `class` (i.e. the class scope is an ancestor of the definition's scope).
+    /// Returns whether any of the rename target's definitions is an instance attribute of `class`.
+    ///
+    /// The target must name an actual instance attribute of `class`, either a member access like
+    /// `self.value = ...` or a bare class-body annotation like `value: int`, and its nearest
+    /// enclosing class must be `class` itself. A parameter or local that merely shares the name, or
+    /// an attribute of a nested class, is not treated as the slot.
     fn target_belongs_to_class(&self, class: &'a ast::StmtClassDef) -> bool {
+        use ty_python_core::definition::DefinitionKind;
+        use ty_python_core::scope::{FileScopeId, NodeWithScopeKind};
+
         let db = self.model.db();
         let file = self.model.file();
         let class_range = class.range();
         let module = ruff_db::parsed::parsed_module(db, file).load(db);
         let index = ty_python_core::semantic_index(db, file);
+
+        // The nearest class scope lexically enclosing `scope`, if any. `ancestor_scopes` skips
+        // class scopes for name resolution, so we walk the lexical parents directly to stop at the
+        // innermost enclosing class rather than an outer one.
+        let nearest_enclosing_class_scope = |mut scope: FileScopeId| loop {
+            let node = index.scope(scope);
+            if node.kind() == ScopeKind::Class {
+                return Some(scope);
+            }
+            scope = node.parent()?;
+        };
 
         self.target_definitions.iter().any(|resolved| {
             let Some(definition) = resolved.definition() else {
@@ -720,14 +738,28 @@ impl<'a> LocalReferencesFinder<'a> {
             if definition.file(db) != file {
                 return false;
             }
-            index
-                .ancestor_scopes(definition.file_scope(db))
-                .any(|(_, scope)| match scope.node() {
-                    ty_python_core::scope::NodeWithScopeKind::Class(node) => {
-                        node.node(&module).range() == class_range
-                    }
-                    _ => false,
-                })
+
+            // The target's nearest enclosing class must be the one declaring the `__slots__`, so an
+            // attribute of a nested class doesn't rename an outer class's slot.
+            let Some(owning_class_scope) = nearest_enclosing_class_scope(definition.file_scope(db))
+            else {
+                return false;
+            };
+            match index.scope(owning_class_scope).node() {
+                NodeWithScopeKind::Class(node) if node.node(&module).range() == class_range => {}
+                _ => return false,
+            }
+
+            // Accept only a member access (`self.value = ...`) or a bare class-body annotation
+            // (`value: int`), so a parameter or local sharing the name is not treated as the slot.
+            let is_bare_class_annotation = definition.file_scope(db) == owning_class_scope
+                && definition.place(db).is_symbol()
+                && matches!(
+                    definition.kind(db),
+                    DefinitionKind::AnnotatedAssignment(assignment)
+                        if assignment.value(&module).is_none()
+                );
+            definition.place(db).is_member() || is_bare_class_annotation
         })
     }
 

@@ -2881,4 +2881,77 @@ class C:
           |
         "#);
     }
+
+    #[test]
+    fn rename_class_body_annotation_updates_slots() {
+        let test = cursor_test(
+            r#"
+class C:
+    __slots__ = ("value",)
+    va<CURSOR>lue: int
+"#,
+        );
+
+        assert_snapshot!(test.rename("amount"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:3:19
+          |
+        3 |     __slots__ = ("value",)
+          |                   ^^^^^
+        4 |     value: int
+          |     -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_parameter_does_not_touch_slots() {
+        // The parameter `value` is a local symbol, not the instance attribute, so renaming it must
+        // leave the `__slots__` string untouched even though it shares the name.
+        let test = cursor_test(
+            r#"
+class C:
+    __slots__ = ("value",)
+
+    def __init__(self, va<CURSOR>lue):
+        self.value = value
+"#,
+        );
+
+        assert_snapshot!(test.rename("amount"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:5:24
+          |
+        5 |     def __init__(self, value):
+          |                        ^^^^^
+        6 |         self.value = value
+          |                      -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_nested_class_attribute_does_not_touch_outer_slots() {
+        // The instance attribute belongs to `Inner`, whose nearest enclosing class has no matching
+        // slot, so renaming it must not touch `Outer.__slots__`.
+        let test = cursor_test(
+            r#"
+class Outer:
+    __slots__ = ("value",)
+
+    class Inner:
+        def __init__(self):
+            self.va<CURSOR>lue = 1
+"#,
+        );
+
+        assert_snapshot!(test.rename("amount"), @r#"
+        info[rename]: Rename symbol (found 1 locations)
+         --> main.py:7:18
+          |
+        7 |             self.value = 1
+          |                  ^^^^^
+          |
+        "#);
+    }
 }
