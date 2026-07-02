@@ -2531,13 +2531,9 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     fn has_own_implicit_instance_member(self, db: &'db dyn Db, name: &str) -> bool {
-        let body_scope = self.body_scope(db);
-        implicit_attribute_names(db, body_scope)
+        implicit_instance_attribute_names(db, self.body_scope(db))
             .binary_search_by(|candidate| candidate.as_str().cmp(name))
             .is_ok()
-            && implicit_instance_attribute_names(db, body_scope)
-                .binary_search_by(|candidate| candidate.as_str().cmp(name))
-                .is_ok()
     }
 
     /// Return whether this class has an annotation-only declaration that contributes an instance
