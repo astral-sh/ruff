@@ -1097,7 +1097,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             (Place::Defined(prev), Place::Undefined) => {
                 if cycle
                     .head_ids()
-                    .any(|id| prev.ty == Type::recursive_cycle_initial(db, env, id))
+                    .any(|id| prev.ty == Type::identity_recursive(db, env, id))
                 {
                     Place::Undefined
                 } else {
@@ -1124,7 +1124,7 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
     returns(copy),
     cycle_initial=|db, id, scope, _, _, _| {
         let env = ProgramEnvironment::from_scope(scope);
-        Place::bound(Type::recursive_cycle_initial(db, &env, id)).into()
+        Place::bound(Type::identity_recursive(db, &env, id)).into()
     },
     cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, scope: ScopeId<'db>, _, _, _| {
         let env = ProgramEnvironment::from_scope(scope);

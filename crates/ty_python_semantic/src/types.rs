@@ -1907,7 +1907,7 @@ impl<'db> Type<'db> {
         Self::Divergent(DivergentType::new(id))
     }
 
-    pub(crate) fn recursive_cycle_initial(
+    pub(crate) fn identity_recursive(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         id: salsa::Id,
@@ -1953,6 +1953,14 @@ impl<'db> Type<'db> {
             (Type::Divergent(left), Type::Divergent(right)) => left.same_marker(right),
             _ => false,
         }
+    }
+
+    pub(crate) fn is_identity_recursive(self, db: &'db dyn Db) -> bool {
+        matches!(
+            self,
+            Type::Recursive(recursive)
+                if Type::Divergent(*recursive.binder(db)) == *recursive.body(db)
+        )
     }
 
     /// If `self` is a materialized `Divergent` type, returns the concrete type it should
@@ -3905,7 +3913,7 @@ impl<'db> Type<'db> {
         returns(copy),
         cycle_initial=|db, id, key: MemberLookupKey<'db>| {
             let env = ProgramEnvironment::from_program(key.program(db));
-            Place::bound(Type::recursive_cycle_initial(db, &env, id)).into()
+            Place::bound(Type::identity_recursive(db, &env, id)).into()
         },
         cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, key: MemberLookupKey<'db>| {
             member.cycle_normalized(db, &ProgramEnvironment::from_program(key.program(db)), *previous, cycle)
@@ -4587,7 +4595,7 @@ impl<'db> Type<'db> {
 
             // A recursive member lookup can yield the internal cycle marker. It does not
             // represent a concrete descriptor method and must not escape through the access.
-            if concrete_descr_get.is_divergent() {
+            if concrete_descr_get.is_identity_recursive(db) {
                 return Ok(None);
             }
 
@@ -5296,7 +5304,7 @@ impl<'db> Type<'db> {
             returns(copy),
             cycle_initial=|db, id, key: MemberLookupKey<'db>| {
                 let env = ProgramEnvironment::from_program(key.program(db));
-                Ok(Place::bound(Type::recursive_cycle_initial(db, &env, id)).into())
+                Ok(Place::bound(Type::identity_recursive(db, &env, id)).into())
             },
             cycle_fn=|db, cycle, previous: &MemberLookupResult<'db>, member: MemberLookupResult<'db>, key: MemberLookupKey<'db>| {
                 cycle_normalized_member_lookup(db, &ProgramEnvironment::from_program(key.program(db)), member, *previous, cycle)
@@ -5314,7 +5322,7 @@ impl<'db> Type<'db> {
             returns(copy),
             cycle_initial=|db, id, key: MemberLookupKey<'db>, _| {
                 let env = ProgramEnvironment::from_program(key.program(db));
-                Ok(Place::bound(Type::recursive_cycle_initial(db, &env, id)).into())
+                Ok(Place::bound(Type::identity_recursive(db, &env, id)).into())
             },
             cycle_fn=|db, cycle, previous: &MemberLookupResult<'db>, member: MemberLookupResult<'db>, key: MemberLookupKey<'db>, _| {
                 cycle_normalized_member_lookup(db, &ProgramEnvironment::from_program(key.program(db)), member, *previous, cycle)
@@ -8569,7 +8577,7 @@ impl<'db> Type<'db> {
             let env = ProgramEnvironment::from_program(
                 specialization.generic_context(db).program(db),
             );
-            Type::recursive_cycle_initial(db, &env, id)
+            Type::identity_recursive(db, &env, id)
         },
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, specialization: Specialization<'db>, _| {
             let env = ProgramEnvironment::from_program(
@@ -9509,7 +9517,7 @@ impl<'db> Type<'db> {
         returns(copy),
         cycle_initial=|db, id, _, program: Program<'db>| {
             let env = ProgramEnvironment::from_program(program);
-            Type::recursive_cycle_initial(db, &env, id)
+            Type::identity_recursive(db, &env, id)
         },
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, program| {
             value.cycle_normalized(db, &ProgramEnvironment::from_program(program), *previous, cycle)

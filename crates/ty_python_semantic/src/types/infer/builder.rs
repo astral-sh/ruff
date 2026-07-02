@@ -2037,7 +2037,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let value_ty = self.expression_type(value);
         let expanded = value_ty.expand_eagerly(db, self.program_environment());
-        if (expanded.is_divergent() || value_ty.has_unguarded_alias_cycle(db))
+        if (expanded.is_identity_recursive(db) || value_ty.has_unguarded_alias_cycle(db))
             && let Some(builder) = self
                 .context
                 .report_lint(&CYCLIC_TYPE_ALIAS_DEFINITION, node)

@@ -152,7 +152,7 @@ fn extend_collection_use_constraints<'db>(
         DefinitionInference::cycle_initial(
             db,
             definition,
-            Type::recursive_cycle_initial(db, &env, id),
+            Type::identity_recursive(db, &env, id),
         )
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
@@ -309,7 +309,7 @@ impl<'db> FunctionDecoratorInference<'db> {
         DefinitionInference::cycle_initial(
             db,
             definition,
-            Type::recursive_cycle_initial(db, &env, id),
+            Type::identity_recursive(db, &env, id),
         )
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
@@ -432,7 +432,7 @@ pub(crate) fn infer_scope_types<'db>(
     cycle_initial=|db, id, input: InferScope<'db>| {
         let (scope, _) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(scope);
-        ScopeInference::cycle_initial(Type::recursive_cycle_initial(db, &env, id))
+        ScopeInference::cycle_initial(Type::identity_recursive(db, &env, id))
     },
     cycle_fn=|db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, input: InferScope<'db>| {
         let (scope, _) = input.into_inner(db);
@@ -533,7 +533,7 @@ fn expression_cycle_initial<'db>(
 ) -> ExpressionInference<'db> {
     let (expression, _) = input.into_inner(db);
     let env = ProgramEnvironment::from_scope(expression.scope(db));
-    let cycle_recovery = Type::recursive_cycle_initial(db, &env, id);
+    let cycle_recovery = Type::identity_recursive(db, &env, id);
     ExpressionInference::cycle_initial(expression.scope(db), cycle_recovery)
 }
 
@@ -571,7 +571,7 @@ pub(crate) fn infer_expression_type<'db>(
     cycle_initial=|db, id, input: InferExpression<'db>| {
         let (expression, _) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(expression.scope(db));
-        Type::recursive_cycle_initial(db, &env, id)
+        Type::identity_recursive(db, &env, id)
     },
     cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, input: InferExpression<'db>| {
         let (expression, _) = input.into_inner(db);
@@ -616,7 +616,7 @@ pub(super) fn infer_statement_types<'db>(
         let env = ProgramEnvironment::from_file(statement.program_file(db));
         StatementInferenceInner::cycle_initial(
             statement.scope(db),
-            Type::recursive_cycle_initial(db, &env, id),
+            Type::identity_recursive(db, &env, id),
         )
     },
     cycle_fn=|db, cycle, previous: &StatementInferenceInner<'db>, inference: StatementInferenceInner<'db>, statement: StatementInner<'db>| {
@@ -814,7 +814,7 @@ impl<'db> From<Type<'db>> for TypeContext<'db> {
     returns(ref),
     cycle_initial=|db, id, unpack: Unpack<'db>| {
         let env = ProgramEnvironment::from_file(unpack.program_file(db));
-        UnpackResult::cycle_initial(Type::recursive_cycle_initial(db, &env, id))
+        UnpackResult::cycle_initial(Type::identity_recursive(db, &env, id))
     },
     cycle_fn=|db, cycle, previous: &UnpackResult<'db>, result: UnpackResult<'db>, unpack: Unpack<'db>| {
         let env = ProgramEnvironment::from_file(unpack.program_file(db));
