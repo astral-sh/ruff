@@ -5,7 +5,8 @@ use rustc_hash::FxHashMap;
 
 use ruff_python_ast::helpers::{from_relative_import, map_subscript};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::{self as ast, Expr, ExprContext, PySourceType, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprContext, PySourceType, PythonVersion, Stmt};
+use ruff_python_stdlib::builtins::{is_python_builtin, python_builtins, python_magic_globals};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Imported;
@@ -30,6 +31,9 @@ pub mod all;
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
     typing_modules: &'a [String],
+    custom_builtins: &'a [String],
+    target_version: PythonVersion,
+    source_type: PySourceType,
     module: Module<'a>,
 
     /// Stack of all AST nodes in the program.
@@ -147,9 +151,19 @@ pub struct SemanticModel<'a> {
 }
 
 impl<'a> SemanticModel<'a> {
-    pub fn new(typing_modules: &'a [String], path: &Path, module: Module<'a>) -> Self {
-        Self {
+    pub fn new(
+        typing_modules: &'a [String],
+        custom_builtins: &'a [String],
+        target_version: PythonVersion,
+        source_type: PySourceType,
+        path: &Path,
+        module: Module<'a>,
+    ) -> Self {
+        let mut semantic = Self {
             typing_modules,
+            custom_builtins,
+            target_version,
+            source_type,
             module,
             nodes: Nodes::default(),
             node_id: None,
@@ -170,7 +184,19 @@ impl<'a> SemanticModel<'a> {
             seen: Modules::empty(),
             handled_exceptions: Vec::default(),
             resolved_names: FxHashMap::default(),
-        }
+        };
+
+        let builtin_count = python_builtins(target_version.minor, source_type.is_ipynb()).count()
+            + python_magic_globals(target_version.minor).count()
+            + custom_builtins.len();
+        // Match the capacity that repeated `push` calls would reach while avoiding the
+        // intermediate allocations.
+        semantic
+            .bindings
+            .reserve_exact(builtin_count.next_power_of_two());
+        semantic.global_scope_mut().reserve_bindings(builtin_count);
+
+        semantic
     }
 
     /// Return the [`Binding`] for the given [`BindingId`].
@@ -226,12 +252,48 @@ impl<'a> SemanticModel<'a> {
             .chain(self.typing_modules.iter().map(String::as_str))
     }
 
-    /// Reserves capacity for builtin bindings.
-    pub fn reserve_builtin_bindings(&mut self, additional: usize) {
-        // Match the capacity that repeated `push` calls would reach while avoiding the
-        // intermediate allocations.
-        self.bindings.reserve_exact(additional.next_power_of_two());
-        self.global_scope_mut().reserve_bindings(additional);
+    /// Returns `true` if `name` is provided by the configured Python runtime.
+    ///
+    /// This includes version- and source-type-specific builtins, magic globals, and custom
+    /// builtins. It does not account for bindings that shadow the name in a scope.
+    fn is_builtin_name(&self, name: &str) -> bool {
+        is_python_builtin(name, self.target_version.minor, self.source_type.is_ipynb())
+            || python_magic_globals(self.target_version.minor).any(|builtin| builtin == name)
+            || self.custom_builtins.iter().any(|builtin| builtin == name)
+    }
+
+    /// Returns `true` if `name` is a builtin with no binding in `scope` or its ancestors.
+    ///
+    /// This recognizes builtins that have not yet been materialized in the global scope. For
+    /// example, `len` is unshadowed in the module but shadowed in `f`:
+    ///
+    /// ```python
+    /// print(len)
+    ///
+    /// def f():
+    ///     len = 0
+    ///     print(len)
+    /// ```
+    fn is_unshadowed_builtin(&self, name: &str, scope: ScopeId) -> bool {
+        self.is_builtin_name(name)
+            && self
+                .scopes
+                .ancestor_ids(scope)
+                .all(|scope_id| !self.scopes[scope_id].has(name))
+    }
+
+    /// Creates a concrete binding for `name` if it is an unmaterialized builtin.
+    ///
+    /// Loads create builtin bindings as they are resolved. Operations that need a [`BindingId`]
+    /// before any load, such as recording what a binding shadows or attaching a reference, must
+    /// call this first.
+    pub fn ensure_builtin_binding(&mut self, name: &'a str) {
+        if self.global_scope().has(name) || !self.is_builtin_name(name) {
+            return;
+        }
+
+        let binding_id = self.push_builtin();
+        self.global_scope_mut().add(name, binding_id);
     }
 
     /// Create a new [`Binding`] for a builtin.
@@ -289,9 +351,11 @@ impl<'a> SemanticModel<'a> {
     /// module, e.g. `import builtins; builtins.open`. It *only* includes the bindings
     /// that are pre-populated in Python's global scope before any imports have taken place.
     pub fn has_builtin_binding_in_scope(&self, member: &str, scope: ScopeId) -> bool {
-        self.lookup_symbol_in_scope(member, scope, false)
-            .map(|binding_id| &self.bindings[binding_id])
-            .is_some_and(|binding| binding.kind.is_builtin())
+        if let Some(binding_id) = self.lookup_symbol_in_scope(member, scope, false) {
+            return self.bindings[binding_id].kind.is_builtin();
+        }
+
+        self.is_unshadowed_builtin(member, scope)
     }
 
     /// If `expr` is a reference to a builtins symbol,
@@ -357,7 +421,9 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Resolve a `del` reference to `symbol` at `range`.
-    pub fn resolve_del(&mut self, symbol: &str, range: TextRange) {
+    pub fn resolve_del(&mut self, symbol: &'a str, range: TextRange) {
+        self.ensure_builtin_binding(symbol);
+
         let is_unbound = self.scopes[self.scope_id]
             .get(symbol)
             .is_none_or(|binding_id| {
@@ -378,7 +444,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Resolve a `load` reference to an [`ast::ExprName`].
-    pub fn resolve_load(&mut self, name: &ast::ExprName) -> ReadResult {
+    pub fn resolve_load(&mut self, name: &'a ast::ExprName) -> ReadResult {
         // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
         // should prefer it over local resolutions.
         if self.in_forward_reference() {
@@ -677,6 +743,22 @@ impl<'a> SemanticModel<'a> {
             }
 
             import_starred = import_starred || scope.uses_star_imports();
+        }
+
+        if self.is_builtin_name(name.id.as_str()) {
+            let binding_id = self.push_builtin();
+            self.global_scope_mut().add(name.id.as_str(), binding_id);
+
+            let reference_id = self.resolved_references.push(
+                self.scope_id,
+                self.node_id,
+                ExprContext::Load,
+                self.flags,
+                name.range,
+            );
+            self.bindings[binding_id].references.push(reference_id);
+            self.resolved_names.insert(name.into(), binding_id);
+            return ReadResult::Resolved(binding_id);
         }
 
         if import_starred {
@@ -1043,7 +1125,24 @@ impl<'a> SemanticModel<'a> {
         let binding = self
             .resolve_name(head)
             .or_else(|| self.lookup_symbol(&head.id))
-            .map(|id| self.binding(id))?;
+            .map(|id| self.binding(id));
+
+        let Some(binding) = binding else {
+            if !self.is_unshadowed_builtin(head.id.as_str(), self.scope_id) {
+                return None;
+            }
+
+            if value.is_name_expr() {
+                return Some(QualifiedName::builtin(head.id.as_str()));
+            }
+
+            let value_name = UnqualifiedName::from_expr(value)?;
+            return Some(
+                std::iter::once("")
+                    .chain(value_name.segments().iter().copied())
+                    .collect(),
+            );
+        };
 
         match &binding.kind {
             BindingKind::Import(Import { qualified_name }) => {
@@ -1597,6 +1696,10 @@ impl<'a> SemanticModel<'a> {
         // ```
         if !self.at_top_level() {
             for (name, range) in globals.iter() {
+                // Global pre-scanning synthesizes an assignment when no global binding exists.
+                // Materialize builtins first so `global range` doesn't replace the builtin with
+                // that synthetic assignment.
+                self.ensure_builtin_binding(name);
                 if self
                     .global_scope()
                     .get(name)
