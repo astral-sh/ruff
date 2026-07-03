@@ -295,9 +295,9 @@ impl<'db> Mro<'db> {
                                     later_indices: later_indices.iter().copied().collect(),
                                 });
                             }
-                            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
-                                duplicate_dynamic_bases = true;
-                            }
+                            ClassBase::Any
+                            | ClassBase::Dynamic(_)
+                            | ClassBase::IdentityRecursive(_) => duplicate_dynamic_bases = true,
                         }
                     }
 

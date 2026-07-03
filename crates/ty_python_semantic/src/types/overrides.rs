@@ -336,7 +336,7 @@ fn check_class_declaration<'db>(
                     has_dynamic_superclass = true;
                     continue;
                 }
-                ClassBase::Divergent(_) => {
+                ClassBase::IdentityRecursive(_) => {
                     has_dynamic_superclass = true;
                     continue;
                 }

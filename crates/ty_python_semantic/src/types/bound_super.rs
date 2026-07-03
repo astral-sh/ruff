@@ -8,9 +8,9 @@ use crate::{
     Db, DisplaySettings,
     place::{Place, PlaceAndQualifiers},
     types::{
-        BoundTypeVarInstance, ClassBase, ClassType, DivergentType, DynamicType, Foldable,
-        IntersectionBuilder, KnownClass, MemberLookupPolicy, RecursiveType, SpecialFormType,
-        SubclassOfInner, SubclassOfType, Type, TypeVarBoundOrConstraints, UnionBuilder,
+        BoundTypeVarInstance, ClassBase, ClassType, DynamicType, Foldable, IntersectionBuilder,
+        KnownClass, MemberLookupPolicy, RecursiveType, SpecialFormType, SubclassOfInner,
+        SubclassOfType, Type, TypeVarBoundOrConstraints, UnionBuilder,
         constraints::ConstraintSet,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
@@ -318,11 +318,18 @@ impl<'db> ResolvedSuperOwner<'db> {
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
 pub enum SuperOwnerKind<'db> {
     Dynamic(DynamicType<'db>),
-    Divergent(DivergentType),
+    /// An identity recursive placeholder (`μa. a`) produced while recovering a `super()` cycle.
+    IdentityRecursive(RecursiveType<'db>),
     Resolved(ResolvedSuperOwner<'db>),
 }
 
 impl<'db> SuperOwnerKind<'db> {
+    fn try_from_recursive(db: &'db dyn Db, recursive: RecursiveType<'db>) -> Option<Self> {
+        recursive
+            .is_identity(db)
+            .then_some(Self::IdentityRecursive(recursive))
+    }
+
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -333,7 +340,7 @@ impl<'db> SuperOwnerKind<'db> {
             SuperOwnerKind::Dynamic(dynamic) => {
                 Some(SuperOwnerKind::Dynamic(dynamic.recursive_type_normalized()))
             }
-            SuperOwnerKind::Divergent(_) => Some(*self),
+            SuperOwnerKind::IdentityRecursive(_) => Some(*self),
             SuperOwnerKind::Resolved(resolved_owner) => Some(SuperOwnerKind::Resolved(
                 resolved_owner.recursive_type_normalized_impl(db, div, nested)?,
             )),
@@ -345,8 +352,8 @@ impl<'db> SuperOwnerKind<'db> {
             SuperOwnerKind::Dynamic(dynamic) => {
                 Either::Left(ClassBase::Dynamic(*dynamic).mro(db, None))
             }
-            SuperOwnerKind::Divergent(divergent) => {
-                Either::Left(ClassBase::Divergent(*divergent).mro(db, None))
+            SuperOwnerKind::IdentityRecursive(recursive) => {
+                Either::Left(ClassBase::IdentityRecursive(*recursive).mro(db, None))
             }
             SuperOwnerKind::Resolved(resolved_owner) => {
                 Either::Right(resolved_owner.lookup_anchor.iter_mro(db))
@@ -358,14 +365,14 @@ impl<'db> SuperOwnerKind<'db> {
     pub(super) fn owner_type(&self) -> Type<'db> {
         match self {
             SuperOwnerKind::Dynamic(dynamic) => Type::Dynamic(*dynamic),
-            SuperOwnerKind::Divergent(divergent) => Type::Divergent(*divergent),
+            SuperOwnerKind::IdentityRecursive(recursive) => Type::Recursive(*recursive),
             SuperOwnerKind::Resolved(resolved_owner) => resolved_owner.owner_type,
         }
     }
 
     fn descriptor_binding(self, db: &'db dyn Db) -> Option<(Option<Type<'db>>, Type<'db>)> {
         match self {
-            SuperOwnerKind::Dynamic(_) | SuperOwnerKind::Divergent(_) => None,
+            SuperOwnerKind::Dynamic(_) | SuperOwnerKind::IdentityRecursive(_) => None,
             SuperOwnerKind::Resolved(resolved_owner) => Some(resolved_owner.descriptor_binding(db)),
         }
     }
@@ -389,7 +396,9 @@ pub(super) fn walk_bound_super_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     visitor.visit_type(db, Type::from(bound_super.pivot_class(db)));
     match bound_super.owner(db) {
         SuperOwnerKind::Dynamic(dynamic) => visitor.visit_type(db, Type::Dynamic(dynamic)),
-        SuperOwnerKind::Divergent(divergent) => visitor.visit_type(db, Type::Divergent(divergent)),
+        SuperOwnerKind::IdentityRecursive(recursive) => {
+            visitor.visit_type(db, Type::Recursive(recursive));
+        }
         SuperOwnerKind::Resolved(resolved_owner) => {
             visitor.visit_type(db, resolved_owner.owner_type);
             visitor.visit_type(db, Type::from(resolved_owner.lookup_anchor));
@@ -404,18 +413,20 @@ impl<'db> BoundSuperType<'db> {
         pivot_class: ClassBase<'db>,
     ) -> bool {
         match pivot_class {
-            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
+            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::IdentityRecursive(_) => true,
             ClassBase::Class(pivot_class) => {
                 let pivot_class = pivot_class.class_literal(db);
                 class.iter_mro(db).any(|superclass| match superclass {
-                    ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
+                    ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::IdentityRecursive(_) => {
+                        true
+                    }
                     ClassBase::Class(superclass) => superclass.class_literal(db) == pivot_class,
                     ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict(_) => false,
                 })
             }
             special_form @ (ClassBase::Generic | ClassBase::Protocol) => {
                 class.iter_mro(db).any(|superclass| match superclass {
-                    ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
+                    ClassBase::Dynamic(_) | ClassBase::IdentityRecursive(_) => true,
                     _ => superclass == special_form,
                 })
             }
@@ -572,7 +583,6 @@ impl<'db> BoundSuperType<'db> {
             Type::SpecialForm(SpecialFormType::Generic) => ClassBase::Generic,
             Type::SpecialForm(SpecialFormType::TypedDict(module)) => ClassBase::TypedDict(module),
             Type::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
-            Type::Divergent(divergent) => ClassBase::Divergent(divergent),
             _ => {
                 return Err(BoundSuperError::InvalidPivotClassType {
                     pivot_class: pivot_class_type,
@@ -631,16 +641,17 @@ impl<'db> BoundSuperType<'db> {
         let owner = match owner_type {
             Type::Never => SuperOwnerKind::Dynamic(DynamicType::Unknown),
             Type::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
-            Type::Divergent(divergent) => SuperOwnerKind::Divergent(divergent),
             Type::Recursive(recursive) => {
                 return recursive.map_or_else(
                     db,
                     || {
-                        Err(BoundSuperError::AbstractOwnerType {
-                            owner_type,
-                            pivot_class: pivot_class_type,
-                            typevar_context: None,
-                        })
+                        SuperOwnerKind::try_from_recursive(db, recursive)
+                            .map(|owner| Self::build_from_owner(db, pivot_class, owner))
+                            .ok_or(BoundSuperError::AbstractOwnerType {
+                                owner_type,
+                                pivot_class: pivot_class_type,
+                                typevar_context: None,
+                            })
                     },
                     delegate_to,
                 );
@@ -880,7 +891,8 @@ impl<'db> BoundSuperType<'db> {
             Type::Callable(callable) if callable.is_function_like(db) => {
                 return delegate_to(KnownClass::FunctionType.to_instance(db));
             }
-            Type::AlwaysFalsy
+            Type::Divergent(_)
+            | Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::Callable(_)
             | Type::DataclassTransformer(_)
@@ -953,10 +965,10 @@ impl<'db> BoundSuperType<'db> {
                     .find_name_in_mro_with_policy(db, name, policy)
                     .expect("Calling `find_name_in_mro` on dynamic type should return `Some`");
             }
-            SuperOwnerKind::Divergent(_) => {
-                return Type::unknown()
+            SuperOwnerKind::IdentityRecursive(recursive) => {
+                return Type::Recursive(*recursive)
                     .find_name_in_mro_with_policy(db, name, policy)
-                    .expect("Calling `find_name_in_mro` on Unknown should return `Some`");
+                    .expect("Calling `find_name_in_mro` on recursive type should return `Some`");
             }
             SuperOwnerKind::Resolved(resolved_owner) => resolved_owner.lookup_anchor,
         };
@@ -1025,11 +1037,12 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
 
             (ClassBase::Class(_), _) => self.never(),
 
-            // A `Divergent` type is only equivalent to itself
-            (ClassBase::Divergent(l), ClassBase::Divergent(r)) => {
-                ConstraintSet::from_bool(self.constraints, l == r)
+            (ClassBase::IdentityRecursive(l), ClassBase::IdentityRecursive(r)) => {
+                self.check_type_pair(db, Type::Recursive(l), Type::Recursive(r))
             }
-            (ClassBase::Divergent(_), _) | (_, ClassBase::Divergent(_)) => self.never(),
+            (ClassBase::IdentityRecursive(_), _) | (_, ClassBase::IdentityRecursive(_)) => {
+                self.never()
+            }
             (ClassBase::Any | ClassBase::Dynamic(_), ClassBase::Any | ClassBase::Dynamic(_)) => {
                 self.always()
             }
@@ -1064,11 +1077,11 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
                 }),
             (SuperOwnerKind::Resolved(_), _) => self.never(),
 
-            // A `Divergent` type is only equivalent to itself
-            (SuperOwnerKind::Divergent(l), SuperOwnerKind::Divergent(r)) => {
-                ConstraintSet::from_bool(self.constraints, l == r)
+            (SuperOwnerKind::IdentityRecursive(l), SuperOwnerKind::IdentityRecursive(r)) => {
+                self.check_type_pair(db, Type::Recursive(l), Type::Recursive(r))
             }
-            (SuperOwnerKind::Divergent(_), _) | (_, SuperOwnerKind::Divergent(_)) => self.never(),
+            (SuperOwnerKind::IdentityRecursive(_), _)
+            | (_, SuperOwnerKind::IdentityRecursive(_)) => self.never(),
             (SuperOwnerKind::Dynamic(_), SuperOwnerKind::Dynamic(_)) => self.always(),
             (SuperOwnerKind::Dynamic(_), _) => self.never(),
         };

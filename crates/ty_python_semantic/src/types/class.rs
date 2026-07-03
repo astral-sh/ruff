@@ -1198,6 +1198,9 @@ impl<'db> ClassType<'db> {
                             })
                         })
                 }
+                Type::Recursive(recursive) => recursive.map_or(db, None, |unfolded| {
+                    type_as_abstract_method(db, unfolded, defining_class)
+                }),
                 _ => None,
             }
         }
@@ -2265,7 +2268,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.constraints,
                     self.relation.is_assignability() || target.is_object(db),
                 ),
-                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => match self.relation {
+                ClassBase::Dynamic(_) | ClassBase::IdentityRecursive(_) => match self.relation {
                     TypeRelation::Subtyping
                     | TypeRelation::Redundancy { .. }
                     | TypeRelation::SubtypingAssuming => {
@@ -2491,7 +2494,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     // but adding such a method wouldn't make much sense -- it would always return `Any`!
                     dynamic_type.get_or_insert(Type::from(superclass));
                 }
-                ClassBase::Divergent(_) => {
+                ClassBase::IdentityRecursive(_) => {
                     dynamic_type.get_or_insert(Type::from(superclass));
                 }
                 ClassBase::Class(class) => {
@@ -2560,7 +2563,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 ClassBase::Generic | ClassBase::Protocol => {
                     // Skip over these very special class bases that aren't really classes.
                 }
-                ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+                ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::IdentityRecursive(_) => {
                     // We already return the dynamic type for class member lookup, so we can
                     // just return unbound here (to avoid having to build a union of the
                     // dynamic type with itself).

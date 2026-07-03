@@ -1,4 +1,5 @@
 use crate::place::Place;
+use crate::types::Foldable;
 use crate::types::{
     CallArguments, DataclassParams, KnownClass, KnownInstanceType, MemberLookupPolicy,
     SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext, TypedDictModule,
@@ -493,6 +494,9 @@ fn class_decorator_preserves_class_binding<'db>(
             .into_class(db)
             .is_some_and(|class| class == original_literal.default_specialization(db)),
         Type::Divergent(_) => true,
+        Type::Recursive(recursive) => recursive.map_or(db, true, |unfolded| {
+            class_decorator_preserves_class_binding(db, original_class, unfolded)
+        }),
         Type::Union(union) => union
             .elements(db)
             .iter()
@@ -525,6 +529,9 @@ fn type_retains_original_class<'db>(
         Type::TypeAlias(alias) => {
             type_retains_original_class(db, original_class, alias.value_type(db))
         }
+        Type::Recursive(recursive) => recursive.map_or(db, true, |unfolded| {
+            type_retains_original_class(db, original_class, unfolded)
+        }),
         _ => class_decorator_preserves_class_binding(db, original_class, decorated_class),
     }
 }
@@ -602,6 +609,12 @@ enum ClassDecoratorUnknownResultPolicy {
     PreserveBinding,
     /// Use the unknown decorator result as the public binding.
     ReplaceBinding,
+}
+
+impl<'db> Foldable<'db> for ClassDecoratorUnknownResultPolicy {
+    fn fold(self, _db: &'db dyn crate::Db, _recursive: crate::types::RecursiveType<'db>) -> Self {
+        self
+    }
 }
 
 impl ClassDecoratorUnknownResultPolicy {
@@ -694,6 +707,9 @@ impl ClassDecoratorUnknownResultPolicy {
                 Self::known_from_decorator(db, alias.value_type(db), decorator_result_ty)
                     .unwrap_or(Self::ReplaceBinding),
             ),
+            Type::Recursive(recursive) => recursive.map_or(db, None, |unfolded| {
+                Self::known_from_decorator(db, unfolded, decorator_result_ty)
+            }),
             Type::Callable(callable) => Some(match callable.provenance(db) {
                 // An unannotated function preserves the class binding when applying it loses the
                 // concrete return type:
