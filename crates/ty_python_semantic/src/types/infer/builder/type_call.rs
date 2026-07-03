@@ -23,6 +23,9 @@ use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex};
 use ty_python_core::definition::Definition;
 
 /// Extract the `TypedDict` fields constrained by a dynamic class namespace type.
+///
+/// Positive intersection elements contribute fields, and repeated fields are intersected. Returns
+/// `None` when the namespace contains no `TypedDict` information.
 fn typed_dict_namespace_members<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,

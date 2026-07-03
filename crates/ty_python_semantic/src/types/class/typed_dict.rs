@@ -691,14 +691,13 @@ pub(super) fn synthesize_typed_dict_merge<'db>(
     let top_dict_ty = KnownClass::Dict
         .to_instance_unknown(db)
         .top_materialization(db);
-    let open_empty_typed_dict_ty = Type::TypedDict(TypedDictType::open_empty(db));
+    let open_empty_typed_dict_ty = Type::open_empty_typed_dict(db);
+    let is_runtime_dict_top = instance_ty == top_dict_ty || instance_ty == open_empty_typed_dict_ty;
     let runtime_dict_return_ty =
         KnownClass::Dict.to_specialized_instance(db, &[Type::unknown(), Type::unknown()]);
     // `__or__` and `__ror__` create a fresh `dict` for the types synthesized by
     // `isinstance(..., dict)` narrowing, while `__ior__` preserves the receiver.
-    let instance_return_ty = if name != "__ior__"
-        && (instance_ty == top_dict_ty || instance_ty == open_empty_typed_dict_ty)
-    {
+    let instance_return_ty = if name != "__ior__" && is_runtime_dict_top {
         runtime_dict_return_ty
     } else {
         instance_ty
@@ -764,7 +763,7 @@ pub(super) fn synthesize_typed_dict_merge<'db>(
             dict_return_ty,
         ));
 
-        if instance_ty == top_dict_ty || instance_ty == open_empty_typed_dict_ty {
+        if is_runtime_dict_top {
             let runtime_dict_top =
                 UnionType::from_elements(db, [top_dict_ty, open_empty_typed_dict_ty]);
             let parameters = [

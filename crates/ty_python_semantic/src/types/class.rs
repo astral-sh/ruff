@@ -2023,6 +2023,10 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Return whether this is the top materialization used for runtime `dict` narrowing.
+    ///
+    /// Its invariant type parameters make the ordinary materialized merge signatures unusable:
+    /// input positions become `Never`, so `__or__` and `__ror__` require synthesized signatures.
     fn is_top_dict_specialization(
         db: &'db dyn Db,
         class_literal: StaticClassLiteral<'db>,

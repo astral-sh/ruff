@@ -631,6 +631,11 @@ pub(crate) fn runtime_instance_constraint_for_class_literal<'db>(
     }
 }
 
+/// Return the constraint imposed by an exact runtime-class check such as `type(x) is dict`.
+///
+/// Positive checks use the same `TypedDict`-aware constraint as `isinstance`. A negative `dict`
+/// check excludes every `TypedDict`, whose exact runtime class is always `dict`, while retaining
+/// ordinary `dict` subclasses. Other non-final classes cannot be narrowed negatively.
 fn exact_class_narrowing_constraint<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
@@ -803,7 +808,10 @@ impl<'db> NarrowingConstraint<'db> {
             .extend(other.replacement_disjuncts);
     }
 
-    /// Apply the constraint to a base type.
+    /// Apply the constraint to a base type without losing replacement semantics.
+    ///
+    /// Intersection disjuncts narrow `base_ty`, while replacement disjuncts use `object` as their
+    /// base so that a `TypeGuard` can replace previously known type information.
     pub(crate) fn narrow_base_type(self, db: &'db dyn Db, base_ty: Type<'db>) -> Type<'db> {
         let mut union = UnionBuilder::new(db);
         for conjunctions in self.replacement_disjuncts {

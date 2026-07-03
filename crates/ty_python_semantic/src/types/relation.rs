@@ -219,6 +219,10 @@ pub(crate) enum TypeVarEvaluation {
     Lazy,
 }
 
+/// Return the mutable `dict` approximation used only to reason about runtime overlap.
+///
+/// `TypedDict` remains statically distinct from mutable dictionaries; this projection captures
+/// that every inhabitant is nevertheless a `dict` with string keys at runtime.
 fn typed_dict_runtime_dict(db: &dyn Db) -> Type<'_> {
     KnownClass::Dict.to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()])
 }
@@ -2519,6 +2523,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             })
     }
 
+    /// Test protocol disjointness using runtime member presence only.
+    ///
+    /// Runtime-checkable protocols ignore member types, so an incompatible annotation cannot prove
+    /// disjointness here; only a member absent from the runtime `dict` surface can.
     fn any_protocol_members_absent(
         &self,
         db: &'db dyn Db,
