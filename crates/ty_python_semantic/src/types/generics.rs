@@ -2800,7 +2800,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             (formal @ Type::NominalInstance(_), Type::TypedDict(typed_dict)) => {
                 let mapping = KnownClass::Mapping.to_specialized_instance(
                     self.db,
-                    &[typed_dict.key_type(self.db), typed_dict.value_type(self.db)],
+                    &[
+                        KnownClass::Str.to_instance(self.db),
+                        typed_dict.value_type(self.db),
+                    ],
                 );
                 return self.infer_map_impl(formal, mapping, polarity, seen);
             }

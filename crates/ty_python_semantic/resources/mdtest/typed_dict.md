@@ -1434,6 +1434,10 @@ class Movie(TypedDict):
 class ReadOnlyExtras(TypedDict, extra_items=ReadOnly[int]):
     pass
 
+class Closed(TypedDict, closed=True):
+    name: str
+    age: int
+
 def project(value: Mapping[K, V]) -> tuple[K, V]:
     raise NotImplementedError
 
@@ -1442,6 +1446,9 @@ def preserve_mapping_intersection(value: Intersection[Movie, Mapping[str, bytes]
 
 def preserve_extra_item_value_type(value: ReadOnlyExtras) -> None:
     reveal_type(project(value))  # revealed: tuple[str, int]
+
+def preserve_closed_value_type(value: Closed) -> None:
+    reveal_type(project(value))  # revealed: tuple[str, int | str]
 ```
 
 ## Structural assignability
