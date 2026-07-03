@@ -100,7 +100,7 @@ use crate::types::newtype::NewType;
 use crate::types::signatures::{ConcatenateTail, walk_signature};
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::special_form::TypeQualifier;
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::tuple::TupleSpec;
 pub use crate::types::type_alias::TypeAliasType;
 pub use crate::types::type_form::TypeFormType;
 pub(crate) use crate::types::typed_dict::TypedDictType;
@@ -2231,14 +2231,6 @@ impl<'db> Type<'db> {
                 // use it only as an extra boundary for binder replacement.
                 current_body =
                     current_body.replace_recursive_with_binder(db, env, semantic_recursive);
-            } else if let Some(Type::Recursive(semantic_recursive)) =
-                previous.type_expression_semantic_view(db, env)
-                && semantic_recursive.binder(db).same_marker(binder)
-                && semantic_recursive != recursive
-            {
-                current_body = current_body
-                    .fold(db, env, semantic_recursive)
-                    .replace_recursive_with_binder(db, env, semantic_recursive);
             }
 
             current_body
@@ -2270,39 +2262,11 @@ impl<'db> Type<'db> {
         Type::recursive_with_origin(db, env, binder, origin, body)
     }
 
-    /// Returns the scope-independent type-expression meaning of a retained runtime
-    /// type-expression value.
-    fn type_expression_semantic_view(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Option<Self> {
-        match self {
-            Type::Recursive(recursive) => {
-                let body = recursive.body(db).type_expression_semantic_view(db, env)?;
-                Some(Type::recursive_with_origin(
-                    db,
-                    env,
-                    *recursive.binder(db),
-                    *recursive.origin(db),
-                    body,
-                ))
-            }
-            Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => Some(Type::tuple(
-                TupleType::new(db, env, alias.specialization(db).tuple(db)?),
-            )),
-            Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
-                instance.union_type(db).as_ref().ok().copied()
-            }
-            _ => None,
-        }
-    }
-
     /// Returns a type-expression view while the owning inference query is still running.
     ///
     /// This may use normal inference-time conversions such as `Type::instance`; do not call it
     /// from salsa cycle recovery functions.
-    pub(crate) fn type_expression_semantic_view_in_inference(
+    pub(crate) fn infer_type_expression_semantic_view(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -8222,19 +8186,15 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) | Type::Divergent(_) => Ok(*self),
 
             Type::Recursive(recursive) => {
-                if let Some(body) = recursive.body(db).type_expression_semantic_view(db, env) {
-                    Ok(Type::recursive(db, env, *recursive.binder(db), body))
-                } else {
-                    // Interpret the body under the same binder. Unfolding here would re-inject
-                    // the recursive type itself into structures that are already type expressions.
-                    let body = recursive.body(db).in_type_expression(
-                        db,
-                        scope_id,
-                        typevar_binding_context,
-                        inference_flags,
-                    )?;
-                    Ok(Type::recursive(db, env, *recursive.binder(db), body))
-                }
+                // Interpret the body under the same binder. Unfolding here would re-inject
+                // the recursive type itself into structures that are already type expressions.
+                let body = recursive.body(db).in_type_expression(
+                    db,
+                    scope_id,
+                    typevar_binding_context,
+                    inference_flags,
+                )?;
+                Ok(Type::recursive(db, env, *recursive.binder(db), body))
             }
 
             Type::NominalInstance(instance) => match instance.known_class(db) {
