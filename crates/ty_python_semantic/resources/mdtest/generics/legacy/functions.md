@@ -1134,18 +1134,32 @@ def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
 Dynamic intersection elements do not prevent inference from a `TypedDict` element:
 
 ```py
-from typing import Any, Iterable, TypedDict, TypeVar
+from typing import Any, Iterable, Mapping, TypedDict, TypeVar
 from ty_extensions import Intersection, Unknown
 
 U = TypeVar("U")
+ValueT = TypeVar("ValueT", bound=int)
 
 class OneKeyTD(TypedDict, closed=True):
     x: int
 
+class StringValueTD(TypedDict, closed=True):
+    x: str
+
 def element(x: Iterable[U]) -> U:
+    raise NotImplementedError
+
+def value(x: Mapping[str, ValueT]) -> ValueT:
     raise NotImplementedError
 
 def _(with_any: Intersection[OneKeyTD, Any], with_unknown: Intersection[OneKeyTD, Unknown]):
     reveal_type(element(with_any))  # revealed: Literal["x"]
     reveal_type(element(with_unknown))  # revealed: Literal["x"]
+
+def _(
+    with_any: Intersection[StringValueTD, Any],
+    with_unknown: Intersection[StringValueTD, Unknown],
+):
+    reveal_type(value(with_any))  # revealed: Unknown
+    reveal_type(value(with_unknown))  # revealed: Unknown
 ```

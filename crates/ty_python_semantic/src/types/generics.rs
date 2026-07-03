@@ -2825,6 +2825,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // They don't all have to.
                 let positives: Vec<_> = actual_intersection.iter_positive(self.db).collect();
                 let mut first_error = None;
+                let mut found_dynamic_element = false;
 
                 for include_typed_dicts in [false, true] {
                     let mut found_matching_element = false;
@@ -2849,9 +2850,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                     self.inferable,
                                 )
                                 .is_never_satisfied(self.db)
-                                && !positive.is_dynamic()
                             {
-                                found_matching_element = true;
+                                if positive.is_dynamic() {
+                                    found_dynamic_element = true;
+                                } else {
+                                    found_matching_element = true;
+                                }
                             }
                         }
                     }
@@ -2861,6 +2865,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     }
                 }
 
+                if found_dynamic_element {
+                    return Ok(());
+                }
                 if let Some(error) = first_error {
                     return Err(error);
                 }
