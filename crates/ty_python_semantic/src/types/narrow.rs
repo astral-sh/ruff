@@ -2678,7 +2678,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 ClassBase::Generic | ClassBase::Protocol => continue,
                 ClassBase::Any
                 | ClassBase::Dynamic(_)
-                | ClassBase::Divergent(_)
+                | ClassBase::IdentityRecursive(_)
                 | ClassBase::TypedDict(_) => {
                     return false;
                 }

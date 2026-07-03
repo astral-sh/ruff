@@ -480,6 +480,9 @@ fn class_decorator_preserves_class_binding<'db>(
             .into_class(db, env)
             .is_some_and(|class| class == original_literal.default_specialization(db)),
         Type::Divergent(_) => true,
+        Type::Recursive(recursive) => recursive.map_or(db, env, true, |unfolded| {
+            class_decorator_preserves_class_binding(db, env, original_class, unfolded)
+        }),
         Type::Union(union) => union.elements(db).iter().all(|element| {
             class_decorator_preserves_class_binding(db, env, original_class, *element)
         }),
@@ -512,6 +515,9 @@ fn type_retains_original_class<'db>(
         Type::TypeAlias(alias) => {
             type_retains_original_class(db, env, original_class, alias.value_type(db))
         }
+        Type::Recursive(recursive) => recursive.map_or(db, env, true, |unfolded| {
+            type_retains_original_class(db, env, original_class, unfolded)
+        }),
         _ => class_decorator_preserves_class_binding(db, env, original_class, decorated_class),
     }
 }

@@ -4243,7 +4243,7 @@ impl<'db> Type<'db> {
             return class_member;
         }
         let Some(dynamic_instance_type) = class.iter_mro(db).find_map(|base| match base {
-            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::IdentityRecursive(_) => {
                 Some(Type::from(base))
             }
             _ => None,

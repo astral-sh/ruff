@@ -94,7 +94,7 @@ use crate::types::variance::{TypeVarVariance, VarianceInferable};
 use crate::types::visitor::non_any_dynamic_content;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
-    CallableType, ClassBase, ClassLiteral, ClassType, FindLegacyTypeVarsVisitor,
+    CallableType, ClassBase, ClassLiteral, ClassType, FindLegacyTypeVarsVisitor, Foldable,
     IntersectionBuilder, KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner,
     SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
     UnionBuilder, UnionType, binding_type, definition_expression_type, walk_signature,
@@ -1086,6 +1086,17 @@ pub(super) enum AbstractMethodKind {
     /// The method is implicitly abstract due to being in a `Protocol` class with a body that
     /// solely consists of `raise NotImplementedError` statements.
     ImplicitDueToAlwaysRaising,
+}
+
+impl<'db> Foldable<'db> for AbstractMethodKind {
+    fn fold(
+        self,
+        _db: &'db dyn Db,
+        _env: &ProgramEnvironment<'db>,
+        _recursive: super::RecursiveType<'db>,
+    ) -> Self {
+        self
+    }
 }
 
 impl AbstractMethodKind {

@@ -893,7 +893,7 @@ impl<'db> StaticClassLiteral<'db> {
         };
 
         metaclass.iter_mro(db).any(|base| match base {
-            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
+            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::IdentityRecursive(_) => true,
             ClassBase::Class(base) => base.static_class_literal(db).is_none_or(|(base, _)| {
                 implicit_attribute_names(db, base.body_scope(db))
                     .binary_search(&Name::new_static("__getattribute__"))
@@ -921,7 +921,7 @@ impl<'db> StaticClassLiteral<'db> {
                         ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY
                             | ClassInstanceFlags::HAS_DYNAMIC_GETATTRIBUTE,
                     ),
-                    ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+                    ClassBase::Dynamic(_) | ClassBase::IdentityRecursive(_) => {
                         flags.insert(ClassInstanceFlags::HAS_DYNAMIC_GETATTRIBUTE);
                     }
                     ClassBase::TypedDict(_) => flags.insert(ClassInstanceFlags::TYPED_DICT),

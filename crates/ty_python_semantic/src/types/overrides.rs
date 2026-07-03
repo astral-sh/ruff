@@ -141,7 +141,7 @@ fn check_inherited_method_conflicts<'db>(
                 | ClassBase::Protocol
                 | ClassBase::Any
                 | ClassBase::Dynamic(_)
-                | ClassBase::Divergent(_),
+                | ClassBase::IdentityRecursive(_),
             ) => {}
             _ => return,
         }
@@ -166,7 +166,7 @@ fn check_inherited_method_conflicts<'db>(
             ClassBase::Class(base) if base.is_object(db) => break,
             ClassBase::Class(base) if base.static_class_literal(db).is_some() => mro.push(base),
             ClassBase::Protocol | ClassBase::Generic => {}
-            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::IdentityRecursive(_) => {
                 first_dynamic_base.get_or_insert(mro.len());
             }
             ClassBase::TypedDict(_) | ClassBase::Class(_) => return,
@@ -637,7 +637,7 @@ fn check_class_declaration<'db>(
                     has_dynamic_superclass = true;
                     continue;
                 }
-                ClassBase::Divergent(_) => {
+                ClassBase::IdentityRecursive(_) => {
                     has_dynamic_superclass = true;
                     continue;
                 }

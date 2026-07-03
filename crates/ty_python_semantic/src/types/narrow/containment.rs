@@ -95,7 +95,7 @@ fn containment_behavior<'db>(
                     ClassBase::Generic | ClassBase::Protocol => continue,
                     ClassBase::Any
                     | ClassBase::Dynamic(_)
-                    | ClassBase::Divergent(_)
+                    | ClassBase::IdentityRecursive(_)
                     | ClassBase::TypedDict(_) => return ContainmentBehavior::Unknown,
                 };
                 if matches!(

@@ -8,9 +8,9 @@ use crate::types::generics::{ApplySpecialization, Specialization};
 use crate::types::mro::MroIterator;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassLiteral, ClassType, DivergentType, DynamicType, Foldable,
-    KnownClass, KnownInstanceType, MaterializationKind, RecursiveType, SpecialFormType,
-    StaticMroError, Type, TypeContext, TypeMapping, TypingModule, todo_type,
+    ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, Foldable, KnownClass,
+    KnownInstanceType, MaterializationKind, RecursiveType, SpecialFormType, StaticMroError, Type,
+    TypeContext, TypeMapping, TypingModule, todo_type,
 };
 use crate::{Db, DisplaySettings};
 
@@ -30,7 +30,8 @@ pub enum ClassBase<'db> {
     /// is `Any` does not give the class the same gradual assignability as an explicit `Any` base.
     Any,
     Dynamic(DynamicType<'db>),
-    Divergent(DivergentType),
+    /// An identity recursive placeholder (`μa. a`) produced while recovering a class-base cycle.
+    IdentityRecursive(RecursiveType<'db>),
     Class(ClassType<'db>),
     /// Although `Protocol` is not a class in typeshed's stubs, it is at runtime,
     /// and can appear in the MRO of a class.
@@ -47,6 +48,12 @@ impl<'db> ClassBase<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
+    fn try_from_recursive(db: &'db dyn Db, recursive: RecursiveType<'db>) -> Option<Self> {
+        recursive
+            .is_identity(db)
+            .then_some(Self::IdentityRecursive(recursive))
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -56,7 +63,7 @@ impl<'db> ClassBase<'db> {
     ) -> Option<Self> {
         match self {
             Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
-            Self::Divergent(_) => Some(self),
+            Self::IdentityRecursive(_) => Some(self),
             Self::Class(class) => Some(Self::Class(
                 class.recursive_type_normalized_impl(db, env, div, nested)?,
             )),
@@ -77,7 +84,7 @@ impl<'db> ClassBase<'db> {
             ) => "Unknown",
             ClassBase::Dynamic(DynamicType::UnspecializedTypeVar) => "UnspecializedTypeVar",
             ClassBase::Dynamic(DynamicType::Todo(_)) => "@Todo",
-            ClassBase::Divergent(_) => "Divergent",
+            ClassBase::IdentityRecursive(_) => "Divergent",
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",
             ClassBase::TypedDict(_) => "TypedDict",
@@ -141,11 +148,11 @@ impl<'db> ClassBase<'db> {
     ) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
-            Type::Divergent(divergent) => Some(Self::Divergent(divergent)),
+            // Type::Divergent(divergent) => Self::try_from_divergent(db, divergent),
             Type::Recursive(recursive) => recursive.map_or_else(
                 db,
                 env,
-                || None,
+                || Self::try_from_recursive(db, recursive),
                 |unfolded| Self::try_from_type(db, env, unfolded, subclass),
             ),
             Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
@@ -213,7 +220,8 @@ impl<'db> ClassBase<'db> {
                 ClassBase::try_from_type(db, env, newtype.concrete_base_type(db), subclass)
             }
 
-            Type::PropertyInstance(_)
+            Type::Divergent(_)
+            | Type::PropertyInstance(_)
             | Type::SlotDescriptor(_)
             | Type::EnumComplement(_)
             | Type::LiteralValue(_)
@@ -363,7 +371,7 @@ impl<'db> ClassBase<'db> {
             Self::Class(class) => Some(class),
             Self::Any
             | Self::Dynamic(_)
-            | Self::Divergent(_)
+            | Self::IdentityRecursive(_)
             | Self::Generic
             | Self::Protocol
             | Self::TypedDict(_) => None,
@@ -395,7 +403,7 @@ impl<'db> ClassBase<'db> {
             }
             Self::Any => Type::Dynamic(DynamicType::Any),
             Self::Dynamic(dynamic) => Type::Dynamic(dynamic),
-            Self::Divergent(divergent) => Type::Divergent(divergent),
+            Self::IdentityRecursive(recursive) => Type::Recursive(recursive),
             Self::Generic | Self::TypedDict(_) => KnownClass::Type.to_instance(db, env),
         };
         ClassMetaclass::Selected(metaclass)
@@ -414,7 +422,7 @@ impl<'db> ClassBase<'db> {
             }
             Self::Any
             | Self::Dynamic(_)
-            | Self::Divergent(_)
+            | Self::IdentityRecursive(_)
             | Self::Generic
             | Self::Protocol
             | Self::TypedDict(_) => self,
@@ -476,7 +484,7 @@ impl<'db> ClassBase<'db> {
             }
             ClassBase::Any
             | ClassBase::Dynamic(_)
-            | ClassBase::Divergent(_)
+            | ClassBase::IdentityRecursive(_)
             | ClassBase::Generic
             | ClassBase::Protocol
             | ClassBase::TypedDict(_) => false,
@@ -496,7 +504,7 @@ impl<'db> ClassBase<'db> {
             }
             ClassBase::Any
             | ClassBase::Dynamic(_)
-            | ClassBase::Divergent(_)
+            | ClassBase::IdentityRecursive(_)
             | ClassBase::Generic
             | ClassBase::TypedDict(_) => ClassBaseMroIterator::length_2(db, env, self),
             ClassBase::Class(class) => {
@@ -522,7 +530,7 @@ impl<'db> ClassBase<'db> {
         std::fmt::from_fn(move |f| match self {
             ClassBase::Any => f.write_str("Any"),
             ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
-            ClassBase::Divergent(_) => f.write_str("Divergent"),
+            ClassBase::IdentityRecursive(_) => f.write_str("Divergent"),
             ClassBase::Class(class) => Type::from(class)
                 .display_with(db, env, display_settings.clone())
                 .fmt(f),
@@ -544,7 +552,7 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
         match value {
             ClassBase::Any => Type::Dynamic(DynamicType::Any),
             ClassBase::Dynamic(dynamic) => Type::Dynamic(dynamic),
-            ClassBase::Divergent(divergent) => Type::Divergent(divergent),
+            ClassBase::IdentityRecursive(recursive) => Type::Recursive(recursive),
             ClassBase::Class(class) => class.into(),
             ClassBase::Protocol => Type::SpecialForm(SpecialFormType::Protocol),
             ClassBase::Generic => Type::SpecialForm(SpecialFormType::Generic),
@@ -575,7 +583,7 @@ impl<'db> Foldable<'db> for ClassBase<'db> {
             )),
             Self::Any
             | Self::Dynamic(_)
-            | Self::Divergent(_)
+            | Self::IdentityRecursive(_)
             | Self::Protocol
             | Self::Generic
             | Self::TypedDict(_) => self,

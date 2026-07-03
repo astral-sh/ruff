@@ -1431,6 +1431,7 @@ impl<'db> ClassType<'db> {
     ) -> FxIndexMap<Name, AbstractMethod<'db>> {
         fn type_as_abstract_method<'db>(
             db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
             defining_class: ClassType<'db>,
         ) -> Option<AbstractMethodKind> {
@@ -1443,18 +1444,21 @@ impl<'db> ClassType<'db> {
                     // A property is abstract if any of its accessors is abstract.
                     property
                         .getter(db)
-                        .and_then(|getter| type_as_abstract_method(db, getter, defining_class))
+                        .and_then(|getter| type_as_abstract_method(db, env, getter, defining_class))
                         .or_else(|| {
                             property.setter(db).and_then(|setter| {
-                                type_as_abstract_method(db, setter, defining_class)
+                                type_as_abstract_method(db, env, setter, defining_class)
                             })
                         })
                         .or_else(|| {
                             property.deleter(db).and_then(|deleter| {
-                                type_as_abstract_method(db, deleter, defining_class)
+                                type_as_abstract_method(db, env, deleter, defining_class)
                             })
                         })
                 }
+                Type::Recursive(recursive) => recursive.map_or(db, env, None, |unfolded| {
+                    type_as_abstract_method(db, env, unfolded, defining_class)
+                }),
                 _ => None,
             }
         }
@@ -1510,7 +1514,7 @@ impl<'db> ClassType<'db> {
                 let Some(definition) = place_and_definition.first_definition else {
                     continue;
                 };
-                if let Some(kind) = type_as_abstract_method(db, ty, class) {
+                if let Some(kind) = type_as_abstract_method(db, env, ty, class) {
                     let abstract_method = AbstractMethod {
                         defining_class: class,
                         definition,
@@ -2649,7 +2653,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.constraints,
                     self.relation.is_assignability() || target.is_object(db),
                 ),
-                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => match self.relation {
+                ClassBase::Dynamic(_) | ClassBase::IdentityRecursive(_) => match self.relation {
                     TypeRelation::Subtyping
                     | TypeRelation::Redundancy { .. }
                     | TypeRelation::SubtypingAssuming => {
@@ -2955,7 +2959,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     // but adding such a method wouldn't make much sense -- it would always return `Any`!
                     dynamic_type.get_or_insert(Type::from(superclass));
                 }
-                ClassBase::Divergent(_) => {
+                ClassBase::IdentityRecursive(_) => {
                     dynamic_type.get_or_insert(Type::from(superclass));
                 }
                 ClassBase::Class(class) => {
@@ -3052,7 +3056,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 ClassBase::Generic | ClassBase::Protocol => {
                     // Skip over these very special class bases that aren't really classes.
                 }
-                ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+                ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::IdentityRecursive(_) => {
                     // We already return the dynamic type for class member lookup, so we can
                     // just return unbound here (to avoid having to build a union of the
                     // dynamic type with itself).

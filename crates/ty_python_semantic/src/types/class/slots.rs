@@ -451,7 +451,7 @@ impl<'db> StaticClassLiteral<'db> {
         for base in self.iter_mro(db, None) {
             let base = match base {
                 ClassBase::Class(base) => base,
-                ClassBase::Any | ClassBase::Divergent(_) | ClassBase::Dynamic(_) => {
+                ClassBase::Any | ClassBase::IdentityRecursive(_) | ClassBase::Dynamic(_) => {
                     dictionary = dictionary.inherited_with(InstanceDictionary::Unknown);
                     continue;
                 }
