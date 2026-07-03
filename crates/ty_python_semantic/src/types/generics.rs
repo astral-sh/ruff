@@ -2823,15 +2823,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 //
                 // It's sufficient for one intersection element to satisfy the constraints here.
                 // They don't all have to.
-                let positives: Vec<_> = actual_intersection.iter_positive(self.db).collect();
                 let mut first_error = None;
                 let mut found_dynamic_element = false;
 
                 for include_typed_dicts in [false, true] {
                     let mut found_matching_element = false;
-                    for positive in positives.iter().copied().filter(|positive| {
-                        matches!(positive, Type::TypedDict(_)) == include_typed_dicts
-                    }) {
+                    for positive in actual_intersection.iter_positive(self.db) {
+                        if matches!(positive, Type::TypedDict(_)) != include_typed_dicts {
+                            continue;
+                        }
                         let result = self.infer_map_impl(formal, positive, polarity, seen);
                         if let Err(err) = result {
                             // TODO: `infer_map_impl` can have side effects even in the error case,
