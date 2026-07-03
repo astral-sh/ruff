@@ -204,6 +204,81 @@ def g(attributes: Namespace):
     reveal_type(y.unknown)  # revealed: Unknown
 ```
 
+## Composite `TypedDict` namespaces
+
+Aliases and composite types whose inhabitants are dictionaries are valid namespace arguments. We
+conservatively leave their class attributes unknown rather than attempting to infer which keys are
+present:
+
+```py
+from typing import Protocol, TypeAlias, TypedDict, TypeVar
+from ty_extensions import Intersection
+
+class Attributes(TypedDict):
+    attribute: int
+
+class OtherAttributes(TypedDict):
+    other_attribute: str
+
+class HasClear(Protocol):
+    def clear(self) -> None: ...
+
+NamespaceAlias: TypeAlias = Attributes
+Bounded = TypeVar("Bounded", bound=Attributes)
+Constrained = TypeVar("Constrained", Attributes, OtherAttributes)
+
+def union(attributes: Attributes | dict[str, object]):
+    Y = type("Y", (), attributes)
+    reveal_type(Y)  # revealed: <class 'Y'>
+    reveal_type(Y.attribute)  # revealed: Unknown
+
+def intersection(attributes: Intersection[Attributes, HasClear]):
+    Y = type("Y", (), attributes)
+    reveal_type(Y)  # revealed: <class 'Y'>
+    reveal_type(Y.attribute)  # revealed: Unknown
+
+def legacy_alias(attributes: NamespaceAlias):
+    Y = type("Y", (), attributes)
+    reveal_type(Y)  # revealed: <class 'Y'>
+    reveal_type(Y.attribute)  # revealed: int
+
+def bounded(attributes: Bounded):
+    Y = type("Y", (), attributes)
+    reveal_type(Y)  # revealed: <class 'Y'>
+    reveal_type(Y.attribute)  # revealed: Unknown
+
+def constrained(attributes: Constrained):
+    Y = type("Y", (), attributes)
+    reveal_type(Y)  # revealed: <class 'Y'>
+```
+
+PEP 695 aliases, including recursive aliases, are also accepted without recursively extracting
+members:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Attributes(TypedDict):
+    attribute: int
+
+type NamespaceAlias = Attributes
+type RecursiveNamespace = Attributes | RecursiveNamespace
+
+def aliases(attributes: NamespaceAlias, recursive: RecursiveNamespace):
+    Y = type("Y", (), attributes)
+    Z = type("Z", (), recursive)
+
+    reveal_type(Y)  # revealed: <class 'Y'>
+    reveal_type(Y.attribute)  # revealed: Unknown
+    reveal_type(Z)  # revealed: <class 'Z'>
+    reveal_type(Z.attribute)  # revealed: Unknown
+```
+
 ## Closed TypedDicts (PEP-728)
 
 TODO: We don't support the PEP-728 `closed=True` keyword argument to `TypedDict` yet. When we do, a
