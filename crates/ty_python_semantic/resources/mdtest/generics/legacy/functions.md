@@ -1130,3 +1130,22 @@ def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
     # error: [invalid-argument-type] "Argument to function `first` is incorrect: Argument type `Unrelated1` does not satisfy upper bound `Base` of type variable `T`"
     reveal_type(first(x))  # revealed: Unknown
 ```
+
+Dynamic intersection elements do not prevent inference from a `TypedDict` element:
+
+```py
+from typing import Any, Iterable, TypedDict, TypeVar
+from ty_extensions import Intersection, Unknown
+
+U = TypeVar("U")
+
+class OneKeyTD(TypedDict, closed=True):
+    x: int
+
+def element(x: Iterable[U]) -> U:
+    raise NotImplementedError
+
+def _(with_any: Intersection[OneKeyTD, Any], with_unknown: Intersection[OneKeyTD, Unknown]):
+    reveal_type(element(with_any))  # revealed: Literal["x"]
+    reveal_type(element(with_unknown))  # revealed: Literal["x"]
+```

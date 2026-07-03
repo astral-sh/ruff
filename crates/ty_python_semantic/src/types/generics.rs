@@ -2849,6 +2849,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                     self.inferable,
                                 )
                                 .is_never_satisfied(self.db)
+                                && !positive.is_dynamic()
                             {
                                 found_matching_element = true;
                             }
