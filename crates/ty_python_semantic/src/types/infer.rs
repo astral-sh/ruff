@@ -1432,9 +1432,10 @@ impl<'db> DefinitionInference<'db> {
             .map_or(&[] as &[(Definition<'db>, Type<'db>)], |extra| {
                 extra.cycle_recovery_semantic_views()
             });
-        let current_generic_contexts = self.extra.as_deref().map_or_else(Vec::new, |extra| {
-            extra.cycle_recovery_generic_contexts().to_vec()
-        });
+        let current_generic_contexts = self
+            .extra
+            .as_deref()
+            .map_or(&[][..], |extra| extra.cycle_recovery_generic_contexts());
         let semantic_view_for_previous_type = |previous_ty| {
             previous_semantic_views
                 .iter()
@@ -1465,7 +1466,7 @@ impl<'db> DefinitionInference<'db> {
             db,
             &previous_inference.types,
             previous_semantic_views,
-            &current_generic_contexts,
+            current_generic_contexts,
             cycle,
             definition,
         );

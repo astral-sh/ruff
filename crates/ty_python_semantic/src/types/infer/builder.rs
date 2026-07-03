@@ -470,7 +470,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        let Some(semantic_view) = value_ty.type_expression_semantic_view_in_inference(db) else {
+        let Some(semantic_view) = value_ty.infer_type_expression_semantic_view(db) else {
             return;
         };
 
