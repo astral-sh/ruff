@@ -228,3 +228,12 @@ tuple(None) or True  # OK
 tuple(...) or True  # OK
 tuple(lambda x: x) or True  # OK
 tuple(x for x in range(0)) or True  # OK
+
+# An f-string is guaranteed non-empty if any element is non-empty, even if others are indeterminate
+print(f"{x}abc" or "bar")  # SIM222
+print(f"abc{x}" or "bar")  # SIM222
+print(f"{x}" f"abc" or "bar")  # SIM222
+print(f"{x}{y}" or "bar")  # OK
+# An empty f-string part in an implicit concatenation guarantees nothing
+print(f"" f"{x}" or "bar")  # OK
+print(f"{f''}" or "bar")  # SIM222 (the f-string is provably empty, so `or` yields "bar")

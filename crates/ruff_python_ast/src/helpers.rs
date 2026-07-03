@@ -1611,7 +1611,8 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
     expr.value.iter().any(|part| match part {
         ast::FStringPart::Literal(string_literal) => !string_literal.is_empty(),
         ast::FStringPart::FString(f_string) => {
-            f_string.elements.iter().all(|element| match element {
+            // The part is a concatenation of elements, so it's guaranteed non-empty if any element is
+            f_string.elements.iter().any(|element| match element {
                 InterpolatedStringElement::Literal(string_literal) => !string_literal.is_empty(),
                 InterpolatedStringElement::Interpolation(f_string) => {
                     f_string.debug_text.is_some() || inner(&f_string.expression)
