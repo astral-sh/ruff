@@ -1275,7 +1275,6 @@ impl<'db> Type<'db> {
                 db,
                 previous,
                 previous_semantic_view,
-                cycle,
                 id,
                 include_previous,
                 origin,
@@ -1305,7 +1304,6 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         previous: Self,
         previous_semantic_view: Option<Self>,
-        cycle: &salsa::Cycle,
         id: salsa::Id,
         include_previous: bool,
         origin: Option<RecursiveTypeOrigin<'db>>,
@@ -1342,12 +1340,18 @@ impl<'db> Type<'db> {
 
             current_body
         } else {
-            self.recursive_type_normalized(db, cycle)
+            let divergent = Type::Divergent(binder);
+            self.recursive_type_normalized_impl(db, divergent, false)
+                .unwrap_or(divergent)
         };
 
         let body = if include_previous {
-            let previous_body = previous_recursive.map_or(previous, |recursive| recursive.body(db));
-            UnionType::from_elements_cycle_recovery(db, [previous_body, current_body])
+            if let Some(recursive) = previous_recursive {
+                UnionType::from_elements_cycle_recovery(db, [recursive.body(db), current_body])
+            } else {
+                // `current_body` already includes `previous` from the stabilized value.
+                current_body
+            }
         } else {
             current_body
         };
