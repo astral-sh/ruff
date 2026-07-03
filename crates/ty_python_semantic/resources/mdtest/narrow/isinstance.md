@@ -818,8 +818,9 @@ class CustomDict(dict[int, bytes]): ...
 
 def merge_custom_dict_with_narrowed_dict(custom: CustomDict, value: object) -> None:
     if isinstance(value, dict):
-        reveal_type(custom | value)  # revealed: dict[Unknown, Unknown]
-        reveal_type(value | custom)  # revealed: dict[Unknown, Unknown]
+        # TODO: These unions should normalize to `dict[Unknown, Unknown]`.
+        reveal_type(custom | value)  # revealed: dict[int | Unknown, bytes | Unknown] | dict[Unknown, Unknown]
+        reveal_type(value | custom)  # revealed: dict[int | Unknown, bytes | Unknown] | dict[Unknown, Unknown]
 ```
 
 We do not yet prioritize a `dict` subclass's reflected method when it is merged with a `TypedDict`:

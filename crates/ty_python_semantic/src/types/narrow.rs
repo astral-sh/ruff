@@ -684,8 +684,12 @@ impl<'db> Conjunctions<'db> {
         self
     }
 
-    fn evaluate_constraint_type(self, db: &'db dyn Db, base_ty: Type<'db>) -> Type<'db> {
-        let mut intersection = IntersectionBuilder::new(db).add_positive(base_ty);
+    fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
+        if self.conjuncts.len() == 1 {
+            return self.conjuncts[0];
+        }
+
+        let mut intersection = IntersectionBuilder::new(db);
         for conjunct in self.conjuncts {
             intersection = intersection.add_positive(conjunct);
         }
@@ -808,17 +812,17 @@ impl<'db> NarrowingConstraint<'db> {
             .extend(other.replacement_disjuncts);
     }
 
-    /// Apply the constraint to a base type without losing replacement semantics.
+    /// Evaluate the type this effectively constrains to
     ///
-    /// Intersection disjuncts narrow `base_ty`, while replacement disjuncts use `object` as their
-    /// base so that a `TypeGuard` can replace previously known type information.
-    pub(crate) fn narrow_base_type(self, db: &'db dyn Db, base_ty: Type<'db>) -> Type<'db> {
+    /// Forgets whether each constraint originated from a `replacement` disjunct or not
+    pub(crate) fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
         let mut union = UnionBuilder::new(db);
-        for conjunctions in self.replacement_disjuncts {
-            union = union.add(conjunctions.evaluate_constraint_type(db, Type::object()));
-        }
-        for conjunctions in self.intersection_disjuncts {
-            union = union.add(conjunctions.evaluate_constraint_type(db, base_ty));
+        for conjunctions in self
+            .replacement_disjuncts
+            .into_iter()
+            .chain(self.intersection_disjuncts)
+        {
+            union = union.add(conjunctions.evaluate_constraint_type(db));
         }
         union.build()
     }

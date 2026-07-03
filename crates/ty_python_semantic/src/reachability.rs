@@ -684,9 +684,12 @@ fn apply_accumulated_narrowing<'db>(
     base_ty: Type<'db>,
     accumulated: Option<NarrowingConstraint<'db>>,
 ) -> Type<'db> {
-    accumulated.map_or(base_ty, |constraint| {
-        constraint.narrow_base_type(db, base_ty)
-    })
+    match accumulated {
+        Some(constraint) => NarrowingConstraint::intersection(base_ty)
+            .merge_constraint_and(constraint)
+            .evaluate_constraint_type(db),
+        None => base_ty,
+    }
 }
 
 /// Identifier for a node in a projected narrowing graph.

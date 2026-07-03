@@ -204,68 +204,6 @@ def g(attributes: Namespace):
     reveal_type(y.unknown)  # revealed: Unknown
 ```
 
-## `TypedDict` unions as class attributes
-
-A union can be passed as the third argument to `type()` when every member is either a `TypedDict` or
-an ordinary dictionary:
-
-```py
-from typing import TypedDict
-
-class Attributes(TypedDict):
-    z: int
-
-def f(attributes: Attributes | dict[str, object]):
-    Y = type("Y", (), attributes)
-
-    reveal_type(Y)  # revealed: <class 'Y'>
-```
-
-## `TypedDict` intersections as class attributes
-
-Known `TypedDict` keys remain available as class attributes when the third argument to `type()` has
-an intersection type:
-
-```py
-from typing import Protocol, TypedDict
-from ty_extensions import Intersection
-
-class Attributes(TypedDict):
-    z: int
-
-class HasClear(Protocol):
-    def clear(self) -> None: ...
-
-def f(attributes: Intersection[Attributes, HasClear]):
-    Y = type("Y", (), attributes)
-
-    reveal_type(Y.z)  # revealed: int
-```
-
-## PEP 695 aliases for class attributes
-
-A PEP 695 alias to a `TypedDict` can be passed as the third argument to `type()` and preserves its
-known keys:
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing import TypedDict
-
-class Attributes(TypedDict):
-    z: int
-
-type AttributesAlias = Attributes
-
-def f(attributes: AttributesAlias):
-    Y = type("Y", (), attributes)
-
-    reveal_type(Y.z)  # revealed: int
-```
-
 ## Closed TypedDicts (PEP-728)
 
 TODO: We don't support the PEP-728 `closed=True` keyword argument to `TypedDict` yet. When we do, a

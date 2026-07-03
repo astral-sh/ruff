@@ -1,6 +1,3 @@
-use std::collections::BTreeMap;
-
-use crate::Db;
 use crate::types::class::{
     ClassLiteral, DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict,
 };
@@ -14,54 +11,10 @@ use crate::types::infer::builder::{
         DynamicClassKind, report_dynamic_mro_errors, report_inconsistent_dynamic_generic_bases,
     },
 };
-use crate::types::{
-    IntersectionType, KnownClass, SubclassOfType, Type, TypeContext, UnionType,
-    definition_expression_type,
-};
+use crate::types::{KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex};
 use ty_python_core::definition::Definition;
-
-/// Extract the `TypedDict` fields constrained by a dynamic class namespace type.
-///
-/// Positive intersection elements contribute fields, and repeated fields are intersected. Returns
-/// `None` when the namespace contains no `TypedDict` information.
-fn typed_dict_namespace_members<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-) -> Option<BTreeMap<Name, Type<'db>>> {
-    fn collect<'db>(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        members: &mut BTreeMap<Name, Type<'db>>,
-    ) -> bool {
-        match ty.resolve_type_alias(db) {
-            Type::TypedDict(typed_dict) => {
-                for (name, field) in typed_dict.items(db) {
-                    let ty = field.declared_ty;
-                    members
-                        .entry(name.clone())
-                        .and_modify(|existing| {
-                            *existing = IntersectionType::from_two_elements(db, *existing, ty);
-                        })
-                        .or_insert(ty);
-                }
-                true
-            }
-            Type::Intersection(intersection) => {
-                let mut found = false;
-                for positive in intersection.positive(db) {
-                    found |= collect(db, *positive, members);
-                }
-                found
-            }
-            _ => false,
-        }
-    }
-
-    let mut members = BTreeMap::new();
-    collect(db, ty, &mut members).then_some(members)
-}
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Infer a call to `builtins.type()`.
@@ -205,28 +158,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     })
                     .collect();
                 (members, !all_keys_are_string_literals)
-            } else if let Some(typed_dict_members) =
-                typed_dict_namespace_members(db, namespace_type)
-            {
-                // `namespace` contains a TypedDict instance. Extract known keys as members.
+            } else if let Type::TypedDict(typed_dict) = namespace_type {
+                // `namespace` is a TypedDict instance. Extract known keys as members.
                 // TypedDicts are "open" (can have additional string keys), so this
                 // is still a dynamic namespace for unknown attributes.
-                let members: Box<[(ast::name::Name, Type<'db>)]> =
-                    typed_dict_members.into_iter().collect();
+                let members: Box<[(ast::name::Name, Type<'db>)]> = typed_dict
+                    .items(db)
+                    .iter()
+                    .map(|(name, field)| (name.clone(), field.declared_ty))
+                    .collect();
                 (members, true)
             } else {
                 // `namespace` is not a dict literal, so it's dynamic.
                 (Box::new([]), true)
             };
 
-        let namespace_target = UnionType::from_two_elements(
-            db,
-            KnownClass::Dict
-                .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]),
-            Type::open_empty_typed_dict(db),
-        );
-
-        if !namespace_type.is_assignable_to(db, namespace_target)
+        if !matches!(namespace_type, Type::TypedDict(_))
+            && !namespace_type.is_assignable_to(
+                db,
+                KnownClass::Dict
+                    .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]),
+            )
             && let Some(builder) = self
                 .context
                 .report_lint(&INVALID_ARGUMENT_TYPE, namespace_arg)

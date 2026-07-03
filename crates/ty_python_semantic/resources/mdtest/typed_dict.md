@@ -1577,38 +1577,6 @@ def use_empty_typed_dict(dst: EmptyTypedDict, src: Year, other: dict[int, bytes]
     reveal_type(other | dst)  # revealed: Unknown
 ```
 
-When inferring the type parameters of `Mapping`, `TypedDict` keys are strings and its value type
-comes from its declared fields and extra items. An explicit `Mapping` in an intersection remains
-more precise:
-
-```py
-from collections.abc import Mapping
-from typing import TypeVar
-from typing_extensions import ReadOnly
-from ty_extensions import Intersection
-
-K = TypeVar("K")
-V = TypeVar("V")
-
-class Movie(TypedDict):
-    title: str
-
-class ReadOnlyExtras(TypedDict, extra_items=ReadOnly[int]):
-    pass
-
-def project(value: Mapping[K, V]) -> tuple[K, V]:
-    raise NotImplementedError
-
-def infer_empty_typed_dict(value: EmptyTypedDict) -> None:
-    reveal_type(project(value))  # revealed: tuple[str, object]
-
-def preserve_mapping_intersection(value: Intersection[Movie, Mapping[str, str]]) -> None:
-    reveal_type(project(value))  # revealed: tuple[str, str]
-
-def preserve_extra_item_value_type(value: ReadOnlyExtras) -> None:
-    reveal_type(project(value))  # revealed: tuple[str, int]
-```
-
 In order for one `TypedDict` `B` to be assignable to another `TypedDict` `A`, all required keys in
 `A`'s schema must be required in `B`'s schema. If a key is not-required and also mutable in `A`,
 then it must be not-required in `B` (because `A` allows the caller to `del` that key). These rules

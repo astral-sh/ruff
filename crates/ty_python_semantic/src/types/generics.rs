@@ -1289,19 +1289,6 @@ impl<'db> Specialization<'db> {
             return self.materialize_impl(db, *materialization_kind, visitor);
         }
 
-        if let TypeMapping::ApplySpecializationWithMaterialization {
-            specialization: ApplySpecialization::Specialization(specialization),
-            materialization_kind,
-        } = type_mapping
-            && self.generic_context(db) == specialization.generic_context(db)
-            && self == self.generic_context(db).identity_specialization(db)
-        {
-            // Preserve an enclosing generic specialization as a unit. Recursively mapping an
-            // identity specialization like `dict[_KT, _VT]` would flip the materialization of its
-            // invariant type variables, turning a top-materialized return type into a bottom one.
-            return specialization.with_materialization_kind(db, Some(*materialization_kind));
-        }
-
         let mut new_materialization_kind = self.materialization_kind(db);
         let types = self.map_types(db, |i, typevar, ty| {
             let tcx = TypeContext::new(tcx.get(i).copied());
@@ -2959,14 +2946,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
-            (formal @ Type::NominalInstance(_), Type::TypedDict(typed_dict)) => {
-                let mapping = KnownClass::Mapping.to_specialized_instance(
-                    self.db,
-                    &[typed_dict.key_type(self.db), typed_dict.value_type(self.db)],
-                );
-                return self.infer_map_impl(formal, mapping, polarity, seen);
-            }
-
             (Type::Intersection(formal_intersection), _) => {
                 // The actual type must be assignable to every (positive) element of the
                 // formal intersection, so we must infer type mappings for each of them. (The
@@ -2992,44 +2971,28 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 //
                 // It's sufficient for one intersection element to satisfy the constraints here.
                 // They don't all have to.
-                let positives: Vec<_> = actual_intersection.iter_positive(self.db).collect();
                 let mut first_error = None;
-
-                for include_typed_dicts in [false, true] {
-                    let mut found_matching_element = false;
-                    for positive in positives.iter().copied().filter(|positive| {
-                        matches!(positive, Type::TypedDict(_)) == include_typed_dicts
-                    }) {
-                        let result = self.infer_map_impl(formal, positive, polarity, seen);
-                        if let Err(err) = result {
-                            // TODO: `infer_map_impl` can have side effects even in the error case,
-                            // so to be fully correct here we'd need to snapshot `self.types` before
-                            // each call and roll it back if we get an error. The `Union` arm has the
-                            // same issue above.
-                            first_error.get_or_insert(err);
-                        } else {
-                            // The recursive call to `infer_map_impl` may succeed even if the actual
-                            // type is not assignable to the formal element.
-                            if !positive
-                                .when_assignable_to(
-                                    self.db,
-                                    formal,
-                                    self.constraints,
-                                    self.inferable,
-                                )
-                                .is_never_satisfied(self.db)
-                            {
-                                found_matching_element = true;
-                            }
+                let mut found_matching_element = false;
+                for positive in actual_intersection.iter_positive(self.db) {
+                    let result = self.infer_map_impl(formal, positive, polarity, seen);
+                    if let Err(err) = result {
+                        // TODO: `infer_map_impl` can have side effects even in the error case, so
+                        // to be fully correct here we'd need to snapshot `self.types` before each
+                        // call and roll it back if we get an error. The `Union` arm has the same
+                        // issue above.
+                        first_error.get_or_insert(err);
+                    } else {
+                        // The recursive call to `infer_map_impl` may succeed even if the actual
+                        // type is not assignable to the formal element.
+                        if !positive
+                            .when_assignable_to(self.db, formal, self.constraints, self.inferable)
+                            .is_never_satisfied(self.db)
+                        {
+                            found_matching_element = true;
                         }
                     }
-
-                    if found_matching_element {
-                        return Ok(());
-                    }
                 }
-
-                if let Some(error) = first_error {
+                if !found_matching_element && let Some(error) = first_error {
                     return Err(error);
                 }
             }
@@ -3187,20 +3150,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             .variables(self.db);
                         let formal_specialization =
                             formal_alias.specialization(self.db).types(self.db);
-                        let base_specialization = base_alias.specialization(self.db);
-                        let materialization_kind =
-                            base_specialization.materialization_kind(self.db);
-                        let materialization_visitor = ApplyTypeMappingVisitor::default();
+                        let base_specialization = base_alias.specialization(self.db).types(self.db);
                         for (typevar, formal_ty, base_ty) in itertools::izip!(
                             generic_context,
                             formal_specialization,
-                            base_specialization.types(self.db)
+                            base_specialization
                         ) {
                             let variance = typevar.variance_with_polarity(self.db, polarity);
-                            let base_ty = materialization_kind.map_or(*base_ty, |kind| {
-                                base_ty.materialize(self.db, kind, &materialization_visitor)
-                            });
-                            self.infer_map_impl(*formal_ty, base_ty, variance, seen)?;
+                            self.infer_map_impl(*formal_ty, *base_ty, variance, seen)?;
                         }
                         return Ok(());
                     }

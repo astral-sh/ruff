@@ -859,9 +859,6 @@ static_assert(not is_assignable_to(Top[InvariantChild[Any]], CovariantBase[A]))
 
 Attributes on top and bottom materializations are specialized on access.
 
-If the type variable appears inside another invariant specialization, the enclosing top or bottom
-materialization is preserved. This applies in both return types and parameter types.
-
 ```toml
 [environment]
 python-version = "3.12"
@@ -876,25 +873,15 @@ class Invariant[T]:
         raise NotImplementedError
 
     def push(self, obj: T) -> None: ...
-    def copy(self) -> "Invariant[T]":
-        raise NotImplementedError
-
-    def replace(self, other: "Invariant[T]") -> None: ...
 
     attr: T
 
 def capybara(top: Top[Invariant[Any]], bottom: Bottom[Invariant[Any]]) -> None:
     reveal_type(top.get)  # revealed: bound method Top[Invariant[Any]].get() -> object
     reveal_type(top.push)  # revealed: bound method Top[Invariant[Any]].push(obj: Never) -> None
-    reveal_type(top.copy)  # revealed: bound method Top[Invariant[Any]].copy() -> Top[Invariant[Any]]
-    # revealed: bound method Top[Invariant[Any]].replace(other: Bottom[Invariant[Any]]) -> None
-    reveal_type(top.replace)
 
     reveal_type(bottom.get)  # revealed: bound method Bottom[Invariant[Any]].get() -> Never
     reveal_type(bottom.push)  # revealed: bound method Bottom[Invariant[Any]].push(obj: object) -> None
-    reveal_type(bottom.copy)  # revealed: bound method Bottom[Invariant[Any]].copy() -> Bottom[Invariant[Any]]
-    # revealed: bound method Bottom[Invariant[Any]].replace(other: Top[Invariant[Any]]) -> None
-    reveal_type(bottom.replace)
 
     reveal_type(top.attr)  # revealed: object
     reveal_type(bottom.attr)  # revealed: Never
@@ -911,25 +898,6 @@ class Mixed[T, U]:
 def preserve_unrelated_any(top: Top[Mixed[Any, int]], bottom: Bottom[Mixed[Any, int]]) -> None:
     reveal_type(top.nested)  # revealed: list[tuple[Any, int]]
     reveal_type(bottom.nested)  # revealed: list[tuple[Any, int]]
-```
-
-Type inference also uses the materialized type arguments. The call below is invalid because a top
-materialization is not assignable to a concrete `dict`, but the inferred return type still uses
-`object` rather than `Any`:
-
-```py
-from typing import Any, TypeVar
-from ty_extensions import Top
-
-K = TypeVar("K")
-V = TypeVar("V")
-
-def project_dict(value: dict[K, V]) -> tuple[K, V]:
-    raise NotImplementedError
-
-def infer_top_dict(value: Top[dict[Any, Any]]) -> None:
-    # error: [invalid-argument-type]
-    reveal_type(project_dict(value))  # revealed: tuple[object, object]
 ```
 
 Alias specializations also preserve the materialization polarity in contravariant positions.
