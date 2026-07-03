@@ -803,12 +803,15 @@ def use_narrowed_dict(value: object, key: object) -> None:
         takes_dict(value)  # error: [invalid-argument-type]
 ```
 
-Merging two values narrowed to `dict` produces an ordinary dictionary:
+Merging two values narrowed to `dict` produces an ordinary dictionary. Calling the corresponding
+special methods directly has the same result:
 
 ```py
 def merge_narrowed_dicts(left: object, right: object) -> None:
     if isinstance(left, dict) and isinstance(right, dict):
         reveal_type(left | right)  # revealed: dict[Unknown, Unknown]
+        reveal_type(left.__or__(right))  # revealed: dict[Unknown, Unknown]
+        reveal_type(right.__ror__(left))  # revealed: dict[Unknown, Unknown]
 ```
 
 A narrowed value can also appear on either side of a concrete dictionary merge:
