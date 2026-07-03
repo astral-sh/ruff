@@ -2826,10 +2826,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 let mut first_error = None;
                 let mut found_dynamic_element = false;
 
-                for include_typed_dicts in [false, true] {
+                // A `TypedDict` infers through a synthesized `Mapping[str, value_type]`, but an
+                // intersection can contain an explicit `Mapping` with more precise type arguments.
+                // Try non-`TypedDict` elements first, and consult `TypedDict`s only if that pass
+                // finds no concrete match. Recreating the iterator only repeats classification;
+                // each element reaches `infer_map_impl` in exactly one pass.
+                for typed_dict_pass in [false, true] {
                     let mut found_matching_element = false;
                     for positive in actual_intersection.iter_positive(self.db) {
-                        if matches!(positive, Type::TypedDict(_)) != include_typed_dicts {
+                        if matches!(positive, Type::TypedDict(_)) != typed_dict_pass {
                             continue;
                         }
                         let result = self.infer_map_impl(formal, positive, polarity, seen);
@@ -2852,6 +2857,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 .is_never_satisfied(self.db)
                             {
                                 if positive.is_dynamic() {
+                                    // Dynamic elements are assignable but contribute no useful
+                                    // mapping. Defer them so they neither block `TypedDict`
+                                    // inference nor expose errors that the dynamic element absorbs.
                                     found_dynamic_element = true;
                                 } else {
                                     found_matching_element = true;
