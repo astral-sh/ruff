@@ -22,6 +22,10 @@ pub fn selection_range(db: &dyn Db, file: File, offset: TextSize) -> Vec<TextRan
             if ranges.last() != Some(&range) {
                 ranges.push(range);
             }
+            // Appends additional range if node content is encased by quotes
+            if let Some(literal_range) = literal_content_range(node) {
+                ranges.push(literal_range);
+            }
         }
     }
 
@@ -41,6 +45,17 @@ fn should_include_in_selection(node: ruff_python_ast::AnyNodeRef) -> bool {
 
         _ => true,
     }
+}
+
+/// Determines the content range of a string or byte literal if it's non-empty.
+fn literal_content_range(node: ruff_python_ast::AnyNodeRef) -> Option<TextRange> {
+    use ruff_python_ast::AnyNodeRef;
+    let range = match node {
+        AnyNodeRef::StringLiteral(s) => Some(s.content_range()),
+        AnyNodeRef::BytesLiteral(b) => Some(b.range),
+        _ => None,
+    };
+    range.filter(|&range| range.len() > 0.into())
 }
 
 #[cfg(test)]
@@ -136,6 +151,13 @@ print(\"he<CURSOR>llo\")
           |
         2 | print("hello")
           |       ^^^^^^^
+          |
+
+        info[selection-range]: Selection Range 4
+         --> main.py:2:8
+          |
+        2 | print("hello")
+          |        ^^^^^
           |
         "#);
     }
@@ -293,6 +315,36 @@ result = [(lambda x: x[key.<CURSOR>attr])(item) for item in data if item is not 
           |                            ^^^^
           |
         ");
+    }
+
+    /// Test selection range on an empty string literal
+    #[test]
+    fn test_selection_range_empty_string_literal() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+"<CURSOR>"
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.selection_range(), @r#"
+        info[selection-range]: Selection Range 0
+         --> main.py:1:1
+          |
+        1 | /
+        2 | | ""
+          | |___^
+          |
+
+        info[selection-range]: Selection Range 1
+         --> main.py:2:1
+          |
+        2 | ""
+          | ^^
+          |
+        "#);
     }
 
     impl CursorTest {
