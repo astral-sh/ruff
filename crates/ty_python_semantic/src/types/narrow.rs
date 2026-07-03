@@ -3518,7 +3518,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
         PatternNarrowingResult::Possible(Some(NarrowingConstraints::from_iter([(
             place,
-            NarrowingConstraint::replacement(narrowed_ty),
+            NarrowingConstraint::intersection(narrowed_ty),
         )])))
     }
 

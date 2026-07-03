@@ -2052,6 +2052,78 @@ def possibly_missing_attribute_is_not_exhaustive(
             return 1
 ```
 
+## Exhaustiveness for types containing `Any`
+
+When `Any` appears within a type, it stands for many possible static types. An exhaustive pattern
+must eliminate all of them; otherwise, a contradictory type such as
+`Mapping[str, Any] & ~Mapping[str, Any]` can remain in the final case.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+The order of the first two cases below reproduces issue #3904:
+
+```py
+from collections.abc import Mapping
+from typing import Any, assert_never
+
+def mapping_with_any_is_exhaustive(value: Mapping[str, Any] | int) -> None:
+    match value:
+        case Mapping():
+            pass
+        case int():
+            pass
+        case _:
+            assert_never(value)
+```
+
+Class patterns over generic classes follow the same rule:
+
+```py
+class Box[T]:
+    value: T
+
+def generic_class_with_any_is_exhaustive(value: Box[Any] | int) -> None:
+    match value:
+        case Box(value=_):
+            pass
+        case int():
+            pass
+        case _:
+            assert_never(value)
+```
+
+A nested pattern can be exhaustive for only part of a union. Here the first case removes
+`Box[Mapping[str, Any]]` but must leave `Box[int]` in the final case:
+
+```py
+def nested_pattern_keeps_unmatched_box(
+    value: Box[Mapping[str, Any]] | Box[int],
+) -> None:
+    match value:
+        case Box(value=Mapping()):
+            pass
+        case _:
+            reveal_type(value)  # revealed: Box[int]
+```
+
+The same check applies to a class pattern nested inside a sequence pattern:
+
+```py
+def nested_sequence_pattern_is_exhaustive(
+    value: tuple[Mapping[str, Any]] | int,
+) -> None:
+    match value:
+        case [Mapping()]:
+            pass
+        case int():
+            pass
+        case _:
+            assert_never(value)
+```
+
 ## Sequence exhaustiveness
 
 Sequence patterns also contribute to negative narrowing and exhaustiveness. Exact tuple shapes can
@@ -2127,6 +2199,22 @@ def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:
             pass
         case _:
             reveal_type(value)  # revealed: list[int]
+```
+
+Narrowing with a sequence pattern must not bring back a type removed by an earlier case. After the
+first two cases below, only `str` remains:
+
+```py
+def sequence_pattern_preserves_earlier_case(
+    value: tuple[int] | int | str,
+) -> None:
+    match value:
+        case int():
+            pass
+        case [int()]:
+            pass
+        case _:
+            reveal_type(value)  # revealed: str
 ```
 
 Named tuples are statically known tuple subclasses, rather than exact `tuple[...]` instances.

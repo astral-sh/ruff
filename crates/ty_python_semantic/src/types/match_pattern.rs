@@ -572,6 +572,10 @@ fn sequence_pattern_is_exhaustive_for_subject(
 /// could raise at runtime. The same rule is propagated through nested sequence, `or`, and `as`
 /// patterns.
 ///
+/// When a pattern exhausts a gradual subject, the definite-match type is the subject's top
+/// materialization. Negative narrowing can then eliminate every materialization of the subject,
+/// including when exhaustiveness depends on a nested pattern.
+///
 /// ```python
 /// class Base:
 ///     x: int
@@ -615,7 +619,11 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
             match class_ty {
                 Type::ClassLiteral(class) => {
                     if class_pattern_is_exhaustive(db, class, resolved_subject_ty, kind) {
-                        return subject_ty;
+                        let top_subject_ty = resolved_subject_ty.top_materialization(db);
+                        if !class_pattern_is_exhaustive(db, class, top_subject_ty, kind) {
+                            return subject_ty;
+                        }
+                        return top_subject_ty;
                     }
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
@@ -628,20 +636,28 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
             }
         }
         PatternPredicateKind::Sequence(kind) => {
-            return if sequence_pattern_is_exhaustive_for_subject(db, kind, resolved_subject_ty) {
-                subject_ty
-            } else {
+            if !sequence_pattern_is_exhaustive_for_subject(db, kind, resolved_subject_ty) {
                 // A nested subject-dependent pattern rejected the context-free approximation.
                 // Reusing that approximation for the surrounding sequence would reintroduce the
                 // values that the recursive analysis deliberately excluded.
-                Type::Never
+                return Type::Never;
+            }
+            let top_subject_ty = resolved_subject_ty.top_materialization(db);
+            return if sequence_pattern_is_exhaustive_for_subject(db, kind, top_subject_ty) {
+                top_subject_ty
+            } else {
+                subject_ty
             };
         }
         PatternPredicateKind::Mapping(kind) => {
-            return if mapping_pattern_is_exhaustive(db, kind, resolved_subject_ty) {
-                subject_ty
+            if !mapping_pattern_is_exhaustive(db, kind, resolved_subject_ty) {
+                return Type::Never;
+            }
+            let top_subject_ty = resolved_subject_ty.top_materialization(db);
+            return if mapping_pattern_is_exhaustive(db, kind, top_subject_ty) {
+                top_subject_ty
             } else {
-                Type::Never
+                subject_ty
             };
         }
         PatternPredicateKind::Or(patterns) => {
