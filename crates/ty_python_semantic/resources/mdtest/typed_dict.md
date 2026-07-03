@@ -1413,6 +1413,37 @@ Type validation still applies to all fields when provided:
 invalid_type = Message(id="not-an-int", content="Hello")
 ```
 
+## Generic `Mapping` inference
+
+When inferring the type parameters of `Mapping`, `TypedDict` keys are strings and an explicit
+extra-item type contributes to its value type. An explicit `Mapping` in an intersection remains more
+precise:
+
+```py
+from collections.abc import Mapping
+from typing import TypeVar, TypedDict
+from typing_extensions import ReadOnly
+from ty_extensions import Intersection
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+class Movie(TypedDict):
+    title: str
+
+class ReadOnlyExtras(TypedDict, extra_items=ReadOnly[int]):
+    pass
+
+def project(value: Mapping[K, V]) -> tuple[K, V]:
+    raise NotImplementedError
+
+def preserve_mapping_intersection(value: Intersection[Movie, Mapping[str, bytes]]) -> None:
+    reveal_type(project(value))  # revealed: tuple[str, bytes]
+
+def preserve_extra_item_value_type(value: ReadOnlyExtras) -> None:
+    reveal_type(project(value))  # revealed: tuple[str, int]
+```
+
 ## Structural assignability
 
 Assignability between `TypedDict` types is structural, that is, it is based on the presence of keys
