@@ -39,7 +39,6 @@ pub(crate) use self::match_pattern::{
     definite_match_pattern_type, definite_match_pattern_type_for_subject,
     exact_sequence_pattern_type, mapping_pattern_type, pattern_binding_fallthrough_type,
     sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
-    typed_dict_matches_class_pattern,
 };
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
