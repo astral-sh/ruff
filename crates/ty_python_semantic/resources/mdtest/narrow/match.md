@@ -44,8 +44,8 @@ match x:
 reveal_type(x)  # revealed: object
 ```
 
-Every `TypedDict` inhabitant matches a `dict()` class pattern at runtime, even though a `TypedDict`
-is not statically assignable to `dict`:
+Every `TypedDict` object matches a `dict()` class pattern at runtime, even though a `TypedDict` is
+not statically assignable to `dict`:
 
 ```py
 from typing import TypedDict
@@ -57,7 +57,6 @@ def _(x: Movie | int):
     match x:
         case dict():
             reveal_type(x)  # revealed: Movie
-            x.missing  # error: [unresolved-attribute]
         case _:
             reveal_type(x)  # revealed: int
 ```

@@ -859,6 +859,9 @@ static_assert(not is_assignable_to(Top[InvariantChild[Any]], CovariantBase[A]))
 
 Attributes on top and bottom materializations are specialized on access.
 
+If the type variable appears inside another invariant specialization, the enclosing top or bottom
+materialization is preserved. This applies in both return types and parameter types.
+
 ```toml
 [environment]
 python-version = "3.12"
@@ -908,6 +911,25 @@ class Mixed[T, U]:
 def preserve_unrelated_any(top: Top[Mixed[Any, int]], bottom: Bottom[Mixed[Any, int]]) -> None:
     reveal_type(top.nested)  # revealed: list[tuple[Any, int]]
     reveal_type(bottom.nested)  # revealed: list[tuple[Any, int]]
+```
+
+Type inference also uses the materialized type arguments. The call below is invalid because a top
+materialization is not assignable to a concrete `dict`, but the inferred return type still uses
+`object` rather than `Any`:
+
+```py
+from typing import Any, TypeVar
+from ty_extensions import Top
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+def project_dict(value: dict[K, V]) -> tuple[K, V]:
+    raise NotImplementedError
+
+def infer_top_dict(value: Top[dict[Any, Any]]) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(project_dict(value))  # revealed: tuple[object, object]
 ```
 
 Alias specializations also preserve the materialization polarity in contravariant positions.

@@ -19,8 +19,8 @@ pub(super) use self::typed_dict::{
 use super::dedicated::pydantic;
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, MaterializationKind, MemberLookupPolicy,
-    MroIterator, SpecialFormType,
-    SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
+    MroIterator, SpecialFormType, SubclassOfType, Type, TypeQualifiers, class_base::ClassBase,
+    function::FunctionType,
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, Provenance, TypeOrigin};

@@ -53,15 +53,10 @@ def _(x: A | B, y: A | C):
         reveal_type(y)  # revealed: A | C
 ```
 
-## `type(x) is dict` with `TypedDict`
+## Exact `dict` checks with `TypedDict`
 
-Every `TypedDict` inhabitant has an exact runtime type of `dict`, even though a `TypedDict` is not
+Every `TypedDict` object has an exact runtime type of `dict`, even though a `TypedDict` is not
 statically assignable to `dict`.
-
-```toml
-[environment]
-python-version = "3.12"
-```
 
 ```py
 from typing import TypedDict
@@ -74,6 +69,22 @@ def _(x: Movie | int):
         reveal_type(x)  # revealed: Movie
     else:
         reveal_type(x)  # revealed: int
+```
+
+## `__class__` on a `TypedDict` alias
+
+The `__class__` attribute follows a PEP 695 type alias and reports the runtime `dict` class:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title: str
 
 type MovieAlias = Movie
 

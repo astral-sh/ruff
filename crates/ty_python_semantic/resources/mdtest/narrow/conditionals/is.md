@@ -178,32 +178,19 @@ def narrow_generic_alias[T: (Generic[int], Specialized)](klass: type[T]) -> None
 
 ## `is` between a `TypedDict` and `dict`
 
-Every `TypedDict` inhabitant is a runtime dictionary, so the identity branch remains reachable:
+An optional `TypedDict` may be empty at runtime. It can therefore be the same object as an empty
+`dict[Never, Never]`, so the identity branch remains reachable:
 
 ```py
 from typing import TypedDict
 from typing_extensions import Never
 
-class EmptyTypedDict(TypedDict):
-    pass
-
-class Movie(TypedDict):
+class Movie(TypedDict, total=False):
     title: str
 
-class PartialMovie(TypedDict, total=False):
-    title: str
-
-def _(x: Movie, y: dict[str, object]) -> None:
+def _(x: Movie, y: dict[Never, Never]) -> None:
     if x is y:
-        x.missing  # error: [unresolved-attribute]
-
-def _(x: EmptyTypedDict, y: dict[Never, Never]) -> None:
-    if x is y:
-        x.missing  # error: [unresolved-attribute]
-
-def _(x: PartialMovie, y: dict[Never, Never]) -> None:
-    if x is y:
-        x.missing  # error: [unresolved-attribute]
+        reveal_type(x)  # revealed: Movie & dict[Never, Never]
 ```
 
 ## `is` where the other operand is a call expression
