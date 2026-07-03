@@ -1871,7 +1871,7 @@ class AlternatePayload(TypedDict):
     value: int
 
 class Marker(Protocol):
-    marker: int
+    def clear(self) -> None: ...
 
 P = TypeVar("P", bound=RequiredPayload)
 Q = TypeVar("Q", RequiredPayload, AlternatePayload)
