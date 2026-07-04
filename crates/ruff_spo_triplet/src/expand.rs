@@ -327,6 +327,18 @@ impl Expander {
         if let Some(sti) = &model.sti {
             self.sti(ns, &model_iri, sti);
         }
+        for parent in &model.inherits {
+            // Frontend-agnostic inheritance (Odoo `_inherit`). Reuses the
+            // `inherits_from` predicate (introduced for C++ bases, also used
+            // by Rails STI) — one edge per parent, authoritatively declared
+            // in the source. Self-edges are excluded by the frontend.
+            self.push(
+                model_iri.clone(),
+                Predicate::InheritsFrom,
+                format!("{ns}:{parent}"),
+                Provenance::Authoritative,
+            );
+        }
 
         // ───── C++ machine-plane ─────
 

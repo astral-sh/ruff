@@ -23,15 +23,19 @@
 //! `inverse_name` (One2many inverse), and `relation_kind`
 //! (`many2one`/`one2many`/`many2many`) — the last separates a Many2one
 //! (scalar FK) from a Many2many (join table), which `target`/`inverse_name`
-//! alone cannot. Selection enums (`selection_value`) and `_inherit` edges
-//! (`inherits_from`) still need predicate variants the closed
-//! [`ruff_spo_triplet::Predicate`] enum does not yet carry; they are a
-//! follow-up that extends the enum + IR carriers together.
+//! alone cannot. `_inherit` edges now lower to `inherits_from` (reusing the
+//! existing cross-frontend [`ruff_spo_triplet::Predicate::InheritsFrom`] +
+//! the frontend-agnostic [`Model::inherits`] carrier) — a genuine `_inherit`
+//! (the model declares its own `_name` and inherits behaviour/fields from a
+//! *different* parent) becomes an is_a edge; a bare-`_inherit` reopen (no
+//! `_name`, so `_inherit` IS the model identity) does not self-edge. Selection
+//! enums (`selection_value`) still need a predicate variant the closed
+//! `Predicate` enum does not yet carry — a remaining follow-up.
 //!
 //! Model names are normalised dot→underscore (`account.move` → `account_move`)
 //! so the IRI dot is unambiguously the model↔member separator.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::Path;
 
@@ -158,21 +162,33 @@ fn resolve_name(class: &RawClass) -> Option<String> {
 /// even when the method lives in a sibling reopen (the per-(field × dep)
 /// fan-out). Building the join per-class would drop those cross-reopen deps.
 fn build_graph(classes: &[RawClass], namespace: &str) -> ModelGraph {
-    // Phase 1: accumulate raw fields + methods per resolved model name.
-    let mut by_model: HashMap<String, (Vec<&RawField>, Vec<&RawMethod>)> = HashMap::new();
+    // Phase 1: accumulate raw fields + methods + inherit-parents per resolved
+    // model name. Inherit parents are the `_inherit` entries, dot→underscore
+    // normalised, deduped (a `BTreeSet` also gives deterministic output), and
+    // with the model's own name excluded — a bare-`_inherit` reopen resolves
+    // its identity FROM `_inherit`, so `parent == model_name` is that reopen,
+    // not an is_a edge.
+    let mut by_model: HashMap<String, (Vec<&RawField>, Vec<&RawMethod>, BTreeSet<String>)> =
+        HashMap::new();
     for class in classes {
         let Some(model_name) = resolve_name(class) else {
             continue;
         };
-        let entry = by_model.entry(model_name).or_default();
+        let entry = by_model.entry(model_name.clone()).or_default();
         entry.0.extend(&class.fields);
         entry.1.extend(&class.methods);
+        for parent in &class.inherits {
+            let parent = parent.replace('.', "_");
+            if parent != model_name {
+                entry.2.insert(parent);
+            }
+        }
     }
 
     // Phase 2: build each model with a model-level compute→depends join.
     let models = by_model
         .into_iter()
-        .map(|(name, (fields, methods))| {
+        .map(|(name, (fields, methods, inherits))| {
             let depends_by_method: HashMap<&str, &Vec<String>> = methods
                 .iter()
                 .map(|m| (m.name.as_str(), &m.depends))
@@ -212,6 +228,7 @@ fn build_graph(classes: &[RawClass], namespace: &str) -> ModelGraph {
                     })
                     .collect(),
                 name,
+                inherits: inherits.into_iter().collect(),
                 ..Default::default()
             }
         })
@@ -611,6 +628,57 @@ class ResUsers(models.Model):
         // is now a recognised predicate).
         let nd = to_ndjson(&graph);
         let parsed = ruff_spo_triplet::from_ndjson(&nd).expect("ndjson round-trips");
+        assert_eq!(parsed, t);
+    }
+
+    #[test]
+    fn genuine_inherit_emits_inherits_from_but_reopen_does_not_self_edge() {
+        // Two shapes:
+        //  (1) a NEW model (`_name` present) that `_inherit`s a DIFFERENT
+        //      parent → an is_a edge `sale_order inherits_from mail_thread`.
+        //  (2) a bare reopen (`_inherit` only, no `_name`) → `_inherit` IS the
+        //      model identity, so it must NOT emit `mail_thread inherits_from
+        //      mail_thread` (a self-edge would poison the is_a axis).
+        let src = r#"
+from odoo import models, fields
+
+
+class SaleOrder(models.Model):
+    _name = 'sale.order'
+    _inherit = ['mail.thread', 'sale.order']
+    name = fields.Char()
+
+
+class MailThreadReopen(models.Model):
+    _inherit = 'mail.thread'
+    extra = fields.Char()
+"#;
+        let t = expand(&extract_from_source(src));
+
+        // (1) genuine inherit → is_a edge, self-reference filtered out.
+        assert!(
+            has(&t, "odoo:sale_order", "inherits_from", "odoo:mail_thread"),
+            "sale_order should inherit_from mail_thread"
+        );
+        assert!(
+            !has(&t, "odoo:sale_order", "inherits_from", "odoo:sale_order"),
+            "self-inherit (`_name` also in `_inherit`) must be filtered"
+        );
+        // (2) the reopen contributes fields to mail_thread but no self-edge.
+        assert!(
+            !has(&t, "odoo:mail_thread", "inherits_from", "odoo:mail_thread"),
+            "a bare `_inherit` reopen must not self-edge"
+        );
+        // Provenance: `_inherit` is authoritatively declared → (0.95, 0.90).
+        let edge = t
+            .iter()
+            .find(|x| x.p == "inherits_from" && x.o == "odoo:mail_thread")
+            .expect("inherits_from edge present");
+        assert!((edge.f - 0.95).abs() < 1e-6 && (edge.c - 0.90).abs() < 1e-6);
+
+        // Byte-compat: still round-trips the closed vocab.
+        let parsed =
+            ruff_spo_triplet::from_ndjson(&to_ndjson(&extract_from_source(src))).unwrap();
         assert_eq!(parsed, t);
     }
 }
