@@ -6887,6 +6887,23 @@ mod tests {
     }
 
     #[test]
+    fn invariant_generic_lazy_subtyping_preserves_gradual_materializations() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let list_t = KnownClass::List.to_specialized_instance(&db, &[Type::TypeVar(t)]);
+        let list_any = KnownClass::List.to_specialized_instance(&db, &[Type::any()]);
+
+        let subtype_builder = ConstraintSetBuilder::new();
+        let subtype = list_t.when_constraint_set_subtype_of(&db, list_any, &subtype_builder);
+        assert!(subtype.is_never_satisfied(&db));
+
+        let assignability_builder = ConstraintSetBuilder::new();
+        let assignable =
+            list_t.when_constraint_set_assignable_to(&db, list_any, &assignability_builder);
+        assert!(!assignable.is_never_satisfied(&db));
+    }
+
+    #[test]
     fn default_solve_leaves_unbounded_typevar_unsolved_without_bounds() {
         let db = setup_db();
         let t = create_typevar(&db, "T");
