@@ -149,6 +149,21 @@ pub fn extract_with(source_tree: &Path, namespace: &str) -> ModelGraph {
     graph
 }
 
+/// Walk an **arbitrary Rails app subtree** directly — `app/controllers`,
+/// `app/models`, `app/jobs`, … — with no `app/models` suffix assumption, and
+/// produce the IR. This is the **DO-arm / controller-harvest entry**: point it
+/// at `app/controllers` and each controller's public actions land in
+/// `Model::functions`, which `ogar_from_ruff::lift_actions` lifts to a
+/// standalone `Vec<ActionDef>` (the DO arm). `extract`/`extract_with` remain
+/// the `app/models` (THINK-arm) specialisations.
+#[must_use]
+pub fn extract_tree_with(dir: &Path, namespace: &str) -> ModelGraph {
+    let classes = parse::parse_tree(dir);
+    let mut graph = ModelGraph::new(namespace);
+    graph.models = build_models(&classes);
+    graph
+}
+
 /// Like [`extract_with`], but walks the **whole Rails application** — the
 /// core `app/models` **plus every mounted engine's `app/models`**
 /// (`modules/*/app/models`, `engines/*/app/models`).

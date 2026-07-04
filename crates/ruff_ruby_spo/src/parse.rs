@@ -26,7 +26,16 @@ use crate::walk::walk_class_body;
 /// Returned classes are in deterministic order: file path (ASCII sort),
 /// then declaration order within a file.
 pub(crate) fn parse_models(source_tree: &Path) -> Vec<RubyClass> {
-    let mut files: Vec<PathBuf> = collect_rb_files(source_tree.join("app/models").as_path());
+    parse_tree(source_tree.join("app/models").as_path())
+}
+
+/// Walk `<dir>/**/*.rb` directly — any Rails app subtree, not just
+/// `app/models` — and parse every file into the [`RubyClass`] shape.
+/// [`parse_models`] is the `app/models` specialisation; the DO-arm /
+/// controller harvest points this at `app/controllers`, where each
+/// controller's public actions land in the class's `functions`.
+pub(crate) fn parse_tree(dir: &Path) -> Vec<RubyClass> {
+    let mut files: Vec<PathBuf> = collect_rb_files(dir);
     files.sort();
     let mut classes = Vec::with_capacity(files.len());
     for path in files {
