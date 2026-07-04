@@ -2163,10 +2163,14 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
 
             Self::try_new(prefix, variable_segment, suffix)
         } else {
-            let prefix = self.prefix_elements().iter().map(|ty| {
-                ty.recursive_type_normalized_impl(db, env, div, true)
-                    .unwrap_or(div)
-            });
+            let mut prefix = self
+                .prefix_elements()
+                .iter()
+                .map(|ty| {
+                    ty.recursive_type_normalized_impl(db, env, div, true)
+                        .unwrap_or(div)
+                })
+                .collect::<Vec<_>>();
 
             let variable_segment = match self.variable() {
                 VariableSegment::Homogeneous(variable) => VariableSegment::Homogeneous(
@@ -2179,10 +2183,26 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
                 }
             };
 
-            let suffix = self.suffix_elements().iter().map(|ty| {
-                ty.recursive_type_normalized_impl(db, env, div, true)
-                    .unwrap_or(div)
-            });
+            let mut suffix = self
+                .suffix_elements()
+                .iter()
+                .map(|ty| {
+                    ty.recursive_type_normalized_impl(db, env, div, true)
+                        .unwrap_or(div)
+                })
+                .collect::<Vec<_>>();
+
+            // `tuple[a, ..., a]` still grows under tuple-star recursion such as
+            // `x = (*x, x)`. The current tuple representation cannot express that
+            // sequence-recursive shape, so absorb redundant binder slots into the
+            // variable portion during cycle recovery.
+            if matches!(
+                variable_segment,
+                VariableSegment::Homogeneous(variable) if variable == div
+            ) {
+                prefix.retain(|ty| *ty != div);
+                suffix.retain(|ty| *ty != div);
+            }
 
             Some(Self::new(prefix, variable_segment, suffix))
         }

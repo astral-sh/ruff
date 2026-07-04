@@ -1389,6 +1389,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             TypeMapping::Promote(..)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
+            | TypeMapping::SemanticViewInInference
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_)
             | TypeMapping::Structural(_) => Type::TypeVar(self),

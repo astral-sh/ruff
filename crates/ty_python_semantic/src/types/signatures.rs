@@ -5975,6 +5975,7 @@ impl<'db> ParameterKind<'db> {
                 TypeMapping::ReplaceParameterDefaults => {
                     ParameterDefault::Inferred(Type::unknown())
                 }
+                TypeMapping::Structural(_) => default,
                 // Defaults describe values, not the set of accepted arguments. Promoting the
                 // enclosing callable must not widen those values.
                 TypeMapping::Promote(..) => default,
