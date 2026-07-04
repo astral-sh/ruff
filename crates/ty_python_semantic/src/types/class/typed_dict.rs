@@ -23,9 +23,9 @@ use crate::types::typed_dict::{
     deferred_functional_typed_dict_openness, deferred_functional_typed_dict_schema,
 };
 use crate::types::{
-    BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType, KnownClass,
-    MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictType,
-    TypingModule, UnionType, determine_upper_bound,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral,
+    ClassType, KnownClass, MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeVarVariance,
+    TypedDictType, TypingModule, UnionType, determine_upper_bound,
 };
 use crate::{Db, FxIndexMap};
 use ty_python_core::definition::Definition;
@@ -853,6 +853,31 @@ pub enum DynamicTypedDictAnchor<'db> {
 }
 
 impl<'db> DynamicTypedDictAnchor<'db> {
+    fn apply_type_mapping_impl<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        match self {
+            Self::Definition(definition) => Self::Definition(*definition),
+            Self::ScopeOffset {
+                scope,
+                offset,
+                schema,
+                openness,
+            } => Self::ScopeOffset {
+                scope: *scope,
+                offset: *offset,
+                schema: schema
+                    .clone()
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                openness: openness.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            },
+        }
+    }
+
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -899,6 +924,22 @@ pub struct DynamicTypedDictLiteral<'db> {
 impl get_size2::GetSize for DynamicTypedDictLiteral<'_> {}
 
 impl<'db> DynamicTypedDictLiteral<'db> {
+    pub(super) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.name(db),
+            self.anchor(db)
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            self.typed_dict_module(db),
+        )
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
