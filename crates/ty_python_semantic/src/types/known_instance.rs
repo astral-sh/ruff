@@ -386,8 +386,7 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::RescopeReturnCallables(_)
-                | TypeMapping::Structural(_)
-                | TypeMapping::SemanticViewInInference => Type::KnownInstance(self),
+                | TypeMapping::Structural(_) => Type::KnownInstance(self),
             },
             KnownInstanceType::UnionType(instance) => {
                 Type::KnownInstance(KnownInstanceType::UnionType(

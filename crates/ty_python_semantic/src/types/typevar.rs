@@ -1172,8 +1172,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_)
-            | TypeMapping::Structural(_)
-            | TypeMapping::SemanticViewInInference => Type::TypeVar(self),
+            | TypeMapping::Structural(_) => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {
                 Type::TypeVar(self.materialize_impl(db, *materialization_kind, visitor))
             }

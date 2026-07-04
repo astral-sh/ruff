@@ -1199,30 +1199,13 @@ impl<'db> Type<'db> {
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
-        self.cycle_normalized_with_semantic_view(db, previous, None, cycle)
+        self.cycle_normalized_with_origin(db, previous, None, cycle)
     }
 
-    pub(crate) fn cycle_normalized_with_semantic_view(
+    pub(crate) fn cycle_normalized_with_origin(
         self,
         db: &'db dyn Db,
         previous: Self,
-        previous_semantic_view: Option<Self>,
-        cycle: &salsa::Cycle,
-    ) -> Self {
-        self.cycle_normalized_with_semantic_view_and_origin(
-            db,
-            previous,
-            previous_semantic_view,
-            None,
-            cycle,
-        )
-    }
-
-    pub(crate) fn cycle_normalized_with_semantic_view_and_origin(
-        self,
-        db: &'db dyn Db,
-        previous: Self,
-        previous_semantic_view: Option<Self>,
         origin: Option<RecursiveTypeOrigin<'db>>,
         cycle: &salsa::Cycle,
     ) -> Self {
@@ -1271,31 +1254,14 @@ impl<'db> Type<'db> {
         };
 
         cycle.head_ids().fold(stabilized, |current, id| {
-            current.cycle_fold_recursive(
-                db,
-                previous,
-                previous_semantic_view,
-                id,
-                include_previous,
-                origin,
-            )
+            current.cycle_fold_recursive(db, previous, id, include_previous, origin)
         })
     }
 
-    fn semantic_view_in_inference(self, db: &'db dyn Db) -> Self {
-        self.apply_type_mapping(
-            db,
-            &TypeMapping::SemanticViewInInference,
-            TypeContext::default(),
-        )
-    }
-
-    #[allow(clippy::too_many_arguments)]
     fn cycle_fold_recursive(
         self,
         db: &'db dyn Db,
         previous: Self,
-        _previous_semantic_view: Option<Self>,
         id: salsa::Id,
         include_previous: bool,
         origin: Option<RecursiveTypeOrigin<'db>>,
@@ -1332,23 +1298,6 @@ impl<'db> Type<'db> {
             .unwrap_or(RecursiveTypeOrigin::Structural);
 
         Type::recursive_with_origin(db, binder, origin, body)
-    }
-
-    /// Returns a type-expression view while the owning inference query is still running.
-    ///
-    /// This may use normal inference-time conversions such as `Type::instance`; do not call it
-    /// from salsa cycle recovery functions.
-    pub(crate) fn infer_type_expression_semantic_view(self, db: &'db dyn Db) -> Option<Self> {
-        match self {
-            Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
-                let union_type = instance.union_type(db).as_ref().ok().copied()?;
-                Some(union_type.semantic_view_in_inference(db))
-            }
-            _ => {
-                let semantic_view = self.semantic_view_in_inference(db);
-                (semantic_view != self).then_some(semantic_view)
-            }
-        }
     }
 
     pub fn is_none(&self, db: &'db dyn Db) -> bool {
@@ -6557,12 +6506,6 @@ impl<'db> Type<'db> {
                 Type::Callable(callable.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }),
 
-            Type::GenericAlias(generic) if matches!(type_mapping, TypeMapping::SemanticViewInInference) => {
-                let generic =
-                    generic.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor);
-                Type::instance(db, ClassType::from(generic))
-            }
-
             Type::GenericAlias(generic) => {
                 Type::GenericAlias(generic.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
@@ -6756,7 +6699,6 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) |
-                TypeMapping::SemanticViewInInference |
                 TypeMapping::Promote(PromotionMode::Off, _) |
                 TypeMapping::Promote(
                     PromotionMode::On,
@@ -6777,7 +6719,6 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) => self,
-                TypeMapping::SemanticViewInInference => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
                     MaterializationKind::Bottom => Type::Never,
@@ -7843,8 +7784,6 @@ pub enum TypeMapping<'a, 'db> {
     },
     /// Applies a query-free structural transformation.
     Structural(StructuralTypeMapping<'db>),
-    /// Converts retained runtime type-expression values to their type-expression meaning.
-    SemanticViewInInference,
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     Promote(PromotionMode, PromotionKind),
@@ -7933,7 +7872,6 @@ impl<'db> TypeMapping<'_, 'db> {
             }
             TypeMapping::Promote(..)
             | TypeMapping::Structural(_)
-            | TypeMapping::SemanticViewInInference
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
@@ -7979,7 +7917,6 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
             TypeMapping::ApplySpecialization(_)
             | TypeMapping::Structural(_)
-            | TypeMapping::SemanticViewInInference
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)
