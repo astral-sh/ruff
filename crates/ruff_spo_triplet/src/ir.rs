@@ -84,6 +84,20 @@ pub struct Model {
     /// Methods / functions.
     pub functions: Vec<Function>,
 
+    /// Frontend-agnostic prototype/delegation inheritance — the parent
+    /// models this model `inherits_from` (Odoo `_inherit`, and any future
+    /// language's plain "extends `<name>`"). Names are already
+    /// frontend-normalised (dot→underscore); the expander emits
+    /// `(ns:model, inherits_from, ns:parent)` per entry with
+    /// [`Provenance::Authoritative`]. Distinct from `bases` (C++ base
+    /// classes, `CppExtracted`) and `sti` (single-parent Rails STI): a
+    /// multi-parent list carrying no per-parent metadata. Self-references
+    /// (an Odoo reopen where the sole `_inherit` == the model name) are
+    /// excluded by the frontend, so this never emits a `model inherits_from
+    /// model` self-edge.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub inherits: Vec<String>,
+
     // ───── OpenProject AR-shape: 12 Vec + 1 Option ─────
     /// Class-level association declarations (`belongs_to`, `has_many`,
     /// `has_one`, `has_and_belongs_to_many`, `accepts_nested_attributes_for`).
