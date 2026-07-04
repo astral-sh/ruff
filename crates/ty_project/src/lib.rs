@@ -31,6 +31,7 @@ mod db;
 mod files;
 pub mod glob;
 pub mod metadata;
+pub mod parallel;
 mod walk;
 pub mod watch;
 

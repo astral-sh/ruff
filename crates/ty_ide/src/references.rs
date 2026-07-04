@@ -12,6 +12,7 @@
 
 use crate::goto::{Definitions, GotoTarget};
 use crate::{Db, ReferenceKind, ReferenceTarget};
+use rayon::prelude::*;
 use ruff_db::files::File;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::token::Tokens;
@@ -20,9 +21,17 @@ use ruff_python_ast::{
     visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
 use ruff_text_size::Ranged;
+use ty_project::parallel::{ParallelIteratorExt, minimum_parallel_job_len};
 use ty_python_core::definition::{Definition, DefinitionState};
 use ty_python_core::scope::ScopeKind;
 use ty_python_semantic::{ImportAliasResolution, ResolvedDefinition, SemanticModel};
+
+/// Salsa snapshots coordinate clone and drop through shared state. For cached files that don't
+/// contain the target, that coordination can cost more than the file scan and scales poorly when
+/// many short-lived jobs finish concurrently. A 64-file minimum on large projects amortizes the
+/// task and snapshot overhead. Smaller projects lower the minimum to retain enough work for
+/// stealing.
+const MAX_MIN_FILES_PER_PARALLEL_JOB: usize = 64;
 
 /// Mode for references search behavior
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -105,53 +114,38 @@ pub(crate) fn references(
     let is_parameter = parameter_owner_is_externally_visible(db, &target_definitions);
 
     if search_across_files && (is_parameter || is_externally_visible_symbol) {
-        let result = std::sync::Mutex::new(Vec::new());
         let files = db.project().files(db);
-
-        {
-            let db = Db::dyn_clone(db);
-            let target_definitions = &target_definitions;
-            let files = &files;
-            let result = &result;
-            let needle = target_text.as_ref();
-
-            rayon::scope(move |s| {
-                for other_file in files {
-                    // Skip the current file as we already processed it
-                    if other_file == file {
-                        continue;
-                    }
-
-                    let db = Db::dyn_clone(&*db);
-
-                    s.spawn(move |_| {
-                        let db = &*db;
-
-                        // First do a simple text search to see if there is a potential match in the file
-                        let source = ruff_db::source::source_text(db, other_file);
-                        if !contains_identifier(&source, needle) {
-                            return;
-                        }
-
-                        // If the target text is found, do the more expensive semantic analysis
-                        let references = if is_externally_visible_symbol {
-                            references_for_file(db, other_file, target_definitions, needle, mode)
-                        } else {
-                            references_for_keyword_arguments_in_file(
-                                db,
-                                other_file,
-                                target_definitions,
-                                needle,
-                                mode,
-                            )
-                        };
-
-                        result.lock().unwrap().extend(references);
-                    });
+        let files: Vec<_> = files
+            .iter()
+            .copied()
+            .filter(|other| *other != file)
+            .collect();
+        let minimum_job_len = minimum_parallel_job_len(files.len(), MAX_MIN_FILES_PER_PARALLEL_JOB);
+        let other_references = files
+            .into_par_iter()
+            .with_min_len(minimum_job_len)
+            .map_with_db(db, |db, other_file| {
+                let source = ruff_db::source::source_text(db, other_file);
+                if !contains_identifier(&source, &target_text) {
+                    return Vec::new();
                 }
-            });
-        }
-        references.extend(result.into_inner().unwrap());
+
+                if is_externally_visible_symbol {
+                    references_for_file(db, other_file, &target_definitions, &target_text, mode)
+                } else {
+                    references_for_keyword_arguments_in_file(
+                        db,
+                        other_file,
+                        &target_definitions,
+                        &target_text,
+                        mode,
+                    )
+                }
+            })
+            .flat_map_iter(|references| references)
+            .collect::<Vec<_>>();
+
+        references.extend(other_references);
     }
 
     if references.is_empty() {
