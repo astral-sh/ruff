@@ -8130,9 +8130,14 @@ impl<'db> RecursiveType<'db> {
                 }
             }
 
-            if removed_binder && retained {
-                builder = builder.recursively_defined(RecursivelyDefined::Yes);
-                body = builder.build();
+            if removed_binder {
+                if retained {
+                    builder = builder.recursively_defined(RecursivelyDefined::Yes);
+                    body = builder.build();
+                } else {
+                    // All elements are recursive binders, e.g. `μa. a | a`
+                    body = Type::Divergent(binder);
+                }
             }
         }
 
