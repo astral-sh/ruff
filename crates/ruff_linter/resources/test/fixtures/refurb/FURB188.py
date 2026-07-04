@@ -214,3 +214,21 @@ def example(filename: str, text: str):
         else filename
     )
 
+
+# Regression test for
+# https://github.com/astral-sh/ruff/issues/20724
+def issue_20724_custom_sequence(seq):
+    if seq.startswith("123"):
+        seq = seq[3:]
+    return seq
+
+
+def issue_20724_tuple_prefix(text: str):
+    prefix = ("123",)
+    if text.startswith(prefix):
+        text = text[len(prefix):]
+    return text
+
+
+def known_bytes(data: bytes, prefix: bytes) -> bytes:
+    return data[len(prefix):] if data.startswith(prefix) else data

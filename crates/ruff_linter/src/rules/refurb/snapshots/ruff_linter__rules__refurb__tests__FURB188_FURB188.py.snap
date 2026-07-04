@@ -116,6 +116,7 @@ help: Use removesuffix instead of ternary expression conditional upon endswith.
 146 +     x = foo.bar.baz.removesuffix(SUFFIX)
 147 |
     |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
    --> FURB188.py:149:12
@@ -191,6 +192,7 @@ help: Use removeprefix instead of assignment conditional upon startswith.
 160 +     text = text.removeprefix("!")
 161 |     if text.startswith("!"):
     |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
    --> FURB188.py:162:5
@@ -210,6 +212,7 @@ help: Use removeprefix instead of assignment conditional upon startswith.
 162 +     text = text.removeprefix("!")
 163 |     print(text)
     |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
    --> FURB188.py:183:5
@@ -228,6 +231,7 @@ help: Use removeprefix instead of assignment conditional upon startswith.
 183 +     text = text.removeprefix("ř")
 184 |
     |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
    --> FURB188.py:190:5
@@ -268,6 +272,7 @@ help: Use removeprefix instead of assignment conditional upon startswith.
 193 +     text = text.removeprefix("\U00010000")
 194 |     
     |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
    --> FURB188.py:205:5
@@ -309,3 +314,37 @@ help: Use removesuffix instead of ternary expression conditional upon endswith.
 213 |     )
     |
 note: This is an unsafe fix and may change runtime behavior
+
+FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
+   --> FURB188.py:221:5
+    |
+219 |   # https://github.com/astral-sh/ruff/issues/20724
+220 |   def issue_20724_custom_sequence(seq):
+221 | /     if seq.startswith("123"):
+222 | |         seq = seq[3:]
+    | |_____________________^
+223 |       return seq
+    |
+help: Use removeprefix instead of assignment conditional upon startswith.
+    |
+220 | def issue_20724_custom_sequence(seq):
+    -     if seq.startswith("123"):
+    -         seq = seq[3:]
+221 +     seq = seq.removeprefix("123")
+222 |     return seq
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
+   --> FURB188.py:234:12
+    |
+233 | def known_bytes(data: bytes, prefix: bytes) -> bytes:
+234 |     return data[len(prefix):] if data.startswith(prefix) else data
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Use removeprefix instead of ternary expression conditional upon startswith.
+    |
+233 | def known_bytes(data: bytes, prefix: bytes) -> bytes:
+    -     return data[len(prefix):] if data.startswith(prefix) else data
+234 +     return data.removeprefix(prefix)
+    |

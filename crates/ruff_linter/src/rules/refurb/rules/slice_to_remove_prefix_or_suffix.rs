@@ -1,7 +1,7 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, PythonVersion};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{Binding, SemanticModel, analyze::typing};
 use ruff_text_size::Ranged;
 
 use crate::Locator;
@@ -40,7 +40,10 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as safe, unless the expression contains comments.
+/// This rule's fix is marked as safe when the receiver and affix are known to be
+/// strings or bytes of the same kind, unless the expression contains comments.
+/// Otherwise, the fix is marked as unsafe. The diagnostic is suppressed when
+/// the receiver and affix have known incompatible types.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.9.0")]
 pub(crate) struct SliceToRemovePrefixOrSuffix {
@@ -72,6 +75,53 @@ impl AlwaysFixableViolation for SliceToRemovePrefixOrSuffix {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+enum ValueKind {
+    String,
+    Bytes,
+    Other,
+}
+
+impl ValueKind {
+    fn from_expr(expr: &ast::Expr, semantic: &SemanticModel) -> Option<Self> {
+        match expr {
+            ast::Expr::StringLiteral(_) => Some(Self::String),
+            ast::Expr::BytesLiteral(_) => Some(Self::Bytes),
+            ast::Expr::Tuple(_) => Some(Self::Other),
+            ast::Expr::List(_)
+            | ast::Expr::Set(_)
+            | ast::Expr::Dict(_)
+            | ast::Expr::NumberLiteral(_)
+            | ast::Expr::BooleanLiteral(_)
+            | ast::Expr::NoneLiteral(_) => Some(Self::Other),
+            ast::Expr::Name(name) => semantic
+                .only_binding(name)
+                .and_then(|binding_id| Self::from_binding(semantic.binding(binding_id), semantic)),
+            _ => semantic
+                .lookup_attribute(expr)
+                .and_then(|binding_id| Self::from_binding(semantic.binding(binding_id), semantic)),
+        }
+    }
+
+    fn from_binding(binding: &Binding<'_>, semantic: &SemanticModel) -> Option<Self> {
+        if typing::is_string(binding, semantic) {
+            Some(Self::String)
+        } else if typing::is_bytes(binding, semantic) {
+            Some(Self::Bytes)
+        } else if typing::is_list(binding, semantic)
+            || typing::is_dict(binding, semantic)
+            || typing::is_int(binding, semantic)
+            || typing::is_float(binding, semantic)
+            || typing::is_set(binding, semantic)
+            || typing::is_tuple(binding, semantic)
+        {
+            Some(Self::Other)
+        } else {
+            None
+        }
+    }
+}
+
 /// FURB188
 pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprIf) {
     if checker.target_version() < PythonVersion::PY39 {
@@ -80,6 +130,14 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
 
     if let Some(removal_data) = affix_removal_data_expr(if_expr) {
         if affix_matches_slice_bound(&removal_data, checker.semantic()) {
+            let Some(applicability) = fix_applicability(
+                &removal_data,
+                checker.semantic(),
+                checker.comment_ranges().intersects(if_expr.range),
+            ) else {
+                return;
+            };
+
             let kind = removal_data.affix_query.kind;
             let text = removal_data.text;
 
@@ -92,12 +150,6 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
             );
             let replacement =
                 generate_removeaffix_expr(text, &removal_data.affix_query, checker.locator());
-
-            let applicability = if checker.comment_ranges().intersects(if_expr.range) {
-                Applicability::Unsafe
-            } else {
-                Applicability::Safe
-            };
 
             diagnostic.set_fix(Fix::applicable_edit(
                 Edit::replacement(replacement, if_expr.start(), if_expr.end()),
@@ -114,6 +166,14 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
     }
     if let Some(removal_data) = affix_removal_data_stmt(if_stmt) {
         if affix_matches_slice_bound(&removal_data, checker.semantic()) {
+            let Some(applicability) = fix_applicability(
+                &removal_data,
+                checker.semantic(),
+                checker.comment_ranges().intersects(if_stmt.range),
+            ) else {
+                return;
+            };
+
             let kind = removal_data.affix_query.kind;
             let text = removal_data.text;
 
@@ -131,17 +191,31 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
                 checker.locator(),
             );
 
-            let applicability = if checker.comment_ranges().intersects(if_stmt.range) {
-                Applicability::Unsafe
-            } else {
-                Applicability::Safe
-            };
-
             diagnostic.set_fix(Fix::applicable_edit(
                 Edit::replacement(replacement, if_stmt.start(), if_stmt.end()),
                 applicability,
             ));
         }
+    }
+}
+
+fn fix_applicability(
+    data: &RemoveAffixData,
+    semantic: &SemanticModel,
+    intersects_comments: bool,
+) -> Option<Applicability> {
+    match (
+        ValueKind::from_expr(data.text, semantic),
+        ValueKind::from_expr(data.affix_query.affix, semantic),
+    ) {
+        (Some(ValueKind::String), Some(ValueKind::String))
+        | (Some(ValueKind::Bytes), Some(ValueKind::Bytes)) => Some(if intersects_comments {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        }),
+        (Some(_), Some(_)) => None,
+        _ => Some(Applicability::Unsafe),
     }
 }
 
