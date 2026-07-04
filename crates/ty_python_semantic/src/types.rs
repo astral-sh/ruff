@@ -113,7 +113,7 @@ use crate::types::typevar::{TypeVarInstance, TypeVarSet};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
-    any_over_type, any_over_type_including_alias_arguments, dynamic_content,
+    TypeVisitor, any_over_type, any_over_type_including_alias_arguments, dynamic_content,
 };
 use crate::{Db, FxOrderSet, HasType, NameKind, Program, SemanticModel};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
@@ -1642,6 +1642,16 @@ impl<'db> DataclassParams<'db> {
         } else {
             Self::new(db, self.flags(db), field_specifiers)
         }
+    }
+}
+
+pub(super) fn walk_dataclass_params<'db, V: TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    params: DataclassParams<'db>,
+    visitor: &V,
+) {
+    for field_specifier in params.field_specifiers(db) {
+        visitor.visit_type(db, *field_specifier);
     }
 }
 

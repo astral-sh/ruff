@@ -153,7 +153,18 @@ impl<'db> ClassBase<'db> {
                 db,
                 env,
                 || Self::try_from_recursive(db, recursive),
-                |unfolded| Self::try_from_type(db, env, unfolded, subclass),
+                |unfolded| {
+                    // A dynamic class can store a loop-carried base in its identity. If unfolding
+                    // that base returns the dynamic class currently being resolved, keep only the
+                    // identity-recursive case; otherwise metaclass/MRO resolution re-enters itself.
+                    if let Some(subclass) = subclass
+                        && let Type::ClassLiteral(unfolded_class) = unfolded
+                        && unfolded_class.same_visit_identity(db, subclass)
+                    {
+                        return Self::try_from_recursive(db, recursive);
+                    }
+                    Self::try_from_type(db, env, unfolded, subclass)
+                },
             ),
             Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),

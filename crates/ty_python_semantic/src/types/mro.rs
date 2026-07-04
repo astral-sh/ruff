@@ -366,7 +366,12 @@ impl<'db> Mro<'db> {
         let mut invalid_bases = Vec::new();
 
         for (i, base_type) in original_bases.iter().enumerate() {
-            match ClassBase::try_from_explicit_base(db, env, *base_type, None) {
+            match ClassBase::try_from_explicit_base(
+                db,
+                env,
+                *base_type,
+                Some(ClassLiteral::Dynamic(dynamic)),
+            ) {
                 Some(class_base) => resolved_bases.push(class_base),
                 None => invalid_bases.push((i, *base_type)),
             }
@@ -526,8 +531,13 @@ impl<'db> Mro<'db> {
 
         for base_type in dynamic.explicit_bases(db) {
             // Convert `Type` to `ClassBase`, falling back to `Unknown` if conversion fails.
-            let base = ClassBase::try_from_explicit_base(db, env, *base_type, None)
-                .unwrap_or_else(ClassBase::unknown);
+            let base = ClassBase::try_from_explicit_base(
+                db,
+                env,
+                *base_type,
+                Some(ClassLiteral::Dynamic(dynamic)),
+            )
+            .unwrap_or_else(ClassBase::unknown);
 
             for item in base.mro(db, env, None) {
                 if seen.insert(item) {

@@ -1030,10 +1030,11 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
 
         let identity = ty.to_type_identity(db);
         let seen = self.seen.borrow();
-        if seen
-            .iter()
-            .any(|active| active.ty == ty || active.identity == identity)
-        {
+        if seen.iter().any(|active| {
+            active.ty == ty
+                || active.identity == identity
+                || Self::same_type_identity(db, active.ty, ty)
+        }) {
             return TypeTransformerVisit::Ready(ty);
         }
         drop(seen);
@@ -1049,6 +1050,17 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         debug_assert_eq!(active.map(|active| active.ty), Some(ty));
         self.cache.borrow_mut().insert_completed(ty, result);
         result
+    }
+    fn same_type_identity(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
+        match (left, right) {
+            (Type::Recursive(left), Type::Recursive(right)) => {
+                left.binder(db).same_marker(*right.binder(db))
+            }
+            (Type::ClassLiteral(left), Type::ClassLiteral(right)) => {
+                left.same_visit_identity(db, right)
+            }
+            _ => false,
+        }
     }
 }
 
