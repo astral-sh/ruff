@@ -1118,7 +1118,8 @@ impl<'db> FunctionType<'db> {
                 ..
             }
         ) || type_mapping
-            .used_in_cycle_recovery()
+            .as_structural()
+            .is_some()
         {
             (
                 self.updated_signature(db).map(|signature| {

@@ -9,7 +9,8 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
         Foldable, FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
         LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, RecursiveType, Signature,
-        SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
+        StructuralTypeMapping, SubclassOfInner, Type, TypeContext, TypeMapping,
+        TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
@@ -718,7 +719,7 @@ impl<'db> Foldable<'db> for CallableType<'db> {
     fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
         self.apply_type_mapping_impl(
             db,
-            &TypeMapping::FoldRecursive { recursive },
+            &TypeMapping::Structural(StructuralTypeMapping::FoldRecursive { recursive }),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
         )

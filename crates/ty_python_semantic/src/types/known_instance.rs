@@ -386,10 +386,7 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::RescopeReturnCallables(_)
-                | TypeMapping::UnfoldRecursive { .. }
-                | TypeMapping::FoldRecursive { .. }
-                | TypeMapping::UnnestRecursive { .. }
-                | TypeMapping::ReplaceRecursiveWithBinder { .. }
+                | TypeMapping::Structural(_)
                 | TypeMapping::SemanticViewInInference => Type::KnownInstance(self),
             },
             KnownInstanceType::UnionType(instance) => {
@@ -622,7 +619,7 @@ impl<'db> UnionTypeInstance<'db> {
     ) -> Self {
         if let Ok(union_type) = self.union_type(db) {
             let value_expr_types = match *self._value_expr_types(db) {
-                Some([first, second]) if type_mapping.used_in_cycle_recovery() => Some([
+                Some([first, second]) if type_mapping.as_structural().is_some() => Some([
                     first.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                     second.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ]),

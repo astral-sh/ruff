@@ -1286,7 +1286,7 @@ impl<'db> Specialization<'db> {
 
         let types = self.map_types(db, |i, typevar, ty| {
             let tcx = TypeContext::new(tcx.get(i).copied());
-            if type_mapping.used_in_cycle_recovery() || typevar.variance(db).is_covariant() {
+            if type_mapping.as_structural().is_some() || typevar.variance(db).is_covariant() {
                 ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             } else {
                 ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor)

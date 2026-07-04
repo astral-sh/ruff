@@ -276,7 +276,7 @@ impl<'db> GenericAlias<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        let tcx = if type_mapping.used_in_cycle_recovery() {
+        let tcx = if type_mapping.as_structural().is_some() {
             &[]
         } else {
             tcx.annotation

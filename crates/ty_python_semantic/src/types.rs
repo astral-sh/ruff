@@ -1282,14 +1282,6 @@ impl<'db> Type<'db> {
         })
     }
 
-    fn replace_recursive_with_binder(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
-        self.apply_type_mapping(
-            db,
-            &TypeMapping::ReplaceRecursiveWithBinder { recursive },
-            TypeContext::default(),
-        )
-    }
-
     fn semantic_view_in_inference(self, db: &'db dyn Db) -> Self {
         self.apply_type_mapping(
             db,
@@ -1303,7 +1295,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         previous: Self,
-        previous_semantic_view: Option<Self>,
+        _previous_semantic_view: Option<Self>,
         id: salsa::Id,
         include_previous: bool,
         origin: Option<RecursiveTypeOrigin<'db>>,
@@ -1317,20 +1309,7 @@ impl<'db> Type<'db> {
         };
 
         let current_body = if let Some(recursive) = previous_recursive {
-            let mut current_body = self
-                .fold(db, recursive)
-                .replace_recursive_with_binder(db, recursive);
-
-            if let Some(Type::Recursive(semantic_recursive)) = previous_semantic_view
-                && semantic_recursive.binder(db).same_marker(binder)
-                && semantic_recursive != recursive
-            {
-                // This semantic view is not a runtime substructure of `current_body`;
-                // use it only as an extra boundary for binder replacement.
-                current_body = current_body.replace_recursive_with_binder(db, semantic_recursive);
-            }
-
-            current_body
+            self.fold(db, recursive)
         } else {
             let divergent = Type::Divergent(binder);
             self.recursive_type_normalized_impl(db, divergent, false)
@@ -6432,18 +6411,12 @@ impl<'db> Type<'db> {
             _ => {}
         }
 
-        if let TypeMapping::FoldRecursive { recursive } = type_mapping
+        if let Some(StructuralTypeMapping::FoldRecursive { recursive }) =
+            type_mapping.as_structural()
             && self == recursive.unfold(db)
         {
-            return Type::Recursive(*recursive);
+            return Type::Recursive(recursive);
         }
-        // Cycle recovery compares against recursive types through their transparent body.
-        if let TypeMapping::ReplaceRecursiveWithBinder { recursive } = type_mapping
-            && self == recursive.body(db)
-        {
-            return Type::Divergent(recursive.binder(db));
-        }
-
         // Recursive singleton promotion only recurses into `NominalInstance` types (tuples
         // and specialized generics). For all other types, return early.
         if matches!(
@@ -6468,17 +6441,12 @@ impl<'db> Type<'db> {
             Type::KnownInstance(known_instance) => known_instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
             Type::Recursive(recursive) => match type_mapping {
-                TypeMapping::UnfoldRecursive { recursive: target } if recursive == *target => self,
-                TypeMapping::UnnestRecursive { binder }
+                TypeMapping::Structural(StructuralTypeMapping::UnfoldRecursive { recursive: target }) if recursive == *target => self,
+                TypeMapping::Structural(StructuralTypeMapping::UnnestRecursive { binder })
                     if recursive.binder(db).same_marker(*binder) =>
                 {
                     // Same-binder nesting denotes a recursive occurrence in the outer type.
                     Type::Divergent(*binder)
-                }
-                TypeMapping::ReplaceRecursiveWithBinder { recursive: target }
-                    if recursive == *target =>
-                {
-                    Type::Divergent(recursive.binder(db))
                 }
                 _ => {
                     let body = recursive.body(db).apply_type_mapping_impl(
@@ -6610,24 +6578,15 @@ impl<'db> Type<'db> {
             }
 
             Type::Union(union) => {
-                if type_mapping.used_in_cycle_recovery() {
-                    union.elements(db)
+                if type_mapping.as_structural().is_some() {
+                    let elements = union
+                        .elements(db)
                         .iter()
-                        .fold(
-                            UnionBuilder::new(db)
-                                .unpack_aliases(false)
-                                .cycle_recovery(true)
-                                .recursively_defined(union.recursively_defined(db)),
-                            |builder, element| {
-                                builder.add(element.apply_type_mapping_impl(
-                                    db,
-                                    type_mapping,
-                                    tcx,
-                                    visitor,
-                                ))
-                            },
-                        )
-                        .build()
+                        .map(|element| {
+                            element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                        })
+                        .collect::<Box<_>>();
+                    Type::Union(UnionType::new(db, elements, union.recursively_defined(db)))
                 } else {
                     union.map_leave_aliases(db, |element| {
                         element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
@@ -6635,7 +6594,7 @@ impl<'db> Type<'db> {
                 }
             }
             Type::Intersection(intersection) => {
-                if type_mapping.used_in_cycle_recovery() {
+                if type_mapping.as_structural().is_some() {
                     let positive = intersection
                         .positive(db)
                         .iter()
@@ -6675,9 +6634,25 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::EnumComplement(complement) => complement
-                .to_intersection(db)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            Type::EnumComplement(complement) => {
+                if type_mapping.as_structural().is_some() {
+                    let rest: FxOrderSet<Type<'db>> = complement
+                        .rest(db)
+                        .iter()
+                        .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                        .collect();
+                    Type::EnumComplement(EnumComplementType::new(
+                        db,
+                        complement.enum_class_literal(db),
+                        complement.excluded_names(db).clone(),
+                        rest,
+                    ))
+                } else {
+                    complement
+                        .to_intersection(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                }
+            }
 
             Type::TypeIs(type_is) => visitor.visit(db, self, type_mapping, || {
                 type_is.with_type(
@@ -6708,10 +6683,7 @@ impl<'db> Type<'db> {
 
             Type::TypeAlias(alias) => {
                 match type_mapping {
-                    TypeMapping::UnfoldRecursive { .. }
-                    | TypeMapping::FoldRecursive { .. }
-                    | TypeMapping::UnnestRecursive { .. }
-                    | TypeMapping::ReplaceRecursiveWithBinder { .. } => self,
+                    TypeMapping::Structural(_) => self,
                     // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
                     // detection rather than the visitor's cycle detection, because the visitor tracks
                     // Type values and `RecursiveList` is different from `RecursiveList[T]`.
@@ -6775,10 +6747,7 @@ impl<'db> Type<'db> {
             Type::LiteralValue(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::ApplySpecializationWithMaterialization { .. } |
-                TypeMapping::UnfoldRecursive { .. } |
-                TypeMapping::FoldRecursive { .. } |
-                TypeMapping::UnnestRecursive { .. } |
-                TypeMapping::ReplaceRecursiveWithBinder { .. } |
+                TypeMapping::Structural(_) |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::FreshenBoundTypeVars { .. } |
                 TypeMapping::BindSelf { .. } |
@@ -6799,10 +6768,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::ApplySpecializationWithMaterialization { .. } |
-                TypeMapping::UnfoldRecursive { .. } |
-                TypeMapping::FoldRecursive { .. } |
-                TypeMapping::UnnestRecursive { .. } |
-                TypeMapping::ReplaceRecursiveWithBinder { .. } |
+                TypeMapping::Structural(_) |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::FreshenBoundTypeVars { .. } |
                 TypeMapping::BindSelf(..) |
@@ -6821,7 +6787,7 @@ impl<'db> Type<'db> {
             // `Unknown`. Preserve the marker across materialization, while recording whether this
             // occurrence should behave like the top (`object`) or bottom (`Never`) bound.
             Type::Divergent(divergent) => match type_mapping {
-                TypeMapping::UnfoldRecursive { recursive }
+                TypeMapping::Structural(StructuralTypeMapping::UnfoldRecursive { recursive })
                     if divergent.same_marker(recursive.binder(db)) =>
                 {
                     Type::Recursive(*recursive)
@@ -7875,14 +7841,8 @@ pub enum TypeMapping<'a, 'db> {
         specialization: ApplySpecialization<'a, 'db>,
         materialization_kind: MaterializationKind,
     },
-    /// Replaces the recursive binder in a recursive type body with the recursive type itself.
-    UnfoldRecursive { recursive: RecursiveType<'db> },
-    /// Replaces an unfolded recursive type occurrence with the recursive type itself.
-    FoldRecursive { recursive: RecursiveType<'db> },
-    /// Expands nested recursive types with the same binder as the recursive type being built.
-    UnnestRecursive { binder: DivergentType },
-    /// Replaces a recursive type occurrence with its binder.
-    ReplaceRecursiveWithBinder { recursive: RecursiveType<'db> },
+    /// Applies a query-free structural transformation.
+    Structural(StructuralTypeMapping<'db>),
     /// Converts retained runtime type-expression values to their type-expression meaning.
     SemanticViewInInference,
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
@@ -7913,7 +7873,28 @@ pub enum TypeMapping<'a, 'db> {
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
 }
 
+/// A query-free mapping that rewrites type nodes structurally.
+///
+/// These mappings may use constructors that perform local, query-free simplifications,
+/// but must not invoke inference queries or relation checks.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+pub enum StructuralTypeMapping<'db> {
+    /// Replaces the recursive binder in a recursive type body with the recursive type itself.
+    UnfoldRecursive { recursive: RecursiveType<'db> },
+    /// Replaces an unfolded recursive type occurrence with the recursive type itself.
+    FoldRecursive { recursive: RecursiveType<'db> },
+    /// Expands nested recursive types with the same binder as the recursive type being built.
+    UnnestRecursive { binder: DivergentType },
+}
+
 impl<'db> TypeMapping<'_, 'db> {
+    pub(crate) const fn as_structural(&self) -> Option<StructuralTypeMapping<'db>> {
+        match self {
+            TypeMapping::Structural(mapping) => Some(*mapping),
+            _ => None,
+        }
+    }
+
     /// Update the generic context of a [`Signature`] according to the current type mapping
     pub(crate) fn update_signature_generic_context(
         &self,
@@ -7951,10 +7932,7 @@ impl<'db> TypeMapping<'_, 'db> {
                 )
             }
             TypeMapping::Promote(..)
-            | TypeMapping::UnfoldRecursive { .. }
-            | TypeMapping::FoldRecursive { .. }
-            | TypeMapping::UnnestRecursive { .. }
-            | TypeMapping::ReplaceRecursiveWithBinder { .. }
+            | TypeMapping::Structural(_)
             | TypeMapping::SemanticViewInInference
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
@@ -8000,10 +7978,7 @@ impl<'db> TypeMapping<'_, 'db> {
             },
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
             TypeMapping::ApplySpecialization(_)
-            | TypeMapping::UnfoldRecursive { .. }
-            | TypeMapping::FoldRecursive { .. }
-            | TypeMapping::UnnestRecursive { .. }
-            | TypeMapping::ReplaceRecursiveWithBinder { .. }
+            | TypeMapping::Structural(_)
             | TypeMapping::SemanticViewInInference
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::FreshenBoundTypeVars { .. }
@@ -8013,19 +7988,6 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
-    }
-
-    /// Returns `true` if this mapping may be used inside a Salsa cycle recovery function.
-    ///
-    /// Such mappings must avoid type-inference queries while walking the type structure.
-    pub(crate) const fn used_in_cycle_recovery(&self) -> bool {
-        matches!(
-            self,
-            TypeMapping::UnfoldRecursive { .. }
-                | TypeMapping::FoldRecursive { .. }
-                | TypeMapping::UnnestRecursive { .. }
-                | TypeMapping::ReplaceRecursiveWithBinder { .. }
-        )
     }
 }
 
@@ -8038,7 +8000,7 @@ impl<'db> Foldable<'db> for Type<'db> {
     fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
         self.apply_type_mapping(
             db,
-            &TypeMapping::FoldRecursive { recursive },
+            &TypeMapping::Structural(StructuralTypeMapping::FoldRecursive { recursive }),
             TypeContext::default(),
         )
     }
@@ -8121,7 +8083,7 @@ impl<'db> Foldable<'db> for Signature<'db> {
     fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
         self.apply_type_mapping_impl(
             db,
-            &TypeMapping::FoldRecursive { recursive },
+            &TypeMapping::Structural(StructuralTypeMapping::FoldRecursive { recursive }),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
         )
@@ -8130,7 +8092,10 @@ impl<'db> Foldable<'db> for Signature<'db> {
 
 impl<'db> Foldable<'db> for Specialization<'db> {
     fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
-        self.apply_type_mapping(db, &TypeMapping::FoldRecursive { recursive })
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::Structural(StructuralTypeMapping::FoldRecursive { recursive }),
+        )
     }
 }
 
@@ -8159,7 +8124,7 @@ impl<'db> Foldable<'db> for PropertyInstanceType<'db> {
     fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
         self.apply_type_mapping_impl(
             db,
-            &TypeMapping::FoldRecursive { recursive },
+            &TypeMapping::Structural(StructuralTypeMapping::FoldRecursive { recursive }),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
         )
@@ -8207,7 +8172,7 @@ impl<'db> RecursiveType<'db> {
     ) -> Type<'db> {
         body = body.apply_type_mapping(
             db,
-            &TypeMapping::UnnestRecursive { binder },
+            &TypeMapping::Structural(StructuralTypeMapping::UnnestRecursive { binder }),
             TypeContext::default(),
         );
 
@@ -8244,7 +8209,7 @@ impl<'db> RecursiveType<'db> {
     pub(crate) fn unfold(self, db: &'db dyn Db) -> Type<'db> {
         self.body(db).apply_type_mapping(
             db,
-            &TypeMapping::UnfoldRecursive { recursive: self },
+            &TypeMapping::Structural(StructuralTypeMapping::UnfoldRecursive { recursive: self }),
             TypeContext::default(),
         )
     }

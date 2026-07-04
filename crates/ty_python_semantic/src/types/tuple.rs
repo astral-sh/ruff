@@ -32,8 +32,8 @@ use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
-    Foldable, IntersectionType, RecursiveType, Type, TypeContext, TypeMapping, UnionBuilder,
-    UnionType,
+    Foldable, IntersectionType, RecursiveType, StructuralTypeMapping, Type, TypeContext,
+    TypeMapping, UnionBuilder, UnionType,
 };
 use crate::{Db, FxOrderSet, Program};
 use ty_python_core::Truthiness;
@@ -241,12 +241,14 @@ impl<'db> TupleType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Option<Self> {
-        TupleType::new(
-            db,
-            &self
-                .tuple(db)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-        )
+        let tuple = self
+            .tuple(db)
+            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+        if type_mapping.as_structural().is_some() {
+            Some(TupleType::new_internal(db, tuple))
+        } else {
+            TupleType::new(db, &tuple)
+        }
     }
 
     pub(crate) fn find_legacy_typevars_impl(
@@ -1877,16 +1879,25 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> TupleSpec<'db> {
-        Self::mixed(
-            self.prefix_elements()
-                .iter()
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
-            self.variable()
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            self.suffix_elements()
-                .iter()
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
-        )
+        let prefix = self
+            .prefix_elements()
+            .iter()
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+            .collect::<Vec<_>>();
+        let variable = self
+            .variable()
+            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+        let suffix = self
+            .suffix_elements()
+            .iter()
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+            .collect::<Vec<_>>();
+
+        if type_mapping.as_structural().is_some() {
+            Tuple::Variable(Self::new_from_vec(prefix, variable, suffix))
+        } else {
+            Self::mixed(prefix, variable, suffix)
+        }
     }
 
     fn find_legacy_typevars_impl(
@@ -2300,7 +2311,7 @@ impl<'db> Foldable<'db> for TupleSpec<'db> {
     fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
         self.apply_type_mapping_impl(
             db,
-            &TypeMapping::FoldRecursive { recursive },
+            &TypeMapping::Structural(StructuralTypeMapping::FoldRecursive { recursive }),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
         )

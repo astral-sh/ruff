@@ -4,8 +4,8 @@ use crate::types::mro::MroIterator;
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, Foldable, KnownClass,
-    KnownInstanceType, MaterializationKind, RecursiveType, SpecialFormType, StaticMroError, Type,
-    TypeContext, TypeMapping, TypedDictModule, todo_type,
+    KnownInstanceType, MaterializationKind, RecursiveType, SpecialFormType, StaticMroError,
+    StructuralTypeMapping, Type, TypeContext, TypeMapping, TypedDictModule, todo_type,
 };
 use crate::{Db, DisplaySettings};
 
@@ -536,7 +536,7 @@ impl<'db> Foldable<'db> for ClassBase<'db> {
         match self {
             Self::Class(class) => Self::Class(class.apply_type_mapping_impl(
                 db,
-                &TypeMapping::FoldRecursive { recursive },
+                &TypeMapping::Structural(StructuralTypeMapping::FoldRecursive { recursive }),
                 TypeContext::default(),
                 &ApplyTypeMappingVisitor::default(),
             )),
