@@ -1601,6 +1601,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         (source_type, target_type)
                     && !ty.is_type_var() =>
             {
+                let ty = ty.materialized_divergent_fallback().unwrap_or(ty);
                 let (lower, upper) = if self.relation.is_subtyping() {
                     (ty.top_materialization(db), ty.bottom_materialization(db))
                 } else {
