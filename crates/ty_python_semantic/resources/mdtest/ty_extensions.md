@@ -860,8 +860,8 @@ def regular_second() -> RegularCallableTypeOf[regular_first]:
 reveal_type(callable)  # revealed: def callable[T]() -> ((*args: object, **kwargs: object) -> Never)
 reveal_type(regular)  # revealed: def regular[T]() -> ((*args: object, **kwargs: object) -> Never)
 reveal_type(call)  # revealed: def call() -> ((*args: object, **kwargs: object) -> Never)
-reveal_type(first)  # revealed: def first() -> () -> (() -> Divergent)
-reveal_type(second)  # revealed: def second() -> (() -> () -> (() -> Divergent))
-reveal_type(regular_first)  # revealed: def regular_first() -> () -> (() -> Divergent)
-reveal_type(regular_second)  # revealed: def regular_second() -> (() -> () -> (() -> Divergent))
+reveal_type(first)  # revealed: def first() -> () -> Divergent
+reveal_type(second)  # revealed: def second() -> (() -> () -> Divergent)
+reveal_type(regular_first)  # revealed: def regular_first() -> () -> Divergent
+reveal_type(regular_second)  # revealed: def regular_second() -> (() -> () -> Divergent)
 ```

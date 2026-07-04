@@ -95,7 +95,17 @@ struct TypeAndRange<'db> {
 }
 
 type CollectionUseConstraints<'db> = FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>;
+type CycleRecoverySemanticViews<'db> = Box<[(Definition<'db>, Type<'db>)]>;
 type CycleRecoveryGenericContexts<'db> = Box<[(Definition<'db>, GenericContext<'db>)]>;
+
+fn cycle_recovery_semantic_view<'db>(
+    views: &[(Definition<'db>, Type<'db>)],
+    definition: Definition<'db>,
+) -> Option<Type<'db>> {
+    views
+        .iter()
+        .find_map(|(candidate, ty)| (*candidate == definition).then_some(*ty))
+}
 
 fn cycle_recovery_generic_context<'db>(
     contexts: &[(Definition<'db>, GenericContext<'db>)],
@@ -1016,9 +1026,11 @@ impl<'db> DefinitionTypes<'db> {
             .find_map(|(candidate, ty)| (candidate == definition).then_some(ty))
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn normalize_binding(
         db: &'db dyn Db,
         previous: &DefinitionTypes<'db>,
+        previous_semantic_views: &[(Definition<'db>, Type<'db>)],
         current_generic_contexts: &[(Definition<'db>, GenericContext<'db>)],
         cycle: &salsa::Cycle,
         owner: Definition<'db>,
@@ -1033,7 +1045,13 @@ impl<'db> DefinitionTypes<'db> {
         );
 
         if let Some(previous_ty) = previous.binding_type(owner, definition) {
-            ty.cycle_normalized_with_origin(db, previous_ty, origin, cycle)
+            ty.cycle_normalized_with_semantic_view_and_origin(
+                db,
+                previous_ty,
+                cycle_recovery_semantic_view(previous_semantic_views, definition),
+                origin,
+                cycle,
+            )
         } else {
             ty.recursive_type_normalized(db, cycle)
         }
@@ -1042,13 +1060,21 @@ impl<'db> DefinitionTypes<'db> {
     fn normalize_declaration(
         db: &'db dyn Db,
         previous: &DefinitionTypes<'db>,
+        previous_semantic_views: &[(Definition<'db>, Type<'db>)],
         cycle: &salsa::Cycle,
         owner: Definition<'db>,
         definition: Definition<'db>,
         ty: TypeAndQualifiers<'db>,
     ) -> TypeAndQualifiers<'db> {
         if let Some(previous_ty) = previous.declaration_type(owner, definition) {
-            ty.map_type(|inner| inner.cycle_normalized(db, previous_ty.inner_type(), cycle))
+            ty.map_type(|inner| {
+                inner.cycle_normalized_with_semantic_view(
+                    db,
+                    previous_ty.inner_type(),
+                    cycle_recovery_semantic_view(previous_semantic_views, definition),
+                    cycle,
+                )
+            })
         } else {
             ty.map_type(|inner| inner.recursive_type_normalized(db, cycle))
         }
@@ -1058,6 +1084,7 @@ impl<'db> DefinitionTypes<'db> {
         self,
         db: &'db dyn Db,
         previous: &DefinitionTypes<'db>,
+        previous_semantic_views: &[(Definition<'db>, Type<'db>)],
         current_generic_contexts: &[(Definition<'db>, GenericContext<'db>)],
         cycle: &salsa::Cycle,
         owner: Definition<'db>,
@@ -1067,6 +1094,7 @@ impl<'db> DefinitionTypes<'db> {
             Self::Binding(ty) => Self::Binding(Self::normalize_binding(
                 db,
                 previous,
+                previous_semantic_views,
                 current_generic_contexts,
                 cycle,
                 owner,
@@ -1074,20 +1102,34 @@ impl<'db> DefinitionTypes<'db> {
                 ty,
             )),
             Self::Declaration(ty) => Self::Declaration(Self::normalize_declaration(
-                db, previous, cycle, owner, owner, ty,
+                db,
+                previous,
+                previous_semantic_views,
+                cycle,
+                owner,
+                owner,
+                ty,
             )),
             Self::BindingAndDeclaration(declaration_ty) => {
                 let binding_ty = Self::normalize_binding(
                     db,
                     previous,
+                    previous_semantic_views,
                     current_generic_contexts,
                     cycle,
                     owner,
                     owner,
                     declaration_ty.inner_type(),
                 );
-                let declaration_ty =
-                    Self::normalize_declaration(db, previous, cycle, owner, owner, declaration_ty);
+                let declaration_ty = Self::normalize_declaration(
+                    db,
+                    previous,
+                    previous_semantic_views,
+                    cycle,
+                    owner,
+                    owner,
+                    declaration_ty,
+                );
 
                 if binding_ty == declaration_ty.inner_type() {
                     Self::BindingAndDeclaration(declaration_ty)
@@ -1103,6 +1145,7 @@ impl<'db> DefinitionTypes<'db> {
                     *ty = Self::normalize_binding(
                         db,
                         previous,
+                        previous_semantic_views,
                         current_generic_contexts,
                         cycle,
                         owner,
@@ -1111,7 +1154,15 @@ impl<'db> DefinitionTypes<'db> {
                     );
                 }
                 for (definition, ty) in &mut other.declarations {
-                    *ty = Self::normalize_declaration(db, previous, cycle, owner, *definition, *ty);
+                    *ty = Self::normalize_declaration(
+                        db,
+                        previous,
+                        previous_semantic_views,
+                        cycle,
+                        owner,
+                        *definition,
+                        *ty,
+                    );
                 }
 
                 match (&*other.bindings, &*other.declarations) {
@@ -1222,6 +1273,9 @@ struct OtherDefinitionInferenceExtra<'db> {
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
+    /// Type-expression views computed during inference for recursive implicit aliases.
+    cycle_recovery_semantic_views: CycleRecoverySemanticViews<'db>,
+
     /// Generic contexts found while inferring recursive generic implicit aliases.
     cycle_recovery_generic_contexts: CycleRecoveryGenericContexts<'db>,
 
@@ -1306,6 +1360,13 @@ impl<'db> DefinitionInferenceExtra<'db> {
             _ => &[],
         }
     }
+
+    fn cycle_recovery_semantic_views(&self) -> &[(Definition<'db>, Type<'db>)] {
+        match self {
+            Self::Other(extra) => &extra.cycle_recovery_semantic_views,
+            _ => &[],
+        }
+    }
 }
 
 impl<'db> DefinitionInference<'db> {
@@ -1365,22 +1426,83 @@ impl<'db> DefinitionInference<'db> {
         cycle: &salsa::Cycle,
         definition: Definition<'db>,
     ) -> DefinitionInference<'db> {
+        let previous_semantic_views = previous_inference
+            .extra
+            .as_deref()
+            .map_or(&[] as &[(Definition<'db>, Type<'db>)], |extra| {
+                extra.cycle_recovery_semantic_views()
+            });
         let current_generic_contexts = self
             .extra
             .as_deref()
             .map_or(&[][..], |extra| extra.cycle_recovery_generic_contexts());
+        let semantic_view_for_previous_type = |previous_ty| {
+            previous_semantic_views
+                .iter()
+                .find_map(|(semantic_view_definition, semantic_view)| {
+                    let binding_ty = previous_inference
+                        .types
+                        .binding_type(definition, *semantic_view_definition)
+                        .or_else(|| {
+                            previous_inference
+                                .types
+                                .declaration_type(definition, *semantic_view_definition)
+                                .map(|declaration| declaration.inner_type())
+                        });
+                    (binding_ty == Some(previous_ty)).then_some(*semantic_view)
+                })
+        };
 
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
+            *ty = ty.cycle_normalized_with_semantic_view(
+                db,
+                previous_ty,
+                semantic_view_for_previous_type(previous_ty),
+                cycle,
+            );
         }
         self.types = std::mem::take(&mut self.types).cycle_normalized(
             db,
             &previous_inference.types,
+            previous_semantic_views,
             current_generic_contexts,
             cycle,
             definition,
         );
+
+        if let Some(extra) = self.extra.as_mut()
+            && let DefinitionInferenceExtra::Other(extra) = extra.as_mut()
+        {
+            for (semantic_view_definition, semantic_view) in
+                &mut extra.cycle_recovery_semantic_views
+            {
+                let previous_ty = previous_inference
+                    .types
+                    .binding_type(definition, *semantic_view_definition)
+                    .or_else(|| {
+                        previous_inference
+                            .types
+                            .declaration_type(definition, *semantic_view_definition)
+                            .map(|declaration| declaration.inner_type())
+                    });
+
+                *semantic_view = if let Some(previous_ty) = previous_ty {
+                    let previous_semantic_view = cycle_recovery_semantic_view(
+                        previous_semantic_views,
+                        *semantic_view_definition,
+                    );
+                    semantic_view.cycle_normalized_with_semantic_view(
+                        db,
+                        previous_semantic_view.unwrap_or(previous_ty),
+                        None,
+                        cycle,
+                    )
+                } else {
+                    semantic_view.recursive_type_normalized(db, cycle)
+                };
+            }
+        }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
             && let Some(previous_constraints) = previous_inference

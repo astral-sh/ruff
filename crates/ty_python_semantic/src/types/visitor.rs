@@ -305,7 +305,7 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
     match TypeKind::from(ty) {
         TypeKind::Atomic => {}
         TypeKind::NonAtomic(non_atomic_type) => {
-            if recursion_guard.type_was_already_seen(db, ty) {
+            if recursion_guard.type_was_already_seen(ty) {
                 // If we have already seen this type, we can skip it.
                 return;
             }
@@ -318,25 +318,8 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
 pub(crate) struct TypeCollector<'db>(RefCell<FxHashSet<Type<'db>>>);
 
 impl<'db> TypeCollector<'db> {
-    pub(crate) fn type_was_already_seen(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
-        let mut seen = self.0.borrow_mut();
-        if seen
-            .iter()
-            .any(|seen_ty| *seen_ty == ty || same_visit_identity(db, *seen_ty, ty))
-        {
-            return true;
-        }
-        seen.insert(ty);
-        false
-    }
-}
-
-fn same_visit_identity<'db>(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
-    match (left, right) {
-        (Type::ClassLiteral(left), Type::ClassLiteral(right)) => {
-            left.same_visit_identity(db, right)
-        }
-        _ => false,
+    pub(crate) fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
+        !self.0.borrow_mut().insert(ty)
     }
 }
 

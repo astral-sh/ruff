@@ -236,16 +236,16 @@ class C:
         self.c = lambda positional_only=self.c, /: positional_only
         self.d = lambda *, kw_only=self.d: kw_only
 
-        # revealed: (positional: Unknown = ...) -> Unknown | ((positional=...) -> Divergent)
+        # revealed: (positional=...) -> Unknown | (positional=...) -> Divergent
         reveal_type(self.a)
 
-        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent)
+        # revealed: (*, kw_only=...) -> Unknown | (*, kw_only=...) -> Divergent
         reveal_type(self.b)
 
-        # revealed: (positional_only: Unknown = ..., /) -> Unknown | ((positional_only=..., /) -> Divergent)
+        # revealed: (positional_only=..., /) -> Unknown | (positional_only=..., /) -> Divergent
         reveal_type(self.c)
 
-        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent)
+        # revealed: (*, kw_only=...) -> Unknown | (*, kw_only=...) -> Divergent
         reveal_type(self.d)
 ```
 
@@ -424,4 +424,17 @@ reveal_mro(GenericBase["Foo", "Bar"])
 
 class Foo: ...
 class Bar: ...
+```
+
+```py
+class Nest:
+    def f(self, cond):
+        self.x1 = [self.x2]
+        self.x2 = {"key": self.x3}
+        self.x3 = [self.x2] if cond else [self.x1]
+
+# どれも少なくともlistとdictを含んでいるはず
+reveal_type(Nest().x1)  # revealed: ?
+reveal_type(Nest().x2)  # revealed: ?
+reveal_type(Nest().x3)  # revealed: ?
 ```

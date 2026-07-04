@@ -384,6 +384,7 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::ReplaceSelf { .. }
                 | TypeMapping::Materialize(_)
                 | TypeMapping::ReplaceParameterDefaults
+                | TypeMapping::SemanticViewInInference
                 | TypeMapping::EagerExpansion
                 | TypeMapping::RescopeReturnCallables(_)
                 | TypeMapping::Structural(_) => Type::KnownInstance(self),

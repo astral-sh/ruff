@@ -4330,6 +4330,11 @@ impl<'db> ParameterKind<'db> {
         let apply_to_default_type = |default_type: &Option<Type<'db>>| {
             if type_mapping == &TypeMapping::ReplaceParameterDefaults && default_type.is_some() {
                 Some(Type::unknown())
+            } else if type_mapping.as_structural().is_some() {
+                // Default-value types may point back to the callable being mapped.
+                // Structural recursive rewrites operate on the callable type shape, not on that
+                // retained value-origin information.
+                *default_type
             } else {
                 default_type
                     .as_ref()
