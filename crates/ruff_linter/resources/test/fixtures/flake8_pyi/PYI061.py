@@ -48,6 +48,11 @@ def good_func(arg1: Literal[int] | None):
     ...
 
 
+# Regression test for https://github.com/astral-sh/ruff/issues/20729.
+# Rewriting this changes `typing.get_args(options)` at runtime, so the fix is unsafe.
+options = Literal["foo", "bar", None]
+
+
 # From flake8-pyi
 Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "None"
 Literal[True, None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
