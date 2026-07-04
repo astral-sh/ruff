@@ -18,7 +18,6 @@ help: Break down assertion into multiple parts
 15 +     assert something_else
 16 |     assert something and something_else and something_third
    |
-note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:15:5
@@ -38,7 +37,6 @@ help: Break down assertion into multiple parts
 16 +     assert something_third
 17 |     assert something and not something_else
    |
-note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:16:5
@@ -58,7 +56,6 @@ help: Break down assertion into multiple parts
 17 +     assert not something_else
 18 |     assert something and (something_else or something_third)
    |
-note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:17:5
@@ -78,7 +75,6 @@ help: Break down assertion into multiple parts
 18 +     assert (something_else or something_third)
 19 |     assert not something and something_else
    |
-note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:18:5
@@ -98,7 +94,6 @@ help: Break down assertion into multiple parts
 19 +     assert something_else
 20 |     assert not (something or something_else)
    |
-note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:19:5
@@ -118,7 +113,6 @@ help: Break down assertion into multiple parts
 20 +     assert not something_else
 21 |     assert not (something or something_else or something_third)
    |
-note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:20:5
@@ -138,7 +132,6 @@ help: Break down assertion into multiple parts
 21 +     assert not something_third
 22 |     assert something and something_else == """error
    |
-note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:21:5
@@ -160,7 +153,6 @@ help: Break down assertion into multiple parts
 22 +     assert something_else == """error
 23 |     message
    |
-note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:24:5
@@ -188,7 +180,6 @@ help: Break down assertion into multiple parts
 26 +         something_else
 27 |         == """error
    |
-note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:33:5
@@ -206,7 +197,6 @@ help: Break down assertion into multiple parts
 34 +     assert (b or c)
 35 |     assert not (a or not (b and c))
    |
-note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:34:5
@@ -226,7 +216,6 @@ help: Break down assertion into multiple parts
 35 +     assert (b and c)
 36 |
    |
-note: This is an unsafe fix and may change runtime behavior
 
 PT018 Assertion should be broken down into multiple parts
   --> PT018.py:37:5
@@ -353,7 +342,6 @@ help: Break down assertion into multiple parts
 65 +     )
 66 |
    |
-note: This is an unsafe fix and may change runtime behavior
 
 PT018 [*] Assertion should be broken down into multiple parts
   --> PT018.py:65:5
@@ -383,5 +371,26 @@ help: Break down assertion into multiple parts
 70 +         self.find_graph_output(node.input[0])
 71 +     )
 72 |
+   |
+
+PT018 [*] Assertion should be broken down into multiple parts
+  --> PT018.py:76:5
+   |
+75 |   def test_comments():
+76 | /     assert (
+77 | |         # comment
+78 | |         something and something_else
+79 | |     )
+   | |_____^
+   |
+help: Break down assertion into multiple parts
+   |
+75 | def test_comments():
+   -     assert (
+   -         # comment
+   -         something and something_else
+   -     )
+76 +     assert something
+77 +     assert something_else
    |
 note: This is an unsafe fix and may change runtime behavior

@@ -28,7 +28,7 @@ use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
 use crate::fix::codemods::CodegenStylist;
 use crate::importer::ImportRequest;
-use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 use super::unittest_assert::UnittestAssert;
 
@@ -831,14 +831,19 @@ pub(crate) fn composite_condition(checker: &Checker, stmt: &Stmt, test: &Expr, m
         let mut diagnostic = checker.report_diagnostic(PytestCompositeAssertion, stmt.range());
         if matches!(composite, CompositionKind::Simple)
             && msg.is_none()
-            && !checker.comment_ranges().intersects(stmt.range())
             && !checker
                 .indexer()
                 .in_multi_statement_line(stmt, checker.source())
         {
             diagnostic.try_set_fix(|| {
-                fix_composite_condition(stmt, checker.locator(), checker.stylist())
-                    .map(Fix::unsafe_edit)
+                fix_composite_condition(stmt, checker.locator(), checker.stylist()).map(|edit| {
+                    let applicability = if checker.comment_ranges().intersects(edit.range()) {
+                        Applicability::Unsafe
+                    } else {
+                        Applicability::Safe
+                    };
+                    Fix::applicable_edit(edit, applicability)
+                })
             });
         }
     }
