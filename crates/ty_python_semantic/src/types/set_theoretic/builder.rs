@@ -671,6 +671,11 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+        let ty = if self.recursively_defined.is_yes() {
+            ty.widen_recursive_tuples(self.db, None)
+        } else {
+            ty
+        };
         let cycle_recovery = self.cycle_recovery;
         let should_widen = |literals, recursively_defined: RecursivelyDefined| {
             if recursively_defined.is_yes() && cycle_recovery {

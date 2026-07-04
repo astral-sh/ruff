@@ -31,9 +31,9 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
-    Foldable, IntersectionType, RecursiveType, StructuralTypeMapping, Type, TypeContext,
-    TypeMapping, UnionBuilder, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, DivergentType, ErrorContext,
+    FindLegacyTypeVarsVisitor, Foldable, IntersectionType, RecursiveType, StructuralTypeMapping,
+    Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
 };
 use crate::{Db, FxOrderSet, Program};
 use ty_python_core::Truthiness;
@@ -241,9 +241,14 @@ impl<'db> TupleType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Option<Self> {
-        let tuple = self
+        let mut tuple = self
             .tuple(db)
             .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+        if let Some(StructuralTypeMapping::WidenRecursiveTuples { binder }) =
+            type_mapping.as_structural()
+        {
+            tuple = tuple.widen_recursive_tuple(db, binder);
+        }
         if type_mapping.as_structural().is_some() {
             Some(TupleType::new_internal(db, tuple))
         } else {
@@ -620,6 +625,11 @@ fn to_class_type_cycle_initial<'db>(
 /// fixed-length element type. [`TupleType`] adds that additional invariant (since a tuple that
 /// must contain an element that can't be instantiated, can't be instantiated itself).
 pub(crate) type TupleSpec<'db> = Tuple<Type<'db>>;
+
+/// Recursive tuple unpacking can append one fixed element per cycle iteration.
+/// Once a recursive variable-length tuple starts accumulating fixed elements, keep only the
+/// element type.
+const MAX_RECURSIVE_TUPLE_FIXED_ELEMENTS: usize = 1;
 
 /// A fixed-length tuple.
 ///
@@ -2059,9 +2069,94 @@ impl<T> Tuple<T> {
     }
 }
 
+fn flatten_tuple_element<'db>(db: &'db dyn Db, element: Type<'db>) -> Vec<Type<'db>> {
+    element.exact_tuple_instance_spec(db).map_or_else(
+        || vec![element],
+        |tuple| tuple.iter_all_elements().collect(),
+    )
+}
+
 impl<'db> Tuple<Type<'db>> {
     pub(crate) fn homogeneous_element_type(&self, db: &'db dyn Db) -> Type<'db> {
         UnionType::from_elements_leave_aliases(db, self.all_elements())
+    }
+
+    fn widen_recursive_tuple(self, db: &'db dyn Db, binder: Option<DivergentType>) -> Self {
+        let tuple = if let Some(binder) = binder {
+            self.reduce_recursive_tuple_elements(db, binder)
+        } else {
+            self
+        };
+
+        let Self::Variable(tuple) = tuple else {
+            return tuple;
+        };
+
+        if let Some(binder) = binder {
+            let contains_binder = tuple
+                .all_elements()
+                .iter()
+                .copied()
+                .any(|element| element.contains_cycle_binder(db, &[binder]));
+            if !contains_binder {
+                return Self::Variable(tuple);
+            }
+        }
+
+        let fixed_elements = tuple
+            .prefix_elements()
+            .len()
+            .saturating_add(tuple.suffix_elements().len());
+        let has_nested_tuple = tuple
+            .fixed_elements()
+            .any(|element| element.exact_tuple_instance_spec(db).is_some());
+
+        if fixed_elements <= MAX_RECURSIVE_TUPLE_FIXED_ELEMENTS && !has_nested_tuple {
+            return Self::Variable(tuple);
+        }
+
+        Self::homogeneous(UnionType::from_elements_cycle_recovery(
+            db,
+            tuple
+                .iter_prefix_elements()
+                .flat_map(|element| flatten_tuple_element(db, element))
+                .chain(std::iter::once(tuple.variable()))
+                .chain(
+                    tuple
+                        .iter_suffix_elements()
+                        .flat_map(|element| flatten_tuple_element(db, element)),
+                ),
+        ))
+    }
+
+    fn reduce_recursive_tuple_elements(self, db: &'db dyn Db, binder: DivergentType) -> Self {
+        fn reduce<'db>(db: &'db dyn Db, element: Type<'db>, binder: DivergentType) -> Type<'db> {
+            if element.exact_tuple_instance_spec(db).is_some()
+                && element.contains_cycle_binder(db, &[binder])
+            {
+                Type::Divergent(binder)
+            } else {
+                element
+            }
+        }
+
+        match self {
+            Self::Fixed(tuple) => Self::Fixed(FixedLengthTuple::from_elements(
+                tuple
+                    .iter_all_elements()
+                    .map(|element| reduce(db, element, binder)),
+            )),
+            Self::Variable(tuple) => {
+                let prefix = tuple
+                    .iter_prefix_elements()
+                    .map(|element| reduce(db, element, binder));
+                let variable = reduce(db, tuple.variable(), binder);
+                let suffix = tuple
+                    .iter_suffix_elements()
+                    .map(|element| reduce(db, element, binder));
+                Self::Variable(VariableLengthTuple::new(prefix, variable, suffix))
+            }
+        }
     }
 
     /// Returns the type of a static slice into this tuple.
