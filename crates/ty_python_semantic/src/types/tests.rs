@@ -684,7 +684,7 @@ fn recursive_fold_does_not_invoke_variance_queries() {
         let _ = box_ty.apply_type_mapping(
             &db,
             &env,
-            &TypeMapping::FoldRecursive { recursive },
+            &TypeMapping::Structural(StructuralTypeMapping::FoldRecursive { recursive }),
             TypeContext::default(),
         );
     }

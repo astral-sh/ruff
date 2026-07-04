@@ -1389,7 +1389,7 @@ impl<'db> Specialization<'db> {
         let mut new_materialization_kind = self.materialization_kind(db);
         let types = self.map_types(db, |i, typevar, ty| {
             let tcx = TypeContext::new(tcx.get(i).copied());
-            if type_mapping.used_in_cycle_recovery() {
+            if type_mapping.as_structural().is_some() {
                 ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             } else {
                 match (typevar.variance(db), type_mapping) {

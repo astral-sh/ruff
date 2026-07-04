@@ -31,7 +31,8 @@ use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
-    Foldable, IntersectionType, RecursiveType, Type, TypeContext, TypeMapping, UnionType,
+    Foldable, IntersectionType, RecursiveType, StructuralTypeMapping, Type, TypeContext,
+    TypeMapping, UnionType,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::Truthiness;
@@ -304,13 +305,14 @@ impl<'db> TupleType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        TupleType::new(
-            db,
-            visitor.env,
-            &self
-                .tuple(db)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-        )
+        let tuple = self
+            .tuple(db)
+            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+        if type_mapping.as_structural().is_some() {
+            TupleType::new_internal(db, visitor.env.program(db), tuple)
+        } else {
+            TupleType::new(db, visitor.env, &tuple)
+        }
     }
 
     pub(crate) fn find_legacy_typevars_impl(
@@ -2193,6 +2195,28 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> TupleSpec<'db> {
+        if type_mapping.as_structural().is_some() {
+            let prefix = self
+                .prefix_elements()
+                .iter()
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                .collect::<Vec<_>>();
+            let variable = match self.variable() {
+                VariableSegment::Homogeneous(variable) => VariableSegment::Homogeneous(
+                    variable.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ),
+                VariableSegment::TypeVarTuple(typevartuple) => {
+                    VariableSegment::TypeVarTuple(typevartuple)
+                }
+            };
+            let suffix = self
+                .suffix_elements()
+                .iter()
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                .collect::<Vec<_>>();
+            return Tuple::Variable(Self::new_from_vec(prefix, variable, suffix));
+        }
+
         let prefix = self
             .prefix_elements()
             .iter()
@@ -2876,7 +2900,7 @@ impl<'db> Foldable<'db> for TupleSpec<'db> {
     ) -> Self {
         self.apply_type_mapping_impl(
             db,
-            &TypeMapping::FoldRecursive { recursive },
+            &TypeMapping::Structural(StructuralTypeMapping::FoldRecursive { recursive }),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
         )
