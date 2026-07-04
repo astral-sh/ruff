@@ -1595,25 +1595,30 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // invariant specializations are combined in a union. Subtyping uses the gradual
             // type's materialization range, while assignability uses the type itself for both
             // bounds.
-            (None, None, _)
+            (None, None, _) => {
                 if self.typevar_evaluation == TypeVarEvaluation::Lazy
                     && let (Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar)) =
                         (source_type, target_type)
-                    && !ty.is_type_var() =>
-            {
-                let ty = ty.materialized_divergent_fallback().unwrap_or(ty);
-                let (lower, upper) = if self.relation.is_subtyping() {
-                    (ty.top_materialization(db), ty.bottom_materialization(db))
+                    && !ty.is_type_var()
+                    // Preserve union distribution before constructing constraints. Storing the
+                    // entire union as an exact bound makes solving common generic calls involving
+                    // large unions significantly more expensive.
+                    && !ty.is_union()
+                {
+                    let ty = ty.materialized_divergent_fallback().unwrap_or(ty);
+                    let (lower, upper) = if self.relation.is_subtyping() {
+                        (ty.top_materialization(db), ty.bottom_materialization(db))
+                    } else {
+                        (ty, ty)
+                    };
+                    ConstraintSet::constrain_typevar(db, self.constraints, typevar, lower, upper)
                 } else {
-                    (ty, ty)
-                };
-                ConstraintSet::constrain_typevar(db, self.constraints, typevar, lower, upper)
-            }
-            (None, None, _) => {
-                self.check_type_pair(db, target_type, source_type)
-                    .and(db, self.constraints, || {
-                        self.check_type_pair(db, source_type, target_type)
-                    })
+                    self.check_type_pair(db, target_type, source_type).and(
+                        db,
+                        self.constraints,
+                        || self.check_type_pair(db, source_type, target_type),
+                    )
+                }
             }
             // For gradual types, A <: B (subtyping) is defined as Top[A] <: Bottom[B]
             (
