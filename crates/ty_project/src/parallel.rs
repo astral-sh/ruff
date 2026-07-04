@@ -2,7 +2,7 @@
 
 use rayon::iter::ParallelIterator;
 
-use crate::Db;
+use crate::{Db, ProjectDatabase};
 
 /// Chooses a minimum Rayon job length without starving the worker pool on smaller inputs.
 ///
@@ -40,6 +40,27 @@ pub trait ParallelIteratorExt: ParallelIterator + Sized {
         self.map_with(ParallelDb(Db::dyn_clone(db)), move |db, item| {
             salsa::attach_allow_change(&*db.0, || map(&*db.0, item))
         })
+    }
+
+    /// Runs an operation in parallel with a cloned [`ProjectDatabase`] for each Rayon job.
+    ///
+    /// Rayon's standard scheduling adapters can be applied before this method. For example, an
+    /// indexed iterator can use [`rayon::iter::IndexedParallelIterator::with_min_len`] to reduce
+    /// task and database-cloning overhead.
+    ///
+    /// # Warning
+    ///
+    /// This method uses [`salsa::attach_allow_change`] and must never be called from within a Salsa
+    /// query. It is intended for top-level request and command handlers that are outside the Salsa
+    /// query stack.
+    fn for_each_with_project_db(
+        self,
+        db: &ProjectDatabase,
+        op: impl Fn(&ProjectDatabase, Self::Item) + Send + Sync,
+    ) {
+        self.for_each_with(db.clone(), move |db, item| {
+            salsa::attach_allow_change(db, || op(db, item));
+        });
     }
 }
 
