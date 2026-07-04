@@ -2382,6 +2382,20 @@ impl<'db> Type<'db> {
         builder.build()
     }
 
+    pub(in crate::types) fn widen_recursive_tuples(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        binder: Option<DivergentType>,
+    ) -> Self {
+        self.apply_type_mapping(
+            db,
+            env,
+            &TypeMapping::Structural(StructuralTypeMapping::WidenRecursiveTuples { binder }),
+            TypeContext::default(),
+        )
+    }
+
     fn semantic_view_in_inference(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
         self.apply_type_mapping(
             db,
@@ -2505,9 +2519,8 @@ impl<'db> Type<'db> {
             current_body
         };
         let body = body
-            .recursive_type_normalized_impl(db, env, Type::Divergent(canonical), false)
-            .unwrap_or(Type::Divergent(canonical));
-        let body = body.widen_recursive_body_unions(db, env, canonical);
+            .widen_recursive_body_unions(db, env, canonical)
+            .widen_recursive_tuples(db, env, Some(canonical));
 
         let origin = origin
             .or_else(|| previous_recursive.map(|recursive| *recursive.origin(db)))
@@ -10604,6 +10617,11 @@ pub enum StructuralTypeMapping<'a, 'db> {
         binders: &'a [DivergentType],
         canonical: DivergentType,
         target_bodies: &'a [Type<'db>],
+    },
+    /// Widens tuple shapes that grow during recursive inference.
+    WidenRecursiveTuples {
+        /// The canonical cycle binder, if the mapping is running in cycle recovery.
+        binder: Option<DivergentType>,
     },
 }
 
