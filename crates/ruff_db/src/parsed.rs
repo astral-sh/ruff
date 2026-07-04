@@ -8,7 +8,8 @@ use ruff_python_ast::{
     StringLiteral,
 };
 use ruff_python_parser::{
-    ParseError, ParseErrorType, ParseOptions, Parsed, parse_string_annotation, parse_unchecked,
+    ParseError, ParseErrorType, ParseOptions, Parsed, parse_cells_unchecked,
+    parse_string_annotation, parse_unchecked,
 };
 
 use crate::Db;
@@ -49,9 +50,17 @@ pub fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
 
     let target_version = db.python_version();
     let options = ParseOptions::from(ty).with_target_version(target_version);
-    parse_unchecked(&source, options)
-        .try_into_module()
-        .expect("PySourceType always parses into a module")
+
+    // Notebooks parse each cell as an independent module so a syntax error confined to one cell is
+    // surfaced instead of being masked by a later cell's content. Regular files take the existing
+    // single-parse path.
+    if let Some(notebook) = source.as_notebook() {
+        parse_cells_unchecked(&source, notebook.cell_offsets().ranges(), options)
+    } else {
+        parse_unchecked(&source, options)
+            .try_into_module()
+            .expect("PySourceType always parses into a module")
+    }
 }
 
 pub fn parsed_string_annotation(

@@ -553,11 +553,16 @@ fn recursion_limit_nested_lambda_chain() {
 }
 
 /// Parses `cells` as consecutive IPython cells, mirroring how a notebook's concatenated source is
-/// split into contiguous ranges by `CellOffsets`.
+/// split into contiguous ranges by `CellOffsets`. Each cell carries its trailing separator newline,
+/// matching the synthetic newline `CellOffsets` appends after every cell's content.
 fn parse_ipy_cells(cells: &[&str]) -> Parsed<ModModule> {
     let mut source = String::new();
     let mut ranges = Vec::new();
     for cell in cells {
+        assert!(
+            cell.ends_with('\n'),
+            "each cell must end with the separator newline that `CellOffsets` appends: {cell:?}"
+        );
         let start = TextSize::of(&source);
         source.push_str(cell);
         ranges.push(TextRange::new(start, TextSize::of(&source)));
@@ -568,8 +573,8 @@ fn parse_ipy_cells(cells: &[&str]) -> Parsed<ModModule> {
 #[test]
 fn notebook_cell_boundary_syntax_errors() {
     // Each pair concatenates into valid source, but the first cell is invalid on its own.
-    // Concatenated parse masks the error; per-cell parsing must surface it.
-    // Decorator case is grammar-level: a lexer-only boundary fix cannot catch it.
+    // Concatenated parse masks the error; per-cell parsing must surface it and report it in the
+    // first cell (an EOF-anchored error must not leak across the boundary into the next cell).
     let cases = [
         ["if True:\n", "    pass\n"],
         ["x = [\n", "1]\n"],
@@ -585,9 +590,19 @@ fn notebook_cell_boundary_syntax_errors() {
             parse_module(&concatenated).is_ok(),
             "concatenated source should parse cleanly: {concatenated:?}"
         );
+
+        let parsed = parse_ipy_cells(&[first, second]);
+        let first_cell = TextRange::up_to(TextSize::of(first));
+        let Some(error) = parsed.errors().first() else {
+            panic!("per-cell parsing should report a syntax error: {concatenated:?}");
+        };
+        // Cell attribution keys off the start offset's row, and the boundary offset is the next
+        // cell's first row, so the error must start strictly before the boundary. A zero-width
+        // error left at the boundary (the pre-fix behavior) would be reported in the next cell.
         assert!(
-            parse_ipy_cells(&[first, second]).has_invalid_syntax(),
-            "per-cell parsing should report a syntax error: {concatenated:?}"
+            error.location.start() < first_cell.end(),
+            "error {:?} should start inside the first cell {first_cell:?}: {concatenated:?}",
+            error.location,
         );
     }
 }

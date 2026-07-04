@@ -76,7 +76,7 @@ use ruff_python_ast::{
     AtomicNodeIndex, Expr, Mod, ModExpression, ModModule, PySourceType, StringFlags, StringLiteral,
     Suite,
 };
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 mod error;
 pub mod lexer;
@@ -305,6 +305,10 @@ pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed
 /// This validates sources such as Jupyter notebooks, where each cell must be syntactically valid on
 /// its own while later cells can still reference earlier definitions.
 /// The `ranges` must be ordered and non-overlapping. An empty `ranges` falls back to [`parse_unchecked`].
+///
+/// A syntax error anchored at a range's trailing offset is pulled one byte back into that range so
+/// it is attributed there rather than to the following range. This assumes each range ends on a
+/// single-byte separator, as notebook cells do with a synthetic newline.
 pub fn parse_cells_unchecked(
     source: &str,
     ranges: impl IntoIterator<Item = TextRange>,
@@ -343,7 +347,24 @@ pub fn parse_cells_unchecked(
 
         body.extend(syntax.body);
         tokens.extend(cell_tokens.iter().copied());
-        errors.extend(cell_errors);
+
+        // A cell is parsed from a slice ending at `range.end()`, which is also the next cell's
+        // start offset. An error anchored at that trailing EOF (e.g. an unclosed bracket, or a
+        // decorator with no following `def`) would otherwise be attributed to the next cell.
+        // Anchor it at the cell's last offset so it stays in the cell that contains the error.
+        let boundary = range.end();
+        errors.extend(cell_errors.into_iter().map(|error| {
+            if range.is_empty() || error.location.start() != boundary {
+                error
+            } else {
+                ParseError {
+                    location: TextRange::new(boundary - TextSize::from(1), boundary),
+                    ..error
+                }
+            }
+        }));
+        // Unlike `errors`, `unsupported_syntax_errors` anchor at real syntax constructs rather than
+        // the trailing EOF, so they never sit on the boundary and need no remapping.
         unsupported_syntax_errors.extend(cell_unsupported_syntax_errors);
         module_range = Some(match module_range {
             Some(previous) => TextRange::new(previous.start(), range.end()),
