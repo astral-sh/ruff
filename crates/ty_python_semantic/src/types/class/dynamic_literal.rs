@@ -107,6 +107,25 @@ pub enum DynamicClassAnchor<'db> {
 }
 
 impl<'db> DynamicClassAnchor<'db> {
+    pub(super) fn same_visit_identity(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Definition(left), Self::Definition(right)) => left == right,
+            (
+                Self::ScopeOffset {
+                    scope: left_scope,
+                    offset: left_offset,
+                    ..
+                },
+                Self::ScopeOffset {
+                    scope: right_scope,
+                    offset: right_offset,
+                    ..
+                },
+            ) => left_scope == right_scope && left_offset == right_offset,
+            _ => false,
+        }
+    }
+
     fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
@@ -335,7 +354,9 @@ impl<'db> DynamicClassLiteral<'db> {
         // returned `Err(InvalidBases)` if any failed, causing us to return early.
         let bases: Vec<ClassBase<'db>> = original_bases
             .iter()
-            .filter_map(|base_type| ClassBase::try_from_type(db, *base_type, None))
+            .filter_map(|base_type| {
+                ClassBase::try_from_type(db, *base_type, Some(ClassLiteral::Dynamic(self)))
+            })
             .collect();
 
         // If all bases failed to convert, return type as the metaclass.

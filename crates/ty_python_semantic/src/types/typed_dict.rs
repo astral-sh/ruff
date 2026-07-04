@@ -121,6 +121,13 @@ impl<'db> TypedDictOpenness<'db> {
         matches!(self, Self::Closed)
     }
 
+    pub(crate) fn walk<V: visitor::TypeVisitor<'db> + ?Sized>(self, db: &'db dyn Db, visitor: &V) {
+        match self {
+            Self::ImplicitlyOpen | Self::Closed => {}
+            Self::Extra(extra_items) => visitor.visit_type(db, extra_items.declared_ty),
+        }
+    }
+
     pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -3028,6 +3035,12 @@ impl<'db> TypedDictSchema<'db> {
                 )
             })
             .collect()
+    }
+
+    pub(crate) fn walk<V: visitor::TypeVisitor<'db> + ?Sized>(&self, db: &'db dyn Db, visitor: &V) {
+        for field in self.values() {
+            visitor.visit_type(db, field.declared_ty);
+        }
     }
 }
 

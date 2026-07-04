@@ -86,6 +86,32 @@ pub enum DynamicEnumAnchor<'db> {
 }
 
 impl<'db> DynamicEnumAnchor<'db> {
+    pub(super) fn same_visit_identity(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Self::Definition {
+                    definition: left, ..
+                },
+                Self::Definition {
+                    definition: right, ..
+                },
+            ) => left == right,
+            (
+                Self::ScopeOffset {
+                    scope: left_scope,
+                    offset: left_offset,
+                    ..
+                },
+                Self::ScopeOffset {
+                    scope: right_scope,
+                    offset: right_offset,
+                    ..
+                },
+            ) => left_scope == right_scope && left_offset == right_offset,
+            _ => false,
+        }
+    }
+
     fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,

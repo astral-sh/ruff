@@ -38,10 +38,11 @@ use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, Signature, SignatureRelationVisitor,
 };
 use crate::types::tuple::TupleSpec;
+use crate::types::visitor::TypeVisitor;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
     FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, TypedDictModule,
-    UnionBuilder, VarianceInferable,
+    UnionBuilder, VarianceInferable, walk_dataclass_params,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet,
@@ -386,6 +387,135 @@ pub enum ClassLiteral<'db> {
     DynamicTypedDict(DynamicTypedDictLiteral<'db>),
     /// A class created via functional enum syntax, e.g., `Enum("Color", "RED GREEN BLUE")`.
     DynamicEnum(DynamicEnumLiteral<'db>),
+}
+
+impl<'db> ClassLiteral<'db> {
+    /// Return whether two class literals come from the same class-producing definition or
+    /// expression, ignoring nested types captured by dynamic functional class literals.
+    pub(crate) fn same_visit_identity(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self, other) {
+            (Self::Static(left), Self::Static(right)) => left == right,
+            (Self::Dynamic(left), Self::Dynamic(right)) => {
+                left.anchor(db).same_visit_identity(right.anchor(db))
+            }
+            (Self::DynamicNamedTuple(left), Self::DynamicNamedTuple(right)) => {
+                left.anchor(db).same_visit_identity(right.anchor(db))
+            }
+            (Self::DynamicTypedDict(left), Self::DynamicTypedDict(right)) => {
+                left.anchor(db).same_visit_identity(right.anchor(db))
+            }
+            (Self::DynamicEnum(left), Self::DynamicEnum(right)) => {
+                left.anchor(db).same_visit_identity(right.anchor(db))
+            }
+            _ => false,
+        }
+    }
+}
+
+pub(super) fn walk_class_literal<'db, V: TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+    visitor: &V,
+) {
+    match class {
+        ClassLiteral::Static(_) => {}
+        ClassLiteral::Dynamic(dynamic) => {
+            walk_dynamic_class_anchor(db, dynamic.anchor(db), visitor);
+            for (_, ty) in dynamic.members(db) {
+                visitor.visit_type(db, *ty);
+            }
+            if let Some(params) = dynamic.dataclass_params(db) {
+                walk_dataclass_params(db, params, visitor);
+            }
+        }
+        ClassLiteral::DynamicNamedTuple(named_tuple) => {
+            walk_dynamic_named_tuple_anchor(db, named_tuple.anchor(db), visitor);
+        }
+        ClassLiteral::DynamicTypedDict(typed_dict) => {
+            walk_dynamic_typed_dict_anchor(db, typed_dict.anchor(db), visitor);
+        }
+        ClassLiteral::DynamicEnum(enum_literal) => {
+            walk_dynamic_enum_anchor(db, enum_literal.anchor(db), visitor);
+            if let Some(mixin) = enum_literal.mixin_type(db) {
+                visitor.visit_type(db, mixin);
+            }
+        }
+    }
+}
+
+fn walk_dynamic_class_anchor<'db, V: TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    anchor: &DynamicClassAnchor<'db>,
+    visitor: &V,
+) {
+    match anchor {
+        DynamicClassAnchor::Definition(_) => {}
+        DynamicClassAnchor::ScopeOffset { explicit_bases, .. } => {
+            for base in explicit_bases {
+                visitor.visit_type(db, *base);
+            }
+        }
+    }
+}
+
+fn walk_dynamic_named_tuple_anchor<'db, V: TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    anchor: &DynamicNamedTupleAnchor<'db>,
+    visitor: &V,
+) {
+    match anchor {
+        DynamicNamedTupleAnchor::CollectionsDefinition { spec, .. } => {
+            walk_named_tuple_spec(db, *spec, visitor);
+        }
+        DynamicNamedTupleAnchor::TypingDefinition(_) => {}
+        DynamicNamedTupleAnchor::ScopeOffset { spec, .. } => {
+            walk_named_tuple_spec(db, *spec, visitor);
+        }
+    }
+}
+
+fn walk_named_tuple_spec<'db, V: TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    spec: NamedTupleSpec<'db>,
+    visitor: &V,
+) {
+    for field in spec.fields(db) {
+        visitor.visit_type(db, field.ty);
+        if let Some(default) = field.default {
+            visitor.visit_type(db, default);
+        }
+    }
+}
+
+fn walk_dynamic_typed_dict_anchor<'db, V: TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    anchor: &DynamicTypedDictAnchor<'db>,
+    visitor: &V,
+) {
+    match anchor {
+        DynamicTypedDictAnchor::Definition(_) => {}
+        DynamicTypedDictAnchor::ScopeOffset {
+            schema, openness, ..
+        } => {
+            schema.walk(db, visitor);
+            openness.walk(db, visitor);
+        }
+    }
+}
+
+fn walk_dynamic_enum_anchor<'db, V: TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    anchor: &DynamicEnumAnchor<'db>,
+    visitor: &V,
+) {
+    match anchor {
+        DynamicEnumAnchor::Definition { spec, .. }
+        | DynamicEnumAnchor::ScopeOffset { spec, .. } => {
+            for (_, ty) in spec.members(db) {
+                visitor.visit_type(db, *ty);
+            }
+        }
+    }
 }
 
 #[salsa::tracked]

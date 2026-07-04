@@ -549,6 +549,33 @@ pub enum DynamicNamedTupleAnchor<'db> {
 }
 
 impl<'db> DynamicNamedTupleAnchor<'db> {
+    pub(super) fn same_visit_identity(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Self::CollectionsDefinition {
+                    definition: left, ..
+                },
+                Self::CollectionsDefinition {
+                    definition: right, ..
+                },
+            )
+            | (Self::TypingDefinition(left), Self::TypingDefinition(right)) => left == right,
+            (
+                Self::ScopeOffset {
+                    scope: left_scope,
+                    offset: left_offset,
+                    ..
+                },
+                Self::ScopeOffset {
+                    scope: right_scope,
+                    offset: right_offset,
+                    ..
+                },
+            ) => left_scope == right_scope && left_offset == right_offset,
+            _ => false,
+        }
+    }
+
     fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,

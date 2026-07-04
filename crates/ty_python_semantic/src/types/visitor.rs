@@ -9,7 +9,7 @@ use crate::{
         TypeAliasType, TypeFormType, TypeGuardType, TypeIsType, TypedDictType, UnionType,
         bound_super::walk_bound_super_type,
         callable::walk_callable_type,
-        class::walk_generic_alias,
+        class::{ClassLiteral, walk_class_literal, walk_generic_alias},
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
         known_instance::walk_known_instance_type,
@@ -77,6 +77,10 @@ pub(crate) trait TypeVisitor<'db> {
 
     fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
         walk_generic_alias(db, alias, self);
+    }
+
+    fn visit_class_literal_type(&self, db: &'db dyn Db, class: ClassLiteral<'db>) {
+        walk_class_literal(db, class, self);
     }
 
     fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
@@ -147,6 +151,7 @@ pub(super) enum NonAtomicType<'db> {
     BoundSuper(BoundSuperType<'db>),
     MethodWrapper(KnownBoundMethodType<'db>),
     Callable(CallableType<'db>),
+    ClassLiteral(ClassLiteral<'db>),
     GenericAlias(GenericAlias<'db>),
     KnownInstance(KnownInstanceType<'db>),
     SubclassOf(SubclassOfType<'db>),
@@ -179,7 +184,6 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             | Type::DataclassTransformer(_)
             | Type::WrapperDescriptor(_)
             | Type::ModuleLiteral(_)
-            | Type::ClassLiteral(_)
             | Type::SpecialForm(_)
             | Type::Divergent(_)
             | Type::Dynamic(_) => TypeKind::Atomic,
@@ -203,6 +207,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
                 TypeKind::NonAtomic(NonAtomicType::MethodWrapper(method_wrapper))
             }
             Type::Callable(callable) => TypeKind::NonAtomic(NonAtomicType::Callable(callable)),
+            Type::ClassLiteral(class) => TypeKind::NonAtomic(NonAtomicType::ClassLiteral(class)),
             Type::GenericAlias(alias) => TypeKind::NonAtomic(NonAtomicType::GenericAlias(alias)),
             Type::KnownInstance(known_instance) => {
                 TypeKind::NonAtomic(NonAtomicType::KnownInstance(known_instance))
@@ -259,6 +264,7 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
             visitor.visit_method_wrapper_type(db, method_wrapper);
         }
         NonAtomicType::Callable(callable) => visitor.visit_callable_type(db, callable),
+        NonAtomicType::ClassLiteral(class) => visitor.visit_class_literal_type(db, class),
         NonAtomicType::GenericAlias(alias) => visitor.visit_generic_alias_type(db, alias),
         NonAtomicType::KnownInstance(known_instance) => {
             visitor.visit_known_instance_type(db, known_instance);
@@ -299,7 +305,7 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
     match TypeKind::from(ty) {
         TypeKind::Atomic => {}
         TypeKind::NonAtomic(non_atomic_type) => {
-            if recursion_guard.type_was_already_seen(ty) {
+            if recursion_guard.type_was_already_seen(db, ty) {
                 // If we have already seen this type, we can skip it.
                 return;
             }
@@ -312,8 +318,25 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
 pub(crate) struct TypeCollector<'db>(RefCell<FxHashSet<Type<'db>>>);
 
 impl<'db> TypeCollector<'db> {
-    pub(crate) fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
-        !self.0.borrow_mut().insert(ty)
+    pub(crate) fn type_was_already_seen(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        let mut seen = self.0.borrow_mut();
+        if seen
+            .iter()
+            .any(|seen_ty| *seen_ty == ty || same_visit_identity(db, *seen_ty, ty))
+        {
+            return true;
+        }
+        seen.insert(ty);
+        false
+    }
+}
+
+fn same_visit_identity<'db>(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
+    match (left, right) {
+        (Type::ClassLiteral(left), Type::ClassLiteral(right)) => {
+            left.same_visit_identity(db, right)
+        }
+        _ => false,
     }
 }
 

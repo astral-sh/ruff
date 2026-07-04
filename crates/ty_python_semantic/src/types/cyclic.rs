@@ -179,6 +179,9 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
             (Type::Recursive(left), Type::Recursive(right)) => {
                 left.binder(db).same_marker(right.binder(db))
             }
+            (Type::ClassLiteral(left), Type::ClassLiteral(right)) => {
+                left.same_visit_identity(db, right)
+            }
             _ => false,
         }
     }
