@@ -7,10 +7,10 @@ use crate::{
     Db, Program,
     place::{Place, PlaceAndQualifiers},
     types::{
-        BindingContext, BoundTypeVarInstance, ClassBase, ClassLiteral, ClassType, GenericContext,
-        KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Parameters,
-        PropertyInstanceType, Signature, SubclassOfType, Type, TypeContext, TypeMapping,
-        definition_expression_type, member::Member, mro::Mro, tuple::TupleType,
+        ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassBase, ClassLiteral,
+        ClassType, GenericContext, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter,
+        Parameters, PropertyInstanceType, Signature, SubclassOfType, Type, TypeContext,
+        TypeMapping, definition_expression_type, member::Member, mro::Mro, tuple::TupleType,
     },
 };
 use ty_python_core::{definition::Definition, scope::ScopeId};
@@ -162,6 +162,21 @@ pub struct DynamicNamedTupleLiteral<'db> {
 impl get_size2::GetSize for DynamicNamedTupleLiteral<'_> {}
 
 impl<'db> DynamicNamedTupleLiteral<'db> {
+    pub(super) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.name(db),
+            self.anchor(db)
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+        )
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -534,6 +549,31 @@ pub enum DynamicNamedTupleAnchor<'db> {
 }
 
 impl<'db> DynamicNamedTupleAnchor<'db> {
+    fn apply_type_mapping_impl<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        match self {
+            Self::CollectionsDefinition { definition, spec } => Self::CollectionsDefinition {
+                definition: *definition,
+                spec: spec.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            },
+            Self::TypingDefinition(definition) => Self::TypingDefinition(*definition),
+            Self::ScopeOffset {
+                scope,
+                offset,
+                spec,
+            } => Self::ScopeOffset {
+                scope: *scope,
+                offset: *offset,
+                spec: spec.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            },
+        }
+    }
+
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -614,6 +654,29 @@ impl<'db> NamedTupleSpec<'db> {
             .collect::<Option<Box<_>>>()?;
 
         Some(Self::new(db, fields, self.has_known_fields(db)))
+    }
+
+    fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let fields = self
+            .fields(db)
+            .iter()
+            .map(|f| NamedTupleField {
+                name: f.name.clone(),
+                ty: f.ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                default: f
+                    .default
+                    .map(|default| default.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+                definition: f.definition,
+            })
+            .collect::<Box<_>>();
+
+        Self::new(db, fields, self.has_known_fields(db))
     }
 }
 

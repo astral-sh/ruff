@@ -6,8 +6,8 @@ use crate::{
     Db, TypeQualifiers,
     place::{Place, PlaceAndQualifiers},
     types::{
-        ClassBase, ClassLiteral, ClassType, DataclassParams, KnownClass, MemberLookupPolicy,
-        SubclassOfType, Type,
+        ApplyTypeMappingVisitor, ClassBase, ClassLiteral, ClassType, DataclassParams, KnownClass,
+        MemberLookupPolicy, SubclassOfType, Type, TypeContext, TypeMapping,
         class::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, InstanceMemberResult, MroLookup,
             typed_dict::typed_dict_fallback_class_member,
@@ -107,6 +107,34 @@ pub enum DynamicClassAnchor<'db> {
 }
 
 impl<'db> DynamicClassAnchor<'db> {
+    fn apply_type_mapping_impl<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        match self {
+            Self::Definition(definition) => Self::Definition(*definition),
+            Self::ScopeOffset {
+                scope,
+                offset,
+                explicit_bases,
+            } => {
+                let mapped_explicit_bases = explicit_bases
+                    .iter()
+                    .map(|base| base.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                    .collect::<Box<_>>();
+
+                Self::ScopeOffset {
+                    scope: *scope,
+                    offset: *offset,
+                    explicit_bases: mapped_explicit_bases,
+                }
+            }
+        }
+    }
+
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -531,6 +559,40 @@ impl<'db> DynamicClassLiteral<'db> {
 }
 
 impl<'db> DynamicClassLiteral<'db> {
+    pub(super) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let anchor = self
+            .anchor(db)
+            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+        let members = self
+            .members(db)
+            .iter()
+            .map(|(name, ty)| {
+                (
+                    name.clone(),
+                    ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                )
+            })
+            .collect::<Box<_>>();
+        let dataclass_params = self
+            .dataclass_params(db)
+            .map(|params| params.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+
+        Self::new(
+            db,
+            self.name(db),
+            anchor,
+            members,
+            self.has_dynamic_namespace(db),
+            dataclass_params,
+        )
+    }
+
     /// Normalize types that are part of this dynamic class's interned identity.
     pub(super) fn recursive_type_normalized_impl(
         self,

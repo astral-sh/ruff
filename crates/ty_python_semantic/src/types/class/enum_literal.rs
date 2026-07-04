@@ -6,12 +6,12 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Db;
 use crate::place::{Place, PlaceAndQualifiers};
-use crate::types::Type;
 use crate::types::class::known::KnownClass;
 use crate::types::class::{ClassLiteral, ClassType, MemberLookupPolicy};
 use crate::types::class_base::ClassBase;
 use crate::types::member::Member;
 use crate::types::mro::{DynamicMroError, Mro};
+use crate::types::{ApplyTypeMappingVisitor, Type, TypeContext, TypeMapping};
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 
@@ -24,6 +24,27 @@ pub struct EnumSpec<'db> {
 }
 
 impl<'db> EnumSpec<'db> {
+    fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let members = self
+            .members(db)
+            .iter()
+            .map(|(name, ty)| {
+                (
+                    name.clone(),
+                    ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                )
+            })
+            .collect::<Box<_>>();
+
+        Self::new(db, members, self.has_known_members(db))
+    }
+
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -65,6 +86,30 @@ pub enum DynamicEnumAnchor<'db> {
 }
 
 impl<'db> DynamicEnumAnchor<'db> {
+    fn apply_type_mapping_impl<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        match self {
+            Self::Definition { definition, spec } => Self::Definition {
+                definition: *definition,
+                spec: spec.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            },
+            Self::ScopeOffset {
+                scope,
+                offset,
+                spec,
+            } => Self::ScopeOffset {
+                scope: *scope,
+                offset: *offset,
+                spec: spec.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            },
+        }
+    }
+
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -103,6 +148,27 @@ pub struct DynamicEnumLiteral<'db> {
 impl get_size2::GetSize for DynamicEnumLiteral<'_> {}
 
 impl<'db> DynamicEnumLiteral<'db> {
+    pub(super) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let mixin_type = self
+            .mixin_type(db)
+            .map(|mixin| mixin.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+
+        Self::new(
+            db,
+            self.name(db),
+            self.anchor(db)
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            self.base_class(db),
+            mixin_type,
+        )
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,

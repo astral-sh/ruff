@@ -421,6 +421,30 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    pub(super) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        match self {
+            Self::Dynamic(dynamic) => {
+                Self::Dynamic(dynamic.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+            }
+            Self::DynamicNamedTuple(named_tuple) => Self::DynamicNamedTuple(
+                named_tuple.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            ),
+            Self::DynamicTypedDict(typed_dict) => Self::DynamicTypedDict(
+                typed_dict.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            ),
+            Self::DynamicEnum(enum_literal) => Self::DynamicEnum(
+                enum_literal.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            ),
+            Self::Static(_) => self,
+        }
+    }
+
     /// Returns the name of the class.
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         match self {
