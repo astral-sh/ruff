@@ -1,4 +1,4 @@
-use compact_str::ToCompactString;
+use compact_str::{CompactString, ToCompactString};
 use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
@@ -1775,6 +1775,16 @@ impl<'db> Type<'db> {
 
     /// Create a promotable string literal.
     pub(crate) fn string_literal(db: &'db dyn Db, string: &str) -> Self {
+        Self::LiteralValue(LiteralValueType::promotable(StringLiteralType::new(
+            db, string,
+        )))
+    }
+
+    /// Create a promotable string literal from an owned [`CompactString`].
+    ///
+    /// On an interning miss, Salsa can store the value directly instead of copying it from a
+    /// borrowed `str`.
+    pub(crate) fn string_literal_owned(db: &'db dyn Db, string: CompactString) -> Self {
         Self::LiteralValue(LiteralValueType::promotable(StringLiteralType::new(
             db, string,
         )))
