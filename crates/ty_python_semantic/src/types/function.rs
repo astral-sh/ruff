@@ -943,7 +943,7 @@ pub(super) enum AbstractMethodKind {
 }
 
 impl<'db> Foldable<'db> for AbstractMethodKind {
-    fn fold(self, _db: &'db dyn Db, _recursive: super::RecursiveType<'db>) -> Self {
+    fn fold_with(self, _db: &'db dyn Db, _mapping: &super::TypeMapping<'db, 'db>) -> Self {
         self
     }
 }

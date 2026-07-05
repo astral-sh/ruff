@@ -18,9 +18,9 @@ use super::diagnostic::{
 };
 use super::infer::{TypeExpressionFlags, infer_deferred_types};
 use super::{
-    ApplyTypeMappingVisitor, ErrorContext, Foldable, IntersectionType, RecursiveType, Type,
-    TypeMapping, TypeQualifiers, UnionBuilder, definition_expression_annotation,
-    definition_expression_type, visitor,
+    ApplyTypeMappingVisitor, ErrorContext, Foldable, IntersectionType, Type, TypeMapping,
+    TypeQualifiers, UnionBuilder, definition_expression_annotation, definition_expression_type,
+    visitor,
 };
 use crate::Db;
 use crate::types::TypeContext;
@@ -173,19 +173,19 @@ impl TypedDictExtraItems<'_> {
 }
 
 impl<'db> Foldable<'db> for TypedDictExtraItems<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         Self {
-            declared_ty: self.declared_ty.fold(db, recursive),
+            declared_ty: self.declared_ty.fold_with(db, mapping),
             is_read_only: self.is_read_only,
         }
     }
 }
 
 impl<'db> Foldable<'db> for TypedDictOpenness<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         match self {
             Self::ImplicitlyOpen | Self::Closed => self,
-            Self::Extra(extra_items) => Self::Extra(extra_items.fold(db, recursive)),
+            Self::Extra(extra_items) => Self::Extra(extra_items.fold_with(db, mapping)),
         }
     }
 }
@@ -1618,9 +1618,9 @@ pub(crate) struct UnpackedTypedDict<'db> {
 }
 
 impl<'db> Foldable<'db> for UnpackedTypedDictKey<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         Self {
-            value_ty: self.value_ty.fold(db, recursive),
+            value_ty: self.value_ty.fold_with(db, mapping),
             is_required: self.is_required,
             definition: self.definition,
         }
@@ -1628,14 +1628,14 @@ impl<'db> Foldable<'db> for UnpackedTypedDictKey<'db> {
 }
 
 impl<'db> Foldable<'db> for UnpackedTypedDict<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         Self {
             keys: self
                 .keys
                 .into_iter()
-                .map(|(name, key)| (name, key.fold(db, recursive)))
+                .map(|(name, key)| (name, key.fold_with(db, mapping)))
                 .collect(),
-            openness: self.openness.fold(db, recursive),
+            openness: self.openness.fold_with(db, mapping),
         }
     }
 }

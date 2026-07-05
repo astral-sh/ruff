@@ -63,9 +63,9 @@ use crate::types::{
     ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, Foldable,
     GenericAlias, InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass,
     KnownInstanceType, LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
-    RecursiveType, SpecialFormType, TypeAliasType, TypeContext, TypeMapping,
-    TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, list_members,
+    SpecialFormType, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
+    list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -334,10 +334,10 @@ impl<'db> CallableItem<'db> {
 }
 
 impl<'db> Foldable<'db> for CallableItem<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         match self {
-            Self::Regular(binding) => Self::Regular(binding.fold(db, recursive)),
-            Self::Constructor(binding) => Self::Constructor(binding.fold(db, recursive)),
+            Self::Regular(binding) => Self::Regular(binding.fold_with(db, mapping)),
+            Self::Constructor(binding) => Self::Constructor(binding.fold_with(db, mapping)),
         }
     }
 }
@@ -452,12 +452,12 @@ impl<'db> BindingsElement<'db> {
 }
 
 impl<'db> Foldable<'db> for BindingsElement<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         Self {
             items: self
                 .items
                 .into_iter()
-                .map(|item| item.fold(db, recursive))
+                .map(|item| item.fold_with(db, mapping))
                 .collect(),
         }
     }
@@ -2774,15 +2774,15 @@ impl<'db> Bindings<'db> {
 }
 
 impl<'db> Foldable<'db> for Bindings<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         Self {
-            callable_type: self.callable_type.fold(db, recursive),
+            callable_type: self.callable_type.fold_with(db, mapping),
             implicit_dunder_new_is_possibly_unbound: self.implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound: self.implicit_dunder_init_is_possibly_unbound,
             elements: self
                 .elements
                 .into_iter()
-                .map(|element| element.fold(db, recursive))
+                .map(|element| element.fold_with(db, mapping))
                 .collect(),
             enclosing_binding_contexts: self.enclosing_binding_contexts,
         }
@@ -4124,18 +4124,18 @@ impl<'a, 'db> IntoIterator for &'a CallableBinding<'db> {
 }
 
 impl<'db> Foldable<'db> for CallableBinding<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         Self {
-            callable_type: self.callable_type.fold(db, recursive),
-            signature_type: self.signature_type.fold(db, recursive),
+            callable_type: self.callable_type.fold_with(db, mapping),
+            signature_type: self.signature_type.fold_with(db, mapping),
             dunder_call_is_possibly_unbound: self.dunder_call_is_possibly_unbound,
-            bound_type: self.bound_type.fold(db, recursive),
-            overload_call_return_type: self.overload_call_return_type.fold(db, recursive),
+            bound_type: self.bound_type.fold_with(db, mapping),
+            overload_call_return_type: self.overload_call_return_type.fold_with(db, mapping),
             matching_overload_before_type_checking: self.matching_overload_before_type_checking,
             overloads: self
                 .overloads
                 .into_iter()
-                .map(|binding| binding.fold(db, recursive))
+                .map(|binding| binding.fold_with(db, mapping))
                 .collect(),
         }
     }
@@ -4158,9 +4158,11 @@ enum OverloadCallReturnType<'db> {
 }
 
 impl<'db> Foldable<'db> for OverloadCallReturnType<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         match self {
-            Self::ArgumentTypeExpansion(ty) => Self::ArgumentTypeExpansion(ty.fold(db, recursive)),
+            Self::ArgumentTypeExpansion(ty) => {
+                Self::ArgumentTypeExpansion(ty.fold_with(db, mapping))
+            }
             Self::ArgumentTypeExpansionLimitReached(limit) => {
                 Self::ArgumentTypeExpansionLimitReached(limit)
             }
@@ -5671,12 +5673,12 @@ impl<'db> MatchedArgument<'db> {
 }
 
 impl<'db> Foldable<'db> for MatchedArgument<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         Self {
             parameters: self
                 .parameters
                 .into_iter()
-                .map(|parameter| parameter.fold(db, recursive))
+                .map(|parameter| parameter.fold_with(db, mapping))
                 .collect(),
             matched: self.matched,
         }
@@ -5684,10 +5686,10 @@ impl<'db> Foldable<'db> for MatchedArgument<'db> {
 }
 
 impl<'db> Foldable<'db> for MatchedParameter<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         Self {
             index: self.index,
-            argument_type: self.argument_type.fold(db, recursive),
+            argument_type: self.argument_type.fold_with(db, mapping),
             provenance: self.provenance,
         }
     }
@@ -6667,21 +6669,21 @@ impl<'db> Binding<'db> {
 }
 
 impl<'db> Foldable<'db> for Binding<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         Self {
-            signature: self.signature.fold(db, recursive),
+            signature: self.signature.fold_with(db, mapping),
             source_overload_index: self.source_overload_index,
-            callable_type: self.callable_type.fold(db, recursive),
-            signature_type: self.signature_type.fold(db, recursive),
-            return_ty: self.return_ty.fold(db, recursive),
-            constructor_context: self.constructor_context.fold(db, recursive),
+            callable_type: self.callable_type.fold_with(db, mapping),
+            signature_type: self.signature_type.fold_with(db, mapping),
+            return_ty: self.return_ty.fold_with(db, mapping),
+            constructor_context: self.constructor_context.fold_with(db, mapping),
             inferable_typevars: self.inferable_typevars,
-            specialization: self.specialization.fold(db, recursive),
+            specialization: self.specialization.fold_with(db, mapping),
             argument_matches: self
                 .argument_matches
                 .into_vec()
                 .into_iter()
-                .map(|argument| argument.fold(db, recursive))
+                .map(|argument| argument.fold_with(db, mapping))
                 .collect(),
             variadic_argument_matched_to_variadic_parameter: self
                 .variadic_argument_matched_to_variadic_parameter,
@@ -6689,9 +6691,9 @@ impl<'db> Foldable<'db> for Binding<'db> {
                 .parameter_tys
                 .into_vec()
                 .into_iter()
-                .map(|ty| ty.fold(db, recursive))
+                .map(|ty| ty.fold_with(db, mapping))
                 .collect(),
-            errors: self.errors.fold(db, recursive),
+            errors: self.errors.fold_with(db, mapping),
         }
     }
 }
@@ -7143,7 +7145,7 @@ impl BindingError<'_> {
 }
 
 impl<'db> Foldable<'db> for BindingError<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         match self {
             Self::InvalidArgumentType {
                 parameter,
@@ -7154,8 +7156,8 @@ impl<'db> Foldable<'db> for BindingError<'db> {
             } => Self::InvalidArgumentType {
                 parameter,
                 argument_index,
-                expected_ty: expected_ty.fold(db, recursive),
-                provided_ty: provided_ty.fold(db, recursive),
+                expected_ty: expected_ty.fold_with(db, mapping),
+                provided_ty: provided_ty.fold_with(db, mapping),
                 provenance,
             },
             Self::InvalidKeyType {
@@ -7163,7 +7165,7 @@ impl<'db> Foldable<'db> for BindingError<'db> {
                 provided_ty,
             } => Self::InvalidKeyType {
                 argument_index,
-                provided_ty: provided_ty.fold(db, recursive),
+                provided_ty: provided_ty.fold_with(db, mapping),
             },
             Self::MissingArguments {
                 parameters,
@@ -7209,18 +7211,18 @@ impl<'db> Foldable<'db> for BindingError<'db> {
                 error,
                 argument_index,
             } => Self::SpecializationError {
-                error: error.fold(db, recursive),
+                error: error.fold_with(db, mapping),
                 argument_index,
             },
             Self::PropertyHasNoSetter(property) => {
-                Self::PropertyHasNoSetter(property.fold(db, recursive))
+                Self::PropertyHasNoSetter(property.fold_with(db, mapping))
             }
             Self::PropertyHasNoDeleter(property) => {
-                Self::PropertyHasNoDeleter(property.fold(db, recursive))
+                Self::PropertyHasNoDeleter(property.fold_with(db, mapping))
             }
             Self::InternalCallError(message) => Self::InternalCallError(message),
             Self::UnmatchedOverload => Self::UnmatchedOverload,
-            Self::CalledTopCallable(ty) => Self::CalledTopCallable(ty.fold(db, recursive)),
+            Self::CalledTopCallable(ty) => Self::CalledTopCallable(ty.fold_with(db, mapping)),
             Self::InvalidDataclassApplication(target) => Self::InvalidDataclassApplication(target),
             Self::InvalidDataclassArgument(argument) => Self::InvalidDataclassArgument(argument),
         }

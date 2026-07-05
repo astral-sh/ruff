@@ -4,6 +4,7 @@ use itertools::{Either, Itertools};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_python_ast::{AnyNodeRef, name::Name};
 
+use crate::types::TypeMapping;
 use crate::{
     Db, DisplaySettings,
     place::{Place, PlaceAndQualifiers},
@@ -223,27 +224,27 @@ impl<'db> BoundSuperError<'db> {
 }
 
 impl<'db> Foldable<'db> for BoundSuperError<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         match self {
             Self::AbstractOwnerType {
                 owner_type,
                 pivot_class,
                 typevar_context,
             } => Self::AbstractOwnerType {
-                owner_type: owner_type.fold(db, recursive),
-                pivot_class: pivot_class.fold(db, recursive),
+                owner_type: owner_type.fold_with(db, mapping),
+                pivot_class: pivot_class.fold_with(db, mapping),
                 typevar_context,
             },
             Self::InvalidPivotClassType { pivot_class } => Self::InvalidPivotClassType {
-                pivot_class: pivot_class.fold(db, recursive),
+                pivot_class: pivot_class.fold_with(db, mapping),
             },
             Self::FailingConditionCheck {
                 pivot_class,
                 owner,
                 typevar_context,
             } => Self::FailingConditionCheck {
-                pivot_class: pivot_class.fold(db, recursive),
-                owner: owner.fold(db, recursive),
+                pivot_class: pivot_class.fold_with(db, mapping),
+                owner: owner.fold_with(db, mapping),
                 typevar_context,
             },
             Self::UnavailableImplicitArguments => Self::UnavailableImplicitArguments,

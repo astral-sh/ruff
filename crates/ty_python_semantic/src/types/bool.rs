@@ -2,13 +2,13 @@ use ruff_db::diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::types::Foldable;
+use crate::types::TypeMapping;
 use crate::{
     Db,
     types::{
         CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, RecursiveType, SubclassOfInner, Type, TypeContext,
-        TypeVarBoundOrConstraints, UnionType, call::CallErrorKind,
-        constraints::ConstraintSetBuilder, context::InferContext,
+        LiteralValueTypeKind, SubclassOfInner, Type, TypeContext, TypeVarBoundOrConstraints,
+        UnionType, call::CallErrorKind, constraints::ConstraintSetBuilder, context::InferContext,
         diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
     },
 };
@@ -345,27 +345,27 @@ impl<'db> Type<'db> {
 }
 
 impl<'db> Foldable<'db> for BoolError<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         match self {
             Self::NotCallable { not_boolable_type } => Self::NotCallable {
-                not_boolable_type: not_boolable_type.fold(db, recursive),
+                not_boolable_type: not_boolable_type.fold_with(db, mapping),
             },
             Self::IncorrectArguments {
                 not_boolable_type,
                 truthiness,
             } => Self::IncorrectArguments {
-                not_boolable_type: not_boolable_type.fold(db, recursive),
+                not_boolable_type: not_boolable_type.fold_with(db, mapping),
                 truthiness,
             },
             Self::IncorrectReturnType {
                 not_boolable_type,
                 return_type,
             } => Self::IncorrectReturnType {
-                not_boolable_type: not_boolable_type.fold(db, recursive),
-                return_type: return_type.fold(db, recursive),
+                not_boolable_type: not_boolable_type.fold_with(db, mapping),
+                return_type: return_type.fold_with(db, mapping),
             },
             Self::Union { union, truthiness } => {
-                let folded = Type::Union(union).fold(db, recursive);
+                let folded = Type::Union(union).fold_with(db, mapping);
                 let Type::Union(union) = folded else {
                     return Self::Other {
                         not_boolable_type: folded,
@@ -374,7 +374,7 @@ impl<'db> Foldable<'db> for BoolError<'db> {
                 Self::Union { union, truthiness }
             }
             Self::Other { not_boolable_type } => Self::Other {
-                not_boolable_type: not_boolable_type.fold(db, recursive),
+                not_boolable_type: not_boolable_type.fold_with(db, mapping),
             },
         }
     }

@@ -374,6 +374,39 @@ where
     visitor.found_matching_type.get()
 }
 
+/// Calls `visit` on `ty` and every type nested in it; each distinct non-atomic type is
+/// visited only once.
+pub(super) fn for_each_over_type<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    should_visit_lazy_type_attributes: bool,
+    visit: impl Fn(Type<'db>),
+) {
+    struct ForEachVisitor<'db, 'a> {
+        visit: &'a dyn Fn(Type<'db>),
+        recursion_guard: TypeCollector<'db>,
+        should_visit_lazy_type_attributes: bool,
+    }
+
+    impl<'db> TypeVisitor<'db> for ForEachVisitor<'db, '_> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            self.should_visit_lazy_type_attributes
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            (self.visit)(ty);
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+    }
+
+    let visitor = ForEachVisitor {
+        visit: &visit,
+        recursion_guard: TypeCollector::default(),
+        should_visit_lazy_type_attributes,
+    };
+    visitor.visit_type(db, ty);
+}
+
 /// Return `true` if `ty`, or any of the types contained in `ty`, match the closure passed in.
 ///
 /// The function guards against infinite recursion

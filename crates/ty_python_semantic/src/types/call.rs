@@ -1,9 +1,9 @@
 use super::context::InferContext;
-use super::{Foldable, RecursiveType, Signature, Type, TypeContext, UnionType};
+use super::{Foldable, Signature, Type, TypeContext, UnionType};
 use crate::Db;
 use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
-use crate::types::{MemberLookupPolicy, PropertyInstanceType};
+use crate::types::{MemberLookupPolicy, PropertyInstanceType, TypeMapping};
 use ruff_python_ast as ast;
 
 mod arguments;
@@ -332,18 +332,20 @@ impl<'db> CallDunderError<'db> {
 }
 
 impl<'db> Foldable<'db> for CallDunderError<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         match self {
-            Self::CallError(kind, bindings, provenance) => {
-                Self::CallError(kind, Box::new((*bindings).fold(db, recursive)), provenance)
-            }
+            Self::CallError(kind, bindings, provenance) => Self::CallError(
+                kind,
+                Box::new((*bindings).fold_with(db, mapping)),
+                provenance,
+            ),
             Self::PossiblyUnbound {
                 bindings,
                 unbound_on,
             } => Self::PossiblyUnbound {
-                bindings: Box::new((*bindings).fold(db, recursive)),
+                bindings: Box::new((*bindings).fold_with(db, mapping)),
                 unbound_on: unbound_on
-                    .map(|types| types.into_vec().fold(db, recursive).into_boxed_slice()),
+                    .map(|types| types.into_vec().fold_with(db, mapping).into_boxed_slice()),
             },
             Self::MethodNotAvailable => Self::MethodNotAvailable,
         }

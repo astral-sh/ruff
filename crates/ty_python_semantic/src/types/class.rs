@@ -14,9 +14,8 @@ pub(crate) use self::static_literal::{
 };
 pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use super::{
-    BoundTypeVarInstance, Foldable, MemberLookupPolicy, MroIterator, RecursiveType,
-    SpecialFormType, SubclassOfType, Type, TypeQualifiers, class_base::ClassBase,
-    function::FunctionType,
+    BoundTypeVarInstance, Foldable, MemberLookupPolicy, MroIterator, SpecialFormType,
+    SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, Provenance, TypeOrigin};
@@ -299,9 +298,9 @@ impl<'db> GenericAlias<'db> {
 }
 
 impl<'db> Foldable<'db> for GenericAlias<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         let original_specialization = self.specialization(db);
-        let specialization = original_specialization.fold(db, recursive);
+        let specialization = original_specialization.fold_with(db, mapping);
         if specialization == original_specialization {
             self
         } else {
@@ -2288,10 +2287,10 @@ impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
 }
 
 impl<'db> Foldable<'db> for ClassType<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         match self {
             Self::NonGeneric(_) => self,
-            Self::Generic(generic) => Self::Generic(generic.fold(db, recursive)),
+            Self::Generic(generic) => Self::Generic(generic.fold_with(db, mapping)),
         }
     }
 }

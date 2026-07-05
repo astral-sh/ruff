@@ -7,6 +7,7 @@ use ruff_python_ast as ast;
 
 use crate::Db;
 use crate::subscript::{PyIndex, PySlice};
+use crate::types::TypeMapping;
 use crate::types::special_form::TypeQualifier;
 
 use super::call::{Bindings, CallArguments, CallDunderError, CallErrorKind};
@@ -22,8 +23,8 @@ use super::infer::TypeContext;
 use super::instance::SliceLiteral;
 use super::special_form::SpecialFormType;
 use super::{
-    DynamicType, Foldable, IntersectionBuilder, IntersectionType, KnownInstanceType, RecursiveType,
-    Type, TypeAliasType, TypedDictType, UnionBuilder, UnionType, todo_type,
+    DynamicType, Foldable, IntersectionBuilder, IntersectionType, KnownInstanceType, Type,
+    TypeAliasType, TypedDictType, UnionBuilder, UnionType, todo_type,
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
@@ -184,16 +185,16 @@ impl<'db> SubscriptError<'db> {
 }
 
 impl<'db> Foldable<'db> for SubscriptError<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         Self {
-            result_ty: self.result_ty.fold(db, recursive),
-            errors: self.errors.fold(db, recursive),
+            result_ty: self.result_ty.fold_with(db, mapping),
+            errors: self.errors.fold_with(db, mapping),
         }
     }
 }
 
 impl<'db> Foldable<'db> for SubscriptErrorKind<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         match self {
             Self::IndexOutOfBounds {
                 kind,
@@ -202,7 +203,7 @@ impl<'db> Foldable<'db> for SubscriptErrorKind<'db> {
                 index,
             } => Self::IndexOutOfBounds {
                 kind,
-                tuple_ty: tuple_ty.fold(db, recursive),
+                tuple_ty: tuple_ty.fold_with(db, mapping),
                 length,
                 index,
             },
@@ -210,7 +211,7 @@ impl<'db> Foldable<'db> for SubscriptErrorKind<'db> {
             Self::NonGenericTypeAlias { alias } => Self::NonGenericTypeAlias { alias },
             Self::DunderPossiblyUnbound { method, value_ty } => Self::DunderPossiblyUnbound {
                 method,
-                value_ty: value_ty.fold(db, recursive),
+                value_ty: value_ty.fold_with(db, mapping),
             },
             Self::DunderCallError {
                 method,
@@ -220,8 +221,8 @@ impl<'db> Foldable<'db> for SubscriptErrorKind<'db> {
                 bindings,
             } => Self::DunderCallError {
                 method,
-                value_ty: value_ty.fold(db, recursive),
-                slice_ty: slice_ty.fold(db, recursive),
+                value_ty: value_ty.fold_with(db, mapping),
+                slice_ty: slice_ty.fold_with(db, mapping),
                 kind,
                 bindings,
             },
@@ -231,11 +232,11 @@ impl<'db> Foldable<'db> for SubscriptErrorKind<'db> {
                 full_object_ty,
             } => Self::InvalidTypedDictKey {
                 typed_dict,
-                slice_ty: slice_ty.fold(db, recursive),
-                full_object_ty: full_object_ty.fold(db, recursive),
+                slice_ty: slice_ty.fold_with(db, mapping),
+                full_object_ty: full_object_ty.fold_with(db, mapping),
             },
             Self::NotSubscriptable { value_ty, method } => Self::NotSubscriptable {
-                value_ty: value_ty.fold(db, recursive),
+                value_ty: value_ty.fold_with(db, mapping),
                 method,
             },
             Self::InvalidLegacyGenericArgument {
@@ -243,7 +244,7 @@ impl<'db> Foldable<'db> for SubscriptErrorKind<'db> {
                 argument_ty,
             } => Self::InvalidLegacyGenericArgument {
                 origin,
-                argument_ty: argument_ty.fold(db, recursive),
+                argument_ty: argument_ty.fold_with(db, mapping),
             },
             Self::DuplicateTypevar {
                 origin,

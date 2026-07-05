@@ -1,9 +1,10 @@
+use crate::types::TypeMapping;
 use crate::{
     Db,
     types::{
         AwaitError, Bindings, CallArguments, CallDunderError, Foldable, KnownClass,
-        LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind, RecursiveType, Type,
-        TypeContext, TypeVarBoundOrConstraints, UnionType,
+        LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
+        TypeVarBoundOrConstraints, UnionType,
         call::CallErrorKind,
         context::InferContext,
         diagnostic::NOT_ITERABLE,
@@ -492,13 +493,13 @@ pub(super) enum IterationError<'db> {
 }
 
 impl<'db> Foldable<'db> for Cow<'db, TupleSpec<'db>> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
-        Cow::Owned(self.into_owned().fold(db, recursive))
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
+        Cow::Owned(self.into_owned().fold_with(db, mapping))
     }
 }
 
 impl<'db> Foldable<'db> for IterationError<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         match self {
             Self::IterCallError {
                 kind,
@@ -506,7 +507,7 @@ impl<'db> Foldable<'db> for IterationError<'db> {
                 mode,
             } => Self::IterCallError {
                 kind,
-                bindings: Box::new((*bindings).fold(db, recursive)),
+                bindings: Box::new((*bindings).fold_with(db, mapping)),
                 mode,
             },
             Self::IterReturnsInvalidIterator {
@@ -514,8 +515,8 @@ impl<'db> Foldable<'db> for IterationError<'db> {
                 dunder_error,
                 mode,
             } => Self::IterReturnsInvalidIterator {
-                iterator: iterator.fold(db, recursive),
-                dunder_error: dunder_error.fold(db, recursive),
+                iterator: iterator.fold_with(db, mapping),
+                dunder_error: dunder_error.fold_with(db, mapping),
                 mode,
             },
             Self::PossiblyUnboundIterAndGetitemError {
@@ -523,15 +524,15 @@ impl<'db> Foldable<'db> for IterationError<'db> {
                 unbound_on_iter,
                 dunder_getitem_error,
             } => Self::PossiblyUnboundIterAndGetitemError {
-                dunder_next_return: dunder_next_return.fold(db, recursive),
+                dunder_next_return: dunder_next_return.fold_with(db, mapping),
                 unbound_on_iter: unbound_on_iter
-                    .map(|types| types.into_vec().fold(db, recursive).into_boxed_slice()),
-                dunder_getitem_error: dunder_getitem_error.fold(db, recursive),
+                    .map(|types| types.into_vec().fold_with(db, mapping).into_boxed_slice()),
+                dunder_getitem_error: dunder_getitem_error.fold_with(db, mapping),
             },
             Self::UnboundIterAndGetitemError {
                 dunder_getitem_error,
             } => Self::UnboundIterAndGetitemError {
-                dunder_getitem_error: dunder_getitem_error.fold(db, recursive),
+                dunder_getitem_error: dunder_getitem_error.fold_with(db, mapping),
             },
             Self::UnboundAiterError => Self::UnboundAiterError,
         }

@@ -612,7 +612,11 @@ enum ClassDecoratorUnknownResultPolicy {
 }
 
 impl<'db> Foldable<'db> for ClassDecoratorUnknownResultPolicy {
-    fn fold(self, _db: &'db dyn crate::Db, _recursive: crate::types::RecursiveType<'db>) -> Self {
+    fn fold_with(
+        self,
+        _db: &'db dyn crate::Db,
+        _mapping: &crate::types::TypeMapping<'db, 'db>,
+    ) -> Self {
         self
     }
 }

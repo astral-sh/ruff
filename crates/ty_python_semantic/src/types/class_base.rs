@@ -527,11 +527,11 @@ impl<'db> From<&ClassBase<'db>> for Type<'db> {
 }
 
 impl<'db> Foldable<'db> for ClassBase<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         match self {
             Self::Class(class) => Self::Class(class.apply_type_mapping_impl(
                 db,
-                &recursive.fold_mapping(db),
+                mapping,
                 TypeContext::default(),
                 &ApplyTypeMappingVisitor::default(),
             )),

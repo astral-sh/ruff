@@ -5,7 +5,7 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::generics::Specialization;
 use crate::types::signatures::Parameter;
 use crate::types::{
-    BoundTypeVarInstance, ClassLiteral, DynamicType, Foldable, RecursiveType, Type, TypeContext,
+    BoundTypeVarInstance, ClassLiteral, DynamicType, Foldable, Type, TypeContext, TypeMapping,
 };
 
 /// Bindings for a constructor call.
@@ -503,13 +503,13 @@ impl<'db> ConstructorBinding<'db> {
 }
 
 impl<'db> Foldable<'db> for ConstructorBinding<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         Self {
-            entry: self.entry.fold(db, recursive),
-            constructor_context: self.constructor_context.fold(db, recursive),
+            entry: self.entry.fold_with(db, mapping),
+            constructor_context: self.constructor_context.fold_with(db, mapping),
             downstream_constructor: self
                 .downstream_constructor
-                .map(|bindings| Box::new(bindings.fold(db, recursive))),
+                .map(|bindings| Box::new(bindings.fold_with(db, mapping))),
         }
     }
 }
@@ -545,9 +545,9 @@ impl<'db> ConstructorContext<'db> {
 }
 
 impl<'db> Foldable<'db> for ConstructorContext<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         Self {
-            instance_type: self.instance_type.fold(db, recursive),
+            instance_type: self.instance_type.fold_with(db, mapping),
             kind: self.kind,
         }
     }

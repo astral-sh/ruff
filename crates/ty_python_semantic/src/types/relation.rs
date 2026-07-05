@@ -1131,6 +1131,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // fixpoint; compare their bodies directly. Unfolding both sides instead multiplies
             // the depth of the comparison by the body size at every level, which can exhaust
             // the stack before the recursion guard sees a repeated pair.
+            //
+            // TODO: extend this to μ-terms with different markers. That requires a real
+            // coinductive hypothesis environment (assumed marker pairs) so that variable
+            // leaf pairs resolve to the assumption instead of the conservative `Divergent`
+            // arm above; without it, union simplification loses precision and recovery
+            // values grow instead of converging.
             (Type::Recursive(source_recursive), Type::Recursive(target_recursive))
                 if source_recursive
                     .binder(db)

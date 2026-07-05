@@ -101,7 +101,7 @@ pub use crate::types::typevar::{
 };
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::{TypeVisitor, any_over_type, find_over_type};
+use crate::types::visitor::{TypeVisitor, any_over_type, find_over_type, for_each_over_type};
 use crate::{Db, FxOrderSet, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator};
@@ -1327,22 +1327,18 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn collect_recursive_boundaries(
-        self,
-        db: &'db dyn Db,
-        recursives: &mut Vec<RecursiveType<'db>>,
-    ) {
-        while let Some(recursive) = find_over_type(db, self, false, |ty| {
-            let Type::Recursive(recursive) = ty else {
-                return None;
-            };
-            recursives
-                .iter()
-                .all(|seen| !seen.binder(db).same_marker(recursive.binder(db)))
-                .then_some(recursive)
-        }) {
-            recursives.push(recursive);
-        }
+    /// Collects every μ-term embedded in this type, in one traversal.
+    fn collect_recursive_types(self, db: &'db dyn Db) -> Vec<RecursiveType<'db>> {
+        let collected = std::cell::RefCell::new(Vec::new());
+        for_each_over_type(db, self, false, |ty| {
+            if let Type::Recursive(recursive) = ty {
+                let mut collected = collected.borrow_mut();
+                if !collected.contains(&recursive) {
+                    collected.push(recursive);
+                }
+            }
+        });
+        collected.into_inner()
     }
 
     fn fold_recursive_boundaries_to_fixpoint(
@@ -1369,15 +1365,7 @@ impl<'db> Type<'db> {
     /// foreign generation never deduplicate and accumulate one variant per iteration.
     fn unify_recursive_generations(mut self, db: &'db dyn Db) -> Self {
         loop {
-            let mut nodes: Vec<RecursiveType<'db>> = Vec::new();
-            while let Some(recursive) = find_over_type(db, self, false, |ty| {
-                let Type::Recursive(recursive) = ty else {
-                    return None;
-                };
-                (!nodes.contains(&recursive)).then_some(recursive)
-            }) {
-                nodes.push(recursive);
-            }
+            let nodes = self.collect_recursive_types(db);
 
             let mut changed = false;
             for (index, first) in nodes.iter().copied().enumerate() {
@@ -1596,8 +1584,20 @@ impl<'db> Type<'db> {
 
         // Keep the value compact: fold unfolded occurrences of the embedded (foreign) μ-terms
         // back to the terms themselves.
-        let mut recursives = Vec::new();
-        current_body.collect_recursive_boundaries(db, &mut recursives);
+        let mut recursives = current_body.collect_recursive_types(db);
+        let mut index = 0;
+        while index < recursives.len() {
+            let binder = recursives[index].binder(db);
+            let first = recursives
+                .iter()
+                .position(|seen| seen.binder(db).same_marker(binder))
+                .unwrap_or(index);
+            if first < index {
+                recursives.remove(index);
+            } else {
+                index += 1;
+            }
+        }
         current_body = current_body.fold_recursive_boundaries_to_fixpoint(db, &recursives);
 
         let body = if include_previous {
@@ -8367,95 +8367,102 @@ impl<'a, 'db> TypeMapping<'a, 'db> {
     }
 }
 
-/// A value that can have occurrences of an unfolded recursive type folded back to that type.
+/// A value whose contained types can be rewritten with a recursive-type mapping, e.g.
+/// folding occurrences of an unfolded recursive type back to the type itself, or
+/// substituting a recursive type into free occurrences of its variable.
 pub(crate) trait Foldable<'db>: Sized {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self;
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self;
+
+    /// Folds occurrences of `recursive`'s unfolding back to `recursive` itself.
+    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+        self.fold_with(db, &recursive.fold_mapping(db))
+    }
 }
 
 impl<'db> Foldable<'db> for Type<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
-        self.apply_type_mapping(db, &recursive.fold_mapping(db), TypeContext::default())
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
+        self.apply_type_mapping(db, mapping, TypeContext::default())
     }
 }
 
 impl<'db, T: Foldable<'db>> Foldable<'db> for Option<T> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
-        self.map(|value| value.fold(db, recursive))
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
+        self.map(|value| value.fold_with(db, mapping))
     }
 }
 
 impl<'db, A: Foldable<'db>, B: Foldable<'db>> Foldable<'db> for (A, B) {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
-        (self.0.fold(db, recursive), self.1.fold(db, recursive))
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
+        (self.0.fold_with(db, mapping), self.1.fold_with(db, mapping))
     }
 }
 
 impl<'db, T: Foldable<'db>> Foldable<'db> for Vec<T> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         self.into_iter()
-            .map(|value| value.fold(db, recursive))
+            .map(|value| value.fold_with(db, mapping))
             .collect()
     }
 }
 
 impl<'db, T: Foldable<'db>, E: Foldable<'db>> Foldable<'db> for Result<T, E> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         match self {
-            Ok(value) => Ok(value.fold(db, recursive)),
-            Err(error) => Err(error.fold(db, recursive)),
+            Ok(value) => Ok(value.fold_with(db, mapping)),
+            Err(error) => Err(error.fold_with(db, mapping)),
         }
     }
 }
 
 impl<'db> Foldable<'db> for () {
-    fn fold(self, _db: &'db dyn Db, _recursive: RecursiveType<'db>) -> Self {}
+    fn fold_with(self, _db: &'db dyn Db, _mapping: &TypeMapping<'db, 'db>) -> Self {}
 }
 
 impl<'db> Foldable<'db> for bool {
-    fn fold(self, _db: &'db dyn Db, _recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, _db: &'db dyn Db, _mapping: &TypeMapping<'db, 'db>) -> Self {
         self
     }
 }
 
 impl<'db> Foldable<'db> for Truthiness {
-    fn fold(self, _db: &'db dyn Db, _recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, _db: &'db dyn Db, _mapping: &TypeMapping<'db, 'db>) -> Self {
         self
     }
 }
 
 impl<'db> Foldable<'db> for TypeDefinition<'db> {
-    fn fold(self, _db: &'db dyn Db, _recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, _db: &'db dyn Db, _mapping: &TypeMapping<'db, 'db>) -> Self {
         self
     }
 }
 
 impl<'db> Foldable<'db> for Place<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
-        self.map_type(|ty| ty.fold(db, recursive))
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
+        self.map_type(|ty| ty.fold_with(db, mapping))
     }
 }
 
 impl<'db> Foldable<'db> for PlaceAndQualifiers<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
-        self.map_type(|ty| ty.fold(db, recursive))
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
+        self.map_type(|ty| ty.fold_with(db, mapping))
     }
 }
 
 impl<'db> Foldable<'db> for GeneratorTypes<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         Self {
-            yield_ty: self.yield_ty.fold(db, recursive),
-            send_ty: self.send_ty.fold(db, recursive),
-            return_ty: self.return_ty.fold(db, recursive),
+            yield_ty: self.yield_ty.fold_with(db, mapping),
+            send_ty: self.send_ty.fold_with(db, mapping),
+            return_ty: self.return_ty.fold_with(db, mapping),
         }
     }
 }
 
 impl<'db> Foldable<'db> for Signature<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         self.apply_type_mapping_impl(
             db,
-            &recursive.fold_mapping(db),
+            mapping,
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
         )
@@ -8463,37 +8470,37 @@ impl<'db> Foldable<'db> for Signature<'db> {
 }
 
 impl<'db> Foldable<'db> for Specialization<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
-        self.apply_type_mapping(db, &recursive.fold_mapping(db))
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
+        self.apply_type_mapping(db, mapping)
     }
 }
 
 impl<'db> Foldable<'db> for SpecializationError<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         match self {
             Self::MismatchedBound {
                 bound_typevar,
                 argument,
             } => Self::MismatchedBound {
                 bound_typevar,
-                argument: argument.fold(db, recursive),
+                argument: argument.fold_with(db, mapping),
             },
             Self::MismatchedConstraint {
                 bound_typevar,
                 argument,
             } => Self::MismatchedConstraint {
                 bound_typevar,
-                argument: argument.fold(db, recursive),
+                argument: argument.fold_with(db, mapping),
             },
         }
     }
 }
 
 impl<'db> Foldable<'db> for PropertyInstanceType<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         self.apply_type_mapping_impl(
             db,
-            &recursive.fold_mapping(db),
+            mapping,
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
         )
@@ -8987,13 +8994,13 @@ impl<'db> InvalidTypeExpressionError<'db> {
 }
 
 impl<'db> Foldable<'db> for InvalidTypeExpressionError<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         Self {
-            fallback_type: self.fallback_type.fold(db, recursive),
+            fallback_type: self.fallback_type.fold_with(db, mapping),
             invalid_expressions: self
                 .invalid_expressions
                 .into_iter()
-                .map(|invalid| invalid.fold(db, recursive))
+                .map(|invalid| invalid.fold_with(db, mapping))
                 .collect(),
         }
     }
@@ -9046,9 +9053,9 @@ enum InvalidTypeExpression<'db> {
 }
 
 impl<'db> Foldable<'db> for InvalidTypeExpression<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         match self {
-            Self::InvalidType(ty, scope) => Self::InvalidType(ty.fold(db, recursive), scope),
+            Self::InvalidType(ty, scope) => Self::InvalidType(ty.fold_with(db, mapping), scope),
             Self::RequiresOneArgument(_)
             | Self::RequiresArguments(_)
             | Self::RequiresTwoArguments(_)

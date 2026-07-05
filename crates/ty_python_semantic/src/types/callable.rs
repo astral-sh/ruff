@@ -8,7 +8,7 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
         Foldable, FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, RecursiveType, Signature,
+        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
         SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         known_instance::FunctoolsPartialInstance,
@@ -700,10 +700,10 @@ impl<'db> CallableTypes<'db> {
 }
 
 impl<'db> Foldable<'db> for CallableType<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
         self.apply_type_mapping_impl(
             db,
-            &recursive.fold_mapping(db),
+            mapping,
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
         )
@@ -711,8 +711,8 @@ impl<'db> Foldable<'db> for CallableType<'db> {
 }
 
 impl<'db> Foldable<'db> for CallableTypes<'db> {
-    fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
-        self.map(|callable| callable.fold(db, recursive))
+    fn fold_with(self, db: &'db dyn Db, mapping: &TypeMapping<'db, 'db>) -> Self {
+        self.map(|callable| callable.fold_with(db, mapping))
     }
 }
 
