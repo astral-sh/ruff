@@ -162,7 +162,7 @@ JSONPrimitive = Union[str, int, float, bool, None]
 JSONValue = TypeAliasType("JSONValue", 'Union[JSONPrimitive, Sequence["JSONValue"], Mapping[str, "JSONValue"]]')
 
 def _(x: JSONValue):
-    reveal_type(x)  # revealed: Sequence[JSONValue] | None | float | Mapping[str, JSONValue] | int
+    reveal_type(x)  # revealed: Mapping[str, JSONValue] | Sequence[JSONValue] | None | float | int
 ```
 
 ## Self-referential legacy type variables
@@ -434,9 +434,9 @@ class Nest:
         self.x3 = [self.x2] if cond else [self.x1]
 
 # どれも少なくともlistとdictを含んでいるはず
-reveal_type(Nest().x1)  # revealed: list[dict[str, list[list[Divergent] | Divergent] | list[list[Divergent]]]]
-# revealed: dict[str, list[list[dict[str, list[list[Divergent] | Divergent] | list[list[Divergent]]]] | dict[str, list[list[Divergent] | Divergent] | list[list[Divergent]]]] | list[list[dict[str, list[list[Divergent] | Divergent] | list[list[Divergent]]]]]]
+reveal_type(Nest().x1)  # revealed: list[dict[str, list[dict[str, Divergent] | list[dict[str, Divergent]]]]]
+# revealed: dict[str, list[dict[str, Divergent] | list[dict[str, Divergent]]]]
 reveal_type(Nest().x2)
-# revealed: list[list[dict[str, list[list[Divergent] | Divergent] | list[list[Divergent]]]] | dict[str, list[list[dict[str, list[list[Divergent] | Divergent] | list[list[Divergent]]]] | dict[str, list[list[Divergent] | Divergent] | list[list[Divergent]]]] | list[list[dict[str, list[list[Divergent] | Divergent] | list[list[Divergent]]]]]]] | list[list[dict[str, list[list[Divergent] | Divergent] | list[list[Divergent]]]]]
+# revealed: list[list[dict[str, list[dict[str, Divergent] | list[dict[str, Divergent]]]]] | dict[str, list[dict[str, Divergent] | list[dict[str, Divergent]]]]] | list[list[dict[str, list[dict[str, Divergent] | list[dict[str, Divergent]]]]]]
 reveal_type(Nest().x3)
 ```

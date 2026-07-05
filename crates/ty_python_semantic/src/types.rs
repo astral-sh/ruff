@@ -1350,11 +1350,205 @@ impl<'db> Type<'db> {
             let mut folded = self;
             for recursive in recursives {
                 folded = folded.fold(db, *recursive);
+                // Also fold *body* images: participant operations unfold an embedded
+                // μ-term in place (its variable leaves stay bare instead of being
+                // rewrapped), which the unfold-image fold above cannot match. A bare
+                // variable body would make every variable occurrence match, so skip it.
+                if !matches!(recursive.body(db), Type::Divergent(_)) {
+                    folded = folded.apply_type_mapping(
+                        db,
+                        &TypeMapping::Structural(StructuralTypeMapping::FoldRecursive {
+                            recursive: *recursive,
+                            unfolded: recursive.body(db),
+                        }),
+                        TypeContext::default(),
+                    );
+                }
             }
             if folded == self {
                 return folded;
             }
             self = folded;
+        }
+    }
+
+    /// Merges same-class generic instance union elements whose specializations differ only
+    /// in positions that embed closed μ-terms of the *same* cycle heads. Those variants are
+    /// iteration snapshots of one closed form; invariance keeps them from deduplicating, so
+    /// they would accumulate one snapshot per iteration (e.g. `dict[str, μa.B] | dict[str,
+    /// <one-step image of μa.B>]`). Variants with different (or no) embedded heads are
+    /// distinct members of the fixpoint union and stay separate. Like recursive tuple
+    /// widening, the merged position is an upward approximation; boundary folding then
+    /// contracts the merged union back onto the closed form.
+    fn merge_instance_snapshot_variants(self, db: &'db dyn Db) -> Self {
+        let Type::Union(union) = self else {
+            return self;
+        };
+
+        let as_elements = |ty: Type<'db>| match ty {
+            Type::Union(union) => union.elements(db).to_vec(),
+            other => vec![other],
+        };
+        // `part` is an earlier, sparser snapshot of the same position: every member of
+        // `part` is a member of `whole`, and the members `whole` adds recurse through a
+        // cycle head. Such pairs arise when a participant reads a position in different
+        // iterations; the fuller snapshot covers the sparser one (Kleene monotonicity).
+        // A pair whose difference is marker-free is a genuine source-level distinction
+        // and never merges.
+        let snapshot_of = |whole: Type<'db>, part: Type<'db>| {
+            let whole_elements = as_elements(whole);
+            let part_elements = as_elements(part);
+            part_elements.len() < whole_elements.len()
+                && part_elements
+                    .iter()
+                    .all(|element| whole_elements.contains(element))
+                && whole_elements
+                    .iter()
+                    .filter(|element| !part_elements.contains(element))
+                    .all(|element| {
+                        any_over_type(db, *element, false, |ty| {
+                            matches!(ty, Type::Divergent(_) | Type::Recursive(_))
+                        })
+                    })
+        };
+        let snapshot_pair = |existing_type: Type<'db>, new_type: Type<'db>| {
+            snapshot_of(existing_type, new_type) || snapshot_of(new_type, existing_type)
+        };
+        let generic_alias = |ty: Type<'db>| match ty {
+            Type::NominalInstance(instance) => match instance.class(db) {
+                ClassType::Generic(alias) if alias.specialization(db).tuple(db).is_none() => {
+                    Some(alias)
+                }
+                _ => None,
+            },
+            _ => None,
+        };
+
+        let mut elements = union.elements(db).to_vec();
+        let mut merged_any = false;
+        'merge: loop {
+            for first_index in 0..elements.len() {
+                let Some(first) = generic_alias(elements[first_index]) else {
+                    continue;
+                };
+                let first_specialization = first.specialization(db);
+                for second_index in first_index + 1..elements.len() {
+                    let Some(second) = generic_alias(elements[second_index]) else {
+                        continue;
+                    };
+                    let second_specialization = second.specialization(db);
+                    if first.origin(db) != second.origin(db)
+                        || first_specialization.generic_context(db)
+                            != second_specialization.generic_context(db)
+                        || first_specialization.materialization_kind(db)
+                            != second_specialization.materialization_kind(db)
+                    {
+                        continue;
+                    }
+                    if !first_specialization
+                        .types(db)
+                        .iter()
+                        .zip(second_specialization.types(db))
+                        .all(|(first_type, second_type)| {
+                            first_type == second_type || snapshot_pair(*first_type, *second_type)
+                        })
+                    {
+                        if Self::cycle_debug_enabled() {
+                            for (first_type, second_type) in first_specialization
+                                .types(db)
+                                .iter()
+                                .zip(second_specialization.types(db))
+                            {
+                                if first_type != second_type {
+                                    eprintln!(
+                                        "[snap-reject] a = {}\n[snap-reject] b = {}",
+                                        first_type.display(db),
+                                        second_type.display(db),
+                                    );
+                                }
+                            }
+                        }
+                        continue;
+                    }
+                    let types: Box<[_]> = first_specialization
+                        .types(db)
+                        .iter()
+                        .zip(second_specialization.types(db))
+                        .map(|(first_type, second_type)| {
+                            if snapshot_of(*first_type, *second_type) {
+                                *first_type
+                            } else {
+                                *second_type
+                            }
+                        })
+                        .collect();
+                    let merged = Type::instance(
+                        db,
+                        ClassType::Generic(GenericAlias::new(
+                            db,
+                            first.origin(db),
+                            Specialization::new(
+                                db,
+                                first_specialization.generic_context(db),
+                                types,
+                                first_specialization.materialization_kind(db),
+                                None,
+                            ),
+                        )),
+                    );
+                    elements.remove(second_index);
+                    elements[first_index] = merged;
+                    merged_any = true;
+                    continue 'merge;
+                }
+            }
+            break;
+        }
+
+        if !merged_any {
+            return self;
+        }
+        UnionType::from_elements_cycle_recovery(db, elements)
+    }
+
+    /// Enforces binder uniqueness (I2) within a recovery result: a μ-term nested anywhere
+    /// inside the scope of a same-marker binder collapses to the recursion variable.
+    /// Structural mappings rewrite μ-term occurrences wholesale and can carry an older
+    /// same-marker generation into a term that is itself substituted under that marker's
+    /// binder; without renormalization, two markers' rewrites keep resurrecting each
+    /// other's stale generations and unification never terminates.
+    fn enforce_binder_uniqueness(mut self, db: &'db dyn Db) -> Self {
+        loop {
+            let mut changed = false;
+            for recursive in self.collect_recursive_types(db) {
+                let body = recursive.body(db);
+                let normalized =
+                    body.replace_with_binder_to_fixpoint(db, recursive.binder(db), &[]);
+                if normalized == body {
+                    continue;
+                }
+                let rebuilt = RecursiveType::build(
+                    db,
+                    recursive.binder(db),
+                    recursive.origin(db),
+                    normalized,
+                );
+                let Type::Recursive(rebuilt) = rebuilt else {
+                    continue;
+                };
+                self = self.apply_type_mapping(
+                    db,
+                    &TypeMapping::Structural(StructuralTypeMapping::FoldRecursive {
+                        recursive: rebuilt,
+                        unfolded: Type::Recursive(recursive),
+                    }),
+                    TypeContext::default(),
+                );
+                changed = true;
+            }
+            if !changed {
+                return self;
+            }
         }
     }
 
@@ -1365,7 +1559,24 @@ impl<'db> Type<'db> {
     /// foreign generation never deduplicate and accumulate one variant per iteration.
     fn unify_recursive_generations(mut self, db: &'db dyn Db) -> Self {
         loop {
+            // Only unify generations that are not nested inside another μ-term's body: a
+            // nested occurrence is part of a Bekić closure whose enclosing binder the
+            // head folds maintain. Merging it with a standalone generation re-embeds each
+            // marker's stale form inside the other's merged term, and the two groups keep
+            // resurrecting each other instead of terminating.
             let nodes = self.collect_recursive_types(db);
+            let nodes: Vec<_> = nodes
+                .iter()
+                .copied()
+                .filter(|node| {
+                    !nodes.iter().any(|other| {
+                        other != node
+                            && any_over_type(db, other.body(db), false, |ty| {
+                                ty == Type::Recursive(*node)
+                            })
+                    })
+                })
+                .collect();
 
             let mut changed = false;
             for (index, first) in nodes.iter().copied().enumerate() {
@@ -1377,10 +1588,40 @@ impl<'db> Type<'db> {
                 if generations.len() < 2 {
                     continue;
                 }
-                let merged_body = UnionType::from_elements_cycle_recovery(
-                    db,
-                    generations.iter().map(|generation| generation.body(db)),
-                );
+                // Circulating generations differ not only by accumulated union elements but
+                // also by unfolding depth (each one embeds the previous body one level
+                // deeper). Contract each body element with the same anti-substitution the
+                // head's own fold uses: a *strict* sub-term equal to a known form of one of
+                // the generations denotes this marker's fixpoint and rebinds to the
+                // variable. The element roots themselves are left alone — erasing a whole
+                // element to the bare variable would drop its content, not fold it — so
+                // deepened elements contract back onto their shallow counterparts and
+                // deduplicate. Without this, the merged union keeps one variant per
+                // unfolding depth and grows with every iteration instead of converging.
+                let mut fold_targets: Vec<Type<'db>> = Vec::new();
+                for generation in &generations {
+                    for form in [
+                        Type::Recursive(*generation),
+                        generation.unfold(db),
+                        generation.body(db),
+                    ] {
+                        let form = form.canonicalize_unions(db);
+                        if !fold_targets.contains(&form) {
+                            fold_targets.push(form);
+                        }
+                    }
+                }
+                let contracted = generations.iter().flat_map(|generation| {
+                    match generation.body(db) {
+                        Type::Union(union) => union.elements(db).to_vec(),
+                        other => vec![other],
+                    }
+                    .into_iter()
+                    .map(|element| {
+                        element.replace_with_binder_to_fixpoint(db, first.binder(db), &fold_targets)
+                    })
+                });
+                let merged_body = UnionType::from_elements_cycle_recovery(db, contracted);
                 let merged =
                     RecursiveType::build(db, first.binder(db), first.origin(db), merged_body);
                 let Type::Recursive(merged) = merged else {
@@ -1388,6 +1629,18 @@ impl<'db> Type<'db> {
                     // generations alone rather than dropping the recursion.
                     continue;
                 };
+                if Self::cycle_debug_enabled() {
+                    eprintln!(
+                        "[unify] marker={:?}@{:?} generations={}",
+                        first.binder(db).query,
+                        first.binder(db).id,
+                        generations.len(),
+                    );
+                    for generation in &generations {
+                        eprintln!("[unify]   gen: {}", generation.body(db).display(db));
+                    }
+                    eprintln!("[unify]   merged: {}", merged.body(db).display(db));
+                }
                 for generation in generations {
                     if generation == merged {
                         continue;
@@ -1407,6 +1660,11 @@ impl<'db> Type<'db> {
                 }
                 break;
             }
+
+            // Rewriting generation occurrences can carry an older same-marker μ-term
+            // into a term substituted under that marker's binder; restore I2 before the
+            // next pass, or two markers' rewrites resurrect each other's generations.
+            self = self.enforce_binder_uniqueness(db);
 
             if !changed {
                 return self;
@@ -1454,6 +1712,15 @@ impl<'db> Type<'db> {
             });
             if covered {
                 replaced = true;
+                if Self::cycle_debug_enabled() {
+                    eprintln!(
+                        "[alpha-drop] foreign={:?}@{:?} into binder={:?}@{:?}",
+                        foreign.binder(db).query,
+                        foreign.binder(db).id,
+                        binder.query,
+                        binder.id,
+                    );
+                }
                 rebuilt.push(Type::Divergent(binder));
             } else {
                 rebuilt.push(element);
@@ -1548,6 +1815,19 @@ impl<'db> Type<'db> {
         if previous_root_recursive.is_none() {
             push_target(&mut targets, previous);
         }
+        // Same-marker generations *nested* inside the previous value (braided under other
+        // heads' binders) are approximations of this same fixpoint. Participants unfold
+        // them in place one level per iteration; without their forms among the targets,
+        // those images never rebind and the nesting deepens forever.
+        for nested in previous.collect_recursive_types(db) {
+            if nested.binder(db).same_marker(binder)
+                && previous_recursive.is_none_or(|prev| nested != prev)
+            {
+                push_target(&mut targets, Type::Recursive(nested));
+                push_target(&mut targets, nested.unfold(db));
+                push_target(&mut targets, nested.body(db));
+            }
+        }
         // The semantic view is a variant representation of the previous value; participants
         // may embed it instead of the raw value. Only a same-marker μ-rooted view is usable
         // for matching, and only as the closed μ-term itself: the view's body and unfolding
@@ -1616,6 +1896,7 @@ impl<'db> Type<'db> {
         let body = body
             .drop_alpha_redundant_recursive_elements(db, binder)
             .widen_recursive_tuples(db, Some(binder))
+            .merge_instance_snapshot_variants(db)
             .unify_recursive_generations(db);
 
         let origin = origin
@@ -6684,33 +6965,21 @@ impl<'db> Type<'db> {
                 TypeMapping::Structural(StructuralTypeMapping::FoldRecursive {
                     recursive: target, ..
                 }) if recursive == *target => self,
-                // A *closed* same-marker μ-term is an approximation generation of the
-                // head's own fixpoint (one id, one fixpoint); rebind it to the recursion
-                // variable even when it matches no known equality form, since older
-                // generations keep circulating through the other heads' memos with an
-                // iteration of delay. A term still referencing foreign markers is not a
-                // value-level approximation but a sub-expression of a foreign body; folding
-                // it would strip the enclosing foreign binder and make the heads flip-flop
-                // between equivalent representations. Never descend into a same-marker body
-                // either: rewriting an older generation's body would re-bind its variable
-                // occurrences under the new binder.
+                // A same-marker μ-term is an approximation generation of the head's own
+                // fixpoint (one id, one fixpoint); rebind it to the recursion variable
+                // even when it matches no known equality form, since older generations
+                // keep circulating through the other heads' memos with an iteration of
+                // delay, deepening in place where participants unfolded them. This also
+                // enforces binder uniqueness along any path: a braid μa.…μb.…μa'.… loses
+                // the inner μa' in favor of the variable bound by the root. Never descend
+                // into a same-marker body instead: the mapping cannot reach positions
+                // under the nested binder, so an unfolded image inside it could never be
+                // rebound and would deepen forever.
                 TypeMapping::Structural(StructuralTypeMapping::ReplaceWithBinder {
                     binder,
                     replace_root: true,
                     ..
-                }) if recursive.binder(db).same_marker(*binder) => {
-                    let own_markers_only = !any_over_type(db, recursive.body(db), false, |ty| {
-                        match ty {
-                            Type::Divergent(divergent) => !divergent.same_marker(*binder),
-                            _ => false,
-                        }
-                    });
-                    if own_markers_only {
-                        Type::Divergent(*binder)
-                    } else {
-                        self
-                    }
-                }
+                }) if recursive.binder(db).same_marker(*binder) => Type::Divergent(*binder),
                 TypeMapping::Structural(StructuralTypeMapping::ReplaceWithBinder {
                     binder,
                     ..
@@ -6881,6 +7150,30 @@ impl<'db> Type<'db> {
                             targets,
                             replace_root: true,
                         } => {
+                            // A nested union recursing through the binder whose elements
+                            // are all covered by a known approximation form is a partial
+                            // snapshot of an earlier provisional; it denotes a subset of
+                            // this fixpoint, so the whole node rebinds to the variable.
+                            // Such deepened images of *partial* provisionals arrive one
+                            // iteration late and can never match a target exactly.
+                            if elements.iter().any(|element| {
+                                any_over_type(db, *element, false, |ty| {
+                                    matches!(ty, Type::Divergent(divergent)
+                                        if divergent.same_marker(binder))
+                                })
+                            }) {
+                                for target in targets {
+                                    if let Type::Union(target_union) = target {
+                                        let target_elements = target_union.elements(db);
+                                        if elements
+                                            .iter()
+                                            .all(|element| target_elements.contains(element))
+                                        {
+                                            return Type::Divergent(binder);
+                                        }
+                                    }
+                                }
+                            }
                             for target in targets {
                                 if let Type::Union(target_union) = target {
                                     collapse_subset(
