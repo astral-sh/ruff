@@ -85,7 +85,7 @@ individual keys:
 from typing import TypedDict
 
 x1 = {"a": 1, "b": "2"}
-reveal_type(x1)  # revealed: dict[str, str | int]
+reveal_type(x1)  # revealed: dict[str, int | str]
 reveal_type(x1["a"])  # revealed: Literal[1]
 reveal_type(x1["b"])  # revealed: Literal["2"]
 

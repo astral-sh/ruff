@@ -51,24 +51,6 @@ use smallvec::SmallVec;
 
 /// Sorts union elements into a canonical (semantically meaningless but session-stable)
 /// order, so that unions built from the same element set always intern to the same type.
-fn canonical_union_sort<'db>(_db: &'db dyn Db, types: &mut [Type<'db>]) {
-    let key = |ty: &Type<'db>| {
-        let mut hasher = rustc_hash::FxHasher::default();
-        std::hash::Hash::hash(ty, &mut hasher);
-        std::hash::Hasher::finish(&hasher)
-    };
-    types.sort_by(|left, right| {
-        key(left).cmp(&key(right)).then_with(|| {
-            if left == right {
-                std::cmp::Ordering::Equal
-            } else {
-                // Hash collision between distinct types: break the tie deterministically.
-                format!("{left:?}").cmp(&format!("{right:?}"))
-            }
-        })
-    });
-}
-
 /// Extract `(core, guard)` from truthiness-guarded intersections.
 ///
 /// e.g.
@@ -1271,14 +1253,6 @@ impl<'db> UnionBuilder<'db> {
                 .into_iter()
                 .fold(builder, UnionBuilder::add)
                 .try_build();
-        }
-
-        // Cycle recovery matches embeddings of previous provisional values by equality.
-        // Participant queries can re-derive semantically equal unions with a different
-        // element order, so recovery-built unions use a canonical element order to keep
-        // that matching (and thereby fixpoint convergence) order-insensitive.
-        if cycle_recovery {
-            canonical_union_sort(db, &mut types);
         }
 
         match types.len() {

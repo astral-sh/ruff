@@ -1288,17 +1288,6 @@ impl<'db> Type<'db> {
         self.replace_with_binder_to_fixpoint(db, to, &[Type::Divergent(from)])
     }
 
-    /// Rebuilds this type so that all unions use the canonical element order of cycle
-    /// recovery, making equality-based matching insensitive to the element order in which
-    /// participant queries re-derived embedded values.
-    fn canonicalize_unions(self, db: &'db dyn Db) -> Self {
-        self.apply_type_mapping(
-            db,
-            &TypeMapping::Structural(StructuralTypeMapping::CanonicalizeUnions),
-            TypeContext::default(),
-        )
-    }
-
     /// Applies the anti-substitution of cycle recovery until a fixpoint: same-marker μ-terms
     /// and sub-terms equal to one of `targets` (known forms of the head's previous
     /// provisional value) are replaced with the recursion variable `binder`. Iterating
@@ -1605,7 +1594,6 @@ impl<'db> Type<'db> {
                         generation.unfold(db),
                         generation.body(db),
                     ] {
-                        let form = form.canonicalize_unions(db);
                         if !fold_targets.contains(&form) {
                             fold_targets.push(form);
                         }
@@ -1798,11 +1786,8 @@ impl<'db> Type<'db> {
 
         // Known equality forms under which the previous provisional value can be embedded in
         // the incoming value. The anti-substitution rebinds exactly these to `binder`.
-        // Everything is compared in canonical union order: participant queries re-derive
-        // semantically equal unions in arbitrary element orders.
         let mut targets = Vec::new();
         let push_target = |targets: &mut Vec<Type<'db>>, target: Type<'db>| {
-            let target = target.canonicalize_unions(db);
             if !targets.contains(&target) {
                 targets.push(target);
             }
@@ -1841,11 +1826,9 @@ impl<'db> Type<'db> {
             push_target(&mut targets, Type::Recursive(semantic_recursive));
         }
 
-        let canonical = self.canonicalize_unions(db);
-
         // Converged up to unfolding: the value is a known form of the previous provisional.
         if let Some(prev) = previous_recursive
-            && targets.contains(&canonical)
+            && targets.contains(&self)
         {
             return Type::Recursive(prev);
         }
@@ -1853,11 +1836,11 @@ impl<'db> Type<'db> {
         // μ-spine decomposition: a value already rooted at this head's binder carries the
         // current approximation in its body (its variable occurrences stay free until the
         // final wrap below).
-        let current = match canonical {
+        let current = match self {
             Type::Recursive(recursive) if recursive.binder(db).same_marker(binder) => {
                 recursive.body(db)
             }
-            _ => canonical,
+            _ => self,
         };
 
         let mut current_body = current.replace_with_binder_to_fixpoint(db, binder, &targets);
@@ -1886,7 +1869,6 @@ impl<'db> Type<'db> {
             // generation per iteration and never converge.
             let previous_body = previous_root_recursive
                 .map_or(previous, |recursive| recursive.body(db))
-                .canonicalize_unions(db)
                 .replace_with_binder_to_fixpoint(db, binder, &targets);
             UnionType::from_elements_cycle_recovery(db, [previous_body, current_body])
         } else {
@@ -2882,9 +2864,7 @@ impl<'db> Type<'db> {
         cycle: &salsa::Cycle,
     ) -> Self {
         let binder = DivergentType::new(query, cycle.id());
-        let body = self
-            .canonicalize_unions(db)
-            .replace_with_binder_to_fixpoint(db, binder, &[]);
+        let body = self.replace_with_binder_to_fixpoint(db, binder, &[]);
         Type::recursive_with_origin(db, binder, RecursiveTypeOrigin::Structural, body)
     }
 
@@ -7455,8 +7435,7 @@ impl<'db> Type<'db> {
                 TypeMapping::Structural(
                     StructuralTypeMapping::FoldRecursive { .. }
                     | StructuralTypeMapping::ReplaceWithBinder { .. }
-                    | StructuralTypeMapping::WidenRecursiveTuples { .. }
-                    | StructuralTypeMapping::CanonicalizeUnions,
+                    | StructuralTypeMapping::WidenRecursiveTuples { .. },
                 ) => self,
                 TypeMapping::Materialize(materialization_kind) => {
                     Type::Divergent(divergent.materialized(*materialization_kind))
@@ -8573,10 +8552,6 @@ pub enum StructuralTypeMapping<'a, 'db> {
         /// The canonical cycle binder, if the mapping is running in cycle recovery.
         binder: Option<DivergentType>,
     },
-    /// Rebuilds the value so that all unions use the canonical element order of cycle
-    /// recovery. Participant queries re-derive semantically equal unions in arbitrary
-    /// element orders; canonicalizing both sides keeps equality-based matching reliable.
-    CanonicalizeUnions,
 }
 
 impl<'a, 'db> TypeMapping<'a, 'db> {

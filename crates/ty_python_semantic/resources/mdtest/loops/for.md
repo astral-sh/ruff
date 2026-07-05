@@ -1784,7 +1784,7 @@ x = 1
 y = 2
 for _ in range(1_000_000):
     x, y = y, x
-    reveal_type(x)  # revealed: Literal[2, 1]
+    reveal_type(x)  # revealed: Literal[1, 2]
     reveal_type(y)  # revealed: Literal[2, 1]
 ```
 
@@ -1810,7 +1810,7 @@ y = 2
 for _ in range(1_000_000):
     if x:
         x, y = y, x
-    reveal_type(x)  # revealed: Literal[2, 1]
+    reveal_type(x)  # revealed: Literal[1, 2]
     reveal_type(y)  # revealed: Literal[2, 1]
 ```
 

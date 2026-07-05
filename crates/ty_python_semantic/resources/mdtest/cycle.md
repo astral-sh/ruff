@@ -156,13 +156,13 @@ A = list["A | None"]
 
 def f(x: A):
     reveal_type(x)  # revealed: list[Divergent | None]
-    reveal_type(x[0])  # revealed: None | list[Divergent | None]
+    reveal_type(x[0])  # revealed: list[Divergent | None] | None
 
 JSONPrimitive = Union[str, int, float, bool, None]
 JSONValue = TypeAliasType("JSONValue", 'Union[JSONPrimitive, Sequence["JSONValue"], Mapping[str, "JSONValue"]]')
 
 def _(x: JSONValue):
-    reveal_type(x)  # revealed: Mapping[str, JSONValue] | Sequence[JSONValue] | None | float | int
+    reveal_type(x)  # revealed: Sequence[JSONValue] | int | float | None | Mapping[str, JSONValue]
 ```
 
 ## Self-referential legacy type variables
@@ -260,7 +260,7 @@ class Cyclic:
         if isinstance(self.data, str):
             self.data = {"url": self.data}
 
-# revealed: dict[Unknown, Unknown] | str | dict[str, str]
+# revealed: str | dict[Unknown, Unknown] | dict[str, str]
 reveal_type(Cyclic("").data)
 ```
 
@@ -434,9 +434,9 @@ class Nest:
         self.x3 = [self.x2] if cond else [self.x1]
 
 # どれも少なくともlistとdictを含んでいるはず
-reveal_type(Nest().x1)  # revealed: list[dict[str, list[dict[str, Divergent] | list[dict[str, Divergent]]]]]
-# revealed: dict[str, list[dict[str, Divergent] | list[dict[str, Divergent]]]]
+reveal_type(Nest().x1)  # revealed: list[dict[str, list[list[dict[str, Divergent]] | dict[str, Divergent]]]]
+# revealed: dict[str, list[list[dict[str, Divergent]] | dict[str, Divergent]]]
 reveal_type(Nest().x2)
-# revealed: list[list[dict[str, list[dict[str, Divergent] | list[dict[str, Divergent]]]]] | dict[str, list[dict[str, Divergent] | list[dict[str, Divergent]]]]] | list[list[dict[str, list[dict[str, Divergent] | list[dict[str, Divergent]]]]]]
+# revealed: list[list[dict[str, list[list[dict[str, Divergent]] | dict[str, Divergent]]]] | dict[str, list[list[dict[str, Divergent]] | dict[str, Divergent]]]] | list[list[dict[str, list[list[dict[str, Divergent]] | dict[str, Divergent]]]]]
 reveal_type(Nest().x3)
 ```
