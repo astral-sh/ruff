@@ -2927,6 +2927,31 @@ class C:
     }
 
     #[test]
+    fn rename_stub_ellipsis_valued_attribute_updates_slots() {
+        let test = CursorTest::builder()
+            .source(
+                "main.pyi",
+                r#"
+class C:
+    __slots__ = ("value",)
+    va<CURSOR>lue: int = ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("amount"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.pyi:3:19
+          |
+        3 |     __slots__ = ("value",)
+          |                   ^^^^^
+        4 |     value: int = ...
+          |     -----
+          |
+        "#);
+    }
+
+    #[test]
     fn rename_parameter_does_not_touch_slots() {
         // The parameter `value` is a local symbol, not the instance attribute, so renaming it must
         // leave the `__slots__` string untouched even though it shares the name.

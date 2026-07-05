@@ -713,9 +713,10 @@ impl<'a> LocalReferencesFinder<'a> {
     /// Returns whether any of the rename target's definitions is an instance attribute of `class`.
     ///
     /// The target must name an actual instance attribute of `class`, either a member access like
-    /// `self.value = ...` or a bare class-body annotation like `value: int`, and its nearest
-    /// enclosing class must be `class` itself. A parameter or local that merely shares the name, or
-    /// an attribute of a nested class, is not treated as the slot.
+    /// `self.value = ...` or a class-body declaration like `value: int` (optionally using `...` as
+    /// the value in a stub), and its nearest enclosing class must be `class` itself. A parameter or
+    /// local that merely shares the name, or an attribute of a nested class, is not treated as the
+    /// slot.
     fn target_belongs_to_class(&self, class: &'a ast::StmtClassDef) -> bool {
         use ty_python_core::definition::DefinitionKind;
         use ty_python_core::scope::{FileScopeId, NodeWithScopeKind};
@@ -756,16 +757,19 @@ impl<'a> LocalReferencesFinder<'a> {
                 _ => return false,
             }
 
-            // Accept only a member access (`self.value = ...`) or a bare class-body annotation
-            // (`value: int`), so a parameter or local sharing the name is not treated as the slot.
-            let is_bare_class_annotation = definition.file_scope(db) == owning_class_scope
+            // Accept only a member access (`self.value = ...`) or a class-body attribute declaration
+            // (`value: int` or `value: int = ...` in a stub), so a parameter or local sharing the
+            // name is not treated as the slot.
+            let is_class_attribute_declaration = definition.file_scope(db) == owning_class_scope
                 && definition.place(db).is_symbol()
                 && matches!(
                     definition.kind(db),
                     DefinitionKind::AnnotatedAssignment(assignment)
-                        if assignment.value(&module).is_none()
+                        if assignment.value(&module).is_none_or(|value| {
+                            file.is_stub(db) && value.is_ellipsis_literal_expr()
+                        })
                 );
-            definition.place(db).is_member() || is_bare_class_annotation
+            definition.place(db).is_member() || is_class_attribute_declaration
         })
     }
 
