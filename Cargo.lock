@@ -3492,6 +3492,7 @@ dependencies = [
  "serde_json",
  "thin-vec",
  "thiserror 2.0.18",
+ "triomphe",
 ]
 
 [[package]]
@@ -4598,6 +4599,12 @@ dependencies = [
  "tracing-core",
  "tracing-log",
 ]
+
+[[package]]
+name = "triomphe"
+version = "0.1.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b40688ea6389c8171614b25491f71d4a27946e0c7ce2da1c6de27e25abf1a0ae"
 
 [[package]]
 name = "tryfn"

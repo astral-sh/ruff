@@ -37,6 +37,7 @@ serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 thiserror = { workspace = true }
 thin-vec = { workspace = true }
+triomphe = { workspace = true }
 
 [features]
 schemars = ["dep:schemars", "dep:serde_json"]

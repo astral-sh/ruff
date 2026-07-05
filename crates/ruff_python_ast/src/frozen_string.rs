@@ -2,12 +2,14 @@
 
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
-use std::mem;
+use std::mem::{self, ManuallyDrop};
 use std::num::NonZeroU8;
 use std::ptr;
 use std::slice;
 use std::str;
-use std::sync::Arc;
+
+// Frozen strings never create weak references, so avoid paying for their counter.
+use triomphe::Arc;
 
 /// The number of UTF-8 bytes stored directly inside a [`FrozenCompactString`].
 const INLINE_CAPACITY: usize = 15;
@@ -156,6 +158,18 @@ impl FrozenRepr {
         debug_assert!(self.is_heap_allocated());
         ptr::slice_from_raw_parts(self.0.cast::<u8>(), self.heap_len())
     }
+
+    #[inline]
+    #[expect(
+        unsafe_code,
+        reason = "temporarily reconstructs the owning Arc without releasing its reference"
+    )]
+    fn with_arc<R>(&self, f: impl FnOnce(&Arc<[u8]>) -> R) -> R {
+        // SAFETY: `raw_arc_ptr` reconstructs the pointer returned by `Arc::into_raw`, and this
+        // value keeps that strong reference alive for the duration of the callback.
+        let arc = unsafe { ManuallyDrop::new(Arc::from_raw_slice(self.raw_arc_ptr())) };
+        f(&arc)
+    }
 }
 
 #[inline]
@@ -172,15 +186,12 @@ fn tag(byte: u8) -> NonZeroU8 {
 
 impl Clone for FrozenRepr {
     #[inline]
-    #[expect(
-        unsafe_code,
-        reason = "cloning shared storage increments the strong count of its raw Arc pointer"
-    )]
     fn clone(&self) -> Self {
         if self.is_heap_allocated() {
-            // SAFETY: `raw_arc_ptr` reconstructs the pointer returned by `Arc::into_raw`, and this
-            // value owns a live strong reference for the duration of this call.
-            unsafe { Arc::increment_strong_count(self.raw_arc_ptr()) };
+            self.with_arc(|arc| {
+                // Transfer the cloned strong reference to the returned representation.
+                let _ = Arc::into_raw(arc.clone());
+            });
         }
 
         Self(self.0, self.1, self.2)
@@ -197,7 +208,7 @@ impl Drop for FrozenRepr {
         if self.is_heap_allocated() {
             // SAFETY: Each heap representation owns exactly one strong reference corresponding to
             // this raw pointer. Reconstructing and dropping the Arc releases that reference.
-            unsafe { drop(Arc::from_raw(self.raw_arc_ptr())) };
+            unsafe { drop(Arc::from_raw_slice(self.raw_arc_ptr())) };
         }
     }
 }
@@ -265,6 +276,8 @@ mod tests {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
 
+    use triomphe::Arc;
+
     use super::{FrozenCompactString, INLINE_CAPACITY};
 
     #[test]
@@ -295,11 +308,15 @@ mod tests {
     #[test]
     fn heap_clones_share_storage() {
         let frozen = FrozenCompactString::new("a string too long for inline storage");
+        assert_eq!(frozen.0.with_arc(Arc::strong_count), 1);
+
         let clone = frozen.clone();
         assert_eq!(frozen.as_str().as_ptr(), clone.as_str().as_ptr());
+        assert_eq!(frozen.0.with_arc(Arc::strong_count), 2);
 
         drop(frozen);
         assert_eq!(clone.as_str(), "a string too long for inline storage");
+        assert_eq!(clone.0.with_arc(Arc::strong_count), 1);
     }
 
     #[test]
