@@ -490,14 +490,23 @@ impl ClassInfoConstraintFunction {
             Type::Intersection(intersection) => {
                 if intersection.negative(db).is_empty() {
                     let mut builder = IntersectionBuilder::new(db);
+                    let mut any_member = false;
                     for element in intersection.positive(db) {
-                        builder = builder.add_positive(self.generate_constraint(
-                            db,
-                            *element,
-                            is_positive,
-                        )?);
+                        // A member that yields no constraint (e.g. a parametrized
+                        // generic alias, which is not a valid runtime isinstance
+                        // target) should be SKIPPED, not abort narrowing on the
+                        // whole intersection. Narrowing on the remaining members
+                        // is still sound.
+                        if let Some(c) = self.generate_constraint(db, *element, is_positive) {
+                            builder = builder.add_positive(c);
+                            any_member = true;
+                        }
                     }
-                    Some(builder.build())
+                    if any_member {
+                        Some(builder.build())
+                    } else {
+                        None
+                    }
                 } else {
                     // TODO: can we do better here?
                     None
