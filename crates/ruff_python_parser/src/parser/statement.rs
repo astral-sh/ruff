@@ -831,7 +831,12 @@ impl<'src> Parser<'src> {
     fn parse_dotted_name(&mut self) -> ast::Identifier {
         let start = self.node_start();
 
-        let mut dotted_name: CompactString = self.parse_identifier().id.into();
+        let first = self.parse_identifier();
+        if !self.at(TokenKind::Dot) {
+            return first;
+        }
+
+        let mut dotted_name: CompactString = first.id.into();
         let mut progress = ParserProgress::default();
 
         while self.eat(TokenKind::Dot) {
