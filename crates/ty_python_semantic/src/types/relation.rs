@@ -1120,30 +1120,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // Coinductive hypothesis for recursion variables: if a judgment between μ-terms
-            // binding these markers is already in progress on the current path, these
-            // variable occurrences denote exactly those fixpoints, so the pair holds by
-            // assumption (it is what the enclosing judgment is establishing).
-            (Type::Divergent(source_divergent), Type::Divergent(target_divergent))
-                if self.relation_visitor.any_in_progress(
-                    |(in_progress_source, in_progress_target, relation, _)| {
-                        *relation == self.relation
-                            && matches!(
-                                in_progress_source,
-                                Type::Recursive(source_recursive)
-                                    if source_recursive.binder(db).same_marker(source_divergent)
-                            )
-                            && matches!(
-                                in_progress_target,
-                                Type::Recursive(target_recursive)
-                                    if target_recursive.binder(db).same_marker(target_divergent)
-                            )
-                    },
-                ) =>
-            {
-                self.always()
-            }
-
             // In some specific situations, `Any`/`Unknown`/`@Todo` can be simplified out of unions and intersections,
             // but this is not true for divergent types (and moving this case any lower down appears to cause
             // "too many cycle iterations" panics).
@@ -1151,16 +1127,25 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
             }
 
-            // Compare μ-terms coinductively: the recursion guard records the in-progress
-            // pair (the coinductive hypothesis), the bodies are compared directly, and
-            // variable leaf pairs resolve to the hypothesis via the `Divergent` arm above.
-            // Unfolding both sides instead materializes a copy of each body per variable
-            // occurrence at every level; the judgments then never repeat and the recursion
-            // exhausts the stack.
-            (Type::Recursive(source_recursive), Type::Recursive(target_recursive)) => self
-                .with_recursion_guard(source, target, || {
+            // Same-marker μ-terms are approximation generations of the same cycle head's
+            // fixpoint; compare their bodies directly. Unfolding both sides instead multiplies
+            // the depth of the comparison by the body size at every level, which can exhaust
+            // the stack before the recursion guard sees a repeated pair.
+            //
+            // TODO: extend this to μ-terms with different markers. That requires a real
+            // coinductive hypothesis environment (assumed marker pairs) so that variable
+            // leaf pairs resolve to the assumption instead of the conservative `Divergent`
+            // arm above; without it, union simplification loses precision and recovery
+            // values grow instead of converging.
+            (Type::Recursive(source_recursive), Type::Recursive(target_recursive))
+                if source_recursive
+                    .binder(db)
+                    .same_marker(target_recursive.binder(db)) =>
+            {
+                self.with_recursion_guard(source, target, || {
                     self.check_type_pair(db, source_recursive.body(db), target_recursive.body(db))
-                }),
+                })
+            }
 
             (Type::Recursive(source_recursive), _) => {
                 let source_unfolded = source_recursive.unfold(db);
@@ -2596,13 +2581,16 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
 
-            // See the coinductive μ-pair comparison in the relation checker above. The
-            // disjointness `Divergent` arm already treats every divergent pair as
-            // not-disjoint, which subsumes the coinductive hypothesis for the leaves.
-            (Type::Recursive(left_recursive), Type::Recursive(right_recursive)) => self
-                .with_recursion_guard(left, right, || {
+            // See the same-marker fast path in the relation checker above.
+            (Type::Recursive(left_recursive), Type::Recursive(right_recursive))
+                if left_recursive
+                    .binder(db)
+                    .same_marker(right_recursive.binder(db)) =>
+            {
+                self.with_recursion_guard(left, right, || {
                     self.check_type_pair(db, left_recursive.body(db), right_recursive.body(db))
-                }),
+                })
+            }
 
             (Type::Recursive(left_recursive), _) => {
                 let left_unfolded = left_recursive.unfold(db);

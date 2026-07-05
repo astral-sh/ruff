@@ -99,11 +99,6 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone, const INLINE_CAPACITY: usize>
         self.cache.borrow_mut().insert_new(item, result.clone());
         result
     }
-
-    /// Whether any in-progress (not yet finished) visit matches `predicate`.
-    pub(crate) fn any_in_progress(&self, predicate: impl Fn(&T) -> bool) -> bool {
-        self.seen.borrow().iter().any(predicate)
-    }
 }
 
 pub(crate) struct TypeTransformer<'db, Tag> {
