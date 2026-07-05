@@ -54,6 +54,11 @@ impl FrozenCompactString {
     }
 
     #[inline]
+    pub(crate) fn concat(left: &str, right: &str) -> Self {
+        Self(FrozenRepr::concat(left, right))
+    }
+
+    #[inline]
     pub(crate) fn as_str(&self) -> &str {
         self.0.as_str()
     }
@@ -76,6 +81,19 @@ impl FrozenRepr {
     }
 
     #[inline]
+    fn concat(left: &str, right: &str) -> Self {
+        let len = left
+            .len()
+            .checked_add(right.len())
+            .expect("combined string is too large");
+        if len <= INLINE_CAPACITY {
+            Self::new_inline_concat(left, right, len)
+        } else {
+            Self::new_heap_concat(left, right)
+        }
+    }
+
+    #[inline]
     #[expect(
         unsafe_code,
         reason = "the inline and tagged representations have identical layouts"
@@ -90,10 +108,58 @@ impl FrozenRepr {
         unsafe { mem::transmute(inline) }
     }
 
+    #[inline]
+    #[expect(
+        unsafe_code,
+        reason = "the inline and tagged representations have identical layouts"
+    )]
+    fn new_inline_concat(left: &str, right: &str, len: usize) -> Self {
+        let len = u8::try_from(len).expect("inline strings are at most 15 bytes");
+        let mut inline = FrozenInline([0; INLINE_CAPACITY], tag(INLINE_TAG_BASE + len));
+        let (left_bytes, right_bytes) = inline.0[..usize::from(len)].split_at_mut(left.len());
+        left_bytes.copy_from_slice(left.as_bytes());
+        right_bytes.copy_from_slice(right.as_bytes());
+
+        // SAFETY: `FrozenInline` and `FrozenRepr` have identical size and alignment. The final
+        // byte is nonzero, and raw pointers permit any bit pattern for the inline case.
+        unsafe { mem::transmute(inline) }
+    }
+
     #[cold]
     fn new_heap(text: &str) -> Self {
-        let raw = Arc::<[u8]>::into_raw(Arc::from(text.as_bytes()));
-        let len_bytes = text.len().to_le_bytes();
+        Self::from_heap_storage(Arc::from(text.as_bytes()))
+    }
+
+    #[cold]
+    #[expect(
+        unsafe_code,
+        reason = "the new Arc allocation is initialized from two valid string slices"
+    )]
+    fn new_heap_concat(left: &str, right: &str) -> Self {
+        let len = left
+            .len()
+            .checked_add(right.len())
+            .expect("combined string is too large");
+        let mut storage = Arc::<[u8]>::new_uninit_slice(len);
+        let destination = Arc::get_mut(&mut storage)
+            .expect("a newly allocated Arc has no other strong or weak references")
+            .as_mut_ptr()
+            .cast::<u8>();
+
+        // SAFETY: `destination` points to `len` uninitialized bytes in a new allocation. The two
+        // source slices contain exactly `len` initialized bytes and cannot overlap that allocation.
+        unsafe {
+            ptr::copy_nonoverlapping(left.as_ptr(), destination, left.len());
+            ptr::copy_nonoverlapping(right.as_ptr(), destination.add(left.len()), right.len());
+        }
+
+        // SAFETY: The two copies above initialized every byte in the allocation.
+        Self::from_heap_storage(unsafe { storage.assume_init() })
+    }
+
+    #[inline]
+    fn from_heap_storage(storage: Arc<[u8]>) -> Self {
+        let len_bytes = storage.len().to_le_bytes();
         let high_byte_index = len_bytes.len() - 1;
         let mut tail = [0; TAIL_SIZE];
         tail[..high_byte_index].copy_from_slice(&len_bytes[..high_byte_index]);
@@ -102,7 +168,7 @@ impl FrozenRepr {
         // high byte produces a nonzero tag in the heap range.
         debug_assert!(len_bytes[high_byte_index] < HEAP_TAG_MAX);
         Self(
-            raw.cast::<u8>().cast::<()>(),
+            Arc::into_raw(storage).cast::<u8>().cast::<()>(),
             tail,
             tag(len_bytes[high_byte_index] + 1),
         )
@@ -300,6 +366,30 @@ mod tests {
 
         drop(frozen);
         assert_eq!(clone.as_str(), "a string too long for inline storage");
+    }
+
+    #[test]
+    fn concatenated_strings_roundtrip() {
+        for (left, right, is_heap_allocated) in [
+            ("", "short", false),
+            ("abcdefg", "hijklmno", false),
+            ("abcdefgh", "ijklmnop", true),
+            ("Python 🐍", " and Rust 🦀", true),
+        ] {
+            let expected = format!("{left}{right}");
+            let frozen = FrozenCompactString::concat(left, right);
+            assert_eq!(frozen.as_str(), expected);
+            assert_eq!(frozen.is_heap_allocated(), is_heap_allocated);
+
+            let clone = frozen.clone();
+            assert_eq!(clone.as_str(), expected);
+            if is_heap_allocated {
+                assert_eq!(frozen.as_str().as_ptr(), clone.as_str().as_ptr());
+            }
+
+            drop(frozen);
+            assert_eq!(clone.as_str(), expected);
+        }
     }
 
     #[test]
