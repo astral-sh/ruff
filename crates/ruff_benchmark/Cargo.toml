@@ -46,7 +46,9 @@ ruff_ranged_value = { workspace = true }
 rustc-hash = { workspace = true }
 
 [features]
-default = ["module_resolution", "ruff_instrumented", "ty_instrumented", "ty_walltime"]
+default = ["module_name", "module_resolution", "ruff_instrumented", "ty_instrumented", "ty_walltime"]
+# Enables the module-name micro-benchmarks
+module_name = ["criterion", "ty_module_resolver"]
 # Enables the ruff instrumented benchmarks
 ruff_instrumented = [
     "criterion",
@@ -94,6 +96,11 @@ required-features = ["ty_instrumented"]
 name = "module_resolution"
 harness = false
 required-features = ["module_resolution"]
+
+[[bench]]
+name = "module_name"
+harness = false
+required-features = ["module_name"]
 
 [[bench]]
 name = "ty_walltime"
