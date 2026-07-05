@@ -677,9 +677,8 @@ dependencies = [
 
 [[package]]
 name = "compact_str"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9dfdd1c2274d9aa354115b09dc9a901d6c5576818cdf70d14cae2bdb47df00ab"
+version = "0.9.0"
+source = "git+https://github.com/charliermarsh/compact_str?rev=f762f64507da110d720fe81dd136d07fe29f54c2#f762f64507da110d720fe81dd136d07fe29f54c2"
 dependencies = [
  "castaway",
  "cfg-if",

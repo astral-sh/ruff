@@ -214,6 +214,10 @@ which = { version = "8.0.0" }
 wild = { version = "2" }
 zip = { version = "8.0", default-features = false }
 
+# Experimental patch for the combined `compact_str` optimizations.
+[patch.crates-io]
+compact_str = { git = "https://github.com/charliermarsh/compact_str", rev = "f762f64507da110d720fe81dd136d07fe29f54c2" }
+
 [workspace.metadata.cargo-shear]
 ignored = [
     "ruff_mdtest",
