@@ -1,0 +1,27 @@
+[package]
+name = "ruff_python"
+version = "0.1.0"
+description = "Python bindings for Ruff's formatting API"
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[lib]
+name = "_ruff_api"
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dependencies]
+ruff_python_formatter = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_python_parser = { workspace = true }
+ruff_formatter = { workspace = true }
+
+pyo3 = { version = "0.23", features = ["extension-module", "abi3-py38"] }
+
+[lints]
+workspace = true
