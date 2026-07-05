@@ -6,6 +6,7 @@ use std::ops::Deref;
 use arrayvec::ArrayVec;
 
 use crate::Expr;
+use crate::frozen_string::FrozenCompactString;
 use crate::generated::ExprName;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -14,17 +15,17 @@ use crate::generated::ExprName;
     derive(schemars::JsonSchema),
     schemars(with = "String")
 )]
-pub struct Name(compact_str::FrozenCompactString);
+pub struct Name(FrozenCompactString);
 
 impl Name {
     #[inline]
     pub fn empty() -> Self {
-        Self(compact_str::FrozenCompactString::default())
+        Self(FrozenCompactString::default())
     }
 
     #[inline]
     pub fn new(name: impl AsRef<str>) -> Self {
-        Self(compact_str::FrozenCompactString::new(name))
+        Self(FrozenCompactString::new(name))
     }
 
     #[inline]
@@ -44,7 +45,7 @@ impl Name {
         let mut name = String::with_capacity(self.len() + s.len());
         name.push_str(self);
         name.push_str(s);
-        self.0 = compact_str::FrozenCompactString::from(name);
+        self.0 = FrozenCompactString::from(name);
     }
 }
 
@@ -152,7 +153,7 @@ impl serde::Serialize for Name {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(self.as_str())
+        serializer.serialize_newtype_struct("Name", self.as_str())
     }
 }
 
@@ -162,8 +163,25 @@ impl<'de> serde::Deserialize<'de> for Name {
     where
         D: serde::Deserializer<'de>,
     {
-        let value = <Cow<'de, str> as serde::Deserialize>::deserialize(deserializer)?;
-        Ok(Self::new(value))
+        struct NameVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for NameVisitor {
+            type Value = Name;
+
+            fn expecting(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("a Python name")
+            }
+
+            fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let value = <Cow<'de, str> as serde::Deserialize>::deserialize(deserializer)?;
+                Ok(Name::new(value))
+            }
+        }
+
+        deserializer.deserialize_newtype_struct("Name", NameVisitor)
     }
 }
 
@@ -820,6 +838,9 @@ type SegmentsStack<'a> = ArrayVec<&'a str, SMALL_LEN>;
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "get-size")]
+    use get_size2::{GetSize, StandardTracker};
+
     use crate::Identifier;
     use crate::name::{Name, SegmentsVec};
 
@@ -829,6 +850,26 @@ mod tests {
         assert_eq!(std::mem::size_of::<Name>(), 16);
         assert_eq!(std::mem::size_of::<Option<Name>>(), 16);
         assert_eq!(std::mem::size_of::<Identifier>(), 32);
+    }
+
+    #[test]
+    #[cfg(all(feature = "serde", feature = "schemars"))]
+    fn serde_roundtrip() {
+        let name = Name::new("Python_🐍");
+        let serialized = serde_json::to_string(&name).unwrap();
+        assert_eq!(serde_json::from_str::<Name>(&serialized).unwrap(), name);
+    }
+
+    #[test]
+    #[cfg(feature = "get-size")]
+    fn heap_size_tracks_shared_storage_once() {
+        assert_eq!(Name::new("inline").get_heap_size(), 0);
+
+        let name = Name::new("a name too long for inline storage");
+        let expected = name.len();
+        let clone = name.clone();
+        let (size, _) = (name, clone).get_heap_size_with_tracker(StandardTracker::new());
+        assert_eq!(size, expected);
     }
 
     #[test]

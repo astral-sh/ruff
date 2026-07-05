@@ -13,6 +13,7 @@ pub mod comparable;
 pub mod docstrings;
 mod expression;
 pub mod find_node;
+mod frozen_string;
 mod generated;
 pub mod helpers;
 pub mod identifier;
