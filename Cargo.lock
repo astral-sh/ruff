@@ -1895,6 +1895,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
+name = "lean_string"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "385ba1b8a25159d816b62eea948cf3c6b38c5050c92ca901c570deead00316e5"
+dependencies = [
+ "castaway",
+ "itoa",
+ "ryu",
+ "serde_core",
+]
+
+[[package]]
 name = "leb128fmt"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3479,6 +3491,7 @@ dependencies = [
  "compact_str",
  "get-size2",
  "is-macro",
+ "lean_string",
  "memchr",
  "ruff_cache",
  "ruff_macros",

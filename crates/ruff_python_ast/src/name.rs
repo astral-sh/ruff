@@ -10,30 +10,27 @@ use crate::generated::ExprName;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "cache", derive(ruff_macros::CacheKey))]
-#[cfg_attr(feature = "salsa", derive(salsa::Update))]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 #[cfg_attr(
     feature = "schemars",
     derive(schemars::JsonSchema),
     schemars(with = "String")
 )]
-pub struct Name(compact_str::CompactString);
+pub struct Name(lean_string::LeanString);
 
 impl Name {
     #[inline]
     pub fn empty() -> Self {
-        Self(compact_str::CompactString::default())
+        Self(lean_string::LeanString::new())
     }
 
     #[inline]
     pub fn new(name: impl AsRef<str>) -> Self {
-        Self(compact_str::CompactString::new(name))
+        Self(name.as_ref().into())
     }
 
     #[inline]
     pub const fn new_static(name: &'static str) -> Self {
-        Self(compact_str::CompactString::const_new(name))
+        Self(lean_string::LeanString::from_static_str(name))
     }
 
     pub fn shrink_to_fit(&mut self) {
@@ -57,7 +54,7 @@ impl Debug for Name {
 
 impl std::fmt::Write for Name {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        self.0.push_str(s);
+        self.push_str(s);
         Ok(())
     }
 }
@@ -88,62 +85,103 @@ impl Borrow<str> for Name {
 impl<'a> From<&'a str> for Name {
     #[inline]
     fn from(s: &'a str) -> Self {
-        Name(s.into())
+        Name::new(s)
     }
 }
 
 impl From<String> for Name {
     #[inline]
     fn from(s: String) -> Self {
-        Name(s.into())
+        Name::new(s)
     }
 }
 
 impl<'a> From<&'a String> for Name {
     #[inline]
     fn from(s: &'a String) -> Self {
-        Name(s.into())
+        Name::new(s)
     }
 }
 
 impl<'a> From<Cow<'a, str>> for Name {
     #[inline]
     fn from(cow: Cow<'a, str>) -> Self {
-        Name(cow.into())
+        Name::new(cow)
     }
 }
 
 impl From<Box<str>> for Name {
     #[inline]
     fn from(b: Box<str>) -> Self {
-        Name(b.into())
+        Name::new(b)
     }
 }
 
 impl From<compact_str::CompactString> for Name {
     #[inline]
     fn from(value: compact_str::CompactString) -> Self {
-        Self(value)
+        Self::new(value)
     }
 }
 
 impl From<Name> for compact_str::CompactString {
     #[inline]
     fn from(name: Name) -> Self {
-        name.0
+        compact_str::CompactString::new(name.as_str())
     }
 }
 
 impl From<Name> for String {
     #[inline]
     fn from(name: Name) -> Self {
-        name.as_str().into()
+        name.0.into()
     }
 }
 
 impl FromIterator<char> for Name {
     fn from_iter<I: IntoIterator<Item = char>>(iter: I) -> Self {
         Self(iter.into_iter().collect())
+    }
+}
+
+#[cfg(feature = "cache")]
+impl ruff_cache::CacheKey for Name {
+    fn cache_key(&self, state: &mut ruff_cache::CacheKeyHasher) {
+        ruff_cache::CacheKey::cache_key(self.as_str(), state);
+    }
+}
+
+#[cfg(feature = "get-size")]
+impl get_size2::GetSize for Name {
+    fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(
+        &self,
+        mut tracker: T,
+    ) -> (usize, T) {
+        let size = if self.0.is_heap_allocated() && tracker.track(self.as_ptr()) {
+            self.len()
+        } else {
+            0
+        };
+        (size, tracker)
+    }
+}
+
+#[cfg(feature = "salsa")]
+#[expect(
+    unsafe_code,
+    reason = "implements Salsa's unsafe update contract for an owned value"
+)]
+unsafe impl salsa::Update for Name {
+    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
+        // SAFETY: `Update` guarantees that `old_pointer` is valid and uniquely available for the
+        // duration of this call. `Name` owns all of its data and has no borrowed state.
+        let old_value = unsafe { &mut *old_pointer };
+        if *old_value == new_value {
+            false
+        } else {
+            *old_value = new_value;
+            true
+        }
     }
 }
 
@@ -759,7 +797,49 @@ type SegmentsStack<'a> = ArrayVec<&'a str, SMALL_LEN>;
 
 #[cfg(test)]
 mod tests {
-    use crate::name::SegmentsVec;
+    #[cfg(feature = "get-size")]
+    use get_size2::{GetSize, StandardTracker};
+
+    use crate::Identifier;
+    use crate::name::{Name, SegmentsVec};
+
+    const STATIC_NAME: Name = Name::new_static("a_static_name_that_is_not_inline");
+
+    #[test]
+    fn inline_and_static_storage() {
+        assert!(!Name::new("1234567890123456").0.is_heap_allocated());
+        assert!(Name::new("12345678901234567").0.is_heap_allocated());
+        assert_eq!(STATIC_NAME, "a_static_name_that_is_not_inline");
+        assert!(!STATIC_NAME.0.is_heap_allocated());
+    }
+
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn size() {
+        assert_eq!(std::mem::size_of::<Name>(), 16);
+        assert_eq!(std::mem::size_of::<Option<Name>>(), 16);
+        assert_eq!(std::mem::size_of::<Identifier>(), 32);
+    }
+
+    #[test]
+    #[cfg(all(feature = "serde", feature = "schemars"))]
+    fn serde_roundtrip() {
+        let name = Name::new("Python_🐍");
+        let serialized = serde_json::to_string(&name).unwrap();
+        assert_eq!(serde_json::from_str::<Name>(&serialized).unwrap(), name);
+    }
+
+    #[test]
+    #[cfg(feature = "get-size")]
+    fn heap_size_tracks_shared_storage_once() {
+        assert_eq!(Name::new("inline").get_heap_size(), 0);
+
+        let name = Name::new("a name too long for inline storage");
+        let expected = name.len();
+        let clone = name.clone();
+        let (size, _) = (name, clone).get_heap_size_with_tracker(StandardTracker::new());
+        assert_eq!(size, expected);
+    }
 
     #[test]
     fn empty_vec() {

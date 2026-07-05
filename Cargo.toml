@@ -127,6 +127,7 @@ jiff = { version = "0.2.0" }
 jod-thread = { version = "1.0.0" }
 js-sys = { version = "0.3.69" }
 libc = { version = "0.2.153" }
+lean_string = "0.6.0"
 libcst = { version = "1.8.4", default-features = false }
 log = { version = "0.4.17" }
 lsp-server = { version = "0.7.6" }
