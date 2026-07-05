@@ -6920,6 +6920,29 @@ impl<'db> Type<'db> {
                             },
                         )
                         .build()
+                } else if matches!(type_mapping, TypeMapping::Materialize(_)) {
+                    // Materialization runs inside relation checks (invariant positions).
+                    // Rebuilding the union with relation-driven simplification there
+                    // re-enters relation checking on freshly materialized types and never
+                    // terminates for recursive types; defer the simplification instead.
+                    union
+                        .elements(db)
+                        .iter()
+                        .fold(
+                            UnionBuilder::new(db)
+                                .unpack_aliases(false)
+                                .defer_simplification(true)
+                                .recursively_defined(union.recursively_defined(db)),
+                            |builder, element| {
+                                builder.add(element.apply_type_mapping_impl(
+                                    db,
+                                    child_type_mapping,
+                                    tcx,
+                                    visitor,
+                                ))
+                            },
+                        )
+                        .build()
                 } else {
                     union.map_leave_aliases(db, |element| {
                         element.apply_type_mapping_impl(db, child_type_mapping, tcx, visitor)

@@ -554,6 +554,14 @@ pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
     unpack_aliases: bool,
+    /// Defers relation-driven simplification (redundancy/negation/subtype checks) while still
+    /// grouping literals and deduplicating: the resulting union is semantically equivalent,
+    /// just not eagerly simplified. Used when a union is rebuilt *inside* a relation check
+    /// (e.g. materialization in an invariant position): running relation-driven
+    /// simplification there re-enters relation checking on freshly built types and never
+    /// terminates for recursive types.
+    defer_simplification: bool,
+
     /// This is enabled when joining types in a `cycle_recovery` function. Because recovery cannot
     /// introduce a new cycle, relation-based union simplifications are skipped in this mode.
     cycle_recovery: bool,
@@ -623,12 +631,18 @@ impl<'db> UnionBuilder<'db> {
             elements: vec![],
             unpack_aliases: true,
             cycle_recovery: false,
+            defer_simplification: false,
             recursively_defined: RecursivelyDefined::No,
         }
     }
 
     pub(crate) fn unpack_aliases(mut self, val: bool) -> Self {
         self.unpack_aliases = val;
+        self
+    }
+
+    pub(crate) fn defer_simplification(mut self, val: bool) -> Self {
+        self.defer_simplification = val;
         self
     }
 
@@ -698,6 +712,7 @@ impl<'db> UnionBuilder<'db> {
             ty
         };
         let cycle_recovery = self.cycle_recovery;
+        let defer_simplification = self.defer_simplification;
         let should_widen = |literals, recursively_defined: RecursivelyDefined| {
             if recursively_defined.is_yes() && cycle_recovery {
                 literals >= MAX_RECURSIVE_UNION_LITERALS
@@ -766,12 +781,14 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing)
-                                    if cycle_recovery
+                                    if (cycle_recovery || defer_simplification)
                                         && literal.fallback_instance(self.db) == *existing =>
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing) if !cycle_recovery => {
+                                UnionElement::Type(existing)
+                                    if !cycle_recovery && !defer_simplification =>
+                                {
                                     // e.g. `existing` could be `Literal[""] & Any`,
                                     // and `ty` could be `Literal[""]`
                                     if ty.is_redundant_with(self.db, *existing) {
@@ -819,12 +836,14 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing)
-                                    if cycle_recovery
+                                    if (cycle_recovery || defer_simplification)
                                         && literal.fallback_instance(self.db) == *existing =>
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing) if !cycle_recovery => {
+                                UnionElement::Type(existing)
+                                    if !cycle_recovery && !defer_simplification =>
+                                {
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -874,12 +893,14 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing)
-                                    if cycle_recovery
+                                    if (cycle_recovery || defer_simplification)
                                         && literal.fallback_instance(self.db) == *existing =>
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing) if !cycle_recovery => {
+                                UnionElement::Type(existing)
+                                    if !cycle_recovery && !defer_simplification =>
+                                {
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -950,12 +971,14 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing)
-                                    if cycle_recovery
+                                    if (cycle_recovery || defer_simplification)
                                         && literal.fallback_instance(self.db) == *existing =>
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing) if !cycle_recovery => {
+                                UnionElement::Type(existing)
+                                    if !cycle_recovery && !defer_simplification =>
+                                {
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -1008,7 +1031,7 @@ impl<'db> UnionBuilder<'db> {
                     _ => self.push_type(ty, seen_aliases),
                 }
             }
-            // Adding `object` to a union results in `object`.
+            // Adding `object` to a union results in `object` (a pure equality check).
             ty if ty.is_object() && !cycle_recovery => self.collapse_to_object(),
             _ => self.push_type(ty, seen_aliases),
         }
@@ -1064,13 +1087,18 @@ impl<'db> UnionBuilder<'db> {
         // If an alias gets here, it means we aren't unpacking aliases, and we also
         // shouldn't try to simplify aliases out of the union, because that will require
         // unpacking them.
-        let should_simplify_full = !matches!(ty, Type::TypeAlias(_)) && !self.cycle_recovery;
+        let should_simplify_full =
+            !matches!(ty, Type::TypeAlias(_)) && !self.cycle_recovery && !self.defer_simplification;
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
 
         for (i, element) in self.elements.iter_mut().enumerate() {
-            let element_type = match element.try_reduce(self.db, ty, self.cycle_recovery) {
+            let element_type = match element.try_reduce(
+                self.db,
+                ty,
+                self.cycle_recovery || self.defer_simplification,
+            ) {
                 ReduceResult::KeepIf(keep) => {
                     if !keep {
                         to_remove.push(i);
@@ -1091,12 +1119,13 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
-            // `object` already contains every possible union element.
+            // `object` already contains every possible union element. This is a pure
+            // equality check, so it also runs with deferred simplification.
             if !self.cycle_recovery && element_type == Type::object() {
                 return;
             }
 
-            if !self.cycle_recovery && should_preserve_hashable_union(self.db, ty, element_type) {
+            if should_simplify_full && should_preserve_hashable_union(self.db, ty, element_type) {
                 continue;
             }
 
@@ -1117,6 +1146,7 @@ impl<'db> UnionBuilder<'db> {
 
             // Fold `(T & ~AlwaysTruthy) | (T & ~AlwaysFalsy)` to `T`.
             if !self.cycle_recovery
+                && !self.defer_simplification
                 && let Some(merged_type) = merge_truthiness_guarded_pair(self.db, ty, element_type)
             {
                 to_remove.push(i);
@@ -1124,7 +1154,7 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             }
 
-            if !self.cycle_recovery
+            if should_simplify_full
                 && element_type
                     .as_literal_value_kind()
                     .zip(bool_pair(ty))
@@ -1188,6 +1218,7 @@ impl<'db> UnionBuilder<'db> {
         let db = self.db;
         let unpack_aliases = self.unpack_aliases;
         let cycle_recovery = self.cycle_recovery;
+        let defer_simplification = self.defer_simplification;
         let recursively_defined = self.recursively_defined;
 
         let type_count = self.elements.iter().map(UnionElement::type_count).sum();
@@ -1234,6 +1265,7 @@ impl<'db> UnionBuilder<'db> {
             let builder = UnionBuilder::new(db)
                 .unpack_aliases(unpack_aliases)
                 .cycle_recovery(cycle_recovery)
+                .defer_simplification(defer_simplification)
                 .recursively_defined(recursively_defined);
             return types
                 .into_iter()
