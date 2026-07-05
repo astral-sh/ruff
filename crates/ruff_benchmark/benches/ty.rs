@@ -9,7 +9,7 @@ use std::fmt::Write;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 
-use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
+use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use rayon::ThreadPoolBuilder;
 use rustc_hash::FxHashSet;
 
@@ -344,6 +344,32 @@ fn benchmark_many_string_assignments(criterion: &mut Criterion) {
             BatchSize::SmallInput,
         );
     });
+}
+
+fn benchmark_string_literal_multiplication(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut group = criterion.benchmark_group("ty_micro[string_literal_multiplication]");
+    for output_len in [8, 24, 64, 256, 4096] {
+        let repetitions = output_len / 4;
+        let mut code = String::new();
+        for index in 0..64 {
+            writeln!(code, "value_{index} = \"s{index:03}\" * {repetitions}").unwrap();
+        }
+
+        group.bench_with_input(BenchmarkId::from_parameter(output_len), &code, |b, code| {
+            b.iter_batched_ref(
+                || setup_micro_case(code),
+                |case| {
+                    let Case { db, .. } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
+    group.finish();
 }
 
 fn benchmark_many_tuple_assignments(criterion: &mut Criterion) {
@@ -1781,6 +1807,7 @@ criterion_group!(check_file, benchmark_cold, benchmark_incremental);
 criterion_group!(
     micro,
     benchmark_many_string_assignments,
+    benchmark_string_literal_multiplication,
     benchmark_many_tuple_assignments,
     benchmark_tuple_implicit_instance_attributes,
     benchmark_complex_constrained_attributes_1,

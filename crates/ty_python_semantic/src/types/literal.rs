@@ -346,14 +346,18 @@ impl std::cmp::PartialOrd for IntLiteralType {
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct StringLiteralType<'db> {
-    #[returns(deref)]
-    pub(crate) value: CompactString,
+    #[returns(ref)]
+    pub(crate) compact_value: CompactString,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for StringLiteralType<'_> {}
 
 impl<'db> StringLiteralType<'db> {
+    pub(crate) fn value(self, db: &'db dyn Db) -> &'db str {
+        self.compact_value(db).as_str()
+    }
+
     /// The length of the string, as would be returned by Python's `len()`.
     pub(crate) fn python_len(self, db: &'db dyn Db) -> usize {
         self.value(db).chars().count()
