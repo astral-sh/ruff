@@ -42,10 +42,11 @@ impl Name {
     }
 
     pub fn push_str(&mut self, s: &str) {
-        let mut name = String::with_capacity(self.len() + s.len());
-        name.push_str(self);
-        name.push_str(s);
-        self.0 = FrozenCompactString::from(name);
+        if s.is_empty() {
+            return;
+        }
+
+        self.0 = FrozenCompactString::concat(self, s);
     }
 }
 
@@ -870,6 +871,23 @@ mod tests {
         let clone = name.clone();
         let (size, _) = (name, clone).get_heap_size_with_tracker(StandardTracker::new());
         assert_eq!(size, expected);
+    }
+
+    #[test]
+    fn push_str_crosses_storage_boundaries() {
+        let mut name = Name::new("abc");
+
+        name.push_str("");
+        assert_eq!(name, "abc");
+
+        name.push_str("defghijklmno");
+        assert_eq!(name, "abcdefghijklmno");
+
+        name.push_str("p");
+        assert_eq!(name, "abcdefghijklmnop");
+
+        name.push_str("qrstuvwx");
+        assert_eq!(name, "abcdefghijklmnopqrstuvwx");
     }
 
     #[test]
