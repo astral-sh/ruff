@@ -214,10 +214,6 @@ which = { version = "8.0.0" }
 wild = { version = "2" }
 zip = { version = "8.0", default-features = false }
 
-# Experimental local patch for the `FrozenCompactString` Name representation.
-[patch.crates-io]
-compact_str = { path = "../compact-str-branches/frozen16/compact_str" }
-
 [workspace.metadata.cargo-shear]
 ignored = [
     "ruff_mdtest",
