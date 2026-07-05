@@ -57,7 +57,7 @@ fn list_instance<'db>(db: &'db dyn Db, argument: Type<'db>) -> Type<'db> {
 }
 
 fn recursive_int_list(db: &dyn Db) -> RecursiveType<'_> {
-    let binder = DivergentType::new(salsa::plumbing::Id::from_bits(1));
+    let binder = DivergentType::new(CycleQuery::Test, salsa::plumbing::Id::from_bits(1));
     let recursive_var = Type::Divergent(binder);
     let element_ty = UnionType::from_elements(db, [KnownClass::Int.to_instance(db), recursive_var]);
     let body = list_instance(db, element_ty);
@@ -116,11 +116,11 @@ fn oscillating_generic_alias_cycle_recover<'db>(
     previous: &Type<'db>,
     current: Type<'db>,
 ) -> Type<'db> {
-    current.cycle_normalized(db, *previous, cycle)
+    current.cycle_normalized(db, CycleQuery::Test, *previous, cycle)
 }
 
 #[salsa::tracked(
-    cycle_initial=Type::identity_recursive,
+    cycle_initial=|db, id| Type::identity_recursive(db, CycleQuery::Test, id),
     cycle_fn=oscillating_generic_alias_cycle_recover,
 )]
 fn oscillating_generic_alias(db: &dyn Db) -> Type<'_> {
@@ -203,7 +203,7 @@ fn todo_types() {
 #[test]
 fn divergent_type() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let div = Type::divergent(CycleQuery::Test, salsa::plumbing::Id::from_bits(1));
     assert!(div.is_dynamic());
     assert!(div.has_dynamic(&db));
     let visitor = ApplyTypeMappingVisitor::default();
@@ -259,11 +259,6 @@ fn divergent_type() {
             .subscript(&db, Type::int_literal(0), ast::ExprContext::Load)
             .is_err()
     );
-    assert_eq!(top_div.recursive_type_normalized_impl(&db, div, true), None);
-    assert_eq!(
-        bottom_div.recursive_type_normalized_impl(&db, div, true),
-        None
-    );
 
     // The `Divergent` type must not be eliminated in union with other dynamic types,
     // as this would prevent detection of divergent type inference using `Divergent`.
@@ -282,28 +277,31 @@ fn divergent_type() {
     assert!(!div.is_redundant_with(&db, Type::unknown()));
     assert!(!Type::unknown().is_redundant_with(&db, div));
 
-    // `Divergent & T` and `Divergent & ~T` both simplify to `Divergent`, except for the
-    // specific case of `Divergent & Never`, which simplifies to `Never`.
+    // The identity recursive type (a cycle initial) dominates intersections:
+    // `μa.a & T` and `μa.a & ~T` both simplify to `μa.a`, except for the specific case
+    // of `μa.a & Never`, which simplifies to `Never`.
+    let identity =
+        Type::identity_recursive(&db, CycleQuery::Test, salsa::plumbing::Id::from_bits(1));
     let divergent_intersection = IntersectionBuilder::new(&db)
-        .add_positive(div)
+        .add_positive(identity)
         .add_positive(todo_type!("2"))
         .add_negative(todo_type!("3"))
         .build();
-    assert_eq!(divergent_intersection, div);
+    assert_eq!(divergent_intersection, identity);
     let divergent_intersection = IntersectionBuilder::new(&db)
         .add_positive(todo_type!("2"))
         .add_negative(todo_type!("3"))
-        .add_positive(div)
+        .add_positive(identity)
         .build();
-    assert_eq!(divergent_intersection, div);
+    assert_eq!(divergent_intersection, identity);
     let divergent_never_intersection = IntersectionBuilder::new(&db)
-        .add_positive(div)
+        .add_positive(identity)
         .add_positive(Type::Never)
         .build();
     assert_eq!(divergent_never_intersection, Type::Never);
     let divergent_never_intersection = IntersectionBuilder::new(&db)
         .add_positive(Type::Never)
-        .add_positive(div)
+        .add_positive(identity)
         .build();
     assert_eq!(divergent_never_intersection, Type::Never);
 
@@ -328,58 +326,6 @@ fn divergent_type() {
         nested_rec.display(&db).to_string(),
         "list[list[Divergent] | None]"
     );
-    let normalized = nested_rec
-        .recursive_type_normalized_impl(&db, div, false)
-        .unwrap();
-    assert_eq!(normalized.display(&db).to_string(), "list[Divergent]");
-
-    let recursive_tuple = Type::heterogeneous_tuple(
-        &db,
-        [
-            UnionType::from_elements(
-                &db,
-                [
-                    KnownClass::Int.to_instance(&db),
-                    Type::heterogeneous_tuple(
-                        &db,
-                        [
-                            UnionType::from_elements(&db, [KnownClass::Int.to_instance(&db), div]),
-                            KnownClass::Str.to_instance(&db),
-                        ],
-                    ),
-                ],
-            ),
-            KnownClass::Str.to_instance(&db),
-        ],
-    );
-    let normalized = recursive_tuple
-        .recursive_type_normalized_impl(&db, div, false)
-        .unwrap();
-    assert_eq!(normalized.display(&db).to_string(), "tuple[Divergent, str]");
-
-    let recursive_dict = KnownClass::Dict.to_specialized_instance(
-        &db,
-        &[
-            KnownClass::Str.to_instance(&db),
-            UnionType::from_elements(
-                &db,
-                [
-                    KnownClass::Int.to_instance(&db),
-                    KnownClass::Dict.to_specialized_instance(
-                        &db,
-                        &[
-                            KnownClass::Str.to_instance(&db),
-                            UnionType::from_elements(&db, [KnownClass::Int.to_instance(&db), div]),
-                        ],
-                    ),
-                ],
-            ),
-        ],
-    );
-    let normalized = recursive_dict
-        .recursive_type_normalized_impl(&db, div, false)
-        .unwrap();
-    assert_eq!(normalized.display(&db).to_string(), "dict[str, Divergent]");
 
     let union = UnionType::from_elements(&db, [div, KnownClass::Int.to_instance(&db)]);
     assert_eq!(union.display(&db).to_string(), "Divergent | int");
@@ -387,10 +333,6 @@ fn divergent_type() {
         let when = source.when_constraint_set_assignable_to_owned(&db, target);
         assert!(when.query(|_builder, when| when.is_always_satisfied(&db)));
     }
-    let normalized = union
-        .recursive_type_normalized_impl(&db, div, false)
-        .unwrap();
-    assert_eq!(normalized.display(&db).to_string(), "int");
 
     // The same can be said about intersections for the `Never` type.
     let intersection = IntersectionType::from_elements(&db, [Type::Never, div]);
@@ -403,7 +345,7 @@ fn divergent_type() {
 #[test]
 fn recursive_type_constructor_simplifies_non_recursive_bodies() {
     let db = setup_db();
-    let binder = DivergentType::new(salsa::plumbing::Id::from_bits(1));
+    let binder = DivergentType::new(CycleQuery::Test, salsa::plumbing::Id::from_bits(1));
     let recursive_var = Type::Divergent(binder);
     let int = KnownClass::Int.to_instance(&db);
 
@@ -740,7 +682,7 @@ type H[T] = G[T]
     let rec_int_list = get_type_alias(&db, "RecursiveIntList");
     assert_eq!(
         rec_int_list.expand_eagerly(&db).display(&db).to_string(),
-        "list[int | Divergent]",
+        "list[T@RecursiveList | Divergent]",
     );
 
     let itself = get_type_alias(&db, "Itself");

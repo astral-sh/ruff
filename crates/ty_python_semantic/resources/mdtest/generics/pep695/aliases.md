@@ -394,12 +394,12 @@ r2: RecursiveList[int] = [1, [1, 2, 3]]
 r3: RecursiveList[int] = "a"
 # error: [invalid-assignment]
 r4: RecursiveList[int] = ["a"]
-# error: [invalid-assignment] "Object of type `list[int | list[RecursiveList[int]] | list[int | list[RecursiveList[int]] | str]]` is not assignable to `RecursiveList[int]`"
+# error: [invalid-assignment] "Object of type `list[list[RecursiveList[int]] | int | list[list[RecursiveList[int]] | int | str]]` is not assignable to `RecursiveList[int]`"
 r5: RecursiveList[int] = [1, ["a"]]
 
 def _(x: RecursiveList[int]):
     if isinstance(x, list):
-        reveal_type(x[0])  # revealed: int | list[RecursiveList[int]]
+        reveal_type(x[0])  # revealed: list[RecursiveList[int]] | int
     if isinstance(x, list) and isinstance(x[0], list):
         reveal_type(x[0])  # revealed: list[RecursiveList[int]]
 ```

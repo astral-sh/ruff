@@ -60,7 +60,6 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::{self as ast, OperatorPrecedence, ParameterWithDefault};
 use ruff_text_size::Ranged;
-use salsa::plumbing::AsId;
 use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module};
 
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
@@ -68,7 +67,6 @@ use crate::types::call::{Binding, CallArguments};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
-use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::diagnostic::{
     ASSERT_TYPE_UNSPELLABLE_SUBTYPE, INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
     TYPE_ASSERTION_FAILURE, report_bad_argument_to_get_protocol_members,
@@ -89,55 +87,16 @@ use crate::types::variance::{TypeVarVariance, VarianceInferable};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
-    ClassLiteral, ClassType, DynamicType, FindLegacyTypeVarsVisitor, Foldable, IntersectionBuilder,
-    KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
-    Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
-    definition_expression_type, walk_signature,
+    ClassLiteral, ClassType, CycleQuery, DynamicType, FindLegacyTypeVarsVisitor, Foldable,
+    IntersectionBuilder, KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner,
+    SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    UnionBuilder, UnionType, definition_expression_type, walk_signature,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{FileScopeId, SemanticIndex, semantic_index};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct RecursiveTypeNormalizationKey {
-    function_literal: salsa::Id,
-    nested: bool,
-}
-
-// Keep this detector thread-local rather than threading it through every recursive
-// normalization helper. Passing an explicit visitor would model the recursion state more
-// directly, but it would touch a wide slice of the type-normalization plumbing for no current
-// behavioral benefit. This works because recursive normalization currently stays on a single
-// thread/query stack; if that ever changes, revisit this and prefer explicit visitor propagation.
-std::thread_local! {
-    static ACTIVE_RECURSIVE_TYPE_NORMALIZATIONS: ActiveRecursionDetector<RecursiveTypeNormalizationKey> =
-        ActiveRecursionDetector::default();
-}
-
-/// Runs recursive type normalization under a scoped guard keyed by function literal identity.
-///
-/// `TypeOf` can make a function signature refer back to the same function through many different
-/// type components. Keeping this guard scoped here lets those components keep their ordinary
-/// `recursive_type_normalized_impl(db, div, nested)` signatures.
-fn visit_recursive_type_normalization<R>(
-    function_literal: FunctionLiteral<'_>,
-    nested: bool,
-    on_cycle: impl FnOnce() -> R,
-    func: impl FnOnce() -> R,
-) -> R {
-    ACTIVE_RECURSIVE_TYPE_NORMALIZATIONS.with(|detector| {
-        detector.visit(
-            &RecursiveTypeNormalizationKey {
-                function_literal: function_literal.last_definition.as_id(),
-                nested,
-            },
-            on_cycle,
-            func,
-        )
-    })
-}
 
 /// A collection of useful spans for annotating functions.
 ///
@@ -1390,8 +1349,10 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|db, id, _| CallableSignature::cycle_initial(db, id),
-        cycle_fn=|db, cycle, previous, value: CallableSignature<'db>, _| value.cycle_normalized(db, previous, cycle),
+        cycle_initial=|db, id, _| CallableSignature::cycle_initial(db, CycleQuery::FunctionSignature, id),
+        cycle_fn=|db, cycle, previous, value: CallableSignature<'db>, _| {
+            value.cycle_normalized(db, CycleQuery::FunctionSignature, previous, cycle)
+        },
         heap_size=ruff_memory_usage::heap_size,
     )]
     pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
@@ -1503,43 +1464,6 @@ impl<'db> FunctionType<'db> {
         for signature in &signatures.overloads {
             signature.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
-    }
-
-    pub(crate) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        visit_recursive_type_normalization(
-            self.literal(db),
-            nested,
-            || None,
-            || {
-                let literal = self.literal(db);
-                let updated_signature = match self.updated_signature(db) {
-                    Some(signature) => {
-                        Some(signature.recursive_type_normalized_impl(db, div, nested)?)
-                    }
-                    None => None,
-                };
-                let updated_implementation_signature =
-                    match self.updated_implementation_signature(db) {
-                        Some(signature) => {
-                            Some(signature.recursive_type_normalized_impl(db, div, nested)?)
-                        }
-                        None => None,
-                    };
-                Some(Self::new(
-                    db,
-                    literal,
-                    UpdatedFunctionSignatures::new(
-                        updated_signature,
-                        updated_implementation_signature,
-                    ),
-                ))
-            },
-        )
     }
 
     pub(super) fn as_abstract_method(

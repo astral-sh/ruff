@@ -379,33 +379,6 @@ impl<'db> NominalInstanceType<'db> {
         })
     }
 
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        match self.0 {
-            NominalInstanceInner::ExactTuple(tuple) => {
-                Some(Self(NominalInstanceInner::ExactTuple(
-                    tuple.recursive_type_normalized_impl(db, div, nested)?,
-                )))
-            }
-            NominalInstanceInner::SysVersionInfo => {
-                Some(Self(NominalInstanceInner::SysVersionInfo))
-            }
-            NominalInstanceInner::Object => Some(Self(NominalInstanceInner::Object)),
-            NominalInstanceInner::NonTuple(class) => {
-                let transformed = class
-                    .class(db)
-                    .recursive_type_normalized_impl(db, div, nested)?;
-                Some(Self(NominalInstanceInner::NonTuple(
-                    class.with_class(db, transformed),
-                )))
-            }
-        }
-    }
-
     pub(super) fn is_singleton(self, db: &'db dyn Db) -> bool {
         match self.0 {
             // The empty tuple is a singleton on CPython and PyPy, but not on other Python
@@ -862,18 +835,6 @@ impl<'db> ProtocolInstanceType<'db> {
         is_equivalent_to_object_inner(db, self, ())
     }
 
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self {
-            inner: self.inner.recursive_type_normalized_impl(db, div, nested)?,
-            _phantom: PhantomData,
-        })
-    }
-
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         match self.inner {
             Protocol::FromClass(class) => class.instance_member(db, name),
@@ -943,22 +904,6 @@ impl<'db> Protocol<'db> {
         }
     }
 
-    fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        match self {
-            Self::FromClass(class) => Some(Self::FromClass(
-                class.recursive_type_normalized_impl(db, div, nested)?,
-            )),
-            Self::Synthesized(synthesized) => Some(Self::Synthesized(
-                synthesized.recursive_type_normalized_impl(db, div, nested)?,
-            )),
-        }
-    }
-
     pub(super) const fn is_synthesized(self) -> bool {
         matches!(self, Self::Synthesized(_))
     }
@@ -978,8 +923,8 @@ impl<'db> VarianceInferable<'db> for Protocol<'db> {
 mod synthesized_protocol {
     use crate::types::protocol_class::ProtocolInterface;
     use crate::types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, Type,
-        TypeContext, TypeMapping, TypeVarVariance, VarianceInferable,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, TypeContext,
+        TypeMapping, TypeVarVariance, VarianceInferable,
     };
     use crate::{Db, FxOrderSet};
     use ty_python_core::definition::Definition;
@@ -1019,17 +964,6 @@ mod synthesized_protocol {
 
         pub(in crate::types) fn interface(self) -> ProtocolInterface<'db> {
             self.0
-        }
-
-        pub(in crate::types) fn recursive_type_normalized_impl(
-            self,
-            db: &'db dyn Db,
-            div: Type<'db>,
-            nested: bool,
-        ) -> Option<Self> {
-            Some(Self(
-                self.0.recursive_type_normalized_impl(db, div, nested)?,
-            ))
         }
     }
 

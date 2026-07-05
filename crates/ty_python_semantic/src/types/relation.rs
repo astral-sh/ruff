@@ -1127,6 +1127,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
             }
 
+            // Same-marker μ-terms are approximation generations of the same cycle head's
+            // fixpoint; compare their bodies directly. Unfolding both sides instead multiplies
+            // the depth of the comparison by the body size at every level, which can exhaust
+            // the stack before the recursion guard sees a repeated pair.
+            (Type::Recursive(source_recursive), Type::Recursive(target_recursive))
+                if source_recursive
+                    .binder(db)
+                    .same_marker(target_recursive.binder(db)) =>
+            {
+                self.with_recursion_guard(source, target, || {
+                    self.check_type_pair(db, source_recursive.body(db), target_recursive.body(db))
+                })
+            }
+
             (Type::Recursive(source_recursive), _) => {
                 let source_unfolded = source_recursive.unfold(db);
                 if source_unfolded == source {
@@ -2560,6 +2574,17 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
+
+            // See the same-marker fast path in the relation checker above.
+            (Type::Recursive(left_recursive), Type::Recursive(right_recursive))
+                if left_recursive
+                    .binder(db)
+                    .same_marker(right_recursive.binder(db)) =>
+            {
+                self.with_recursion_guard(left, right, || {
+                    self.check_type_pair(db, left_recursive.body(db), right_recursive.body(db))
+                })
+            }
 
             (Type::Recursive(left_recursive), _) => {
                 let left_unfolded = left_recursive.unfold(db);

@@ -42,11 +42,32 @@ use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
-    StringLiteralType, SubclassOfType, Type, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    RecursiveType, StringLiteralType, SubclassOfType, Type, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
+
+/// Sorts union elements into a canonical (semantically meaningless but session-stable)
+/// order, so that unions built from the same element set always intern to the same type.
+fn canonical_union_sort<'db>(_db: &'db dyn Db, types: &mut [Type<'db>]) {
+    let key = |ty: &Type<'db>| {
+        let mut hasher = rustc_hash::FxHasher::default();
+        std::hash::Hash::hash(ty, &mut hasher);
+        std::hash::Hasher::finish(&hasher)
+    };
+    types.sort_by(|left, right| {
+        key(left).cmp(&key(right)).then_with(|| {
+            if left == right {
+                std::cmp::Ordering::Equal
+            } else {
+                // Hash collision between distinct types: break the tie deterministically.
+                format!("{left:?}").cmp(&format!("{right:?}"))
+            }
+        })
+    });
+}
 
 /// Extract `(core, guard)` from truthiness-guarded intersections.
 ///
@@ -994,6 +1015,43 @@ impl<'db> UnionBuilder<'db> {
     }
 
     fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+        // During cycle recovery, μ-terms with the same binder are approximation generations of
+        // the same cycle head (fixpoint); merge them instead of accumulating one generation per
+        // iteration: `μa.B1 | μa.B2` → `μa.(B1 | B2)`.
+        if self.cycle_recovery
+            && let Type::Recursive(recursive) = ty
+        {
+            let mut merge_with = None;
+            for (index, element) in self.elements.iter().enumerate() {
+                if let UnionElement::Type(Type::Recursive(existing)) = element
+                    && existing
+                        .binder(self.db)
+                        .same_marker(recursive.binder(self.db))
+                {
+                    merge_with = Some((index, *existing));
+                    break;
+                }
+            }
+            if let Some((index, existing)) = merge_with {
+                if existing == recursive {
+                    return;
+                }
+                let merged_body = UnionType::from_elements_cycle_recovery(
+                    self.db,
+                    [existing.body(self.db), recursive.body(self.db)],
+                );
+                let merged = RecursiveType::build(
+                    self.db,
+                    existing.binder(self.db),
+                    existing.origin(self.db),
+                    merged_body,
+                );
+                self.elements.swap_remove(index);
+                self.add_in_place_impl(merged, seen_aliases);
+                return;
+            }
+        }
+
         let mut ty = ty;
         let bool_pair = |ty: Type<'db>| {
             if let Some(LiteralValueTypeKind::Bool(b)) = ty.as_literal_value_kind() {
@@ -1181,6 +1239,14 @@ impl<'db> UnionBuilder<'db> {
                 .into_iter()
                 .fold(builder, UnionBuilder::add)
                 .try_build();
+        }
+
+        // Cycle recovery matches embeddings of previous provisional values by equality.
+        // Participant queries can re-derive semantically equal unions with a different
+        // element order, so recovery-built unions use a canonical element order to keep
+        // that matching (and thereby fixpoint convergence) order-insensitive.
+        if cycle_recovery {
+            canonical_union_sort(db, &mut types);
         }
 
         match types.len() {

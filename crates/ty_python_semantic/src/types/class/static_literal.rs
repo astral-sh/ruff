@@ -19,11 +19,12 @@ use crate::{
     reachability::{DeclarationsIteratorExtension, binding_reachability},
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallArguments, CallableType, ClassBase,
-        ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias,
-        GenericContext, KnownClass, KnownInstanceType, MaterializationKind, MemberLookupPolicy,
-        MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType,
-        Signature, SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
-        TypeMapping, TypeVarVariance, TypedDictModule, UnionBuilder, UnionType,
+        ClassLiteral, ClassType, CycleQuery, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
+        GenericAlias, GenericContext, KnownClass, KnownInstanceType, MaterializationKind,
+        MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters,
+        PropertyInstanceType, Signature, SpecialFormType, StaticMroError, SubclassOfType,
+        Truthiness, Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictModule, UnionBuilder,
+        UnionType,
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
@@ -2234,7 +2235,8 @@ impl<'db> StaticClassLiteral<'db> {
     #[salsa::tracked(
         cycle_fn=implicit_attribute_cycle_recover,
         cycle_initial=|db, id, _| Member {
-            inner: Place::bound(Type::identity_recursive(db, id)).into(),
+            inner: Place::bound(Type::identity_recursive(db, CycleQuery::ImplicitAttribute, id))
+                .into(),
         },
         heap_size=ruff_memory_usage::heap_size,
     )]
@@ -3181,7 +3183,8 @@ fn explicit_bases_cycle_initial<'db>(
     // Try to produce a list of `Divergent` types of the right length. However, if one or more of
     // the bases is a starred expression, we don't know how many entries that will eventually
     // expand to.
-    vec![Type::identity_recursive(db, id); class_stmt.bases().len()].into_boxed_slice()
+    vec![Type::identity_recursive(db, CycleQuery::ExplicitBases, id); class_stmt.bases().len()]
+        .into_boxed_slice()
 }
 
 fn explicit_bases_cycle_fn<'db>(
@@ -3197,7 +3200,7 @@ fn explicit_bases_cycle_fn<'db>(
         current
             .iter()
             .zip(previous.iter())
-            .map(|(curr, prev)| curr.cycle_normalized(db, *prev, cycle))
+            .map(|(curr, prev)| curr.cycle_normalized(db, CycleQuery::ExplicitBases, *prev, cycle))
             .collect()
     } else {
         // The length of bases has changed, presumably because we expanded a starred expression. We
@@ -3245,8 +3248,11 @@ fn implicit_attribute_cycle_recover<'db>(
     member: Member<'db>,
     _attribute: ImplicitAttributeName<'db>,
 ) -> Member<'db> {
-    let inner = member
-        .inner
-        .cycle_normalized(db, previous_member.inner, cycle);
+    let inner = member.inner.cycle_normalized(
+        db,
+        CycleQuery::ImplicitAttribute,
+        previous_member.inner,
+        cycle,
+    );
     Member { inner }
 }

@@ -31,7 +31,7 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, DivergentType, ErrorContext,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, CycleQuery, DivergentType, ErrorContext,
     FindLegacyTypeVarsVisitor, Foldable, IntersectionType, RecursiveType, StructuralTypeMapping,
     Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
 };
@@ -219,19 +219,6 @@ impl<'db> TupleType<'db> {
                 generic_context.default_specialization(db, Some(KnownClass::Tuple))
             }
         })
-    }
-
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self::new_internal(
-            db,
-            self.tuple(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
-        ))
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
@@ -612,7 +599,11 @@ fn to_class_type_cycle_initial<'db>(
 
     tuple_class.apply_specialization(db, |generic_context| {
         if generic_context.variables(db).len() == 1 {
-            generic_context.specialize_tuple(db, Type::identity_recursive(db, id), self_)
+            generic_context.specialize_tuple(
+                db,
+                Type::identity_recursive(db, CycleQuery::TupleToClassType, id),
+                self_,
+            )
         } else {
             generic_context.default_specialization(db, Some(KnownClass::Tuple))
         }
@@ -704,32 +695,6 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                 let suffix = elements.by_ref().take(suffix);
                 Ok(VariableLengthTuple::mixed(prefix, variable, suffix))
             }
-        }
-    }
-
-    fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        if nested {
-            Some(Self::from_elements(
-                self.0
-                    .iter()
-                    .map(|ty| ty.recursive_type_normalized_impl(db, div, true))
-                    .collect::<Option<Box<[_]>>>()?,
-            ))
-        } else {
-            Some(Self::from_elements(
-                self.0
-                    .iter()
-                    .map(|ty| {
-                        ty.recursive_type_normalized_impl(db, div, true)
-                            .unwrap_or(div)
-                    })
-                    .collect::<Box<[_]>>(),
-            ))
         }
     }
 
@@ -837,38 +802,6 @@ impl<T> VariableLengthTuple<T> {
         suffix: impl IntoIterator<Item = T>,
     ) -> Tuple<T> {
         Tuple::Variable(Self::new(prefix, variable, suffix))
-    }
-
-    fn try_new<P, S>(prefix: P, variable: T, suffix: S) -> Option<Self>
-    where
-        P: IntoIterator<Item = Option<T>>,
-        P::IntoIter: ExactSizeIterator,
-        S: IntoIterator<Item = Option<T>>,
-        S::IntoIter: ExactSizeIterator,
-    {
-        let prefix = prefix.into_iter();
-        let suffix = suffix.into_iter();
-
-        let mut elements =
-            SmallVec::with_capacity(prefix.len().saturating_add(suffix.len()).saturating_add(1));
-
-        for element in prefix {
-            elements.push(element?);
-        }
-
-        let variable_index = elements.len();
-        elements.push(variable);
-
-        for element in suffix {
-            elements.push(element?);
-        }
-
-        elements.shrink_to_fit();
-
-        Some(Self {
-            elements,
-            variable_index,
-        })
     }
 
     fn new(
@@ -1840,65 +1773,6 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         }
     }
 
-    fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        if nested {
-            let prefix = self
-                .prefix_elements()
-                .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, div, true));
-
-            let variable = self
-                .variable()
-                .recursive_type_normalized_impl(db, div, true)?;
-
-            let suffix = self
-                .suffix_elements()
-                .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, div, true));
-
-            Self::try_new(prefix, variable, suffix)
-        } else {
-            let mut prefix = self
-                .prefix_elements()
-                .iter()
-                .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, div, true)
-                        .unwrap_or(div)
-                })
-                .collect::<Vec<_>>();
-
-            let variable = self
-                .variable()
-                .recursive_type_normalized_impl(db, div, true)
-                .unwrap_or(div);
-
-            let mut suffix = self
-                .suffix_elements()
-                .iter()
-                .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, div, true)
-                        .unwrap_or(div)
-                })
-                .collect::<Vec<_>>();
-
-            // `tuple[a, ..., a]` still grows under tuple-star recursion such as
-            // `x = (*x, x)`. The current tuple representation cannot express that
-            // sequence-recursive shape, so absorb redundant binder slots into the
-            // variable portion during cycle recovery.
-            if variable == div {
-                prefix.retain(|ty| *ty != div);
-                suffix.retain(|ty| *ty != div);
-            }
-
-            Some(Self::new(prefix, variable, suffix))
-        }
-    }
-
     fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
@@ -2097,7 +1971,7 @@ impl<'db> Tuple<Type<'db>> {
                 .all_elements()
                 .iter()
                 .copied()
-                .any(|element| element.contains_cycle_binder(db, &[binder]));
+                .any(|element| element.contains_cycle_binder(db, binder));
             if !contains_binder {
                 return Self::Variable(tuple);
             }
@@ -2132,7 +2006,7 @@ impl<'db> Tuple<Type<'db>> {
     fn reduce_recursive_tuple_elements(self, db: &'db dyn Db, binder: DivergentType) -> Self {
         fn reduce<'db>(db: &'db dyn Db, element: Type<'db>, binder: DivergentType) -> Type<'db> {
             if element.exact_tuple_instance_spec(db).is_some()
-                && element.contains_cycle_binder(db, &[binder])
+                && element.contains_cycle_binder(db, binder)
             {
                 Type::Divergent(binder)
             } else {
@@ -2190,22 +2064,6 @@ impl<'db> Tuple<Type<'db>> {
         match self {
             Tuple::Fixed(tuple) => tuple.resize(db, new_length),
             Tuple::Variable(tuple) => tuple.resize(db, new_length),
-        }
-    }
-
-    pub(super) fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        match self {
-            Tuple::Fixed(tuple) => Some(Tuple::Fixed(
-                tuple.recursive_type_normalized_impl(db, div, nested)?,
-            )),
-            Tuple::Variable(tuple) => Some(Tuple::Variable(
-                tuple.recursive_type_normalized_impl(db, div, nested)?,
-            )),
         }
     }
 
@@ -2423,7 +2281,7 @@ impl<'db> Foldable<'db> for TupleSpec<'db> {
     fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
         self.apply_type_mapping_impl(
             db,
-            &TypeMapping::Structural(StructuralTypeMapping::FoldRecursive { recursive }),
+            &recursive.fold_mapping(db),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
         )

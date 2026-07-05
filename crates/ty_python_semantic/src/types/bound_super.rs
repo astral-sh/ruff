@@ -288,23 +288,6 @@ impl<'db> ResolvedSuperOwner<'db> {
         }
     }
 
-    fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self {
-            owner_type: self
-                .owner_type
-                .recursive_type_normalized_impl(db, div, nested)?,
-            lookup_anchor: self
-                .lookup_anchor
-                .recursive_type_normalized_impl(db, div, nested)?,
-            receiver: self.receiver,
-        })
-    }
-
     fn descriptor_binding(&self, db: &'db dyn Db) -> (Option<Type<'db>>, Type<'db>) {
         match self.receiver {
             DescriptorReceiverKind::Class => (None, self.owner_type),
@@ -328,23 +311,6 @@ impl<'db> SuperOwnerKind<'db> {
         recursive
             .is_identity(db)
             .then_some(Self::IdentityRecursive(recursive))
-    }
-
-    fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        match self {
-            SuperOwnerKind::Dynamic(dynamic) => {
-                Some(SuperOwnerKind::Dynamic(dynamic.recursive_type_normalized()))
-            }
-            SuperOwnerKind::IdentityRecursive(_) => Some(*self),
-            SuperOwnerKind::Resolved(resolved_owner) => Some(SuperOwnerKind::Resolved(
-                resolved_owner.recursive_type_normalized_impl(db, div, nested)?,
-            )),
-        }
     }
 
     fn iter_mro(&self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> + Clone {
@@ -995,21 +961,6 @@ impl<'db> BoundSuperType<'db> {
         }
 
         result
-    }
-
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self::new(
-            db,
-            self.pivot_class(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
-            self.owner(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
-        ))
     }
 }
 

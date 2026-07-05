@@ -156,13 +156,13 @@ A = list["A | None"]
 
 def f(x: A):
     reveal_type(x)  # revealed: list[Divergent | None]
-    reveal_type(x[0])  # revealed: list[Divergent | None] | None
+    reveal_type(x[0])  # revealed: None | list[Divergent | None]
 
 JSONPrimitive = Union[str, int, float, bool, None]
 JSONValue = TypeAliasType("JSONValue", 'Union[JSONPrimitive, Sequence["JSONValue"], Mapping[str, "JSONValue"]]')
 
 def _(x: JSONValue):
-    reveal_type(x)  # revealed: Sequence[JSONValue] | int | float | None | Mapping[str, JSONValue]
+    reveal_type(x)  # revealed: Sequence[JSONValue] | None | float | Mapping[str, JSONValue] | int
 ```
 
 ## Self-referential legacy type variables
@@ -236,16 +236,16 @@ class C:
         self.c = lambda positional_only=self.c, /: positional_only
         self.d = lambda *, kw_only=self.d: kw_only
 
-        # revealed: (positional=...) -> Unknown | (positional=...) -> Divergent
+        # revealed: (positional=...) -> Unknown | (positional=...) -> Unknown | Divergent
         reveal_type(self.a)
 
-        # revealed: (*, kw_only=...) -> Unknown | (*, kw_only=...) -> Divergent
+        # revealed: (*, kw_only=...) -> Unknown | (*, kw_only=...) -> Unknown | Divergent
         reveal_type(self.b)
 
-        # revealed: (positional_only=..., /) -> Unknown | (positional_only=..., /) -> Divergent
+        # revealed: (positional_only=..., /) -> Unknown | (positional_only=..., /) -> Unknown | Divergent
         reveal_type(self.c)
 
-        # revealed: (*, kw_only=...) -> Unknown | (*, kw_only=...) -> Divergent
+        # revealed: (*, kw_only=...) -> Unknown | (*, kw_only=...) -> Unknown | Divergent
         reveal_type(self.d)
 ```
 
@@ -260,7 +260,7 @@ class Cyclic:
         if isinstance(self.data, str):
             self.data = {"url": self.data}
 
-# revealed: str | dict[Unknown, Unknown] | dict[str, str]
+# revealed: dict[Unknown, Unknown] | str | dict[str, str]
 reveal_type(Cyclic("").data)
 ```
 
@@ -434,7 +434,9 @@ class Nest:
         self.x3 = [self.x2] if cond else [self.x1]
 
 # どれも少なくともlistとdictを含んでいるはず
-reveal_type(Nest().x1)  # revealed: ?
-reveal_type(Nest().x2)  # revealed: ?
-reveal_type(Nest().x3)  # revealed: ?
+reveal_type(Nest().x1)  # revealed: list[dict[str, list[list[Divergent] | Divergent] | list[list[Divergent]]]]
+# revealed: dict[str, list[list[dict[str, list[list[Divergent] | Divergent] | list[list[Divergent]]]] | dict[str, list[list[Divergent] | Divergent] | list[list[Divergent]]]] | list[list[dict[str, list[list[Divergent] | Divergent] | list[list[Divergent]]]]]]
+reveal_type(Nest().x2)
+# revealed: list[list[dict[str, list[list[Divergent] | Divergent] | list[list[Divergent]]]] | dict[str, list[list[dict[str, list[list[Divergent] | Divergent] | list[list[Divergent]]]] | dict[str, list[list[Divergent] | Divergent] | list[list[Divergent]]]] | list[list[dict[str, list[list[Divergent] | Divergent] | list[list[Divergent]]]]]]] | list[list[dict[str, list[list[Divergent] | Divergent] | list[list[Divergent]]]]]
+reveal_type(Nest().x3)
 ```

@@ -32,11 +32,13 @@ use crate::types::relation::{
 };
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
 use crate::types::typevar::{BoundTypeVarIdentity, max_typevar_freshness_matching_generic_context};
+use crate::types::visitor::any_over_type;
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
-    ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind,
-    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping, TypeVarNonce,
-    TypedDictType, UnionBuilder, VarianceInferable, infer_complete_scope_types, todo_type,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CycleQuery,
+    ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind,
+    ParamSpecAttrKind, ParameterDescription, SelfBinding, StructuralTypeMapping, TypeContext,
+    TypeMapping, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
+    infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -143,10 +145,10 @@ impl<'db> CallableSignature<'db> {
         Self::single(Signature::bottom())
     }
 
-    pub(crate) fn cycle_initial(db: &'db dyn Db, id: salsa::Id) -> Self {
+    pub(crate) fn cycle_initial(db: &'db dyn Db, query: CycleQuery, id: salsa::Id) -> Self {
         Self::single(Signature::new(
             Parameters::bottom(),
-            Type::identity_recursive(db, id),
+            Type::identity_recursive(db, query, id),
         ))
     }
 
@@ -224,6 +226,7 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn cycle_normalized(
         &self,
         db: &'db dyn Db,
+        query: CycleQuery,
         previous: &Self,
         cycle: &salsa::Cycle,
     ) -> Self {
@@ -233,28 +236,13 @@ impl<'db> CallableSignature<'db> {
                     .overloads
                     .iter()
                     .zip(previous.overloads.iter())
-                    .map(|(curr, prev)| curr.cycle_normalized(db, prev, cycle))
+                    .map(|(curr, prev)| curr.cycle_normalized(db, query, prev, cycle))
                     .collect(),
             }
         } else {
             debug_assert!(previous.is_cycle_initial(db));
             self.clone()
         }
-    }
-
-    pub(super) fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self {
-            overloads: self
-                .overloads
-                .iter()
-                .map(|signature| signature.recursive_type_normalized_impl(db, div, nested))
-                .collect::<Option<SmallVec<_>>>()?,
-        })
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
@@ -755,10 +743,16 @@ impl<'db> Signature<'db> {
         self
     }
 
-    fn cycle_normalized(&self, db: &'db dyn Db, previous: &Self, cycle: &salsa::Cycle) -> Self {
+    fn cycle_normalized(
+        &self,
+        db: &'db dyn Db,
+        query: CycleQuery,
+        previous: &Self,
+        cycle: &salsa::Cycle,
+    ) -> Self {
         let return_ty = self
             .return_ty
-            .cycle_normalized(db, previous.return_ty, cycle);
+            .cycle_normalized(db, query, previous.return_ty, cycle);
 
         let parameters = if self.parameters.len() == previous.parameters.len() {
             Parameters::new(
@@ -766,7 +760,7 @@ impl<'db> Signature<'db> {
                 self.parameters
                     .iter()
                     .zip(previous.parameters.iter())
-                    .map(|(curr, prev)| curr.cycle_normalized(db, prev, cycle)),
+                    .map(|(curr, prev)| curr.cycle_normalized(db, query, prev, cycle)),
             )
         } else {
             debug_assert_eq!(previous.parameters, Parameters::bottom());
@@ -779,35 +773,6 @@ impl<'db> Signature<'db> {
             parameters,
             return_ty,
         }
-    }
-
-    pub(super) fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        let return_ty = if nested {
-            self.return_ty
-                .recursive_type_normalized_impl(db, div, true)?
-        } else {
-            self.return_ty
-                .recursive_type_normalized_impl(db, div, true)
-                .unwrap_or(div)
-        };
-        let parameters = {
-            let mut parameters = Vec::with_capacity(self.parameters.len());
-            for param in &self.parameters {
-                parameters.push(param.recursive_type_normalized_impl(db, div, nested)?);
-            }
-            Parameters::new(db, parameters)
-        };
-        Some(Self {
-            generic_context: self.generic_context,
-            definition: self.definition,
-            parameters,
-            return_ty,
-        })
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
@@ -3963,12 +3928,18 @@ impl<'db> Parameter<'db> {
         }
     }
 
-    fn cycle_normalized(&self, db: &'db dyn Db, previous: &Self, cycle: &salsa::Cycle) -> Self {
+    fn cycle_normalized(
+        &self,
+        db: &'db dyn Db,
+        query: CycleQuery,
+        previous: &Self,
+        cycle: &salsa::Cycle,
+    ) -> Self {
         let annotated_type =
             self.annotated_type
-                .cycle_normalized(db, previous.annotated_type, cycle);
+                .cycle_normalized(db, query, previous.annotated_type, cycle);
 
-        let kind = self.kind.cycle_normalized(db, &previous.kind, cycle);
+        let kind = self.kind.cycle_normalized(db, query, &previous.kind, cycle);
 
         Self {
             annotated_type,
@@ -3977,81 +3948,6 @@ impl<'db> Parameter<'db> {
             annotation_kind: self.annotation_kind,
             kind,
         }
-    }
-
-    pub(super) fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        let Parameter {
-            annotated_type,
-            definition,
-            annotation_kind,
-            inferred_annotation,
-            kind,
-        } = self;
-
-        let annotated_type = if nested {
-            annotated_type.recursive_type_normalized_impl(db, div, true)?
-        } else {
-            annotated_type
-                .recursive_type_normalized_impl(db, div, true)
-                .unwrap_or(div)
-        };
-
-        let kind = match kind {
-            ParameterKind::PositionalOnly { name, default_type } => ParameterKind::PositionalOnly {
-                name: name.clone(),
-                default_type: match default_type {
-                    Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
-                    Some(ty) => Some(
-                        ty.recursive_type_normalized_impl(db, div, true)
-                            .unwrap_or(div),
-                    ),
-                    None => None,
-                },
-            },
-            ParameterKind::PositionalOrKeyword { name, default_type } => {
-                ParameterKind::PositionalOrKeyword {
-                    name: name.clone(),
-                    default_type: match default_type {
-                        Some(ty) if nested => {
-                            Some(ty.recursive_type_normalized_impl(db, div, true)?)
-                        }
-                        Some(ty) => Some(
-                            ty.recursive_type_normalized_impl(db, div, true)
-                                .unwrap_or(div),
-                        ),
-                        None => None,
-                    },
-                }
-            }
-            ParameterKind::KeywordOnly { name, default_type } => ParameterKind::KeywordOnly {
-                name: name.clone(),
-                default_type: match default_type {
-                    Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
-                    Some(ty) => Some(
-                        ty.recursive_type_normalized_impl(db, div, true)
-                            .unwrap_or(div),
-                    ),
-                    None => None,
-                },
-            },
-            ParameterKind::Variadic { name } => ParameterKind::Variadic { name: name.clone() },
-            ParameterKind::KeywordVariadic { name } => {
-                ParameterKind::KeywordVariadic { name: name.clone() }
-            }
-        };
-
-        Some(Self {
-            annotated_type,
-            definition: *definition,
-            inferred_annotation: *inferred_annotation,
-            annotation_kind: *annotation_kind,
-            kind,
-        })
     }
 
     fn from_node_and_kind(
@@ -4270,18 +4166,25 @@ impl<'db> ParameterKind<'db> {
     #[expect(clippy::ref_option)]
     fn cycle_normalized_default(
         db: &'db dyn Db,
+        query: CycleQuery,
         current: &Option<Type<'db>>,
         previous: &Option<Type<'db>>,
         cycle: &salsa::Cycle,
     ) -> Option<Type<'db>> {
         match (current, previous) {
-            (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, *prev, cycle)),
-            (Some(curr), None) => Some(curr.recursive_type_normalized(db, cycle)),
+            (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, query, *prev, cycle)),
+            (Some(curr), None) => Some(curr.recursive_type_normalized(db, query, cycle)),
             (None, _) => *current,
         }
     }
 
-    fn cycle_normalized(&self, db: &'db dyn Db, previous: &Self, cycle: &salsa::Cycle) -> Self {
+    fn cycle_normalized(
+        &self,
+        db: &'db dyn Db,
+        query: CycleQuery,
+        previous: &Self,
+        cycle: &salsa::Cycle,
+    ) -> Self {
         match (self, previous) {
             (
                 ParameterKind::PositionalOnly { name, default_type },
@@ -4291,7 +4194,13 @@ impl<'db> ParameterKind<'db> {
                 },
             ) => ParameterKind::PositionalOnly {
                 name: name.clone(),
-                default_type: Self::cycle_normalized_default(db, default_type, prev_default, cycle),
+                default_type: Self::cycle_normalized_default(
+                    db,
+                    query,
+                    default_type,
+                    prev_default,
+                    cycle,
+                ),
             },
             (
                 ParameterKind::PositionalOrKeyword { name, default_type },
@@ -4301,7 +4210,13 @@ impl<'db> ParameterKind<'db> {
                 },
             ) => ParameterKind::PositionalOrKeyword {
                 name: name.clone(),
-                default_type: Self::cycle_normalized_default(db, default_type, prev_default, cycle),
+                default_type: Self::cycle_normalized_default(
+                    db,
+                    query,
+                    default_type,
+                    prev_default,
+                    cycle,
+                ),
             },
             (
                 ParameterKind::KeywordOnly { name, default_type },
@@ -4311,7 +4226,13 @@ impl<'db> ParameterKind<'db> {
                 },
             ) => ParameterKind::KeywordOnly {
                 name: name.clone(),
-                default_type: Self::cycle_normalized_default(db, default_type, prev_default, cycle),
+                default_type: Self::cycle_normalized_default(
+                    db,
+                    query,
+                    default_type,
+                    prev_default,
+                    cycle,
+                ),
             },
             // Variadic / KeywordVariadic have no types to normalize.
             // Also, if the current `ParameterKind` is different from `previous`, it means that `previous` is the cycle initial value,
@@ -4330,10 +4251,26 @@ impl<'db> ParameterKind<'db> {
         let apply_to_default_type = |default_type: &Option<Type<'db>>| {
             if type_mapping == &TypeMapping::ReplaceParameterDefaults && default_type.is_some() {
                 Some(Type::unknown())
+            } else if matches!(
+                type_mapping.as_structural(),
+                Some(StructuralTypeMapping::ReplaceWithBinder { .. })
+            ) {
+                // A default value that references the recursive cycle would retain one more
+                // nesting layer of the previous provisional value on every iteration; recovery
+                // deliberately falls back to `Unknown` for such defaults (which only affects
+                // the displayed type; see the "Parameter default values" cycle tests).
+                default_type.as_ref().map(|ty| {
+                    if any_over_type(db, *ty, false, |ty| {
+                        matches!(ty, Type::Divergent(_) | Type::Recursive(_))
+                    }) {
+                        Type::unknown()
+                    } else {
+                        *ty
+                    }
+                })
             } else if type_mapping.as_structural().is_some() {
-                // Default-value types may point back to the callable being mapped.
-                // Structural recursive rewrites operate on the callable type shape, not on that
-                // retained value-origin information.
+                // Default-value types may point back to the callable being mapped; chasing
+                // fold/unfold through them would re-expand self-nested recursive callables.
                 *default_type
             } else {
                 default_type

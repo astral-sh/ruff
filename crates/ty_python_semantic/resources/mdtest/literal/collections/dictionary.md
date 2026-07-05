@@ -85,15 +85,15 @@ individual keys:
 from typing import TypedDict
 
 x1 = {"a": 1, "b": "2"}
-reveal_type(x1)  # revealed: dict[str, int | str]
+reveal_type(x1)  # revealed: dict[str, str | int]
 reveal_type(x1["a"])  # revealed: Literal[1]
 reveal_type(x1["b"])  # revealed: Literal["2"]
 
 x1["a"] = 2
 reveal_type(x1["a"])  # revealed: Literal[2]
 
-x2: dict[str, int | str] = {"a": 1, "b": "2"}
-reveal_type(x2)  # revealed: dict[str, int | str]
+x2: dict[str, str | int] = {"a": 1, "b": "2"}
+reveal_type(x2)  # revealed: dict[str, str | int]
 reveal_type(x2["a"])  # revealed: Literal[1]
 reveal_type(x2["b"])  # revealed: Literal["2"]
 
@@ -122,19 +122,19 @@ x6 = x7 = {"a": 1}
 reveal_type(x6["a"])  # revealed: int
 reveal_type(x7["a"])  # revealed: int
 
-x8: list[dict[str, int | str]] = [{"a": 1, "b": "2"}, {"a": 3, "b": "4"}]
+x8: list[dict[str, str | int]] = [{"a": 1, "b": "2"}, {"a": 3, "b": "4"}]
 reveal_type(x8[0]["a"])  # revealed: Literal[1]
 reveal_type(x8[1]["b"])  # revealed: Literal["4"]
 
-x9: dict[str, list[dict[str, int | str]]] = {"a": [{"a": 1, "b": "2"}, {"a": 3, "b": "4"}]}
+x9: dict[str, list[dict[str, str | int]]] = {"a": [{"a": 1, "b": "2"}, {"a": 3, "b": "4"}]}
 reveal_type(x9["a"][0]["a"])  # revealed: Literal[1]
 reveal_type(x9["a"][1]["b"])  # revealed: Literal["4"]
 
-x10: tuple[dict[str, int | str], ...] = ({"a": 1, "b": "2"}, {"a": 3, "b": "4"})
+x10: tuple[dict[str, str | int], ...] = ({"a": 1, "b": "2"}, {"a": 3, "b": "4"})
 reveal_type(x10[0]["a"])  # revealed: Literal[1]
 reveal_type(x10[1]["b"])  # revealed: Literal["4"]
 
-x11: dict[str, tuple[dict[str, int | str], ...]] = {"a": ({"a": 1, "b": "2"}, {"a": 3, "b": "4"})}
+x11: dict[str, tuple[dict[str, str | int], ...]] = {"a": ({"a": 1, "b": "2"}, {"a": 3, "b": "4"})}
 reveal_type(x11["a"][0]["a"])  # revealed: Literal[1]
 reveal_type(x11["a"][1]["b"])  # revealed: Literal["4"]
 
@@ -176,14 +176,14 @@ def _(x: dict[str, int]):
     # error: [invalid-argument-type]
     f2(**x)
 
-def _(x: dict[str, int | str]):
+def _(x: dict[str, str | int]):
     # error: [invalid-argument-type]
     f1(**x)
 
     x["a"] = 1
     f1(**x)  # ok
 
-def _(x: dict[str, int | str], flag: bool):
+def _(x: dict[str, str | int], flag: bool):
     if flag:
         x["a"] = 1
 

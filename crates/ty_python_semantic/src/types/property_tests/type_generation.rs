@@ -5,7 +5,7 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::known_instance::KnownInstanceType;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundMethodType, EnumLiteralType, IntersectionBuilder,
+    ApplyTypeMappingVisitor, BoundMethodType, CycleQuery, EnumLiteralType, IntersectionBuilder,
     IntersectionType, KnownClass, MaterializationKind, Parameter, Parameters, Signature,
     SpecialFormType, SubclassOfType, Type, UnionType,
 };
@@ -267,7 +267,7 @@ impl Ty {
 }
 
 fn divergent(db: &TestDb, id_bits: u64, materialization: Option<MaterializationKind>) -> Type<'_> {
-    let divergent = Type::divergent(salsa::plumbing::Id::from_bits(id_bits));
+    let divergent = Type::divergent(CycleQuery::Test, salsa::plumbing::Id::from_bits(id_bits));
 
     match materialization {
         Some(materialization_kind) => divergent.materialize(

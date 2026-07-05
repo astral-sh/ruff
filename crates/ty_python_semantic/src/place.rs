@@ -12,8 +12,9 @@ use crate::reachability::{
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
-    DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
-    UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
+    CycleQuery, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers,
+    TypeQualifiers, UnionBuilder, UnionType, binding_type, inferred_declaration,
+    is_discarded_dict_key_assignment,
 };
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
@@ -913,6 +914,7 @@ impl<'db> PlaceAndQualifiers<'db> {
     pub(crate) fn cycle_normalized(
         self,
         db: &'db dyn Db,
+        query: CycleQuery,
         previous_place: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
@@ -927,7 +929,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             // iteration into the current result; after the first couple iterations, the same
             // applies to boundness and qualifiers.
             (Place::Defined(prev), Place::Defined(current)) => Place::Defined(DefinedPlace {
-                ty: current.ty.cycle_normalized(db, prev.ty, cycle),
+                ty: current.ty.cycle_normalized(db, query, prev.ty, cycle),
                 definedness: if cycle.iteration() <= 1
                     || matches!(
                         (prev.definedness, current.definedness),
@@ -948,7 +950,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             // However, the handling described above may reduce the exactness of reachability analysis,
             // so it may be better to remove it. In that case, this branch is necessary.
             (Place::Undefined, Place::Defined(current)) => Place::Defined(DefinedPlace {
-                ty: current.ty.recursive_type_normalized(db, cycle),
+                ty: current.ty.recursive_type_normalized(db, query, cycle),
                 definedness: if cycle.iteration() <= 1 {
                     current.definedness
                 } else {
@@ -959,14 +961,11 @@ impl<'db> PlaceAndQualifiers<'db> {
             // If a `Place` that was `Defined(Divergent)` in the previous cycle is actually found to be unreachable in the current cycle,
             // it is set to `Undefined` (because the cycle initial value does not include meaningful reachability information).
             (Place::Defined(prev), Place::Undefined) => {
-                if cycle
-                    .head_ids()
-                    .any(|id| prev.ty == Type::identity_recursive(db, id))
-                {
+                if prev.ty.is_identity_recursive(db) {
                     Place::Undefined
                 } else {
                     Place::Defined(DefinedPlace {
-                        ty: prev.ty.recursive_type_normalized(db, cycle),
+                        ty: prev.ty.recursive_type_normalized(db, query, cycle),
                         definedness: Definedness::PossiblyUndefined,
                         ..prev
                     })
@@ -985,9 +984,9 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
 }
 
 #[salsa::tracked(
-    cycle_initial=|db, id, _, _, _, _| Place::bound(Type::identity_recursive(db, id)).into(),
+    cycle_initial=|db, id, _, _, _, _| Place::bound(Type::identity_recursive(db, CycleQuery::Place, id)).into(),
     cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, _, _, _, _| {
-        place.cycle_normalized(db, *previous, cycle)
+        place.cycle_normalized(db, CycleQuery::Place, *previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]

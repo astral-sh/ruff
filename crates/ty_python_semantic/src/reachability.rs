@@ -195,6 +195,8 @@
 
 use std::cell::RefCell;
 
+use crate::types::CycleQuery;
+
 use crate::{
     Db,
     dunder_all::dunder_all_names,
@@ -236,9 +238,9 @@ use ty_python_core::{
 /// rebuilding it from the union of all preceding patterns, which can repeatedly distribute the
 /// same intersections.
 #[salsa::tracked(
-    cycle_initial = |db, id, _, _| Type::identity_recursive(db, id),
+    cycle_initial = |db, id, _, _| Type::identity_recursive(db, CycleQuery::PatternNarrowing, id),
     cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-        result.cycle_normalized(db, *previous, cycle)
+        result.cycle_normalized(db, CycleQuery::PatternNarrowing, *previous, cycle)
     },
     heap_size = ruff_memory_usage::heap_size
 )]
@@ -265,9 +267,9 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
 ///
 /// This result is also the preceding-pattern prefix for the next unguarded case.
 #[salsa::tracked(
-    cycle_initial = |db, id, _, _| Type::identity_recursive(db, id),
+    cycle_initial = |db, id, _, _| Type::identity_recursive(db, CycleQuery::PatternNarrowing, id),
     cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-        result.cycle_normalized(db, *previous, cycle)
+        result.cycle_normalized(db, CycleQuery::PatternNarrowing, *previous, cycle)
     },
     heap_size = ruff_memory_usage::heap_size
 )]

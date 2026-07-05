@@ -252,20 +252,6 @@ impl<'db> GenericAlias<'db> {
         ))
     }
 
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self::new(
-            db,
-            self.origin(db),
-            self.specialization(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
-        ))
-    }
-
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         self.origin(db).definition(db)
     }
@@ -526,29 +512,6 @@ impl<'db> ClassLiteral<'db> {
             .to_class_literal(db)
             .as_class_literal()
             .expect("`object` should always be a non-generic class in typeshed")
-    }
-
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        match self {
-            Self::Dynamic(dynamic) => Some(Self::Dynamic(
-                dynamic.recursive_type_normalized_impl(db, div, nested)?,
-            )),
-            Self::DynamicNamedTuple(named_tuple) => Some(Self::DynamicNamedTuple(
-                named_tuple.recursive_type_normalized_impl(db, div, nested)?,
-            )),
-            Self::DynamicTypedDict(typed_dict) => Some(Self::DynamicTypedDict(
-                typed_dict.recursive_type_normalized_impl(db, div, nested)?,
-            )),
-            Self::DynamicEnum(enum_literal) => Some(Self::DynamicEnum(
-                enum_literal.recursive_type_normalized_impl(db, div, nested)?,
-            )),
-            Self::Static(_) => Some(self),
-        }
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(
@@ -1097,22 +1060,6 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(_) => None,
             Self::Generic(generic) => Some(generic),
-        }
-    }
-
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        match self {
-            Self::NonGeneric(class) => Some(Self::NonGeneric(
-                class.recursive_type_normalized_impl(db, div, nested)?,
-            )),
-            Self::Generic(generic) => Some(Self::Generic(
-                generic.recursive_type_normalized_impl(db, div, nested)?,
-            )),
         }
     }
 

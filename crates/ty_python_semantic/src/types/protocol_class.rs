@@ -8,7 +8,7 @@ use rustc_hash::FxHashMap;
 
 use crate::types::callable::CallableTypeKind;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
-use crate::types::{TypeContext, UpcastPolicy};
+use crate::types::{CycleQuery, TypeContext, UpcastPolicy};
 use crate::{
     Db, FxOrderSet,
     place::{
@@ -156,17 +156,6 @@ impl<'db> ProtocolClass<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
         )
     }
-
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self(
-            self.0.recursive_type_normalized_impl(db, div, nested)?,
-        ))
-    }
 }
 
 impl<'db> Deref for ProtocolClass<'db> {
@@ -263,7 +252,13 @@ impl<'db> ProtocolInterface<'db> {
         Self::new(db, BTreeMap::default())
     }
 
-    fn cycle_normalized(self, db: &'db dyn Db, previous: Self, cycle: &salsa::Cycle) -> Self {
+    fn cycle_normalized(
+        self,
+        db: &'db dyn Db,
+        query: CycleQuery,
+        previous: Self,
+        cycle: &salsa::Cycle,
+    ) -> Self {
         let prev_inner = previous.inner(db);
         let curr_inner = self.inner(db);
 
@@ -271,7 +266,7 @@ impl<'db> ProtocolInterface<'db> {
             .iter()
             .map(|(name, curr_data)| {
                 let normalized = if let Some(prev_data) = prev_inner.get(name) {
-                    curr_data.cycle_normalized(db, prev_data, cycle)
+                    curr_data.cycle_normalized(db, query, prev_data, cycle)
                 } else {
                     curr_data.clone()
                 };
@@ -336,26 +331,6 @@ impl<'db> ProtocolInterface<'db> {
                 qualifiers: member.qualifiers(),
             })
             .unwrap_or_else(|| Type::object().member(db, name))
-    }
-
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self::new(
-            db,
-            self.inner(db)
-                .iter()
-                .map(|(name, data)| {
-                    Some((
-                        name.clone(),
-                        data.recursive_type_normalized_impl(db, div, nested)?,
-                    ))
-                })
-                .collect::<Option<BTreeMap<_, _>>>()?,
-        ))
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(
@@ -434,39 +409,18 @@ pub(super) struct ProtocolMemberData<'db> {
 }
 
 impl<'db> ProtocolMemberData<'db> {
-    fn cycle_normalized(&self, db: &'db dyn Db, previous: &Self, cycle: &salsa::Cycle) -> Self {
+    fn cycle_normalized(
+        &self,
+        db: &'db dyn Db,
+        query: CycleQuery,
+        previous: &Self,
+        cycle: &salsa::Cycle,
+    ) -> Self {
         Self {
-            kind: self.kind.cycle_normalized(db, &previous.kind, cycle),
+            kind: self.kind.cycle_normalized(db, query, &previous.kind, cycle),
             qualifiers: self.qualifiers,
             definition: self.definition,
         }
-    }
-
-    fn recursive_type_normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(Self {
-            kind: match &self.kind {
-                ProtocolMemberKind::Method(callable) => ProtocolMemberKind::Method(
-                    callable.recursive_type_normalized_impl(db, div, nested)?,
-                ),
-                ProtocolMemberKind::Property(property) => ProtocolMemberKind::Property(
-                    property.recursive_type_normalized_impl(db, div, nested)?,
-                ),
-                ProtocolMemberKind::Other(ty) if nested => {
-                    ProtocolMemberKind::Other(ty.recursive_type_normalized_impl(db, div, true)?)
-                }
-                ProtocolMemberKind::Other(ty) => ProtocolMemberKind::Other(
-                    ty.recursive_type_normalized_impl(db, div, true)
-                        .unwrap_or(div),
-                ),
-            },
-            qualifiers: self.qualifiers,
-            definition: self.definition,
-        })
     }
 
     fn apply_type_mapping_impl<'a>(
@@ -547,13 +501,19 @@ enum ProtocolMemberKind<'db> {
 }
 
 impl<'db> ProtocolMemberKind<'db> {
-    fn cycle_normalized(&self, db: &'db dyn Db, previous: &Self, cycle: &salsa::Cycle) -> Self {
+    fn cycle_normalized(
+        &self,
+        db: &'db dyn Db,
+        query: CycleQuery,
+        previous: &Self,
+        cycle: &salsa::Cycle,
+    ) -> Self {
         match (self, previous) {
             (Self::Method(curr), Self::Method(prev)) => {
                 debug_assert_eq!(curr.kind(db), prev.kind(db));
                 let normalized =
                     curr.signatures(db)
-                        .cycle_normalized(db, prev.signatures(db), cycle);
+                        .cycle_normalized(db, query, prev.signatures(db), cycle);
                 Self::Method(CallableType::new(
                     db,
                     normalized,
@@ -563,24 +523,24 @@ impl<'db> ProtocolMemberKind<'db> {
             }
             (Self::Property(curr), Self::Property(prev)) => {
                 let getter = match (curr.getter(db), prev.getter(db)) {
-                    (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, prev, cycle)),
-                    (Some(curr), None) => Some(curr.recursive_type_normalized(db, cycle)),
+                    (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, query, prev, cycle)),
+                    (Some(curr), None) => Some(curr.recursive_type_normalized(db, query, cycle)),
                     (None, _) => None,
                 };
                 let setter = match (curr.setter(db), prev.setter(db)) {
-                    (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, prev, cycle)),
-                    (Some(curr), None) => Some(curr.recursive_type_normalized(db, cycle)),
+                    (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, query, prev, cycle)),
+                    (Some(curr), None) => Some(curr.recursive_type_normalized(db, query, cycle)),
                     (None, _) => None,
                 };
                 let deleter = match (curr.deleter(db), prev.deleter(db)) {
-                    (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, prev, cycle)),
-                    (Some(curr), None) => Some(curr.recursive_type_normalized(db, cycle)),
+                    (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, query, prev, cycle)),
+                    (Some(curr), None) => Some(curr.recursive_type_normalized(db, query, cycle)),
                     (None, _) => None,
                 };
                 Self::Property(PropertyInstanceType::new(db, getter, setter, deleter))
             }
             (Self::Other(curr), Self::Other(prev)) => {
-                Self::Other(curr.cycle_normalized(db, *prev, cycle))
+                Self::Other(curr.cycle_normalized(db, query, *prev, cycle))
             }
             _ => {
                 debug_assert!(matches!(previous, Self::Other(ty) if ty.is_identity_recursive(db)));
@@ -1114,7 +1074,7 @@ fn proto_interface_cycle_recover<'db>(
     value: ProtocolInterface<'db>,
     _class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
-    value.cycle_normalized(db, *previous, cycle)
+    value.cycle_normalized(db, CycleQuery::ProtocolInterface, *previous, cycle)
 }
 
 /// Bind `self`, and *also* discard the functionlike-ness of the callable.

@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, btree_map::Entry as BTreeEntry, hash_map::Entry
 use crate::Db;
 use crate::reachability::{narrow_type_by_constraint, type_narrowed_by_previous_patterns};
 use crate::subscript::PyIndex;
+use crate::types::CycleQuery;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::special_form::TypeQualifier;
@@ -215,11 +216,19 @@ impl<'db> PatternSuccessTypes<'db> {
 
     fn cycle_normalized(mut self, db: &'db dyn Db, previous: &Self, cycle: &salsa::Cycle) -> Self {
         for (place, ty) in &mut self.bindings {
-            *ty = ty.cycle_normalized(db, previous.binding_type(*place), cycle);
+            *ty = ty.cycle_normalized(
+                db,
+                CycleQuery::PatternSuccess,
+                previous.binding_type(*place),
+                cycle,
+            );
         }
-        self.missing_binding_ty =
-            self.missing_binding_ty
-                .cycle_normalized(db, previous.missing_binding_ty, cycle);
+        self.missing_binding_ty = self.missing_binding_ty.cycle_normalized(
+            db,
+            CycleQuery::PatternSuccess,
+            previous.missing_binding_ty,
+            cycle,
+        );
         self
     }
 }
@@ -396,7 +405,7 @@ struct PatternSuccessAnalyzer<'db> {
 /// ```
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, _| PatternSuccessTypes::cycle_initial(Type::identity_recursive(db, id)),
+    cycle_initial=|db, id, _| PatternSuccessTypes::cycle_initial(Type::identity_recursive(db, CycleQuery::PatternSuccess, id)),
     cycle_fn=|db, cycle, previous: &PatternSuccessTypes<'db>, result: PatternSuccessTypes<'db>, _| {
         result.cycle_normalized(db, previous, cycle)
     },

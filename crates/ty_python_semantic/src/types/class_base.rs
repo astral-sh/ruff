@@ -4,8 +4,8 @@ use crate::types::mro::MroIterator;
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, Foldable, KnownClass,
-    KnownInstanceType, MaterializationKind, RecursiveType, SpecialFormType, StaticMroError,
-    StructuralTypeMapping, Type, TypeContext, TypeMapping, TypedDictModule, todo_type,
+    KnownInstanceType, MaterializationKind, RecursiveType, SpecialFormType, StaticMroError, Type,
+    TypeContext, TypeMapping, TypedDictModule, todo_type,
 };
 use crate::{Db, DisplaySettings};
 
@@ -47,22 +47,6 @@ impl<'db> ClassBase<'db> {
         recursive
             .is_identity(db)
             .then_some(Self::IdentityRecursive(recursive))
-    }
-
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        match self {
-            Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
-            Self::IdentityRecursive(_) => Some(self),
-            Self::Class(class) => Some(Self::Class(
-                class.recursive_type_normalized_impl(db, div, nested)?,
-            )),
-            Self::Any | Self::Protocol | Self::Generic | Self::TypedDict(_) => Some(self),
-        }
     }
 
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
@@ -547,7 +531,7 @@ impl<'db> Foldable<'db> for ClassBase<'db> {
         match self {
             Self::Class(class) => Self::Class(class.apply_type_mapping_impl(
                 db,
-                &TypeMapping::Structural(StructuralTypeMapping::FoldRecursive { recursive }),
+                &recursive.fold_mapping(db),
                 TypeContext::default(),
                 &ApplyTypeMappingVisitor::default(),
             )),

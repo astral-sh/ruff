@@ -9,8 +9,7 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
         Foldable, FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
         LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, RecursiveType, Signature,
-        StructuralTypeMapping, SubclassOfInner, Type, TypeContext, TypeMapping,
-        TypeVarBoundOrConstraints, UnionType,
+        SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
@@ -583,21 +582,6 @@ impl<'db> CallableType<'db> {
         )
     }
 
-    pub(super) fn recursive_type_normalized_impl(
-        self,
-        db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
-    ) -> Option<Self> {
-        Some(CallableType::new(
-            db,
-            self.signatures(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
-            self.kind(db),
-            self.provenance(db),
-        ))
-    }
-
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -719,7 +703,7 @@ impl<'db> Foldable<'db> for CallableType<'db> {
     fn fold(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> Self {
         self.apply_type_mapping_impl(
             db,
-            &TypeMapping::Structural(StructuralTypeMapping::FoldRecursive { recursive }),
+            &recursive.fold_mapping(db),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
         )

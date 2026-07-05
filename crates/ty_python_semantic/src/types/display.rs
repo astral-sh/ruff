@@ -956,16 +956,38 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 }
                 write!(f.with_type(self.ty), "{dynamic}")
             }
-            Type::Divergent(div) => write!(f.with_type(self.ty), "Divergent({:?})", div.id),
+            // With `TY_CYCLE_DEBUG`, binders and markers are displayed explicitly so that the
+            // folded structure of recursive types can be inspected; the default display keeps
+            // recursive types transparent.
+            Type::Divergent(div) => {
+                if Type::cycle_debug_enabled() {
+                    write!(
+                        f.with_type(self.ty),
+                        "Divergent({:?}@{:?})",
+                        div.query,
+                        div.id
+                    )
+                } else {
+                    f.with_type(self.ty).write_str("Divergent")
+                }
+            }
             Type::Recursive(recursive) => {
-                f.set_invalid_type_annotation();
-                let mut f = f.with_type(self.ty);
-                write!(f, "<Recursive({:?}) ", recursive.binder(self.db).id)?;
-                recursive
-                    .body(self.db)
-                    .display_with(self.db, self.settings.clone())
-                    .fmt_detailed(&mut f)?;
-                f.write_str(">")
+                if Type::cycle_debug_enabled() {
+                    f.set_invalid_type_annotation();
+                    let mut f = f.with_type(self.ty);
+                    let binder = recursive.binder(self.db);
+                    write!(f, "<Recursive({:?}@{:?}) ", binder.query, binder.id)?;
+                    recursive
+                        .body(self.db)
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(&mut f)?;
+                    f.write_str(">")
+                } else {
+                    recursive
+                        .body(self.db)
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)
+                }
             }
             Type::Never => f.with_type(self.ty).write_str("Never"),
             Type::NominalInstance(instance) => {
