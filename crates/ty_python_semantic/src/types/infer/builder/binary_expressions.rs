@@ -718,8 +718,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 new_length <= Self::MAX_STRING_LITERAL_SIZE
                             })
                         {
-                            let new_literal = s.value(db).repeat(n);
-                            Type::string_literal(db, &new_literal)
+                            let value = s.compact_value(db).repeat(n);
+                            Type::string_literal_owned(db, value)
                         } else {
                             Type::literal_string()
                         };
