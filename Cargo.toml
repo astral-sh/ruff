@@ -67,6 +67,7 @@ anstream = { version = "1.0.0" }
 anstyle = { version = "1.0.10" }
 anyhow = { version = "1.0.80" }
 arc-swap = { version = "1.7.1" }
+arcstr = { version = "1.2.0", default-features = false }
 argfile = { version = "1.0.0" }
 assert_fs = { version = "1.1.0" }
 rkyv = { version = "0.8.16" }

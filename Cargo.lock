@@ -178,6 +178,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "arcstr"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03918c3dbd7701a85c6b9887732e2921175f26c350b4563841d0958c21d57e6d"
+
+[[package]]
 name = "argfile"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3474,6 +3480,7 @@ name = "ruff_python_ast"
 version = "0.0.3"
 dependencies = [
  "aho-corasick",
+ "arcstr",
  "arrayvec",
  "bitflags 2.13.0",
  "compact_str",

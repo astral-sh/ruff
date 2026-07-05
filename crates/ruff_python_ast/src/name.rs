@@ -847,9 +847,9 @@ mod tests {
     #[test]
     #[cfg(target_pointer_width = "64")]
     fn size() {
-        assert_eq!(std::mem::size_of::<Name>(), 16);
-        assert_eq!(std::mem::size_of::<Option<Name>>(), 16);
-        assert_eq!(std::mem::size_of::<Identifier>(), 32);
+        assert_eq!(std::mem::size_of::<Name>(), 8);
+        assert_eq!(std::mem::size_of::<Option<Name>>(), 8);
+        assert_eq!(std::mem::size_of::<Identifier>(), 24);
     }
 
     #[test]
@@ -863,7 +863,7 @@ mod tests {
     #[test]
     #[cfg(feature = "get-size")]
     fn heap_size_tracks_shared_storage_once() {
-        assert_eq!(Name::new("inline").get_heap_size(), 0);
+        assert_eq!(Name::empty().get_heap_size(), 0);
 
         let name = Name::new("a name too long for inline storage");
         let expected = name.len();
