@@ -2905,6 +2905,28 @@ class C:
     }
 
     #[test]
+    fn rename_attribute_ignores_slots_annotation_container() {
+        let test = cursor_test(
+            r#"
+class C:
+    __slots__: ("value",) = ("other",)
+
+    def __init__(self):
+        self.va<CURSOR>lue = 1
+"#,
+        );
+
+        assert_snapshot!(test.rename("amount"), @"
+        info[rename]: Rename symbol (found 1 locations)
+         --> main.py:6:14
+          |
+        6 |         self.value = 1
+          |              ^^^^^
+          |
+        ");
+    }
+
+    #[test]
     fn rename_parameter_does_not_touch_slots() {
         // The parameter `value` is a local symbol, not the instance attribute, so renaming it must
         // leave the `__slots__` string untouched even though it shares the name.

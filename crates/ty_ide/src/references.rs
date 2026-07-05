@@ -219,21 +219,26 @@ fn is_ascii_identifier_continue(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'_'
 }
 
-/// Returns whether `node` is an assignment whose (sole) target is the name
-/// `__slots__`, e.g. `__slots__ = (...)` or `__slots__: tuple = (...)`.
-fn is_slots_assignment(node: AnyNodeRef<'_>) -> bool {
+/// Returns whether `node` assigns `value` to the sole target `__slots__`, e.g.
+/// `__slots__ = (...)` or `__slots__: tuple = (...)`.
+fn is_slots_assignment(node: AnyNodeRef<'_>, value: AnyNodeRef<'_>) -> bool {
     match node {
         AnyNodeRef::StmtAssign(assign) => {
-            matches!(
-                assign.targets.as_slice(),
-                [ast::Expr::Name(name)] if name.id.as_str() == "__slots__"
-            )
+            assign.value.range() == value.range()
+                && matches!(
+                    assign.targets.as_slice(),
+                    [ast::Expr::Name(name)] if name.id.as_str() == "__slots__"
+                )
         }
         AnyNodeRef::StmtAnnAssign(assign) => {
-            matches!(
-                assign.target.as_ref(),
-                ast::Expr::Name(name) if name.id.as_str() == "__slots__"
-            )
+            assign
+                .value
+                .as_deref()
+                .is_some_and(|assigned| assigned.range() == value.range())
+                && matches!(
+                    assign.target.as_ref(),
+                    ast::Expr::Name(name) if name.id.as_str() == "__slots__"
+                )
         }
         _ => false,
     }
@@ -665,7 +670,8 @@ impl<'a> LocalReferencesFinder<'a> {
             AnyNodeRef::ExprStringLiteral(_) => {}
             _ => return None,
         }
-        match ancestors.next()? {
+        let container = *ancestors.next()?;
+        match container {
             AnyNodeRef::ExprTuple(_) | AnyNodeRef::ExprList(_) | AnyNodeRef::ExprSet(_) => {}
             // For a dict, both keys and values have the `ExprDict` as their
             // direct parent, so `is_dict_key` checks that this string is one of
@@ -680,7 +686,7 @@ impl<'a> LocalReferencesFinder<'a> {
 
         // The container must be the value of an assignment to `__slots__`.
         let assignment = ancestors.next()?;
-        if !is_slots_assignment(*assignment) {
+        if !is_slots_assignment(*assignment, container) {
             return None;
         }
 
