@@ -63,8 +63,37 @@ pub(crate) fn extract_functions_from_body(
     };
     let known_relations = collect_known_relations(declarations);
     let mut out = Vec::new();
-    walk_class_body_for_defs(body, &known_relations, &mut out);
-    out
+    // Visibility-at-def, parallel to `out` (true = public where the def appeared).
+    let mut vis: Vec<bool> = Vec::new();
+    // Symbol-form statements in source order: `private :a` / `public :a`. The
+    // LAST statement about a name wins (`private :x` then `public :x` ⇒ public).
+    let mut sym_overrides: Vec<(String, bool)> = Vec::new();
+    // Default visibility, threaded so it persists across transparent `begin/end`
+    // wrappers (a bare `private` before a nested begin still governs later defs).
+    let mut default_public = true;
+    walk_class_body_for_defs(
+        body,
+        &known_relations,
+        &mut out,
+        &mut vis,
+        &mut sym_overrides,
+        &mut default_public,
+    );
+    // Ruby visibility filtering: `private`/`protected` helpers (`set_project`,
+    // `authorize`, …) are NOT routable actions and must not be harvested. Final
+    // visibility = visibility-at-def, then each symbol-form override applied in
+    // order (so `public :x` re-publishes a method an earlier `private :x` hid).
+    for (name, is_public) in &sym_overrides {
+        for (i, f) in out.iter().enumerate() {
+            if &f.name == name {
+                vis[i] = *is_public;
+            }
+        }
+    }
+    out.into_iter()
+        .zip(vis)
+        .filter_map(|(f, public)| public.then_some(f))
+        .collect()
 }
 
 /// Pre-compute the set of relation names declared on the class so
@@ -80,18 +109,42 @@ fn collect_known_relations(decls: &[Declaration]) -> Vec<String> {
 }
 
 /// Recurse into Begin / Module / Class wrappers AND `class_methods do`
-/// blocks; for each `Node::Def` encountered, extract one Function.
+/// blocks; for each **public** `Node::Def` encountered, extract one Function.
+///
+/// Ruby method visibility is tracked so non-public helpers are not harvested as
+/// actions: a bare `private` / `protected` statement flips subsequent defs to
+/// non-public (a bare `public` flips back); `private def foo …` marks just that
+/// inline def; `private :foo` records an ordered `sym_overrides` entry the caller
+/// applies by name (last wins, so a later `public :foo` re-publishes it).
 fn walk_class_body_for_defs(
     node: &Node,
     known_relations: &[String],
     out: &mut Vec<Function>,
+    vis: &mut Vec<bool>,
+    sym_overrides: &mut Vec<(String, bool)>,
+    default_public: &mut bool,
 ) {
     match node {
-        Node::Begin(b) => {
-            for stmt in &b.statements {
-                walk_class_body_for_defs(stmt, known_relations, out);
-            }
-        }
+        // Both an implicit statement sequence (`Node::Begin`) and an explicit
+        // `begin … end` (`Node::KwBegin`) are transparent to visibility:
+        // `default_public` flows in and out unchanged, so a bare `private` inside
+        // a nested begin still governs later class-body siblings.
+        Node::Begin(b) => walk_body_stmts(
+            &b.statements,
+            known_relations,
+            out,
+            vis,
+            sym_overrides,
+            default_public,
+        ),
+        Node::KwBegin(b) => walk_body_stmts(
+            &b.statements,
+            known_relations,
+            out,
+            vis,
+            sym_overrides,
+            default_public,
+        ),
         Node::Def(d) => {
             let mut func = Function {
                 name: d.name.clone(),
@@ -104,28 +157,98 @@ fn walk_class_body_for_defs(
             if let Some(fn_body) = d.body.as_deref() {
                 walk_method_body(fn_body, known_relations, &mut func);
             }
-            // Dedupe per-function reads / raises / traverses / writes /
-            // calls (a method that calls `raise UserError` twice should
-            // produce one `raises` triple, not two — `expand()` dedupes by
-            // (s, p, o) anyway, but keeping the IR tight reduces churn).
             dedup_in_place(&mut func.reads);
             dedup_in_place(&mut func.raises);
             dedup_in_place(&mut func.traverses);
             dedup_in_place(&mut func.writes);
             dedup_in_place(&mut func.calls);
             out.push(func);
+            // Visibility-at-def: the default in force where this `def` appeared.
+            vis.push(*default_public);
         }
         Node::Block(blk) => {
-            // `class_methods do … end` / `included do … end` blocks
-            // wrap `def` nodes whose methods are class-level (or
-            // instance-level via include). The walker treats them as
-            // siblings of regular `def` for now — D-AR-3.6 will split
-            // class-method discovery off.
+            // `class_methods do … end` / `included do … end` blocks wrap `def`
+            // nodes. The block INHERITS the enclosing default visibility, but its
+            // own bare markers are scoped to the block — save/restore so a
+            // `private` inside the block does not leak out to later class-body
+            // siblings (D-AR-3.6 will split class-method discovery off).
             if let Some(body) = blk.body.as_deref() {
-                walk_class_body_for_defs(body, known_relations, out);
+                let saved = *default_public;
+                walk_class_body_for_defs(
+                    body,
+                    known_relations,
+                    out,
+                    vis,
+                    sym_overrides,
+                    default_public,
+                );
+                *default_public = saved;
             }
         }
         _ => {}
+    }
+}
+
+/// Walk a linear statement sequence (a class body or a transparent `begin/end`),
+/// tracking `default_public` visibility across siblings and emitting one
+/// [`Function`] per public `def`.
+fn walk_body_stmts(
+    stmts: &[Node],
+    known_relations: &[String],
+    out: &mut Vec<Function>,
+    vis: &mut Vec<bool>,
+    sym_overrides: &mut Vec<(String, bool)>,
+    default_public: &mut bool,
+) {
+    for stmt in stmts {
+        if let Node::Send(s) = stmt {
+            if s.recv.is_none()
+                && matches!(s.method_name.as_str(), "private" | "protected" | "public")
+            {
+                if s.args.is_empty() {
+                    // Bare marker: flips the default for subsequent defs.
+                    *default_public = s.method_name == "public";
+                    continue;
+                }
+                // Argument forms.
+                let is_public = s.method_name == "public";
+                for arg in &s.args {
+                    match arg {
+                        // `private :a` / `public :a` — record an ordered
+                        // override applied by name (last wins).
+                        Node::Sym(sym) => {
+                            sym_overrides.push((sym.name.to_string_lossy(), is_public));
+                        }
+                        // `private def foo …` / `public def foo …` — emit the
+                        // inline def with THIS explicit visibility.
+                        Node::Def(_) => {
+                            let before = out.len();
+                            walk_class_body_for_defs(
+                                arg,
+                                known_relations,
+                                out,
+                                vis,
+                                sym_overrides,
+                                default_public,
+                            );
+                            for v in &mut vis[before..] {
+                                *v = is_public;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                continue;
+            }
+        }
+        walk_class_body_for_defs(
+            stmt,
+            known_relations,
+            out,
+            vis,
+            sym_overrides,
+            default_public,
+        );
     }
 }
 
@@ -446,6 +569,125 @@ mod tests {
             Node::Begin(b) => b.statements.iter().find_map(find_first_class),
             _ => None,
         }
+    }
+
+    #[test]
+    fn bare_private_marker_hides_subsequent_defs() {
+        // The Rails controller pattern: public actions, then a bare `private`,
+        // then non-routable helpers (`set_project`, `authorize`). Only the
+        // public actions must be harvested (codex #42).
+        let funcs = class_functions(
+            r#"
+class NodesController
+  def show
+  end
+  def create
+  end
+
+  private
+
+  def set_project
+  end
+  def authorize
+  end
+end
+"#,
+        );
+        let names: Vec<&str> = funcs.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(names, ["show", "create"]);
+    }
+
+    #[test]
+    fn public_marker_flips_visibility_back() {
+        let funcs = class_functions(
+            r#"
+class M
+  private
+  def helper
+  end
+  public
+  def action
+  end
+end
+"#,
+        );
+        let names: Vec<&str> = funcs.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(names, ["action"]);
+    }
+
+    #[test]
+    fn private_symbol_form_hides_named_method() {
+        // `private :set_project` after the def — retroactive by name.
+        let funcs = class_functions(
+            r#"
+class M
+  def show
+  end
+  def set_project
+  end
+  private :set_project
+end
+"#,
+        );
+        let names: Vec<&str> = funcs.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(names, ["show"]);
+    }
+
+    #[test]
+    fn private_inline_def_form_is_hidden() {
+        let funcs = class_functions(
+            r#"
+class M
+  def show
+  end
+  private def set_project
+  end
+end
+"#,
+        );
+        let names: Vec<&str> = funcs.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(names, ["show"]);
+    }
+
+    #[test]
+    fn visibility_is_transparent_across_begin_end() {
+        // A bare `private` inside a nested `begin/end` still governs later
+        // class-body siblings (begin/end is transparent in Ruby) — the def after
+        // it must NOT be harvested (Bugbot: visibility reset per Begin).
+        let funcs = class_functions(
+            r#"
+class M
+  def show
+  end
+  begin
+    private
+  end
+  def helper
+  end
+end
+"#,
+        );
+        let names: Vec<&str> = funcs.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(names, ["show"]);
+    }
+
+    #[test]
+    fn public_symbol_republishes_a_privatised_method() {
+        // `private :show` then `public :show` — Ruby's final visibility is
+        // public, so `show` must be harvested (codex P2 / Bugbot: append-only
+        // non_public dropped it).
+        let funcs = class_functions(
+            r#"
+class M
+  def show
+  end
+  private :show
+  public :show
+end
+"#,
+        );
+        let names: Vec<&str> = funcs.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(names, ["show"]);
     }
 
     #[test]
