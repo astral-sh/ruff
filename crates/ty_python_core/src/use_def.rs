@@ -632,11 +632,14 @@ static ALWAYS_UNDECLARED_DECLARATIONS: LazyLock<Declarations> =
     LazyLock::new(|| Declarations::undeclared(ScopedReachabilityConstraintId::ALWAYS_TRUE));
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct DefinitionUsage {
+    is_used: bool,
+    is_multipart_import_used: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 enum RetainedDefinitionState<'db> {
-    Unused(Definition<'db>),
-    Used(Definition<'db>),
-    MultipartImportUsed(Definition<'db>),
-    UsedAndMultipartImportUsed(Definition<'db>),
+    Defined(Definition<'db>, DefinitionUsage),
     Undefined,
     Deleted,
 }
@@ -644,12 +647,13 @@ enum RetainedDefinitionState<'db> {
 impl<'db> RetainedDefinitionState<'db> {
     fn new(state: DefinitionState<'db>, used: bool, multipart_import_used: bool) -> Self {
         match state {
-            DefinitionState::Defined(definition) => match (used, multipart_import_used) {
-                (false, false) => Self::Unused(definition),
-                (true, false) => Self::Used(definition),
-                (false, true) => Self::MultipartImportUsed(definition),
-                (true, true) => Self::UsedAndMultipartImportUsed(definition),
-            },
+            DefinitionState::Defined(definition) => Self::Defined(
+                definition,
+                DefinitionUsage {
+                    is_used: used,
+                    is_multipart_import_used: multipart_import_used,
+                },
+            ),
             DefinitionState::Undefined => {
                 debug_assert!(!used);
                 debug_assert!(!multipart_import_used);
@@ -665,26 +669,18 @@ impl<'db> RetainedDefinitionState<'db> {
 
     fn state(self) -> DefinitionState<'db> {
         match self {
-            Self::Unused(definition)
-            | Self::Used(definition)
-            | Self::MultipartImportUsed(definition)
-            | Self::UsedAndMultipartImportUsed(definition) => {
-                DefinitionState::Defined(definition)
-            }
+            Self::Defined(definition, _) => DefinitionState::Defined(definition),
             Self::Undefined => DefinitionState::Undefined,
             Self::Deleted => DefinitionState::Deleted,
         }
     }
 
     fn is_used(self) -> bool {
-        matches!(self, Self::Used(_) | Self::UsedAndMultipartImportUsed(_))
+        matches!(self, Self::Defined(_, usage) if usage.is_used)
     }
 
     fn is_multipart_import_used(self) -> bool {
-        matches!(
-            self,
-            Self::MultipartImportUsed(_) | Self::UsedAndMultipartImportUsed(_)
-        )
+        matches!(self, Self::Defined(_, usage) if usage.is_multipart_import_used)
     }
 }
 
@@ -2275,22 +2271,19 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     pub(super) fn mark_symbol_bindings_used(&mut self, symbol: ScopedSymbolId) {
-        let bindings = self.symbol_states[symbol].bindings();
-        let binding_definition_ids: Vec<ScopedDefinitionId> =
-            bindings.iter().map(LiveBinding::binding).collect();
+        let pending = self.pending_reachability.current;
+        let bindings = self
+            .pending_reachability
+            .materialize_ref(
+                &mut self.symbol_states[symbol],
+                pending,
+                &mut self.reachability_constraints,
+            )
+            .bindings()
+            .clone();
+        let binding_definition_ids = bindings.iter().map(LiveBinding::binding);
 
         self.mark_definition_ids_used(binding_definition_ids);
-    }
-
-    pub(super) fn symbol_binding_definition_ids(
-        &self,
-        symbol: ScopedSymbolId,
-    ) -> Vec<ScopedDefinitionId> {
-        self.symbol_states[symbol]
-            .bindings()
-            .iter()
-            .map(LiveBinding::binding)
-            .collect()
     }
 
     pub(super) fn reachable_symbol_binding_definition_ids(

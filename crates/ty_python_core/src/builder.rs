@@ -1419,8 +1419,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 continue;
             }
 
-            let live_definition_ids =
-                self.use_def_maps[scope_id].symbol_binding_definition_ids(symbol_id);
+            let live_definition_ids = self.use_def_maps[scope_id]
+                .symbol_binding_definition_ids(symbol_id)
+                .collect::<Vec<_>>();
             let all_live_definitions_are_multipart_imports =
                 live_definition_ids.iter().all(|definition_id| {
                     let DefinitionState::Defined(definition) =
