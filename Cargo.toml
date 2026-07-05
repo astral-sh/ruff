@@ -214,9 +214,9 @@ which = { version = "8.0.0" }
 wild = { version = "2" }
 zip = { version = "8.0", default-features = false }
 
-# Experimental local patch for the `FrozenCompactString` Name representation.
+# Experimental patch for the combined `compact_str` optimizations.
 [patch.crates-io]
-compact_str = { path = "../compact_str/compact_str" }
+compact_str = { git = "https://github.com/charliermarsh/compact_str", branch = "charlie/ruff-mega-optimizations" }
 
 [workspace.metadata.cargo-shear]
 ignored = [

@@ -678,6 +678,7 @@ dependencies = [
 [[package]]
 name = "compact_str"
 version = "0.9.0"
+source = "git+https://github.com/charliermarsh/compact_str?branch=charlie%2Fruff-mega-optimizations#f762f64507da110d720fe81dd136d07fe29f54c2"
 dependencies = [
  "castaway",
  "cfg-if",
