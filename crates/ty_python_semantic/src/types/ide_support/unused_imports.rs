@@ -75,15 +75,15 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
                 continue;
             }
 
+            if is_intentionally_unused_name(&display_name) {
+                continue;
+            }
+
             if multipart_import_name.is_none()
                 && string_annotation_definitions
                     .get_or_insert_with(|| string_annotation_used_definitions(db, file))
                     .contains(&definition)
             {
-                continue;
-            }
-
-            if is_intentionally_unused_name(&display_name) {
                 continue;
             }
 
@@ -524,6 +524,22 @@ mod tests {
 
             os = "not os"
             print(os)
+            "#,
+        )?;
+
+        assert_eq!(names, vec!["os"]);
+        Ok(())
+    }
+
+    #[test]
+    fn reports_import_shadowed_by_function_local_binding() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            import os
+
+            def f():
+                os = 1
+                print(os)
             "#,
         )?;
 

@@ -2270,22 +2270,6 @@ impl<'db> UseDefMapBuilder<'db> {
         self.record_use_bindings(bindings, use_id);
     }
 
-    pub(super) fn mark_symbol_bindings_used(&mut self, symbol: ScopedSymbolId) {
-        let pending = self.pending_reachability.current;
-        let bindings = self
-            .pending_reachability
-            .materialize_ref(
-                &mut self.symbol_states[symbol],
-                pending,
-                &mut self.reachability_constraints,
-            )
-            .bindings()
-            .clone();
-        let binding_definition_ids = bindings.iter().map(LiveBinding::binding);
-
-        self.mark_definition_ids_used(binding_definition_ids);
-    }
-
     pub(super) fn reachable_symbol_binding_definition_ids(
         &self,
         symbol: ScopedSymbolId,

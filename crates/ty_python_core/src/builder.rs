@@ -721,23 +721,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             // We don't record lazy snapshots of attributes or subscripts, because these are difficult to track as they modify.
             for nested_symbol in self.place_tables[popped_scope_id].symbols() {
-                // Public module/class bindings are not snapshotted below, but they still need
-                // usage tracking when a lazy nested scope references them.
-                if nested_symbol.is_used()
-                    && (enclosing_scope_kind.is_module() || enclosing_scope_kind.is_class())
-                {
-                    let nested_name = nested_symbol.name();
-
-                    if self.resolve_nested_reference_scope(popped_scope_id, nested_name.as_str())
-                        == Some(enclosing_scope_id)
-                        && let Some(enclosed_symbol_id) =
-                            enclosing_place_table.symbol_id(nested_name)
-                    {
-                        self.use_def_maps[enclosing_scope_id]
-                            .mark_symbol_bindings_used(enclosed_symbol_id);
-                    }
-                }
-
                 // For the same reason, we don't snapshot bindings owned by `global`/`nonlocal`
                 // forwarding declarations here; `snapshot_enclosing_state` stores only a
                 // constraint for those symbols. Also, if the enclosing scope allows its members to
