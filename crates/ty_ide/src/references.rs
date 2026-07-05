@@ -22,8 +22,8 @@ use ruff_python_ast::{
 };
 use ruff_text_size::Ranged;
 use ty_project::parallel::{ParallelIteratorExt, minimum_parallel_job_len};
-use ty_python_core::definition::{Definition, DefinitionState};
-use ty_python_core::scope::ScopeKind;
+use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
+use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, ScopeKind};
 use ty_python_semantic::{ImportAliasResolution, ResolvedDefinition, SemanticModel};
 
 /// Salsa snapshots coordinate clone and drop through shared state. For cached files that don't
@@ -718,9 +718,6 @@ impl<'a> LocalReferencesFinder<'a> {
     /// local that merely shares the name, or an attribute of a nested class, is not treated as the
     /// slot.
     fn target_belongs_to_class(&self, class: &'a ast::StmtClassDef) -> bool {
-        use ty_python_core::definition::DefinitionKind;
-        use ty_python_core::scope::{FileScopeId, NodeWithScopeKind};
-
         let db = self.model.db();
         let file = self.model.file();
         let class_range = class.range();
