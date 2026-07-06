@@ -265,9 +265,13 @@ fn route_send(name: &str, args: &[Node], out: &mut Vec<Declaration>) {
         n if n.starts_with("acts_as_") => emit_acts_as(n, args, out),
 
         // ───── OpenProject custom registrations: promoted ─────
-        "register_journal_formatter" | "register_journal_formatted_fields"
-        | "register_query" | "activity_provider_for" | "deprecated_alias"
-        | "associated_to_ask_before_destruction" | "has_details_table" => {
+        "register_journal_formatter"
+        | "register_journal_formatted_fields"
+        | "register_query"
+        | "activity_provider_for"
+        | "deprecated_alias"
+        | "associated_to_ask_before_destruction"
+        | "has_details_table" => {
             out.push(Declaration::DslCall(DslCall {
                 name: name.to_string(),
                 args: format_args(args),
@@ -316,8 +320,13 @@ fn route_send(name: &str, args: &[Node], out: &mut Vec<Declaration>) {
         }
 
         // ───── Scope markers — consume silently (not emitted) ─────
-        "private" | "protected" | "public" | "private_class_method"
-        | "private_constant" | "class_attribute" | "module_function" => {}
+        "private"
+        | "protected"
+        | "public"
+        | "private_class_method"
+        | "private_constant"
+        | "class_attribute"
+        | "module_function" => {}
 
         // ───── Unknown DSL — catch-all so D-AR-4 coverage stays 100 % ─────
         // The OpenProject §2 closed-vocab table lists every name observed
@@ -366,9 +375,7 @@ fn emit_validation(kind: ValidationKind, args: &[Node], out: &mut Vec<Declaratio
             "<empty>".to_string()
         }
     });
-    let options = args
-        .iter().find_map(as_hash_options)
-        .unwrap_or_default();
+    let options = args.iter().find_map(as_hash_options).unwrap_or_default();
     out.push(Declaration::Validation(Validation {
         kind,
         target,
@@ -377,18 +384,27 @@ fn emit_validation(kind: ValidationKind, args: &[Node], out: &mut Vec<Declaratio
 }
 
 fn emit_callback(phase: &str, args: &[Node], out: &mut Vec<Declaration>) {
-    let target = args
-        .first()
-        .and_then(sym_string)
-        .unwrap_or_else(|| "<block>".to_string());
-    let options = args
-        .iter().find_map(as_hash_options)
-        .unwrap_or_default();
-    out.push(Declaration::Callback(Callback {
-        phase: phase.to_string(),
-        target,
-        options,
-    }));
+    // Rails accepts several targets per declaration —
+    // `before_save :a, :b, :c` registers three callbacks in order — so one
+    // `Callback` is emitted per symbol arg. A block/lambda-only declaration
+    // (no symbol args) emits the single `<block>` placeholder as before.
+    let options = args.iter().find_map(as_hash_options).unwrap_or_default();
+    let targets: Vec<String> = args.iter().filter_map(sym_string).collect();
+    if targets.is_empty() {
+        out.push(Declaration::Callback(Callback {
+            phase: phase.to_string(),
+            target: "<block>".to_string(),
+            options,
+        }));
+    } else {
+        for target in targets {
+            out.push(Declaration::Callback(Callback {
+                phase: phase.to_string(),
+                target,
+                options: options.clone(),
+            }));
+        }
+    }
 }
 
 fn emit_concern(kind: ConcernKind, args: &[Node], out: &mut Vec<Declaration>) {
@@ -407,10 +423,7 @@ fn emit_attr(kind: AttrKind, args: &[Node], out: &mut Vec<Declaration>) {
     // Two-arg alias forms (`alias_attribute :new, :orig`) → one decl with
     // "new=orig" name; everything else takes one declaration per leading
     // symbol arg.
-    if matches!(
-        kind,
-        AttrKind::AliasAttribute | AttrKind::AliasMethod
-    ) {
+    if matches!(kind, AttrKind::AliasAttribute | AttrKind::AliasMethod) {
         if args.len() >= 2 {
             let new_n = sym_string(&args[0]).unwrap_or_default();
             let orig = sym_string(&args[1]).unwrap_or_default();
@@ -455,7 +468,9 @@ fn emit_attr(kind: AttrKind, args: &[Node], out: &mut Vec<Declaration>) {
         }
     }
     for arg in args.iter().skip(skip).take(take) {
-        let Some(name) = sym_string(arg) else { continue };
+        let Some(name) = sym_string(arg) else {
+            continue;
+        };
         out.push(Declaration::Attribute(AttrDecl {
             kind,
             name,
@@ -543,9 +558,7 @@ fn emit_scopes_plural(args: &[Node], out: &mut Vec<Declaration>) {
 
 fn emit_acts_as(name: &str, args: &[Node], out: &mut Vec<Declaration>) {
     let variant = name.strip_prefix("acts_as_").unwrap_or(name).to_string();
-    let options = args
-        .iter().find_map(as_hash_options)
-        .unwrap_or_default();
+    let options = args.iter().find_map(as_hash_options).unwrap_or_default();
     out.push(Declaration::ActsAs(ActsAs { variant, options }));
 }
 
@@ -595,7 +608,12 @@ fn render_node(node: &Node) -> String {
         Node::False(_) => "false".to_string(),
         Node::Nil(_) => "nil".to_string(),
         Node::Array(a) => {
-            let elems = a.elements.iter().map(render_node).collect::<Vec<_>>().join(",");
+            let elems = a
+                .elements
+                .iter()
+                .map(render_node)
+                .collect::<Vec<_>>()
+                .join(",");
             format!("[{elems}]")
         }
         Node::Hash(h) => format_hash_inline(h),

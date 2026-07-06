@@ -57,9 +57,9 @@ use crate::Declaration;
 pub(crate) fn extract_functions_from_body(
     body: Option<&Node>,
     declarations: &[Declaration],
-) -> Vec<Function> {
+) -> (Vec<Function>, Vec<Function>) {
     let Some(body) = body else {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     };
     let known_relations = collect_known_relations(declarations);
     let mut out = Vec::new();
@@ -79,8 +79,11 @@ pub(crate) fn extract_functions_from_body(
         &mut sym_overrides,
         &mut default_public,
     );
-    // Ruby visibility filtering: `private`/`protected` helpers (`set_project`,
-    // `authorize`, …) are NOT routable actions and must not be harvested. Final
+    // Ruby visibility split: `private`/`protected` helpers (`set_project`,
+    // `authorize`, …) are NOT routable actions and stay out of the first
+    // (public/action) vec — but their body facts matter (Rails callbacks
+    // conventionally target private methods; OGAR F17 body triage), so they
+    // are returned as the second (helpers) vec instead of dropped. Final
     // visibility = visibility-at-def, then each symbol-form override applied in
     // order (so `public :x` re-publishes a method an earlier `private :x` hid).
     for (name, is_public) in &sym_overrides {
@@ -90,10 +93,16 @@ pub(crate) fn extract_functions_from_body(
             }
         }
     }
-    out.into_iter()
-        .zip(vis)
-        .filter_map(|(f, public)| public.then_some(f))
-        .collect()
+    let mut public_fns = Vec::new();
+    let mut helper_fns = Vec::new();
+    for (f, public) in out.into_iter().zip(vis) {
+        if public {
+            public_fns.push(f);
+        } else {
+            helper_fns.push(f);
+        }
+    }
+    (public_fns, helper_fns)
 }
 
 /// Pre-compute the set of relation names declared on the class so
@@ -468,8 +477,7 @@ fn receiver_label(recv: Option<&Node>) -> String {
         // `order.update` / `self.order.update` — the immediate receiver is a
         // bare or self-rooted send naming the relation/attribute.
         Some(Node::Send(inner))
-            if inner.recv.is_none()
-                || matches!(inner.recv.as_deref(), Some(Node::Self_(_))) =>
+            if inner.recv.is_none() || matches!(inner.recv.as_deref(), Some(Node::Self_(_))) =>
         {
             inner.method_name.clone()
         }
@@ -486,9 +494,7 @@ fn receiver_label(recv: Option<&Node>) -> String {
 fn exception_type_name(arg: &Node) -> Option<String> {
     match arg {
         Node::Const(_) => const_to_dotted(arg),
-        Node::Send(s) if s.method_name == "new" => {
-            s.recv.as_deref().and_then(const_to_dotted)
-        }
+        Node::Send(s) if s.method_name == "new" => s.recv.as_deref().and_then(const_to_dotted),
         _ => None,
     }
 }
@@ -501,9 +507,7 @@ fn const_to_dotted(node: &Node) -> Option<String> {
     let suffix = c.name.clone();
     match c.scope.as_deref() {
         Some(Node::Cbase(_)) => Some(format!("::{suffix}")),
-        Some(inner) => {
-            const_to_dotted(inner).map(|p| format!("{p}::{suffix}"))
-        }
+        Some(inner) => const_to_dotted(inner).map(|p| format!("{p}::{suffix}")),
         None => Some(suffix),
     }
 }
@@ -571,7 +575,7 @@ mod tests {
         let parser = Parser::new(src.as_bytes().to_vec(), ParserOptions::default());
         let ast = parser.do_parse().ast.expect("parse");
         let class = find_first_class(&ast).expect("class");
-        extract_functions_from_body(class.body.as_deref(), &classes[0].declarations)
+        extract_functions_from_body(class.body.as_deref(), &classes[0].declarations).0
     }
 
     fn find_first_class(node: &Node) -> Option<&lib_ruby_parser::nodes::Class> {
@@ -757,7 +761,10 @@ class M
 end
 "#,
         );
-        assert!(funcs[0].raises.is_empty(), "variable raise must not be captured");
+        assert!(
+            funcs[0].raises.is_empty(),
+            "variable raise must not be captured"
+        );
     }
 
     #[test]
@@ -1063,5 +1070,45 @@ end
 "#,
         );
         assert_eq!(funcs[0].writes, vec!["total"]);
+    }
+
+    #[test]
+    fn private_defs_land_in_helpers_with_body_facts() {
+        // Rails lifecycle callbacks conventionally target private methods
+        // (OGAR F17 body triage needs their body facts). The visibility
+        // split must keep them OUT of the action vec but IN helpers, with
+        // the same body walk applied.
+        let src = r#"
+class M
+  def visible
+    self.a = 1
+  end
+  private
+  def hook_me
+    raise Foo unless ok
+    self.b = 2
+  end
+end
+"#;
+        let classes = extract_from_source(src);
+        let parser = Parser::new(src.as_bytes().to_vec(), ParserOptions::default());
+        let ast = parser.do_parse().ast.expect("parse");
+        let class = find_first_class(&ast).expect("class");
+        let (public_fns, helper_fns) =
+            extract_functions_from_body(class.body.as_deref(), &classes[0].declarations);
+        assert_eq!(public_fns.len(), 1, "only the public def is an action");
+        assert_eq!(helper_fns.len(), 1, "the private def lands in helpers");
+        let h = &helper_fns[0];
+        assert_eq!(h.name, "hook_me");
+        assert!(
+            h.raises.contains(&"Foo".to_string()),
+            "postfix-unless raise walked in helper; got {:?}",
+            h.raises
+        );
+        assert!(
+            h.writes.contains(&"b".to_string()),
+            "setter write walked in helper; got {:?}",
+            h.writes
+        );
     }
 }

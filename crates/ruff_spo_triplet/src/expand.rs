@@ -1282,12 +1282,19 @@ mod tests {
             "writes_field",
             "odoo:account_move.state"
         ));
-        assert_eq!(truth("writes_field", "odoo:account_move.state"), Some((0.95, 0.90)));
+        assert_eq!(
+            truth("writes_field", "odoo:account_move.state"),
+            Some((0.95, 0.90))
+        );
 
         // calls: object is the raw "receiver.method" string (NOT an IRI);
         // Inferred.
         assert!(has("odoo:account_move.post", "calls", "self.save"));
-        assert!(has("odoo:account_move.post", "calls", "line_ids.update_all"));
+        assert!(has(
+            "odoo:account_move.post",
+            "calls",
+            "line_ids.update_all"
+        ));
         assert_eq!(truth("calls", "self.save"), Some((0.85, 0.75)));
     }
 

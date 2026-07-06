@@ -189,6 +189,7 @@ fn collect_classes_with_namespace(node: &Node, ns: &[String], out: &mut Vec<Ruby
                 name: qualified,
                 declarations: Vec::new(),
                 functions: Vec::new(),
+                helpers: Vec::new(),
             };
             // STI parent is the explicit superclass when it isn't
             // ApplicationRecord / ActiveRecord::Base / a synthetic root.
@@ -211,7 +212,7 @@ fn collect_classes_with_namespace(node: &Node, ns: &[String], out: &mut Vec<Ruby
             // runs over the same class body. We pass the declarations
             // (already populated above) so the body walker can filter
             // `traverses_relation` candidates to declared associations.
-            class.functions =
+            (class.functions, class.helpers) =
                 extract_functions_from_body(c.body.as_deref(), &class.declarations);
             out.push(class);
             // A nested class inside a class body is unusual but possible

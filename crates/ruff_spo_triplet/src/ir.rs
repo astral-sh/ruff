@@ -83,6 +83,16 @@ pub struct Model {
     pub fields: Vec<Field>,
     /// Methods / functions.
     pub functions: Vec<Function>,
+    /// Non-public (`private`/`protected`) defs — same [`Function`] body
+    /// facts as `functions`, but NOT routable actions: [`crate::expand`]
+    /// emits no triples for them (no `has_function`), keeping the action
+    /// surface unchanged. Carried in the IR because Rails lifecycle
+    /// callbacks conventionally target private methods and body-fact
+    /// analysis (OGAR F17 body triage) needs to resolve those hook
+    /// targets. Additive + serde-defaulted: existing dumps deserialize
+    /// with an empty vec.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub helpers: Vec<Function>,
 
     /// Frontend-agnostic prototype/delegation inheritance — the parent
     /// models this model `inherits_from` (Odoo `_inherit`, and any future
