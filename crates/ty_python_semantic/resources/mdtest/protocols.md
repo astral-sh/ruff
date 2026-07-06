@@ -2849,8 +2849,40 @@ class IntOrStrConstrainedObjectImplementation:
     def f[S: (int, str)](self, input: S) -> object:
         return input
 
+class ConstrainedListProtocol(Protocol):
+    def f[T: (int, str)](self, input: list[T]) -> object: ...
+
+class ConstrainedListImplementation:
+    def f[S: (list[int], list[str])](self, input: S) -> object:
+        return input
+
+class UnusedConstrainedTypevarsImplementation:
+    def f[
+        S01: (int, str),
+        S02: (int, str),
+        S03: (int, str),
+        S04: (int, str),
+        S05: (int, str),
+        S06: (int, str),
+        S07: (int, str),
+        S08: (int, str),
+        S09: (int, str),
+        S10: (int, str),
+        S11: (int, str),
+        S12: (int, str),
+        S13: (int, str),
+        S14: (int, str),
+        S15: (int, str),
+        S16: (int, str),
+        S17: (int, str),
+        S18: (int, str),
+    ](self, input: object) -> object:
+        return input
+
 def requires_int_bound_identity(value: IntBoundIdentityProtocol) -> None: ...
 def requires_int_bound_object(value: IntBoundObjectProtocol) -> None: ...
+def requires_constrained_list(value: ConstrainedListProtocol) -> None: ...
+def requires_generic_returns_object(value: GenericReturnsObject) -> None: ...
 
 class IntOrStrIdentityProtocol(Protocol):
     def f[T: (int, str)](self, input: T) -> T: ...
@@ -2932,6 +2964,10 @@ requires_int_bound_identity(
 )
 static_assert(is_assignable_to(IntOrStrConstrainedObjectImplementation, IntBoundObjectProtocol))
 requires_int_bound_object(IntOrStrConstrainedObjectImplementation())
+static_assert(is_assignable_to(ConstrainedListImplementation, ConstrainedListProtocol))
+requires_constrained_list(ConstrainedListImplementation())
+static_assert(is_assignable_to(UnusedConstrainedTypevarsImplementation, GenericReturnsObject))
+requires_generic_returns_object(UnusedConstrainedTypevarsImplementation())
 static_assert(is_assignable_to(IntOrStrConstrainedIdentityImplementation, IntOrStrIdentityProtocol))
 requires_int_or_str_identity(IntOrStrConstrainedIdentityImplementation())
 requires_int_or_str_identity(IntOrStrOverloadedImplementation())  # error: [invalid-argument-type]

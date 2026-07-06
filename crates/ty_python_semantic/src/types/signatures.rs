@@ -1993,6 +1993,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
             }
             TypeVarBoundOrConstraints::Constraints(source_constraints) => {
+                if specialized
+                    .as_typevar()
+                    .is_some_and(|specialized| specialized.is_same_typevar_as(db, source))
+                {
+                    return self.always();
+                }
+                let checker = self.with_lazy_typevar_evaluation();
                 let source_accepts_constraint = |candidate| {
                     source_constraints.elements(db).iter().copied().when_any(
                         db,
@@ -2000,29 +2007,22 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         |source_constraint| {
                             let source_constraint =
                                 source_constraint.apply_specialization(db, specialization);
-                            self.check_type_pair(db, candidate, source_constraint).and(
-                                db,
-                                self.constraints,
-                                || self.check_type_pair(db, source_constraint, candidate),
-                            )
+                            checker
+                                .check_type_pair(db, candidate, source_constraint)
+                                .and(db, self.constraints, || {
+                                    checker.check_type_pair(db, source_constraint, candidate)
+                                })
                         },
                     )
                 };
-
-                if let Type::TypeVar(target) = specialized {
-                    let TypeVarBoundOrConstraints::Constraints(target_constraints) =
-                        target.typevar(db).require_bound_or_constraints(db)
-                    else {
-                        return self.never();
-                    };
-                    target_constraints.elements(db).iter().copied().when_all(
+                ConstraintSet::from_bool(
+                    self.constraints,
+                    source_accepts_constraint(specialized).satisfied_by_all_typevars(
                         db,
                         self.constraints,
-                        source_accepts_constraint,
-                    )
-                } else {
-                    source_accepts_constraint(specialized)
-                }
+                        self.inferable,
+                    ),
+                )
             }
         }
     }
@@ -2056,21 +2056,55 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let Some(source_context) = source.generic_context else {
             return self.never();
         };
-        let source_domain =
-            source_context
+        let relation = checker.with_signature_recursion_guard(source, target, || {
+            checker.check_signature_pair_inner(db, source, target)
+        });
+        // Prefer a structural solution such as `S = list[T]`, which preserves how the source
+        // specialization depends on each rigid target specialization. If that is not valid for a
+        // constrained source variable, also try the source's declared alternatives; this models
+        // promotion such as choosing `S = int` for every `T` bounded by `int`.
+        let structural_solutions = relation
+            .remove_noninferable(db, self.constraints, source_inferable)
+            .structural_solutions(db, self.constraints);
+        self.check_signature_pair_with_source_solutions(
+            db,
+            source,
+            target,
+            source_context,
+            structural_solutions,
+        )
+        .or(db, self.constraints, || {
+            let source_domain = source_context
                 .variables(db)
+                // An unused variable cannot affect assignability. Including its constrained
+                // alternatives here would needlessly multiply the solver's paths.
+                .filter(|typevar| source.variance_of(db, *typevar) != TypeVarVariance::Bivariant)
                 .when_all(db, self.constraints, |typevar| {
                     ConstraintSet::valid_specializations(db, self.constraints, typevar)
                 });
-        let when = checker.with_signature_recursion_guard(source, target, || {
-            source_domain.and(db, self.constraints, || {
-                checker.check_signature_pair_inner(db, source, target)
-            })
-        });
-        let solutions = match when
-            .remove_noninferable(db, self.constraints, source_inferable)
-            .solutions(db, self.constraints)
-        {
+            let domain_solutions = source_domain
+                .and(db, self.constraints, || relation)
+                .remove_noninferable(db, self.constraints, source_inferable)
+                .solutions(db, self.constraints);
+            self.check_signature_pair_with_source_solutions(
+                db,
+                source,
+                target,
+                source_context,
+                domain_solutions,
+            )
+        })
+    }
+
+    fn check_signature_pair_with_source_solutions(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+        source_context: GenericContext<'db>,
+        solutions: Solutions<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let solutions = match solutions {
             Solutions::Unsatisfiable => return self.never(),
             Solutions::Unconstrained => vec![Vec::new()],
             Solutions::Constrained(solutions) => solutions,
