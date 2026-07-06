@@ -127,7 +127,9 @@ jobs:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          # This job downloads artifacts instead of checking out the repository.
+          # This job downloads artifacts instead of checking out the repository. An empty
+          # glob means "never invalidate setup-uv's cache":
+          # https://github.com/astral-sh/setup-uv/blob/fac544c07dec837d0ccb6301d7b5580bf5edae39/docs/caching.md#cache-dependency-glob
           cache-dependency-glob: ""
           enable-cache: true
           ignore-empty-workdir: true
@@ -183,7 +185,9 @@ jobs:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          # This job downloads artifacts instead of checking out the repository.
+          # This job downloads artifacts instead of checking out the repository. An empty
+          # glob means "never invalidate setup-uv's cache":
+          # https://github.com/astral-sh/setup-uv/blob/fac544c07dec837d0ccb6301d7b5580bf5edae39/docs/caching.md#cache-dependency-glob
           cache-dependency-glob: ""
           enable-cache: true
           ignore-empty-workdir: true
