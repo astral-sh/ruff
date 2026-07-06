@@ -438,13 +438,15 @@ pub enum Predicate {
     WritesField,
     /// `(model.fn, writes_if_blank, model.field)` — the write of `<field>` is
     /// **guarded by a blank/nil test on that same field** (`self.x = default if
-    /// self.x.blank?`, or `self.x ||= default`). This is the J1 fact
-    /// (`.claude/knowledge/fuzzy-recipe-codebook.md` §5): it splits the fuzzy
-    /// `SelfMap` recipe (`W ⊆ R`, idempotent) into **schema-default**
-    /// (write-if-blank ⇒ this fact present) vs **`normalizes`** (unconditional
-    /// transform ⇒ absent). A subset of `writes_field` — every `writes_if_blank`
-    /// field is ALSO a `writes_field`. Authoritative: the guard shape is a
-    /// machine-readable syntactic pattern, not a heuristic.
+    /// self.x.blank?`, or the nil/false-guarded `self.x ||= default` — a
+    /// narrower falsy test than `.blank?`, but the same "absent" guard for J1
+    /// purposes). This is the J1 fact (`.claude/knowledge/fuzzy-recipe-codebook.md`
+    /// §5): it splits the fuzzy `SelfMap` recipe (`W ⊆ R`, idempotent) into
+    /// **schema-default** (write-if-blank ⇒ this fact present) vs
+    /// **`normalizes`** (unconditional transform ⇒ absent). A subset of
+    /// `writes_field` — every `writes_if_blank` field is ALSO a `writes_field`.
+    /// Authoritative: the guard shape is a machine-readable syntactic pattern,
+    /// not a heuristic.
     WritesIfBlank,
     /// `(model.fn, calls, "<receiver>.<method>")` — body dispatches an
     /// `ActiveRecord` lifecycle mutator (`save`, `update`, `destroy`, …) on
