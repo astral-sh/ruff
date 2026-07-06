@@ -1775,10 +1775,19 @@ impl<'db> Type<'db> {
     }
 
     /// Create a promotable string literal.
-    pub(crate) fn string_literal(db: &'db dyn Db, string: impl Into<CompactString>) -> Self {
+    pub(crate) fn string_literal(db: &'db dyn Db, string: &str) -> Self {
         Self::LiteralValue(LiteralValueType::promotable(StringLiteralType::new(
-            db,
-            string.into(),
+            db, string,
+        )))
+    }
+
+    /// Create a promotable string literal from an owned [`CompactString`].
+    ///
+    /// On an interning miss, Salsa can store the value directly instead of copying it from a
+    /// borrowed `str`.
+    pub(crate) fn string_literal_owned(db: &'db dyn Db, string: CompactString) -> Self {
+        Self::LiteralValue(LiteralValueType::promotable(StringLiteralType::new(
+            db, string,
         )))
     }
 
@@ -5402,7 +5411,7 @@ impl<'db> Type<'db> {
             self.try_call_dunder(
                 db,
                 "__getattr__",
-                CallArguments::positional([Type::string_literal(db, name.as_str())]),
+                CallArguments::positional([Type::string_literal(db, name)]),
                 TypeContext::default(),
             )
             .map(|outcome| Place::bound(outcome.return_type(db)))
@@ -5421,7 +5430,7 @@ impl<'db> Type<'db> {
             self.try_call_dunder_with_policy(
                 db,
                 "__getattribute__",
-                &mut CallArguments::positional([Type::string_literal(db, name.as_str())]),
+                &mut CallArguments::positional([Type::string_literal(db, name)]),
                 TypeContext::default(),
                 MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
             )
@@ -6813,7 +6822,7 @@ impl<'db> Type<'db> {
                 LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => *self,
                 LiteralValueTypeKind::Enum(enum_literal) => Type::string_literal(
                     db,
-                    format!(
+                    &format!(
                         "{enum_class}.{name}",
                         enum_class = enum_literal.enum_class(db).name(db),
                         name = enum_literal.name(db)
@@ -6821,9 +6830,9 @@ impl<'db> Type<'db> {
                 ),
                 LiteralValueTypeKind::Bytes(_) => KnownClass::Str.to_instance(db),
             },
-            Type::SpecialForm(special_form) => Type::string_literal(db, special_form.to_string()),
+            Type::SpecialForm(special_form) => Type::string_literal(db, &special_form.to_string()),
             Type::KnownInstance(known_instance) => {
-                Type::string_literal(db, known_instance.repr(db).to_string())
+                Type::string_literal(db, &known_instance.repr(db).to_string())
             }
             ty if ty.is_subtype_of(db, Type::literal_string()) => Type::literal_string(),
             Type::Intersection(intersection) => {
@@ -6845,18 +6854,18 @@ impl<'db> Type<'db> {
     pub(crate) fn repr(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::LiteralValue(literal) => match literal.kind() {
-                LiteralValueTypeKind::Int(number) => Type::string_literal(db, number.to_string()),
+                LiteralValueTypeKind::Int(number) => Type::string_literal(db, &number.to_string()),
                 LiteralValueTypeKind::Bool(true) => Type::string_literal(db, "True"),
                 LiteralValueTypeKind::Bool(false) => Type::string_literal(db, "False"),
                 LiteralValueTypeKind::String(literal) => {
-                    Type::string_literal(db, format!("'{}'", literal.value(db).escape_default()))
+                    Type::string_literal(db, &format!("'{}'", literal.value(db).escape_default()))
                 }
                 LiteralValueTypeKind::LiteralString => Type::literal_string(),
                 _ => KnownClass::Str.to_instance(db),
             },
-            Type::SpecialForm(special_form) => Type::string_literal(db, special_form.to_string()),
+            Type::SpecialForm(special_form) => Type::string_literal(db, &special_form.to_string()),
             Type::KnownInstance(known_instance) => {
-                Type::string_literal(db, known_instance.repr(db).to_string())
+                Type::string_literal(db, &known_instance.repr(db).to_string())
             }
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
