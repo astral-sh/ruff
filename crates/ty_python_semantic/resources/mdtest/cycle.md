@@ -266,6 +266,32 @@ class Cyclic:
 reveal_type(Cyclic("").data)
 ```
 
+## Cycle normalization preserves non-gradual variadic parameters
+
+Normalizing a recursive implicit-attribute type does not reinterpret specialized variadic parameters
+as gradual:
+
+```py
+from typing import Any, Callable, Generic, TypeVar
+from ty_extensions import TypeOf, is_subtype_of, static_assert
+
+T = TypeVar("T")
+flag: bool
+
+class C(Generic[T]):
+    def method(self, *args: T, **kwargs: T) -> None: ...
+
+c = C[Any]()
+
+class Recursive:
+    def __init__(self, other: "Recursive"):
+        self.callback = c.method if flag else other.callback
+
+def check(value: Recursive):
+    reveal_type(value.callback)  # revealed: bound method C[Any].method(*args: Any, **kwargs: Any) -> None
+    static_assert(is_subtype_of(TypeOf[value.callback], Callable[[], None]))
+```
+
 ## Decorated methods with implicit class attributes
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3471>.

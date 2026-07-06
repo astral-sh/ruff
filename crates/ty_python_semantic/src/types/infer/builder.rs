@@ -7519,14 +7519,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Synthesize overloads for `__getitem__` based on known dictionary elements.
         let getitem_overloads = elements.into_iter().map(|(name, ty)| {
             Signature::new(
-                Parameters::from_annotation(
-                    db,
-                    [
-                        Parameter::positional_only(Some(Name::new_static("self"))),
-                        Parameter::positional_or_keyword(Name::new_static("key"))
-                            .with_annotated_type(Type::string_literal(db, name)),
-                    ],
-                ),
+                Parameters::standard([
+                    Parameter::positional_only(Some(Name::new_static("self"))),
+                    Parameter::positional_or_keyword(Name::new_static("key"))
+                        .with_annotated_type(Type::string_literal(db, name)),
+                ]),
                 ty,
             )
         });

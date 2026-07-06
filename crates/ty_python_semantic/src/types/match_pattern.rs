@@ -107,27 +107,21 @@ fn sequence_pattern_getitem_method<'db>(
         .into_iter()
         .map(|(index, element_type)| {
             Signature::new(
-                Parameters::from_annotation(
-                    db,
-                    [
-                        self_parameter(),
-                        Parameter::positional_only(Some(Name::new_static("index")))
-                            .with_annotated_type(Type::int_literal(index)),
-                    ],
-                ),
+                Parameters::standard([
+                    self_parameter(),
+                    Parameter::positional_only(Some(Name::new_static("index")))
+                        .with_annotated_type(Type::int_literal(index)),
+                ]),
                 element_type,
             )
         });
     let fallback_overload = fallback_return_type.map(|fallback_return_type| {
         Signature::new(
-            Parameters::from_annotation(
-                db,
-                [
-                    self_parameter(),
-                    Parameter::positional_only(Some(Name::new_static("index")))
-                        .with_annotated_type(KnownClass::Int.to_instance(db)),
-                ],
-            ),
+            Parameters::standard([
+                self_parameter(),
+                Parameter::positional_only(Some(Name::new_static("index")))
+                    .with_annotated_type(KnownClass::Int.to_instance(db)),
+            ]),
             fallback_return_type,
         )
     });
@@ -170,10 +164,7 @@ pub(crate) fn exact_sequence_pattern_type<'db>(
 
     let self_parameter = || Parameter::positional_only(Some(Name::new_static("self")));
 
-    let len_signature = Signature::new(
-        Parameters::from_annotation(db, [self_parameter()]),
-        length_type,
-    );
+    let len_signature = Signature::new(Parameters::standard([self_parameter()]), length_type);
     let len_method = CallableType::function_like(db, len_signature);
 
     let getitem_method = (element_types.len() > 0).then(|| {

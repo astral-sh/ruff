@@ -934,7 +934,7 @@ impl<'db> BoundSuperType<'db> {
         {
             let item_parameter = Parameter::positional_only(Some(Name::new_static("item")))
                 .with_annotated_type(Type::unknown());
-            let parameters = Parameters::from_annotation(db, [item_parameter]);
+            let parameters = Parameters::standard([item_parameter]);
             let return_type = self.owner(db).owner_type();
             let class_getitem = Type::single_callable(db, Signature::new(parameters, return_type));
             return Place::bound(class_getitem).into();
