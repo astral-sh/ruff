@@ -79,6 +79,8 @@ pub(crate) struct RawField {
     /// / `monetary` / `boolean` / `date` / `datetime` / `selection` / …).
     /// `None` for relational fields (their kind rides `relation_kind`).
     pub field_type: Option<String>,
+    /// The `store=` kwarg value on a computed field, if present.
+    pub stored: Option<bool>,
 }
 
 /// One `def ...` declaration with its extracted body facts.
@@ -87,6 +89,10 @@ pub(crate) struct RawMethod {
     pub name: String,
     /// `@api.depends('a','b')` field-path args (dotted, verbatim).
     pub depends: Vec<String>,
+    /// `@api.constrains('a','b')` trigger-field-paths (dotted, verbatim).
+    pub constrains: Vec<String>,
+    /// `@api.onchange('a','b')` trigger-field-paths (dotted, verbatim).
+    pub onchange: Vec<String>,
     /// `self.attr` / record-var attribute reads in the body.
     pub reads: Vec<String>,
     /// Exception type names raised in the body.
@@ -210,6 +216,7 @@ fn build_graph(classes: &[RawClass], namespace: &str) -> ModelGraph {
                         relation_kind: f.relation_kind.clone(),
                         field_type: f.field_type.clone(),
                         not_null: None,
+                        stored: f.stored,
                     })
                     .collect(),
                 functions: methods
@@ -219,6 +226,8 @@ fn build_graph(classes: &[RawClass], namespace: &str) -> ModelGraph {
                         reads: m.reads.clone(),
                         raises: m.raises.clone(),
                         traverses: m.traverses.clone(),
+                        constrains: m.constrains.clone(),
+                        onchange: m.onchange.clone(),
                         // Command-shape facts (writes / calls) are not yet
                         // harvested on the Python side — the Odoo compute
                         // path already carries its write target declaratively
@@ -254,6 +263,15 @@ pub(crate) fn expr_str(expr: &Expr) -> Option<String> {
 pub(crate) fn name_id(expr: &Expr) -> Option<&str> {
     if let Expr::Name(n) = expr {
         Some(n.id.as_str())
+    } else {
+        None
+    }
+}
+
+/// Pull the boolean value out of a boolean-literal expression.
+pub(crate) fn bool_literal(expr: &Expr) -> Option<bool> {
+    if let Expr::BooleanLiteral(b) = expr {
+        Some(b.value)
     } else {
         None
     }
@@ -400,9 +418,9 @@ class AccountCashRounding(models.Model):
         ));
         // …but relational fields do NOT — their kind rides `relation_kind`,
         // so the two predicates never double-emit for one field.
-        assert!(!t.iter().any(|tr| tr.s
-            == "odoo:account_cash_rounding.profit_account_id"
-            && tr.p == "field_type"));
+        assert!(!t.iter().any(
+            |tr| tr.s == "odoo:account_cash_rounding.profit_account_id" && tr.p == "field_type"
+        ));
 
         // Many2one comodels surface as `target` (raw dotted, not an IRI).
         assert!(has(
@@ -586,14 +604,14 @@ class ResUsers(models.Model):
         let t = expand(&graph);
 
         // All three carry their comodel as `target`.
-        assert!(has(&t, "odoo:res_users.partner_id", "target", "res.partner"));
-        assert!(has(&t, "odoo:res_users.group_ids", "target", "res.groups"));
         assert!(has(
             &t,
-            "odoo:res_users.log_ids",
+            "odoo:res_users.partner_id",
             "target",
-            "res.users.log"
+            "res.partner"
         ));
+        assert!(has(&t, "odoo:res_users.group_ids", "target", "res.groups"));
+        assert!(has(&t, "odoo:res_users.log_ids", "target", "res.users.log"));
 
         // …but only `relation_kind` tells the cardinality apart.
         assert!(has(
@@ -678,8 +696,117 @@ class MailThreadReopen(models.Model):
         assert!((edge.f - 0.95).abs() < 1e-6 && (edge.c - 0.90).abs() < 1e-6);
 
         // Byte-compat: still round-trips the closed vocab.
-        let parsed =
-            ruff_spo_triplet::from_ndjson(&to_ndjson(&extract_from_source(src))).unwrap();
+        let parsed = ruff_spo_triplet::from_ndjson(&to_ndjson(&extract_from_source(src))).unwrap();
         assert_eq!(parsed, t);
+    }
+
+    // `@api.constrains` / `@api.onchange` fixture: neither decorator computes
+    // a field, so their trigger-field-paths land on the `Function` node
+    // directly rather than joining through `Field::depends_on`.
+    const CONSTRAINS_ONCHANGE: &str = r#"
+from odoo import models, fields, api
+
+
+class Foo(models.Model):
+    _name = 'x.foo'
+    field_a = fields.Char()
+    field_b = fields.Char()
+    partner_id = fields.Many2one('res.partner')
+
+    @api.constrains('field_a', 'field_b')
+    def _check_x(self):
+        pass
+
+    @api.onchange('partner_id')
+    def _onchange_partner(self):
+        pass
+"#;
+
+    #[test]
+    fn constrains_decorator_populates_function_constrains() {
+        let graph = extract_from_source(CONSTRAINS_ONCHANGE);
+        let func = graph.models[0]
+            .functions
+            .iter()
+            .find(|f| f.name == "_check_x")
+            .expect("_check_x present");
+        assert_eq!(
+            func.constrains,
+            vec!["field_a".to_string(), "field_b".to_string()]
+        );
+        assert!(func.onchange.is_empty());
+    }
+
+    #[test]
+    fn onchange_decorator_populates_function_onchange() {
+        let graph = extract_from_source(CONSTRAINS_ONCHANGE);
+        let func = graph.models[0]
+            .functions
+            .iter()
+            .find(|f| f.name == "_onchange_partner")
+            .expect("_onchange_partner present");
+        assert_eq!(func.onchange, vec!["partner_id".to_string()]);
+        assert!(func.constrains.is_empty());
+    }
+
+    #[test]
+    fn depends_arm_unchanged_by_new_decorators() {
+        // Regression: the existing compute+depends fixture is completely
+        // unaffected by generalising the decorator match to 3 arms.
+        let graph = extract_from_source(COMPUTE);
+        let t = expand(&graph);
+        assert!(has(
+            &t,
+            "odoo:x_foo.total",
+            "depends_on",
+            "odoo:x_foo.line_ids.amount"
+        ));
+        assert!(has(&t, "odoo:x_foo.total", "depends_on", "odoo:x_foo.tax"));
+
+        let compute_fn = graph.models[0]
+            .functions
+            .iter()
+            .find(|f| f.name == "_compute_total")
+            .expect("_compute_total present");
+        assert!(compute_fn.constrains.is_empty());
+        assert!(compute_fn.onchange.is_empty());
+    }
+
+    const STORE_KWARG: &str = r#"
+from odoo import models, fields
+
+
+class Foo(models.Model):
+    _name = 'x.foo'
+    total = fields.Monetary(compute='_compute_total', store=True)
+    subtotal = fields.Monetary(compute='_compute_subtotal', store=False)
+    tax = fields.Monetary(compute='_compute_tax')
+"#;
+
+    #[test]
+    fn stored_true_kwarg_captured() {
+        let graph = extract_from_source(STORE_KWARG);
+        let fields = &graph.models[0].fields;
+        let get = |name: &str| fields.iter().find(|f| f.name == name).unwrap();
+        assert_eq!(get("total").stored, Some(true));
+        assert_eq!(get("subtotal").stored, Some(false));
+        assert_eq!(get("tax").stored, None);
+    }
+
+    #[test]
+    fn ndjson_byte_identical_without_new_facts() {
+        // ndjson serialises expanded *triples*, not the IR structs, and
+        // `expand` deliberately does not emit the new facts — so no new
+        // predicate strings may ever surface in ndjson, with or without
+        // `store=` / `@api.constrains` / `@api.onchange` in the source.
+        // (The `skip_serializing_if` attributes on the IR fields matter only
+        // for direct struct serialisation, which is OGAR-side surface.)
+        let graph = extract_from_source(RELATION_KINDS);
+        let nd = to_ndjson(&graph);
+        assert!(!nd.contains("constrains"));
+        assert!(!nd.contains("onchange"));
+        assert!(!nd.contains("stored"));
+        let parsed = ruff_spo_triplet::from_ndjson(&nd).expect("ndjson round-trips");
+        assert_eq!(parsed, expand(&graph));
     }
 }

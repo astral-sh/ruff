@@ -18,11 +18,17 @@ use crate::{RawMethod, expr_str};
 /// Analyse a method into its decorator + body facts.
 pub(crate) fn analyze_method(func: &StmtFunctionDef) -> RawMethod {
     let mut depends = Vec::new();
+    let mut constrains = Vec::new();
+    let mut onchange = Vec::new();
     for decorator in &func.decorator_list {
-        if let Expr::Call(call) = &decorator.expression
-            && terminal_name(&call.func) == Some("depends")
-        {
-            depends.extend(call.arguments.args.iter().filter_map(expr_str));
+        if let Expr::Call(call) = &decorator.expression {
+            let args = || call.arguments.args.iter().filter_map(expr_str);
+            match terminal_name(&call.func) {
+                Some("depends") => depends.extend(args()),
+                Some("constrains") => constrains.extend(args()),
+                Some("onchange") => onchange.extend(args()),
+                _ => {}
+            }
         }
     }
 
@@ -32,6 +38,8 @@ pub(crate) fn analyze_method(func: &StmtFunctionDef) -> RawMethod {
     RawMethod {
         name: func.name.id.as_str().to_string(),
         depends,
+        constrains,
+        onchange,
         reads: dedup(walker.reads),
         raises: dedup(walker.raises),
         traverses: dedup(walker.traverses),
