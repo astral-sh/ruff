@@ -3268,6 +3268,26 @@ def from_gradual_value(value: Unknown, condition: bool) -> FactoryObject | Facto
     return candidate
 ```
 
+## Class objects with class-method protocol members
+
+A class object implements a protocol when its directly accessible members have compatible types. The
+corresponding member does not also need to exist on the class object's metaclass:
+
+```py
+from typing import Protocol
+
+class Parser(Protocol):
+    @classmethod
+    def parse(cls, value: str) -> int: ...
+
+class IntParser:
+    @classmethod
+    def parse(cls, value: str) -> int:
+        return int(value)
+
+parser: Parser = IntParser
+```
+
 ## Subtyping of protocols with `@classmethod` or `@staticmethod` members
 
 The typing specification permits protocols to declare class and static methods, but it does not

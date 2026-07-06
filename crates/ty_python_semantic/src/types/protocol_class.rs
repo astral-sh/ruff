@@ -1024,7 +1024,8 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     /// Returns the accesses that a candidate value must provide for this member.
     ///
     /// A module-level callable can satisfy an ordinary or static method through direct member
-    /// access. The member does not also need to exist on `ModuleType`.
+    /// access. A class object can likewise satisfy a class or static method. The member does not
+    /// also need to exist on the value's meta-type.
     fn implementation_capabilities(
         &self,
         db: &'db dyn Db,
@@ -1038,6 +1039,12 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 ProtocolMemberKind::Method(
                     _,
                     ProtocolMethodKind::Instance | ProtocolMethodKind::Static
+                )
+            ) | (
+                Type::ClassLiteral(_),
+                ProtocolMemberKind::Method(
+                    _,
+                    ProtocolMethodKind::Class | ProtocolMethodKind::Static
                 )
             )
         ) {
