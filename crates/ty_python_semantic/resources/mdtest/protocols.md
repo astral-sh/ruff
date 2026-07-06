@@ -4081,6 +4081,29 @@ def _(source: NoArgs):
     target: Variadic[Any] = source  # error: [invalid-assignment]
 ```
 
+## Class constructors and static callback protocols
+
+A class object's call signature comes from its constructor. An unrelated `__call__` method on the
+class's instances does not replace that constructor signature when matching a static callback
+protocol:
+
+```py
+from typing import Protocol
+
+class Product:
+    def __init__(self, value: int) -> None:
+        self.value = value
+
+    def __call__(self, text: str) -> str:
+        return text
+
+class Constructor(Protocol):
+    @staticmethod
+    def __call__(value: int) -> Product: ...
+
+constructor: Constructor = Product
+```
+
 ## Generic protocols and union arguments
 
 When a union is passed to a parameter annotated as a generic protocol, each union element can

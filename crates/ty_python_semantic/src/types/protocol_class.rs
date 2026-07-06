@@ -1219,8 +1219,10 @@ fn protocol_member_read_type<'db>(
     member: &ProtocolMember<'_, 'db>,
     access: ProtocolMemberAccessMode,
 ) -> Option<Type<'db>> {
+    // A callback protocol describes call syntax. Use the candidate's callable type instead of an
+    // explicitly resolved `__call__` attribute, which can differ for class objects.
     if access == ProtocolMemberAccessMode::Instance
-        && member.is_instance_method()
+        && member.is_method()
         && member.name == "__call__"
     {
         return Some(ty);
