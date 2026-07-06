@@ -18,6 +18,9 @@
 //! | `raise UserError(...)`                  | [`Function::raises`] | `raises` (`exc:`)    |
 //! | `self.attr` / `record.attr`             | [`Function::reads`]  | `reads_field`        |
 //! | `for r in self.line_ids:`               | [`Function::traverses`]| `traverses_relation`|
+//! | `self.attr = …` / `record.attr = …`     | [`Function::writes`] | `writes_field`       |
+//! | write guarded by a blank/`None` test (J1)| [`Function::guarded_writes`]| `writes_if_blank` |
+//! | `self.create/write/unlink/…(…)`         | [`Function::calls`]  | `calls`              |
 //!
 //! Odoo relations carry their cardinality too: `target` (comodel),
 //! `inverse_name` (One2many inverse), and `relation_kind`
@@ -99,6 +102,14 @@ pub(crate) struct RawMethod {
     pub raises: Vec<String>,
     /// Relation names traversed by `for r in self.rel:` loops.
     pub traverses: Vec<String>,
+    /// Own-field store targets (`self.<f> = …` / `<record-var>.<f> = …`).
+    pub writes: Vec<String>,
+    /// The J1 subset of `writes` guarded by a blank/`None` test (or an
+    /// `x or default` RHS) on the same field. Always ⊆ `writes`.
+    pub guarded_writes: Vec<String>,
+    /// Closed-set ORM-mutator dispatches (`create`/`write`/`unlink`/…), as
+    /// `"<receiver>.<method>"`.
+    pub calls: Vec<String>,
 }
 
 /// Extract a [`ModelGraph`] from a single Python source string.
@@ -228,12 +239,16 @@ fn build_graph(classes: &[RawClass], namespace: &str) -> ModelGraph {
                         traverses: m.traverses.clone(),
                         constrains: m.constrains.clone(),
                         onchange: m.onchange.clone(),
-                        // Command-shape facts (writes / calls) are not yet
-                        // harvested on the Python side — the Odoo compute
-                        // path already carries its write target declaratively
-                        // via `Field::emitted_by`, so body-write capture is a
-                        // follow-up. Left empty (additive, byte-identical
-                        // ndjson) until a Python body-pass lands.
+                        // Command-shape facts (E-ACCIDENTAL-IMPERATIVE / OGAR
+                        // F17): the write-side counterpart of reads/traverses.
+                        // The Odoo compute path already carries its primary
+                        // write target declaratively via `Field::emitted_by`;
+                        // `writes` additionally captures every body-level
+                        // store (defaults, cascading writes on other fields,
+                        // …) that declaration doesn't see.
+                        writes: m.writes.clone(),
+                        guarded_writes: m.guarded_writes.clone(),
+                        calls: m.calls.clone(),
                         ..Default::default()
                     })
                     .collect(),
@@ -808,5 +823,151 @@ class Foo(models.Model):
         assert!(!nd.contains("stored"));
         let parsed = ruff_spo_triplet::from_ndjson(&nd).expect("ndjson round-trips");
         assert_eq!(parsed, expand(&graph));
+    }
+
+    // The DTO-arm quartet (writes / guarded_writes / calls) — the coverage
+    // table row `.claude/knowledge/fuzzy-recipe-codebook.md` §2 flags as
+    // "reads/raises only; needs writes/calls/helpers". Five shapes:
+    // (a) a compute writing via a loop var, (b) a blank-guarded default
+    // (`if not self.x:`), (c) an or-guarded default (`self.x = self.x or v`),
+    // (d) a closed-set ORM-mutator call, (e) a local assignment that must
+    // NOT be a write.
+    const DTO_ARM: &str = r#"
+from odoo import models, fields
+
+
+class AccountMove(models.Model):
+    _name = 'account.move'
+    amount_total = fields.Monetary(compute='_compute_amount_total', store=True)
+    subtotal = fields.Monetary()
+    tax = fields.Monetary()
+    name = fields.Char()
+    ref = fields.Char()
+    line_ids = fields.One2many('account.move.line', 'move_id')
+
+    def _compute_amount_total(self):
+        for move in self:
+            move.amount_total = move.subtotal + move.tax
+
+    def _set_default_name(self):
+        if not self.name:
+            self.name = 'draft'
+
+    def _default_ref(self):
+        self.ref = self.ref or '/'
+
+    def action_clear_lines(self):
+        self.line_ids.unlink()
+
+    def _local_only(self):
+        total = 0
+        return total
+"#;
+
+    #[test]
+    fn dto_arm_writes_guarded_writes_and_calls() {
+        let graph = extract_from_source(DTO_ARM);
+        let model = graph
+            .models
+            .iter()
+            .find(|m| m.name == "account_move")
+            .expect("account_move model");
+        let func = |name: &str| {
+            model
+                .functions
+                .iter()
+                .find(|f| f.name == name)
+                .unwrap_or_else(|| panic!("missing function {name}"))
+        };
+
+        // (a) `for move in self: move.amount_total = move.subtotal + move.tax`
+        // — an unconditional compute write, NOT guarded.
+        let compute = func("_compute_amount_total");
+        assert_eq!(compute.writes, vec!["amount_total"]);
+        assert!(
+            compute.guarded_writes.is_empty(),
+            "unconditional compute write must not be guarded; got {:?}",
+            compute.guarded_writes
+        );
+        assert!(compute.reads.contains(&"subtotal".to_string()));
+        assert!(compute.reads.contains(&"tax".to_string()));
+
+        // (b) `if not self.name: self.name = 'draft'` — the blank-guarded
+        // default (J1): guarded_writes is a subset of writes, both "name".
+        let default_name = func("_set_default_name");
+        assert_eq!(default_name.writes, vec!["name"]);
+        assert_eq!(default_name.guarded_writes, vec!["name"]);
+
+        // (c) `self.ref = self.ref or '/'` — the or-guarded default, the
+        // Python spelling of ruby's `self.x ||= v`.
+        let default_ref = func("_default_ref");
+        assert_eq!(default_ref.writes, vec!["ref"]);
+        assert_eq!(default_ref.guarded_writes, vec!["ref"]);
+
+        // (d) `self.line_ids.unlink()` — closed-set ORM-mutator dispatch;
+        // the receiver renders as the relation path ("line_ids"), not "self".
+        let clear_lines = func("action_clear_lines");
+        assert_eq!(clear_lines.calls, vec!["line_ids.unlink"]);
+        assert!(clear_lines.writes.is_empty());
+
+        // (e) `total = 0` — a bare local assignment must NOT be a write.
+        let local_only = func("_local_only");
+        assert!(
+            local_only.writes.is_empty(),
+            "local-var assignment must not be a field write; got {:?}",
+            local_only.writes
+        );
+
+        // `expand()` emits the quartet as writes_field / writes_if_blank /
+        // calls — zero IR change, per the codebook's own acceptance criterion.
+        let t = expand(&graph);
+        assert!(has(
+            &t,
+            "odoo:account_move._compute_amount_total",
+            "writes_field",
+            "odoo:account_move.amount_total"
+        ));
+        // The unconditional compute write must NOT also carry writes_if_blank.
+        assert!(!has(
+            &t,
+            "odoo:account_move._compute_amount_total",
+            "writes_if_blank",
+            "odoo:account_move.amount_total"
+        ));
+        assert!(has(
+            &t,
+            "odoo:account_move._set_default_name",
+            "writes_field",
+            "odoo:account_move.name"
+        ));
+        assert!(has(
+            &t,
+            "odoo:account_move._set_default_name",
+            "writes_if_blank",
+            "odoo:account_move.name"
+        ));
+        assert!(has(
+            &t,
+            "odoo:account_move._default_ref",
+            "writes_field",
+            "odoo:account_move.ref"
+        ));
+        assert!(has(
+            &t,
+            "odoo:account_move._default_ref",
+            "writes_if_blank",
+            "odoo:account_move.ref"
+        ));
+        assert!(has(
+            &t,
+            "odoo:account_move.action_clear_lines",
+            "calls",
+            "line_ids.unlink"
+        ));
+
+        // The ndjson round-trips through the closed-vocab parser.
+        let nd = to_ndjson(&graph);
+        let parsed = ruff_spo_triplet::from_ndjson(&nd).expect("ndjson round-trips");
+        assert_eq!(parsed, t);
     }
 }
