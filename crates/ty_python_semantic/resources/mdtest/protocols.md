@@ -3428,6 +3428,44 @@ static_assert(is_assignable_to(AlsoCorrect, ContextManagerProtocol))
 static_assert(not is_assignable_to(MissingDecorator, ContextManagerProtocol))
 ```
 
+Transparent decorators preserve class and static protocol methods:
+
+```py
+from collections.abc import Callable
+from typing import ParamSpec, Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def transparent(function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+class StaticProtocol(Protocol):
+    @staticmethod
+    @transparent
+    def method(value: int) -> str: ...
+
+class StaticImplementation:
+    @staticmethod
+    def method(value: int) -> str:
+        return str(value)
+
+class ClassProtocol(Protocol):
+    @classmethod
+    @transparent
+    def method(cls, value: int) -> str: ...
+
+class ClassImplementation:
+    @classmethod
+    def method(cls, value: int) -> str:
+        return str(value)
+
+static_assert(is_subtype_of(StaticImplementation, StaticProtocol))
+static_assert(is_subtype_of(ClassImplementation, ClassProtocol))
+```
+
 ## Equivalence of protocols with method or property members
 
 Two protocols `P1` and `P2`, both with a method member `x`, are considered equivalent if the

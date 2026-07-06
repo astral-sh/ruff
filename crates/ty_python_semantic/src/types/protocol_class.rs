@@ -2164,7 +2164,7 @@ fn cached_protocol_interface<'db>(
                     definition,
                 ),
                 Type::Callable(callable)
-                    if bound_on_class.is_yes() && callable.is_function_like(db) =>
+                    if bound_on_class.is_yes() && callable.is_method_like(db) =>
                 {
                     ProtocolMemberData::method(db, callable, definition)
                 }
