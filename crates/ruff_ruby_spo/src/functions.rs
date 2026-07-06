@@ -41,7 +41,9 @@
 //! - Op-assign writes on non-self-attribute targets (`x ||= y`, `@x += 1`) —
 //!   only a `self.<field>` receiver is recognised. `self.x ||= y` is captured
 //!   as `writes` + `guarded_writes` (the J1 default idiom); `self.x += y` is
-//!   captured as `writes` + `reads` (a read-modify-write, not a guard).
+//!   captured as `writes` + `reads` (a read-modify-write, not a guard);
+//!   `self.x &&= y` is captured as a plain `writes` (present-guarded — the
+//!   mirror of J1, deliberately not `guarded_writes`).
 //!
 //! These all land in follow-up D-AR-3.6 (method bodies are deep; the
 //! 80/20 here is method NAMES + leaf `raise` + association walks).
@@ -423,6 +425,16 @@ fn walk_method_body(node: &Node, known_relations: &[String], func: &mut Function
                 func.writes.push(field.to_string());
             }
             walk_method_body(&o.value, known_relations, func);
+        }
+        // `self.<field> &&= v` — the PRESENT-guarded write (assigns only when
+        // the field is already truthy). A write, but the mirror image of the
+        // J1 "absent" guard — deliberately NOT `guarded_writes` (that predicate
+        // means default-when-blank). RHS is still walked for facts.
+        Node::AndAsgn(a) => {
+            if let Some(field) = attr_of_self(&a.recv) {
+                func.writes.push(field.to_string());
+            }
+            walk_method_body(&a.value, known_relations, func);
         }
         // `<relation>.each` / `<relation>.<m>` — association walks, plus any
         // `ActiveRecord` lifecycle mutator dispatched on a non-self receiver
@@ -1338,6 +1350,66 @@ end
         assert!(
             funcs[0].guarded_writes.is_empty(),
             "local-var or-asgn must not be a guarded write; got {:?}",
+            funcs[0].guarded_writes
+        );
+    }
+
+    #[test]
+    fn or_asgn_ivar_emits_nothing() {
+        // `@x ||= v` (ivar memoization) is not an AR attribute write —
+        // pins the doc-comment claim explicitly.
+        let funcs = class_functions(
+            r#"
+class M
+  def memo
+    @cache ||= expensive
+  end
+end
+"#,
+        );
+        assert!(funcs[0].writes.is_empty(), "ivar or-asgn must not be a field write");
+        assert!(funcs[0].guarded_writes.is_empty());
+    }
+
+    #[test]
+    fn or_asgn_rhs_facts_are_still_walked() {
+        // Facts inside the RHS of `self.a ||= …` must not be lost: the value
+        // expression is walked like any other body statement.
+        let funcs = class_functions(
+            r#"
+class M
+  def default_name
+    self.name ||= build_from(self.slug)
+  end
+end
+"#,
+        );
+        assert_eq!(funcs[0].writes, vec!["name"]);
+        assert_eq!(funcs[0].guarded_writes, vec!["name"]);
+        assert!(
+            funcs[0].reads.contains(&"slug".to_string()),
+            "RHS read of self.slug must be captured; got {:?}",
+            funcs[0].reads
+        );
+    }
+
+    #[test]
+    fn and_asgn_self_attr_emits_plain_write_not_guarded() {
+        // `self.x &&= v` is a write but NOT a J1 guarded default (it assigns
+        // only when the field is PRESENT — the mirror idiom).
+        let funcs = class_functions(
+            r#"
+class M
+  def normalize
+    self.email &&= email.strip
+  end
+end
+"#,
+        );
+        assert_eq!(funcs[0].writes, vec!["email"]);
+        assert!(
+            funcs[0].guarded_writes.is_empty(),
+            "&&= must not be guarded_writes (present-guard, not J1); got {:?}",
             funcs[0].guarded_writes
         );
     }
