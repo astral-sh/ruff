@@ -1000,11 +1000,13 @@ fn find_suppression_comments<'a>(
                 None
             };
 
-        // Prefer extending an existing `ruff:ignore` over an existing `noqa` directive.
-        let directive = suppressions
-            .find_applicable_ignore(message)
-            .map(ExistingDirective::Ignore)
-            .or(existing_noqa);
+        // Reuse an existing directive that matches the requested suppression style.
+        let directive = match suppression_kind {
+            SuppressionKind::Noqa => existing_noqa,
+            SuppressionKind::Ignore => suppressions
+                .find_applicable_ignore(message)
+                .map(ExistingDirective::Ignore),
+        };
 
         let identifier = match suppression_kind {
             SuppressionKind::Noqa => code.as_str(),

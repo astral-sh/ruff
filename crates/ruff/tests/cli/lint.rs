@@ -2068,7 +2068,7 @@ def first_square():
     ----- stdout -----
 
     ----- stderr -----
-    Added 1 suppression comment.
+    Added 1 noqa directive.
     ");
 
     let test_code =
@@ -2116,7 +2116,7 @@ def unused(x):
     ----- stdout -----
 
     ----- stderr -----
-    Added 1 suppression comment.
+    Added 1 noqa directive.
     ");
 
     let test_code =
@@ -2165,7 +2165,7 @@ import a
     ----- stdout -----
 
     ----- stderr -----
-    Added 1 suppression comment.
+    Added 1 noqa directive.
     ");
 
     let test_code =
@@ -2214,7 +2214,7 @@ def unused(x):  # noqa: ANN001, ARG001, D103
     ----- stdout -----
 
     ----- stderr -----
-    Added 1 suppression comment.
+    Added 1 noqa directive.
     ");
 
     let test_code =
@@ -2362,7 +2362,7 @@ print(
     ----- stdout -----
 
     ----- stderr -----
-    Added 1 suppression comment.
+    Added 1 noqa directive.
     ");
 
     let test_code =
@@ -2409,7 +2409,7 @@ select = ["D100"]
     ----- stdout -----
 
     ----- stderr -----
-    Added 1 suppression comment.
+    Added 1 noqa directive.
     ");
 
     let test_code =
@@ -2448,7 +2448,7 @@ select = ["D100"]
     ----- stdout -----
 
     ----- stderr -----
-    Added 1 suppression comment.
+    Added 1 noqa directive.
     ");
 
     let test_code =
@@ -2498,7 +2498,7 @@ def first_square():
     ----- stdout -----
 
     ----- stderr -----
-    Added 1 suppression comment.
+    Added 1 noqa directive.
     ");
 
     Ok(())
@@ -2554,7 +2554,7 @@ def foo():
     ----- stdout -----
 
     ----- stderr -----
-    Added 2 suppression comments.
+    Added 2 noqa directives.
     ");
 
     let content = fs::read_to_string(fixture.root().join("test.py"))?;
@@ -2613,7 +2613,7 @@ fn add_ignore() -> Result<()> {
         ----- stdout -----
 
         ----- stderr -----
-        Added 1 suppression comment.
+        Added 1 ignore comment.
         ",
     );
 
@@ -2632,7 +2632,7 @@ fn add_ignore() -> Result<()> {
 }
 
 #[test]
-fn add_ignore_alias_without_preview() -> Result<()> {
+fn add_ignore_requires_preview() -> Result<()> {
     let fixture = CliTest::new()?;
     fixture.write_file("noqa.py", "import os\n")?;
 
@@ -2642,49 +2642,18 @@ fn add_ignore_alias_without_preview() -> Result<()> {
             .arg("--select=F401")
             .arg("--add-ignore"),
         @"
-        success: true
-        exit_code: 0
+        success: false
+        exit_code: 2
         ----- stdout -----
 
         ----- stderr -----
-        Added 1 suppression comment.
+        ruff failed
+          Cause: `--add-ignore` requires preview mode, but preview is disabled for `[TMP]/noqa.py`
         ",
     );
 
     let test_code = fixture.read_file("noqa.py")?;
-    insta::assert_snapshot!(test_code, @"import os  # noqa: F401");
-
-    Ok(())
-}
-
-#[test]
-fn add_ignore_respects_hierarchical_preview_settings() -> Result<()> {
-    let fixture = CliTest::new()?;
-    fixture.write_file(
-        "ruff.toml",
-        r#"lint = { preview = true, select = ["F401"] }"#,
-    )?;
-    fixture.write_file("root.py", "import os\n")?;
-    fixture.write_file(
-        "nested/ruff.toml",
-        r#"lint = { preview = false, select = ["F401"] }"#,
-    )?;
-    fixture.write_file("nested/nested.py", "import sys\n")?;
-
-    assert_cmd_snapshot!(
-        fixture.check_command().arg("--add-ignore"),
-        @"
-        success: true
-        exit_code: 0
-        ----- stdout -----
-
-        ----- stderr -----
-        Added 2 suppression comments.
-        ",
-    );
-
-    insta::assert_snapshot!(fixture.read_file("root.py")?, @"import os  # ruff:ignore[unused-import]");
-    insta::assert_snapshot!(fixture.read_file("nested/nested.py")?, @"import sys  # noqa: F401");
+    insta::assert_snapshot!(test_code, @"import os");
 
     Ok(())
 }
@@ -2712,7 +2681,7 @@ fn add_ignore_multiple_codes() -> Result<()> {
         ----- stdout -----
 
         ----- stderr -----
-        Added 1 suppression comment.
+        Added 1 ignore comment.
         ",
     );
 
@@ -2754,7 +2723,7 @@ fn add_ignore_multiline_diagnostic() -> Result<()> {
         ----- stdout -----
 
         ----- stderr -----
-        Added 1 suppression comment.
+        Added 1 ignore comment.
         ",
     );
 
@@ -2796,7 +2765,7 @@ fn add_ignore_existing_ignore() -> Result<()> {
         ----- stdout -----
 
         ----- stderr -----
-        Added 1 suppression comment.
+        Added 1 ignore comment.
         ",
     );
 
@@ -2856,7 +2825,7 @@ fn add_ignore_existing_own_line_ignore() -> Result<()> {
         ----- stdout -----
 
         ----- stderr -----
-        Added 1 suppression comment.
+        Added 1 ignore comment.
         ",
     );
 
@@ -2897,7 +2866,7 @@ fn add_ignore_existing_noqa() -> Result<()> {
         ----- stdout -----
 
         ----- stderr -----
-        Added 1 suppression comment.
+        Added 1 ignore comment.
         ",
     );
 
@@ -2938,7 +2907,7 @@ fn add_noqa_existing_ignore() -> Result<()> {
 
         ----- stderr -----
         warning: #ruff:ignore comment found but not active, enable preview mode
-        Added 1 suppression comment.
+        Added 1 noqa directive.
         ",
     );
 
@@ -2949,6 +2918,47 @@ fn add_noqa_existing_ignore() -> Result<()> {
         @"
 
         def unused(x):  # ruff:ignore[ANN001, ARG001, D103]  # noqa: ANN001, ANN201, D103
+            pass
+        ",
+    );
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_existing_ignore_preview() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "noqa.py",
+        r#"
+        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]
+            pass
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .arg("--select=ANN001,ANN201,ARG001,D103")
+            .arg("--preview")
+            .arg("--add-noqa"),
+        @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        ----- stderr -----
+        Added 1 noqa directive.
+        ",
+    );
+
+    let test_code = fixture.read_file("noqa.py")?;
+
+    insta::assert_snapshot!(
+        test_code,
+        @"
+
+        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]  # noqa: ANN201
             pass
         ",
     );

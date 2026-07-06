@@ -627,10 +627,12 @@ Options:
       --statistics
           Show counts for every rule with at least one violation
       --add-noqa[=<REASON>]
-          Enable automatic additions of suppression directives to failing
-          lines. Uses `ruff:ignore` in preview mode and `noqa` otherwise.
-          Optionally provide a reason to append after the codes [aliases:
-          --add-ignore]
+          Enable automatic additions of `noqa` directives to failing lines.
+          Optionally provide a reason to append after the codes
+      --add-ignore[=<REASON>]
+          Enable automatic additions of `ruff:ignore` comments to failing
+          lines. Optionally provide a reason to append after the rule names.
+          Requires preview mode
       --show-files
           See the files Ruff will be run against with the current settings
       --show-settings

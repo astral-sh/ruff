@@ -541,9 +541,8 @@ lines, run Ruff with `--add-noqa`:
 $ ruff check /path/to/file.py --add-noqa
 ```
 
-In stable mode, Ruff adds `noqa` directives with rule codes. In preview mode, Ruff adds
-`ruff:ignore` comments with human-readable rule names. The `--add-ignore` flag is an alias for
-`--add-noqa`.
+The `--add-noqa` flag adds `noqa` directives with rule codes. To add `ruff:ignore` comments with
+human-readable rule names instead, use `--add-ignore` with preview mode enabled.
 
 ### isort action comments
 

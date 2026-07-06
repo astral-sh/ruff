@@ -25,7 +25,7 @@ use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
 use crate::noqa::add_suppression;
 use crate::package::PackageRoot;
-use crate::preview::{is_human_readable_names_enabled, is_py315_support_enabled};
+use crate::preview::is_py315_support_enabled;
 use crate::registry::Rule;
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TEST_RULES, TestRule};
@@ -379,6 +379,7 @@ pub fn add_suppressions_to_path(
     source_type: PySourceType,
     settings: &LinterSettings,
     reason: Option<&str>,
+    suppression_kind: SuppressionKind,
 ) -> Result<usize> {
     // Parse once.
     let target_version = settings.resolve_target_version(path);
@@ -424,11 +425,6 @@ pub fn add_suppressions_to_path(
 
     // Add any missing suppression comments.
     // TODO(dhruvmanila): Add support for Jupyter Notebooks
-    let suppression_kind = if is_human_readable_names_enabled(settings.preview) {
-        SuppressionKind::Ignore
-    } else {
-        SuppressionKind::Noqa
-    };
     add_suppression(
         path,
         &diagnostics,
