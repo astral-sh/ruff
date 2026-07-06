@@ -16,9 +16,9 @@ use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState, do
 use ty_python_core::scope::ScopeKind;
 use ty_python_core::semantic_index;
 
-use super::visible_reachable_definitions_for_name;
+use super::{known_type_form_parameter_index, visible_reachable_definitions_for_name};
 use crate::dunder_all::dunder_all_names;
-use crate::{Db, SemanticModel};
+use crate::{Db, HasType, SemanticModel};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, GetSize)]
 pub struct UnusedImport {
@@ -217,10 +217,48 @@ impl<'model> SourceOrderVisitor<'model> for StringAnnotationDefinitionVisitor<'m
         });
     }
 
+    fn visit_stmt(&mut self, stmt: &'model ast::Stmt) {
+        // The value assigned to a type alias is a type expression, so its strings
+        // are forward references.
+        if let ast::Stmt::AnnAssign(assignment) = stmt
+            && let Some(value) = assignment.value.as_deref()
+            && self.model.is_type_alias_annotation(&assignment.annotation)
+        {
+            self.visit_expr(&assignment.target);
+            self.visit_annotation(&assignment.annotation);
+            self.enter_annotation(value, |visitor| visitor.visit_expr(value));
+            return;
+        }
+
+        source_order::walk_stmt(self, stmt);
+    }
+
     fn visit_expr(&mut self, expr: &'model ast::Expr) {
         match expr {
             ast::Expr::StringLiteral(string) if self.in_annotation => {
                 self.visit_string_annotation(string);
+            }
+            ast::Expr::Call(call) => {
+                // Arguments that ty evaluates as type expressions (`cast("X", v)`,
+                // `assert_type(v, "X")`, ...) contain forward references. Keyword
+                // arguments are not mapped to parameters here, so strings passed by
+                // keyword remain values.
+                let type_form_index = call
+                    .func
+                    .inferred_type(self.model)
+                    .and_then(|ty| known_type_form_parameter_index(self.model.db(), ty));
+
+                self.visit_expr(&call.func);
+                for (index, argument) in call.arguments.args.iter().enumerate() {
+                    if type_form_index == Some(index) {
+                        self.enter_annotation(argument, |visitor| visitor.visit_expr(argument));
+                    } else {
+                        self.visit_expr(argument);
+                    }
+                }
+                for keyword in &call.arguments.keywords {
+                    self.visit_expr(&keyword.value);
+                }
             }
             _ => source_order::walk_expr(self, expr),
         }
@@ -1222,6 +1260,71 @@ mod tests {
         )?;
 
         assert_eq!(names, vec!["xml.etree.ElementTree"]);
+        Ok(())
+    }
+
+    #[test]
+    fn skips_imports_used_in_stringified_cast_types() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            from collections import OrderedDict
+            from typing import cast
+
+            def f(x):
+                return cast("OrderedDict", x)
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_imports_used_in_stringified_assert_type_types() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            from collections import OrderedDict
+            from typing_extensions import assert_type
+
+            def f(x):
+                assert_type(x, "OrderedDict")
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_imports_used_in_stringified_type_alias_values() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            from os import PathLike
+            from typing import TypeAlias
+
+            P: TypeAlias = "PathLike[str]"
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn reports_imports_passed_as_strings_to_unknown_callables() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            from collections import OrderedDict
+
+            def cast(typ, val):
+                return val
+
+            def f(x):
+                return cast("OrderedDict", x)
+            "#,
+        )?;
+
+        assert_eq!(names, vec!["OrderedDict"]);
         Ok(())
     }
 
