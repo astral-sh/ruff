@@ -386,6 +386,7 @@ class PolyRing(DefaultPrinting, IPolys[T], Generic[T]):
     symbols: tuple[object, ...]
     domain: Domain[T]
 
+    # error: [invalid-method-override]
     def clone(
         self,
         symbols: object | None = None,

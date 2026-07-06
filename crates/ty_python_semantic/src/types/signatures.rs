@@ -536,7 +536,6 @@ pub(crate) struct SignatureRelationKey<'db> {
     target_definition: Definition<'db>,
     relation: TypeRelation,
     typevar_evaluation: TypeVarEvaluation,
-    universal_target_typevars: bool,
 }
 
 impl<'db> SignatureRelationKey<'db> {
@@ -545,14 +544,12 @@ impl<'db> SignatureRelationKey<'db> {
         target: &Signature<'db>,
         relation: TypeRelation,
         typevar_evaluation: TypeVarEvaluation,
-        universal_target_typevars: bool,
     ) -> Option<Self> {
         Some(Self {
             source_definition: source.definition?,
             target_definition: target.definition?,
             relation,
             typevar_evaluation,
-            universal_target_typevars,
         })
     }
 }
@@ -1748,9 +1745,26 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let target_binds_typevars = target
-            .generic_context
-            .is_some_and(|context| context.variables(db).next().is_some());
+        self.check_signature_pair_impl(db, source, target, false)
+    }
+
+    /// Check two generic signatures using the established inference relation.
+    fn check_signature_pair_with_inferred_typevars(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.check_signature_pair_impl(db, source, target, true)
+    }
+
+    fn check_signature_pair_impl(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+        infer_target_typevars: bool,
+    ) -> ConstraintSet<'db, 'c> {
         // Freshen callable-local typevars so same-source typevars in the two signatures do not
         // collide. The relation below decides which fresh variables are inferable.
         let freshened_source;
@@ -1778,12 +1792,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target
         };
         let unaligned_source = source;
-        let nested_checker = self.without_universal_callable_target_typevars();
 
         // Positional alpha-renaming is a common fast path and avoids forcing recursive protocol
         // members while their interfaces are still being inferred.
-        let aligned_source = self
-            .universal_callable_target_typevars
+        let aligned_source = (!infer_target_typevars)
             .then(|| source.generic_context.zip(target.generic_context))
             .flatten()
             .and_then(|(source_context, target_context)| {
@@ -1819,7 +1831,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             .require_bound_or_constraints(db)
                             .as_type(db)
                             .apply_specialization(db, specialization);
-                        nested_checker.check_type_pair(db, target_domain, source_domain)
+                        self.check_type_pair(db, target_domain, source_domain)
                     },
                 );
                 Some((
@@ -1833,7 +1845,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Variables bound directly by the target signature are universal. Other variables pulled
         // into its inferable set through bounds or specializations belong to the surrounding
         // inference context and remain inferable.
-        let target_inferable = if self.universal_callable_target_typevars && target_binds_typevars {
+        let target_inferable = if infer_target_typevars {
+            target.inferable_typevars(db)
+        } else {
             InferableTypeVars::from_typevars(
                 db,
                 target
@@ -1846,17 +1860,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     })
                     .collect::<FxOrderSet<_>>(),
             )
-        } else {
-            target.inferable_typevars(db)
         };
         let inferable = source_inferable.merge(db, target_inferable);
         let inferable = self.inferable.merge(db, inferable);
 
         // `inner` will create a constraint set that references these newly inferable typevars.
         let checker = self.with_inferable_typevars(inferable);
-        let nested_checker = checker.without_universal_callable_target_typevars();
         let when = checker.with_signature_recursion_guard(source, target, || {
-            nested_checker.check_signature_pair_inner(db, source, target)
+            checker.check_signature_pair_inner(db, source, target)
         });
 
         // But the caller does not need to consider those extra typevars. Whatever constraint set
@@ -1868,7 +1879,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.constraints,
             source_inferable.iter(db).chain(target_inferable.iter(db)),
         );
-        if !self.universal_callable_target_typevars {
+        if infer_target_typevars {
             return when;
         }
         if unaligned_source.generic_context.is_none() || target.generic_context.is_none() {
@@ -1890,8 +1901,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         } else {
             positional.or(db, self.constraints, || {
                 self.without_context_collection(|| {
-                    self.without_universal_callable_target_typevars()
-                        .check_signature_pair(db, unaligned_source, target)
+                    self.check_signature_pair_with_inferred_typevars(db, unaligned_source, target)
                 })
             })
         }
@@ -1908,7 +1918,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target,
             self.relation,
             self.typevar_evaluation,
-            self.universal_callable_target_typevars,
         ) else {
             return work();
         };

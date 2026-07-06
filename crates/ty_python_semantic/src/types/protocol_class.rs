@@ -1405,12 +1405,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             attribute_type
                 .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(self.relation))
                 .when_some_and(db, self.constraints, |callables| {
-                    self.with_universal_callable_target_typevars()
-                        .check_callables_vs_callable(
-                            db,
-                            &callables.map(|callable| callable.apply_self(db, fallback_ty)),
-                            required_callable.apply_self(db, fallback_ty),
-                        )
+                    self.check_callables_vs_callable(
+                        db,
+                        &callables.map(|callable| callable.apply_self(db, fallback_ty)),
+                        required_callable.apply_self(db, fallback_ty),
+                    )
                 })
         } else if member.is_method() {
             let Some(required_ty) = required_ty.resolve(db) else {
@@ -1422,16 +1421,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             attribute_type
                 .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(self.relation))
                 .when_some_and(db, self.constraints, |callables| {
-                    let checker = self.with_universal_callable_target_typevars();
                     callables.iter().when_all(db, self.constraints, |callable| {
                         if callable.is_function_like(db) {
-                            checker.check_callable_pair(
+                            self.check_callable_pair(
                                 db,
                                 callable.bind_self(db, Some(fallback_ty)),
                                 protocol_bind_self(db, required_callable, Some(fallback_ty)),
                             )
                         } else {
-                            checker.check_callable_pair(db, *callable, required_callable)
+                            self.check_callable_pair(db, *callable, required_callable)
                         }
                     })
                 })
@@ -1623,12 +1621,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 ) else {
                     return self.never();
                 };
-                if source_member.is_method() && target_member.is_method() {
-                    self.with_universal_callable_target_typevars()
-                        .check_type_pair(db, source, target)
-                } else {
-                    self.check_type_pair(db, source, target)
-                }
+                self.check_type_pair(db, source, target)
             }
         };
 
