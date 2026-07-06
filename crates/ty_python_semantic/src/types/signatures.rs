@@ -520,6 +520,7 @@ pub(crate) struct SignatureRelationKey<'db> {
     target_definition: Definition<'db>,
     relation: TypeRelation,
     typevar_evaluation: TypeVarEvaluation,
+    universal_target_typevars: bool,
 }
 
 impl<'db> SignatureRelationKey<'db> {
@@ -528,12 +529,14 @@ impl<'db> SignatureRelationKey<'db> {
         target: &Signature<'db>,
         relation: TypeRelation,
         typevar_evaluation: TypeVarEvaluation,
+        universal_target_typevars: bool,
     ) -> Option<Self> {
         Some(Self {
             source_definition: source.definition?,
             target_definition: target.definition?,
             relation,
             typevar_evaluation,
+            universal_target_typevars,
         })
     }
 }
@@ -1724,10 +1727,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        // If either signature is generic, freshen that signature's typevars before considering
-        // them inferable for this relation. The relation only needs to find one specialization of
-        // each generic callable that causes the check to succeed, but those callable-local
-        // specializations must not collide with any same-source typevars in the other signature.
+        let target_binds_typevars = target
+            .generic_context
+            .is_some_and(|context| context.variables(db).next().is_some());
+        // Freshen callable-local typevars so same-source typevars in the two signatures do not
+        // collide. The relation below decides which fresh variables are inferable.
         let freshened_source;
         let source = if source.generic_context != target.generic_context
             && let Some(generic_context) = source.generic_context
@@ -1752,27 +1756,100 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         } else {
             target
         };
+        let nested_checker = self.without_universal_callable_target_typevars();
+
+        // A generic source can be specialized for each target specialization. Align equivalent
+        // generic contexts positionally, while requiring the source domain to cover the target
+        // domain.
+        let aligned_source = self
+            .universal_callable_target_typevars
+            .then(|| source.generic_context.zip(target.generic_context))
+            .flatten()
+            .and_then(|(source_context, target_context)| {
+                let source_typevars = source_context.variables(db).collect::<Vec<_>>();
+                let target_typevars = target_context.variables(db).collect::<Vec<_>>();
+                if source_typevars.len() != target_typevars.len()
+                    || source_typevars
+                        .iter()
+                        .zip(&target_typevars)
+                        .any(|(source, target)| source.is_paramspec(db) != target.is_paramspec(db))
+                {
+                    return None;
+                }
+
+                let specialization = source_context.specialize(
+                    db,
+                    target_typevars
+                        .iter()
+                        .copied()
+                        .map(Type::TypeVar)
+                        .collect::<Vec<_>>(),
+                );
+                let generic_context_check = target_typevars.iter().zip(&source_typevars).when_all(
+                    db,
+                    self.constraints,
+                    |(target, source)| {
+                        let target_domain = target
+                            .typevar(db)
+                            .require_bound_or_constraints(db)
+                            .as_type(db);
+                        let source_domain = source
+                            .typevar(db)
+                            .require_bound_or_constraints(db)
+                            .as_type(db)
+                            .apply_specialization(db, specialization);
+                        nested_checker.check_type_pair(db, target_domain, source_domain)
+                    },
+                );
+                Some((
+                    source.apply_specialization(db, specialization),
+                    generic_context_check,
+                ))
+            });
+        let source = aligned_source.as_ref().map_or(source, |(source, _)| source);
 
         let source_inferable = source.inferable_typevars(db);
-        let target_inferable = target.inferable_typevars(db);
+        // Variables bound directly by the target signature are universal. Other variables pulled
+        // into its inferable set through bounds or specializations belong to the surrounding
+        // inference context and remain inferable.
+        let target_inferable = if self.universal_callable_target_typevars && target_binds_typevars {
+            InferableTypeVars::from_typevars(
+                db,
+                target
+                    .inferable_typevars(db)
+                    .iter(db)
+                    .filter(|typevar| {
+                        target
+                            .generic_context
+                            .is_none_or(|context| !context.contains(db, *typevar))
+                    })
+                    .collect::<FxOrderSet<_>>(),
+            )
+        } else {
+            target.inferable_typevars(db)
+        };
         let inferable = source_inferable.merge(db, target_inferable);
         let inferable = self.inferable.merge(db, inferable);
 
         // `inner` will create a constraint set that references these newly inferable typevars.
         let checker = self.with_inferable_typevars(inferable);
+        let nested_checker = checker.without_universal_callable_target_typevars();
         let when = checker.with_signature_recursion_guard(source, target, || {
-            checker.check_signature_pair_inner(db, source, target)
+            nested_checker.check_signature_pair_inner(db, source, target)
         });
 
         // But the caller does not need to consider those extra typevars. Whatever constraint set
         // we produce, we reduce it back down to the inferable set that the caller asked about.
         // If we introduced new inferable typevars, those will be existentially quantified away
         // before returning.
-        when.reduce_inferable(
+        let when = when.reduce_inferable(
             db,
             self.constraints,
             source_inferable.iter(db).chain(target_inferable.iter(db)),
-        )
+        );
+        aligned_source.map_or(when, |(_, generic_context_check)| {
+            generic_context_check.and(db, self.constraints, || when)
+        })
     }
 
     fn with_signature_recursion_guard(
@@ -1786,6 +1863,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target,
             self.relation,
             self.typevar_evaluation,
+            self.universal_callable_target_typevars,
         ) else {
             return work();
         };

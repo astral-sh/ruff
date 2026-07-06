@@ -345,6 +345,7 @@ impl<'db> Type<'db> {
             inferable,
             relation: TypeRelation::SubtypingAssuming,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            universal_callable_target_typevars: false,
             context_tree: None,
             given: assuming,
             relation_visitor: &relation_visitor,
@@ -382,6 +383,7 @@ impl<'db> Type<'db> {
             inferable: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            universal_callable_target_typevars: false,
             context_tree: Some(ErrorContextTree::new()),
             given: ConstraintSet::from_bool(&builder, false),
             relation_visitor: &HasRelationToVisitor::default(&builder),
@@ -586,6 +588,7 @@ impl<'db> Type<'db> {
             inferable,
             relation,
             typevar_evaluation,
+            universal_callable_target_typevars: false,
             context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor: &relation_visitor,
@@ -741,6 +744,12 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) inferable: InferableTypeVars<'db>,
     pub(super) relation: TypeRelation,
     pub(super) typevar_evaluation: TypeVarEvaluation,
+    /// Treat type variables bound by a target callable as universally quantified.
+    ///
+    /// This is enabled while checking a protocol method implementation, which must support every
+    /// specialization exposed by the protocol method. It is consumed by the outer signature pair
+    /// so nested callable types use their ordinary relation rules.
+    pub(super) universal_callable_target_typevars: bool,
     context_tree: Option<ErrorContextTree<'db>>,
     pub(super) given: ConstraintSet<'db, 'c>,
 
@@ -770,6 +779,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable,
             relation: TypeRelation::Subtyping,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            universal_callable_target_typevars: false,
             context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
@@ -791,6 +801,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
+            universal_callable_target_typevars: false,
             context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
@@ -812,6 +823,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
+            universal_callable_target_typevars: false,
             context_tree: Some(ErrorContextTree::new()),
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
@@ -833,6 +845,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            universal_callable_target_typevars: false,
             context_tree: Some(ErrorContextTree::new()),
             given: ConstraintSet::from_bool(constraints, false),
             relation_visitor,
@@ -845,6 +858,21 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     pub(super) fn with_inferable_typevars(&self, inferable: InferableTypeVars<'db>) -> Self {
         Self {
             inferable,
+            ..self.clone()
+        }
+    }
+
+    /// Return a checker that requires callable sources to support every target specialization.
+    pub(super) fn with_universal_callable_target_typevars(&self) -> Self {
+        Self {
+            universal_callable_target_typevars: true,
+            ..self.clone()
+        }
+    }
+
+    pub(super) fn without_universal_callable_target_typevars(&self) -> Self {
+        Self {
+            universal_callable_target_typevars: false,
             ..self.clone()
         }
     }
@@ -2362,6 +2390,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
         TypeRelationChecker {
             relation: TypeRelation::Redundancy { pure: true },
             typevar_evaluation: TypeVarEvaluation::Eager,
+            universal_callable_target_typevars: false,
             constraints: self.constraints,
             context_tree: None,
             given: self.given,
@@ -2447,6 +2476,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         TypeRelationChecker {
             relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            universal_callable_target_typevars: false,
             constraints: self.constraints,
             inferable: self.inferable,
             context_tree: None,
