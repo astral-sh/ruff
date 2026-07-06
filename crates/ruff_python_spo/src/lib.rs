@@ -209,6 +209,7 @@ fn build_graph(classes: &[RawClass], namespace: &str) -> ModelGraph {
                         inverse_name: f.inverse_name.clone(),
                         relation_kind: f.relation_kind.clone(),
                         field_type: f.field_type.clone(),
+                        not_null: None,
                     })
                     .collect(),
                 functions: methods
@@ -552,7 +553,7 @@ class FooExt(models.Model):
     }
 
     #[test]
-    fn unparseable_source_yields_empty_graph() {
+    fn unparsable_source_yields_empty_graph() {
         let graph = extract_from_source("class Broken(:  # not valid python\n");
         assert!(graph.models.is_empty());
     }

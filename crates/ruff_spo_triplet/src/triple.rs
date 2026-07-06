@@ -442,6 +442,22 @@ pub enum Predicate {
     /// IRI), emitted verbatim like [`Self::Target`]: the receiver is
     /// heuristically resolved, so the default tier is `Inferred`.
     Calls,
+
+    // ───── Schema-stratum extension (D-AR-3.5: migration-DSL columns) ─────
+    //
+    // Physical DB columns extracted from the Rails migration DSL
+    // (`db/migrate/tables/*.rb` squashed baseline). The WorkPackage oracle
+    // diff (op-nexgen `RESIDUAL-THREE-BUCKETS.md` §4c) measured that ~90%
+    // of a hand-written model struct derives from this stratum alone; the
+    // declared type reuses [`Self::FieldType`], so nullability is the one
+    // fact the vocabulary lacked.
+    /// `(model.field, column_not_null, "true")` — the column carries a
+    /// `null: false` constraint in the migration DSL. Emitted ONLY for
+    /// NOT NULL columns; absence means nullable (the Rails default).
+    /// Authoritative: the constraint is a machine-readable DSL literal.
+    /// Downstream this is the `required` axis of `DEFINE FIELD` — NOT
+    /// NULL emits `TYPE <t>`, nullable emits `TYPE option<t>`.
+    ColumnNotNull,
 }
 
 impl Predicate {
@@ -516,6 +532,8 @@ impl Predicate {
             // Body-mutation extension
             Self::WritesField => "writes_field",
             Self::Calls => "calls",
+            // Schema-stratum extension
+            Self::ColumnNotNull => "column_not_null",
         }
     }
 
@@ -596,6 +614,8 @@ impl Predicate {
             // Body-mutation extension
             "writes_field" => Self::WritesField,
             "calls" => Self::Calls,
+            // Schema-stratum extension
+            "column_not_null" => Self::ColumnNotNull,
             _ => return None,
         })
     }
@@ -676,6 +696,7 @@ impl Predicate {
         // Body-mutation extension
         Self::WritesField,
         Self::Calls,
+        Self::ColumnNotNull,
     ];
 
     /// The default provenance tier for this predicate, per the Odoo
@@ -769,6 +790,9 @@ impl Predicate {
             | Self::ClassName
             | Self::ValidationKind
             | Self::ValidationParam => Provenance::OpenProjectExtracted,
+            // Schema-stratum extension: the constraint is a machine-readable
+            // migration-DSL literal — same certainty tier as `writes_field`.
+            Self::ColumnNotNull => Provenance::Authoritative,
         }
     }
 }
@@ -881,7 +905,7 @@ mod tests {
     }
 
     #[test]
-    fn predicate_count_locked_at_62() {
+    fn predicate_count_locked_at_63() {
         // The exact count is part of the schema contract: 7 core (Odoo
         // Python) + 32 OpenProject AR-shape (PR #15 added
         // `association_kind`; #18 added `class_name`; #21 added
@@ -893,10 +917,13 @@ mod tests {
         // + 2 body-mutation (`writes_field` / `calls` — the command-shape
         // counterpart of `reads_field` / `traverses_relation`, capturing
         // self-field writes and lifecycle-mutator dispatches so the body-pass
-        // triage can split query from command) = 62. Council review of any
+        // triage can split query from command)
+        // + 1 schema-stratum (`column_not_null` — the D-AR-3.5 migration-DSL
+        // column constraint; the declared type reuses `field_type`, so
+        // nullability was the one missing fact) = 63. Council review of any
         // new variant means this number changes — the test must change with
         // the source.
-        assert_eq!(Predicate::ALL.len(), 62);
+        assert_eq!(Predicate::ALL.len(), 63);
     }
 
     #[test]

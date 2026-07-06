@@ -222,6 +222,17 @@ impl Expander {
                     Provenance::Authoritative,
                 );
             }
+            // Schema stratum (D-AR-3.5): a `null: false` column constraint
+            // from the migration DSL. Only the positive fact is emitted —
+            // absence means nullable (the Rails default).
+            if field.not_null == Some(true) {
+                self.push(
+                    field_iri.clone(),
+                    Predicate::ColumnNotNull,
+                    "true".to_string(),
+                    Provenance::Authoritative,
+                );
+            }
         }
 
         // 3 + 6 + 7 + 8. functions

@@ -40,8 +40,12 @@ everything above it is the per-language frontend.
 
 ## 2. The triple schema (closed vocabulary)
 
-Nine triple forms over seven predicates. `ns` is the namespace prefix you
-choose for the source app (`odoo`, `openproject`, …).
+Eleven triple forms over nine predicates shown below — this is the
+foundational cross-language subset; `Predicate::ALL` in `src/triple.rs`
+is the full enumeration (63, including the C++- and Rails-specific
+extensions), and is the source of truth for the complete vocabulary.
+`ns` is the namespace prefix you choose for the source app (`odoo`,
+`openproject`, …).
 
 | predicate            | subject            | object             | provenance     | meaning |
 | ---                  | ---                | ---                | ---            | --- |
@@ -54,6 +58,8 @@ choose for the source app (`odoo`, `openproject`, …).
 | `reads_field`        | `ns:model.fn`      | `ns:model.field`   | Inferred       | method body reads field |
 | `raises`             | `ns:model.fn`      | `exc:<Type>`       | Authoritative  | method raises error |
 | `traverses_relation` | `ns:model.fn`      | `ns:model.<rel>`   | Inferred       | method walks relation |
+| `inherits_from`      | `ns:model`         | `ns:parent`        | CppExtracted (C++ base) / OpenProjectExtracted (Rails STI) | model inherits from a base/parent |
+| `column_not_null`    | `ns:model.field`   | `"true"`           | Authoritative  | schema-declared `NOT NULL` constraint on the column (D-AR-3.5 schema stratum) |
 
 **IRI shape.** Subjects and objects are `"<ns>:<model>.<member>"`. The
 single dot separates model from member; dotted *dependency paths*

@@ -3684,6 +3684,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruff_sqlalchemy_spo"
+version = "0.1.0"
+dependencies = [
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_spo_triplet",
+]
+
+[[package]]
 name = "ruff_text_size"
 version = "0.0.0"
 dependencies = [
