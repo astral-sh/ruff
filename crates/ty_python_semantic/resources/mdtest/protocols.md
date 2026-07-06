@@ -2697,7 +2697,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Callable, final
+from typing import Callable, Literal, final
 from typing_extensions import TypeVar, Self, Protocol
 from ty_extensions import is_equivalent_to, static_assert, is_assignable_to, is_subtype_of
 
@@ -2798,6 +2798,13 @@ class NominalIntCallback:
     def m(self, item: int, callback: Callable[[int], str]) -> str:
         return callback(item)
 
+class SingletonBounded(Protocol):
+    def f[T: Literal[1]](self, input: T) -> T: ...
+
+class NominalSingleton:
+    def f(self, input: Literal[1]) -> Literal[1]:
+        return input
+
 class NominalReturningSelfNotGeneric:
     def g(self) -> "NominalReturningSelfNotGeneric":
         return self
@@ -2836,6 +2843,9 @@ static_assert(is_assignable_to(NominalAcceptsObject, GenericReturnsObject))
 
 static_assert(not is_subtype_of(NominalIntCallback, GenericCallback))
 static_assert(not is_assignable_to(NominalIntCallback, GenericCallback))
+
+static_assert(is_subtype_of(NominalSingleton, SingletonBounded))
+static_assert(is_assignable_to(NominalSingleton, SingletonBounded))
 
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, LegacyFunctionScoped))

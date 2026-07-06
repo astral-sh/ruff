@@ -22,8 +22,8 @@ use crate::{
         place_from_declarations,
     },
     types::{
-        ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ClassBase,
-        ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
+        ApplySpecialization, ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance,
+        CallableType, ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
         InstanceFallbackShadowsNonDataDescriptor, KnownFunction, MemberLookupPolicy,
         PropertyInstanceType, ProtocolInstanceType, SelfBinding, StaticClassLiteral, Type,
         TypeMapping, TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable,
@@ -1986,8 +1986,10 @@ fn protocol_bind_self<'db>(
 /// is monomorphic.
 ///
 /// A monomorphic implementation must support every specialization promised by the protocol
-/// method. Removing the target's generic context keeps its type variables in the signature but
-/// prevents callable matching from choosing a single convenient specialization for them.
+/// method. First, type variables with single-valued upper bounds are replaced by those bounds,
+/// because every specialization has the same runtime value. Removing the remaining generic
+/// context keeps its type variables in the signature but prevents callable matching from choosing
+/// a single convenient specialization for them.
 fn rigidify_generic_protocol_target_for_monomorphic_source<'db>(
     db: &'db dyn Db,
     source: CallableType<'db>,
@@ -2011,6 +2013,26 @@ fn rigidify_generic_protocol_target_for_monomorphic_source<'db>(
         db,
         CallableSignature::from_overloads(target.signatures(db).iter().map(|signature| {
             let mut signature = signature.clone();
+            let singleton_typevars = signature
+                .generic_context
+                .into_iter()
+                .flat_map(|context| context.variables(db))
+                .filter_map(|typevar| {
+                    typevar
+                        .typevar(db)
+                        .upper_bound(db)
+                        .filter(|bound| bound.is_single_valued(db))
+                        .map(|bound| (typevar, bound))
+                })
+                .collect::<Vec<_>>();
+            for (typevar, bound) in singleton_typevars {
+                signature = signature.apply_type_mapping_impl(
+                    db,
+                    &TypeMapping::ApplySpecialization(ApplySpecialization::Single(typevar, bound)),
+                    TypeContext::default(),
+                    &ApplyTypeMappingVisitor::default(),
+                );
+            }
             signature.generic_context = None;
             signature
         })),
