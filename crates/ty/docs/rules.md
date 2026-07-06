@@ -775,6 +775,7 @@ assigned a value in their scope.
 A `Final` symbol must be initialized with a value at the time of declaration
 or in a subsequent assignment. At module or function scope, the assignment must
 occur in the same scope. In a class body, the assignment may occur in `__init__`.
+Protocol members are declarations of an interface and do not require a value.
 
 **Examples**
 
@@ -4202,8 +4203,8 @@ Checks for redundant combinations of the `ClassVar` and `Final` type qualifiers.
 An attribute that is marked `Final` in a class body is implicitly a class variable.
 Marking it as `ClassVar` is therefore redundant.
 
-Note that this diagnostic is not emitted for dataclass fields, where
-`ClassVar[Final[int]]` has a distinct meaning from `Final[int]`.
+Note that this diagnostic is not emitted for dataclass fields or protocol members,
+where `ClassVar[Final[int]]` has a distinct meaning from `Final[int]`.
 
 **Examples**
 

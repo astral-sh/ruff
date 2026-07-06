@@ -488,8 +488,6 @@ If users want to read/write to attributes such as `__qualname__`, they need to c
 of the attribute first:
 
 ```py
-from inspect import getattr_static
-
 def f_okay(c: Callable[[], None]):
     if hasattr(c, "__qualname__"):
         reveal_type(c.__qualname__)  # revealed: object
@@ -503,10 +501,14 @@ def f_okay(c: Callable[[], None]):
         # error: [invalid-assignment] "Object of type `Literal["my_callable"]` is not assignable to attribute `__qualname__` on type `(() -> None) & <Protocol with members '__qualname__'>`"
         c.__qualname__ = "my_callable"
 
-        result = getattr_static(c, "__qualname__")
-        reveal_type(result)  # revealed: property
-        if isinstance(result, property) and result.fset:
-            c.__qualname__ = "my_callable"  # okay
+        # TODO: should we have some way for users to narrow a read-only attribute
+        # into a writable attribute...? What would that look like? Something like this?
+        if (
+            hasattr(type(c), "__qualname__")
+            and isinstance(type(c).__qualname__, property)
+            and type(c).__qualname__.fset is not None
+        ):
+            c.__qualname__ = "my_callable"  # error: [invalid-assignment]
 ```
 
 ## From a class
