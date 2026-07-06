@@ -3225,6 +3225,49 @@ static_assert(not is_assignable_to(BadReturnType, ShapeProtocolImplicitSelf))
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolExplicitSelf))
 ```
 
+## Module objects with static-method protocol members
+
+Module objects implement protocols through their public interface. A module-level function can
+therefore satisfy a static-method member with the same signature.
+
+Here, the ordinary method and the static method both describe a callable `(int) -> str` on the
+protocol value. Combining those protocols in a union must not make the module incompatible,
+including when the other possible value has an unknown type.
+
+`factory.py`:
+
+```py
+size: int = 1
+
+def make(value: int) -> str:
+    return str(value)
+```
+
+`main.py`:
+
+```py
+from typing import Protocol
+from ty_extensions import Unknown
+
+import factory
+
+class FactoryObject(Protocol):
+    size: int
+    def make(self, value: int) -> str: ...
+
+class FactoryModule(Protocol):
+    size: int
+
+    @staticmethod
+    def make(value: int) -> str: ...
+
+factory_protocol: FactoryModule = factory
+
+def from_gradual_value(value: Unknown, condition: bool) -> FactoryObject | FactoryModule:
+    candidate = factory if condition else value
+    return candidate
+```
+
 ## Subtyping of protocols with `@classmethod` or `@staticmethod` members
 
 The typing specification permits protocols to declare class and static methods, but it does not

@@ -1021,6 +1021,35 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         self.data.capabilities(db)
     }
 
+    /// Returns the accesses that a candidate value must provide for this member.
+    ///
+    /// A module-level callable can satisfy an ordinary or static method through direct member
+    /// access. The member does not also need to exist on `ModuleType`.
+    fn implementation_capabilities(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> ProtocolMemberCapabilities<'db> {
+        let capabilities = self.capabilities(db);
+        if matches!(
+            (ty, self.data.kind),
+            (
+                Type::ModuleLiteral(_),
+                ProtocolMemberKind::Method(
+                    _,
+                    ProtocolMethodKind::Instance | ProtocolMethodKind::Static
+                )
+            )
+        ) {
+            ProtocolMemberCapabilities {
+                class: ProtocolMemberAccess::NONE,
+                ..capabilities
+            }
+        } else {
+            capabilities
+        }
+    }
+
     fn has_todo_type(&self) -> bool {
         self.data
             .kind
@@ -1190,7 +1219,10 @@ fn protocol_member_read_type<'db>(
         return Some(ty);
     }
 
-    let place = if access == ProtocolMemberAccessMode::Instance && member.is_instance_method() {
+    let place = if access == ProtocolMemberAccessMode::Instance
+        && member.is_instance_method()
+        && !matches!(ty, Type::ModuleLiteral(_))
+    {
         ty.invoke_descriptor_protocol(
             db,
             ty,
@@ -1625,7 +1657,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         required: ProtocolMemberAccess<'db>,
         access: ProtocolMemberAccessMode,
     ) -> ConstraintSet<'db, 'c> {
-        if access == ProtocolMemberAccessMode::Class && member.is_instance_method() {
+        if access == ProtocolMemberAccessMode::Class
+            && member.is_instance_method()
+            && required.read.is_some()
+        {
             // The instance-side check is authoritative for the signature of a method
             // implementation. Class access only establishes that the member is present. Callable
             // types and several callable literal forms do not expose a useful `__call__` member
@@ -1691,7 +1726,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ty: Type<'db>,
         member: &ProtocolMember<'_, 'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let capabilities = member.capabilities(db);
+        let capabilities = member.implementation_capabilities(db, ty);
         if let Some(context) = self.report_context() {
             let instance_read_missing = capabilities.instance.read.is_some()
                 && protocol_member_read_type(
