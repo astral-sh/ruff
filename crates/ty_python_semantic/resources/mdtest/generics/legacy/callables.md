@@ -366,6 +366,52 @@ reveal_type(partial(partial, drop)(1)("x"))  # revealed: Unknown
 reveal_type(partial(partial, drop)("x")(1))  # revealed: Unknown
 ```
 
+## ParamSpec substitution preserves non-gradual variadic parameters
+
+Specializing variadic parameter types to `Any` does not make the parameter list gradual when it is
+substituted for a `ParamSpec`:
+
+```py
+from typing import Any, Callable, Generic, ParamSpec, TypeVar
+from ty_extensions import TypeOf, is_subtype_of, static_assert
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+class C(Generic[T]):
+    def method(self, *args: T, **kwargs: T) -> None: ...
+
+def identity(callback: Callable[P, None]) -> Callable[P, None]:
+    return callback
+
+callback = identity(C[Any]().method)
+reveal_type(callback)  # revealed: (*args: Any, **kwargs: Any) -> None
+static_assert(is_subtype_of(TypeOf[callback], Callable[[], None]))
+```
+
+## ParamSpec inference preserves non-gradual residual parameters
+
+Removing a `Concatenate` prefix while inferring a `ParamSpec` also preserves whether the remaining
+parameters are gradual:
+
+```py
+from typing import Any, Callable, Concatenate, Generic, ParamSpec, TypeVar
+from ty_extensions import TypeOf, is_subtype_of, static_assert
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+class C(Generic[T]):
+    def method(self, first: int, *args: T, **kwargs: T) -> None: ...
+
+def strip_first(callback: Callable[Concatenate[int, P], None]) -> Callable[P, None]:
+    raise NotImplementedError
+
+callback = strip_first(C[Any]().method)
+reveal_type(callback)  # revealed: (*args: Any, **kwargs: Any) -> None
+static_assert(is_subtype_of(TypeOf[callback], Callable[[], None]))
+```
+
 ## SymPy one-import MRE scaffold (multi-file)
 
 Reduced regression lock for a SymPy overload/protocol shape that can panic in the

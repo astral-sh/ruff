@@ -1194,10 +1194,9 @@ impl<'db> StaticClassLiteral<'db> {
                 .get(name)
             {
                 let property_getter_signature = Signature::new(
-                    Parameters::from_annotation(
-                        db,
-                        [Parameter::positional_only(Some(Name::new_static("self")))],
-                    ),
+                    Parameters::standard([Parameter::positional_only(Some(Name::new_static(
+                        "self",
+                    )))]),
                     field.declared_ty,
                 );
                 let property_getter = Type::single_callable(db, property_getter_signature);
@@ -1473,10 +1472,10 @@ impl<'db> StaticClassLiteral<'db> {
             let signature = match name {
                 "__new__" | "__init__" => Signature::new_generic(
                     inherited_generic_context.or_else(|| self.inherited_generic_context(db)),
-                    Parameters::from_annotation(db, parameters),
+                    Parameters::standard(parameters),
                     return_ty,
                 ),
-                _ => Signature::new(Parameters::from_annotation(db, parameters), return_ty),
+                _ => Signature::new(Parameters::standard(parameters), return_ty),
             };
             Some(Type::function_like_callable(db, signature))
         };
@@ -1545,17 +1544,14 @@ impl<'db> StaticClassLiteral<'db> {
                 }
 
                 let signature = Signature::new(
-                    Parameters::from_annotation(
-                        db,
-                        [
-                            Parameter::positional_or_keyword(Name::new_static("self"))
-                                // TODO: could be `Self`.
-                                .with_annotated_type(instance_ty),
-                            Parameter::positional_or_keyword(Name::new_static("other"))
-                                // TODO: could be `Self`.
-                                .with_annotated_type(instance_ty),
-                        ],
-                    ),
+                    Parameters::standard([
+                        Parameter::positional_or_keyword(Name::new_static("self"))
+                            // TODO: could be `Self`.
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_or_keyword(Name::new_static("other"))
+                            // TODO: could be `Self`.
+                            .with_annotated_type(instance_ty),
+                    ]),
                     KnownClass::Bool.to_instance(db),
                 );
 
@@ -1569,11 +1565,10 @@ impl<'db> StaticClassLiteral<'db> {
 
                 if unsafe_hash || (frozen && eq) {
                     let signature = Signature::new(
-                        Parameters::from_annotation(
-                            db,
-                            [Parameter::positional_or_keyword(Name::new_static("self"))
-                                .with_annotated_type(instance_ty)],
-                        ),
+                        Parameters::standard([Parameter::positional_or_keyword(Name::new_static(
+                            "self",
+                        ))
+                        .with_annotated_type(instance_ty)]),
                         KnownClass::Int.to_instance(db),
                     );
 
@@ -1660,15 +1655,12 @@ impl<'db> StaticClassLiteral<'db> {
             (CodeGeneratorKind::DataclassLike(_), "__setattr__") => {
                 if self.is_frozen_dataclass(db) == Some(true) {
                     let signature = Signature::new(
-                        Parameters::from_annotation(
-                            db,
-                            [
-                                Parameter::positional_or_keyword(Name::new_static("self"))
-                                    .with_annotated_type(instance_ty),
-                                Parameter::positional_or_keyword(Name::new_static("name")),
-                                Parameter::positional_or_keyword(Name::new_static("value")),
-                            ],
-                        ),
+                        Parameters::standard([
+                            Parameter::positional_or_keyword(Name::new_static("self"))
+                                .with_annotated_type(instance_ty),
+                            Parameter::positional_or_keyword(Name::new_static("name")),
+                            Parameter::positional_or_keyword(Name::new_static("value")),
+                        ]),
                         Type::Never,
                     );
 
@@ -1719,16 +1711,13 @@ impl<'db> StaticClassLiteral<'db> {
             Type::instance(db, self.apply_optional_specialization(db, specialization));
         let setattr_signature = |name_ty, return_ty| {
             Signature::new(
-                Parameters::from_annotation(
-                    db,
-                    [
-                        Parameter::positional_or_keyword(Name::new_static("self"))
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_or_keyword(Name::new_static("name"))
-                            .with_annotated_type(name_ty),
-                        Parameter::positional_or_keyword(Name::new_static("value")),
-                    ],
-                ),
+                Parameters::standard([
+                    Parameter::positional_or_keyword(Name::new_static("self"))
+                        .with_annotated_type(instance_ty),
+                    Parameter::positional_or_keyword(Name::new_static("name"))
+                        .with_annotated_type(name_ty),
+                    Parameter::positional_or_keyword(Name::new_static("value")),
+                ]),
                 return_ty,
             )
         };

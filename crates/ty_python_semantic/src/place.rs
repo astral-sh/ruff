@@ -2074,11 +2074,10 @@ pub(crate) mod implicit_globals {
             // if at least one global symbol is annotated in the module.
             "__annotate__" if Program::get(db).python_version(db) >= PythonVersion::PY314 => {
                 let signature = Signature::new(
-                    Parameters::from_annotation(
-                        db,
-                        [Parameter::positional_only(Some(Name::new_static("format")))
-                            .with_annotated_type(KnownClass::Int.to_instance(db))],
-                    ),
+                    Parameters::standard([Parameter::positional_only(Some(Name::new_static(
+                        "format",
+                    )))
+                    .with_annotated_type(KnownClass::Int.to_instance(db))]),
                     KnownClass::Dict.to_specialized_instance(
                         db,
                         &[KnownClass::Str.to_instance(db), Type::any()],

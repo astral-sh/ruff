@@ -1552,14 +1552,13 @@ impl<'db> ClassType<'db> {
         name: &str,
     ) -> Member<'db> {
         fn synthesize_getitem_overload_signature<'db>(
-            db: &'db dyn Db,
             index_annotation: Type<'db>,
             return_annotation: Type<'db>,
         ) -> Signature<'db> {
             let self_parameter = Parameter::positional_only(Some(Name::new_static("self")));
             let index_parameter = Parameter::positional_only(Some(Name::new_static("index")))
                 .with_annotated_type(index_annotation);
-            let parameters = Parameters::from_annotation(db, [self_parameter, index_parameter]);
+            let parameters = Parameters::standard([self_parameter, index_parameter]);
             Signature::new(parameters, return_annotation)
         }
 
@@ -1595,11 +1594,10 @@ impl<'db> ClassType<'db> {
                     .map(Type::int_literal)
                     .unwrap_or_else(|| KnownClass::Int.to_instance(db));
 
-                let parameters = Parameters::from_annotation(
-                    db,
-                    [Parameter::positional_only(Some(Name::new_static("self")))
-                        .with_annotated_type(Type::instance(db, self))],
-                );
+                let parameters = Parameters::standard([Parameter::positional_only(Some(
+                    Name::new_static("self"),
+                ))
+                .with_annotated_type(Type::instance(db, self))]);
 
                 let synthesized_dunder_method =
                     Type::function_like_callable(db, Signature::new(parameters, return_type));
@@ -1732,7 +1730,6 @@ impl<'db> ClassType<'db> {
                                 );
 
                                 Some(synthesize_getitem_overload_signature(
-                                    db,
                                     index_annotation,
                                     return_type,
                                 ))
@@ -1750,7 +1747,6 @@ impl<'db> ClassType<'db> {
                         //    __getitem__(self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[str | float | bytes, ...]
                         //
                         overload_signatures.push(synthesize_getitem_overload_signature(
-                            db,
                             KnownClass::SupportsIndex.to_instance(db),
                             all_elements_unioned,
                         ));
@@ -1760,7 +1756,6 @@ impl<'db> ClassType<'db> {
                             [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
                         );
                         overload_signatures.push(synthesize_getitem_overload_signature(
-                            db,
                             KnownClass::Slice.to_specialized_instance(
                                 db,
                                 &[slice_bound, slice_bound, slice_bound],
@@ -1837,14 +1832,11 @@ impl<'db> ClassType<'db> {
                         iterable_parameter.with_default_type(Type::empty_tuple(db));
                 }
 
-                let parameters = Parameters::from_annotation(
-                    db,
-                    [
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(SubclassOfType::from(db, self)),
-                        iterable_parameter,
-                    ],
-                );
+                let parameters = Parameters::standard([
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(SubclassOfType::from(db, self)),
+                    iterable_parameter,
+                ]);
 
                 let synthesized_dunder = Type::function_like_callable(
                     db,
