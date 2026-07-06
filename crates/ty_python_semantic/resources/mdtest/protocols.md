@@ -3268,6 +3268,10 @@ class NStaticMethodBad:
     def x(cls, val: int) -> str:
         return "foo"
 
+class NStaticMethodShadowed(NStaticMethodGood):
+    def __init__(self) -> None:
+        self.x: int = 1
+
 class PFactory(Protocol):
     @classmethod
     def create(cls) -> Self: ...
@@ -3319,6 +3323,7 @@ static_assert(is_subtype_of(NStaticMethodGood, PStaticMethod))
 static_assert(not is_assignable_to(NStaticMethodBad, PClassMethod))
 static_assert(not is_assignable_to(NStaticMethodBad, PStaticMethod))
 static_assert(not is_assignable_to(NStaticMethodGood | NStaticMethodBad, PStaticMethod))
+static_assert(not is_subtype_of(NStaticMethodShadowed, PStaticMethod))
 
 # `Self` in the classmethod signature is bound to the implementation type.
 static_assert(is_subtype_of(Factory, PFactory))

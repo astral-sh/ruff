@@ -1203,7 +1203,7 @@ fn protocol_member_read_type<'db>(
         return Some(ty);
     }
 
-    let place = if access == ProtocolMemberAccessMode::Instance && member.is_method() {
+    let place = if access == ProtocolMemberAccessMode::Instance && member.is_instance_method() {
         ty.invoke_descriptor_protocol(
             db,
             ty,
