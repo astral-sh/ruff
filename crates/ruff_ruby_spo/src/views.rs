@@ -37,6 +37,25 @@
 //! - **Whitespace between receiver and dot** (`issue .subject`) — Rails
 //!   view code does not write this; treating it as out of scope keeps
 //!   the scanner a single closed-vocab pass over the line.
+//!
+//! # The honest coverage denominator (`ViewFieldSet::referenced`)
+//!
+//! A `coverage = |known| / |referenced|` metric needs the RAW distinct
+//! `<receiver>.<ident>` references as its denominator, not just the
+//! subset that happens to already be in the harvested field vocabulary
+//! — otherwise coverage is trivially `1.0` (every hit counted is, by
+//! construction, a known hit). [`ViewFieldSet::referenced`] is that raw
+//! set: every distinct identifier seen immediately after a *registered*
+//! receiver + `.`, regardless of vocabulary membership.
+//! [`ViewFieldSet::fields`] stays the known subset — `fields ⊆
+//! referenced` always holds (enforced by construction: a candidate is
+//! recorded into `referenced` unconditionally, then additionally into
+//! `fields` when it matches the vocabulary).
+//!
+//! Note: `?` and `!` are not in the ident charset (see [`is_ident_char`]),
+//! so a Ruby predicate/bang method like `issue.persisted?` is captured as
+//! bare `persisted` in `referenced` — this is intentional, not a bug: the
+//! scanner has no notion of "method" vs "field", only identifier text.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -75,6 +94,13 @@ pub struct ViewFieldSet {
     /// names in the harvested field list count (a helper arg like
     /// `format_date(issue.start_date)` still matches `issue.start_date`).
     pub fields: Vec<String>,
+    /// Every distinct identifier referenced immediately after a
+    /// *registered* receiver + `.` — deduped, sorted — REGARDLESS of
+    /// whether the identifier is in the harvested field vocabulary. The
+    /// honest denominator for a `coverage = |fields| / |referenced|`
+    /// metric (see the module doc). `fields` is always a subset of this
+    /// set.
+    pub referenced: Vec<String>,
 }
 
 /// Conservation-ledger totals for a view scan (same discipline as
@@ -83,7 +109,9 @@ pub struct ViewFieldSet {
 pub struct ViewScanReport {
     /// Every `*.erb` file found under the views root.
     pub erb_files: usize,
-    /// Files that produced at least one non-empty [`ViewFieldSet`].
+    /// Files that produced at least one non-empty [`ViewFieldSet`] — a
+    /// known field hit OR a raw `referenced` ident off a registered
+    /// receiver.
     pub views_with_hits: usize,
 }
 
@@ -116,15 +144,20 @@ pub fn extract_view_field_sets_with_report(
         let view = relative_view_path(views_root, path);
         let mut file_had_hit = false;
         for target in targets {
-            let fields = referenced_fields(&content, target);
-            if fields.is_empty() {
+            let (fields, referenced) = referenced_fields(&content, target);
+            if fields.is_empty() && referenced.is_empty() {
                 continue;
             }
+            debug_assert!(
+                fields.iter().all(|f| referenced.contains(f)),
+                "fields must be a subset of referenced: fields={fields:?} referenced={referenced:?}"
+            );
             file_had_hit = true;
             results.push(ViewFieldSet {
                 resource: target.model.clone(),
                 view: view.clone(),
                 fields,
+                referenced,
             });
         }
         if file_had_hit {
@@ -170,31 +203,41 @@ fn relative_view_path(root: &Path, path: &Path) -> String {
         .join("/")
 }
 
-/// The closed-vocab field references in `content` for one [`ViewTarget`]:
-/// every `<receiver>.<field>` where `receiver` is one of `target.receivers`
-/// and `field` is one of `target.fields`. Deduped + sorted.
-fn referenced_fields(content: &str, target: &ViewTarget) -> Vec<String> {
+/// The field references in `content` for one [`ViewTarget`]: every
+/// `<receiver>.<ident>` where `receiver` is one of `target.receivers`.
+/// Returns `(fields, referenced)` — `fields` is the closed-vocab subset
+/// (only `<ident>` values in `target.fields`), `referenced` is every
+/// distinct `<ident>` seen regardless of vocabulary membership. Both
+/// deduped + sorted; `fields` is always a subset of `referenced`.
+fn referenced_fields(content: &str, target: &ViewTarget) -> (Vec<String>, Vec<String>) {
     let mut found = std::collections::BTreeSet::new();
+    let mut referenced = std::collections::BTreeSet::new();
     for line in content.lines() {
         for receiver in &target.receivers {
-            scan_line_for_receiver(line, receiver, &target.fields, &mut found);
+            scan_line_for_receiver(line, receiver, &target.fields, &mut found, &mut referenced);
         }
     }
-    found.into_iter().collect()
+    (
+        found.into_iter().collect(),
+        referenced.into_iter().collect(),
+    )
 }
 
 /// Scan one `line` for occurrences of `receiver` immediately followed by
-/// `.<identifier>`, recording `<identifier>` into `found` when it matches
-/// one of `fields` exactly. `receiver` must sit on a word boundary (the
-/// preceding character, if any, must not itself be an identifier
-/// character) — this rejects `reissue.subject` as a match for receiver
-/// `issue`, and lets `issue` / `@issue` coexist as distinct receivers
-/// without `issue` falsely matching inside `@issue`.
+/// `.<identifier>`. Every such `<identifier>` is recorded into
+/// `referenced` unconditionally; it is ADDITIONALLY recorded into `found`
+/// when it matches one of `fields` exactly (so `found ⊆ referenced` by
+/// construction). `receiver` must sit on a word boundary (the preceding
+/// character, if any, must not itself be an identifier character) — this
+/// rejects `reissue.subject` as a match for receiver `issue`, and lets
+/// `issue` / `@issue` coexist as distinct receivers without `issue`
+/// falsely matching inside `@issue`.
 fn scan_line_for_receiver(
     line: &str,
     receiver: &str,
     fields: &[String],
     found: &mut std::collections::BTreeSet<String>,
+    referenced: &mut std::collections::BTreeSet<String>,
 ) {
     if receiver.is_empty() {
         return;
@@ -224,6 +267,7 @@ fn scan_line_for_receiver(
             continue;
         }
         let candidate: String = chars[field_start..field_end].iter().collect();
+        referenced.insert(candidate.clone());
         if fields.iter().any(|f| f == &candidate) {
             found.insert(candidate);
         }
@@ -280,6 +324,7 @@ mod tests {
         assert_eq!(sets[0].resource, "Issue");
         assert_eq!(sets[0].view, "issues/show.html.erb");
         assert_eq!(sets[0].fields, vec!["subject".to_string()]);
+        assert_eq!(sets[0].referenced, vec!["subject".to_string()]);
 
         let _ = fs::remove_dir_all(&root);
     }
@@ -294,6 +339,7 @@ mod tests {
         let sets = extract_view_field_sets(&root, &[issue_target()]);
         assert_eq!(sets.len(), 1);
         assert_eq!(sets[0].fields, vec!["subject".to_string()]);
+        assert_eq!(sets[0].referenced, vec!["subject".to_string()]);
 
         let _ = fs::remove_dir_all(&root);
     }
@@ -312,21 +358,28 @@ mod tests {
         let sets = extract_view_field_sets(&root, &[issue_target()]);
         assert_eq!(sets.len(), 1);
         assert_eq!(sets[0].fields, vec!["start_date".to_string()]);
+        assert_eq!(sets[0].referenced, vec!["start_date".to_string()]);
 
         let _ = fs::remove_dir_all(&root);
     }
 
-    /// (d) A field NOT in the closed vocabulary must not be captured.
+    /// (d) A field NOT in the closed vocabulary must not land in `fields`
+    /// — but it IS captured in `referenced`, the raw honest-denominator
+    /// set (§ module doc): a registered-receiver reference is recorded
+    /// regardless of vocabulary membership.
     #[test]
     fn unknown_field_is_not_captured() {
         let root = scratch_dir("unknown_field");
         write_view(&root, "issues/show.html.erb", "<%= issue.frobnicate %>\n");
 
         let sets = extract_view_field_sets(&root, &[issue_target()]);
+        assert_eq!(sets.len(), 1, "referenced-only hit must still be reported");
         assert!(
-            sets.is_empty(),
-            "unknown field must not be captured: {sets:?}"
+            sets[0].fields.is_empty(),
+            "unknown field must not be captured as a field: {:?}",
+            sets[0].fields
         );
+        assert_eq!(sets[0].referenced, vec!["frobnicate".to_string()]);
 
         let _ = fs::remove_dir_all(&root);
     }
@@ -399,8 +452,65 @@ mod tests {
         assert_eq!(sets.len(), 2);
         assert_eq!(sets[0].resource, "Issue");
         assert_eq!(sets[0].fields, vec!["subject".to_string()]);
+        assert_eq!(sets[0].referenced, vec!["subject".to_string()]);
         assert_eq!(sets[1].resource, "User");
         assert_eq!(sets[1].fields, vec!["name".to_string()]);
+        assert_eq!(sets[1].referenced, vec!["name".to_string()]);
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    // ─────── Part 1: raw-ident census (`referenced`) tests ───────
+
+    /// (a) An unknown ident lands in `referenced` but not in `fields`,
+    /// while a known ident referenced alongside it lands in both.
+    #[test]
+    fn unknown_ident_lands_in_referenced_not_in_fields() {
+        let root = scratch_dir("referenced_denominator");
+        write_view(
+            &root,
+            "issues/show.html.erb",
+            "<%= issue.subject %> <%= issue.frobnicate %>\n",
+        );
+
+        let sets = extract_view_field_sets(&root, &[issue_target()]);
+        assert_eq!(sets.len(), 1);
+        assert_eq!(sets[0].fields, vec!["subject".to_string()]);
+        assert_eq!(
+            sets[0].referenced,
+            vec!["frobnicate".to_string(), "subject".to_string()]
+        );
+        assert!(!sets[0].fields.contains(&"frobnicate".to_string()));
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// (b) `fields ⊆ referenced` holds across a realistic mix of known and
+    /// unknown idents referenced off both a bare and an ivar receiver.
+    #[test]
+    fn fields_is_always_a_subset_of_referenced() {
+        let root = scratch_dir("subset_invariant");
+        write_view(
+            &root,
+            "issues/show.html.erb",
+            "<%= issue.subject %> <%= issue.made_up_helper %> <%= @issue.status_id %>\n",
+        );
+
+        let sets = extract_view_field_sets(&root, &[issue_target()]);
+        assert_eq!(sets.len(), 1);
+        assert!(
+            sets[0].fields.len() < sets[0].referenced.len(),
+            "fixture must contain at least one unknown ident: fields={:?} referenced={:?}",
+            sets[0].fields,
+            sets[0].referenced
+        );
+        for field in &sets[0].fields {
+            assert!(
+                sets[0].referenced.contains(field),
+                "fields must be a subset of referenced: field {field:?} missing from {:?}",
+                sets[0].referenced
+            );
+        }
 
         let _ = fs::remove_dir_all(&root);
     }

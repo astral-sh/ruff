@@ -36,10 +36,12 @@ use ruff_spo_triplet::{
 
 mod functions;
 mod parse;
+mod representers;
 mod schema;
 mod views;
 mod walk;
 
+pub use representers::{RepresenterDecl, RepresenterFieldSet, extract_representer_field_sets};
 pub use schema::{SchemaReport, extract_app_with_schema};
 pub use views::{
     ViewFieldSet, ViewScanReport, ViewTarget, extract_view_field_sets,
