@@ -2833,12 +2833,24 @@ def requires_int_bound_identity(value: IntBoundIdentityProtocol) -> None: ...
 class IntOrStrIdentityProtocol(Protocol):
     def f[T: (int, str)](self, input: T) -> T: ...
 
+# Separate overloads cannot jointly cover a generic target. One source overload must satisfy every
+# specialization of the target method.
 class IntOrStrOverloadedImplementation:
     @overload
     def f(self, input: int) -> int: ...
     @overload
     def f(self, input: str) -> str: ...
     def f(self, input: int | str) -> int | str:
+        return input
+
+# A source overload set is valid if one generic overload covers the entire target, regardless of
+# unrelated additional overloads.
+class IntOrStrGenericOverloadedImplementation:
+    @overload
+    def f[T: (int, str)](self, input: T) -> T: ...
+    @overload
+    def f(self, input: bytes) -> bytes: ...
+    def f(self, input: int | str | bytes) -> int | str | bytes:
         return input
 
 def requires_int_or_str_identity(value: IntOrStrIdentityProtocol) -> None: ...
@@ -2890,7 +2902,8 @@ static_assert(is_subtype_of(ReorderedPairImplementation, PairProtocol))
 static_assert(is_assignable_to(ReorderedPairImplementation, PairProtocol))
 
 requires_int_bound_identity(GenericListReturnImplementation())  # error: [invalid-argument-type]
-requires_int_or_str_identity(IntOrStrOverloadedImplementation())
+requires_int_or_str_identity(IntOrStrOverloadedImplementation())  # error: [invalid-argument-type]
+requires_int_or_str_identity(IntOrStrGenericOverloadedImplementation())
 
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, LegacyFunctionScoped))
