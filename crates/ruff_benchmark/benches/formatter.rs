@@ -9,7 +9,7 @@ use ruff_benchmark::{
 };
 use ruff_python_formatter::{PreviewMode, PyFormatOptions, format_module_ast};
 use ruff_python_parser::{Mode, ParseOptions, parse};
-use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::TriviaRanges;
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -53,11 +53,11 @@ fn benchmark_formatter(criterion: &mut Criterion) {
                     .expect("Input should be a valid Python code");
 
                 b.iter(|| {
-                    let comment_ranges = CommentRanges::from(parsed.tokens());
+                    let trivia_ranges = TriviaRanges::from(parsed.tokens());
                     let options = PyFormatOptions::from_extension(Path::new(case.name()))
                         .with_preview(PreviewMode::Enabled);
                     let formatted =
-                        format_module_ast(&parsed, &comment_ranges, case.code(), options)
+                        format_module_ast(&parsed, &trivia_ranges, case.code(), options)
                             .expect("Formatting to succeed");
 
                     formatted.print().expect("Printing to succeed")

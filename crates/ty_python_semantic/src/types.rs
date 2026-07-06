@@ -38,8 +38,8 @@ pub(crate) use self::match_pattern::{
     ClassPatternPositionalSource, callable_pattern_type, class_pattern_positional_sources,
     definite_match_pattern_type, definite_match_pattern_type_for_subject,
     exact_sequence_pattern_type, mapping_pattern_type, pattern_binding_fallthrough_type,
-    pattern_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
-    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
+    sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
+    typed_dict_matches_class_pattern,
 };
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
@@ -116,6 +116,7 @@ use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{Truthiness, place_table, semantic_index};
 
+mod attribute_write;
 mod bool;
 mod bound_super;
 mod call;
@@ -126,6 +127,7 @@ mod constraints;
 mod context;
 mod context_manager;
 mod cyclic;
+mod dedicated;
 mod diagnostic;
 mod display;
 mod enums;
@@ -7613,7 +7615,7 @@ impl<'db> TypeMapping<'_, 'db> {
 
 /// A type that is determined to be divergent during recursive type inference.
 /// This type must never be eliminated by dynamic type reduction
-/// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reducted to `@Todo`).
+/// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reduced to `@Todo`).
 /// Otherwise, type inference cannot converge properly.
 /// For detailed properties of this type, see the unit test at the end of the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]

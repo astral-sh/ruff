@@ -80,7 +80,7 @@ camino = { version = "1.1.7" }
 clap = { version = "4.5.3", features = ["derive"] }
 clap_complete_command = { version = "0.6.0" }
 clearscreen = { version = "4.0.0" }
-codspeed-criterion-compat = { version = "4.4.1", default-features = false }
+codspeed-criterion-compat = { version = "5.0.0", default-features = false }
 colored = { version = "3.0.0" }
 compact_str = "0.9.0"
 console_error_panic_hook = { version = "0.1.7" }
@@ -91,7 +91,7 @@ crossbeam = { version = "0.8.4" }
 csv = { version = "1.3.1" }
 dashmap = { version = "6.0.1" }
 datatest-stable = { version = "0.3.3" }
-divan = { package = "codspeed-divan-compat", version = "4.4.1" }
+divan = { package = "codspeed-divan-compat", version = "5.0.0" }
 drop_bomb = { version = "0.1.5" }
 dunce = { version = "1.0.5" }
 etcetera = { version = "0.11.0" }
@@ -277,9 +277,6 @@ unused_peekable = "warn"
 # in the `if` being an order of magnitude bigger than the
 # `else`, then some might consider that harder to read.
 if_not_else = "allow"
-
-# Diagnostics are not actionable: Enable once https://github.com/rust-lang/rust-clippy/issues/13774 is resolved.
-large_stack_arrays = "allow"
 
 [profile.release]
 lto = "fat"

@@ -961,6 +961,23 @@ help: Replace with `"bar"`
     |
 note: This is an unsafe fix and may change runtime behavior
 
+SIM222 [*] Use `f"{1}{''}"` instead of `f"{1}{''}" or ...`
+   --> SIM222.py:169:7
+    |
+167 | print(f"{a}{''}" or "bar")
+168 | print(f"{''}{''}" or "bar")
+169 | print(f"{1}{''}" or "bar")
+    |       ^^^^^^^^^^^^^^^^^^^
+    |
+help: Replace with `f"{1}{''}"`
+    |
+168 | print(f"{''}{''}" or "bar")
+    - print(f"{1}{''}" or "bar")
+169 + print(f"{1}{''}")
+170 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
 SIM222 [*] Use `f"{b''}"` instead of `f"{b''}" or ...`
    --> SIM222.py:202:7
     |
@@ -1050,5 +1067,23 @@ help: Replace with `True`
     - tuple("") or True  # SIM222
 222 + True  # SIM222
 223 | tuple(t"") or True  # OK
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+SIM222 [*] Use `f"{x}abc"` instead of `f"{x}abc" or ...`
+   --> SIM222.py:233:7
+    |
+232 | # An f-string is guaranteed non-empty if any element is non-empty, even if others are indeterminate
+233 | print(f"{x}abc" or "bar")  # SIM222
+    |       ^^^^^^^^^^^^^^^^^^
+234 | # An empty f-string part in an implicit concatenation guarantees nothing
+235 | print(f"" f"{x}" or "bar")  # OK
+    |
+help: Replace with `f"{x}abc"`
+    |
+232 | # An f-string is guaranteed non-empty if any element is non-empty, even if others are indeterminate
+    - print(f"{x}abc" or "bar")  # SIM222
+233 + print(f"{x}abc")  # SIM222
+234 | # An empty f-string part in an implicit concatenation guarantees nothing
     |
 note: This is an unsafe fix and may change runtime behavior

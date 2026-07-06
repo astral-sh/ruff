@@ -3203,41 +3203,51 @@ impl<'db> Parameters<'db> {
 
         for parameter in parameters {
             if let Some(unpacked_typed_dict) = parameter.unpacked_typed_dict(db) {
-                let kwargs_name = parameter
-                    .name()
-                    .expect("keyword variadic parameter always has a name")
-                    .clone();
-
-                for (name, field) in unpacked_typed_dict.items(db) {
-                    if value
-                        .iter()
-                        .any(|existing| existing.callable_by_name(name.as_str()))
-                    {
-                        continue;
-                    }
-
-                    value.push(
-                        Parameter::keyword_only(name.clone())
-                            .with_annotated_type(field.declared_ty)
-                            .with_optional_default_type(
-                                (!field.is_required()).then_some(Type::unknown()),
-                            )
-                            .with_definition(field.first_declaration()),
-                    );
-                }
-
-                if let Some(extra_items) = unpacked_typed_dict.openness(db).effective_extra_items()
-                {
-                    value.push(
-                        Parameter::keyword_variadic(kwargs_name)
-                            .with_annotated_type(extra_items.declared_ty),
-                    );
-                }
+                Self::push_unpacked_typed_dict(db, &mut value, &parameter, unpacked_typed_dict);
             } else {
                 value.push(parameter);
             }
         }
 
+        Self::from_normalized(db, value)
+    }
+
+    fn push_unpacked_typed_dict(
+        db: &'db dyn Db,
+        value: &mut Vec<Parameter<'db>>,
+        parameter: &Parameter<'db>,
+        unpacked_typed_dict: TypedDictType<'db>,
+    ) {
+        let kwargs_name = parameter
+            .name()
+            .expect("keyword variadic parameter always has a name")
+            .clone();
+
+        for (name, field) in unpacked_typed_dict.items(db) {
+            if value
+                .iter()
+                .any(|existing| existing.callable_by_name(name.as_str()))
+            {
+                continue;
+            }
+
+            value.push(
+                Parameter::keyword_only(name.clone())
+                    .with_annotated_type(field.declared_ty)
+                    .with_optional_default_type((!field.is_required()).then_some(Type::unknown()))
+                    .with_definition(field.first_declaration()),
+            );
+        }
+
+        if let Some(extra_items) = unpacked_typed_dict.openness(db).effective_extra_items() {
+            value.push(
+                Parameter::keyword_variadic(kwargs_name)
+                    .with_annotated_type(extra_items.declared_ty),
+            );
+        }
+    }
+
+    fn from_normalized(db: &'db dyn Db, value: Vec<Parameter<'db>>) -> Self {
         let mut kind = ParametersKind::Standard;
 
         let variadic_param = value

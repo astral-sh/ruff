@@ -1518,8 +1518,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // Note `definition_node` is guaranteed to be a child of `self.module`
         let kind = definition_node.into_owned(self.module);
         let is_loop_header = kind.is_loop_header();
-
-        let category = kind.category(self.source_type.is_stub(), self.module);
         let is_reexported = kind.is_reexported();
 
         let definition: Definition<'db> =
@@ -1534,6 +1532,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             definitions.push(definition);
             definitions.len()
         };
+
+        self.record_definition(place, definition);
+
+        (definition, num_definitions)
+    }
+
+    /// Records an already-created definition in the current scope.
+    fn record_definition(&mut self, place: ScopedPlaceId, definition: Definition<'db>) {
+        let kind = definition.kind(self.db);
+        let is_loop_header = kind.is_loop_header();
+        let category = kind.category(self.source_type.is_stub(), self.module);
 
         // We need to avoid marking places as bound as soon as we encounter a loop header
         // definition for them, because that would lead to false-positive semantic syntax errors in
@@ -1588,8 +1597,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
         try_node_stack_manager.record_definition(self);
         self.try_node_context_stack_manager = try_node_stack_manager;
-
-        (definition, num_definitions)
     }
 
     // Creates a definition for each key-value assignment in the dictionary.

@@ -5,12 +5,12 @@
 ```py
 from b import __file__ as module_path
 from stub import __file__ as stub_path
-from override import __file__ as overidden_path
+from override import __file__ as overridden_path
 
 reveal_type(__file__)  # revealed: str
 reveal_type(module_path)  # revealed: str
 reveal_type(stub_path)  # revealed: str
-reveal_type(overidden_path)  # revealed: None
+reveal_type(overridden_path)  # revealed: None
 
 # NOTE: This import fails at runtime as this is a C Extension
 # with no `__file__` global. It's hard for us to determine this

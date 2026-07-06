@@ -295,7 +295,7 @@ fn setup_logging(log_level_args: &LogLevelArgs, log_file: Option<&Path>) -> io::
         // Default without the spinner
         ProgressStyle::with_template("{span_child_prefix} {span_name}{{{span_fields}}}").unwrap(),
     );
-    let indicitif_compatible_writer_layer = tracing_subscriber::fmt::layer()
+    let indicatif_compatible_writer_layer = tracing_subscriber::fmt::layer()
         .with_writer(indicatif_layer.get_stderr_writer())
         .with_target(false);
     let log_layer = log_file.map(File::create).transpose()?.map(|log_file| {
@@ -305,7 +305,7 @@ fn setup_logging(log_level_args: &LogLevelArgs, log_file: Option<&Path>) -> io::
     });
     tracing_subscriber::registry()
         .with(filter_layer)
-        .with(indicitif_compatible_writer_layer)
+        .with(indicatif_compatible_writer_layer)
         .with(indicatif_layer)
         .with(log_layer)
         .init();

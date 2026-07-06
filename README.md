@@ -29,7 +29,7 @@ An extremely fast Python linter and code formatter, written in Rust.
 - 🐍 Installable via `pip`
 - 🛠️ `pyproject.toml` support
 - 🤝 Python 3.14 compatibility
-- ⚖️ Drop-in parity with [Flake8](https://docs.astral.sh/ruff/faq/#how-does-ruffs-linter-compare-to-flake8), isort, and [Black](https://docs.astral.sh/ruff/faq/#how-does-ruffs-formatter-compare-to-black)
+- ⚖️ Drop-in parity with [Flake8](https://docs.astral.sh/ruff/faq/#how-does-ruffs-linter-compare-to-flake8), [isort](https://docs.astral.sh/ruff/faq/#how-does-ruffs-import-sorting-compare-to-isort), and [Black](https://docs.astral.sh/ruff/faq/#how-does-ruffs-formatter-compare-to-black)
 - 📦 Built-in caching, to avoid re-analyzing unchanged files
 - 🔧 Fix support, for automatic error correction (e.g., automatically remove unused imports)
 - 📏 Over [900 built-in rules](https://docs.astral.sh/ruff/rules/), with native re-implementations
@@ -476,7 +476,7 @@ Ruff is used by a number of major open-source projects and companies, including:
     [ONNX Runtime](https://github.com/microsoft/onnxruntime),
     [LightGBM](https://github.com/microsoft/LightGBM))
 - Modern Treasury ([Python SDK](https://github.com/Modern-Treasury/modern-treasury-python))
-- Mozilla ([Firefox](https://github.com/mozilla/gecko-dev))
+- Mozilla ([Firefox](https://github.com/mozilla-firefox/firefox))
 - [Mypy](https://github.com/python/mypy)
 - [Nautobot](https://github.com/nautobot/nautobot)
 - Netflix ([Dispatch](https://github.com/Netflix/dispatch))

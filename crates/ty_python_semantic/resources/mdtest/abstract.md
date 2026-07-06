@@ -58,7 +58,7 @@ class ConcreteOrdered(AbstractOrdered): ...
 ConcreteOrdered()  # fine
 
 @total_ordering
-class AlsoConreteOrdered(AbstractOrdered):
+class AlsoConcreteOrdered(AbstractOrdered):
     def __gt__(self, other): ...
 
 # total_ordering does not override a comparison method
@@ -66,7 +66,7 @@ class AlsoConreteOrdered(AbstractOrdered):
 # exists in the MRO is abstract!
 #
 # TODO: should emit diagnostic
-AlsoConreteOrdered()
+AlsoConcreteOrdered()
 ```
 
 We also allow abstract methods or properties to be "overridden" by a `ClassVar` annotation, even if

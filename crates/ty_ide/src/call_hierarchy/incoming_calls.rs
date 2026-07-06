@@ -2,6 +2,7 @@ use crate::call_hierarchy::{CalleeLeaf, module_detail};
 use crate::goto::{Definitions, GotoTarget, find_goto_target};
 use crate::references::{contains_identifier, has_any_external_visible_definitions};
 use crate::{CallHierarchyItem, Db, SymbolKind};
+use rayon::prelude::*;
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::helpers::is_dunder;
@@ -11,10 +12,17 @@ use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::FxHashMap;
+use ty_project::parallel::{ParallelIteratorExt, minimum_parallel_job_len};
 use ty_python_core::scope::{NodeWithScopeKind, ScopeKind};
 use ty_python_semantic::types::ide_support::static_member_type_for_attribute;
 use ty_python_semantic::types::{PropertyAccessorRole, Type};
 use ty_python_semantic::{HasDefinition as _, HasType as _, ImportAliasResolution, SemanticModel};
+
+/// Salsa snapshots coordinate clone and drop through shared state. For ordinary targets, most
+/// files are rejected by the text prefilter, so process enough files per job to amortize that
+/// coordination. Use a lower minimum than references because matching files do more semantic work,
+/// and dunder targets cannot use the prefilter.
+const MAX_MIN_FILES_PER_PARALLEL_JOB: usize = 16;
 
 /// Find every place in the project that calls the symbol at `offset`, grouped
 /// by enclosing function/method/class/module.
@@ -63,47 +71,37 @@ pub fn incoming_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Incoming
     let mut raw = call_sites_for_file(db, file, &target_definitions, target_role, needle);
 
     if is_externally_visible {
-        let result = std::sync::Mutex::new(Vec::<RawCallSite>::new());
         let files = db.project().files(db);
-        {
-            let db_clone = Db::dyn_clone(db);
-            let target_definitions = &target_definitions;
-            let files = &files;
-            let result = &result;
-            // The byte-level text prefilter still pays off as a coarse gate:
-            // files that don't contain the target name (or an import of it)
-            // textually are skipped before any AST work. Files that route the
-            // call through an alias (`from m import foo as bar; bar()`) still
-            // pass the gate because they contain `foo` in the import line.
-            // Dunder calls have no required textual spelling, so the filter
-            // is disabled for them.
-            rayon::scope(move |s| {
-                for other_file in files {
-                    if other_file == file {
-                        continue;
-                    }
-                    let db = Db::dyn_clone(&*db_clone);
-                    s.spawn(move |_| {
-                        let db = &*db;
-                        let source = ruff_db::source::source_text(db, other_file);
-                        if let Some(name) = needle
-                            && !contains_identifier(&source, name)
-                        {
-                            return;
-                        }
-                        let sites = call_sites_for_file(
-                            db,
-                            other_file,
-                            target_definitions,
-                            target_role,
-                            needle,
-                        );
-                        result.lock().unwrap().extend(sites);
-                    });
+        let files: Vec<_> = files
+            .iter()
+            .copied()
+            .filter(|other| *other != file)
+            .collect();
+        let minimum_job_len = minimum_parallel_job_len(files.len(), MAX_MIN_FILES_PER_PARALLEL_JOB);
+        // The byte-level text prefilter still pays off as a coarse gate:
+        // files that don't contain the target name (or an import of it)
+        // textually are skipped before any AST work. Files that route the
+        // call through an alias (`from m import foo as bar; bar()`) still
+        // pass the gate because they contain `foo` in the import line.
+        // Dunder calls have no required textual spelling, so the filter
+        // is disabled for them.
+        let other_sites = files
+            .into_par_iter()
+            .with_min_len(minimum_job_len)
+            .map_with_db(db, |db, other_file| {
+                let source = ruff_db::source::source_text(db, other_file);
+                if let Some(name) = needle
+                    && !contains_identifier(&source, name)
+                {
+                    return Vec::new();
                 }
-            });
-        }
-        raw.extend(result.into_inner().unwrap());
+
+                call_sites_for_file(db, other_file, &target_definitions, target_role, needle)
+            })
+            .flat_map_iter(|sites| sites)
+            .collect::<Vec<_>>();
+
+        raw.extend(other_sites);
     }
 
     // Group by (enclosing scope file, enclosing scope selection range).

@@ -7,7 +7,9 @@ use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::special_form::TypeQualifier;
-use crate::types::tuple::{Tuple, TupleLength, TupleType, TupleUnpacker};
+use crate::types::tuple::{
+    Tuple, TupleLength, TupleSpec, TupleSpecBuilder, TupleType, TupleUnpacker,
+};
 use crate::types::typed_dict::{
     TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
@@ -18,8 +20,8 @@ use crate::types::{
     Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type,
     class_pattern_positional_sources, definite_match_pattern_type_for_subject,
     exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
-    pattern_binding_fallthrough_type, pattern_fallthrough_type, sequence_pattern_type_builder,
-    singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
+    pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
+    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::frozen::FrozenMap;
@@ -38,10 +40,12 @@ use ruff_python_stdlib::identifiers::is_identifier;
 
 use super::UnionType;
 use super::call::CallArguments;
+use super::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use super::equality::{
     equality_exclusion_constraint, equality_truthiness, evaluate_type_equality,
     evaluate_type_inequality,
 };
+use super::variance::TypeVarVariance;
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
@@ -931,6 +935,40 @@ fn positive_class_pattern_type<'db>(
     }
 }
 
+/// Refine an exact tuple with the element types established by an exact sequence pattern.
+///
+/// As elsewhere in tuple-pattern narrowing, this assumes that values represented by a `tuple[...]`
+/// annotation preserve the builtin relationship between iteration and indexing. Statically known
+/// tuple subclasses are not refined here.
+///
+/// Gradual tuple elements retain their uncertainty through intersection with the observed pattern
+/// type. For example, matching `tuple[Any]` against `[str()]` produces `tuple[Any & str]`.
+///
+/// In the example below, `subject_ty` is `tuple[int | str]`, `pattern_element_types` is `[str]`,
+/// and the refined type returned is `tuple[str]`.
+///
+/// ```python
+/// def f(value: tuple[int | str]) -> None:
+///     match value:
+///         case [str()]:
+///             reveal_type(value)  # tuple[str]
+/// ```
+fn refine_exact_tuple_for_sequence_pattern<'db>(
+    db: &'db dyn Db,
+    subject_ty: Type<'db>,
+    pattern_element_types: &[Type<'db>],
+) -> Option<Type<'db>> {
+    let tuple = subject_ty.exact_tuple_instance_spec(db)?;
+    let pattern_tuple = TupleSpec::heterogeneous(pattern_element_types.iter().copied());
+    Some(
+        TupleSpecBuilder::from(tuple.as_ref())
+            .intersect(db, &pattern_tuple)
+            .map_or(Type::Never, |refined| {
+                Type::tuple(TupleType::new(db, &refined.build()))
+            }),
+    )
+}
+
 /// Return a type that contains every value that can match `pattern`.
 ///
 /// For example, given:
@@ -1394,7 +1432,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
 
         for pattern in patterns {
             remaining_subject_ty =
-                pattern_fallthrough_type(self.db, previous_pattern, remaining_subject_ty);
+                pattern_binding_fallthrough_type(self.db, previous_pattern, remaining_subject_ty);
             let alternative = self.analyze_successful_pattern(pattern, remaining_subject_ty);
             matched_subject_types.add_in_place(alternative.matched_subject_ty);
             binding_subject_types.add_in_place(alternative.binding_subject_ty);
@@ -1471,11 +1509,23 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         kind: &ClassPatternPredicateKind<'db>,
         context: &ClassPatternContext<'db>,
         original_subject_ty: Type<'db>,
+        filtering_subject_ty: Type<'db>,
         subject_ty: Type<'db>,
     ) -> Option<Vec<ClassPatternArgument<'db>>> {
         let subject_is_final = subject_ty
             .nominal_class(self.db)
             .is_some_and(|class| class.is_final(self.db));
+        let specialized_pattern_class =
+            if context.positional_sources.is_empty() && kind.keywords.is_empty() {
+                None
+            } else {
+                context
+                    .class
+                    .zip(filtering_subject_ty.nominal_class(self.db))
+                    .and_then(|(pattern_class, subject_class)| {
+                        self.specialize_pattern_class_for_subject(pattern_class, subject_class)
+                    })
+            };
         let member_type = |name: &Name| {
             let original_member_ty = original_subject_ty
                 .member(self.db, name.as_str())
@@ -1483,7 +1533,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 .ignore_possibly_undefined();
             let place = subject_ty.member(self.db, name.as_str()).place;
             let mut member_ty = place.ignore_possibly_undefined();
-            if member_ty.is_some_and(|ty| ty.is_never())
+            if original_subject_ty.nominal_class(self.db).is_some()
                 && let Type::Intersection(intersection) = subject_ty
             {
                 let overlapping_member_ty = UnionType::from_elements(
@@ -1503,8 +1553,13 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 }
             }
 
-            if context.class.is_some_and(|pattern_class| {
-                pattern_class
+            if let Some(specialized_pattern_class) = specialized_pattern_class {
+                member_ty = Type::instance(self.db, specialized_pattern_class)
+                    .member(self.db, name.as_str())
+                    .place
+                    .ignore_possibly_undefined();
+            } else if let Some(pattern_class) = context.class
+                && pattern_class
                     .generic_context(self.db)
                     .and_then(|generic_context| {
                         pattern_class
@@ -1517,11 +1572,44 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                             .ignore_possibly_undefined()
                     })
                     .is_some_and(|ty| ty.has_typevar(self.db))
-            }) {
-                // The pattern subclass's default specialization loses the type arguments from the
-                // subject's generic base. Prefer a member type already known from the subject;
-                // otherwise, do not treat the subclass's fallback as a declared type.
-                member_ty = Some(original_member_ty.unwrap_or_else(Type::unknown));
+            {
+                let unknown_pattern_class = pattern_class.unknown_specialization(self.db);
+                let unknown_pattern_member_ty = Type::instance(self.db, unknown_pattern_class)
+                    .member(self.db, name.as_str())
+                    .place
+                    .ignore_possibly_undefined();
+                // For example, `Child[int]` and `Base[T]` share a generic hierarchy, so a `Base`
+                // pattern can reuse `int` from the subject. This is also the conservative fallback
+                // when the subject does not determine one exact specialization of the pattern
+                // subclass.
+                if original_subject_ty
+                    .nominal_class(self.db)
+                    .is_some_and(|original_class| {
+                        unknown_pattern_class.is_subtype_of_class_literal(
+                            self.db,
+                            original_class.class_literal(self.db),
+                        ) || original_class.is_subtype_of_class_literal(
+                            self.db,
+                            unknown_pattern_class.class_literal(self.db),
+                        )
+                    })
+                {
+                    // The pattern class's unknown specialization loses type arguments known
+                    // through the related subject type. Prefer the subject's member type when it
+                    // exists, but retain a member declared only by the pattern class.
+                    member_ty = Some(
+                        original_member_ty
+                            .or(unknown_pattern_member_ty)
+                            .unwrap_or_else(Type::unknown),
+                    );
+                } else if let Some(pattern_member_ty) = unknown_pattern_member_ty {
+                    // Unrelated classes can overlap through multiple inheritance, so retain the
+                    // generic pattern class's member as a possible runtime value.
+                    member_ty = Some(UnionType::from_elements(
+                        self.db,
+                        member_ty.into_iter().chain([pattern_member_ty]),
+                    ));
+                }
             }
             member_ty.or_else(|| (!subject_is_final).then_some(Type::unknown()))
         };
@@ -1554,43 +1642,170 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             .collect()
     }
 
+    /// Infer an exact specialization of a generic pattern subclass from a specialized base-class
+    /// subject.
+    ///
+    /// This intentionally handles only the case where every pattern-class type variable has one
+    /// exact solution. Variant base classes and pattern classes with unconstrained parameters keep
+    /// the existing conservative member type.
+    ///
+    /// ```python
+    /// class Base[T]: ...
+    ///
+    /// class Child[T](Base[T]):
+    ///     item: T
+    ///
+    /// def f(value: Base[int]) -> None:
+    ///     match value:
+    ///         case Child(item=item):
+    ///             reveal_type(item)  # int
+    /// ```
+    fn specialize_pattern_class_for_subject(
+        &self,
+        pattern_class: ClassLiteral<'db>,
+        subject_class: ClassType<'db>,
+    ) -> Option<ClassType<'db>> {
+        let generic_context = pattern_class.generic_context(self.db)?;
+        let pattern_base = pattern_class
+            .identity_specialization(self.db)
+            .iter_mro(self.db)
+            .filter_map(ClassBase::into_class)
+            .find(|base| base.class_literal(self.db) == subject_class.class_literal(self.db))?;
+
+        let constraints = ConstraintSetBuilder::new();
+        let solutions = Type::instance(self.db, pattern_base)
+            .assignable_solutions_with_inferable(
+                self.db,
+                Type::instance(self.db, subject_class),
+                generic_context.inferable_typevars(self.db),
+            )
+            .solve_with(|variance, path_bound| {
+                let Some(lower) = path_bound.lower else {
+                    return Ok(None);
+                };
+                if variance != TypeVarVariance::Invariant
+                    || path_bound.upper.materialize_exact(self.db) != lower
+                {
+                    return Ok(None);
+                }
+                PathBounds::default_solve(self.db, &constraints, path_bound)
+            });
+        let Solutions::Constrained(solutions) = solutions else {
+            return None;
+        };
+        let [solution] = solutions.as_slice() else {
+            return None;
+        };
+
+        let typevars = generic_context.variables(self.db);
+        let types = typevars
+            .clone()
+            .map(|typevar| {
+                solution
+                    .iter()
+                    .find(|binding| binding.bound_typevar == typevar)
+                    .map(|binding| binding.solution)
+            })
+            .collect::<Option<Vec<_>>>()?;
+        if types.iter().any(|ty| {
+            typevars.clone().any(|typevar| {
+                ty.references_typevar(self.db, typevar.typevar(self.db).identity(self.db))
+            })
+        }) {
+            return None;
+        }
+        Some(
+            pattern_class
+                .apply_specialization(self.db, |_| generic_context.specialize(self.db, types)),
+        )
+    }
+
+    fn class_pattern_contexts(
+        &self,
+        kind: &ClassPatternPredicateKind<'db>,
+    ) -> SmallVec<[ClassPatternContext<'db>; 2]> {
+        let class_expr_ty =
+            infer_same_file_expression_type(self.db, kind.class, TypeContext::default())
+                .resolve_type_alias(self.db);
+        let context = |class_expr_ty: Type<'db>| {
+            let class = class_expr_ty.as_class_literal();
+            ClassPatternContext {
+                class,
+                class_ty: positive_class_pattern_type(self.db, class_expr_ty)
+                    .unwrap_or_else(Type::object),
+                positional_sources: class.map_or_else(
+                    || vec![ClassPatternPositionalSource::Unknown; kind.positional.len()],
+                    |class| class_pattern_positional_sources(self.db, class, kind.positional.len()),
+                ),
+            }
+        };
+        match class_expr_ty {
+            Type::Union(union) => union
+                .elements(self.db)
+                .iter()
+                .copied()
+                .map(context)
+                .collect(),
+            _ => smallvec![context(class_expr_ty)],
+        }
+    }
+
+    fn class_pattern_arm(
+        &self,
+        kind: &ClassPatternPredicateKind<'db>,
+        context: &ClassPatternContext<'db>,
+        original_subject_ty: Type<'db>,
+        subject_ty: Type<'db>,
+    ) -> Option<(Type<'db>, Vec<ClassPatternArgument<'db>>)> {
+        let narrowed_subject_ty =
+            self.filter_class_pattern_subject_type(context.class, context.class_ty, subject_ty);
+        if narrowed_subject_ty.is_never() {
+            return None;
+        }
+        let arguments = self.class_pattern_arguments_for_arm(
+            kind,
+            context,
+            original_subject_ty,
+            subject_ty,
+            narrowed_subject_ty,
+        )?;
+        Some((narrowed_subject_ty, arguments))
+    }
+
     fn analyze_successful_class_pattern(
         &self,
         kind: &ClassPatternPredicateKind<'db>,
         subject_ty: Type<'db>,
     ) -> PatternSuccessResult<'db> {
-        let class_expr_ty =
-            infer_same_file_expression_type(self.db, kind.class, TypeContext::default());
-        let class = class_expr_ty.as_class_literal();
-        let class_ty =
-            positive_class_pattern_type(self.db, class_expr_ty).unwrap_or_else(Type::object);
-        let context = ClassPatternContext {
-            class,
-            class_ty,
-            positional_sources: class.map_or_else(
-                || vec![ClassPatternPositionalSource::Unknown; kind.positional.len()],
-                |class| class_pattern_positional_sources(self.db, class, kind.positional.len()),
-            ),
-        };
+        let mut matched_subject_types = UnionBuilder::new(self.db);
+        let mut binding_subject_types = UnionBuilder::new(self.db);
+        let mut bindings = BTreeMap::new();
+        for context in self.class_pattern_contexts(kind) {
+            let result =
+                self.analyze_successful_class_pattern_for_context(kind, &context, subject_ty);
+            matched_subject_types.add_in_place(result.matched_subject_ty);
+            binding_subject_types.add_in_place(result.binding_subject_ty);
+            Self::merge_bindings(&mut bindings, result.bindings);
+        }
+        PatternSuccessResult {
+            matched_subject_ty: matched_subject_types.build(),
+            binding_subject_ty: binding_subject_types.build(),
+            bindings,
+        }
+    }
+
+    fn analyze_successful_class_pattern_for_context(
+        &self,
+        kind: &ClassPatternPredicateKind<'db>,
+        context: &ClassPatternContext<'db>,
+        subject_ty: Type<'db>,
+    ) -> PatternSuccessResult<'db> {
         self.analyze_pattern_subject_arms(
             subject_ty,
             OriginalSubjectPreservation::EquivalentTypes,
             |analyzer, original_subject_ty, subject_ty| {
-                let narrowed_subject_ty = analyzer.filter_class_pattern_subject_type(
-                    context.class,
-                    context.class_ty,
-                    subject_ty,
-                );
-                if narrowed_subject_ty.is_never() {
-                    return None;
-                }
-
-                let arguments = analyzer.class_pattern_arguments_for_arm(
-                    kind,
-                    &context,
-                    original_subject_ty,
-                    narrowed_subject_ty,
-                )?;
+                let (narrowed_subject_ty, arguments) =
+                    analyzer.class_pattern_arm(kind, context, original_subject_ty, subject_ty)?;
                 let mut matched_subject_ty = narrowed_subject_ty;
                 let mut binding_subject_ty = narrowed_subject_ty;
                 let mut bindings = BTreeMap::new();
@@ -1702,37 +1917,43 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         false
     }
 
+    fn mapping_pattern_key_types(&self, kind: &MappingPatternPredicateKind<'db>) -> Vec<Type<'db>> {
+        kind.entries
+            .iter()
+            .map(|entry| {
+                infer_same_file_expression_type(self.db, entry.key, TypeContext::default())
+            })
+            .collect()
+    }
+
+    fn mapping_pattern_arm(
+        &self,
+        subject_ty: Type<'db>,
+        key_types: &[Type<'db>],
+    ) -> Option<(Type<'db>, Vec<Type<'db>>)> {
+        let narrowed_subject_ty = self.intersect_types(subject_ty, mapping_pattern_type(self.db));
+        if narrowed_subject_ty.is_never() {
+            return None;
+        }
+        let value_types = key_types
+            .iter()
+            .map(|key_ty| self.mapping_pattern_value_type_for_arm(narrowed_subject_ty, *key_ty))
+            .collect::<Option<Vec<_>>>()?;
+        Some((narrowed_subject_ty, value_types))
+    }
+
     fn analyze_successful_mapping_pattern(
         &self,
         kind: &MappingPatternPredicateKind<'db>,
         subject_ty: Type<'db>,
     ) -> PatternSuccessResult<'db> {
-        let key_types: Vec<_> = kind
-            .entries
-            .iter()
-            .map(|entry| {
-                infer_same_file_expression_type(self.db, entry.key, TypeContext::default())
-            })
-            .collect();
+        let key_types = self.mapping_pattern_key_types(kind);
         self.analyze_pattern_subject_arms(
             subject_ty,
             OriginalSubjectPreservation::EquivalentTypes,
             |analyzer, _, subject_ty| {
-                let narrowed_subject_ty =
-                    analyzer.intersect_types(subject_ty, mapping_pattern_type(analyzer.db));
-                if narrowed_subject_ty.is_never() {
-                    return None;
-                }
-
-                let value_types: Option<Vec<_>> = kind
-                    .entries
-                    .iter()
-                    .zip(&key_types)
-                    .map(|(_, key_ty)| {
-                        analyzer.mapping_pattern_value_type_for_arm(subject_ty, *key_ty)
-                    })
-                    .collect();
-                let value_types = value_types?;
+                let (narrowed_subject_ty, value_types) =
+                    analyzer.mapping_pattern_arm(subject_ty, &key_types)?;
                 let mut bindings = BTreeMap::new();
                 for (entry, value_ty) in kind.entries.iter().zip(value_types) {
                     let mut child = analyzer.analyze_successful_pattern(&entry.pattern, value_ty);
@@ -1846,6 +2067,13 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         narrowed_subject_ty: Type<'db>,
         matched_element_types: &[Type<'db>],
     ) -> Type<'db> {
+        if kind.split_around_star().is_none()
+            && let Some(refined) =
+                refine_exact_tuple_for_sequence_pattern(self.db, subject_ty, matched_element_types)
+        {
+            return refined;
+        }
+
         if subject_ty.exact_tuple_instance_spec(self.db).is_some() {
             self.intersect_types(
                 narrowed_subject_ty,
@@ -1868,6 +2096,13 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         subject_ty: Type<'db>,
         binding_element_types: &[Type<'db>],
     ) -> Type<'db> {
+        if kind.split_around_star().is_none()
+            && let Some(refined) =
+                refine_exact_tuple_for_sequence_pattern(self.db, subject_ty, binding_element_types)
+        {
+            return refined;
+        }
+
         if subject_ty.exact_tuple_instance_spec(self.db).is_some() {
             self.intersect_types(
                 subject_ty,
@@ -2223,19 +2458,63 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 })
             }
             _ => {
-                let sequence_ty = if resolved.exact_tuple_instance_spec(db).is_some() {
-                    necessary_sequence_pattern_type(db, kind)
-                } else {
-                    sequence_pattern_type_builder(db).build()
-                };
-                IntersectionBuilder::new(db)
-                    .add_positive(resolved)
-                    .add_positive(sequence_ty)
-                    .build()
+                let refined_exact = resolved
+                    .exact_tuple_instance_spec(db)
+                    .filter(|_| kind.split_around_star().is_none())
+                    .and_then(|tuple| {
+                        tuple
+                            .resize(db, TupleLength::Fixed(kind.patterns.len()))
+                            .ok()
+                    })
+                    .and_then(|tuple| {
+                        let element_types = tuple
+                            .iter_all_elements()
+                            .zip(kind.patterns.iter())
+                            .map(|(element, pattern)| {
+                                Self::necessary_match_pattern_type_for_subject(db, pattern, element)
+                            })
+                            .collect::<Vec<_>>();
+                        refine_exact_tuple_for_sequence_pattern(db, resolved, &element_types)
+                    });
+
+                refined_exact.unwrap_or_else(|| {
+                    let sequence_ty = if resolved.exact_tuple_instance_spec(db).is_some() {
+                        necessary_sequence_pattern_type(db, kind)
+                    } else {
+                        sequence_pattern_type_builder(db).build()
+                    };
+                    IntersectionBuilder::new(db)
+                        .add_positive(resolved)
+                        .add_positive(sequence_ty)
+                        .build()
+                })
             }
         };
 
         if narrowed == resolved { ty } else { narrowed }
+    }
+
+    /// Return the type required by `pattern`, preserving nested exact tuples from `subject_ty`.
+    fn necessary_match_pattern_type_for_subject(
+        db: &'db dyn Db,
+        pattern: &PatternPredicateKind<'db>,
+        subject_ty: Type<'db>,
+    ) -> Type<'db> {
+        match pattern {
+            PatternPredicateKind::Sequence(kind) => {
+                Self::narrow_type_by_sequence_pattern(db, subject_ty, kind)
+            }
+            PatternPredicateKind::Or(patterns) => UnionType::from_elements(
+                db,
+                patterns.iter().map(|pattern| {
+                    Self::necessary_match_pattern_type_for_subject(db, pattern, subject_ty)
+                }),
+            ),
+            PatternPredicateKind::As(Some(pattern), _) => {
+                Self::necessary_match_pattern_type_for_subject(db, pattern, subject_ty)
+            }
+            _ => necessary_match_pattern_type(db, pattern),
+        }
     }
 
     /// Filter a type based on an equality or inequality comparison against an exact length.
@@ -3239,7 +3518,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
         PatternNarrowingResult::Possible(Some(NarrowingConstraints::from_iter([(
             place,
-            NarrowingConstraint::replacement(narrowed_ty),
+            NarrowingConstraint::intersection(narrowed_ty),
         )])))
     }
 

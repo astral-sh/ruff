@@ -2282,7 +2282,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
         // If the last entry has the same reachability constraint and the same
         // "in-TYPE_CHECKING" status, extend it to cover this range too, collapsing
-        // consecutive statements in a contiguous rangfe into a single entry.
+        // consecutive statements in a contiguous range into a single entry.
         if let Some((last_range, last_range_info)) = self.range_reachability.last_mut()
             && *last_range_info == this_range_info
         {

@@ -359,7 +359,7 @@ def _[T]() -> None:
     static_assert(constraints == expected)
 ```
 
-Otherwise we clip the negative constraint to the mininum range that overlaps with the positive
+Otherwise we clip the negative constraint to the minimum range that overlaps with the positive
 range.
 
 ```py
@@ -599,7 +599,7 @@ def _[T]() -> None:
     static_assert(constraints == expected)
 ```
 
-Otherwise we clip the positive constraint to the mininum range that overlaps with the negative
+Otherwise we clip the positive constraint to the minimum range that overlaps with the negative
 range.
 
 ```py

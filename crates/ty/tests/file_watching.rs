@@ -1572,7 +1572,7 @@ fn hard_links_in_project() -> anyhow::Result<()> {
 /// ```
 ///
 /// # Linux
-/// inotiyf doesn't support observing changes to hard linked files.
+/// inotify doesn't support observing changes to hard linked files.
 ///
 /// > Note: when monitoring a directory, events are not generated for
 /// > the files inside the directory when the events are performed via

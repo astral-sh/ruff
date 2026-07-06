@@ -79,7 +79,7 @@ impl LineIndex {
     ///
     /// For files starting with a UTF-8 BOM marker, the byte offsets
     /// in the range `0...3` are all mapped to line 0 and column 0.
-    /// Because of this, the conversion isn't losless.
+    /// Because of this, the conversion isn't lossless.
     ///
     /// ## Examples
     ///

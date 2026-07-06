@@ -23,7 +23,7 @@ pub(crate) const INTERNAL_MODULE_WARNING: &str = "This is an internal module whi
 pub(crate) enum Replacement {
     // There's no replacement or suggestion other than removal
     None,
-    // Additional information. Used when there's no direct maaping replacement.
+    // Additional information. Used when there's no direct mapping replacement.
     Message(&'static str),
     // The attribute name of a class has been changed.
     AttrName(&'static str),

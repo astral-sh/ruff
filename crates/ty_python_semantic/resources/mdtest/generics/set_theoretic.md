@@ -244,8 +244,9 @@ If we use the interpretation where `Bottom[Invariant[Any]]` is a special bottom 
 Invariant[P] & Invariant[Any] = Invariant[P]
 ```
 
-One seemingly problematic observation here is the following. If we compute the bottom materalization
-of the left hand side of this relation by "distributing" `Bottom` over the intersection, we get:
+One seemingly problematic observation here is the following. If we compute the bottom
+materialization of the left hand side of this relation by "distributing" `Bottom` over the
+intersection, we get:
 
 ```ignore
 Bottom[Invariant[P] & Invariant[Any]]  

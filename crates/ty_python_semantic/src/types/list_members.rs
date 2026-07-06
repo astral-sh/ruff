@@ -348,7 +348,7 @@ impl<'db> AllMembers<'db> {
 
             Type::ModuleLiteral(literal) => {
                 // Looking up `__file__` on `types.ModuleType` will not give as precise a type
-                // as we infer in type inference, but it's confuisng if autocomplete etc.
+                // as we infer in type inference, but it's confusing if autocomplete etc.
                 // shows a different type in the tooltip to the one inferred by the type checker.
                 let dunder_file_type = if literal.module(db).file(db).is_some() {
                     KnownClass::Str.to_instance(db)

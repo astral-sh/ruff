@@ -1445,7 +1445,7 @@ def _(flag: bool) -> None:
 ### Compatible signatures
 
 But they can also be compatible, but not identical. We should correctly report errors only for the
-mthod that would fail.
+method that would fail.
 
 ```py
 class Foo:
