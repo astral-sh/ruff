@@ -167,6 +167,12 @@ fn walk_class_body_for_defs(
                 writes: Vec::new(),
                 calls: Vec::new(),
                 guarded_writes: Vec::new(),
+                // Odoo decorator facts (#49) — no Ruby analogue; Rails hook
+                // targeting lives on Callback, not the Function. The literal
+                // stays exhaustive ON PURPOSE: a new IR fact must be a
+                // conscious decision for the Ruby arm, not a silent default.
+                constrains: Vec::new(),
+                onchange: Vec::new(),
             };
             if let Some(fn_body) = d.body.as_deref() {
                 walk_method_body(fn_body, known_relations, &mut func);
