@@ -187,6 +187,17 @@ impl ProjectDatabase {
         }
     }
 
+    /// Controls whether type inference collects the expected-type map that string-literal
+    /// completions depend on. The language server leaves it on; batch (CLI) runs turn it off
+    /// because they never serve completions.
+    pub fn set_collect_expected_types(&mut self, enabled: bool) {
+        if Program::get(self).collect_expected_types(self) != enabled {
+            Program::get(self)
+                .set_collect_expected_types(self)
+                .to(enabled);
+        }
+    }
+
     /// Returns a mutable reference to the system.
     ///
     /// WARNING: Triggers a new revision, canceling other database handles. This can lead to deadlock.

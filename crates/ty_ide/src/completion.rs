@@ -3191,7 +3191,9 @@ mod tests {
     use ruff_python_ast::helpers::is_dunder;
     use ruff_python_ast::token::{TokenKind, Tokens};
     use ruff_python_parser::{Mode, ParseOptions};
+    use salsa::Setter;
     use ty_module_resolver::ModuleName;
+    use ty_python_core::program::Program;
 
     use crate::CompletionCapabilities;
     use crate::completion::{Completion, completion};
@@ -7555,6 +7557,31 @@ value: Literal["x", "y"] = "<CURSOR>"
     }
 
     #[test]
+    fn string_literal_completions_absent_without_collection() {
+        // When expected-type collection is disabled (as it is for batch/CLI runs), the annotation
+        // no longer drives string-literal completions.
+        let builder = completion_test_builder(
+            r#"
+from typing import Literal
+
+value: Literal["x", "y"] = "<CURSOR>"
+"#,
+        );
+
+        assert_snapshot!(
+            builder
+                .without_expected_types()
+                .skip_keywords()
+                .skip_builtins()
+                .skip_auto_import()
+                .type_signatures()
+                .build()
+                .snapshot(),
+            @"<No completions found>",
+        );
+    }
+
+    #[test]
     fn string_literal_completions_nested_expected_type() {
         let builder = completion_test_builder(
             r#"
@@ -10806,6 +10833,15 @@ raise <CURSOR>
         /// might want to skip keywords but *not* builtins.
         fn skip_keywords(mut self) -> CompletionTestBuilder {
             self.skip_keywords = true;
+            self
+        }
+
+        /// Disables collection of the expected-type map, the way a batch (CLI) run does.
+        fn without_expected_types(mut self) -> CompletionTestBuilder {
+            let program = Program::get(&self.cursor_test.db);
+            program
+                .set_collect_expected_types(&mut self.cursor_test.db)
+                .to(false);
             self
         }
 

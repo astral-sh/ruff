@@ -171,6 +171,9 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
     project.set_force_exclude(&mut db, force_exclude);
 
+    // A batch check never serves completions, so skip collecting the expected-type map they need.
+    db.set_collect_expected_types(false);
+
     if !check_paths.is_empty() {
         project.set_included_paths(&mut db, check_paths);
     }

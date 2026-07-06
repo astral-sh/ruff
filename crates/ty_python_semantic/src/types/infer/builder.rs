@@ -6494,11 +6494,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assert_eq!(previous, None);
     }
 
+    /// Whether inference should record the expected-type map that string-literal completions use.
+    /// Batch runs (the CLI) disable it since they never serve completions.
+    fn collect_expected_types(&self) -> bool {
+        Program::get(self.db()).collect_expected_types(self.db())
+    }
+
     fn store_maybe_expected_type(
         &mut self,
         expression: impl Into<ExpressionNodeKey>,
         ty: Type<'db>,
     ) {
+        if !self.collect_expected_types() {
+            return;
+        }
+
         if !self.has_string_literal_completion_candidates(ty) {
             return;
         }
@@ -6507,6 +6517,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn store_expected_type(&mut self, expression: impl Into<ExpressionNodeKey>, ty: Type<'db>) {
+        if !self.collect_expected_types() {
+            return;
+        }
+
         self.expected_types.insert(expression.into(), ty);
     }
 

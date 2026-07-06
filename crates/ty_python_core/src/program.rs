@@ -20,6 +20,11 @@ pub struct Program {
 
     #[returns(ref)]
     pub search_paths: SearchPaths,
+
+    /// Whether type inference collects the expression-to-expected-type map that string-literal
+    /// completions rely on. On by default; batch runs that never serve completions (the CLI) turn
+    /// it off to avoid building the map for every file.
+    pub collect_expected_types: bool,
 }
 
 impl Program {
@@ -42,7 +47,7 @@ impl Program {
 
         search_paths.try_register_static_roots(db);
 
-        Program::builder(python_version, python_platform, search_paths)
+        Program::builder(python_version, python_platform, search_paths, true)
             .durability(Durability::HIGH)
             .new(db)
     }
@@ -84,6 +89,7 @@ impl Program {
         let python_version = self.python_version_with_source(db).clone();
         let python_platform = self.python_platform(db).clone();
         let search_paths = self.search_paths(db).clone();
+        let collect_expected_types = self.collect_expected_types(db);
 
         self.set_python_version_with_source(db)
             .with_durability(durability)
@@ -94,6 +100,9 @@ impl Program {
         self.set_search_paths(db)
             .with_durability(durability)
             .to(search_paths);
+        self.set_collect_expected_types(db)
+            .with_durability(durability)
+            .to(collect_expected_types);
     }
 
     pub fn custom_stdlib_search_path(self, db: &dyn Db) -> Option<&SystemPath> {
