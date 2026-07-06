@@ -2830,6 +2830,14 @@ from ty_extensions._internal import is_subtype_of, is_assignable_to
 class P(Protocol):
     def m(self, x: int, /) -> None: ...
 
+class PWithClassMethod(Protocol):
+    @classmethod
+    def m(cls, x: int, /) -> None: ...
+
+class PWithStaticMethod(Protocol):
+    @staticmethod
+    def m(x: int, /) -> None: ...
+
 class NominalSubtype:
     def m(self, y: int) -> None: ...
 
@@ -2870,6 +2878,8 @@ static_assert(is_assignable_to(NominalWithClassMethod, P))
 static_assert(is_assignable_to(NominalWithStaticMethodGood, P))
 static_assert(is_assignable_to(NominalSubtype | NominalWithClassMethod, P))
 static_assert(is_assignable_to(NominalSubtype | NominalWithStaticMethodGood, P))
+static_assert(is_subtype_of(PWithClassMethod, P))
+static_assert(is_subtype_of(PWithStaticMethod, P))
 
 # This staticmethod has an extra parameter when accessed on an instance.
 static_assert(not is_assignable_to(NominalWithStaticMethod, P))

@@ -1765,16 +1765,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         let source_capabilities = source_member.capabilities(db);
         let target_capabilities = target_member.capabilities(db);
+
+        if access == ProtocolMemberAccessMode::Class
+            && source_member.is_method()
+            && target_member.is_instance_method()
+        {
+            // The instance-side check is authoritative for an ordinary method's signature. Class
+            // access only establishes that the source member is also present on the class.
+            return ConstraintSet::from_bool(
+                self.constraints,
+                source_capabilities.class.read.is_some(),
+            );
+        }
+
         let (source, target) = match access {
             ProtocolMemberAccessMode::Instance => {
-                (source_capabilities.instance, target_capabilities.instance)
-            }
-            ProtocolMemberAccessMode::Class
-                if source_member.is_instance_method() && target_member.is_instance_method() =>
-            {
-                // The receiver type of an unbound method is specific to the class that
-                // defines it. Compare the corresponding bound access types after separately
-                // establishing that both methods are available through their classes.
                 (source_capabilities.instance, target_capabilities.instance)
             }
             ProtocolMemberAccessMode::Class => {
