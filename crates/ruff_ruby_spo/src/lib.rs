@@ -37,9 +37,14 @@ use ruff_spo_triplet::{
 mod functions;
 mod parse;
 mod schema;
+mod views;
 mod walk;
 
 pub use schema::{SchemaReport, extract_app_with_schema};
+pub use views::{
+    ViewFieldSet, ViewScanReport, ViewTarget, extract_view_field_sets,
+    extract_view_field_sets_with_report,
+};
 
 /// The namespace prefix for `OpenProject` subjects/objects.
 pub const NAMESPACE: &str = "openproject";
