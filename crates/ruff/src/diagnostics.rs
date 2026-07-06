@@ -1,7 +1,6 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
 use std::borrow::Cow;
-use std::fs::File;
 use std::io;
 use std::io::Write;
 use std::ops::{Add, AddAssign};
@@ -26,7 +25,7 @@ use ruff_text_size::TextRange;
 use ruff_workspace::Settings;
 use rustc_hash::FxHashMap;
 
-use crate::cache::{Cache, FileCache, FileCacheKey};
+use crate::cache::{Cache, FileCache, FileCacheKey, tempfile_in};
 
 /// A collection of [`Diagnostic`]s and additional information needed to render them.
 ///
@@ -269,7 +268,14 @@ pub(crate) fn lint_path(
             ) {
                 if !fixed.is_empty() {
                     match fix_mode {
-                        flags::FixMode::Apply => transformed.write(&mut File::create(path)?)?,
+                        flags::FixMode::Apply => {
+                            let parent = path.parent().ok_or_else(|| {
+                                io::Error::new(io::ErrorKind::InvalidInput, "path has no parent")
+                            })?;
+                            let mut temp = tempfile_in(parent)?;
+                            transformed.write(&mut temp)?;
+                            temp.persist(path).map_err(|err| err.error)?;
+                        }
                         flags::FixMode::Diff => {
                             write!(
                                 &mut io::stdout().lock(),

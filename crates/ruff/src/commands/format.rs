@@ -1,5 +1,4 @@
 use std::fmt::{Display, Formatter};
-use std::fs::File;
 use std::io;
 use std::io::{Write, stderr, stdout};
 use std::path::{Path, PathBuf};
@@ -42,7 +41,7 @@ use ruff_workspace::resolver::{
 };
 
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
-use crate::cache::{Cache, FileCacheKey, PackageCacheMap, PackageCaches};
+use crate::cache::{Cache, FileCacheKey, PackageCacheMap, PackageCaches, tempfile_in};
 use crate::{ExitStatus, resolve_default_files};
 
 #[derive(Debug, Copy, Clone, is_macro::Is)]
@@ -293,12 +292,19 @@ pub(crate) fn format_path(
     let format_result = match format_source(&unformatted, Some(path), settings, range)? {
         FormattedSource::Formatted(formatted) => match mode {
             FormatMode::Write => {
-                let mut writer = File::create(path).map_err(|err| {
-                    FormatCommandError::Write(Some(path.to_path_buf()), err.into())
-                })?;
+                let mut temp = tempfile_in(path.parent().ok_or_else(|| {
+                    FormatCommandError::Write(
+                        Some(path.to_path_buf()),
+                        io::Error::new(io::ErrorKind::InvalidInput, "path has no parent").into(),
+                    )
+                })?)
+                .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err.into()))?;
                 formatted
-                    .write(&mut writer)
+                    .write(&mut temp)
                     .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err))?;
+                temp.persist(path).map_err(|err| {
+                    FormatCommandError::Write(Some(path.to_path_buf()), err.error.into())
+                })?;
 
                 if let Some(cache) = cache {
                     if let Ok(cache_key) = FileCacheKey::from_path(path) {

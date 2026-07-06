@@ -1,9 +1,45 @@
+use std::io::{self, Write};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
+
+use tempfile::NamedTempFile;
 
 use path_absolutize::Absolutize;
 
 use crate::registry::RuleSet;
 use crate::settings::types::CompiledPerFileIgnoreList;
+
+/// Atomically write `contents` to `path`.
+///
+/// Writes to a temporary file in the same directory as `path`, then renames
+/// the temporary file over `path`. `rename(2)` is atomic on POSIX, so an
+/// interrupted write leaves the original file intact.
+pub(crate) fn atomic_write(path: &Path, contents: &[u8]) -> io::Result<()> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "path has no parent"))?;
+    let mut temp = tempfile_in(parent)?;
+    temp.write_all(contents)?;
+    temp.persist(path).map_err(|err| err.error).map(drop)
+}
+
+/// Return a [`NamedTempFile`] in the specified directory.
+///
+/// Sets permissions to `0o666` on Unix (matching the non-temporary file
+/// default; [`NamedTempFile`] otherwise defaults to `0o600`).
+#[cfg(unix)]
+pub(crate) fn tempfile_in(path: &Path) -> io::Result<NamedTempFile> {
+    tempfile::Builder::new()
+        .permissions(std::fs::Permissions::from_mode(0o666))
+        .tempfile_in(path)
+}
+
+/// Return a [`NamedTempFile`] in the specified directory.
+#[cfg(not(unix))]
+pub(crate) fn tempfile_in(path: &Path) -> io::Result<NamedTempFile> {
+    tempfile::Builder::new().tempfile_in(path)
+}
 
 /// Return the current working directory.
 ///
