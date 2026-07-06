@@ -1086,16 +1086,19 @@ fn generate_suppression_edit<'a>(
     let mut existing_codes = Vec::new();
     let blank_line;
 
-    // Add codes.
     match (directive, suppression_kind) {
+        // Add additional rule codes to an existing `noqa` comment.
         (Some(ExistingDirective::Noqa(codes)), SuppressionKind::Noqa) => {
             (edit_range, blank_line) = suppression_edit_range(locator, line_range, codes.start());
             existing_codes.extend(codes.iter().map(Code::as_str));
         }
+        // Add additional rule names to an existing `ruff:ignore` comment.
         (Some(ExistingDirective::Ignore(comment)), SuppressionKind::Ignore) => {
             (edit_range, blank_line) = suppression_edit_range(locator, line_range, comment.start());
             existing_codes.extend(comment.codes_as_str(locator.contents()));
         }
+        // Add a new comment when one doesn't exist, or the "wrong" kind is present. In either case,
+        // append a new comment.
         (None | Some(_), _) => {
             let trimmed_line = locator.slice(line_range).trim_end();
             blank_line = trimmed_line.trim_whitespace_start().is_empty();
