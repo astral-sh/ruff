@@ -301,6 +301,14 @@ pub struct Function {
     /// assignment (`@x = …`, local memoization) is deliberately NOT a write.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub writes: Vec<String>,
+    /// Fields whose write is **guarded by a blank/nil test on that same field**
+    /// (`self.x = v if self.x.blank?`, or `self.x ||= v`). The J1 fact
+    /// (`.claude/knowledge/fuzzy-recipe-codebook.md` §5) that splits the fuzzy
+    /// `SelfMap` recipe into schema-default (present) vs `normalizes` (absent).
+    /// Always a subset of `writes`; emitted as `writes_if_blank` (Authoritative).
+    /// Additive + serde-defaulted (existing dumps deserialize with an empty vec).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guarded_writes: Vec<String>,
     /// Lifecycle-mutator calls the body dispatches, as `"<receiver>.<method>"`
     /// (e.g. `self.save`, `order.update`, `line_ids.destroy_all`). Only the
     /// closed `ActiveRecord` mutator set is captured (create/update/save/

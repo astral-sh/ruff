@@ -284,6 +284,16 @@ impl Expander {
                     Provenance::Authoritative,
                 );
             }
+            // J1 (writes_if_blank): the subset of writes guarded by a blank/nil
+            // test on the same field — the schema-default vs normalize split.
+            for gw in &func.guarded_writes {
+                self.push(
+                    fn_iri.clone(),
+                    Predicate::WritesIfBlank,
+                    format!("{model_iri}.{gw}"),
+                    Provenance::Authoritative,
+                );
+            }
             // `calls` objects are raw `"receiver.method"` strings (NOT IRIs):
             // the receiver may be a local / relation / const / self, so the
             // object is emitted verbatim like `target` / `field_type`.

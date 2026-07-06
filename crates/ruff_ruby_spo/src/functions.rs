@@ -162,6 +162,7 @@ fn walk_class_body_for_defs(
                 traverses: Vec::new(),
                 writes: Vec::new(),
                 calls: Vec::new(),
+                guarded_writes: Vec::new(),
             };
             if let Some(fn_body) = d.body.as_deref() {
                 walk_method_body(fn_body, known_relations, &mut func);
@@ -171,6 +172,7 @@ fn walk_class_body_for_defs(
             dedup_in_place(&mut func.traverses);
             dedup_in_place(&mut func.writes);
             dedup_in_place(&mut func.calls);
+            dedup_in_place(&mut func.guarded_writes);
             out.push(func);
             // Visibility-at-def: the default in force where this `def` appeared.
             vis.push(*default_public);
@@ -262,6 +264,96 @@ fn walk_body_stmts(
 }
 
 /// Walk one method body, populating `func.reads` / `raises` / `traverses`.
+/// J1 (`writes_if_blank`) — detect the write-if-blank / write-if-nil idiom that
+/// distinguishes a **schema default** from a **`normalizes` transform** inside
+/// the otherwise-degenerate `SelfMap` recipe (`W ⊆ R`). See
+/// `.claude/knowledge/fuzzy-recipe-codebook.md` §5 (J1).
+///
+/// Two shapes are recognised, both LOCAL to one `If`/`IfMod` node (no
+/// dominator analysis — a write buried under a nested unrelated conditional is
+/// deliberately NOT claimed, keeping the fact Authoritative):
+/// - `self.X = default if  self.X.blank? | .nil? | .empty?` — guarded branch is
+///   `if_true`, cond is a blank-test on `X`.
+/// - `self.X = default unless self.X.present?` — guarded branch is `if_false`
+///   (`unless present` ≡ `if blank`), cond is a present-test on `X`.
+///
+/// When the guarded branch writes the same field the cond tests, that field is
+/// pushed to `func.guarded_writes` (it is ALSO recorded in `writes` by the
+/// normal walk; `dedup` handles the overlap).
+fn detect_guarded_default(
+    cond: &Node,
+    if_true: Option<&Node>,
+    if_false: Option<&Node>,
+    func: &mut Function,
+) {
+    // `if X.blank?` guards the true-branch on X.
+    if let (Some(field), Some(branch)) = (blank_guarded_field(cond), if_true) {
+        claim_if_writes(branch, field, func);
+    }
+    // `unless X.present?` (≡ `if X.blank?`) guards the false-branch on X.
+    if let (Some(field), Some(branch)) = (present_guarded_field(cond), if_false) {
+        claim_if_writes(branch, field, func);
+    }
+}
+
+/// `self.X` or bare `X` (implicit-self attribute) → `Some("X")`; else `None`.
+fn attr_of_self(node: &Node) -> Option<&str> {
+    if let Node::Send(s) = node
+        && s.args.is_empty()
+        && is_attr_ident(&s.method_name)
+        && matches!(s.recv.as_deref(), Some(Node::Self_(_)) | None)
+    {
+        return Some(&s.method_name);
+    }
+    None
+}
+
+/// `self.X.blank?` / `X.nil?` / `self.X.empty?` → the guarded field `X`.
+fn blank_guarded_field(cond: &Node) -> Option<&str> {
+    if let Node::Send(s) = cond
+        && matches!(s.method_name.as_str(), "blank?" | "nil?" | "empty?")
+    {
+        return s.recv.as_deref().and_then(attr_of_self);
+    }
+    None
+}
+
+/// `self.X.present?` → `X` (the false-branch, i.e. `… unless X.present?`).
+fn present_guarded_field(cond: &Node) -> Option<&str> {
+    if let Node::Send(s) = cond
+        && s.method_name == "present?"
+    {
+        return s.recv.as_deref().and_then(attr_of_self);
+    }
+    None
+}
+
+/// If `branch` contains a direct `self.<field> = …` write (through transparent
+/// `begin`/statement wrappers only — NOT into nested conditionals), record
+/// `field` as a guarded (default) write.
+fn claim_if_writes(branch: &Node, field: &str, func: &mut Function) {
+    match branch {
+        Node::Send(s)
+            if matches!(s.recv.as_deref(), Some(Node::Self_(_)))
+                && s.method_name.strip_suffix('=').is_some_and(is_attr_ident)
+                && s.method_name.strip_suffix('=') == Some(field) =>
+        {
+            func.guarded_writes.push(field.to_string());
+        }
+        Node::Begin(b) => {
+            for st in &b.statements {
+                claim_if_writes(st, field, func);
+            }
+        }
+        Node::KwBegin(b) => {
+            for st in &b.statements {
+                claim_if_writes(st, field, func);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn walk_method_body(node: &Node, known_relations: &[String], func: &mut Function) {
     match node {
         Node::Begin(b) => {
@@ -342,6 +434,9 @@ fn walk_method_body(node: &Node, known_relations: &[String], func: &mut Function
             walk_method_body(&blk.call, known_relations, func);
         }
         Node::If(i) => {
+            // J1 guard detection (blank/nil-guarded default write) runs on the
+            // block-form `if` too — same (cond, if_true, if_false) shape.
+            detect_guarded_default(&i.cond, i.if_true.as_deref(), i.if_false.as_deref(), func);
             if let Some(b) = i.if_true.as_deref() {
                 walk_method_body(b, known_relations, func);
             }
@@ -354,6 +449,9 @@ fn walk_method_body(node: &Node, known_relations: &[String], func: &mut Function
         // `if_true` is set for `if`, `if_false` for `unless`; never both.
         // Same shape as `Node::If`, just without a block body.
         Node::IfMod(i) => {
+            // J1: `self.x = default if self.x.blank?` is the canonical
+            // write-if-blank (schema-default) idiom — detect it here.
+            detect_guarded_default(&i.cond, i.if_true.as_deref(), i.if_false.as_deref(), func);
             if let Some(b) = i.if_true.as_deref() {
                 walk_method_body(b, known_relations, func);
             }
@@ -1109,6 +1207,60 @@ end
             h.writes.contains(&"b".to_string()),
             "setter write walked in helper; got {:?}",
             h.writes
+        );
+    }
+
+    #[test]
+    fn j1_write_if_blank_is_guarded_default_not_normalize() {
+        // The J1 split: a write guarded by a blank/nil test on the SAME field
+        // is a schema-default (`guarded_writes`); an unconditional self-write
+        // is a `normalizes` transform (writes only). See
+        // .claude/knowledge/fuzzy-recipe-codebook.md §5 (J1).
+        let default_form = class_functions(
+            r#"
+class M
+  def set_default
+    self.state = "new" if self.state.blank?
+  end
+end
+"#,
+        );
+        assert_eq!(default_form[0].writes, vec!["state"]);
+        assert_eq!(
+            default_form[0].guarded_writes,
+            vec!["state"],
+            "write-if-blank must be a guarded (default) write"
+        );
+
+        let unless_form = class_functions(
+            r#"
+class M
+  def set_default
+    self.state = "new" unless self.state.present?
+  end
+end
+"#,
+        );
+        assert_eq!(
+            unless_form[0].guarded_writes,
+            vec!["state"],
+            "`unless present?` is the same guard as `if blank?`"
+        );
+
+        let normalize_form = class_functions(
+            r#"
+class M
+  def tidy
+    self.path = sanitize(self.path)
+  end
+end
+"#,
+        );
+        assert_eq!(normalize_form[0].writes, vec!["path"]);
+        assert!(
+            normalize_form[0].guarded_writes.is_empty(),
+            "an unconditional transform is a normalize, not a default; got {:?}",
+            normalize_form[0].guarded_writes
         );
     }
 }
