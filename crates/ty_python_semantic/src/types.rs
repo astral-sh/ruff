@@ -1775,17 +1775,11 @@ impl<'db> Type<'db> {
     }
 
     /// Create a promotable string literal.
-    pub(crate) fn string_literal(db: &'db dyn Db, string: &str) -> Self {
-        Self::LiteralValue(LiteralValueType::promotable(StringLiteralType::new(
-            db, string,
-        )))
-    }
-
-    /// Create a promotable string literal from an owned [`CompactString`].
-    ///
-    /// On an interning miss, Salsa can store the value directly instead of copying it from a
-    /// borrowed `str`.
-    pub(crate) fn string_literal_owned(db: &'db dyn Db, string: CompactString) -> Self {
+    pub(crate) fn string_literal<T>(db: &'db dyn Db, string: T) -> Self
+    where
+        T: salsa::Lookup<CompactString> + std::hash::Hash,
+        CompactString: salsa::HashEqLike<T>,
+    {
         Self::LiteralValue(LiteralValueType::promotable(StringLiteralType::new(
             db, string,
         )))
@@ -6829,7 +6823,7 @@ impl<'db> Type<'db> {
                 LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => *self,
                 LiteralValueTypeKind::Enum(enum_literal) => Type::string_literal(
                     db,
-                    &format!(
+                    compact_str::format_compact!(
                         "{enum_class}.{name}",
                         enum_class = enum_literal.enum_class(db).name(db),
                         name = enum_literal.name(db)
@@ -6837,9 +6831,11 @@ impl<'db> Type<'db> {
                 ),
                 LiteralValueTypeKind::Bytes(_) => KnownClass::Str.to_instance(db),
             },
-            Type::SpecialForm(special_form) => Type::string_literal(db, &special_form.to_string()),
+            Type::SpecialForm(special_form) => {
+                Type::string_literal(db, special_form.to_compact_string())
+            }
             Type::KnownInstance(known_instance) => {
-                Type::string_literal(db, &known_instance.repr(db).to_string())
+                Type::string_literal(db, known_instance.repr(db).to_compact_string())
             }
             ty if ty.is_subtype_of(db, Type::literal_string()) => Type::literal_string(),
             Type::Intersection(intersection) => {
@@ -6861,18 +6857,21 @@ impl<'db> Type<'db> {
     pub(crate) fn repr(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::LiteralValue(literal) => match literal.kind() {
-                LiteralValueTypeKind::Int(number) => Type::string_literal(db, &number.to_string()),
+                LiteralValueTypeKind::Int(number) => {
+                    Type::string_literal(db, number.to_compact_string())
+                }
                 LiteralValueTypeKind::Bool(true) => Type::string_literal(db, "True"),
                 LiteralValueTypeKind::Bool(false) => Type::string_literal(db, "False"),
-                LiteralValueTypeKind::String(literal) => {
-                    Type::string_literal(db, &format!("'{}'", literal.value(db).escape_default()))
-                }
+                LiteralValueTypeKind::String(literal) => Type::string_literal(
+                    db,
+                    compact_str::format_compact!("'{}'", literal.value(db).escape_default()),
+                ),
                 LiteralValueTypeKind::LiteralString => Type::literal_string(),
                 _ => KnownClass::Str.to_instance(db),
             },
-            Type::SpecialForm(special_form) => Type::string_literal(db, &special_form.to_string()),
+            Type::SpecialForm(special_form) => Type::string_literal(db, &*special_form.to_string()),
             Type::KnownInstance(known_instance) => {
-                Type::string_literal(db, &known_instance.repr(db).to_string())
+                Type::string_literal(db, known_instance.repr(db).to_compact_string())
             }
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
