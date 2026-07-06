@@ -132,7 +132,7 @@ impl<'db> Type<'db> {
                             TupleSpec::heterogeneous(
                                 string_literal
                                     .chars()
-                                    .map(|c| Type::string_literal(db, &c.to_string())),
+                                    .map(|c| Type::string_literal(db, c.to_string())),
                             )
                         } else {
                             TupleSpec::homogeneous(Type::literal_string())

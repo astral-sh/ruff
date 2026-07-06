@@ -72,7 +72,7 @@ impl KnownEnumDataTypeMixin {
                 Type::int_literal(i64::from(value))
             }
             (Self::Str, Some(LiteralValueTypeKind::Int(value))) => {
-                Type::string_literal(db, &value.to_string())
+                Type::string_literal(db, value.to_string())
             }
             (Self::Str, Some(LiteralValueTypeKind::Bool(value))) => {
                 Type::string_literal(db, if value { "True" } else { "False" })
@@ -1093,7 +1093,7 @@ pub(crate) fn enum_metadata<'db>(
                                     if Type::ClassLiteral(ClassLiteral::Static(class))
                                         .is_subtype_of(db, KnownClass::StrEnum.to_subclass_of(db))
                                     {
-                                        Type::string_literal(db, &name.to_lowercase())
+                                        Type::string_literal(db, name.to_lowercase())
                                     } else {
                                         let custom_mixins: SmallVec<[Option<KnownClass>; 1]> =
                                             class

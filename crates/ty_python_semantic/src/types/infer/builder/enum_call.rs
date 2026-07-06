@@ -166,7 +166,7 @@ fn first_enum_auto_value<'db>(
     start: EnumStart,
 ) -> Type<'db> {
     match base_class {
-        KnownClass::StrEnum => Type::string_literal(db, &name.to_lowercase()),
+        KnownClass::StrEnum => Type::string_literal(db, name.to_lowercase()),
         _ => match start {
             EnumStart::Literal(start) => Type::int_literal(start),
             EnumStart::DynamicInt => KnownClass::Int.to_instance(db),
@@ -188,7 +188,7 @@ fn next_auto_value<'db>(
     last_int_value: Option<i64>,
 ) -> Type<'db> {
     match base_class {
-        KnownClass::StrEnum => Type::string_literal(db, &name.to_lowercase()),
+        KnownClass::StrEnum => Type::string_literal(db, name.to_lowercase()),
         _ => {
             let Some(last) = last_int_value else {
                 return KnownClass::Int.to_instance(db);
@@ -260,7 +260,7 @@ fn apply_generated_type_mixin_member_values<'db>(
                 .into_iter()
                 .map(|(name, value)| {
                     let value = if let Some(literal) = value.as_int_literal() {
-                        Type::string_literal(db, &literal.to_string())
+                        Type::string_literal(db, literal.to_string())
                     } else if value.is_assignable_to(db, KnownClass::Int.to_instance(db)) {
                         KnownClass::Str.to_instance(db)
                     } else {
