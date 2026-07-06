@@ -1740,7 +1740,7 @@ fn report_invalid_union_type_elements<'db>(
 /// this will return `True` at runtime, `Truthiness::AlwaysFalse` if we can definitely infer
 /// that this will return `False` at runtime, or `Truthiness::Ambiguous` if we should infer `bool`
 /// instead.
-fn is_instance_truthiness<'db>(
+pub(super) fn is_instance_truthiness<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
     class: ClassLiteral<'db>,
