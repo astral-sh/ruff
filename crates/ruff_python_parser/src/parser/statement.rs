@@ -853,7 +853,7 @@ impl<'src> Parser<'src> {
         // import a.b.c
         // import a .  b  . c
         ast::Identifier {
-            id: Name::from(dotted_name),
+            id: self.intern_owned_name(Name::from(dotted_name)),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }

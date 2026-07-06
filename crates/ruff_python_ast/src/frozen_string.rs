@@ -10,7 +10,7 @@ use std::str;
 use std::sync::Arc;
 
 /// The number of UTF-8 bytes stored directly inside a [`FrozenCompactString`].
-const INLINE_CAPACITY: usize = 15;
+pub(crate) const INLINE_CAPACITY: usize = 15;
 
 // Heap tags encode the most significant length byte plus one, reserving zero as a niche. Inline
 // tags start above the heap range and encode lengths 0 through 15.

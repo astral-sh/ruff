@@ -18,6 +18,9 @@ use crate::generated::ExprName;
 pub struct Name(FrozenCompactString);
 
 impl Name {
+    /// The maximum number of UTF-8 bytes stored inline in a name.
+    pub const INLINE_CAPACITY: usize = crate::frozen_string::INLINE_CAPACITY;
+
     #[inline]
     pub fn empty() -> Self {
         Self(FrozenCompactString::default())
