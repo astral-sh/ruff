@@ -57,7 +57,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
 
             let signature = Signature::new_generic(
                 Some(generic_context),
-                Parameters::new(db, parameters),
+                Parameters::from_annotation(db, parameters),
                 self_ty,
             );
             Some(Type::function_like_callable(db, signature))
@@ -102,7 +102,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
                     .with_definition(field.definition)
             }));
 
-            let signature = Signature::new(Parameters::new(db, parameters), self_ty);
+            let signature = Signature::new(Parameters::from_annotation(db, parameters), self_ty);
             Some(Type::function_like_callable(db, signature))
         }
         "__init__" => {
@@ -622,7 +622,7 @@ impl get_size2::GetSize for NamedTupleSpec<'_> {}
 /// Create a property type for a namedtuple field.
 fn create_field_property<'db>(db: &'db dyn Db, field_ty: Type<'db>) -> Type<'db> {
     let property_getter_signature = Signature::new(
-        Parameters::new(
+        Parameters::from_annotation(
             db,
             [Parameter::positional_only(Some(Name::new_static("self")))],
         ),

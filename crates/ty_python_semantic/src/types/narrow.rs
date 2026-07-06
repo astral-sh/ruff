@@ -4071,7 +4071,7 @@ fn required_typeddict_key<'db>(
 /// synthesized `TypedDict` used for `TypedDict` arms.
 fn key_membership_contains_protocol<'db>(db: &'db dyn Db, key: &str) -> Type<'db> {
     let signature = Signature::new(
-        Parameters::new(
+        Parameters::from_annotation(
             db,
             [
                 Parameter::positional_only(Some(Name::new_static("self"))),

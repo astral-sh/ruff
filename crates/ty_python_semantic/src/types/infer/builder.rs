@@ -7416,7 +7416,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .chain(keyword_only)
                 .chain(keyword_variadic);
 
-            Parameters::new(self.db(), parameters)
+            Parameters::from_annotation(self.db(), parameters)
         } else {
             Parameters::empty()
         };
@@ -7526,7 +7526,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Synthesize overloads for `__getitem__` based on known dictionary elements.
         let getitem_overloads = elements.into_iter().map(|(name, ty)| {
             Signature::new(
-                Parameters::new(
+                Parameters::from_annotation(
                     db,
                     [
                         Parameter::positional_only(Some(Name::new_static("self"))),

@@ -1559,7 +1559,7 @@ impl<'db> ClassType<'db> {
             let self_parameter = Parameter::positional_only(Some(Name::new_static("self")));
             let index_parameter = Parameter::positional_only(Some(Name::new_static("index")))
                 .with_annotated_type(index_annotation);
-            let parameters = Parameters::new(db, [self_parameter, index_parameter]);
+            let parameters = Parameters::from_annotation(db, [self_parameter, index_parameter]);
             Signature::new(parameters, return_annotation)
         }
 
@@ -1595,7 +1595,7 @@ impl<'db> ClassType<'db> {
                     .map(Type::int_literal)
                     .unwrap_or_else(|| KnownClass::Int.to_instance(db));
 
-                let parameters = Parameters::new(
+                let parameters = Parameters::from_annotation(
                     db,
                     [Parameter::positional_only(Some(Name::new_static("self")))
                         .with_annotated_type(Type::instance(db, self))],
@@ -1837,7 +1837,7 @@ impl<'db> ClassType<'db> {
                         iterable_parameter.with_default_type(Type::empty_tuple(db));
                 }
 
-                let parameters = Parameters::new(
+                let parameters = Parameters::from_annotation(
                     db,
                     [
                         Parameter::positional_only(Some(Name::new_static("self")))

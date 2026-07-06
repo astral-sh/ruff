@@ -107,7 +107,7 @@ fn sequence_pattern_getitem_method<'db>(
         .into_iter()
         .map(|(index, element_type)| {
             Signature::new(
-                Parameters::new(
+                Parameters::from_annotation(
                     db,
                     [
                         self_parameter(),
@@ -120,7 +120,7 @@ fn sequence_pattern_getitem_method<'db>(
         });
     let fallback_overload = fallback_return_type.map(|fallback_return_type| {
         Signature::new(
-            Parameters::new(
+            Parameters::from_annotation(
                 db,
                 [
                     self_parameter(),
@@ -170,7 +170,10 @@ pub(crate) fn exact_sequence_pattern_type<'db>(
 
     let self_parameter = || Parameter::positional_only(Some(Name::new_static("self")));
 
-    let len_signature = Signature::new(Parameters::new(db, [self_parameter()]), length_type);
+    let len_signature = Signature::new(
+        Parameters::from_annotation(db, [self_parameter()]),
+        length_type,
+    );
     let len_method = CallableType::function_like(db, len_signature);
 
     let getitem_method = (element_types.len() > 0).then(|| {
