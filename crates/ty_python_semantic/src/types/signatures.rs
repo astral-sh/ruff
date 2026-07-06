@@ -1671,6 +1671,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
             // source is possibly overloaded while target is definitely not overloaded.
             (_, [target_signature]) => {
+                // Universal target variables must be evaluated after the source overloads have
+                // been combined. Until callable-level universal projection can preserve that
+                // coverage, retain the established overload relation instead of rejecting each
+                // overload independently.
+                if self.universal_callable_target_typevars
+                    && target_signature
+                        .generic_context
+                        .is_some_and(|context| context.variables(db).next().is_some())
+                {
+                    return self
+                        .without_universal_callable_target_typevars()
+                        .check_callable_signature_pair_inner(
+                            db,
+                            source_overloads,
+                            target_overloads,
+                        );
+                }
+
                 if let Some(aggregate_relation) = self.try_unary_overload_aggregate_relation(
                     db,
                     source_overloads,
