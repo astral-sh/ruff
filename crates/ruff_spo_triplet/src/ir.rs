@@ -268,6 +268,13 @@ pub struct Field {
     /// `DEFINE FIELD` (`TYPE <t>` vs `TYPE option<t>`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub not_null: Option<bool>,
+    /// `store=True` on a computed Odoo field — the compute result is
+    /// persisted in a DB column rather than recomputed on read. `None` when
+    /// the constructor carries no `store=` kwarg (Odoo default: not stored for
+    /// computed fields). Emitted as `(field, stored, "true")` — only for
+    /// `Some(true)`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stored: Option<bool>,
 }
 
 /// One method / function.
@@ -321,6 +328,14 @@ pub struct Function {
     /// literal).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub calls: Vec<String>,
+    /// Field paths that trigger this method as an `@api.constrains` validation.
+    /// Emitted as `constrains` (Authoritative — the decorator names them).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub constrains: Vec<String>,
+    /// Field paths that trigger this method as an `@api.onchange` UI recompute.
+    /// Emitted as `onchange` (Authoritative — the decorator names them).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub onchange: Vec<String>,
 }
 
 impl Model {
