@@ -552,9 +552,9 @@ fn recursion_limit_nested_lambda_chain() {
     );
 }
 
-/// Parses `cells` as consecutive IPython cells, mirroring how a notebook's concatenated source is
-/// split into contiguous ranges by `CellOffsets`. Each cell carries its trailing separator newline,
-/// matching the synthetic newline `CellOffsets` appends after every cell's content.
+/// Parses `cells` as consecutive IPython cells, mirroring how `CellOffsets::content_ranges` splits a
+/// notebook's concatenated source: each range covers a cell's content up to but not including the
+/// synthetic `\n` separator, and the next range starts just after it.
 fn parse_ipy_cells(cells: &[&str]) -> Parsed<ModModule> {
     let mut source = String::new();
     let mut ranges = Vec::new();
@@ -565,7 +565,9 @@ fn parse_ipy_cells(cells: &[&str]) -> Parsed<ModModule> {
         );
         let start = TextSize::of(&source);
         source.push_str(cell);
-        ranges.push(TextRange::new(start, TextSize::of(&source)));
+        // Exclude the trailing separator newline, matching `CellOffsets::content_ranges`.
+        let end = TextSize::of(&source) - TextSize::from(1);
+        ranges.push(TextRange::new(start, end));
     }
     parse_cells_unchecked(&source, ranges, ParseOptions::from(Mode::Ipython))
 }

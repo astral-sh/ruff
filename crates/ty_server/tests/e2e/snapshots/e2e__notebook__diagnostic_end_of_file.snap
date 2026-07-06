@@ -189,8 +189,8 @@ expression: diagnostics
           "character": 7
         },
         "end": {
-          "line": 3,
-          "character": 0
+          "line": 2,
+          "character": 7
         }
       },
       "severity": 1,
