@@ -6754,22 +6754,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
-    /// Returns the evaluation mode (async or sync) of the comprehension.
-    fn infer_first_comprehension_iter(
-        &mut self,
-        comprehensions: &[ast::Comprehension],
-    ) -> EvaluationMode {
+    fn infer_first_comprehension_iter(&mut self, comprehensions: &[ast::Comprehension]) {
         let mut comprehensions_iter = comprehensions.iter();
         let Some(first_comprehension) = comprehensions_iter.next() else {
             unreachable!("Comprehension must contain at least one generator");
         };
         self.infer_maybe_standalone_expression(&first_comprehension.iter, TypeContext::default());
-
-        if first_comprehension.is_async {
-            EvaluationMode::Async
-        } else {
-            EvaluationMode::Sync
-        }
     }
 
     /// Derive the type context for a generator expression's yielded element from the expected type
@@ -6843,8 +6833,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parenthesized: _,
         } = generator;
 
-        let evaluation_mode = self.infer_first_comprehension_iter(generators);
-        let yield_tcx = self.generator_yield_type_context(tcx, evaluation_mode);
+        self.infer_first_comprehension_iter(generators);
 
         let Some(scope_id) = self
             .index
@@ -6852,6 +6841,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         else {
             return Type::unknown();
         };
+        let evaluation_mode =
+            EvaluationMode::from_is_async(scope_id.is_async_comprehension(self.index));
+        let yield_tcx = self.generator_yield_type_context(tcx, evaluation_mode);
         let scope = scope_id.to_scope_id(self.db(), self.file());
         let inference = infer_scope_types(self.db(), scope, yield_tcx);
         self.extend_scope(inference);
@@ -7416,7 +7408,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .chain(keyword_only)
                 .chain(keyword_variadic);
 
-            Parameters::new(self.db(), parameters)
+            Parameters::from_annotation(self.db(), parameters)
         } else {
             Parameters::empty()
         };
@@ -7526,7 +7518,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Synthesize overloads for `__getitem__` based on known dictionary elements.
         let getitem_overloads = elements.into_iter().map(|(name, ty)| {
             Signature::new(
-                Parameters::new(
+                Parameters::from_annotation(
                     db,
                     [
                         Parameter::positional_only(Some(Name::new_static("self"))),

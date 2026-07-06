@@ -175,6 +175,10 @@ impl Declarations {
         self.live_declarations.iter()
     }
 
+    pub(super) fn as_slice(&self) -> &[LiveDeclaration] {
+        &self.live_declarations
+    }
+
     fn merge(&mut self, b: Self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
         let a = std::mem::take(self);
 

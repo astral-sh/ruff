@@ -3309,7 +3309,7 @@ mod tests {
         return_ty: Option<Type<'db>>,
     ) -> String {
         Signature::new(
-            Parameters::new(db, parameters),
+            Parameters::from_annotation(db, parameters),
             return_ty.unwrap_or(Type::unknown()),
         )
         .display(db)
@@ -3322,7 +3322,7 @@ mod tests {
         return_ty: Option<Type<'db>>,
     ) -> String {
         Signature::new(
-            Parameters::new(db, parameters),
+            Parameters::from_annotation(db, parameters),
             return_ty.unwrap_or(Type::unknown()),
         )
         .display_with(db, super::DisplaySettings::default().multiline())

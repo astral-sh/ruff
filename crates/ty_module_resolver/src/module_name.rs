@@ -253,22 +253,14 @@ impl ModuleName {
         if !is_identifier(first_part) {
             return None;
         }
-        let name = if let Some(second_part) = components.next() {
-            if !is_identifier(second_part) {
+        let mut name = CompactString::from(first_part);
+        for part in components {
+            if !is_identifier(part) {
                 return None;
             }
-            let mut name = format!("{first_part}.{second_part}");
-            for part in components {
-                if !is_identifier(part) {
-                    return None;
-                }
-                name.push('.');
-                name.push_str(part);
-            }
-            CompactString::from(&name)
-        } else {
-            CompactString::from(first_part)
-        };
+            name.push('.');
+            name.push_str(part);
+        }
         Some(Self(name))
     }
 

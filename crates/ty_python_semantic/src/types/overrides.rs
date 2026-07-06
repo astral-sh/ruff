@@ -1442,7 +1442,7 @@ fn check_post_init_signature<'db>(
         Parameter::positional_only(Some(name.clone())).with_annotated_type(field.declared_ty)
     });
 
-    let parameters = Parameters::new(
+    let parameters = Parameters::from_annotation(
         db,
         std::iter::chain([first_parameter], following_parameters),
     );

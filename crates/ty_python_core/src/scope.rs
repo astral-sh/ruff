@@ -103,6 +103,10 @@ impl FileScopeId {
     pub fn is_generator_function(self, index: &SemanticIndex) -> bool {
         index.generator_functions.contains(&self)
     }
+
+    pub fn is_async_comprehension(self, index: &SemanticIndex) -> bool {
+        index.async_comprehensions.contains(&self)
+    }
 }
 
 #[derive(Debug, salsa::Update, get_size2::GetSize)]
