@@ -2862,7 +2862,15 @@ class IntOrStrConstrainedIdentityImplementation:
     def f[S: (int, str)](self, input: S) -> S:
         return input
 
+class IntBoundObjectProtocol(Protocol):
+    def f[T: int](self, input: T) -> object: ...
+
+class IntOrStrConstrainedObjectImplementation:
+    def f[S: (int, str)](self, input: S) -> object:
+        return input
+
 def requires_int_bound_identity(value: IntBoundIdentityProtocol) -> None: ...
+def requires_int_bound_object(value: IntBoundObjectProtocol) -> None: ...
 
 class IntOrStrIdentityProtocol(Protocol):
     def f[T: (int, str)](self, input: T) -> T: ...
@@ -2942,6 +2950,8 @@ static_assert(not is_assignable_to(IntOrStrConstrainedIdentityImplementation, In
 requires_int_bound_identity(
     IntOrStrConstrainedIdentityImplementation()  # error: [invalid-argument-type]
 )
+static_assert(is_assignable_to(IntOrStrConstrainedObjectImplementation, IntBoundObjectProtocol))
+requires_int_bound_object(IntOrStrConstrainedObjectImplementation())
 static_assert(is_assignable_to(IntOrStrConstrainedIdentityImplementation, IntOrStrIdentityProtocol))
 requires_int_or_str_identity(IntOrStrConstrainedIdentityImplementation())
 requires_int_or_str_identity(IntOrStrOverloadedImplementation())  # error: [invalid-argument-type]

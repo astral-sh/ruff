@@ -2035,8 +2035,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let Some(source_context) = source.generic_context else {
             return self.never();
         };
+        let source_domain =
+            source_context
+                .variables(db)
+                .when_all(db, self.constraints, |typevar| {
+                    ConstraintSet::valid_specializations(db, self.constraints, typevar)
+                });
         let when = checker.with_signature_recursion_guard(source, target, || {
-            checker.check_signature_pair_inner(db, source, target)
+            source_domain.and(db, self.constraints, || {
+                checker.check_signature_pair_inner(db, source, target)
+            })
         });
         let solutions = match when.solutions(db, self.constraints, source_inferable) {
             Solutions::Unsatisfiable => return self.never(),
