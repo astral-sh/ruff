@@ -271,8 +271,8 @@ pub struct Field {
     /// `store=True` on a computed Odoo field — the compute result is
     /// persisted in a DB column rather than recomputed on read. `None` when
     /// the constructor carries no `store=` kwarg (Odoo default: not stored for
-    /// computed fields). Emitted as `(field, stored, "true")` — only for
-    /// `Some(true)`.
+    /// computed fields). Not expanded as a triple — consumers (OGAR lifts)
+    /// read the struct field directly.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stored: Option<bool>,
 }
@@ -328,12 +328,14 @@ pub struct Function {
     /// literal).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub calls: Vec<String>,
-    /// Field paths that trigger this method as an `@api.constrains` validation.
-    /// Emitted as `constrains` (Authoritative — the decorator names them).
+    /// Field paths that trigger this method as an `@api.constrains` validation
+    /// (Authoritative — the decorator names them). Not expanded as a triple —
+    /// consumers (OGAR lifts) read the struct field directly.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub constrains: Vec<String>,
-    /// Field paths that trigger this method as an `@api.onchange` UI recompute.
-    /// Emitted as `onchange` (Authoritative — the decorator names them).
+    /// Field paths that trigger this method as an `@api.onchange` UI recompute
+    /// (Authoritative — the decorator names them). Not expanded as a triple —
+    /// consumers (OGAR lifts) read the struct field directly.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub onchange: Vec<String>,
 }

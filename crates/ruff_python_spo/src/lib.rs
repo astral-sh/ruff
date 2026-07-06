@@ -795,11 +795,12 @@ class Foo(models.Model):
 
     #[test]
     fn ndjson_byte_identical_without_new_facts() {
-        // A fixture with none of the new facts (no `store=`, no
-        // `@api.constrains`/`@api.onchange`) must serialise identically to
-        // before this change: `skip_serializing_if` keeps the new `Function`
-        // (`constrains`/`onchange`) and `Field` (`stored`) keys entirely
-        // absent from the ndjson.
+        // ndjson serialises expanded *triples*, not the IR structs, and
+        // `expand` deliberately does not emit the new facts — so no new
+        // predicate strings may ever surface in ndjson, with or without
+        // `store=` / `@api.constrains` / `@api.onchange` in the source.
+        // (The `skip_serializing_if` attributes on the IR fields matter only
+        // for direct struct serialisation, which is OGAR-side surface.)
         let graph = extract_from_source(RELATION_KINDS);
         let nd = to_ndjson(&graph);
         assert!(!nd.contains("constrains"));
