@@ -664,11 +664,11 @@ impl<'db> ProtocolMemberData<'db> {
     ) -> Self {
         let (method_kind, callable) = if callable.is_classmethod_like(db) {
             (
-                ProtocolMethodKind::ClassOrStatic,
+                ProtocolMethodKind::Class,
                 protocol_bind_self(db, callable, None),
             )
         } else if callable.is_staticmethod_like(db) {
-            (ProtocolMethodKind::ClassOrStatic, callable.into_regular(db))
+            (ProtocolMethodKind::Static, callable.into_regular(db))
         } else {
             (ProtocolMethodKind::Instance, callable)
         };
@@ -859,27 +859,11 @@ enum ProtocolMemberKind<'db> {
     Attribute(ProtocolMemberType<'db>),
 }
 
-/// Describes how descriptor binding exposes a protocol method.
-///
-/// Class and static methods share a variant because both expose the same effective signature
-/// through instance and class access. Class methods have already bound their receiver, while static
-/// methods have no receiver to bind:
-///
-/// ```python
-/// class P(Protocol):
-///     @classmethod
-///     def method(cls, value: int) -> str: ...
-///
-/// p: P
-/// ```
-///
-/// Both `P.method` and `p.method` are viewed as `(int) -> str`.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 enum ProtocolMethodKind {
-    /// Instance access binds the receiver; class access leaves it unbound.
     Instance,
-    /// Instance and class access expose the same effective signature.
-    ClassOrStatic,
+    Class,
+    Static,
 }
 
 impl<'db> ProtocolMemberKind<'db> {
