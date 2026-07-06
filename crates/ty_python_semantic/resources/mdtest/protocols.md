@@ -2938,15 +2938,11 @@ static_assert(is_subtype_of(ReorderedPairImplementation, PairProtocol))
 static_assert(is_assignable_to(ReorderedPairImplementation, PairProtocol))
 
 requires_int_bound_identity(GenericListReturnImplementation())  # error: [invalid-argument-type]
-static_assert(
-    not is_assignable_to(IntOrStrConstrainedIdentityImplementation, IntBoundIdentityProtocol)
-)
+static_assert(not is_assignable_to(IntOrStrConstrainedIdentityImplementation, IntBoundIdentityProtocol))
 requires_int_bound_identity(
     IntOrStrConstrainedIdentityImplementation()  # error: [invalid-argument-type]
 )
-static_assert(
-    is_assignable_to(IntOrStrConstrainedIdentityImplementation, IntOrStrIdentityProtocol)
-)
+static_assert(is_assignable_to(IntOrStrConstrainedIdentityImplementation, IntOrStrIdentityProtocol))
 requires_int_or_str_identity(IntOrStrConstrainedIdentityImplementation())
 requires_int_or_str_identity(IntOrStrOverloadedImplementation())  # error: [invalid-argument-type]
 requires_int_or_str_identity(IntOrStrGenericOverloadedImplementation())
