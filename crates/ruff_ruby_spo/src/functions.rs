@@ -38,8 +38,10 @@
 //! - Block-form callbacks (`before_save do |r| … end`) — the block
 //!   body's def-less statements aren't reachable here.
 //! - Receiver-walks that span multiple hops (`self.project.members`).
-//! - Op-assign writes (`self.x += 1`, `self.x ||= y`) — only the plain
-//!   `self.x = …` setter form is recorded as a write today.
+//! - Op-assign writes on non-self-attribute targets (`x ||= y`, `@x += 1`) —
+//!   only a `self.<field>` receiver is recognised. `self.x ||= y` is captured
+//!   as `writes` + `guarded_writes` (the J1 default idiom); `self.x += y` is
+//!   captured as `writes` + `reads` (a read-modify-write, not a guard).
 //!
 //! These all land in follow-up D-AR-3.6 (method bodies are deep; the
 //! 80/20 here is method NAMES + leaf `raise` + association walks).
@@ -395,6 +397,32 @@ fn walk_method_body(node: &Node, known_relations: &[String], func: &mut Function
             for arg in &s.args {
                 walk_method_body(arg, known_relations, func);
             }
+        }
+        // `self.<field> ||= v` — the nil/false-guarded default write. Same J1
+        // family as `self.x = v if self.x.blank?` (a falsy test is the same
+        // "absent" guard for this purpose): recorded as BOTH `writes` and
+        // `guarded_writes` (the latter always a subset of the former, same
+        // invariant `claim_if_writes` upholds for the `If`/`IfMod` shape).
+        // Non-self-attribute targets (`x ||= v`, `@x ||= v`) are left alone,
+        // consistent with `is_attr_ident`/`attr_of_self` elsewhere.
+        Node::OrAsgn(o) => {
+            if let Some(field) = attr_of_self(&o.recv) {
+                let field = field.to_string();
+                func.writes.push(field.clone());
+                func.guarded_writes.push(field);
+            }
+            walk_method_body(&o.value, known_relations, func);
+        }
+        // `self.<field> += v` (and the other op-assign operators) — a
+        // read-modify-write, NOT a guarded default: the field's current value
+        // is read to compute the new one, so both `reads` and `writes` are
+        // recorded (no `guarded_writes` — there is no blank/nil test here).
+        Node::OpAsgn(o) => {
+            if let Some(field) = attr_of_self(&o.recv) {
+                func.reads.push(field.to_string());
+                func.writes.push(field.to_string());
+            }
+            walk_method_body(&o.value, known_relations, func);
         }
         // `<relation>.each` / `<relation>.<m>` — association walks, plus any
         // `ActiveRecord` lifecycle mutator dispatched on a non-self receiver
@@ -1261,6 +1289,79 @@ end
             normalize_form[0].guarded_writes.is_empty(),
             "an unconditional transform is a normalize, not a default; got {:?}",
             normalize_form[0].guarded_writes
+        );
+    }
+
+    #[test]
+    fn or_asgn_self_attr_emits_guarded_and_plain_write() {
+        // `self.x ||= v` is the most common default idiom (#45-audit blind
+        // spot): semantically the same as `self.x = v if self.x.blank?`, so
+        // it must land in BOTH `writes` and `guarded_writes` (subset
+        // invariant), not neither.
+        let funcs = class_functions(
+            r#"
+class M
+  def set_default
+    self.state ||= "new"
+  end
+end
+"#,
+        );
+        assert_eq!(funcs[0].writes, vec!["state"]);
+        assert_eq!(
+            funcs[0].guarded_writes,
+            vec!["state"],
+            "`self.x ||= v` must be recorded as a guarded (default) write"
+        );
+    }
+
+    #[test]
+    fn or_asgn_local_var_emits_nothing() {
+        // `x ||= v` (a local variable, no `self.` receiver) is not an AR
+        // attribute write — consistent with `attr_of_self` / `is_attr_ident`
+        // elsewhere (e.g. `@x = …` is likewise not a write).
+        let funcs = class_functions(
+            r#"
+class M
+  def compute
+    x ||= 1
+    x
+  end
+end
+"#,
+        );
+        assert!(
+            funcs[0].writes.is_empty(),
+            "local-var or-asgn must not be a field write; got {:?}",
+            funcs[0].writes
+        );
+        assert!(
+            funcs[0].guarded_writes.is_empty(),
+            "local-var or-asgn must not be a guarded write; got {:?}",
+            funcs[0].guarded_writes
+        );
+    }
+
+    #[test]
+    fn op_asgn_self_attr_emits_write_and_read() {
+        // `self.x += v` reads the current value to compute the new one — a
+        // read-modify-write, NOT a guarded default (no blank/nil test), so it
+        // must be `writes` + `reads`, never `guarded_writes`.
+        let funcs = class_functions(
+            r#"
+class M
+  def bump
+    self.count += 1
+  end
+end
+"#,
+        );
+        assert_eq!(funcs[0].writes, vec!["count"]);
+        assert_eq!(funcs[0].reads, vec!["count"]);
+        assert!(
+            funcs[0].guarded_writes.is_empty(),
+            "op-asgn is a read-modify-write, not a guarded default; got {:?}",
+            funcs[0].guarded_writes
         );
     }
 }
