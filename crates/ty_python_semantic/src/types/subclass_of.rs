@@ -326,6 +326,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
             // and `type[int]` describes all possible runtime subclasses of the class `int`.
             // The first set is a subset of the second set, because `bool` is itself a subclass of `int`.
+            //
+            // When the target is a protocol, `type[C]` assignable to `type[Protocol]` is a
+            // *structural* relationship (does `C`'s class object satisfy the protocol's class-level
+            // interface), not a nominal MRO membership. `check_class_pair` only performs the nominal
+            // walk and would wrongly reject e.g. `type[Impl]` assignable to `type[P]` where `Impl`
+            // structurally satisfies `P` without inheriting it. `type[Protocol]` is modeled
+            // gradually elsewhere (a source-written `type[P]` annotation infers a dynamic `@Todo`,
+            // which accepts any class object), so -- for assignability -- treat a protocol target
+            // like that gradual form. For *subtyping* we keep the nominal check, so that intersection
+            // simplification does not treat an arbitrary `type[C]` as a subtype of `type[Protocol]`.
+            (SubclassOfInner::Class(_), SubclassOfInner::Class(target))
+                if target.is_protocol(db) && self.is_eager_assignability() =>
+            {
+                ConstraintSet::from_bool(self.constraints, true)
+            }
             (SubclassOfInner::Class(source), SubclassOfInner::Class(target)) => {
                 self.check_class_pair(db, source, target)
             }

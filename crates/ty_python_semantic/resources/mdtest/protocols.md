@@ -4338,6 +4338,46 @@ async def variant_two() -> int:
     return await second(first(123))
 ```
 
+## Generic member returning `type[T]` satisfied by a structural subtype
+
+When a generic protocol has a member whose return type is `type[T]`, an implementer whose
+corresponding member returns `type[Impl]` should satisfy the protocol specialized with `P` whenever
+`type[Impl]` is assignable to `type[P]` -- including when `Impl` is a *structural* (non-nominal)
+subtype of `P`. This must agree with ordinary assignability: `type[Impl]` is assignable to
+`type[P]`, so `Impl` satisfies the specialized member.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class P(Protocol):
+    def step(self) -> None: ...
+
+# `Impl` structurally satisfies `P` (it does not inherit from it):
+class Impl:
+    def step(self) -> None: ...
+
+# Ordinary assignability holds: `type[Impl]` is assignable to `type[P]`.
+_direct: type[P] = Impl
+
+class HasFactory[T](Protocol):
+    def factory(self) -> type[T] | None: ...
+
+class ImplFactory:
+    def factory(self) -> type[Impl]:
+        return Impl
+
+def want(x: HasFactory[P]) -> None: ...
+
+# `ImplFactory.factory` returns `type[Impl]`, assignable to the member's `type[P] | None`,
+# so `ImplFactory` satisfies `HasFactory[P]`:
+want(ImplFactory())
+```
+
 ## TODO
 
 Add tests for:
