@@ -36,7 +36,7 @@ pub(super) enum AttributeWriteRequirement<'db> {
     Unconstrained,
     /// The object type does not permit writes at all.
     CannotAssign,
-    /// A module symbol, with its declared type when the symbol is known.
+    /// A module symbol, with its effective write type when the symbol is known.
     ///
     /// `None` represents an unresolved module attribute rather than an unconstrained write.
     Module(Option<Type<'db>>),
@@ -229,7 +229,7 @@ pub(super) fn attribute_write_requirement<'db>(
                 module.static_member(db, attribute)
             };
             AttributeWriteRequirement::Module(match symbol.place {
-                Place::Defined(DefinedPlace { ty, .. }) => Some(ty),
+                Place::Defined(DefinedPlace { ty, .. }) => Some(ty.promote(db)),
                 Place::Undefined => None,
             })
         }

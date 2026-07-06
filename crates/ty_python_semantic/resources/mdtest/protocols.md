@@ -1815,6 +1815,36 @@ static_assert(is_subtype_of(UsesMeta, HasX))  # error: [static-assert-error]
 static_assert(is_assignable_to(UsesMeta, HasX))  # error: [static-assert-error]
 ```
 
+An unannotated module global retains its inferred literal type when read. Its write type is
+promoted, because code outside the module can reassign it:
+
+`settings.py`:
+
+```py
+from typing import Literal
+
+debug = True
+mode: Literal["development"] = "development"
+```
+
+`use_settings.py`:
+
+```py
+import settings
+from typing import Protocol
+
+class Options(Protocol):
+    debug: bool
+
+options: Options = settings
+
+reveal_type(settings.debug)  # revealed: Literal[True]
+settings.debug = False
+
+# An explicit literal annotation is not promoted.
+settings.mode = "production"  # error: [invalid-assignment]
+```
+
 ## `ClassVar` attribute members
 
 If a protocol `ClassVarX` has a `ClassVar` attribute member `x` with type `int`, this indicates that
