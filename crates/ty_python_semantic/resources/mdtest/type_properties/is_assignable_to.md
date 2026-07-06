@@ -1348,9 +1348,18 @@ def identity[T](t: T) -> T:
 def int_identity(t: int) -> int:
     return t
 
+def returns_int[T](t: T) -> int:
+    return 1
+
 static_assert(
     not is_assignable_to(
         RegularCallableTypeOf[int_identity],
+        RegularCallableTypeOf[identity],
+    )
+)
+static_assert(
+    not is_assignable_to(
+        RegularCallableTypeOf[returns_int],
         RegularCallableTypeOf[identity],
     )
 )
