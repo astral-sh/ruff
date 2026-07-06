@@ -37,7 +37,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
     MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
-    TypeMapping, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder,
+    VarianceInferable,
     infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
@@ -1781,16 +1782,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     db,
                     self.constraints,
                     |(target, source)| {
-                        let target_domain = target
-                            .typevar(db)
-                            .require_bound_or_constraints(db)
-                            .as_type(db);
-                        let source_domain = source
-                            .typevar(db)
-                            .require_bound_or_constraints(db)
-                            .as_type(db)
-                            .apply_specialization(db, specialization);
-                        self.check_type_pair(db, target_domain, source_domain)
+                        self.check_source_typevar_specialization(
+                            db,
+                            *source,
+                            Type::TypeVar(*target),
+                            specialization,
+                        )
                     },
                 );
                 Some((
@@ -1853,6 +1850,56 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
     }
 
+    /// Check that a source type variable can be specialized to `specialized` without erasing the
+    /// difference between an upper bound and a constrained domain.
+    fn check_source_typevar_specialization(
+        &self,
+        db: &'db dyn Db,
+        source: BoundTypeVarInstance<'db>,
+        specialized: Type<'db>,
+        specialization: Specialization<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        match source.typevar(db).require_bound_or_constraints(db) {
+            TypeVarBoundOrConstraints::UpperBound(bound) => self.check_type_pair(
+                db,
+                specialized,
+                bound.apply_specialization(db, specialization),
+            ),
+            TypeVarBoundOrConstraints::Constraints(source_constraints) => {
+                let source_accepts_constraint = |candidate| {
+                    source_constraints.elements(db).iter().copied().when_any(
+                        db,
+                        self.constraints,
+                        |source_constraint| {
+                            let source_constraint =
+                                source_constraint.apply_specialization(db, specialization);
+                            self.check_type_pair(db, candidate, source_constraint).and(
+                                db,
+                                self.constraints,
+                                || self.check_type_pair(db, source_constraint, candidate),
+                            )
+                        },
+                    )
+                };
+
+                if let Type::TypeVar(target) = specialized {
+                    let TypeVarBoundOrConstraints::Constraints(target_constraints) =
+                        target.typevar(db).require_bound_or_constraints(db)
+                    else {
+                        return self.never();
+                    };
+                    target_constraints.elements(db).iter().copied().when_all(
+                        db,
+                        self.constraints,
+                        source_accepts_constraint,
+                    )
+                } else {
+                    source_accepts_constraint(specialized)
+                }
+            }
+        }
+    }
+
     /// Infer a source specialization, then verify it against the rigid generic target.
     fn check_signature_pair_with_inferred_source(
         &self,
@@ -1911,12 +1958,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .variables(db)
                 .zip(specialization.types(db))
                 .when_all(db, self.constraints, |(typevar, specialized)| {
-                    let domain = typevar
-                        .typevar(db)
-                        .require_bound_or_constraints(db)
-                        .as_type(db)
-                        .apply_specialization(db, specialization);
-                    self.check_type_pair(db, *specialized, domain)
+                    self.check_source_typevar_specialization(
+                        db,
+                        typevar,
+                        *specialized,
+                        specialization,
+                    )
                 });
             specialization_is_valid.and(db, self.constraints, || {
                 self.with_signature_recursion_guard(&specialized_source, target, || {
