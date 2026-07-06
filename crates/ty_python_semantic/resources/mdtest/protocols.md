@@ -751,6 +751,7 @@ class FooWithZero:
 
 static_assert(is_subtype_of(FooWithZero, HasXWithDefault))
 static_assert(is_assignable_to(FooWithZero, HasXWithDefault))
+
 # TODO: whether or not any of these four assertions should pass is not clearly specified.
 #
 # A test in the typing conformance suite implies that they all should:
@@ -1058,15 +1059,15 @@ class AssignmentForms(Protocol):
 
 ```snapshot
 warning[ambiguous-protocol-member]: Cannot assign to an undeclared attribute in a protocol method
-   --> src/mdtest_snippet.py:324:9
+   --> src/mdtest_snippet.py:325:9
     |
-324 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
+325 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
     |         ^^^^^^^^^^^^^^ `augmented` is not declared as a protocol member
     |
 info: Assigning to an undeclared attribute in a protocol method leads to an ambiguous interface
-   --> src/mdtest_snippet.py:316:7
+   --> src/mdtest_snippet.py:317:7
     |
-316 | class AssignmentForms(Protocol):
+317 | class AssignmentForms(Protocol):
     |       ^^^^^^^^^^^^^^^^^^^^^^^^^ `AssignmentForms` declared as a protocol here
     |
 info: No declarations found for `augmented` in the body of `AssignmentForms` or any of its superclasses
