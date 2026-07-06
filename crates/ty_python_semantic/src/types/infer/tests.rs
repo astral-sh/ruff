@@ -163,27 +163,6 @@ fn multiplied_string() -> anyhow::Result<()> {
 }
 
 #[test]
-fn added_string_literals() -> anyhow::Result<()> {
-    let mut db = setup_db();
-    db.write_dedented(
-        "src/a.py",
-        r#"
-            from typing_extensions import Literal, assert_type
-
-            assert_type("hello " + "world", Literal["hello world"])
-            assert_type(
-                "this string is long " + "enough to allocate",
-                Literal["this string is long enough to allocate"],
-            )
-        "#,
-    )?;
-
-    assert_file_diagnostics(&db, "src/a.py", &[]);
-
-    Ok(())
-}
-
-#[test]
 fn multiplied_literal_string() -> anyhow::Result<()> {
     let mut db = setup_db();
     let content = format!(

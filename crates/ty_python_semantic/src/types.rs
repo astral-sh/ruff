@@ -1775,19 +1775,10 @@ impl<'db> Type<'db> {
     }
 
     /// Create a promotable string literal.
-    pub(crate) fn string_literal(db: &'db dyn Db, string: &str) -> Self {
+    pub(crate) fn string_literal(db: &'db dyn Db, string: impl Into<CompactString>) -> Self {
         Self::LiteralValue(LiteralValueType::promotable(StringLiteralType::new(
-            db, string,
-        )))
-    }
-
-    /// Create a promotable string literal from an owned [`CompactString`].
-    ///
-    /// On an interning miss, Salsa can store the value directly instead of copying it from a
-    /// borrowed `str`.
-    pub(crate) fn string_literal_owned(db: &'db dyn Db, string: CompactString) -> Self {
-        Self::LiteralValue(LiteralValueType::promotable(StringLiteralType::new(
-            db, string,
+            db,
+            string.into(),
         )))
     }
 
@@ -5411,7 +5402,7 @@ impl<'db> Type<'db> {
             self.try_call_dunder(
                 db,
                 "__getattr__",
-                CallArguments::positional([Type::string_literal(db, name)]),
+                CallArguments::positional([Type::string_literal(db, name.as_str())]),
                 TypeContext::default(),
             )
             .map(|outcome| Place::bound(outcome.return_type(db)))
@@ -5430,7 +5421,7 @@ impl<'db> Type<'db> {
             self.try_call_dunder_with_policy(
                 db,
                 "__getattribute__",
-                &mut CallArguments::positional([Type::string_literal(db, name)]),
+                &mut CallArguments::positional([Type::string_literal(db, name.as_str())]),
                 TypeContext::default(),
                 MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
             )
