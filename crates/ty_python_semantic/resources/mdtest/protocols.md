@@ -3235,7 +3235,7 @@ of `N` or inhabitants of `type[N]`, *and* the signature of `N.x` is equivalent t
 
 ```py
 from collections.abc import Callable
-from typing import Protocol
+from typing import Protocol, overload
 from typing_extensions import Self
 from ty_extensions import static_assert
 from ty_extensions._internal import is_subtype_of, is_assignable_to, is_equivalent_to, is_disjoint_from
@@ -3303,6 +3303,25 @@ class BadFactory:
     def create(cls) -> int:
         return 42
 
+class POverloadedFactory(Protocol):
+    @overload
+    @classmethod
+    def create(cls, value: int) -> Self: ...
+    @overload
+    @classmethod
+    def create(cls, value: str) -> Self: ...
+
+class OverloadedFactory:
+    @overload
+    @classmethod
+    def create(cls, value: int) -> Self: ...
+    @overload
+    @classmethod
+    def create(cls, value: str) -> Self: ...
+    @classmethod
+    def create(cls, value: int | str) -> Self:
+        return cls()
+
 # `PClassMethod.x` and `PStaticMethod.x` evaluate to callable types with equivalent signatures
 # whether you access them on the protocol class or instances of the protocol.
 # That means that they are equivalent protocols!
@@ -3346,6 +3365,7 @@ static_assert(not is_subtype_of(NStaticMethodShadowed, PStaticMethod))
 # `Self` in the classmethod signature is bound to the implementation type.
 static_assert(is_subtype_of(Factory, PFactory))
 static_assert(not is_assignable_to(BadFactory, PFactory))
+static_assert(is_subtype_of(OverloadedFactory, POverloadedFactory))
 ```
 
 A classmethod protocol member does not require a mutable instance attribute. In particular, a frozen

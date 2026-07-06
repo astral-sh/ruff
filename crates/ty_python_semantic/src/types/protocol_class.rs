@@ -1593,6 +1593,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         }
                     })
                 })
+        } else if member.is_method() {
+            let Some(required_ty) = required_ty.resolve(db) else {
+                return self.never();
+            };
+            let Type::Callable(required_callable) = required_ty.ty() else {
+                return self.never();
+            };
+            self.check_type_pair(
+                db,
+                attribute_type,
+                Type::Callable(required_callable.apply_self(db, fallback_ty)),
+            )
         } else {
             required_ty.bind_self(db, fallback_ty).when_some_and(
                 db,
