@@ -2284,6 +2284,64 @@ class ThisFails:
 ThisFails().x
 ```
 
+`__getattribute__` is also checked against assignments to protocols, to make sure all fields are
+compatible. In the following `Person.name` can't be an `int` so this should fail:
+
+```py
+from typing import Protocol
+
+class IntName(Protocol):
+    def __getattribute__(self, name: Any, /) -> int: ...
+
+class Person:
+    name: str
+
+def get_name_as_int(person: IntName) -> int:
+    return person.name
+
+# error: [invalid-argument-type]
+get_name_as_int(Person())
+```
+
+This can be used with literal type arguments to construct the necessary fields names later:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, Literal
+
+class HasAttr[A: str, T](Protocol):
+    def __getattribute__(self, attribute: A, /) -> T: ...  # ty: ignore[invalid-method-override]
+
+class IntStrPair:
+    left: int
+    right: str
+
+# This errors, `left` is not an str in IntStrPair
+# error: [invalid-assignment]
+a: HasAttr[Literal["left"], str] = IntStrPair()
+
+# This errors, `other` is not in IntStrPair
+# error: [invalid-assignment]
+b: HasAttr[Literal["other"], str] = IntStrPair()
+
+# This doesn't error, `left` is an int in IntStrPair
+c: HasAttr[Literal["left"], int] = IntStrPair()
+```
+
+This allows you to give a type to `getattr`:
+
+```py
+def my_getattr[A: str, T](object: HasAttr[A, T], attr: A) -> T:
+    return getattr(object, attr)
+
+reveal_type(my_getattr(IntStrPair(), "left"))  # revealed: int
+reveal_type(my_getattr(IntStrPair(), "right"))  # revealed: str
+```
+
 ## Metaclasses with custom `__getattr__` methods
 
 A class is an instance of its metaclass. When attribute lookup on a class fails, Python falls back
