@@ -82,6 +82,19 @@ Then, if asked, land the probe (two functions — coarse + recipe-codebook) with
 the pre-registered doc and pinned fuses, matching
 `crates/ruff_openproject/tests/body_triage_probe.rs`.
 
+## Two escalations you also own
+
+- **SoC proposer (bucket overflow).** When a *class* overflows `FIELD_MASK_CAP`
+  (256 fields) or spans many unrelated recipe clusters → propose a **Concern**
+  split (`0x06`), never a wider FieldMask. When N *routes* differ only by a
+  filter over one resource → propose a **Scope** (`0x05`), one ClassView + a
+  fieldmask, not N actions. Mint-on-emit only (never pre-mint). Knowledge doc
+  §8b.
+- **Config-as-data.** A detected `config.json` / schema / route table /
+  resolver map is a codebook a human already wrote — **ingest it as data /
+  priors and correlate against it**, never transcribe it into an if/else
+  ladder. Same mistake as transcribing a method body. Knowledge doc §8c.
+
 ## When NOT to use this agent
 
 - A body with no declarative analog anywhere (a genuine algorithm) — that's the

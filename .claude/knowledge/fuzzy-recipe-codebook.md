@@ -60,6 +60,7 @@ The fingerprint is FOUR fact sets per method, on `ruff_spo_triplet::Function`:
 | `reads` | `reads_field` | Inferred | own-field reads (incl. condition reads) |
 | `raises` | `raises` | Authoritative | `raise X` / `errors.add` abort signals |
 | `calls` | `calls` | Inferred | mutator dispatches `"receiver.method"` |
+| `guarded_writes` | `writes_if_blank` | **Authoritative** | writes guarded by a blank/nil test on the same field — the **J1** fact (§5), splits SelfMap into default vs normalize |
 
 Plus the **visibility split**: hook targets are conventionally *private*, so a
 frontend that drops private defs cannot resolve most hooks. `ruff_ruby_spo`
@@ -90,15 +91,26 @@ the identical codebook classifies Ruby hooks, Odoo `_compute_*`, C# handlers,
 C++ methods. First match wins, top to bottom:
 
 ```
-Compensate  C ∧ X            manual txn (rollback/raise mid-dispatch)  → NO recipe — essential
-Cascade     C ∧ ¬X           relation.method dispatch                 → `dependent:` / assoc callback
-Guard       X ∧ ¬W           abort-only                               → validation
-WriteRaise  W ∧ X            partial-write then escape                → essential (order-dependent)
-Compute     W ⊄ R (fresh)    writes a field it did not read           → `emitted_by` compute edge
-SelfMap     W ⊆ R            idempotent self-transform                → `normalizes` | schema default
-Observe     R only           read-only                                → excluded from the arm
-Empty       ∅                no facts                                 → unresolved (scope boundary)
+Compensate  C ∧ X                    manual txn (rollback/raise mid-dispatch)  → NO recipe — essential
+Cascade     C ∧ ¬X                   relation.method dispatch                 → `dependent:` / assoc callback
+Guard       X ∧ ¬W ∧ ¬C              abort-only                               → validation
+WriteRaise  W ∧ X                    partial-write then escape                → essential (order-dependent)
+Default     W ⊆ guarded_writes       write-if-blank (J1)                      → schema default / `attribute default:`
+Compute     W ⊄ R (a fresh write)    writes a field it did not read           → `emitted_by` compute edge
+Normalize   W ⊆ R (unguarded)        idempotent self-transform                → `normalizes`
+Observe     R only                   read-only                                → excluded from the arm
+Empty       ∅                        no facts                                 → unresolved (scope boundary)
 ```
+
+> **J1 (`writes_if_blank`) promoted `Default` to a first-class centroid.**
+> Before J1, `Default` and `Normalize` were fused as a degenerate `SelfMap`
+> (`W ⊆ R`). J1 splits them AND catches the read-less default (`x ??= v` /
+> `x ||= v`, which writes-guarded but never self-reads → it isn't even
+> `SelfMap`). So `Default` (`W ⊆ guarded_writes`) is checked BEFORE
+> `Compute`/`Normalize`. Measured: Redmine SelfMap population 1 Default /
+> 3 Normalize; the C# fixture classifies all 7 shapes correctly
+> (`SetDefaults ??=`→Default, `Backfill if(x==null)`→Default,
+> `Tidy`→Normalize, `ComputeDisplay`→Compute).
 
 **Recoverable** = Compute + SelfMap + Cascade + Guard (order-free recipes).
 **Essential** = Compensate + WriteRaise (genuinely order-dependent — keep
@@ -135,11 +147,19 @@ noise — characterize it.
 Correlation is fuzzy by design; the residuals are not failures, they're the
 **map of what one more fact would buy.** Record them as a codebook:
 
-- **J1 — SelfMap degeneracy.** `normalizes` vs schema-default are identical
-  under `(W, R)`. Splitting them needs the **guard-predicate fact**
-  (`x.blank?` ⇒ default; pure transform ⇒ normalize). Both order-free, so the
-  PASS rate is unaffected — only the *emit target* differs. → next fact:
-  capture the hook's guard condition.
+- **J1 — SelfMap degeneracy. ✅ RESOLVED (`writes_if_blank`).** `normalizes` vs
+  schema-default were identical under `(W, R)`. The **guard-predicate fact** now
+  splits them (`x.blank?`/`.nil?`/`.empty?` guard, or `unless x.present?` ⇒
+  default; unconditional transform ⇒ normalize). Both order-free, so the PASS
+  rate was never affected — only the *emit target* differed, and it is now
+  determined. Implementation: `ruff_ruby_spo::detect_guarded_default`,
+  `Function::guarded_writes`, predicate `writes_if_blank` (Authoritative). This
+  is the worked example of "a jitter residual names the next fact, then you
+  capture it" — the loop closes. (Deferred sub-case: `self.x ||= v` op-assign,
+  not yet captured as a write at all — module-doc D-AR-3.6.) **Port this fact to
+  the other frontends** when they get the arm: the guard shape is language-
+  universal (`??=` in C#, `if (x == null)` in C#/C++, `x = x or default` in
+  Python).
 - **J2 — Cascade rests on Inferred `calls`.** The residual is the
   receiver→`dependent:`-kind codebook (`page.destroy`, `line_ids.update_all`).
   This is why the answer is a **band** (93.8–98.4%), not a point. → next fact:
@@ -190,6 +210,64 @@ into "here are the exact three facts that take it to 100% *targeted*."
   print the count so the boundary is visible.
 - **Fixing a body "bug" mid-transcode.** Behaviour-preserving: a weird body is
   a finding for an RFC, not a silent fix.
+
+## 8b. The SoC proposer — when a bucket OVERFLOWS, propose a split (don't widen)
+
+The recipe codebook classifies *methods*. The same fuzzy→exact instinct applies
+one level up, to *classes and routes*: when a bucket overflows a cap, that is a
+**separation-of-concerns signal**, not a reason to widen the container. Two
+overflow detectors, both feeding the OGAR reserved SoC families (Scope `0x05`,
+Concern `0x06`, mint-**on-emit** per `E-RECIPE-FAMILIES-MINT-ON-EMIT` — do NOT
+pre-mint):
+
+- **God-object bucket overflow → Concern split.** A class whose field count
+  exceeds `FIELD_MASK_CAP = MAX_SIBLINGS_PER_TIER` (256), or whose method-recipe
+  histogram spans many unrelated recipe clusters, is a **god object**. The
+  proposer does NOT widen the FieldMask past 256 (that path is explicitly a
+  non-use-case, lance-graph #651 / OGAR doctrine) — it emits a **Concern**
+  (`0x06`): partition the fields+methods into cohesive sub-ClassViews (Rails
+  `concerns`/mixins; the `ruff_spo_address::soc` `Conflation` verdict). The
+  bucket cap is the trigger; the split is the recipe. Cook it the same way:
+  fingerprint each member by which sub-cluster it touches, roll until each
+  sub-ClassView is cohesive, name the residual (members that genuinely span
+  concerns — the essential coupling).
+- **Duplicate-routes bucket overflow → Scope split.** When N controller routes
+  differ only by a filter predicate over the SAME resource (a `ruff` DTO-AST
+  route-dedup finds them collapsing to one `ClassView` + a fieldmask), that is a
+  **Scope** (`0x05`): a named filtered view (Rails `scope`/`default_scope`), not
+  N separate actions. The dedup is the detector; the named scope is the recipe.
+  One `ClassView` fieldmask standing in for N routes IS the emit seam that mints
+  Scope.
+
+Rule of thumb: **a recipe correlates a body to an existing lift; an SoC proposal
+fires when NO single bucket can hold the thing without overflow — the answer is
+a split, never a wider bucket.** The rolling-bucket loop is identical; the
+"win" is every member landing in a cohesive sub-bucket with a named residual.
+
+## 8c. Detected `config.json` becomes DATA (the training-wheel → data rule)
+
+When the harvest DETECTS a configuration artifact — a `config.json`, a
+migration-DSL schema, an ORM→AR back-projection map, a route table — that
+artifact **becomes a data input to the codebook, not code to transcribe.** The
+config is a *codebook already written by a human*; ingest it as centroids /
+priors, don't re-derive it and don't reimplement it.
+
+Worked precedents in-tree:
+- op-nexgen `.claude/harvest/orm-ar-backprojection.toml` — the ORM→AR resolver
+  config: detected column facts (migration DSL) become the *data* that guesses
+  AR declarations, closing the 90→100% model-shape gap. It is data, the ONE
+  training wheel the consumer owns; everything else retires into the pipeline.
+- OGAR `ogar_codebook` / `ruff_spo_address` `class_ids` — the concept codebook
+  is data the frontend *reads* to mint classids, never a table each consumer
+  re-hardcodes (the consumer anti-pattern: copying the codebook — see
+  `ogar-consumer-preflight`).
+
+The discipline: **detect → ingest as data → correlate against it.** A detected
+config that gets transcribed into imperative branches is the same mistake as
+transcribing a method body — you turned a declarative codebook back into fuzz.
+When you find a config, register it as a fact source (like the schema stratum),
+and let the recipe/SoC correlation run against it. `config.json` → codebook row,
+not `config.json` → `if/else` ladder.
 
 ## 8. Why this is the DO-arm's foundation
 
