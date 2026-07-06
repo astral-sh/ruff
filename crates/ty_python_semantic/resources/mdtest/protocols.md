@@ -2825,6 +2825,20 @@ class StrBoundImplementation:
     def f[T: str](self, input: T) -> T:
         return input
 
+class NestedListProtocol(Protocol):
+    def f[T](self, input: list[T]) -> list[list[T]]: ...
+
+class GenericListImplementation:
+    def f[S](self, input: S) -> list[S]:
+        return [input]
+
+class PairProtocol(Protocol):
+    def f[T, U](self, first: T, second: U) -> tuple[T, U]: ...
+
+class ReorderedPairImplementation:
+    def f[S, R](self, first: R, second: S) -> tuple[R, S]:
+        return first, second
+
 class NominalReturningSelfNotGeneric:
     def g(self) -> "NominalReturningSelfNotGeneric":
         return self
@@ -2865,6 +2879,11 @@ static_assert(is_subtype_of(ObjectBoundImplementation, StrBoundProtocol))
 static_assert(is_assignable_to(ObjectBoundImplementation, StrBoundProtocol))
 static_assert(not is_subtype_of(StrBoundImplementation, ObjectBoundProtocol))
 static_assert(not is_assignable_to(StrBoundImplementation, ObjectBoundProtocol))
+
+static_assert(is_subtype_of(GenericListImplementation, NestedListProtocol))
+static_assert(is_assignable_to(GenericListImplementation, NestedListProtocol))
+static_assert(is_subtype_of(ReorderedPairImplementation, PairProtocol))
+static_assert(is_assignable_to(ReorderedPairImplementation, PairProtocol))
 
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, LegacyFunctionScoped))

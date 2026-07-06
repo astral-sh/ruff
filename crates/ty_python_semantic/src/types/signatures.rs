@@ -1756,11 +1756,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         } else {
             target
         };
+        let unaligned_source = source;
         let nested_checker = self.without_universal_callable_target_typevars();
 
-        // A generic source can be specialized for each target specialization. Align equivalent
-        // generic contexts positionally, while requiring the source domain to cover the target
-        // domain.
+        // Positional alpha-renaming is a common fast path and avoids forcing recursive protocol
+        // members while their interfaces are still being inferred.
         let aligned_source = self
             .universal_callable_target_typevars
             .then(|| source.generic_context.zip(target.generic_context))
@@ -1847,9 +1847,75 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.constraints,
             source_inferable.iter(db).chain(target_inferable.iter(db)),
         );
-        aligned_source.map_or(when, |(_, generic_context_check)| {
-            generic_context_check.and(db, self.constraints, || when)
-        })
+        if !self.universal_callable_target_typevars {
+            return when;
+        }
+        if unaligned_source.generic_context.is_none() || target.generic_context.is_none() {
+            return when;
+        }
+
+        let positional = aligned_source.as_ref().map_or_else(
+            || self.never(),
+            |(_, generic_context_check)| generic_context_check.and(db, self.constraints, || when),
+        );
+        if positional.is_always_satisfied(db) {
+            positional
+        } else {
+            positional.or(db, self.constraints, || {
+                self.without_context_collection(|| {
+                    self.check_signature_pair_with_inferred_source(db, unaligned_source, target)
+                })
+            })
+        }
+    }
+
+    /// Check a generic source by inferring its specialization from a universal generic target.
+    fn check_signature_pair_with_inferred_source(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let source_inferable = source.inferable_typevars(db);
+        let target_inferable = InferableTypeVars::from_typevars(
+            db,
+            target
+                .inferable_typevars(db)
+                .iter(db)
+                .filter(|typevar| {
+                    target
+                        .generic_context
+                        .is_none_or(|context| !context.contains(db, *typevar))
+                })
+                .collect::<FxOrderSet<_>>(),
+        );
+        let inferable = self
+            .inferable
+            .merge(db, source_inferable.merge(db, target_inferable));
+        let checker = self.with_inferable_typevars(inferable);
+        let nested_checker = checker
+            .without_universal_callable_target_typevars()
+            .with_lazy_typevar_evaluation();
+        let source_domain = source.generic_context.map_or_else(
+            || checker.always(),
+            |context| {
+                context
+                    .variables(db)
+                    .when_all(db, self.constraints, |typevar| {
+                        ConstraintSet::valid_specializations(db, self.constraints, typevar)
+                    })
+            },
+        );
+        let when = checker.with_signature_recursion_guard(source, target, || {
+            source_domain.and(db, self.constraints, || {
+                nested_checker.check_signature_pair_inner(db, source, target)
+            })
+        });
+        when.reduce_inferable(
+            db,
+            self.constraints,
+            source_inferable.iter(db).chain(target_inferable.iter(db)),
+        )
     }
 
     fn with_signature_recursion_guard(
