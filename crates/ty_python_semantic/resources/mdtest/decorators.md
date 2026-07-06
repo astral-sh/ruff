@@ -179,6 +179,31 @@ class Foo:
 reveal_type(Foo().foo)  # revealed: str
 ```
 
+A cached property can refer to type variables from its enclosing class in its return type:
+
+```py
+from functools import cached_property
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class View(Generic[T]):
+    pass
+
+class Container(Generic[T]):
+    @cached_property
+    def items(self) -> View[T]:
+        return View()
+
+    @cached_property
+    def optional_items(self) -> list[T] | None:
+        return None
+
+container = Container[str]()
+reveal_type(container.items)  # revealed: View[str]
+reveal_type(container.optional_items)  # revealed: list[str] | None
+```
+
 ## Lambdas as decorators
 
 ```py
