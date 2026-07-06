@@ -2869,6 +2869,27 @@ static_assert(not is_assignable_to(BadReturnType, ShapeProtocolImplicitSelf))
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolExplicitSelf))
 ```
 
+### Generic self types
+
+A method type variable used for `self` is specialized to the concrete receiver. It is not chosen
+independently on every call like an ordinary method type variable:
+
+```py
+from typing import Protocol, TypeVar
+from ty_extensions import is_assignable_to, static_assert
+
+SelfT = TypeVar("SelfT", bound="Copyable")
+
+class Copyable(Protocol):
+    def copy(self: SelfT) -> SelfT: ...
+
+class One:
+    def copy(self) -> "One":
+        return One()
+
+static_assert(is_assignable_to(One, Copyable))
+```
+
 ### Concrete implementations
 
 A non-generic method can satisfy a generic protocol method if it accepts every call promised by the

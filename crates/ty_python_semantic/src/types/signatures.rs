@@ -385,9 +385,10 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    /// Binds the first (presumably `self`) parameter of this signature. If a `self_type` is
-    /// provided, we will replace any occurrences of `typing.Self` in the parameter and return
-    /// annotations with that type.
+    /// Binds the first (presumably `self`) parameter of this signature. An explicit generic self
+    /// type is specialized to `self_type`, or preserved as `typing.Self` if the receiver is not
+    /// known yet. Any existing occurrences of `typing.Self` are also replaced when `self_type` is
+    /// provided.
     pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
         Self {
             overloads: self
@@ -939,19 +940,60 @@ impl<'db> Signature<'db> {
     }
 
     pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
-        let removed_receiver = self.parameters.get(0).is_some_and(Parameter::is_positional);
+        let specialized;
+        let signature = if let Some(generic_context) = self.generic_context
+            && let Some(first_parameter) = self.parameters.get(0)
+            && first_parameter.is_positional()
+            && !first_parameter.inferred_annotation
+            && let Type::TypeVar(self_typevar) = first_parameter.annotated_type()
+            && !self_typevar.typevar(db).is_self(db)
+            && generic_context.contains(db, self_typevar.identity(db))
+            && let Some(specialized_self) = self_type.or_else(|| {
+                // Protocol capabilities bind methods before the implementation type is known.
+                // Preserve the generic receiver until it can be bound to that type.
+                match self_typevar.typevar(db).require_bound_or_constraints(db) {
+                    TypeVarBoundOrConstraints::UpperBound(upper_bound) => {
+                        Some(Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+                            db,
+                            upper_bound,
+                            self_typevar.binding_context(db),
+                        )))
+                    }
+                    TypeVarBoundOrConstraints::Constraints(_) => None,
+                }
+            }) {
+            let specialization = generic_context.specialize_recursive(
+                db,
+                generic_context.variables(db).map(|typevar| {
+                    Some(if typevar.identity(db) == self_typevar.identity(db) {
+                        specialized_self
+                    } else {
+                        Type::TypeVar(typevar)
+                    })
+                }),
+            );
+            specialized = self.apply_specialization(db, specialization);
+            &specialized
+        } else {
+            self
+        };
+
+        let removed_receiver = signature
+            .parameters
+            .get(0)
+            .is_some_and(Parameter::is_positional);
 
         // TODO: Theoretically, for a signature like `f(*args: *tuple[MyClass, int, *tuple[str, ...]])` with
         // a variadic first parameter, we should also "skip the first parameter" by modifying the tuple type.
         let mut parameters = if removed_receiver {
-            self.parameters.without_first()
+            signature.parameters.without_first()
         } else {
-            self.parameters.clone()
+            signature.parameters.clone()
         };
-        let mut return_ty = self.return_ty;
-        let binding_context = self.definition.map(BindingContext::Definition);
+        let mut return_ty = signature.return_ty;
+        let binding_context = signature.definition.map(BindingContext::Definition);
         if let Some(self_type) = self_type
-            && self.needs_self_mapping(db, removed_receiver)
+            && signature.needs_self_mapping(db, removed_receiver)
         {
             let self_mapping =
                 TypeMapping::BindSelf(SelfBinding::new(db, self_type, binding_context));
@@ -964,10 +1006,10 @@ impl<'db> Signature<'db> {
             return_ty = return_ty.apply_type_mapping(db, &self_mapping, TypeContext::default());
         }
         Self {
-            generic_context: self
+            generic_context: signature
                 .generic_context
                 .map(|generic_context| generic_context.remove_self(db, binding_context)),
-            definition: self.definition,
+            definition: signature.definition,
             parameters,
             return_ty,
         }
