@@ -3,6 +3,7 @@ use std::cmp::Ordering;
 use std::str::FromStr;
 
 use bitflags::bitflags;
+use hashbrown::HashSet;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
@@ -10,6 +11,7 @@ use ruff_python_ast::{
 };
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use rustc_hash::FxBuildHasher;
 use thin_vec::ThinVec;
 use unicode_normalization::UnicodeNormalization;
 
@@ -34,12 +36,31 @@ mod statement;
 #[cfg(test)]
 mod tests;
 
+#[derive(Debug, Default)]
+struct NameInterner {
+    names: HashSet<Name, FxBuildHasher>,
+}
+
+impl NameInterner {
+    fn intern(&mut self, text: &str) -> Name {
+        self.names
+            .get_or_insert_with(text, |text| Name::new(text))
+            .clone()
+    }
+
+    fn intern_owned(&mut self, name: Name) -> Name {
+        self.names.get_or_insert(name).clone()
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Parser<'src> {
     source: &'src str,
 
     /// Token source for the parser that skips over any non-trivia token.
     tokens: TokenSource<'src>,
+
+    name_interner: NameInterner,
 
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
@@ -92,6 +113,7 @@ impl<'src> Parser<'src> {
             errors: Vec::new(),
             unsupported_syntax_errors: Vec::new(),
             tokens,
+            name_interner: NameInterner::default(),
             recovery_context: RecoveryContext::empty(),
             prev_token_end: TextSize::new(0),
             start_offset,
@@ -395,12 +417,21 @@ impl<'src> Parser<'src> {
     fn bump_name(&mut self) -> Name {
         let text = self.current_token_text();
         let name = if !self.tokens.current_flags().is_non_ascii_name() {
-            Name::new(text)
+            self.intern_name(text)
         } else {
-            normalize_name(text)
+            let normalized = normalize_name(text);
+            self.intern_owned_name(normalized)
         };
         self.bump(TokenKind::Name);
         name
+    }
+
+    fn intern_name(&mut self, text: &str) -> Name {
+        self.name_interner.intern(text)
+    }
+
+    fn intern_owned_name(&mut self, name: Name) -> Name {
+        self.name_interner.intern_owned(name)
     }
 
     fn bump_int(&mut self) -> Int {

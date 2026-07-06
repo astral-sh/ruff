@@ -1,5 +1,7 @@
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, Stmt};
 
+use super::NameInterner;
 use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
 
 #[test]
@@ -69,6 +71,52 @@ fn nfkc_normalizes_names() {
     };
 
     assert_eq!(name.id.as_str(), "C");
+}
+
+#[test]
+fn repeated_names_share_storage() {
+    for name in ["x", "identifier_longer_than_inline_capacity"] {
+        let source = format!("{name} = {name}");
+        let parsed = parse_module(&source).unwrap();
+        let [Stmt::Assign(assign)] = parsed.suite().as_slice() else {
+            panic!("expected an assignment");
+        };
+        let [Expr::Name(target)] = assign.targets.as_slice() else {
+            panic!("expected a name target");
+        };
+        let Expr::Name(value) = assign.value.as_ref() else {
+            panic!("expected a name value");
+        };
+
+        assert!(std::ptr::eq(target.id.as_str(), value.id.as_str()));
+    }
+}
+
+#[test]
+fn all_names_are_interned() {
+    let mut interner = NameInterner::default();
+    interner.intern("x");
+    assert_eq!(interner.names.len(), 1);
+
+    interner.intern("identifier_longer_than_inline_capacity");
+    assert_eq!(interner.names.len(), 2);
+}
+
+#[test]
+fn normalized_names_share_storage() {
+    let parsed = parse_module("\u{1d49e} = C").unwrap();
+    let [Stmt::Assign(assign)] = parsed.suite().as_slice() else {
+        panic!("expected an assignment");
+    };
+    let [Expr::Name(target)] = assign.targets.as_slice() else {
+        panic!("expected a name target");
+    };
+    let Expr::Name(value) = assign.value.as_ref() else {
+        panic!("expected a name value");
+    };
+
+    assert_eq!(target.id, Name::new("C"));
+    assert!(std::ptr::eq(target.id.as_str(), value.id.as_str()));
 }
 
 #[test]
