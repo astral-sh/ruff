@@ -2784,6 +2784,27 @@ class NominalNotGeneric:
     def f(self, input: int) -> int:
         return input
 
+class GenericReturnsObject(Protocol):
+    def f(self, input: FunctionT) -> object: ...
+
+class NominalAcceptsObject:
+    def f(self, input: object) -> object:
+        return input
+
+class ObjectBoundProtocol(Protocol):
+    def f[T: object](self, input: T) -> T: ...
+
+class StrBoundProtocol(Protocol):
+    def f[T: str](self, input: T) -> T: ...
+
+class ObjectBoundImplementation:
+    def f[T: object](self, input: T) -> T:
+        return input
+
+class StrBoundImplementation:
+    def f[T: str](self, input: T) -> T:
+        return input
+
 class NominalReturningSelfNotGeneric:
     def g(self) -> "NominalReturningSelfNotGeneric":
         return self
@@ -2813,10 +2834,17 @@ static_assert(not is_assignable_to(NominalWithSelf, LegacyFunctionScoped))
 static_assert(is_assignable_to(NominalWithSelf, UsesSelf))
 static_assert(is_subtype_of(NominalWithSelf, UsesSelf))
 
-# TODO: these should pass
-static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NominalNotGeneric, LegacyFunctionScoped))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))
+static_assert(not is_assignable_to(NominalNotGeneric, LegacyFunctionScoped))
 static_assert(not is_assignable_to(NominalNotGeneric, UsesSelf))
+
+static_assert(is_subtype_of(NominalAcceptsObject, GenericReturnsObject))
+static_assert(is_assignable_to(NominalAcceptsObject, GenericReturnsObject))
+
+static_assert(is_subtype_of(ObjectBoundImplementation, StrBoundProtocol))
+static_assert(is_assignable_to(ObjectBoundImplementation, StrBoundProtocol))
+static_assert(not is_subtype_of(StrBoundImplementation, ObjectBoundProtocol))
+static_assert(not is_assignable_to(StrBoundImplementation, ObjectBoundProtocol))
 
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, LegacyFunctionScoped))
