@@ -22,6 +22,8 @@ from typing import (
     TypeVar,
     overload,
 )
+
+from ty_extensions import Top as _Top
 from typing_extensions import Buffer, LiteralString, Self as _Self
 
 _KT = TypeVar("_KT")
@@ -363,7 +365,7 @@ TraceFunction: TypeAlias = Callable[
 #   https://github.com/python/typeshed/pull/9362
 #   https://github.com/microsoft/pyright/issues/4339
 class DataclassInstance(Protocol):
-    __dataclass_fields__: ClassVar[dict[str, Field[Any]]]
+    __dataclass_fields__: ClassVar[Final[_Top[dict[str, Field[Any]]]]]
 
 # Anything that can be passed to the int/float constructors
 if sys.version_info >= (3, 14):

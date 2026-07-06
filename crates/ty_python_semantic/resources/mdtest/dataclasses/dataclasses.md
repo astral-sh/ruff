@@ -1806,6 +1806,28 @@ But calling `asdict` on the class object is not allowed:
 asdict(Foo)
 ```
 
+## `dataclasses.is_dataclass`
+
+`DataclassInstance` uses a read-only class variable as its marker and accepts any materialization of
+the gradual `Field[Any]` type. This allows `is_dataclass` to determine that a known dataclass
+instance always satisfies the protocol:
+
+```py
+from dataclasses import asdict, dataclass, is_dataclass
+
+@dataclass
+class Event:
+    x: int
+
+def serialize(event: Event) -> dict[str, object]:
+    if is_dataclass(event):
+        reveal_type(event)  # revealed: Event
+        return asdict(event)
+    else:
+        reveal_type(event)  # revealed: Never
+        return dict(event)
+```
+
 ## `dataclasses.KW_ONLY`
 
 If an attribute is annotated with `dataclasses.KW_ONLY`, it is not added to the synthesized
