@@ -607,6 +607,26 @@ def f(x: Foo, y: Intersection[type[Bar], type[list[int]]]):
         reveal_type(x.attribute)  # revealed: int
 ```
 
+Without skipping the invalid member, narrowing would be aborted for the whole intersection,
+leaving the subject un-narrowed. This is a false positive in ordinary code that narrows a value to
+a class and then accesses one of its attributes -- e.g. libraries that synthesize an intersection
+`classinfo` (such as a config type that is simultaneously a class and a builder of that class):
+
+```py
+from ty_extensions import Intersection
+
+class Widget:
+    size: int = 0
+
+def configure(obj: object, cls: Intersection[type[Widget], type[list[int]]]) -> None:
+    if isinstance(obj, cls):
+        # Skipping the invalid `type[list[int]]` member narrows to `Widget`, so accessing
+        # and assigning `size` type-checks. Aborting narrowing would leave `obj` as `object`
+        # and report a spurious `unresolved-attribute` here.
+        reveal_type(obj)  # revealed: Widget
+        obj.size = 10
+```
+
 ## Narrowing with generics
 
 ```toml
