@@ -311,7 +311,7 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::PropertyDunderGet(_) => Either::Left(Either::Left(
                 [
                     Signature::new(
-                        Parameters::new(
+                        Parameters::from_annotation(
                             db,
                             [
                                 Parameter::positional_only(Some(Name::new_static("instance")))
@@ -323,7 +323,7 @@ impl<'db> KnownBoundMethodType<'db> {
                         Type::unknown(),
                     ),
                     Signature::new(
-                        Parameters::new(
+                        Parameters::from_annotation(
                             db,
                             [
                                 Parameter::positional_only(Some(Name::new_static("instance")))
@@ -347,7 +347,7 @@ impl<'db> KnownBoundMethodType<'db> {
             )),
             KnownBoundMethodType::PropertyDunderSet(_) => {
                 Either::Right(std::iter::once(Signature::new(
-                    Parameters::new(
+                    Parameters::from_annotation(
                         db,
                         [
                             Parameter::positional_only(Some(Name::new_static("instance")))
@@ -361,7 +361,7 @@ impl<'db> KnownBoundMethodType<'db> {
             }
             KnownBoundMethodType::PropertyDunderDelete(_) => {
                 Either::Right(std::iter::once(Signature::new(
-                    Parameters::new(
+                    Parameters::from_annotation(
                         db,
                         [
                             Parameter::positional_only(Some(Name::new_static("instance")))
@@ -373,7 +373,7 @@ impl<'db> KnownBoundMethodType<'db> {
             }
             KnownBoundMethodType::StrStartswith(_) => {
                 Either::Right(std::iter::once(Signature::new(
-                    Parameters::new(
+                    Parameters::from_annotation(
                         db,
                         [
                             Parameter::positional_only(Some(Name::new_static("prefix")))
@@ -404,7 +404,7 @@ impl<'db> KnownBoundMethodType<'db> {
 
             KnownBoundMethodType::ConstraintSetRange => {
                 Either::Right(std::iter::once(Signature::new(
-                    Parameters::new(
+                    Parameters::from_annotation(
                         db,
                         [
                             Parameter::positional_only(Some(Name::new_static("lower_bound")))
@@ -429,7 +429,7 @@ impl<'db> KnownBoundMethodType<'db> {
 
             KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_) => {
                 Either::Right(std::iter::once(Signature::new(
-                    Parameters::new(
+                    Parameters::from_annotation(
                         db,
                         [
                             Parameter::positional_only(Some(Name::new_static("ty")))
@@ -444,7 +444,7 @@ impl<'db> KnownBoundMethodType<'db> {
 
             KnownBoundMethodType::ConstraintSetSatisfies(_) => {
                 Either::Right(std::iter::once(Signature::new(
-                    Parameters::new(
+                    Parameters::from_annotation(
                         db,
                         [Parameter::positional_only(Some(Name::new_static("other")))
                             .with_annotated_type(KnownClass::ConstraintSet.to_instance(db))],
@@ -455,7 +455,7 @@ impl<'db> KnownBoundMethodType<'db> {
 
             KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => {
                 Either::Right(std::iter::once(Signature::new(
-                    Parameters::new(
+                    Parameters::from_annotation(
                         db,
                         [Parameter::keyword_only(Name::new_static("inferable"))
                             .with_annotated_type(UnionType::from_two_elements(
@@ -607,7 +607,7 @@ impl WrapperDescriptorKind {
             let descriptor = class.to_instance(db);
             [
                 Signature::new(
-                    Parameters::new(
+                    Parameters::from_annotation(
                         db,
                         [
                             Parameter::positional_only(Some(Name::new_static("self")))
@@ -621,7 +621,7 @@ impl WrapperDescriptorKind {
                     Type::unknown(),
                 ),
                 Signature::new(
-                    Parameters::new(
+                    Parameters::from_annotation(
                         db,
                         [
                             Parameter::positional_only(Some(Name::new_static("self")))
@@ -652,7 +652,7 @@ impl WrapperDescriptorKind {
             WrapperDescriptorKind::PropertyDunderSet => {
                 let object = Type::object();
                 Either::Right(std::iter::once(Signature::new(
-                    Parameters::new(
+                    Parameters::from_annotation(
                         db,
                         [
                             Parameter::positional_only(Some(Name::new_static("self")))
@@ -668,7 +668,7 @@ impl WrapperDescriptorKind {
             }
             WrapperDescriptorKind::PropertyDunderDelete => {
                 Either::Right(std::iter::once(Signature::new(
-                    Parameters::new(
+                    Parameters::from_annotation(
                         db,
                         [
                             Parameter::positional_only(Some(Name::new_static("self")))

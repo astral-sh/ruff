@@ -1194,7 +1194,7 @@ impl<'db> StaticClassLiteral<'db> {
                 .get(name)
             {
                 let property_getter_signature = Signature::new(
-                    Parameters::new(
+                    Parameters::from_annotation(
                         db,
                         [Parameter::positional_only(Some(Name::new_static("self")))],
                     ),
@@ -1473,10 +1473,10 @@ impl<'db> StaticClassLiteral<'db> {
             let signature = match name {
                 "__new__" | "__init__" => Signature::new_generic(
                     inherited_generic_context.or_else(|| self.inherited_generic_context(db)),
-                    Parameters::new(db, parameters),
+                    Parameters::from_annotation(db, parameters),
                     return_ty,
                 ),
-                _ => Signature::new(Parameters::new(db, parameters), return_ty),
+                _ => Signature::new(Parameters::from_annotation(db, parameters), return_ty),
             };
             Some(Type::function_like_callable(db, signature))
         };
@@ -1545,7 +1545,7 @@ impl<'db> StaticClassLiteral<'db> {
                 }
 
                 let signature = Signature::new(
-                    Parameters::new(
+                    Parameters::from_annotation(
                         db,
                         [
                             Parameter::positional_or_keyword(Name::new_static("self"))
@@ -1569,7 +1569,7 @@ impl<'db> StaticClassLiteral<'db> {
 
                 if unsafe_hash || (frozen && eq) {
                     let signature = Signature::new(
-                        Parameters::new(
+                        Parameters::from_annotation(
                             db,
                             [Parameter::positional_or_keyword(Name::new_static("self"))
                                 .with_annotated_type(instance_ty)],
@@ -1660,7 +1660,7 @@ impl<'db> StaticClassLiteral<'db> {
             (CodeGeneratorKind::DataclassLike(_), "__setattr__") => {
                 if self.is_frozen_dataclass(db) == Some(true) {
                     let signature = Signature::new(
-                        Parameters::new(
+                        Parameters::from_annotation(
                             db,
                             [
                                 Parameter::positional_or_keyword(Name::new_static("self"))
@@ -1719,7 +1719,7 @@ impl<'db> StaticClassLiteral<'db> {
             Type::instance(db, self.apply_optional_specialization(db, specialization));
         let setattr_signature = |name_ty, return_ty| {
             Signature::new(
-                Parameters::new(
+                Parameters::from_annotation(
                     db,
                     [
                         Parameter::positional_or_keyword(Name::new_static("self"))

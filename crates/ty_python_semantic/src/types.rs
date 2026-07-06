@@ -2748,7 +2748,7 @@ impl<'db> Type<'db> {
                     _ => None,
                 } && let Ok(length) = i64::try_from(length)
                 {
-                    let parameters = Parameters::new(
+                    let parameters = Parameters::from_annotation(
                         db,
                         [Parameter::positional_only(Some(Name::new_static("self")))
                             .with_annotated_type(self)],
@@ -4317,7 +4317,7 @@ impl<'db> Type<'db> {
             Type::DataclassTransformer(_) => Binding::single(
                 self,
                 Signature::new(
-                    Parameters::new(
+                    Parameters::from_annotation(
                         db,
                         [Parameter::positional_only(Some(Name::new_static("func")))
                             .with_annotated_type(Type::object())],
@@ -4339,7 +4339,7 @@ impl<'db> Type<'db> {
                         self,
                         Signature::new_generic(
                             Some(GenericContext::from_typevar_instances(db, [val_ty])),
-                            Parameters::new(
+                            Parameters::from_annotation(
                                 db,
                                 [
                                     Parameter::positional_only(Some(Name::new_static("value")))
@@ -4358,7 +4358,7 @@ impl<'db> Type<'db> {
                     Binding::single(
                         self,
                         Signature::new(
-                            Parameters::new(
+                            Parameters::from_annotation(
                                 db,
                                 [Parameter::positional_only(Some(Name::new_static("arg")))
                                     // We need to set the type to `Any` here (instead of `Never`),
@@ -4376,7 +4376,7 @@ impl<'db> Type<'db> {
                 Some(KnownFunction::Cast) => Binding::single(
                     self,
                     Signature::new(
-                        Parameters::new(
+                        Parameters::from_annotation(
                             db,
                             [
                                 Parameter::positional_or_keyword(Name::new_static("typ"))
@@ -4434,12 +4434,15 @@ impl<'db> Type<'db> {
                         [
                             // def dataclass(cls: None, /, *, ...) -> Callable[[type[_T]], type[_T]]: ...
                             Signature::new(
-                                Parameters::new(db, parameters_with_cls(Type::none(db))),
+                                Parameters::from_annotation(
+                                    db,
+                                    parameters_with_cls(Type::none(db)),
+                                ),
                                 Type::unknown(),
                             ),
                             // def dataclass(cls: type[_T], /, *, ...) -> type[_T]: ...
                             Signature::new(
-                                Parameters::new(
+                                Parameters::from_annotation(
                                     db,
                                     parameters_with_cls(KnownClass::Type.to_instance(db)),
                                 ),
@@ -4459,7 +4462,7 @@ impl<'db> Type<'db> {
                             //     weakref_slot: bool = False,
                             // ) -> Callable[[type[_T]], type[_T]]: ...
                             Signature::new(
-                                Parameters::new(db, decorator_factory_parameters),
+                                Parameters::from_annotation(db, decorator_factory_parameters),
                                 Type::unknown(),
                             ),
                         ],
@@ -4525,7 +4528,8 @@ impl<'db> Type<'db> {
             Type::SpecialForm(SpecialFormType::TypeQualifier(TypeQualifier::InitVar)) => {
                 let parameter = Parameter::positional_or_keyword(Name::new_static("type"))
                     .with_annotated_type(Type::any());
-                let signature = Signature::new(Parameters::new(db, [parameter]), Type::any());
+                let signature =
+                    Signature::new(Parameters::from_annotation(db, [parameter]), Type::any());
                 Binding::single(self, signature).into()
             }
 
@@ -4596,8 +4600,11 @@ impl<'db> Type<'db> {
                 // Intersect with `Any` for the return type to reflect the fact that the `dataclass()`
                 // decorator adds methods to the class
                 let returns = IntersectionType::from_two_elements(db, typevar_meta, Type::any());
-                let signature =
-                    Signature::new_generic(Some(context), Parameters::new(db, parameters), returns);
+                let signature = Signature::new_generic(
+                    Some(context),
+                    Parameters::from_annotation(db, parameters),
+                    returns,
+                );
                 Binding::single(self, signature).into()
             }
 
@@ -4614,7 +4621,7 @@ impl<'db> Type<'db> {
             Type::KnownInstance(KnownInstanceType::NewType(newtype)) => Binding::single(
                 self,
                 Signature::new(
-                    Parameters::new(
+                    Parameters::from_annotation(
                         db,
                         [Parameter::positional_only(None)
                             .with_annotated_type(newtype.base(db).instance_type(db))],
@@ -4663,7 +4670,7 @@ impl<'db> Type<'db> {
                     Binding::single(
                         self,
                         Signature::new(
-                            Parameters::new(
+                            Parameters::from_annotation(
                                 db,
                                 [Parameter::positional_only(Some(Name::new_static("o")))
                                     .with_annotated_type(Type::any())
@@ -4703,7 +4710,7 @@ impl<'db> Type<'db> {
                         self,
                         [
                             Signature::new(
-                                Parameters::new(
+                                Parameters::from_annotation(
                                     db,
                                     [
                                         Parameter::positional_only(Some(Name::new_static("t")))
@@ -4715,7 +4722,7 @@ impl<'db> Type<'db> {
                                 KnownClass::Super.to_instance(db),
                             ),
                             Signature::new(
-                                Parameters::new(
+                                Parameters::from_annotation(
                                     db,
                                     [Parameter::positional_only(Some(Name::new_static("t")))
                                         .with_annotated_type(Type::any())],
@@ -4747,7 +4754,7 @@ impl<'db> Type<'db> {
                     Binding::single(
                         self,
                         Signature::new(
-                            Parameters::new(
+                            Parameters::from_annotation(
                                 db,
                                 [
                                     Parameter::positional_only(Some(Name::new_static("message")))
@@ -4785,7 +4792,7 @@ impl<'db> Type<'db> {
                     Binding::single(
                         self,
                         Signature::new(
-                            Parameters::new(
+                            Parameters::from_annotation(
                                 db,
                                 [
                                     Parameter::positional_or_keyword(Name::new_static("name"))
@@ -4816,14 +4823,14 @@ impl<'db> Type<'db> {
 
             KnownClass::Property => {
                 let getter_signature = Signature::new(
-                    Parameters::new(
+                    Parameters::from_annotation(
                         db,
                         [Parameter::positional_only(None).with_annotated_type(Type::any())],
                     ),
                     Type::any(),
                 );
                 let setter_signature = Signature::new(
-                    Parameters::new(
+                    Parameters::from_annotation(
                         db,
                         [
                             Parameter::positional_only(None).with_annotated_type(Type::any()),
@@ -4833,7 +4840,7 @@ impl<'db> Type<'db> {
                     Type::none(db),
                 );
                 let deleter_signature = Signature::new(
-                    Parameters::new(
+                    Parameters::from_annotation(
                         db,
                         [Parameter::positional_only(None).with_annotated_type(Type::any())],
                     ),
@@ -4844,7 +4851,7 @@ impl<'db> Type<'db> {
                     Binding::single(
                         self,
                         Signature::new(
-                            Parameters::new(
+                            Parameters::from_annotation(
                                 db,
                                 [
                                     Parameter::positional_or_keyword(Name::new_static("fget"))
@@ -4900,7 +4907,7 @@ impl<'db> Type<'db> {
                         self,
                         Signature::new_generic(
                             Some(GenericContext::from_typevar_instances(db, [return_ty])),
-                            Parameters::new(
+                            Parameters::from_annotation(
                                 db,
                                 [
                                     Parameter::positional_only(Some(Name::new_static("func")))
@@ -4946,7 +4953,7 @@ impl<'db> Type<'db> {
                             Signature::new(Parameters::empty(), Type::empty_tuple(db)),
                             Signature::new_generic(
                                 Some(GenericContext::from_typevar_instances(db, [element_ty])),
-                                Parameters::new(
+                                Parameters::from_annotation(
                                     db,
                                     [Parameter::positional_only(Some(Name::new_static(
                                         "iterable",
