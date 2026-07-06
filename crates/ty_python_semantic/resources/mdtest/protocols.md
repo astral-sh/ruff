@@ -2715,12 +2715,12 @@ Protocol method members can be generic. They can have generic contexts scoped to
 python-version = "3.12"
 ```
 
+### Type variables scoped to the protocol
+
 ```py
-from collections.abc import Sequence
-from typing import final, overload
-from typing_extensions import TypeVar, Self, Protocol
+from typing_extensions import Protocol, TypeVar
 from ty_extensions import static_assert
-from ty_extensions._internal import is_equivalent_to, is_assignable_to, is_subtype_of
+from ty_extensions._internal import is_assignable_to, is_equivalent_to, is_subtype_of
 
 class NewStyleClassScoped[T](Protocol):
     def method(self, input: T) -> None: ...
@@ -2775,9 +2775,17 @@ static_assert(not is_subtype_of(NominalGeneric[int], NewStyleClassScoped[str]))
 static_assert(not is_subtype_of(NominalGeneric[int], LegacyClassScoped[str]))
 ```
 
-And they can also have generic contexts scoped to the method:
+### Type variables scoped to a method
+
+Unlike a type variable on the protocol, a method type variable is chosen separately for every call.
+An implementation must therefore support every specialization of the method.
 
 ```py
+from typing import final
+from typing_extensions import Protocol, Self, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_equivalent_to, is_subtype_of
+
 class NewStyleFunctionScoped(Protocol):
     def f[T](self, input: T) -> T: ...
 
@@ -2804,130 +2812,6 @@ class NominalWithSelf:
 class NominalNotGeneric:
     def f(self, input: int) -> int:
         return input
-
-class GenericReturnsObject(Protocol):
-    def f(self, input: FunctionT) -> object: ...
-
-class NominalAcceptsObject:
-    def f(self, input: object) -> object:
-        return input
-
-class ObjectBoundProtocol(Protocol):
-    def f[T: object](self, input: T) -> T: ...
-
-class StrBoundProtocol(Protocol):
-    def f[T: str](self, input: T) -> T: ...
-
-class ObjectBoundImplementation:
-    def f[T: object](self, input: T) -> T:
-        return input
-
-class StrBoundImplementation:
-    def f[T: str](self, input: T) -> T:
-        return input
-
-def requires_object_bound(value: ObjectBoundProtocol) -> None: ...
-
-class NestedListProtocol(Protocol):
-    def f[T](self, input: list[T]) -> list[list[T]]: ...
-
-class GenericListImplementation:
-    def f[S](self, input: S) -> list[S]:
-        return [input]
-
-class ListIdentityProtocol(Protocol):
-    def f[T](self, input: list[T]) -> list[T]: ...
-
-class SequenceIdentityImplementation:
-    def f[S: Sequence[object]](self, input: S) -> S:
-        return input
-
-def requires_list_identity(value: ListIdentityProtocol) -> None: ...
-
-class PairProtocol(Protocol):
-    def f[T, U](self, first: T, second: U) -> tuple[T, U]: ...
-
-class ReorderedPairImplementation:
-    def f[S, R](self, first: R, second: S) -> tuple[R, S]:
-        return first, second
-
-class IntBoundIdentityProtocol(Protocol):
-    def f[T: int](self, input: T) -> T: ...
-
-class GenericListReturnImplementation:
-    def f[S](self, input: S) -> list[S]:
-        return [input]
-
-class IntOrStrConstrainedIdentityImplementation:
-    def f[S: (int, str)](self, input: S) -> S:
-        return input
-
-class IntBoundObjectProtocol(Protocol):
-    def f[T: int](self, input: T) -> object: ...
-
-class IntOrStrConstrainedObjectImplementation:
-    def f[S: (int, str)](self, input: S) -> object:
-        return input
-
-class ConstrainedListProtocol(Protocol):
-    def f[T: (int, str)](self, input: list[T]) -> object: ...
-
-class ConstrainedListImplementation:
-    def f[S: (list[int], list[str])](self, input: S) -> object:
-        return input
-
-class UnusedConstrainedTypevarsImplementation:
-    def f[
-        S01: (int, str),
-        S02: (int, str),
-        S03: (int, str),
-        S04: (int, str),
-        S05: (int, str),
-        S06: (int, str),
-        S07: (int, str),
-        S08: (int, str),
-        S09: (int, str),
-        S10: (int, str),
-        S11: (int, str),
-        S12: (int, str),
-        S13: (int, str),
-        S14: (int, str),
-        S15: (int, str),
-        S16: (int, str),
-        S17: (int, str),
-        S18: (int, str),
-    ](self, input: object) -> object:
-        return input
-
-def requires_int_bound_identity(value: IntBoundIdentityProtocol) -> None: ...
-def requires_int_bound_object(value: IntBoundObjectProtocol) -> None: ...
-def requires_constrained_list(value: ConstrainedListProtocol) -> None: ...
-def requires_generic_returns_object(value: GenericReturnsObject) -> None: ...
-
-class IntOrStrIdentityProtocol(Protocol):
-    def f[T: (int, str)](self, input: T) -> T: ...
-
-# Separate overloads cannot jointly cover a generic target. One source overload must satisfy every
-# specialization of the target method.
-class IntOrStrOverloadedImplementation:
-    @overload
-    def f(self, input: int) -> int: ...
-    @overload
-    def f(self, input: str) -> str: ...
-    def f(self, input: int | str) -> int | str:
-        return input
-
-# A source overload set is valid if one generic overload covers the entire target, regardless of
-# unrelated additional overloads.
-class IntOrStrGenericOverloadedImplementation:
-    @overload
-    def f[T: (int, str)](self, input: T) -> T: ...
-    @overload
-    def f(self, input: bytes) -> bytes: ...
-    def f(self, input: int | str | bytes) -> int | str | bytes:
-        return input
-
-def requires_int_or_str_identity(value: IntOrStrIdentityProtocol) -> None: ...
 
 class NominalReturningSelfNotGeneric:
     def g(self) -> "NominalReturningSelfNotGeneric":
@@ -2962,37 +2846,6 @@ static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalNotGeneric, LegacyFunctionScoped))
 static_assert(not is_assignable_to(NominalNotGeneric, UsesSelf))
 
-static_assert(is_subtype_of(NominalAcceptsObject, GenericReturnsObject))
-static_assert(is_assignable_to(NominalAcceptsObject, GenericReturnsObject))
-
-static_assert(is_subtype_of(ObjectBoundImplementation, StrBoundProtocol))
-static_assert(is_assignable_to(ObjectBoundImplementation, StrBoundProtocol))
-static_assert(not is_subtype_of(StrBoundImplementation, ObjectBoundProtocol))
-static_assert(not is_assignable_to(StrBoundImplementation, ObjectBoundProtocol))
-requires_object_bound(StrBoundImplementation())  # error: [invalid-argument-type]
-
-static_assert(is_assignable_to(GenericListImplementation, NestedListProtocol))
-static_assert(is_assignable_to(SequenceIdentityImplementation, ListIdentityProtocol))
-requires_list_identity(SequenceIdentityImplementation())
-static_assert(is_subtype_of(ReorderedPairImplementation, PairProtocol))
-static_assert(is_assignable_to(ReorderedPairImplementation, PairProtocol))
-
-requires_int_bound_identity(GenericListReturnImplementation())  # error: [invalid-argument-type]
-static_assert(not is_assignable_to(IntOrStrConstrainedIdentityImplementation, IntBoundIdentityProtocol))
-requires_int_bound_identity(
-    IntOrStrConstrainedIdentityImplementation()  # error: [invalid-argument-type]
-)
-static_assert(is_assignable_to(IntOrStrConstrainedObjectImplementation, IntBoundObjectProtocol))
-requires_int_bound_object(IntOrStrConstrainedObjectImplementation())
-static_assert(is_assignable_to(ConstrainedListImplementation, ConstrainedListProtocol))
-requires_constrained_list(ConstrainedListImplementation())
-static_assert(is_assignable_to(UnusedConstrainedTypevarsImplementation, GenericReturnsObject))
-requires_generic_returns_object(UnusedConstrainedTypevarsImplementation())
-static_assert(is_assignable_to(IntOrStrConstrainedIdentityImplementation, IntOrStrIdentityProtocol))
-requires_int_or_str_identity(IntOrStrConstrainedIdentityImplementation())
-requires_int_or_str_identity(IntOrStrOverloadedImplementation())  # error: [invalid-argument-type]
-requires_int_or_str_identity(IntOrStrGenericOverloadedImplementation())
-
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, LegacyFunctionScoped))
 
@@ -3014,6 +2867,216 @@ class BadReturnType:
 
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolImplicitSelf))
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolExplicitSelf))
+```
+
+### Concrete implementations
+
+A non-generic method can satisfy a generic protocol method if it accepts every call promised by the
+protocol. Here, accepting and returning `object` is sufficient for every specialization of
+`[T](T) -> object`:
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class ReturnsObject(Protocol):
+    def f[T](self, value: T) -> object: ...
+
+class AcceptsObject:
+    def f(self, value: object) -> object:
+        return value
+
+static_assert(is_subtype_of(AcceptsObject, ReturnsObject))
+```
+
+### Bounds on method type variables
+
+An implementation with an `object` bound supports a protocol method with a `str` bound. The reverse
+is not safe, because callers of the protocol may use types other than `str`:
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class ObjectIdentityProtocol(Protocol):
+    def f[T: object](self, value: T) -> T: ...
+
+class StrIdentityProtocol(Protocol):
+    def f[T: str](self, value: T) -> T: ...
+
+class ObjectIdentity:
+    def f[T: object](self, value: T) -> T:
+        return value
+
+class StrIdentity:
+    def f[T: str](self, value: T) -> T:
+        return value
+
+static_assert(is_subtype_of(ObjectIdentity, StrIdentityProtocol))
+static_assert(not is_subtype_of(StrIdentity, ObjectIdentityProtocol))
+```
+
+### Inferring implementation type variables
+
+When the implementation is also generic, its type variables may be chosen separately for each
+specialization of the protocol method. The mapping may wrap a target type, use a compatible bound,
+or reorder type variables:
+
+```py
+from collections.abc import Sequence
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+class NestedListProtocol(Protocol):
+    def f[T](self, value: list[T]) -> list[list[T]]: ...
+
+class WrapsValue:
+    def f[S](self, value: S) -> list[S]:
+        return [value]
+
+class ListIdentityProtocol(Protocol):
+    def f[T](self, value: list[T]) -> list[T]: ...
+
+class SequenceIdentity:
+    def f[S: Sequence[object]](self, value: S) -> S:
+        return value
+
+class PairProtocol(Protocol):
+    def f[T, U](self, first: T, second: U) -> tuple[T, U]: ...
+
+class ReorderedPair:
+    def f[S, R](self, first: R, second: S) -> tuple[R, S]:
+        return first, second
+
+static_assert(is_assignable_to(WrapsValue, NestedListProtocol))
+static_assert(is_assignable_to(SequenceIdentity, ListIdentityProtocol))
+static_assert(is_assignable_to(ReorderedPair, PairProtocol))
+```
+
+### Constraints on method type variables
+
+A constrained type variable is limited to its listed choices; it is not the same as an upper bound.
+In particular, `[T: int]` includes `bool`, while `[S: (int, str)]` promotes `bool` to `int`. The
+constrained identity method therefore cannot preserve the exact return type promised by the bounded
+protocol, but it does satisfy a protocol with the same constraints:
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+class IntBoundIdentityProtocol(Protocol):
+    def f[T: int](self, value: T) -> T: ...
+
+class IntOrStrIdentityProtocol(Protocol):
+    def f[T: (int, str)](self, value: T) -> T: ...
+
+class IntBoundReturnsObjectProtocol(Protocol):
+    def f[T: int](self, value: T) -> object: ...
+
+class IntOrStrIdentity:
+    def f[S: (int, str)](self, value: S) -> S:
+        return value
+
+static_assert(not is_assignable_to(IntOrStrIdentity, IntBoundIdentityProtocol))
+static_assert(is_assignable_to(IntOrStrIdentity, IntOrStrIdentityProtocol))
+static_assert(is_assignable_to(IntOrStrIdentity, IntBoundReturnsObjectProtocol))
+```
+
+### Constraints that depend on protocol type variables
+
+The implementation's choice may depend on the protocol method's type variable. For `T = int`, the
+implementation below uses `S = list[int]`; for `T = str`, it uses `S = list[str]`:
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+class ConstrainedListProtocol(Protocol):
+    def f[T: (int, str)](self, value: list[T]) -> object: ...
+
+class ConstrainedList:
+    def f[S: (list[int], list[str])](self, value: S) -> object:
+        return value
+
+static_assert(is_assignable_to(ConstrainedList, ConstrainedListProtocol))
+```
+
+### Unused method type variables
+
+Type variables that do not appear in the parameters or return type cannot affect compatibility.
+Their constraints should not multiply the number of combinations that the checker considers:
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+class ReturnsObject(Protocol):
+    def f[T](self, value: T) -> object: ...
+
+class ManyUnusedTypeVariables:
+    def f[
+        S01: (int, str),
+        S02: (int, str),
+        S03: (int, str),
+        S04: (int, str),
+        S05: (int, str),
+        S06: (int, str),
+        S07: (int, str),
+        S08: (int, str),
+        S09: (int, str),
+        S10: (int, str),
+        S11: (int, str),
+        S12: (int, str),
+        S13: (int, str),
+        S14: (int, str),
+        S15: (int, str),
+        S16: (int, str),
+        S17: (int, str),
+        S18: (int, str),
+    ](self, value: object) -> object:
+        return value
+
+static_assert(is_assignable_to(ManyUnusedTypeVariables, ReturnsObject))
+```
+
+### Overloaded implementations
+
+An overloaded implementation satisfies a generic protocol method only if one overload supports the
+entire method. Separate `int` and `str` overloads cannot be combined to cover the two constraints.
+An unrelated overload does not invalidate a generic overload that already covers the method:
+
+```py
+from typing import Protocol, overload
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+class IntOrStrIdentityProtocol(Protocol):
+    def f[T: (int, str)](self, value: T) -> T: ...
+
+class SeparateOverloads:
+    @overload
+    def f(self, value: int) -> int: ...
+    @overload
+    def f(self, value: str) -> str: ...
+    def f(self, value: int | str) -> int | str:
+        return value
+
+class GenericOverload:
+    @overload
+    def f[T: (int, str)](self, value: T) -> T: ...
+    @overload
+    def f(self, value: bytes) -> bytes: ...
+    def f(self, value: int | str | bytes) -> int | str | bytes:
+        return value
+
+static_assert(not is_assignable_to(SeparateOverloads, IntOrStrIdentityProtocol))
+static_assert(is_assignable_to(GenericOverload, IntOrStrIdentityProtocol))
 ```
 
 ## Subtyping of protocols with `@classmethod` or `@staticmethod` members

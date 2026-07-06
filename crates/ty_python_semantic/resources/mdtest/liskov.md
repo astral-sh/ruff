@@ -878,10 +878,13 @@ class B(A):
 
 class C(A):
     def method(self, x: object) -> Never: ...  # fine
+```
 
+`A.method` accepts an argument of any type. An override restricted to `int` rejects calls that are
+valid for the base method:
+
+```pyi
 class D(A):
-    # `A.method` accepts an argument of any type,
-    # but `D.method` only accepts `int`s
     def method(self, x: int) -> int: ...  # error: [invalid-method-override]
 
 class A2:
@@ -944,11 +947,13 @@ class I3(A3):
 
 class A4:
     def method[T: int](self, x: T) -> T: ...
+```
 
+`A4.method` preserves the caller's exact subtype of `int` in its return type. An override that
+returns `int` loses that promise when passed a `bool` or another subclass:
+
+```pyi
 class B4(A4):
-    # `A4.method` promises that if it is passed a `bool`, it will return a `bool`,
-    # but this is not necessarily true for `B4.method`: if passed a `bool`,
-    # it could return a non-`bool` `int`!
     def method(self, x: int) -> int: ...  # error: [invalid-method-override]
 ```
 
