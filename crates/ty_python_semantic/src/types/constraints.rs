@@ -609,6 +609,36 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         })
     }
 
+    /// Computes structural solutions without restricting them to each typevar's declared domain.
+    ///
+    /// Callers must validate every returned solution against the corresponding declaration before
+    /// using it. This is useful when a solution can depend on another constrained typevar, because
+    /// the dependent type can be valid for every specialization without being equal to one fixed
+    /// constraint.
+    pub(crate) fn structural_solutions(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'db>,
+    ) -> Solutions<'db> {
+        self.solutions_with(db, builder, inferable, |_variance, path_bound| {
+            if let Some(lower) = path_bound.lower {
+                if !path_bound.upper.is_satisfied_by(db, lower)
+                    && path_bound
+                        .upper
+                        .when_satisfied_by(db, builder, lower)
+                        .is_never_satisfied(db)
+                {
+                    return Err(());
+                }
+                return Ok(Some(lower));
+            }
+            Ok(path_bound
+                .has_upper()
+                .then(|| path_bound.upper.materialize_exact(db)))
+        })
+    }
+
     pub(crate) fn solutions_with(
         self,
         db: &'db dyn Db,
