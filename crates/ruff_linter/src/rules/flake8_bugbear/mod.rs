@@ -175,6 +175,7 @@ mod tests {
                         "custom.ImmutableTypeA".to_string(),
                         "custom.ImmutableTypeB".to_string(),
                     ],
+                    ..super::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(Rule::MutableArgumentDefault)
             },
@@ -196,6 +197,7 @@ mod tests {
                         "custom.ImmutableTypeA".to_string(),
                         "B008_extended.Class".to_string(),
                     ],
+                    ..super::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(Rule::FunctionCallInDefaultArgument)
             },
@@ -212,8 +214,26 @@ mod tests {
             &LinterSettings {
                 flake8_bugbear: super::settings::Settings {
                     extend_immutable_calls: vec!["fastapi.Query".to_string()],
+                    ..super::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(Rule::MutableContextvarDefault)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn check_immutable_argument_defaults() -> Result<()> {
+        let snapshot = "check_immutable_argument_defaults".to_string();
+        let diagnostics = test_path(
+            Path::new("flake8_bugbear/B008_check_immutable.py"),
+            &LinterSettings {
+                flake8_bugbear: super::settings::Settings {
+                    check_immutable_argument_defaults: true,
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::FunctionCallInDefaultArgument)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
