@@ -1412,7 +1412,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         self.check_callable_pair(
                             db,
                             source,
-                            rigidify_generic_protocol_target_for_monomorphic_source(
+                            make_protocol_target_typevars_non_inferable_for_nongeneric_source(
                                 db, source, target,
                             ),
                         )
@@ -1628,7 +1628,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 ) else {
                     return self.never();
                 };
-                self.check_type_pair(db, source, target)
+                if let (Type::Callable(source), Type::Callable(target)) = (source, target) {
+                    self.check_type_pair(
+                        db,
+                        Type::Callable(source),
+                        Type::Callable(
+                            make_protocol_target_typevars_non_inferable_for_nongeneric_source(
+                                db, source, target,
+                            ),
+                        ),
+                    )
+                } else {
+                    self.check_type_pair(db, source, target)
+                }
             }
         };
 
@@ -1982,30 +1994,40 @@ fn protocol_bind_self<'db>(
     )
 }
 
-/// Make method-scoped type variables in a generic protocol method rigid when its implementation
-/// is monomorphic.
+/// Make a protocol target's type variables non-inferable when the source is nongeneric.
 ///
-/// A monomorphic implementation must support every specialization promised by the protocol
-/// method. First, type variables with single-valued upper bounds are replaced by those bounds,
-/// because every specialization has the same runtime value. Removing the remaining generic
-/// context keeps its type variables in the signature but prevents callable matching from choosing
-/// a single convenient specialization for them.
-fn rigidify_generic_protocol_target_for_monomorphic_source<'db>(
+/// A generic protocol method allows callers to use every valid specialization. A nongeneric
+/// implementation must therefore support all of them. Callable matching normally infers type
+/// variables from a target signature's generic context, which can make an incompatible source
+/// appear compatible by choosing one specialization that happens to match it. Removing the target
+/// signature's generic context while leaving its type variables in place prevents that inference.
+///
+/// Type variables with single-valued upper bounds are replaced by those bounds because every
+/// specialization has the same runtime value. If the source is also generic, or the target is not
+/// generic, this returns the target unchanged and leaves the comparison to the existing callable
+/// relation.
+fn make_protocol_target_typevars_non_inferable_for_nongeneric_source<'db>(
     db: &'db dyn Db,
     source: CallableType<'db>,
     target: CallableType<'db>,
 ) -> CallableType<'db> {
-    let has_method_typevars = |callable: CallableType<'db>| {
+    let has_non_self_typevars = |callable: CallableType<'db>| {
         callable.signatures(db).iter().any(|signature| {
+            // A generic context can be temporarily incomplete during recursive inference, so
+            // also inspect the types in the signature itself.
             signature.generic_context.is_some_and(|context| {
                 context
                     .variables(db)
                     .any(|typevar| !typevar.typevar(db).is_self(db))
-            })
+            }) || signature
+                .parameters()
+                .iter()
+                .any(|parameter| parameter.annotated_type().has_non_self_typevar(db))
+                || signature.return_ty.has_non_self_typevar(db)
         })
     };
 
-    if has_method_typevars(source) || !has_method_typevars(target) {
+    if has_non_self_typevars(source) || !has_non_self_typevars(target) {
         return target;
     }
 

@@ -2784,6 +2784,9 @@ class NominalNotGeneric:
     def f(self, input: int) -> int:
         return input
 
+class ProtocolNotGeneric(Protocol):
+    def f(self, input: int) -> int: ...
+
 class GenericReturnsObject(Protocol):
     def f(self, input: FunctionT) -> object: ...
 
@@ -2837,6 +2840,9 @@ static_assert(is_subtype_of(NominalWithSelf, UsesSelf))
 static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalNotGeneric, LegacyFunctionScoped))
 static_assert(not is_assignable_to(NominalNotGeneric, UsesSelf))
+
+static_assert(not is_subtype_of(ProtocolNotGeneric, NewStyleFunctionScoped))
+static_assert(not is_assignable_to(ProtocolNotGeneric, NewStyleFunctionScoped))
 
 static_assert(is_subtype_of(NominalAcceptsObject, GenericReturnsObject))
 static_assert(is_assignable_to(NominalAcceptsObject, GenericReturnsObject))
