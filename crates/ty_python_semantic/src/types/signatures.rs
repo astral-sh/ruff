@@ -1869,14 +1869,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             || self.never(),
             |(_, generic_context_check)| generic_context_check.and(db, self.constraints, || when),
         );
-        if positional.is_always_satisfied(db)
-            || aligned_source
-                .as_ref()
-                .is_some_and(|(_, generic_context_check)| {
-                    generic_context_check.is_never_satisfied(db)
-                })
-        {
+        if positional.is_always_satisfied(db) {
             positional
+        } else if aligned_source
+            .as_ref()
+            .is_some_and(|(_, generic_context_check)| generic_context_check.is_never_satisfied(db))
+        {
+            // Inferring the target here would erase the domain mismatch, so infer only a source
+            // specialization while keeping the target variables rigid.
+            self.without_context_collection(|| {
+                self.check_signature_pair_with_inferred_source(db, unaligned_source, target)
+            })
         } else {
             positional.or(db, self.constraints, || {
                 self.without_context_collection(|| {
@@ -1884,6 +1887,52 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
             })
         }
+    }
+
+    /// Infer a source specialization for a rigid generic target.
+    fn check_signature_pair_with_inferred_source(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let source_inferable = source.inferable_typevars(db);
+        let target_inferable = InferableTypeVars::from_typevars(
+            db,
+            target
+                .inferable_typevars(db)
+                .iter(db)
+                .filter(|typevar| {
+                    target
+                        .generic_context
+                        .is_none_or(|context| !context.contains(db, *typevar))
+                })
+                .collect::<FxOrderSet<_>>(),
+        );
+        let inferable = self
+            .inferable
+            .merge(db, source_inferable.merge(db, target_inferable));
+        let checker = self.with_inferable_typevars(inferable);
+        let source_domain = source.generic_context.map_or_else(
+            || checker.always(),
+            |context| {
+                context
+                    .variables(db)
+                    .when_all(db, self.constraints, |typevar| {
+                        ConstraintSet::valid_specializations(db, self.constraints, typevar)
+                    })
+            },
+        );
+        let when = checker.with_signature_recursion_guard(source, target, || {
+            source_domain.and(db, self.constraints, || {
+                checker.check_signature_pair_inner(db, source, target)
+            })
+        });
+        when.reduce_inferable(
+            db,
+            self.constraints,
+            source_inferable.iter(db).chain(target_inferable.iter(db)),
+        )
     }
 
     fn with_signature_recursion_guard(

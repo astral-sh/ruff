@@ -2716,6 +2716,7 @@ python-version = "3.12"
 ```
 
 ```py
+from collections.abc import Sequence
 from typing import final, overload
 from typing_extensions import TypeVar, Self, Protocol
 from ty_extensions import static_assert
@@ -2834,6 +2835,15 @@ class GenericListImplementation:
     def f[S](self, input: S) -> list[S]:
         return [input]
 
+class ListIdentityProtocol(Protocol):
+    def f[T](self, input: list[T]) -> list[T]: ...
+
+class SequenceIdentityImplementation:
+    def f[S: Sequence[object]](self, input: S) -> S:
+        return input
+
+def requires_list_identity(value: ListIdentityProtocol) -> None: ...
+
 class PairProtocol(Protocol):
     def f[T, U](self, first: T, second: U) -> tuple[T, U]: ...
 
@@ -2918,6 +2928,8 @@ static_assert(not is_assignable_to(StrBoundImplementation, ObjectBoundProtocol))
 requires_object_bound(StrBoundImplementation())  # error: [invalid-argument-type]
 
 static_assert(is_assignable_to(GenericListImplementation, NestedListProtocol))
+static_assert(is_assignable_to(SequenceIdentityImplementation, ListIdentityProtocol))
+requires_list_identity(SequenceIdentityImplementation())
 static_assert(is_subtype_of(ReorderedPairImplementation, PairProtocol))
 static_assert(is_assignable_to(ReorderedPairImplementation, PairProtocol))
 
