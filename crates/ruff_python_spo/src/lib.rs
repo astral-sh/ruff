@@ -418,9 +418,9 @@ class AccountCashRounding(models.Model):
         ));
         // …but relational fields do NOT — their kind rides `relation_kind`,
         // so the two predicates never double-emit for one field.
-        assert!(!t.iter().any(|tr| tr.s
-            == "odoo:account_cash_rounding.profit_account_id"
-            && tr.p == "field_type"));
+        assert!(!t.iter().any(
+            |tr| tr.s == "odoo:account_cash_rounding.profit_account_id" && tr.p == "field_type"
+        ));
 
         // Many2one comodels surface as `target` (raw dotted, not an IRI).
         assert!(has(
@@ -604,14 +604,14 @@ class ResUsers(models.Model):
         let t = expand(&graph);
 
         // All three carry their comodel as `target`.
-        assert!(has(&t, "odoo:res_users.partner_id", "target", "res.partner"));
-        assert!(has(&t, "odoo:res_users.group_ids", "target", "res.groups"));
         assert!(has(
             &t,
-            "odoo:res_users.log_ids",
+            "odoo:res_users.partner_id",
             "target",
-            "res.users.log"
+            "res.partner"
         ));
+        assert!(has(&t, "odoo:res_users.group_ids", "target", "res.groups"));
+        assert!(has(&t, "odoo:res_users.log_ids", "target", "res.users.log"));
 
         // …but only `relation_kind` tells the cardinality apart.
         assert!(has(
@@ -696,8 +696,7 @@ class MailThreadReopen(models.Model):
         assert!((edge.f - 0.95).abs() < 1e-6 && (edge.c - 0.90).abs() < 1e-6);
 
         // Byte-compat: still round-trips the closed vocab.
-        let parsed =
-            ruff_spo_triplet::from_ndjson(&to_ndjson(&extract_from_source(src))).unwrap();
+        let parsed = ruff_spo_triplet::from_ndjson(&to_ndjson(&extract_from_source(src))).unwrap();
         assert_eq!(parsed, t);
     }
 
@@ -731,7 +730,10 @@ class Foo(models.Model):
             .iter()
             .find(|f| f.name == "_check_x")
             .expect("_check_x present");
-        assert_eq!(func.constrains, vec!["field_a".to_string(), "field_b".to_string()]);
+        assert_eq!(
+            func.constrains,
+            vec!["field_a".to_string(), "field_b".to_string()]
+        );
         assert!(func.onchange.is_empty());
     }
 
