@@ -341,6 +341,18 @@ fn walk_method_body(node: &Node, known_relations: &[String], func: &mut Function
             }
             walk_method_body(&i.cond, known_relations, func);
         }
+        // `stmt if cond` / `stmt unless cond` — the postfix modifier form.
+        // `if_true` is set for `if`, `if_false` for `unless`; never both.
+        // Same shape as `Node::If`, just without a block body.
+        Node::IfMod(i) => {
+            if let Some(b) = i.if_true.as_deref() {
+                walk_method_body(b, known_relations, func);
+            }
+            if let Some(b) = i.if_false.as_deref() {
+                walk_method_body(b, known_relations, func);
+            }
+            walk_method_body(&i.cond, known_relations, func);
+        }
         Node::Case(c) => {
             for arm in &c.when_bodies {
                 walk_method_body(arm, known_relations, func);
@@ -855,6 +867,31 @@ end
     }
 
     #[test]
+    fn raise_in_postfix_unless_captures_exception_type() {
+        // `raise X unless cond` — the postfix `unless` modifier (`Node::IfMod`
+        // with `if_false` set). Root-caused from openproject's WorkPackage
+        // fixture: `raise ActiveRecord::RecordInvalid unless status` was
+        // invisible to the harvest because `walk_method_body` had no arm for
+        // `Node::IfMod`, only `Node::If` (block form).
+        let funcs = class_functions(
+            r#"
+class M
+  def compute_total_hours
+    raise ActiveRecord::RecordInvalid unless status
+  end
+end
+"#,
+        );
+        assert!(
+            funcs[0]
+                .raises
+                .contains(&"ActiveRecord::RecordInvalid".to_string()),
+            "postfix-unless raise must be captured; got {:?}",
+            funcs[0].raises,
+        );
+    }
+
+    #[test]
     fn self_assignment_emits_write_not_read() {
         let funcs = class_functions(
             r#"
@@ -1010,5 +1047,21 @@ end
             le.writes,
             le.reads,
         );
+    }
+
+    #[test]
+    fn postfix_if_write_is_captured() {
+        // `self.<field> = … if cond` — the postfix `if` modifier (`Node::IfMod`
+        // with `if_true` set), the mirror case of the postfix `unless` form.
+        let funcs = class_functions(
+            r#"
+class M
+  def reset_total
+    self.total = 0 if reset
+  end
+end
+"#,
+        );
+        assert_eq!(funcs[0].writes, vec!["total"]);
     }
 }
