@@ -1232,6 +1232,21 @@ impl<'db> Signature<'db> {
         }
     }
 
+    /// Returns inferable type variables that are referenced by this signature's generic context
+    /// but bound by an enclosing context, such as a generic class.
+    fn outer_inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {
+        let Some(generic_context) = self.generic_context else {
+            return InferableTypeVars::None;
+        };
+        InferableTypeVars::from_typevars(
+            db,
+            self.inferable_typevars(db)
+                .iter(db)
+                .filter(|typevar| !generic_context.contains(db, *typevar))
+                .collect::<FxOrderSet<_>>(),
+        )
+    }
+
     pub(crate) fn is_non_generic(&self) -> bool {
         self.generic_context.is_none()
     }
@@ -1728,16 +1743,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         self.check_signature_pair_impl(db, source, target, false)
     }
 
-    /// Check two signatures while inferring both signatures' type variables.
-    fn check_signature_pair_with_inferred_typevars(
-        &self,
-        db: &'db dyn Db,
-        source: &Signature<'db>,
-        target: &Signature<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        self.check_signature_pair_impl(db, source, target, true)
-    }
-
+    /// Checks a signature pair using positional type-variable alignment where possible, then
+    /// falls back to inferred source specialization when the target's local variables are rigid.
     fn check_signature_pair_impl(
         &self,
         db: &'db dyn Db,
@@ -1824,18 +1831,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let target_inferable = if infer_target_typevars {
             target.inferable_typevars(db)
         } else {
-            InferableTypeVars::from_typevars(
-                db,
-                target
-                    .inferable_typevars(db)
-                    .iter(db)
-                    .filter(|typevar| {
-                        target
-                            .generic_context
-                            .is_none_or(|context| !context.contains(db, *typevar))
-                    })
-                    .collect::<FxOrderSet<_>>(),
-            )
+            target.outer_inferable_typevars(db)
         };
         let inferable = source_inferable.merge(db, target_inferable);
         let inferable = self.inferable.merge(db, inferable);
@@ -1888,13 +1884,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         } else {
             positional.or(db, self.constraints, || {
                 self.without_context_collection(|| {
-                    self.check_signature_pair_with_inferred_typevars(db, unaligned_source, target)
+                    self.check_signature_pair_impl(db, unaligned_source, target, true)
                 })
             })
         }
     }
 
-    /// Infer a source specialization when both signatures are part of an outer inference goal.
+    /// Infers a source specialization when both signatures contribute to an outer inference goal.
+    ///
+    /// The source's declared domain is included before its variables are abstracted away, while
+    /// the target's callable-local variables remain rigid.
     fn check_signature_pair_with_inferred_source_for_inference(
         &self,
         db: &'db dyn Db,
@@ -1902,18 +1901,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let source_inferable = source.inferable_typevars(db);
-        let target_inferable = InferableTypeVars::from_typevars(
-            db,
-            target
-                .inferable_typevars(db)
-                .iter(db)
-                .filter(|typevar| {
-                    target
-                        .generic_context
-                        .is_none_or(|context| !context.contains(db, *typevar))
-                })
-                .collect::<FxOrderSet<_>>(),
-        );
+        let target_inferable = target.outer_inferable_typevars(db);
         let inferable = self
             .inferable
             .merge(db, source_inferable.merge(db, target_inferable));
@@ -1940,7 +1928,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         )
     }
 
-    /// Check that a source type variable can be specialized to `specialized` without erasing the
+    /// Checks that a source type variable can be specialized to `specialized` without erasing the
     /// difference between an upper bound and a constrained domain.
     fn check_source_typevar_specialization(
         &self,
@@ -2006,7 +1994,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
     }
 
-    /// Infer a source specialization, then verify it against the rigid generic target.
+    /// Infers a source specialization, then verifies it against the rigid generic target.
+    ///
+    /// The inferred specialization may depend on a target type variable. For example, the source
+    /// below satisfies the target by choosing `S = list[T]` for each target specialization:
+    ///
+    /// ```python
+    /// def source[S](value: S) -> list[S]: ...
+    /// def target[T](value: list[T]) -> list[list[T]]: ...
+    /// ```
     fn check_signature_pair_with_inferred_source(
         &self,
         db: &'db dyn Db,
@@ -2014,18 +2010,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let source_inferable = source.inferable_typevars(db);
-        let target_inferable = InferableTypeVars::from_typevars(
-            db,
-            target
-                .inferable_typevars(db)
-                .iter(db)
-                .filter(|typevar| {
-                    target
-                        .generic_context
-                        .is_none_or(|context| !context.contains(db, *typevar))
-                })
-                .collect::<FxOrderSet<_>>(),
-        );
+        let target_inferable = target.outer_inferable_typevars(db);
         let inferable = self
             .inferable
             .merge(db, source_inferable.merge(db, target_inferable));
@@ -2073,6 +2058,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         })
     }
 
+    /// Applies candidate source solutions and checks each specialized source against the original
+    /// target, including validation against the source variables' declared domains.
     fn check_signature_pair_with_source_solutions(
         &self,
         db: &'db dyn Db,
