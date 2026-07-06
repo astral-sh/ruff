@@ -23,6 +23,8 @@ mod multiple_annotations;
 mod multiple_highlight_duplicated;
 mod multiple_multiline_removal;
 mod primary_title_second_group;
+mod regression_leading_tab_label_alignment;
+mod regression_leading_tab_long_line;
 mod simple;
 mod strip_line;
 mod strip_line_char;
