@@ -71,121 +71,191 @@ help: Prefix it with an underscore or any other dummy variable pattern
    |
 note: This is an unsafe fix and may change runtime behavior
 
-RUF059 [*] Unpacked variable `connection` is never used
-  --> RUF059_0.py:66:24
+RUF059 [*] Unpacked variable `a` is never used
+  --> RUF059_0.py:38:6
    |
-64 |         return None, None
-65 |
-66 |     with connect() as (connection, cursor):
-   |                        ^^^^^^^^^^
-67 |         cursor.execute("SELECT * FROM users")
+36 |     bar = (1, 2)
+37 |     locals()
+38 |     (a, b) = bar
+   |      ^
    |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-65 |
-   -     with connect() as (connection, cursor):
-66 +     with connect() as (_connection, cursor):
-67 |         cursor.execute("SELECT * FROM users")
+37 |     locals()
+   -     (a, b) = bar
+38 +     (_a, b) = bar
+39 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF059 [*] Unpacked variable `b` is never used
+  --> RUF059_0.py:38:9
+   |
+36 |     bar = (1, 2)
+37 |     locals()
+38 |     (a, b) = bar
+   |         ^
+   |
+help: Prefix it with an underscore or any other dummy variable pattern
+   |
+37 |     locals()
+   -     (a, b) = bar
+38 +     (a, _b) = bar
+39 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF059 [*] Unpacked variable `a` is never used
+  --> RUF059_0.py:43:6
+   |
+41 | def f():
+42 |     bar = (1, 2)
+43 |     (a, b) = bar
+   |      ^
+44 |     locals()
+   |
+help: Prefix it with an underscore or any other dummy variable pattern
+   |
+42 |     bar = (1, 2)
+   -     (a, b) = bar
+43 +     (_a, b) = bar
+44 |     locals()
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF059 [*] Unpacked variable `b` is never used
+  --> RUF059_0.py:43:9
+   |
+41 | def f():
+42 |     bar = (1, 2)
+43 |     (a, b) = bar
+   |         ^
+44 |     locals()
+   |
+help: Prefix it with an underscore or any other dummy variable pattern
+   |
+42 |     bar = (1, 2)
+   -     (a, b) = bar
+43 +     (a, _b) = bar
+44 |     locals()
    |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `connection` is never used
-  --> RUF059_0.py:74:24
+  --> RUF059_0.py:79:24
    |
-72 |         return None, None
-73 |
-74 |     with connect() as (connection, cursor):
+77 |         return None, None
+78 |
+79 |     with connect() as (connection, cursor):
    |                        ^^^^^^^^^^
-75 |         cursor.execute("SELECT * FROM users")
+80 |         cursor.execute("SELECT * FROM users")
    |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-73 |
+78 |
    -     with connect() as (connection, cursor):
-74 +     with connect() as (_connection, cursor):
-75 |         cursor.execute("SELECT * FROM users")
+79 +     with connect() as (_connection, cursor):
+80 |         cursor.execute("SELECT * FROM users")
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF059 [*] Unpacked variable `connection` is never used
+  --> RUF059_0.py:87:24
+   |
+85 |         return None, None
+86 |
+87 |     with connect() as (connection, cursor):
+   |                        ^^^^^^^^^^
+88 |         cursor.execute("SELECT * FROM users")
+   |
+help: Prefix it with an underscore or any other dummy variable pattern
+   |
+86 |
+   -     with connect() as (connection, cursor):
+87 +     with connect() as (_connection, cursor):
+88 |         cursor.execute("SELECT * FROM users")
    |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `this` is never used
-  --> RUF059_0.py:79:49
+  --> RUF059_0.py:92:49
    |
-78 | def f():
-79 |     with open("file") as my_file, open("") as ((this, that)):
+91 | def f():
+92 |     with open("file") as my_file, open("") as ((this, that)):
    |                                                 ^^^^
-80 |         print("hello")
+93 |         print("hello")
    |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-78 | def f():
+91 | def f():
    -     with open("file") as my_file, open("") as ((this, that)):
-79 +     with open("file") as my_file, open("") as ((_this, that)):
-80 |         print("hello")
+92 +     with open("file") as my_file, open("") as ((_this, that)):
+93 |         print("hello")
    |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `that` is never used
-  --> RUF059_0.py:79:55
+  --> RUF059_0.py:92:55
    |
-78 | def f():
-79 |     with open("file") as my_file, open("") as ((this, that)):
+91 | def f():
+92 |     with open("file") as my_file, open("") as ((this, that)):
    |                                                       ^^^^
-80 |         print("hello")
+93 |         print("hello")
    |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
-78 | def f():
+91 | def f():
    -     with open("file") as my_file, open("") as ((this, that)):
-79 +     with open("file") as my_file, open("") as ((this, _that)):
-80 |         print("hello")
+92 +     with open("file") as my_file, open("") as ((this, _that)):
+93 |         print("hello")
    |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `this` is never used
-  --> RUF059_0.py:86:23
-   |
-84 |     with (
-85 |         open("file") as my_file,
-86 |         open("") as ((this, that)),
-   |                       ^^^^
-87 |     ):
-88 |         print("hello")
-   |
+   --> RUF059_0.py:99:23
+    |
+ 97 |     with (
+ 98 |         open("file") as my_file,
+ 99 |         open("") as ((this, that)),
+    |                       ^^^^
+100 |     ):
+101 |         print("hello")
+    |
 help: Prefix it with an underscore or any other dummy variable pattern
-   |
-85 |         open("file") as my_file,
-   -         open("") as ((this, that)),
-86 +         open("") as ((_this, that)),
-87 |     ):
-   |
+    |
+98  |         open("file") as my_file,
+    -         open("") as ((this, that)),
+99  +         open("") as ((_this, that)),
+100 |     ):
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 [*] Unpacked variable `that` is never used
-  --> RUF059_0.py:86:29
-   |
-84 |     with (
-85 |         open("file") as my_file,
-86 |         open("") as ((this, that)),
-   |                             ^^^^
-87 |     ):
-88 |         print("hello")
-   |
+   --> RUF059_0.py:99:29
+    |
+ 97 |     with (
+ 98 |         open("file") as my_file,
+ 99 |         open("") as ((this, that)),
+    |                             ^^^^
+100 |     ):
+101 |         print("hello")
+    |
 help: Prefix it with an underscore or any other dummy variable pattern
-   |
-85 |         open("file") as my_file,
-   -         open("") as ((this, that)),
-86 +         open("") as ((this, _that)),
-87 |     ):
-   |
+    |
+98  |         open("file") as my_file,
+    -         open("") as ((this, that)),
+99  +         open("") as ((this, _that)),
+100 |     ):
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF059 Unpacked variable `x` is never used
-   --> RUF059_0.py:101:5
+   --> RUF059_0.py:114:5
     |
- 99 | # see: https://github.com/astral-sh/ruff/issues/18507
-100 | def f(_x):
-101 |     x, = "1"
+112 | # see: https://github.com/astral-sh/ruff/issues/18507
+113 | def f(_x):
+114 |     x, = "1"
     |     ^
-102 |     print(_x)
+115 |     print(_x)
     |
 help: Prefix it with an underscore or any other dummy variable pattern

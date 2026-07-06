@@ -31,6 +31,19 @@ def f():
     x = 1
 
 
+# Unpacked assignments should still be flagged even with locals().
+def f():
+    bar = (1, 2)
+    locals()
+    (a, b) = bar
+
+
+def f():
+    bar = (1, 2)
+    (a, b) = bar
+    locals()
+
+
 def f():
     _ = 1
     __ = 1

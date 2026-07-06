@@ -150,9 +150,9 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         }
 
         if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Lambda(_)) {
-            if checker.any_rule_enabled(&[Rule::UnusedVariable, Rule::UnusedUnpackedVariable])
-                && !(scope.uses_locals() && scope.kind.is_function())
-            {
+            let uses_locals = scope.uses_locals() && scope.kind.is_function();
+
+            if checker.any_rule_enabled(&[Rule::UnusedVariable, Rule::UnusedUnpackedVariable]) {
                 let unused_bindings = scope
                     .bindings()
                     .map(|(name, binding_id)| (name, checker.semantic().binding(binding_id)))
@@ -179,7 +179,11 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                     });
 
                 for (unused_name, unused_binding) in unused_bindings {
-                    if checker.is_rule_enabled(Rule::UnusedVariable) {
+                    // `locals()` makes all local variables implicitly "used"
+                    // since they're accessible through the returned dict. However,
+                    // unpacked assignments (RUF059) are very unlikely to be
+                    // accessed through `locals()`, so we still report those.
+                    if checker.is_rule_enabled(Rule::UnusedVariable) && !uses_locals {
                         pyflakes::rules::unused_variable(checker, unused_name, unused_binding);
                     }
 
