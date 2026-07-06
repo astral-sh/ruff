@@ -2327,6 +2327,9 @@ class HasSetAttrWithUnsuitableInput:
 static_assert(not is_subtype_of(HasSetAttrWithUnsuitableInput, HasMutableXProperty))
 static_assert(not is_assignable_to(HasSetAttrWithUnsuitableInput, HasMutableXProperty))
 
+# For static checking, an explicit attribute declaration takes precedence over `__setattr__`.
+# This matches other type checkers and likely user intent, even though a custom `__setattr__`
+# intercepts every assignment at runtime.
 class ExplicitXWithBroadSetAttr:
     x: int
 
