@@ -438,8 +438,8 @@ class AccountCashRounding(models.Model):
         assert!(!t.iter().any(|tr| tr.p == "emitted_by"));
 
         // The ndjson round-trips through the closed-vocab parser.
-        let and = to_ndjson(&graph);
-        let parsed = ruff_spo_triplet::from_ndjson(&and).expect("ndjson round-trips");
+        let nd = to_ndjson(&graph);
+        let parsed = ruff_spo_triplet::from_ndjson(&nd).expect("ndjson round-trips");
         assert_eq!(parsed, t);
     }
 
@@ -627,8 +627,8 @@ class ResUsers(models.Model):
 
         // The ndjson round-trips through the closed-vocab parser (relation_kind
         // is now a recognised predicate).
-        let and = to_ndjson(&graph);
-        let parsed = ruff_spo_triplet::from_ndjson(&and).expect("ndjson round-trips");
+        let nd = to_ndjson(&graph);
+        let parsed = ruff_spo_triplet::from_ndjson(&nd).expect("ndjson round-trips");
         assert_eq!(parsed, t);
     }
 
