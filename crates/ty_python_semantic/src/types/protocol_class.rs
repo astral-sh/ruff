@@ -1968,27 +1968,9 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                 return self.never();
             }
 
-            // Callable upcasting requires every union arm to be callable. Preserve any concrete
-            // callable arm instead of treating the whole-union failure as proof of disjointness.
-            if let Type::Union(union) = ty
-                && union.elements(db).iter().any(|element| {
-                    !element.is_dynamic()
-                        && element
-                            .try_upcast_to_callable_with_policy(db, UpcastPolicy::Sound)
-                            .is_some()
-                })
-            {
-                return union
-                    .elements(db)
-                    .iter()
-                    .when_all(db, self.constraints, |element| {
-                        self.protocol_member_has_disjoint_type_from_ty(db, member, *element)
-                    });
-            }
-
             let Some(callables) = ty.try_upcast_to_callable_with_policy(db, UpcastPolicy::Sound)
             else {
-                return ConstraintSet::from_bool(self.constraints, !member.is_instance_method());
+                return self.never();
             };
 
             callables.iter().when_all(db, self.constraints, |callable| {

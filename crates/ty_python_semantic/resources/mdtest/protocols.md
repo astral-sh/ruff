@@ -3244,6 +3244,13 @@ class NNotCallable:
 class NMaybeCallable:
     x: Callable[[int], str] | None
 
+class F:
+    def __call__(self, val: int) -> str:
+        return "foo"
+
+class NObject:
+    x: object = F()
+
 class NInstanceMethod:
     def x(self, val: int) -> str:
         return "foo"
@@ -3293,9 +3300,10 @@ static_assert(is_equivalent_to(PClassMethod, PStaticMethod))
 
 static_assert(not is_assignable_to(NNotCallable, PClassMethod))
 static_assert(not is_assignable_to(NNotCallable, PStaticMethod))
-static_assert(is_disjoint_from(NNotCallable, PClassMethod))
-static_assert(is_disjoint_from(NNotCallable, PStaticMethod))
+static_assert(not is_disjoint_from(NNotCallable, PClassMethod))
+static_assert(not is_disjoint_from(NNotCallable, PStaticMethod))
 static_assert(not is_disjoint_from(NMaybeCallable, PStaticMethod))
+static_assert(not is_disjoint_from(NObject, PStaticMethod))
 
 # `NInstanceMethod.x` has the correct type when accessed on an instance of
 # `NInstanceMethod`, but not when accessed on the class object itself
