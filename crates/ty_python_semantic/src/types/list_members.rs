@@ -585,6 +585,9 @@ impl<'db> AllMembers<'db> {
                     }
                 }
             }
+            Some(CodeGeneratorKind::Pydantic(_)) => {
+                // Pydantic's special attributes are declared on and inherited from `BaseModel`.
+            }
             None => {}
         }
     }

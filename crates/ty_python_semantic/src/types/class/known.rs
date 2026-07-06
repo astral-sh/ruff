@@ -155,6 +155,8 @@ pub enum KnownClass {
     TyExtensionsIterator,
     // Pydantic
     PydanticBaseModel,
+    PydanticConfigDict,
+    PydanticRootModel,
 }
 
 impl KnownClass {
@@ -282,7 +284,9 @@ impl KnownClass {
             | Self::FunctoolsPartial
             | Self::ExtensionTypedDictFallback
             | Self::TypedDictFallback
-            | Self::PydanticBaseModel => Some(Truthiness::Ambiguous),
+            | Self::PydanticBaseModel
+            | Self::PydanticConfigDict
+            | Self::PydanticRootModel => Some(Truthiness::Ambiguous),
 
             Self::Tuple => None,
         }
@@ -391,7 +395,9 @@ impl KnownClass {
             | KnownClass::Template
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
-            | KnownClass::PydanticBaseModel => false,
+            | KnownClass::PydanticBaseModel
+            | KnownClass::PydanticConfigDict
+            | KnownClass::PydanticRootModel => false,
         }
     }
 
@@ -497,7 +503,10 @@ impl KnownClass {
             | KnownClass::Template
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
-            | KnownClass::PydanticBaseModel => false,
+            | KnownClass::PydanticBaseModel
+            | KnownClass::PydanticRootModel => false,
+
+            KnownClass::PydanticConfigDict => true,
         }
     }
 
@@ -602,7 +611,9 @@ impl KnownClass {
             | KnownClass::Template
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
-            | KnownClass::PydanticBaseModel => false,
+            | KnownClass::PydanticBaseModel
+            | KnownClass::PydanticConfigDict
+            | KnownClass::PydanticRootModel => false,
         }
     }
 
@@ -720,7 +731,9 @@ impl KnownClass {
             | Self::FunctoolsPartial
             | Self::Mapping
             | Self::Sequence
-            | Self::PydanticBaseModel => false,
+            | Self::PydanticBaseModel
+            | Self::PydanticConfigDict
+            | Self::PydanticRootModel => false,
         }
     }
 
@@ -827,7 +840,9 @@ impl KnownClass {
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
             | KnownClass::Specialization
-            | KnownClass::PydanticBaseModel => false,
+            | KnownClass::PydanticBaseModel
+            | KnownClass::PydanticConfigDict
+            | KnownClass::PydanticRootModel => false,
             KnownClass::NamedTupleFallback
             | KnownClass::TypedDictFallback
             | KnownClass::ExtensionTypedDictFallback => true,
@@ -948,6 +963,8 @@ impl KnownClass {
             Self::FunctoolsPartial => "partial",
             Self::ProtocolMeta => "_ProtocolMeta",
             Self::PydanticBaseModel => "BaseModel",
+            Self::PydanticConfigDict => "ConfigDict",
+            Self::PydanticRootModel => "RootModel",
         }
     }
 
@@ -1331,6 +1348,8 @@ impl KnownClass {
             Self::Path => KnownModule::Pathlib,
             Self::FunctoolsPartial => KnownModule::Functools,
             Self::PydanticBaseModel => KnownModule::PydanticMain,
+            Self::PydanticConfigDict => KnownModule::PydanticConfig,
+            Self::PydanticRootModel => KnownModule::PydanticRootModel,
         }
     }
 
@@ -1438,7 +1457,9 @@ impl KnownClass {
             | Self::Path
             | Self::UnionType
             | Self::FunctoolsPartial
-            | Self::PydanticBaseModel => Some(false),
+            | Self::PydanticBaseModel
+            | Self::PydanticConfigDict
+            | Self::PydanticRootModel => Some(false),
 
             Self::Tuple => None,
         }
@@ -1549,7 +1570,9 @@ impl KnownClass {
             | Self::Template
             | Self::Path
             | Self::FunctoolsPartial
-            | Self::PydanticBaseModel => false,
+            | Self::PydanticBaseModel
+            | Self::PydanticConfigDict
+            | Self::PydanticRootModel => false,
         }
     }
 
@@ -1660,6 +1683,8 @@ impl KnownClass {
             "_ProtocolMeta" => &[Self::ProtocolMeta],
             "_TypedDict" => &[Self::ExtensionTypedDictFallback],
             "BaseModel" => &[Self::PydanticBaseModel],
+            "ConfigDict" => &[Self::PydanticConfigDict],
+            "RootModel" => &[Self::PydanticRootModel],
             _ => return None,
         };
 
@@ -1756,7 +1781,9 @@ impl KnownClass {
             | Self::Template
             | Self::Path
             | Self::FunctoolsPartial
-            | Self::PydanticBaseModel => module == self.canonical_module(db),
+            | Self::PydanticBaseModel
+            | Self::PydanticConfigDict
+            | Self::PydanticRootModel => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
             | Self::TypeAliasType

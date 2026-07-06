@@ -3849,6 +3849,10 @@ pub(super) fn report_invalid_method_override<'db>(
                     "`{overridden_method}` is a generated method created because \
                         `{superclass_name}` is a dataclass"
                 )),
+                CodeGeneratorKind::Pydantic(_) => make_sub(format_args!(
+                    "`{overridden_method}` is a generated method created because \
+                        `{superclass_name}` is a Pydantic model"
+                )),
                 CodeGeneratorKind::NamedTuple => make_sub(format_args!(
                     "`{overridden_method}` is a generated method created because \
                         `{superclass_name}` inherits from `typing.NamedTuple`"

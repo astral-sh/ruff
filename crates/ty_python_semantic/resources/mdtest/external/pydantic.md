@@ -271,8 +271,23 @@ class PersonWithoutExtras(BaseModel):
 
     name: str
 
-# TODO: this should be an error once we support `extra="forbid"`
-PersonWithoutExtras(name="Alice", something_else=7)
+# revealed: (self: PersonWithoutExtras, *, name: str) -> None
+reveal_type(PersonWithoutExtras.__init__)
+PersonWithoutExtras(name="Alice", something_else=7)  # error: [unknown-argument]
+
+class PersonIgnoringExtras(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    name: str
+
+PersonIgnoringExtras(name="Alice", something_else=7)
+
+class PersonAllowingExtras(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    name: str
+
+PersonAllowingExtras(name="Alice", something_else=7)
 ```
 
 ## Field named `extra`
@@ -399,6 +414,168 @@ Settings()
 
 # `BaseSettings` defines a specialized constructor and forbids extra values by default.
 Settings(host="localhost", port=8000, something_else=7)  # error: [unknown-argument]
+```
+
+## Root models
+
+Unlike fields on ordinary Pydantic models, a root model's `root` field can be passed either
+positionally or by keyword:
+
+```py
+from pydantic import RootModel
+
+class IntList(RootModel[list[int]]): ...
+
+reveal_type(IntList.__init__)  # revealed: (self: IntList, root: list[int]) -> None
+
+IntList([1, 2, 3])
+IntList(root=[1, 2, 3])
+```
+
+## Model configuration
+
+The tests in this section use `extra` as an exemplary setting, but primarily test how model
+configuration is detected, inherited, merged, and overridden.
+
+```py
+from pydantic import BaseModel, ConfigDict
+
+class ForbidExtras(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+class InheritsForbidExtras(ForbidExtras):
+    name: str
+
+InheritsForbidExtras(name="Alice", something_else=7)  # error: [unknown-argument]
+
+class OverridesForbidExtras(ForbidExtras):
+    model_config = ConfigDict(extra="ignore")
+
+    name: str
+
+OverridesForbidExtras(name="Alice", something_else=7)
+
+class KeepsInheritedExtraSetting(ForbidExtras):
+    model_config = ConfigDict(strict=True)
+
+    name: str
+
+KeepsInheritedExtraSetting(name="Alice", something_else=7)  # error: [unknown-argument]
+```
+
+Pydantic merges configs from multiple bases from left to right, so the rightmost base takes
+precedence:
+
+```py
+class AllowExtras(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+class RightmostForbids(AllowExtras, ForbidExtras):
+    name: str
+
+RightmostForbids(name="Alice", something_else=7)  # error: [unknown-argument]
+
+class RightmostAllows(ForbidExtras, AllowExtras):
+    name: str
+
+RightmostAllows(name="Alice", something_else=7)
+```
+
+Mixins (classes that do not inherit from `BaseModel`) can also change the configuration:
+
+```py
+class AllowExtrasMixin:
+    model_config = ConfigDict(extra="allow")
+
+class ConfigMixinOverridesForbid(ForbidExtras, AllowExtrasMixin):
+    name: str
+
+ConfigMixinOverridesForbid(name="Alice", something_else=7)
+```
+
+Config values passed as class keywords take precedence over inherited `model_config`s:
+
+```py
+class KeywordForbidsExtras(BaseModel, extra="forbid"):
+    name: str
+
+KeywordForbidsExtras(name="Alice", something_else=7)  # error: [unknown-argument]
+
+class KeywordOverridesForbid(ForbidExtras, extra="allow"):
+    name: str
+
+KeywordOverridesForbid(name="Alice", something_else=7)
+```
+
+The `ConfigDict` class is recognized by identity, including through an import alias:
+
+```py
+from pydantic import ConfigDict as ModelConfig
+
+class AliasedConfigDict(BaseModel):
+    model_config = ModelConfig(extra="forbid")
+
+    name: str
+
+AliasedConfigDict(name="Alice", something_else=7)  # error: [unknown-argument]
+```
+
+Pydantic also accepts a plain dictionary as `model_config`:
+
+```py
+class PlainDictConfig(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    name: str
+
+# TODO: this should be an error
+PlainDictConfig(name="Alice", something_else=7)
+```
+
+## Differences from dataclasses
+
+Pydantic models use `dataclass_transform` to describe their fields and constructor to static type
+checkers, but that does not make them dataclasses or grant them all dataclass-generated behavior. In
+particular, Pydantic allows a required field after one with a default:
+
+```py
+from pydantic import BaseModel
+
+class RequiredAfterDefault(BaseModel):
+    defaulted: int = 0
+    required: int
+
+# revealed: (self: RequiredAfterDefault, *, defaulted: int = 0, required: int, **extra: Any) -> None
+reveal_type(RequiredAfterDefault.__init__)
+RequiredAfterDefault(required=1)
+```
+
+Pydantic models do not expose some of the special attributes of dataclasses:
+
+```py
+RequiredAfterDefault.__dataclass_fields__  # error: [unresolved-attribute]
+RequiredAfterDefault.__dataclass_params__  # error: [unresolved-attribute]
+RequiredAfterDefault.__match_args__  # error: [unresolved-attribute]
+```
+
+They do, however, expose various Pydantic-specific fields (inherited from `BaseModel`), for example:
+
+```py
+reveal_type(RequiredAfterDefault.__pydantic_fields__)  # revealed: dict[str, FieldInfo]
+```
+
+Invalid type qualifiers are diagnosed as Pydantic model fields rather than dataclass fields:
+
+```py
+from typing_extensions import NotRequired, ReadOnly, Required
+
+class InvalidFieldQualifiers(BaseModel):
+    # error: [invalid-type-form] "`NotRequired` is not allowed in Pydantic model fields"
+    not_required: NotRequired[int]
+    # error: [invalid-type-form] "`ReadOnly` is not allowed in Pydantic model fields"
+    read_only: ReadOnly[int]
+    # error: [invalid-type-form] "`Required` is not allowed in Pydantic model fields"
+    required: Required[int]
 ```
 
 ## Pydantic dataclasses

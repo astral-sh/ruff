@@ -4795,7 +4795,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ));
                         }
                     }
-                    Some(CodeGeneratorKind::DataclassLike(_)) => match qualifier {
+                    Some(
+                        class_kind @ (CodeGeneratorKind::DataclassLike(_)
+                        | CodeGeneratorKind::Pydantic(_)),
+                    ) => match qualifier {
                         TypeQualifier::NotRequired
                         | TypeQualifier::ReadOnly
                         | TypeQualifier::Required => {
@@ -4804,9 +4807,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             else {
                                 continue;
                             };
+                            let field_kind = if matches!(class_kind, CodeGeneratorKind::Pydantic(_))
+                            {
+                                "Pydantic model"
+                            } else {
+                                "dataclass"
+                            };
                             builder.into_diagnostic(format_args!(
-                                "`{name}` is not allowed in dataclass fields",
-                                name = qualifier.name()
+                                "`{name}` is not allowed in {field_kind} fields",
+                                name = qualifier.name(),
                             ));
                         }
                         TypeQualifier::ClassVar | TypeQualifier::Final | TypeQualifier::InitVar => {

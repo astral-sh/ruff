@@ -331,8 +331,12 @@ pub enum KnownModule {
     #[strum(serialize = "struct", serialize = "_struct")]
     Struct,
     // Third-party modules
+    #[strum(serialize = "pydantic.config")]
+    PydanticConfig,
     #[strum(serialize = "pydantic.main")]
     PydanticMain,
+    #[strum(serialize = "pydantic.root_model")]
+    PydanticRootModel,
 }
 
 impl KnownModule {
@@ -364,7 +368,9 @@ impl KnownModule {
             Self::Templatelib => "string.templatelib",
             Self::Numbers => "numbers",
             Self::Struct => "struct",
+            Self::PydanticConfig => "pydantic.config",
             Self::PydanticMain => "pydantic.main",
+            Self::PydanticRootModel => "pydantic.root_model",
         }
     }
 
@@ -388,7 +394,7 @@ impl KnownModule {
     /// Return `true` if this module is provided by a supported third-party package.
     pub const fn is_third_party(self) -> bool {
         match self {
-            Self::PydanticMain => true,
+            Self::PydanticConfig | Self::PydanticMain | Self::PydanticRootModel => true,
             Self::Builtins
             | Self::Enum
             | Self::Types
