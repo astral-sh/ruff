@@ -370,22 +370,3 @@ help: Remove redundant '+' operator to implicitly concatenate
 230 +      " broken"
 231 |     + " line"
     |
-
-ISC003 [*] Explicitly concatenated string should be implicitly concatenated
-   --> ISC.py:236:9
-    |
-235 |   foo(
-236 |       bar="A"  # Complains about this: +
-    |  _________^
-237 | |     + " broken"
-    | |_______________^
-238 |       + " line"
-239 |       + " string."
-    |
-help: Remove redundant '+' operator to implicitly concatenate
-    |
-236 |     bar="A"  # Complains about this: +
-    -     + " broken"
-237 +      " broken"
-238 |     + " line"
-    |

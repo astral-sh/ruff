@@ -105,32 +105,30 @@ pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
                     return;
                 }
 
-                diagnostic.set_fix(generate_fix(checker, bin_op));
+                if let Some(fix) = generate_fix(checker, bin_op) {
+                    diagnostic.set_fix(fix);
+                }
             }
         }
     }
 }
 
-fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Fix {
+fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Option<Fix> {
     let ast::ExprBinOp { left, right, .. } = expr_bin_op;
 
     let between_operands_range = TextRange::new(left.end(), right.start());
-    let between_operands = checker.locator().slice(between_operands_range);
-
     let plus_token = checker
         .tokens()
         .in_range(between_operands_range)
         .iter()
-        .find(|token| token.kind() == TokenKind::Plus);
+        .find(|token| token.kind() == TokenKind::Plus)?;
 
-    let (before_plus, after_plus) = if let Some(plus_token) = plus_token {
-        let plus_relative_start = plus_token.start() - left.end();
-        let (before, after) = between_operands.split_at(plus_relative_start.to_usize());
-        (before, &after[1..])
-    } else {
-        // Fallback in case of unexpected token structure
-        between_operands.split_once('+').unwrap()
-    };
+    let before_plus = checker
+        .locator()
+        .slice(TextRange::new(left.end(), plus_token.start()));
+    let after_plus = checker
+        .locator()
+        .slice(TextRange::new(plus_token.end(), right.start()));
 
     let linebreak_before_operator =
         before_plus.contains_line_break(TextRange::at(TextSize::new(0), before_plus.text_len()));
@@ -143,8 +141,8 @@ fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Fix {
         before_plus.trim_end_matches(is_python_whitespace)
     };
 
-    Fix::safe_edit(Edit::range_replacement(
+    Some(Fix::safe_edit(Edit::range_replacement(
         format!("{before_plus}{after_plus}"),
         between_operands_range,
-    ))
+    )))
 }

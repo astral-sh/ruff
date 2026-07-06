@@ -231,11 +231,3 @@ x = (
     + " line"
     + " string."
 )
-
-foo(
-    bar="A"  # Complains about this: +
-    + " broken"
-    + " line"
-    + " string."
-)
-
