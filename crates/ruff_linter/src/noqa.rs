@@ -1117,6 +1117,8 @@ fn generate_suppression_edit<'a>(
     }
 }
 
+/// Returns the range to replace when updating an existing suppression directive, along with whether
+/// the directive is on an otherwise blank line.
 fn suppression_edit_range(
     locator: &Locator,
     line_range: TextRange,
