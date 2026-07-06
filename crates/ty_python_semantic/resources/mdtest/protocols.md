@@ -2805,6 +2805,8 @@ class StrBoundImplementation:
     def f[T: str](self, input: T) -> T:
         return input
 
+def requires_object_bound(value: ObjectBoundProtocol) -> None: ...
+
 class NestedListProtocol(Protocol):
     def f[T](self, input: list[T]) -> list[list[T]]: ...
 
@@ -2881,6 +2883,7 @@ static_assert(is_subtype_of(ObjectBoundImplementation, StrBoundProtocol))
 static_assert(is_assignable_to(ObjectBoundImplementation, StrBoundProtocol))
 static_assert(not is_subtype_of(StrBoundImplementation, ObjectBoundProtocol))
 static_assert(not is_assignable_to(StrBoundImplementation, ObjectBoundProtocol))
+requires_object_bound(StrBoundImplementation())  # error: [invalid-argument-type]
 
 static_assert(is_assignable_to(GenericListImplementation, NestedListProtocol))
 static_assert(is_subtype_of(ReorderedPairImplementation, PairProtocol))
