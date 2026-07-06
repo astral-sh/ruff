@@ -331,6 +331,15 @@ impl<'db> DefinitionState<'db> {
     }
 }
 
+/// Returns `true` if the dotted path `path` starts with `prefix` at a segment boundary:
+/// `os.path.join` starts with `os.path` and `os`, but not with `os.pa`.
+///
+/// Used to decide whether a dotted use goes through a multipart import
+/// (see [`DefinitionKind::unaliased_multipart_import_name`]).
+pub fn dotted_starts_with(path: &str, prefix: &str) -> bool {
+    path == prefix || (path.starts_with(prefix) && path.as_bytes().get(prefix.len()) == Some(&b'.'))
+}
+
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     Import(ImportDefinitionNodeRef<'ast>),

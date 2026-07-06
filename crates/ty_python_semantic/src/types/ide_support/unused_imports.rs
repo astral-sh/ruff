@@ -4,11 +4,15 @@ use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::{SourceText, source_text};
 use ruff_python_ast::ModExpression;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
-use ruff_python_ast::{self as ast, AnyNodeRef, helpers::is_dunder, name::Name};
+use ruff_python_ast::{
+    self as ast, AnyNodeRef,
+    helpers::is_dunder,
+    name::{Name, UnqualifiedName},
+};
 use ruff_python_parser::Parsed;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
-use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
+use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState, dotted_starts_with};
 use ty_python_core::scope::ScopeKind;
 use ty_python_core::semantic_index;
 
@@ -79,11 +83,20 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
                 continue;
             }
 
-            if multipart_import_name.is_none()
-                && string_annotation_definitions
-                    .get_or_insert_with(|| string_annotation_used_definitions(db, file))
-                    .contains(&definition)
-            {
+            // Multipart imports additionally require a dotted path in some string
+            // annotation to go through the imported submodule.
+            let string_annotation_uses = string_annotation_definitions
+                .get_or_insert_with(|| string_annotation_used_definitions(db, file));
+            let used_in_string_annotation =
+                string_annotation_uses.definitions.contains(&definition)
+                    && multipart_import_name.is_none_or(|imported_name| {
+                        string_annotation_uses
+                            .dotted_names
+                            .iter()
+                            .any(|dotted| dotted_starts_with(dotted, imported_name))
+                    });
+
+            if used_in_string_annotation {
                 continue;
             }
 
@@ -110,15 +123,26 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
     unused
 }
 
-fn string_annotation_used_definitions(db: &dyn Db, file: File) -> FxHashSet<Definition<'_>> {
+/// Definitions and dotted attribute paths referenced from string annotations.
+///
+/// `dotted_names` retains the full dotted paths (`xml.etree.ElementTree.Element`) so
+/// multipart imports can be matched by submodule path rather than by root name alone.
+struct StringAnnotationUses<'db> {
+    definitions: FxHashSet<Definition<'db>>,
+    dotted_names: FxHashSet<Box<str>>,
+}
+
+fn string_annotation_used_definitions(db: &dyn Db, file: File) -> StringAnnotationUses<'_> {
     let parsed = parsed_module(db, file).load(db);
     let source = source_text(db, file);
     let model = SemanticModel::new(db, file);
     let mut definitions = FxHashSet::default();
+    let mut dotted_names = FxHashSet::default();
     let mut visitor = StringAnnotationDefinitionVisitor {
         model: &model,
         source: &source,
         definitions: &mut definitions,
+        dotted_names: &mut dotted_names,
         in_annotation: false,
         scope_node: None,
     };
@@ -127,7 +151,10 @@ fn string_annotation_used_definitions(db: &dyn Db, file: File) -> FxHashSet<Defi
         visitor.visit_stmt(stmt);
     }
 
-    definitions
+    StringAnnotationUses {
+        definitions,
+        dotted_names,
+    }
 }
 
 fn parse_string_annotation(
@@ -149,6 +176,7 @@ struct StringAnnotationDefinitionVisitor<'model, 'db> {
     model: &'model SemanticModel<'db>,
     source: &'model SourceText,
     definitions: &'model mut FxHashSet<Definition<'db>>,
+    dotted_names: &'model mut FxHashSet<Box<str>>,
     in_annotation: bool,
     scope_node: Option<AnyNodeRef<'model>>,
 }
@@ -174,6 +202,7 @@ impl<'model> StringAnnotationDefinitionVisitor<'model, '_> {
             model: self.model,
             source: self.source,
             definitions: self.definitions,
+            dotted_names: self.dotted_names,
             scope_node,
             parse_nested_string_annotations: true,
         };
@@ -202,6 +231,7 @@ struct ParsedStringAnnotationDefinitionVisitor<'model, 'db> {
     model: &'model SemanticModel<'db>,
     source: &'model SourceText,
     definitions: &'model mut FxHashSet<Definition<'db>>,
+    dotted_names: &'model mut FxHashSet<Box<str>>,
     scope_node: AnyNodeRef<'model>,
     parse_nested_string_annotations: bool,
 }
@@ -270,6 +300,16 @@ impl<'ast> SourceOrderVisitor<'ast> for ParsedStringAnnotationDefinitionVisitor<
             ast::Expr::Name(name) => self.collect_name(name),
             ast::Expr::StringLiteral(string) => self.visit_string_annotation(string),
             ast::Expr::Subscript(subscript) => self.visit_subscript(subscript),
+            ast::Expr::Attribute(_) => {
+                // Retain the dotted path so multipart imports (`import xml.etree.ElementTree`)
+                // can be matched by submodule path. The walk must continue so the root
+                // name still records its definitions.
+                if let Some(dotted) = UnqualifiedName::from_expr(expr) {
+                    self.dotted_names
+                        .insert(dotted.to_string().into_boxed_str());
+                }
+                source_order::walk_expr(self, expr);
+            }
             _ => source_order::walk_expr(self, expr),
         }
     }
@@ -1153,6 +1193,35 @@ mod tests {
         )?;
 
         assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_multipart_imports_used_only_in_stringified_annotations() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            import xml.etree.ElementTree
+
+            def f(tree: "xml.etree.ElementTree.Element"): ...
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn reports_multipart_imports_sharing_only_the_root_with_stringified_annotations()
+    -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            import xml.etree.ElementTree
+
+            def f(x: "xml.dom.minidom.Document"): ...
+            "#,
+        )?;
+
+        assert_eq!(names, vec!["xml.etree.ElementTree"]);
         Ok(())
     }
 

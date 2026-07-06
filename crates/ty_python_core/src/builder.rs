@@ -33,7 +33,7 @@ use crate::definition::{
     ImportFromDefinitionNodeRef, ImportFromSubmoduleDefinitionNodeRef,
     LambdaParameterDefinitionNodeRef, LoopHeaderDefinitionNodeRef, LoopStmtRef,
     MatchPatternDefinitionNodeRef, NestedBindingsDefinitionKind, ParameterDefinitionNodeRef,
-    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef, dotted_starts_with,
 };
 use crate::expression::{Expression, ExpressionKind};
 use crate::frozen::{FrozenMap, FrozenSet};
@@ -1436,7 +1436,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     let kind = definition.kind(self.db);
                     kind.unaliased_multipart_import_name(self.module)
                         .is_some_and(|imported_name| {
-                            dotted_name_matches(&dotted_name, imported_name)
+                            dotted_starts_with(&dotted_name, imported_name)
                         })
                 })
                 .collect::<Vec<_>>();
@@ -5240,12 +5240,6 @@ fn dotted_attribute_name(expr: &ast::Expr) -> Option<String> {
         }
         _ => None,
     }
-}
-
-fn dotted_name_matches(name: &str, imported_name: &str) -> bool {
-    name == imported_name
-        || (name.starts_with(imported_name)
-            && name.as_bytes().get(imported_name.len()) == Some(&b'.'))
 }
 
 /// Returns if the expression is a `not TYPE_CHECKING` expression.
