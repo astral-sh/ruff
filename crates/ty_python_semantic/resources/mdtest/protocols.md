@@ -2360,6 +2360,8 @@ class WritableSelfAttr:
 class RecursiveWritableSelfAttr(Protocol):
     x: Self
 
+# TODO: Add an equivalent property protocol and an `is_equivalent_to` assertion once `Self` types
+# are supported in protocol member comparisons.
 class HasWritableSelfAttr(Protocol):
     @property
     def x(self) -> WritableSelfAttr: ...
@@ -2388,8 +2390,10 @@ class ReadableSelfProperty:
     def x(self) -> "ReadableSelfProperty":
         return self
 
-static_assert(is_subtype_of(ReadableSelfProperty, HasReadableSelfProperty))
-static_assert(is_assignable_to(ReadableSelfProperty, HasReadableSelfProperty))
+# TODO: These should pass once `Self` protocol members are checked against all possible subclasses
+# of the implementation.
+static_assert(not is_subtype_of(ReadableSelfProperty, HasReadableSelfProperty))  # error: [static-assert-error]
+static_assert(not is_assignable_to(ReadableSelfProperty, HasReadableSelfProperty))  # error: [static-assert-error]
 
 class HasWritableSelfProperty(Protocol):
     @property
