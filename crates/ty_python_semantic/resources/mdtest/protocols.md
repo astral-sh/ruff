@@ -2697,7 +2697,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import final
+from typing import Callable, final
 from typing_extensions import TypeVar, Self, Protocol
 from ty_extensions import is_equivalent_to, static_assert, is_assignable_to, is_subtype_of
 
@@ -2784,6 +2784,20 @@ class NominalNotGeneric:
     def f(self, input: int) -> int:
         return input
 
+class GenericReturnsObject(Protocol):
+    def f(self, input: FunctionT) -> object: ...
+
+class NominalAcceptsObject:
+    def f(self, input: object) -> object:
+        return input
+
+class GenericCallback(Protocol):
+    def m(self, item: FunctionT, callback: Callable[[FunctionT], str]) -> str: ...
+
+class NominalIntCallback:
+    def m(self, item: int, callback: Callable[[int], str]) -> str:
+        return callback(item)
+
 class NominalReturningSelfNotGeneric:
     def g(self) -> "NominalReturningSelfNotGeneric":
         return self
@@ -2813,10 +2827,15 @@ static_assert(not is_assignable_to(NominalWithSelf, LegacyFunctionScoped))
 static_assert(is_assignable_to(NominalWithSelf, UsesSelf))
 static_assert(is_subtype_of(NominalWithSelf, UsesSelf))
 
-# TODO: these should pass
-static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NominalNotGeneric, LegacyFunctionScoped))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))
+static_assert(not is_assignable_to(NominalNotGeneric, LegacyFunctionScoped))
 static_assert(not is_assignable_to(NominalNotGeneric, UsesSelf))
+
+static_assert(is_subtype_of(NominalAcceptsObject, GenericReturnsObject))
+static_assert(is_assignable_to(NominalAcceptsObject, GenericReturnsObject))
+
+static_assert(not is_subtype_of(NominalIntCallback, GenericCallback))
+static_assert(not is_assignable_to(NominalIntCallback, GenericCallback))
 
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, LegacyFunctionScoped))

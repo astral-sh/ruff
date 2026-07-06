@@ -13,6 +13,7 @@ use crate::types::attribute_write::{
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::callable::CallableTypeKind;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
+use crate::types::signatures::CallableSignature;
 use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
     Db, FxOrderSet,
@@ -1405,11 +1406,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             attribute_type
                 .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(self.relation))
                 .when_some_and(db, self.constraints, |callables| {
-                    self.check_callables_vs_callable(
-                        db,
-                        &callables.map(|callable| callable.apply_self(db, fallback_ty)),
-                        required_callable.apply_self(db, fallback_ty),
-                    )
+                    let target = required_callable.apply_self(db, fallback_ty);
+                    callables.iter().when_all(db, self.constraints, |callable| {
+                        let source = callable.apply_self(db, fallback_ty);
+                        self.check_callable_pair(
+                            db,
+                            source,
+                            rigidify_generic_protocol_target_for_monomorphic_source(
+                                db, source, target,
+                            ),
+                        )
+                    })
                 })
         } else if member.is_method() {
             let Some(required_ty) = required_ty.resolve(db) else {
@@ -1972,6 +1979,43 @@ fn protocol_bind_self<'db>(
         callable.signatures(db).bind_self(db, self_type),
         CallableTypeKind::Regular,
         callable.provenance(db),
+    )
+}
+
+/// Make method-scoped type variables in a generic protocol method rigid when its implementation
+/// is monomorphic.
+///
+/// A monomorphic implementation must support every specialization promised by the protocol
+/// method. Removing the target's generic context keeps its type variables in the signature but
+/// prevents callable matching from choosing a single convenient specialization for them.
+fn rigidify_generic_protocol_target_for_monomorphic_source<'db>(
+    db: &'db dyn Db,
+    source: CallableType<'db>,
+    target: CallableType<'db>,
+) -> CallableType<'db> {
+    let has_method_typevars = |callable: CallableType<'db>| {
+        callable.signatures(db).iter().any(|signature| {
+            signature.generic_context.is_some_and(|context| {
+                context
+                    .variables(db)
+                    .any(|typevar| !typevar.typevar(db).is_self(db))
+            })
+        })
+    };
+
+    if has_method_typevars(source) || !has_method_typevars(target) {
+        return target;
+    }
+
+    CallableType::new(
+        db,
+        CallableSignature::from_overloads(target.signatures(db).iter().map(|signature| {
+            let mut signature = signature.clone();
+            signature.generic_context = None;
+            signature
+        })),
+        target.kind(db),
+        target.provenance(db),
     )
 }
 
