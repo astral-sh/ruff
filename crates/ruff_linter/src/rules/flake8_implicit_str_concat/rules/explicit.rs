@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::token::parenthesized_range;
+use ruff_python_ast::token::{TokenKind, parenthesized_range};
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::LineRanges;
@@ -116,7 +116,21 @@ fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Fix {
 
     let between_operands_range = TextRange::new(left.end(), right.start());
     let between_operands = checker.locator().slice(between_operands_range);
-    let (before_plus, after_plus) = between_operands.split_once('+').unwrap();
+
+    let plus_token = checker
+        .tokens()
+        .in_range(between_operands_range)
+        .iter()
+        .find(|token| token.kind() == TokenKind::Plus);
+
+    let (before_plus, after_plus) = if let Some(plus_token) = plus_token {
+        let plus_relative_start = plus_token.start() - left.end();
+        let (before, after) = between_operands.split_at(plus_relative_start.to_usize());
+        (before, &after[1..])
+    } else {
+        // Fallback in case of unexpected token structure
+        between_operands.split_once('+').unwrap()
+    };
 
     let linebreak_before_operator =
         before_plus.contains_line_break(TextRange::at(TextSize::new(0), before_plus.text_len()));

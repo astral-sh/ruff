@@ -351,3 +351,41 @@ ISC003 Explicitly concatenated string should be implicitly concatenated
     | |_________^
     |
 help: Remove redundant '+' operator to implicitly concatenate
+
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+   --> ISC.py:229:5
+    |
+227 |   # https://github.com/astral-sh/ruff/issues/26541
+228 |   x = (
+229 | /     "A"  # Complains about this: +
+230 | |     + " broken"
+    | |_______________^
+231 |       + " line"
+232 |       + " string."
+    |
+help: Remove redundant '+' operator to implicitly concatenate
+    |
+229 |     "A"  # Complains about this: +
+    -     + " broken"
+230 +      " broken"
+231 |     + " line"
+    |
+
+ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+   --> ISC.py:236:9
+    |
+235 |   foo(
+236 |       bar="A"  # Complains about this: +
+    |  _________^
+237 | |     + " broken"
+    | |_______________^
+238 |       + " line"
+239 |       + " string."
+    |
+help: Remove redundant '+' operator to implicitly concatenate
+    |
+236 |     bar="A"  # Complains about this: +
+    -     + " broken"
+237 +      " broken"
+238 |     + " line"
+    |
