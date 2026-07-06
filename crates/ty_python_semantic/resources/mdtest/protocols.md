@@ -3932,6 +3932,34 @@ static_assert(not is_assignable_to(TypeOf[doesnt_satisfy_foo], Foo))
 static_assert(not is_subtype_of(TypeOf[doesnt_satisfy_foo], Foo))
 ```
 
+Generic inference also uses static and class `__call__` members:
+
+```py
+from typing import Protocol, TypeVar
+
+CallbackT = TypeVar("CallbackT")
+
+class StaticCallback(Protocol[CallbackT]):
+    @staticmethod
+    def __call__(value: CallbackT) -> CallbackT: ...
+
+class ClassCallback(Protocol[CallbackT]):
+    @classmethod
+    def __call__(cls, value: CallbackT) -> CallbackT: ...
+
+def use_static(callback: StaticCallback[CallbackT]) -> CallbackT:
+    raise NotImplementedError
+
+def use_class(callback: ClassCallback[CallbackT]) -> CallbackT:
+    raise NotImplementedError
+
+def identity(value: int) -> int:
+    return value
+
+reveal_type(use_static(identity))  # revealed: int
+reveal_type(use_class(identity))  # revealed: int
+```
+
 Class-literals and generic aliases can also be subtypes of callback protocols:
 
 ```py

@@ -323,12 +323,12 @@ impl<'db> ProtocolInterface<'db> {
     /// Returns the `__call__` method's callable type if this protocol has a `__call__` method member.
     pub(super) fn call_method(self, db: &'db dyn Db) -> Option<CallableType<'db>> {
         self.member_by_name(db, "__call__").and_then(|member| {
-            if !member.is_instance_method() {
+            if !member.is_method() {
                 return None;
             }
             match member
                 .capabilities(db)
-                .class
+                .instance
                 .read
                 .and_then(|read| read.resolve(db))
                 .map(ProtocolMemberType::ty)
