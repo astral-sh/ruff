@@ -121,7 +121,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Add search paths information to the diagnostic
         // Use the same search paths function that is used in actual module resolution
         let verbose = db.verbose();
-        let search_paths = search_paths(db, ModuleResolveMode::StubsAllowed);
+        let search_paths = search_paths(db, ModuleResolveMode::Typing);
 
         diagnostic.info(format_args!(
             "Searched in the following paths during module resolution:"

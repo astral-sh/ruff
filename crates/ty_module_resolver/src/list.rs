@@ -27,7 +27,7 @@ pub fn all_modules(db: &dyn Db) -> Vec<Module<'_>> {
 #[salsa::tracked(returns(deref))]
 pub fn list_modules(db: &dyn Db) -> Box<[Module<'_>]> {
     let mut modules: BTreeMap<&ModuleName, ListedModule<'_>> = BTreeMap::new();
-    for search_path in search_paths(db, ModuleResolveMode::StubsAllowed) {
+    for search_path in search_paths(db, ModuleResolveMode::Typing) {
         for &new in list_modules_in(db, SearchPathIngredient::new(db, search_path.clone())) {
             match modules.entry(new.module(db).name(db)) {
                 Entry::Vacant(entry) => {
@@ -318,8 +318,7 @@ impl<'db> Lister<'db> {
 
     /// Returns true if the given module name cannot be shadowable.
     fn is_non_shadowable(&self, name: &ModuleName) -> bool {
-        ModuleResolveMode::StubsAllowed
-            .is_non_shadowable(self.python_version().minor, name.as_str())
+        ModuleResolveMode::Typing.is_non_shadowable(self.python_version().minor, name.as_str())
     }
 
     /// Returns the Python version we want to perform module resolution
@@ -335,7 +334,7 @@ impl<'db> Lister<'db> {
             python_version: self.python_version(),
             // We don't currently support listing modules
             // in a "no stubs allowed" mode.
-            mode: ModuleResolveMode::StubsAllowed,
+            mode: ModuleResolveMode::Typing,
         }
     }
 }
@@ -1438,7 +1437,7 @@ not_a_directory
         assert_function_query_was_not_run(
             &db,
             dynamic_resolution_paths,
-            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::StubsAllowed),
+            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::Typing),
             &events,
         );
     }
