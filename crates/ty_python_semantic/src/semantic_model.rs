@@ -547,7 +547,7 @@ impl<'db> SemanticModel<'db> {
                     .map(|string_literal| {
                         let value = string_literal.value(db).to_string();
                         vec![ExpectedStringLiteralCompletion {
-                            ty: Type::string_literal(db, &value),
+                            ty: Type::string_literal(db, &*value),
                             value,
                         }]
                     })

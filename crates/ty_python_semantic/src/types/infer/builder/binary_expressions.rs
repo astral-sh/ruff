@@ -688,7 +688,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             let mut value = CompactString::with_capacity(new_length);
                             value.push_str(lhs_value);
                             value.push_str(rhs_value);
-                            Type::string_literal_owned(db, value)
+                            Type::string_literal(db, value)
                         } else {
                             Type::literal_string()
                         };
@@ -719,7 +719,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             })
                         {
                             let new_literal = s.value(db).repeat(n);
-                            Type::string_literal(db, &new_literal)
+                            Type::string_literal(db, &*new_literal)
                         } else {
                             Type::literal_string()
                         };

@@ -1,6 +1,7 @@
 use std::cell::{OnceCell, RefCell};
 use std::rc::Rc;
 
+use compact_str::CompactString;
 use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
@@ -10936,14 +10937,14 @@ impl From<bool> for DeferredExpressionState {
 /// infers an instance of `builtins.str`.
 #[derive(Debug)]
 struct StringPartsCollector {
-    concatenated: Option<String>,
+    concatenated: Option<CompactString>,
     contains_non_literal_str: bool,
 }
 
 impl StringPartsCollector {
     fn new() -> Self {
         Self {
-            concatenated: Some(String::new()),
+            concatenated: Some(CompactString::new("")),
             contains_non_literal_str: false,
         }
     }

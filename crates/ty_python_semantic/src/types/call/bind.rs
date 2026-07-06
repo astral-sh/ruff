@@ -2049,7 +2049,7 @@ impl<'db> Bindings<'db> {
                                                 Type::heterogeneous_tuple(
                                                     db,
                                                     names.iter().map(|name| {
-                                                        Type::string_literal(db, name.as_str())
+                                                        Type::string_literal(db, *name)
                                                     }),
                                                 )
                                             }

@@ -2275,7 +2275,7 @@ impl<'db> Tuple<Type<'db>> {
         let release_level_ty = {
             let elements: Box<[Type<'db>]> = ["alpha", "beta", "candidate", "final"]
                 .iter()
-                .map(|level| Type::string_literal(db, level))
+                .map(|level| Type::string_literal(db, *level))
                 .collect();
 
             // For most unions, it's better to go via `UnionType::from_elements` or use `UnionBuilder`;
