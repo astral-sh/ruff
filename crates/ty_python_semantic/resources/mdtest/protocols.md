@@ -2697,7 +2697,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import final
+from typing import final, overload
 from typing_extensions import TypeVar, Self, Protocol
 from ty_extensions import is_equivalent_to, static_assert, is_assignable_to, is_subtype_of
 
@@ -2828,6 +2828,19 @@ class GenericListReturnImplementation:
 
 def requires_int_bound_identity(value: IntBoundIdentityProtocol) -> None: ...
 
+class IntOrStrIdentityProtocol(Protocol):
+    def f[T: (int, str)](self, input: T) -> T: ...
+
+class IntOrStrOverloadedImplementation:
+    @overload
+    def f(self, input: int) -> int: ...
+    @overload
+    def f(self, input: str) -> str: ...
+    def f(self, input: int | str) -> int | str:
+        return input
+
+def requires_int_or_str_identity(value: IntOrStrIdentityProtocol) -> None: ...
+
 class NominalReturningSelfNotGeneric:
     def g(self) -> "NominalReturningSelfNotGeneric":
         return self
@@ -2874,6 +2887,7 @@ static_assert(is_subtype_of(ReorderedPairImplementation, PairProtocol))
 static_assert(is_assignable_to(ReorderedPairImplementation, PairProtocol))
 
 requires_int_bound_identity(GenericListReturnImplementation())  # error: [invalid-argument-type]
+requires_int_or_str_identity(IntOrStrOverloadedImplementation())
 
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, LegacyFunctionScoped))
