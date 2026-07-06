@@ -178,6 +178,35 @@ fn test_format_title() {
     assert_data_eq!(renderer.render(input), expected_unicode);
 }
 
+/// Tests that we can format a message *without* a header.
+///
+/// This uses `Level::None`, which is somewhat of a hacky API addition I made
+/// to our vendored copy of `annotate-snippets` in order to do exactly what
+/// this test asserts: skip the header.
+#[test]
+fn test_format_skip_title() {
+    let source =
+        "# Docstring followed by a newline\n\ndef foobar(foot, bar={}):\n    \"\"\"\n    \"\"\"\n";
+    let src_annotation = AnnotationKind::Primary.span(56..58).label("B006");
+    let snippet = Snippet::source(source)
+        .line_start(1)
+        .annotation(src_annotation)
+        .fold(false);
+    let message = Group::with_level(Level::ERROR).element(snippet);
+
+    let expected = str![[r#"
+  |
+1 | # Docstring followed by a newline
+2 |
+3 | def foobar(foot, bar={}):
+  |                      ^^ B006
+4 |     """
+5 |     """
+  |
+"#]];
+    assert_data_eq!(Renderer::plain().render(&[message]).clone(), expected);
+}
+
 #[test]
 fn test_format_snippet_only() {
     let source = "This is line 1\nThis is line 2";
@@ -5273,4 +5302,57 @@ error[test-diagnostic]: main diagnostic message
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
     assert_data_eq!(renderer.render(input), expected_unicode);
+}
+
+#[test]
+fn long_line_cut() {
+    let source = "abcd abcd abcd abcd abcd abcd abcd";
+    let input = Level::ERROR.primary_title("").element(
+        Snippet::source(source)
+            .line_start(1)
+            .annotation(AnnotationKind::Primary.span(0..4)),
+    );
+    let expected = str![[r#"
+error: 
+  |
+1 | abcd abcd a...
+  | ^^^^
+"#]];
+    let renderer = Renderer::plain().term_width(18);
+    assert_data_eq!(renderer.render(&[input]).clone(), expected);
+}
+
+#[test]
+fn long_line_cut_custom() {
+    let source = "abcd abcd abcd abcd abcd abcd abcd";
+    let input = Level::ERROR.primary_title("").element(
+        Snippet::source(source)
+            .line_start(1)
+            .annotation(AnnotationKind::Primary.span(0..4)),
+    );
+    // This trims a little less because `…` is visually smaller than `...`.
+    let expected = str![[r#"
+error: 
+  |
+1 | abcd abcd a...
+  | ^^^^
+"#]];
+    let renderer = Renderer::plain().term_width(18).cut_indicator("…");
+    assert_data_eq!(renderer.render(&[input]).clone(), expected);
+}
+
+#[test]
+fn leading_nbsp_no_overflow() {
+    // Regression test: an annotation pointing at leading whitespace caused a
+    // subtraction overflow in Margin::compute because `label_right` can be less
+    // than `whitespace_left`. See https://github.com/astral-sh/ty/issues/836
+    let source = " \u{00A0}                                     'betting_env.datastructure.team_lineup.Tamheet.get_latest': ( 'dataStructure/team_lineup.htm#teamsheet.getlatest',";
+    let input = Level::ERROR.primary_title("test").element(
+        Snippet::source(source)
+            .line_start(1)
+            .annotation(AnnotationKind::Primary.span(0..1)),
+    );
+    // Should not panic.
+    let renderer = Renderer::plain();
+    let _ = renderer.render(&[input]).clone();
 }
