@@ -127,7 +127,10 @@ jobs:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
+          # This job downloads artifacts instead of checking out the repository.
+          cache-dependency-glob: ""
           enable-cache: true
+          ignore-empty-workdir: true
           version: "0.11.26"
 
       - name: Download ty binaries, flaky project list, and config
@@ -180,7 +183,10 @@ jobs:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
+          # This job downloads artifacts instead of checking out the repository.
+          cache-dependency-glob: ""
           enable-cache: true
+          ignore-empty-workdir: true
           version: "0.11.26"
 
       - name: Download shard diagnostics
