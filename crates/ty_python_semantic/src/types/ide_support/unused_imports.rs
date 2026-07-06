@@ -239,23 +239,26 @@ impl<'model> SourceOrderVisitor<'model> for StringAnnotationDefinitionVisitor<'m
                 self.visit_string_annotation(string);
             }
             ast::Expr::Call(call) => {
-                // Arguments that ty evaluates as type expressions (`cast("X", v)`,
-                // `assert_type(v, "X")`, ...) contain forward references. Keyword
-                // arguments are not mapped to parameters here, so strings passed by
-                // keyword remain values.
                 let type_form_index = call
                     .func
                     .inferred_type(self.model)
                     .and_then(|ty| known_type_form_parameter_index(self.model.db(), ty));
 
+                let Some(type_form_index) = type_form_index else {
+                    source_order::walk_expr(self, expr);
+                    return;
+                };
+
                 self.visit_expr(&call.func);
                 for (index, argument) in call.arguments.args.iter().enumerate() {
-                    if type_form_index == Some(index) {
+                    if index == type_form_index {
                         self.enter_annotation(argument, |visitor| visitor.visit_expr(argument));
                     } else {
                         self.visit_expr(argument);
                     }
                 }
+                // Keyword arguments are not mapped to parameters, so their strings
+                // remain values.
                 for keyword in &call.arguments.keywords {
                     self.visit_expr(&keyword.value);
                 }
@@ -671,6 +674,20 @@ mod tests {
     }
 
     #[test]
+    fn reports_import_used_only_before_import() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            print(os)
+
+            import os
+            "#,
+        )?;
+
+        assert_eq!(names, vec!["os"]);
+        Ok(())
+    }
+
+    #[test]
     fn reports_multipart_import_used_only_before_import() -> anyhow::Result<()> {
         let entries = UnusedImportTest::new().entries(
             r#"
@@ -1028,6 +1045,19 @@ mod tests {
         )?;
 
         assert_eq!(names, vec!["os"]);
+        Ok(())
+    }
+
+    #[test]
+    fn reports_class_scope_unused_from_imports() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            class C:
+                from os import path
+            "#,
+        )?;
+
+        assert_eq!(names, vec!["path"]);
         Ok(())
     }
 
