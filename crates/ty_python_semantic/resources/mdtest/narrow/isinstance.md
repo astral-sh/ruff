@@ -607,8 +607,8 @@ def f(x: Foo, y: Intersection[type[Bar], type[list[int]]]):
         reveal_type(x.attribute)  # revealed: int
 ```
 
-Without skipping the invalid member, narrowing would be aborted for the whole intersection,
-leaving the subject un-narrowed. Unlike the example above, the intersection here is *inhabitable*:
+Without skipping the invalid member, narrowing would be aborted for the whole intersection, leaving
+the subject un-narrowed. Unlike the example above, the intersection here is *inhabitable*:
 `type[Maker[Widget]]` is a parametrized generic (not a valid runtime `isinstance()` target, so it
 contributes no constraint), but a class can be both a `Config` and a `Maker[Widget]`, so a real
 object exists and the call site below type-checks. This is the shape produced by builder/config
@@ -625,7 +625,6 @@ class Config:
     size: int = 0
 
 class Widget: ...
-
 class WidgetConfig(Config, Maker[Widget]): ...
 
 def configure(obj: object, cls: Intersection[type[Config], type[Maker[Widget]]]) -> None:
