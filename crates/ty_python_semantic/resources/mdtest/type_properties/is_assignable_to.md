@@ -1379,6 +1379,16 @@ from ty_extensions._internal import RegularCallableTypeOf, TypeOf, is_assignable
 def identity[T](t: T) -> T:
     return t
 
+def int_identity(t: int) -> int:
+    return t
+
+static_assert(
+    not is_assignable_to(
+        RegularCallableTypeOf[int_identity],
+        RegularCallableTypeOf[identity],
+    )
+)
+
 static_assert(is_assignable_to(TypeOf[identity], Callable[[int], int]))
 static_assert(is_assignable_to(TypeOf[identity], Callable[[str], str]))
 # TODO: This should not be assignable. A generic callable must use one coherent specialization.
