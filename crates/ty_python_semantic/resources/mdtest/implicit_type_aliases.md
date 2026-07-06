@@ -327,11 +327,11 @@ reveal_type(int | Invalid())  # revealed: Unknown
 reveal_type(Invalid() | list[int])  # revealed: Unknown
 ```
 
-## Custom `__(r)or__` methods on metaclasses are only partially respected
+## Custom union methods on metaclasses are only partially respected
 
-A drawback of our extensive special casing of `|` operations between class objects is that
-`__(r)or__` methods on metaclasses are completely disregarded if two classes are `|`'d together. We
-respect the metaclass dunder if a class is `|`'d with a non-class, however:
+Ty special-cases `|` between class objects, so it ignores a metaclass's `__or__` and `__ror__`
+methods when both operands are classes. The custom method below is also an invalid override of
+`type.__or__`, because it returns `str` instead of a union object:
 
 ```py
 class Meta(type):
@@ -343,17 +343,22 @@ class Foo(metaclass=Meta): ...
 class Bar(metaclass=Meta): ...
 
 X = Foo | Bar
+```
 
-# In an ideal world, perhaps we would respect `Meta.__or__` here and reveal `str`?
-# But we still need to record what the elements are, since (according to the typing spec)
-# `X` is still a valid type alias
+Even though `Meta.__or__` returns `str`, `X` remains a valid union type alias when both operands are
+classes:
+
+```py
 reveal_type(X)  # revealed: <types.UnionType special-form 'Foo | Bar'>
 
 def f(obj: X):
     reveal_type(obj)  # revealed: Foo | Bar
+```
 
-# We do respect the metaclass `__or__` if it's used between a class and a non-class, however:
+Ty uses `Meta.__or__` when the other operand is not a class, so these expressions have type `str`
+and cannot be used as type annotations:
 
+```py
 Y = Foo | 42
 reveal_type(Y)  # revealed: str
 

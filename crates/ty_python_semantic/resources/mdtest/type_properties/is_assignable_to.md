@@ -1344,7 +1344,27 @@ from ty_extensions import RegularCallableTypeOf, TypeOf, is_assignable_to, stati
 
 def identity[T](t: T) -> T:
     return t
+```
 
+The generic identity function can be used wherever a particular specialization is expected:
+
+```py
+static_assert(is_assignable_to(TypeOf[identity], Callable[[int], int]))
+static_assert(is_assignable_to(TypeOf[identity], Callable[[str], str]))
+# TODO: This should not be assignable. A generic callable must use one coherent specialization.
+# error: [static-assert-error]
+static_assert(not is_assignable_to(TypeOf[identity], Callable[[str], int]))
+
+static_assert(is_assignable_to(RegularCallableTypeOf[identity], Callable[[int], int]))
+static_assert(is_assignable_to(RegularCallableTypeOf[identity], Callable[[str], str]))
+# error: [static-assert-error]
+static_assert(not is_assignable_to(RegularCallableTypeOf[identity], Callable[[str], int]))
+```
+
+The reverse does not hold. A callable that only accepts `int`, or one that always returns `int`,
+cannot replace the generic identity function because a caller may choose another type:
+
+```py
 def int_identity(t: int) -> int:
     return t
 
@@ -1363,18 +1383,12 @@ static_assert(
         RegularCallableTypeOf[identity],
     )
 )
+```
 
-static_assert(is_assignable_to(TypeOf[identity], Callable[[int], int]))
-static_assert(is_assignable_to(TypeOf[identity], Callable[[str], str]))
-# TODO: This should not be assignable. A generic callable must use one coherent specialization.
-# error: [static-assert-error]
-static_assert(not is_assignable_to(TypeOf[identity], Callable[[str], int]))
+Bounds and constraints follow the same rule when the generic callable is used at a particular
+specialization:
 
-static_assert(is_assignable_to(RegularCallableTypeOf[identity], Callable[[int], int]))
-static_assert(is_assignable_to(RegularCallableTypeOf[identity], Callable[[str], str]))
-# error: [static-assert-error]
-static_assert(not is_assignable_to(RegularCallableTypeOf[identity], Callable[[str], int]))
-
+```py
 def bounded[T_bound: object](t: T_bound) -> T_bound:
     return t
 

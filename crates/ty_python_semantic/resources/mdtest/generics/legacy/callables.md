@@ -366,10 +366,11 @@ reveal_type(partial(partial, drop)(1)("x"))  # revealed: Unknown
 reveal_type(partial(partial, drop)("x")(1))  # revealed: Unknown
 ```
 
-## SymPy one-import MRE scaffold (multi-file)
+## SymPy overload regression
 
-Reduced regression lock for a SymPy overload/protocol shape that can panic in the
-overload-assignability path.
+This reduced SymPy example checks that overload comparison does not panic. It also rejects the
+`clone` override: the inherited overload accepts `Domain[S]` and returns `IPolys[S]`, while the
+override always returns `PolyRing[T]`.
 
 ```py
 from __future__ import annotations
