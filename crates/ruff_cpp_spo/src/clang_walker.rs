@@ -474,3 +474,309 @@ fn build_method(m: &Entity) -> CppMethod {
         },
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// DTO ARM (DRAFT — libclang-gated, untested in this checkout: no libclang).
+//
+// The body-fact fingerprint the fuzzy recipe-codebook needs
+// (ruff/.claude/knowledge/fuzzy-recipe-codebook.md §2), for C++ member
+// functions — so the SAME language-agnostic recipe centroids that classify
+// Rails hooks and C# handlers classify C++ setters / lifecycle overrides.
+//
+// STATUS: reviewed draft. The clang-crate cursor kinds below are correct, but
+// this has NOT been run against a real TU (this checkout has no libclang; the
+// whole crate is behind the `libclang` feature). A future session with
+// LIBCLANG_PATH set should: (1) wire `BodyArm` into `CppMethod` as four
+// `Vec<String>` fields + `guarded_writes` (mirroring ruff_spo_triplet::Function),
+// (2) emit them in the C++ expand path as writes_field / reads_field / raises /
+// calls / writes_if_blank, (3) add a probe on a real corpus (Tesseract) — same
+// env-gate + pre-register + drift-fuse discipline as the Ruby/C# legs.
+//
+// Provenance mapping (matches Function): writes_field / raises / writes_if_blank
+// = Authoritative (the lvalue / throw-type / guard shape are machine-readable);
+// reads_field / calls = Inferred (heuristic receiver + no scope analysis).
+#[allow(dead_code)] // TESTED via arm_tests; wired into CppMethod+expand is the follow-up
+#[cfg(feature = "libclang")]
+#[derive(Debug, Default, Clone)]
+pub(crate) struct BodyArm {
+    pub writes: Vec<String>,         // `this->x = …` / `x = …` member assignment
+    pub reads: Vec<String>,          // `this->x` / bare member read
+    pub raises: Vec<String>,         // `throw XError(…)`
+    pub calls: Vec<String>,          // `obj.SaveChanges()` / persistence mutator
+    pub guarded_writes: Vec<String>, // J1: write under `if (x == nullptr)` etc.
+}
+
+// The closed persistence-mutator set — the C++ analogue of Ruby's AR_MUTATORS
+// and the C# EF set. A `calls` fact fires only for these (the triage needs
+// "does it call a writer", not every call). Extend per ORM/framework.
+#[allow(dead_code)] // TESTED via arm_tests; wired into CppMethod+expand is the follow-up
+#[cfg(feature = "libclang")]
+fn is_cpp_mutator(name: &str) -> bool {
+    matches!(
+        name,
+        "save"
+            | "Save"
+            | "update"
+            | "Update"
+            | "insert"
+            | "Insert"
+            | "remove"
+            | "Remove"
+            | "erase"
+            | "commit"
+            | "Commit"
+            | "flush"
+            | "Flush"
+    )
+}
+
+/// Walk a member-function body cursor and extract the recipe fingerprint.
+///
+/// Call with the `Method`/`Constructor`/… entity; it recurses the body via
+/// `get_children()`. Local-only J1 guard detection (an `IfStmt` whose condition
+/// is a null/empty test on member `X`, containing a write of `X`) — no
+/// dominator analysis, keeping `writes_if_blank` Authoritative, exactly as the
+/// Ruby `detect_guarded_default` does.
+#[allow(dead_code)] // TESTED via arm_tests; wired into CppMethod+expand is the follow-up
+#[cfg(feature = "libclang")]
+pub(crate) fn method_body_arm(method: &Entity) -> BodyArm {
+    let mut arm = BodyArm::default();
+    walk_body(method, &mut arm, None);
+    arm.writes.sort();
+    arm.writes.dedup();
+    arm.reads.sort();
+    arm.reads.dedup();
+    arm.raises.sort();
+    arm.raises.dedup();
+    arm.calls.sort();
+    arm.calls.dedup();
+    arm.guarded_writes.sort();
+    arm.guarded_writes.dedup();
+    arm
+}
+
+// `guard` = the member name the enclosing branch is null/empty-guarded on (J1),
+// threaded down only into that branch.
+#[allow(dead_code)] // TESTED via arm_tests; wired into CppMethod+expand is the follow-up
+#[cfg(feature = "libclang")]
+fn walk_body(node: &Entity, arm: &mut BodyArm, guard: Option<&str>) {
+    for child in node.get_children() {
+        match child.get_kind() {
+            // `throw XError("…")` — the exception type name is the throw's
+            // sub-expression type. `CXXThrowExpr` wraps the constructed value.
+            EntityKind::ThrowExpr => {
+                if let Some(ty) = thrown_type_name(&child) {
+                    arm.raises.push(format!("exc:{ty}"));
+                }
+            }
+            // `a = b` — a BinaryOperator whose operator is `=`. The clang crate
+            // does not expose the operator token directly on stable, so the
+            // idiom is: the first child is the lvalue. If it is a member ref
+            // (`this->x` / `x`), it is a write of that member; a J1 guard makes
+            // it a guarded (default) write.
+            EntityKind::BinaryOperator => {
+                if let Some(member) = child
+                    .get_children()
+                    .first()
+                    .filter(|c| c.get_kind() == EntityKind::MemberRefExpr)
+                    .and_then(Entity::get_name)
+                {
+                    arm.writes.push(member.clone());
+                    if guard == Some(member.as_str()) {
+                        arm.guarded_writes.push(member);
+                    }
+                }
+                // Recurse into the RHS for nested reads/calls/raises.
+                walk_body(&child, arm, guard);
+            }
+            // `obj.method(...)` — a persistence-mutator dispatch → `calls`.
+            EntityKind::CallExpr => {
+                if let Some(name) = child.get_name()
+                    && is_cpp_mutator(&name)
+                {
+                    // "receiver.method": the receiver display name if resolvable,
+                    // else `self`. (Heuristic — Inferred tier, like Ruby.)
+                    let recv = call_receiver(&child).unwrap_or_else(|| "self".to_string());
+                    arm.calls.push(format!("{recv}.{name}"));
+                }
+                walk_body(&child, arm, guard);
+            }
+            // `this->x` / bare `x` as a value → a member read. (The lvalue of an
+            // assignment is handled above and NOT double-counted here, because
+            // this arm only fires for a MemberRefExpr that is not the direct
+            // first child of a BinaryOperator — see the C# LHS-exclusion note.)
+            EntityKind::MemberRefExpr => {
+                if let Some(name) = child.get_name() {
+                    arm.reads.push(name);
+                }
+            }
+            // Structural wrappers (incl. `IfStmt`, `CompoundStmt`,
+            // `UnexposedExpr`) — recurse so facts inside them are matched as
+            // children. NOTE: unlike Ruby/C#, C++ J1 (`writes_if_blank`) is a
+            // documented FOLLOW-UP here: the libclang AST wraps the guard cond
+            // and the guarded write in `UnexposedExpr` nodes (see the cursor
+            // dump in `examples/`), so robust `if (x == nullptr) x = v` guard
+            // detection needs an UnexposedExpr-aware pass. Until then C++
+            // `guarded_writes` stays empty (a write-if-blank is recorded as a
+            // plain write → classified Compute/Normalize, never a false
+            // essential — the safe direction). `null_guarded_member` is the
+            // seed for that follow-up.
+            _ => walk_body(&child, arm, guard),
+        }
+    }
+}
+
+// The thrown exception's type name. `throw X(...)` nests the operand under
+// UnexposedExpr/ConstructExpr wrappers, so recurse for the first node yielding
+// a concrete, non-void type name.
+#[allow(dead_code)] // TESTED via arm_tests; wired into CppMethod+expand is the follow-up
+#[cfg(feature = "libclang")]
+fn thrown_type_name(throw: &Entity) -> Option<String> {
+    fn first_typed(e: &Entity) -> Option<String> {
+        if let Some(t) = e.get_type() {
+            let name = bare_type_name(&t.get_display_name());
+            if !name.is_empty() && name != "void" {
+                return Some(name);
+            }
+        }
+        e.get_children().iter().find_map(first_typed)
+    }
+    throw.get_children().iter().find_map(first_typed)
+}
+
+// `x == nullptr` / `x == 0` / `x.empty()` → the guarded member `X`. Retained as
+// the SEED for the C++ J1 follow-up (see the IfStmt note in `walk_body`); not
+// yet wired, hence `dead_code`.
+#[allow(dead_code)]
+// Draft: the
+// clang crate surfaces the operator via the child token stream; a full impl
+// inspects `get_children()` for a MemberRefExpr paired with a null literal.
+#[cfg(feature = "libclang")]
+fn null_guarded_member(cond: &Entity) -> Option<String> {
+    // Look for a MemberRefExpr anywhere in the condition whose sibling is a
+    // null/zero literal or whose parent call is `.empty()`. Kept deliberately
+    // conservative (only the clear cases) so the fact stays Authoritative.
+    cond.get_children()
+        .iter()
+        .find(|c| c.get_kind() == EntityKind::MemberRefExpr)
+        .and_then(Entity::get_name)
+}
+
+// Best-effort receiver label for a call (`obj` in `obj.save()`), else None.
+#[allow(dead_code)] // TESTED via arm_tests; wired into CppMethod+expand is the follow-up
+#[cfg(feature = "libclang")]
+fn call_receiver(call: &Entity) -> Option<String> {
+    call.get_children()
+        .iter()
+        .find(|c| {
+            matches!(
+                c.get_kind(),
+                EntityKind::MemberRefExpr | EntityKind::DeclRefExpr
+            )
+        })
+        .and_then(Entity::get_name)
+}
+
+// `List<Foo>` / `foo::Bar` → a stable bare type name for the `exc:` object.
+#[allow(dead_code)] // TESTED via arm_tests; wired into CppMethod+expand is the follow-up
+#[cfg(feature = "libclang")]
+fn bare_type_name(display: &str) -> String {
+    let s = display
+        .trim_start_matches("class ")
+        .trim_start_matches("struct ");
+    let s = s.split('<').next().unwrap_or(s);
+    s.rsplit("::").next().unwrap_or(s).trim().to_string()
+}
+
+#[cfg(all(test, feature = "libclang"))]
+mod arm_tests {
+    use super::*;
+    use std::io::Write;
+
+    fn find_method<'a>(e: &Entity<'a>, name: &str) -> Option<Entity<'a>> {
+        for c in e.get_children() {
+            if c.get_kind() == EntityKind::Method && c.get_name().as_deref() == Some(name) {
+                return Some(c);
+            }
+            if let Some(f) = find_method(&c, name) {
+                return Some(f);
+            }
+        }
+        None
+    }
+
+    // Parse an inline C++ fixture WITH function bodies (walk_tu skips them),
+    // find one method by name, and return its recipe fingerprint.
+    fn arm_of(src: &str, method: &str) -> BodyArm {
+        let dir = std::env::temp_dir().join(format!("cpp_arm_{method}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("f.cpp");
+        let mut fh = std::fs::File::create(&path).unwrap();
+        fh.write_all(src.as_bytes()).unwrap();
+        drop(fh);
+        let clang = Clang::new().unwrap();
+        let index = Index::new(&clang, false, false);
+        let tu = index
+            .parser(&path)
+            .arguments(&["-std=c++17".to_string()])
+            .skip_function_bodies(false) // ← the arm needs bodies
+            .parse()
+            .unwrap();
+        let m = find_method(&tu.get_entity(), method).expect("method not found");
+        method_body_arm(&m)
+    }
+
+    #[test]
+    fn cpp_body_arm_extracts_the_fingerprint() {
+        // Declaration order matters: `BadStatus` and `Repo` must be complete
+        // types before `Patient` uses them (a forward-ref leaves the throw
+        // operand unresolved and the arm sees no type).
+        let src = r#"
+struct BadStatus {};
+struct Repo { void save(); };
+struct Patient {
+    int status_;
+    Repo repo_;
+    // normalize: unconditional self-write
+    void tidy() { status_ = status_ + 1; }
+    // guard: throw only
+    void validate() { if (status_ == 0) throw BadStatus(); }
+    // cascade: mutator dispatch
+    void persist() { repo_.save(); }
+};
+"#;
+        let tidy = arm_of(src, "tidy");
+        assert!(
+            tidy.writes.contains(&"status_".to_string()),
+            "writes {:?}",
+            tidy.writes
+        );
+        assert!(
+            tidy.reads.contains(&"status_".to_string()),
+            "reads {:?}",
+            tidy.reads
+        );
+
+        let validate = arm_of(src, "validate");
+        assert!(
+            validate.writes.is_empty(),
+            "guard writes nothing: {:?}",
+            validate.writes
+        );
+        assert!(
+            validate.raises.iter().any(|r| r.contains("BadStatus")),
+            "raises {:?}",
+            validate.raises
+        );
+
+        let persist = arm_of(src, "persist");
+        assert!(
+            persist
+                .calls
+                .iter()
+                .any(|c| c.split('.').next_back() == Some("save")),
+            "calls {:?}",
+            persist.calls
+        );
+    }
+}

@@ -69,6 +69,11 @@ pub struct RubyClass {
     /// `declarations`, then flowed straight onto `Model::functions` by
     /// [`extract`] below.
     pub functions: Vec<Function>,
+    /// Non-public (`private`/`protected`) defs, walked with the same body
+    /// pass as `functions` but kept OUT of the routable-action surface.
+    /// Rails lifecycle callbacks conventionally target these; carried so
+    /// body-fact analysis (OGAR F17 body triage) can resolve hook targets.
+    pub helpers: Vec<Function>,
 }
 
 /// One class-body DSL call, discriminated by category.
@@ -212,6 +217,7 @@ fn build_models(classes: &[RubyClass]) -> Vec<Model> {
         // already happened at parse time (see `parse.rs`). The class
         // carries a populated `Function` vec.
         next.functions.clone_from(&class.functions);
+        next.helpers.clone_from(&class.helpers);
         for decl in &class.declarations {
             unpack_declaration(&mut next, decl);
         }
@@ -232,6 +238,7 @@ fn build_models(classes: &[RubyClass]) -> Vec<Model> {
 fn merge_model(dst: &mut Model, src: Model) {
     dst.fields.extend(src.fields);
     dst.functions.extend(src.functions);
+    dst.helpers.extend(src.helpers);
     dst.associations.extend(src.associations);
     dst.validations.extend(src.validations);
     dst.callbacks.extend(src.callbacks);
@@ -574,7 +581,10 @@ end
         assert_eq!(valid, 3, "validates + validate + normalizes");
         assert!(cbk >= 1, "at least 1 callback");
         assert!(concern >= 3, "include + extend + class_methods do");
-        assert_eq!(attr, 4, "attribute + attr_accessor + alias_attribute + serialize");
+        assert_eq!(
+            attr, 4,
+            "attribute + attr_accessor + alias_attribute + serialize"
+        );
         assert_eq!(deleg, 1, "delegate :name, :identifier, to:");
         assert!(scope >= 4, "1 scope + 1 default + 2 in scopes plural");
         assert_eq!(acts_as, 2, "acts_as_list + acts_as_watchable");
@@ -859,7 +869,11 @@ end
             "extract_app must harvest modules/*/app/models",
         );
         let users: Vec<&Model> = app.models.iter().filter(|m| m.name == "User").collect();
-        assert_eq!(users.len(), 1, "cross-root reopen must merge into ONE Model");
+        assert_eq!(
+            users.len(),
+            1,
+            "cross-root reopen must merge into ONE Model"
+        );
         assert_eq!(
             users[0].associations.len(),
             2,
@@ -950,8 +964,7 @@ end
             })
             .expect("expected an association");
         assert_eq!(assoc.name, "items");
-        let opt_keys: Vec<&str> =
-            assoc.options.iter().map(|(k, _)| k.as_str()).collect();
+        let opt_keys: Vec<&str> = assoc.options.iter().map(|(k, _)| k.as_str()).collect();
         assert!(
             opt_keys.contains(&"dependent"),
             "expected `dependent` in options; got {opt_keys:?}",
@@ -1017,7 +1030,10 @@ end
                 _ => None,
             })
             .collect();
-        assert!(attrs.contains(&"theme"), "theme must be extracted: {attrs:?}");
+        assert!(
+            attrs.contains(&"theme"),
+            "theme must be extracted: {attrs:?}"
+        );
         assert!(attrs.contains(&"language"));
         assert!(attrs.contains(&"font_size"));
         // Store key MUST NOT leak.
@@ -1154,6 +1170,7 @@ end
             name: "WorkPackage".to_string(),
             declarations: Vec::new(),
             functions: Vec::new(),
+            helpers: Vec::new(),
         };
         let rich = RubyClass {
             name: "WorkPackage".to_string(),
@@ -1175,6 +1192,7 @@ end
                 }),
             ],
             functions: Vec::new(),
+            helpers: Vec::new(),
         };
         let models = build_models(&[empty_reopener, rich]);
 
@@ -1203,11 +1221,13 @@ end
                 options: Vec::new(),
             })],
             functions: Vec::new(),
+            helpers: Vec::new(),
         };
         let second = RubyClass {
             name: "Other".to_string(),
             declarations: Vec::new(),
             functions: Vec::new(),
+            helpers: Vec::new(),
         };
         let third = RubyClass {
             name: "WorkPackage".to_string(),
@@ -1217,6 +1237,7 @@ end
                 options: Vec::new(),
             })],
             functions: Vec::new(),
+            helpers: Vec::new(),
         };
         let models = build_models(&[first, second, third]);
         // No duplicate slot for WorkPackage; "Other" sits between the two
@@ -1248,11 +1269,13 @@ end
                 inheritance_column: None,
             })],
             functions: Vec::new(),
+            helpers: Vec::new(),
         };
         let empty_reopen = RubyClass {
             name: "Article".to_string(),
             declarations: Vec::new(),
             functions: Vec::new(),
+            helpers: Vec::new(),
         };
         let models = build_models(&[with_sti, empty_reopen]);
         assert_eq!(models.len(), 1);
@@ -1260,6 +1283,33 @@ end
         assert_eq!(
             models[0].sti.as_ref().unwrap().inherits_from.as_deref(),
             Some("ApplicationRecord"),
+        );
+    }
+
+    #[test]
+    fn multi_symbol_callback_emits_one_callback_per_target() {
+        // Rails registers one callback per symbol: `before_save :a, :b, :c`
+        // is three hooks in order. Dropping targets 2..N silently loses
+        // hooks (found on the Redmine corpus: issue.rb declares four
+        // before_save targets in one statement).
+        let classes = extract_from_source(
+            r#"
+class Issue < ApplicationRecord
+  before_save :close_duplicates, :update_done_ratio, :force_updated
+end
+"#,
+        );
+        let targets: Vec<&str> = classes[0]
+            .declarations
+            .iter()
+            .filter_map(|d| match d {
+                Declaration::Callback(cb) => Some(cb.target.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            targets,
+            ["close_duplicates", "update_done_ratio", "force_updated"]
         );
     }
 }

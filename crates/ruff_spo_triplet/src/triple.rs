@@ -436,6 +436,16 @@ pub enum Predicate {
     /// target unambiguously (machine-readable lvalue), the same certainty
     /// tier as [`Self::EmittedBy`].
     WritesField,
+    /// `(model.fn, writes_if_blank, model.field)` — the write of `<field>` is
+    /// **guarded by a blank/nil test on that same field** (`self.x = default if
+    /// self.x.blank?`, or `self.x ||= default`). This is the J1 fact
+    /// (`.claude/knowledge/fuzzy-recipe-codebook.md` §5): it splits the fuzzy
+    /// `SelfMap` recipe (`W ⊆ R`, idempotent) into **schema-default**
+    /// (write-if-blank ⇒ this fact present) vs **`normalizes`** (unconditional
+    /// transform ⇒ absent). A subset of `writes_field` — every `writes_if_blank`
+    /// field is ALSO a `writes_field`. Authoritative: the guard shape is a
+    /// machine-readable syntactic pattern, not a heuristic.
+    WritesIfBlank,
     /// `(model.fn, calls, "<receiver>.<method>")` — body dispatches an
     /// `ActiveRecord` lifecycle mutator (`save`, `update`, `destroy`, …) on
     /// some receiver. Object is the raw `"receiver.method"` string (NOT an
@@ -531,6 +541,7 @@ impl Predicate {
             Self::RelationKind => "relation_kind",
             // Body-mutation extension
             Self::WritesField => "writes_field",
+            Self::WritesIfBlank => "writes_if_blank",
             Self::Calls => "calls",
             // Schema-stratum extension
             Self::ColumnNotNull => "column_not_null",
@@ -613,6 +624,7 @@ impl Predicate {
             "relation_kind" => Self::RelationKind,
             // Body-mutation extension
             "writes_field" => Self::WritesField,
+            "writes_if_blank" => Self::WritesIfBlank,
             "calls" => Self::Calls,
             // Schema-stratum extension
             "column_not_null" => Self::ColumnNotNull,
@@ -695,6 +707,7 @@ impl Predicate {
         Self::RelationKind,
         // Body-mutation extension
         Self::WritesField,
+        Self::WritesIfBlank,
         Self::Calls,
         Self::ColumnNotNull,
     ];
@@ -733,7 +746,8 @@ impl Predicate {
             | Self::Target
             | Self::InverseName
             | Self::RelationKind
-            | Self::WritesField => Provenance::Authoritative,
+            | Self::WritesField
+            | Self::WritesIfBlank => Provenance::Authoritative,
             // Body-inferred (heuristic by definition) — including the two
             // C++ metaprogramming-residual predicates (macro provenance,
             // single-TU template instantiation visibility) and the
@@ -905,7 +919,7 @@ mod tests {
     }
 
     #[test]
-    fn predicate_count_locked_at_63() {
+    fn predicate_count_locked_at_64() {
         // The exact count is part of the schema contract: 7 core (Odoo
         // Python) + 32 OpenProject AR-shape (PR #15 added
         // `association_kind`; #18 added `class_name`; #21 added
@@ -918,12 +932,16 @@ mod tests {
         // counterpart of `reads_field` / `traverses_relation`, capturing
         // self-field writes and lifecycle-mutator dispatches so the body-pass
         // triage can split query from command)
+        // + 1 J1 body-mutation (`writes_if_blank` — the guard-predicate fact
+        // that splits the fuzzy `SelfMap` recipe into schema-default vs
+        // `normalizes`; a subset of `writes_field`, Authoritative; see
+        // `.claude/knowledge/fuzzy-recipe-codebook.md` §5 J1)
         // + 1 schema-stratum (`column_not_null` — the D-AR-3.5 migration-DSL
         // column constraint; the declared type reuses `field_type`, so
-        // nullability was the one missing fact) = 63. Council review of any
+        // nullability was the one missing fact) = 64. Council review of any
         // new variant means this number changes — the test must change with
         // the source.
-        assert_eq!(Predicate::ALL.len(), 63);
+        assert_eq!(Predicate::ALL.len(), 64);
     }
 
     #[test]

@@ -83,6 +83,16 @@ pub struct Model {
     pub fields: Vec<Field>,
     /// Methods / functions.
     pub functions: Vec<Function>,
+    /// Non-public (`private`/`protected`) defs — same [`Function`] body
+    /// facts as `functions`, but NOT routable actions: [`crate::expand`]
+    /// emits no triples for them (no `has_function`), keeping the action
+    /// surface unchanged. Carried in the IR because Rails lifecycle
+    /// callbacks conventionally target private methods and body-fact
+    /// analysis (OGAR F17 body triage) needs to resolve those hook
+    /// targets. Additive + serde-defaulted: existing dumps deserialize
+    /// with an empty vec.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub helpers: Vec<Function>,
 
     /// Frontend-agnostic prototype/delegation inheritance — the parent
     /// models this model `inherits_from` (Odoo `_inherit`, and any future
@@ -291,6 +301,14 @@ pub struct Function {
     /// assignment (`@x = …`, local memoization) is deliberately NOT a write.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub writes: Vec<String>,
+    /// Fields whose write is **guarded by a blank/nil test on that same field**
+    /// (`self.x = v if self.x.blank?`, or `self.x ||= v`). The J1 fact
+    /// (`.claude/knowledge/fuzzy-recipe-codebook.md` §5) that splits the fuzzy
+    /// `SelfMap` recipe into schema-default (present) vs `normalizes` (absent).
+    /// Always a subset of `writes`; emitted as `writes_if_blank` (Authoritative).
+    /// Additive + serde-defaulted (existing dumps deserialize with an empty vec).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub guarded_writes: Vec<String>,
     /// Lifecycle-mutator calls the body dispatches, as `"<receiver>.<method>"`
     /// (e.g. `self.save`, `order.update`, `line_ids.destroy_all`). Only the
     /// closed `ActiveRecord` mutator set is captured (create/update/save/

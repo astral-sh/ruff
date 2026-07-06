@@ -41,7 +41,10 @@ fn dump_openproject_triples_and_stats() {
     for t in &triples {
         *predicate_freq.entry(t.p.as_str()).or_insert(0) += 1;
     }
-    eprintln!("\n=== Predicate frequency ({} triples total) ===", triples.len());
+    eprintln!(
+        "\n=== Predicate frequency ({} triples total) ===",
+        triples.len()
+    );
     let mut sorted: Vec<_> = predicate_freq.iter().collect();
     sorted.sort_by(|a, b| b.1.cmp(a.1));
     for (p, count) in &sorted {

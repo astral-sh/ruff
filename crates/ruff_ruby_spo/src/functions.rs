@@ -57,9 +57,9 @@ use crate::Declaration;
 pub(crate) fn extract_functions_from_body(
     body: Option<&Node>,
     declarations: &[Declaration],
-) -> Vec<Function> {
+) -> (Vec<Function>, Vec<Function>) {
     let Some(body) = body else {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     };
     let known_relations = collect_known_relations(declarations);
     let mut out = Vec::new();
@@ -79,8 +79,11 @@ pub(crate) fn extract_functions_from_body(
         &mut sym_overrides,
         &mut default_public,
     );
-    // Ruby visibility filtering: `private`/`protected` helpers (`set_project`,
-    // `authorize`, …) are NOT routable actions and must not be harvested. Final
+    // Ruby visibility split: `private`/`protected` helpers (`set_project`,
+    // `authorize`, …) are NOT routable actions and stay out of the first
+    // (public/action) vec — but their body facts matter (Rails callbacks
+    // conventionally target private methods; OGAR F17 body triage), so they
+    // are returned as the second (helpers) vec instead of dropped. Final
     // visibility = visibility-at-def, then each symbol-form override applied in
     // order (so `public :x` re-publishes a method an earlier `private :x` hid).
     for (name, is_public) in &sym_overrides {
@@ -90,10 +93,16 @@ pub(crate) fn extract_functions_from_body(
             }
         }
     }
-    out.into_iter()
-        .zip(vis)
-        .filter_map(|(f, public)| public.then_some(f))
-        .collect()
+    let mut public_fns = Vec::new();
+    let mut helper_fns = Vec::new();
+    for (f, public) in out.into_iter().zip(vis) {
+        if public {
+            public_fns.push(f);
+        } else {
+            helper_fns.push(f);
+        }
+    }
+    (public_fns, helper_fns)
 }
 
 /// Pre-compute the set of relation names declared on the class so
@@ -153,6 +162,7 @@ fn walk_class_body_for_defs(
                 traverses: Vec::new(),
                 writes: Vec::new(),
                 calls: Vec::new(),
+                guarded_writes: Vec::new(),
             };
             if let Some(fn_body) = d.body.as_deref() {
                 walk_method_body(fn_body, known_relations, &mut func);
@@ -162,6 +172,7 @@ fn walk_class_body_for_defs(
             dedup_in_place(&mut func.traverses);
             dedup_in_place(&mut func.writes);
             dedup_in_place(&mut func.calls);
+            dedup_in_place(&mut func.guarded_writes);
             out.push(func);
             // Visibility-at-def: the default in force where this `def` appeared.
             vis.push(*default_public);
@@ -253,6 +264,96 @@ fn walk_body_stmts(
 }
 
 /// Walk one method body, populating `func.reads` / `raises` / `traverses`.
+/// J1 (`writes_if_blank`) — detect the write-if-blank / write-if-nil idiom that
+/// distinguishes a **schema default** from a **`normalizes` transform** inside
+/// the otherwise-degenerate `SelfMap` recipe (`W ⊆ R`). See
+/// `.claude/knowledge/fuzzy-recipe-codebook.md` §5 (J1).
+///
+/// Two shapes are recognised, both LOCAL to one `If`/`IfMod` node (no
+/// dominator analysis — a write buried under a nested unrelated conditional is
+/// deliberately NOT claimed, keeping the fact Authoritative):
+/// - `self.X = default if  self.X.blank? | .nil? | .empty?` — guarded branch is
+///   `if_true`, cond is a blank-test on `X`.
+/// - `self.X = default unless self.X.present?` — guarded branch is `if_false`
+///   (`unless present` ≡ `if blank`), cond is a present-test on `X`.
+///
+/// When the guarded branch writes the same field the cond tests, that field is
+/// pushed to `func.guarded_writes` (it is ALSO recorded in `writes` by the
+/// normal walk; `dedup` handles the overlap).
+fn detect_guarded_default(
+    cond: &Node,
+    if_true: Option<&Node>,
+    if_false: Option<&Node>,
+    func: &mut Function,
+) {
+    // `if X.blank?` guards the true-branch on X.
+    if let (Some(field), Some(branch)) = (blank_guarded_field(cond), if_true) {
+        claim_if_writes(branch, field, func);
+    }
+    // `unless X.present?` (≡ `if X.blank?`) guards the false-branch on X.
+    if let (Some(field), Some(branch)) = (present_guarded_field(cond), if_false) {
+        claim_if_writes(branch, field, func);
+    }
+}
+
+/// `self.X` or bare `X` (implicit-self attribute) → `Some("X")`; else `None`.
+fn attr_of_self(node: &Node) -> Option<&str> {
+    if let Node::Send(s) = node
+        && s.args.is_empty()
+        && is_attr_ident(&s.method_name)
+        && matches!(s.recv.as_deref(), Some(Node::Self_(_)) | None)
+    {
+        return Some(&s.method_name);
+    }
+    None
+}
+
+/// `self.X.blank?` / `X.nil?` / `self.X.empty?` → the guarded field `X`.
+fn blank_guarded_field(cond: &Node) -> Option<&str> {
+    if let Node::Send(s) = cond
+        && matches!(s.method_name.as_str(), "blank?" | "nil?" | "empty?")
+    {
+        return s.recv.as_deref().and_then(attr_of_self);
+    }
+    None
+}
+
+/// `self.X.present?` → `X` (the false-branch, i.e. `… unless X.present?`).
+fn present_guarded_field(cond: &Node) -> Option<&str> {
+    if let Node::Send(s) = cond
+        && s.method_name == "present?"
+    {
+        return s.recv.as_deref().and_then(attr_of_self);
+    }
+    None
+}
+
+/// If `branch` contains a direct `self.<field> = …` write (through transparent
+/// `begin`/statement wrappers only — NOT into nested conditionals), record
+/// `field` as a guarded (default) write.
+fn claim_if_writes(branch: &Node, field: &str, func: &mut Function) {
+    match branch {
+        Node::Send(s)
+            if matches!(s.recv.as_deref(), Some(Node::Self_(_)))
+                && s.method_name.strip_suffix('=').is_some_and(is_attr_ident)
+                && s.method_name.strip_suffix('=') == Some(field) =>
+        {
+            func.guarded_writes.push(field.to_string());
+        }
+        Node::Begin(b) => {
+            for st in &b.statements {
+                claim_if_writes(st, field, func);
+            }
+        }
+        Node::KwBegin(b) => {
+            for st in &b.statements {
+                claim_if_writes(st, field, func);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn walk_method_body(node: &Node, known_relations: &[String], func: &mut Function) {
     match node {
         Node::Begin(b) => {
@@ -333,6 +434,24 @@ fn walk_method_body(node: &Node, known_relations: &[String], func: &mut Function
             walk_method_body(&blk.call, known_relations, func);
         }
         Node::If(i) => {
+            // J1 guard detection (blank/nil-guarded default write) runs on the
+            // block-form `if` too — same (cond, if_true, if_false) shape.
+            detect_guarded_default(&i.cond, i.if_true.as_deref(), i.if_false.as_deref(), func);
+            if let Some(b) = i.if_true.as_deref() {
+                walk_method_body(b, known_relations, func);
+            }
+            if let Some(b) = i.if_false.as_deref() {
+                walk_method_body(b, known_relations, func);
+            }
+            walk_method_body(&i.cond, known_relations, func);
+        }
+        // `stmt if cond` / `stmt unless cond` — the postfix modifier form.
+        // `if_true` is set for `if`, `if_false` for `unless`; never both.
+        // Same shape as `Node::If`, just without a block body.
+        Node::IfMod(i) => {
+            // J1: `self.x = default if self.x.blank?` is the canonical
+            // write-if-blank (schema-default) idiom — detect it here.
+            detect_guarded_default(&i.cond, i.if_true.as_deref(), i.if_false.as_deref(), func);
             if let Some(b) = i.if_true.as_deref() {
                 walk_method_body(b, known_relations, func);
             }
@@ -456,8 +575,7 @@ fn receiver_label(recv: Option<&Node>) -> String {
         // `order.update` / `self.order.update` — the immediate receiver is a
         // bare or self-rooted send naming the relation/attribute.
         Some(Node::Send(inner))
-            if inner.recv.is_none()
-                || matches!(inner.recv.as_deref(), Some(Node::Self_(_))) =>
+            if inner.recv.is_none() || matches!(inner.recv.as_deref(), Some(Node::Self_(_))) =>
         {
             inner.method_name.clone()
         }
@@ -474,9 +592,7 @@ fn receiver_label(recv: Option<&Node>) -> String {
 fn exception_type_name(arg: &Node) -> Option<String> {
     match arg {
         Node::Const(_) => const_to_dotted(arg),
-        Node::Send(s) if s.method_name == "new" => {
-            s.recv.as_deref().and_then(const_to_dotted)
-        }
+        Node::Send(s) if s.method_name == "new" => s.recv.as_deref().and_then(const_to_dotted),
         _ => None,
     }
 }
@@ -489,9 +605,7 @@ fn const_to_dotted(node: &Node) -> Option<String> {
     let suffix = c.name.clone();
     match c.scope.as_deref() {
         Some(Node::Cbase(_)) => Some(format!("::{suffix}")),
-        Some(inner) => {
-            const_to_dotted(inner).map(|p| format!("{p}::{suffix}"))
-        }
+        Some(inner) => const_to_dotted(inner).map(|p| format!("{p}::{suffix}")),
         None => Some(suffix),
     }
 }
@@ -559,7 +673,7 @@ mod tests {
         let parser = Parser::new(src.as_bytes().to_vec(), ParserOptions::default());
         let ast = parser.do_parse().ast.expect("parse");
         let class = find_first_class(&ast).expect("class");
-        extract_functions_from_body(class.body.as_deref(), &classes[0].declarations)
+        extract_functions_from_body(class.body.as_deref(), &classes[0].declarations).0
     }
 
     fn find_first_class(node: &Node) -> Option<&lib_ruby_parser::nodes::Class> {
@@ -745,7 +859,10 @@ class M
 end
 "#,
         );
-        assert!(funcs[0].raises.is_empty(), "variable raise must not be captured");
+        assert!(
+            funcs[0].raises.is_empty(),
+            "variable raise must not be captured"
+        );
     }
 
     #[test]
@@ -850,6 +967,31 @@ end
         assert!(
             funcs[0].raises.contains(&"UserError".to_string()),
             "rescue-arm raise must be captured; got {:?}",
+            funcs[0].raises,
+        );
+    }
+
+    #[test]
+    fn raise_in_postfix_unless_captures_exception_type() {
+        // `raise X unless cond` — the postfix `unless` modifier (`Node::IfMod`
+        // with `if_false` set). Root-caused from openproject's WorkPackage
+        // fixture: `raise ActiveRecord::RecordInvalid unless status` was
+        // invisible to the harvest because `walk_method_body` had no arm for
+        // `Node::IfMod`, only `Node::If` (block form).
+        let funcs = class_functions(
+            r#"
+class M
+  def compute_total_hours
+    raise ActiveRecord::RecordInvalid unless status
+  end
+end
+"#,
+        );
+        assert!(
+            funcs[0]
+                .raises
+                .contains(&"ActiveRecord::RecordInvalid".to_string()),
+            "postfix-unless raise must be captured; got {:?}",
             funcs[0].raises,
         );
     }
@@ -1009,6 +1151,116 @@ end
             "`self <= other` is neither write nor read; got writes {:?} reads {:?}",
             le.writes,
             le.reads,
+        );
+    }
+
+    #[test]
+    fn postfix_if_write_is_captured() {
+        // `self.<field> = … if cond` — the postfix `if` modifier (`Node::IfMod`
+        // with `if_true` set), the mirror case of the postfix `unless` form.
+        let funcs = class_functions(
+            r#"
+class M
+  def reset_total
+    self.total = 0 if reset
+  end
+end
+"#,
+        );
+        assert_eq!(funcs[0].writes, vec!["total"]);
+    }
+
+    #[test]
+    fn private_defs_land_in_helpers_with_body_facts() {
+        // Rails lifecycle callbacks conventionally target private methods
+        // (OGAR F17 body triage needs their body facts). The visibility
+        // split must keep them OUT of the action vec but IN helpers, with
+        // the same body walk applied.
+        let src = r#"
+class M
+  def visible
+    self.a = 1
+  end
+  private
+  def hook_me
+    raise Foo unless ok
+    self.b = 2
+  end
+end
+"#;
+        let classes = extract_from_source(src);
+        let parser = Parser::new(src.as_bytes().to_vec(), ParserOptions::default());
+        let ast = parser.do_parse().ast.expect("parse");
+        let class = find_first_class(&ast).expect("class");
+        let (public_fns, helper_fns) =
+            extract_functions_from_body(class.body.as_deref(), &classes[0].declarations);
+        assert_eq!(public_fns.len(), 1, "only the public def is an action");
+        assert_eq!(helper_fns.len(), 1, "the private def lands in helpers");
+        let h = &helper_fns[0];
+        assert_eq!(h.name, "hook_me");
+        assert!(
+            h.raises.contains(&"Foo".to_string()),
+            "postfix-unless raise walked in helper; got {:?}",
+            h.raises
+        );
+        assert!(
+            h.writes.contains(&"b".to_string()),
+            "setter write walked in helper; got {:?}",
+            h.writes
+        );
+    }
+
+    #[test]
+    fn j1_write_if_blank_is_guarded_default_not_normalize() {
+        // The J1 split: a write guarded by a blank/nil test on the SAME field
+        // is a schema-default (`guarded_writes`); an unconditional self-write
+        // is a `normalizes` transform (writes only). See
+        // .claude/knowledge/fuzzy-recipe-codebook.md §5 (J1).
+        let default_form = class_functions(
+            r#"
+class M
+  def set_default
+    self.state = "new" if self.state.blank?
+  end
+end
+"#,
+        );
+        assert_eq!(default_form[0].writes, vec!["state"]);
+        assert_eq!(
+            default_form[0].guarded_writes,
+            vec!["state"],
+            "write-if-blank must be a guarded (default) write"
+        );
+
+        let unless_form = class_functions(
+            r#"
+class M
+  def set_default
+    self.state = "new" unless self.state.present?
+  end
+end
+"#,
+        );
+        assert_eq!(
+            unless_form[0].guarded_writes,
+            vec!["state"],
+            "`unless present?` is the same guard as `if blank?`"
+        );
+
+        let normalize_form = class_functions(
+            r#"
+class M
+  def tidy
+    self.path = sanitize(self.path)
+  end
+end
+"#,
+        );
+        assert_eq!(normalize_form[0].writes, vec!["path"]);
+        assert!(
+            normalize_form[0].guarded_writes.is_empty(),
+            "an unconditional transform is a normalize, not a default; got {:?}",
+            normalize_form[0].guarded_writes
         );
     }
 }
