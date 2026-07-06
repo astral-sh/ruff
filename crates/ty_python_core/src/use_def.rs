@@ -631,7 +631,7 @@ static ALWAYS_UNBOUND_BINDINGS: LazyLock<Bindings> =
 static ALWAYS_UNDECLARED_DECLARATIONS: LazyLock<Declarations> =
     LazyLock::new(|| Declarations::undeclared(ScopedReachabilityConstraintId::ALWAYS_TRUE));
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct DefinitionUsage {
     is_used: bool,
     is_multipart_import_used: bool,
@@ -645,23 +645,15 @@ enum RetainedDefinitionState<'db> {
 }
 
 impl<'db> RetainedDefinitionState<'db> {
-    fn new(state: DefinitionState<'db>, used: bool, multipart_import_used: bool) -> Self {
+    fn new(state: DefinitionState<'db>, usage: DefinitionUsage) -> Self {
         match state {
-            DefinitionState::Defined(definition) => Self::Defined(
-                definition,
-                DefinitionUsage {
-                    is_used: used,
-                    is_multipart_import_used: multipart_import_used,
-                },
-            ),
+            DefinitionState::Defined(definition) => Self::Defined(definition, usage),
             DefinitionState::Undefined => {
-                debug_assert!(!used);
-                debug_assert!(!multipart_import_used);
+                debug_assert_eq!(usage, DefinitionUsage::default());
                 Self::Undefined
             }
             DefinitionState::Deleted => {
-                debug_assert!(!used);
-                debug_assert!(!multipart_import_used);
+                debug_assert_eq!(usage, DefinitionUsage::default());
                 Self::Deleted
             }
         }
@@ -695,27 +687,20 @@ struct RetainedDefinitions<'db> {
 impl<'db> RetainedDefinitions<'db> {
     fn new(
         states: IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
-        used: IndexVec<ScopedDefinitionId, bool>,
-        multipart_import_used: IndexVec<ScopedDefinitionId, bool>,
+        usages: IndexVec<ScopedDefinitionId, DefinitionUsage>,
     ) -> Self {
         let mut states = states.into_iter();
-        let mut used = used.into_iter();
-        let mut multipart_import_used = multipart_import_used.into_iter();
+        let mut usages = usages.into_iter();
 
         let unbound_state = states.next();
-        let unbound_used = used.next();
-        let unbound_multipart_import_used = multipart_import_used.next();
+        let unbound_usage = usages.next();
         debug_assert_eq!(unbound_state, Some(DefinitionState::Undefined));
-        debug_assert_eq!(unbound_used, Some(false));
-        debug_assert_eq!(unbound_multipart_import_used, Some(false));
+        debug_assert_eq!(unbound_usage, Some(DefinitionUsage::default()));
 
         Self {
             states: states
-                .zip(used)
-                .zip(multipart_import_used)
-                .map(|((state, used), multipart_import_used)| {
-                    RetainedDefinitionState::new(state, used, multipart_import_used)
-                })
+                .zip(usages)
+                .map(|(state, usage)| RetainedDefinitionState::new(state, usage))
                 .collect(),
         }
     }
@@ -1630,15 +1615,10 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Append-only array of [`DefinitionState`].
     all_definitions: IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
 
-    /// Tracks whether each binding definition has at least one use.
+    /// Usage flags for each binding definition.
     ///
     /// Uses the same index as `all_definitions`.
-    used_bindings: IndexVec<ScopedDefinitionId, bool>,
-
-    /// Tracks whether each multipart import definition has a dotted attribute use.
-    ///
-    /// Uses the same index as `all_definitions`.
-    used_multipart_imports: IndexVec<ScopedDefinitionId, bool>,
+    definition_usages: IndexVec<ScopedDefinitionId, DefinitionUsage>,
 
     /// Builder of predicates.
     pub(super) predicates: PredicatesBuilder<'db>,
@@ -1701,8 +1681,7 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn new(is_class_scope: bool) -> Self {
         Self {
             all_definitions: IndexVec::from_iter([DefinitionState::Undefined]),
-            used_bindings: IndexVec::from_iter([false]),
-            used_multipart_imports: IndexVec::from_iter([false]),
+            definition_usages: IndexVec::from_iter([DefinitionUsage::default()]),
             predicates: PredicatesBuilder::default(),
             reachability_constraints: ReachabilityConstraintsBuilder::default(),
             narrowing_constraints: NarrowingConstraintsBuilder::default(),
@@ -1732,10 +1711,8 @@ impl<'db> UseDefMapBuilder<'db> {
 
     fn push_definition(&mut self, state: DefinitionState<'db>) -> ScopedDefinitionId {
         let def_id = self.all_definitions.push(state);
-        let used_id = self.used_bindings.push(false);
-        let multipart_used_id = self.used_multipart_imports.push(false);
-        debug_assert_eq!(def_id, used_id);
-        debug_assert_eq!(def_id, multipart_used_id);
+        let usage_id = self.definition_usages.push(DefinitionUsage::default());
+        debug_assert_eq!(def_id, usage_id);
         def_id
     }
 
@@ -2282,15 +2259,8 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     pub(super) fn mark_multipart_import_definition_used(&mut self, definition: ScopedDefinitionId) {
-        if definition.is_unbound() {
-            return;
-        }
-
-        if matches!(
-            self.all_definitions[definition],
-            DefinitionState::Defined(_)
-        ) {
-            self.used_multipart_imports[definition] = true;
+        if let Some(usage) = self.definition_usage_mut(definition) {
+            usage.is_multipart_import_used = true;
         }
     }
 
@@ -2459,16 +2429,25 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     fn mark_definition_used(&mut self, definition_id: ScopedDefinitionId) {
-        if definition_id.is_unbound() {
-            return;
+        if let Some(usage) = self.definition_usage_mut(definition_id) {
+            usage.is_used = true;
+        }
+    }
+
+    fn definition_usage_mut(
+        &mut self,
+        definition_id: ScopedDefinitionId,
+    ) -> Option<&mut DefinitionUsage> {
+        if definition_id.is_unbound()
+            || !matches!(
+                self.all_definitions[definition_id],
+                DefinitionState::Defined(_)
+            )
+        {
+            return None;
         }
 
-        if matches!(
-            self.all_definitions[definition_id],
-            DefinitionState::Defined(_)
-        ) {
-            self.used_bindings[definition_id] = true;
-        }
+        Some(&mut self.definition_usages[definition_id])
     }
 
     /// Take a snapshot of the current visible-places state.
@@ -2709,11 +2688,8 @@ impl<'db> UseDefMapBuilder<'db> {
                 narrowing_constraints,
             })
         });
-        let all_definitions = RetainedDefinitions::new(
-            self.all_definitions,
-            self.used_bindings,
-            self.used_multipart_imports,
-        );
+        let all_definitions =
+            RetainedDefinitions::new(self.all_definitions, self.definition_usages);
 
         UseDefMap {
             all_definitions,

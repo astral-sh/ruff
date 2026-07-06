@@ -32,7 +32,7 @@ pub struct UnusedImport {
 /// unless the file explicitly reexports them with `as` aliases or `__all__`. This can report an
 /// implicit package export as unused; make the export explicit to suppress the hint.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
+pub fn unused_imports(db: &dyn Db, file: File) -> Box<[UnusedImport]> {
     let parsed = parsed_module(db, file).load(db);
     let index = semantic_index(db, file);
     let mut string_annotation_definitions = None;
@@ -42,7 +42,7 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
     for scope_id in index.scope_ids() {
         let file_scope_id = scope_id.file_scope_id(db);
         let scope = index.scope(file_scope_id);
-        let is_module_scope = matches!(scope.kind(), ScopeKind::Module);
+        let is_module_scope = scope.kind().is_module();
 
         if matches!(scope.kind(), ScopeKind::TypeParams | ScopeKind::TypeAlias) {
             continue;
@@ -64,10 +64,6 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
                 continue;
             }
 
-            let Some((range, display_name)) = import_target(kind, &parsed) else {
-                continue;
-            };
-
             let multipart_import_name = kind.unaliased_multipart_import_name(&parsed);
             let is_used = if multipart_import_name.is_some() {
                 use_def_map.is_multipart_import_definition_used(definition_id)
@@ -78,6 +74,10 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
             if is_used {
                 continue;
             }
+
+            let Some((range, display_name)) = import_target(kind, &parsed) else {
+                continue;
+            };
 
             if is_intentionally_unused_name(&display_name) {
                 continue;
@@ -93,7 +93,7 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
                         string_annotation_uses
                             .dotted_names
                             .iter()
-                            .any(|dotted| dotted_starts_with(dotted, imported_name))
+                            .any(|dotted| dotted_starts_with(dotted.split('.'), imported_name))
                     });
 
             if used_in_string_annotation {
@@ -120,13 +120,10 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Vec<UnusedImport> {
 
     unused.sort_unstable_by_key(|import| (import.range.start(), import.range.end()));
     unused.dedup_by_key(|import| import.range);
-    unused
+    unused.into_boxed_slice()
 }
 
 /// Definitions and dotted attribute paths referenced from string annotations.
-///
-/// `dotted_names` retains the full dotted paths (`xml.etree.ElementTree.Element`) so
-/// multipart imports can be matched by submodule path rather than by root name alone.
 struct StringAnnotationUses<'db> {
     definitions: FxHashSet<Definition<'db>>,
     dotted_names: FxHashSet<Box<str>>,
@@ -238,7 +235,7 @@ impl<'model> SourceOrderVisitor<'model> for StringAnnotationDefinitionVisitor<'m
             ast::Expr::StringLiteral(string) if self.in_annotation => {
                 self.visit_string_annotation(string);
             }
-            ast::Expr::Call(call) => {
+            ast::Expr::Call(call) if !call.arguments.args.is_empty() => {
                 let type_form_index = call
                     .func
                     .inferred_type(self.model)
@@ -342,9 +339,9 @@ impl<'ast> SourceOrderVisitor<'ast> for ParsedStringAnnotationDefinitionVisitor<
             ast::Expr::StringLiteral(string) => self.visit_string_annotation(string),
             ast::Expr::Subscript(subscript) => self.visit_subscript(subscript),
             ast::Expr::Attribute(_) => {
-                // Retain the dotted path so multipart imports (`import xml.etree.ElementTree`)
-                // can be matched by submodule path. The walk must continue so the root
-                // name still records its definitions.
+                // Retain the dotted path for multipart matching, the walk must continue
+                // so the root name records its definitions. Re-recorded sub-chain
+                // prefixes are harmless.
                 if let Some(dotted) = UnqualifiedName::from_expr(expr) {
                     self.dotted_names
                         .insert(dotted.to_string().into_boxed_str());

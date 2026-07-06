@@ -331,13 +331,15 @@ impl<'db> DefinitionState<'db> {
     }
 }
 
-/// Returns `true` if the dotted path `path` starts with `prefix` at a segment boundary:
-/// `os.path.join` starts with `os.path` and `os`, but not with `os.pa`.
-///
-/// Used to decide whether a dotted use goes through a multipart import
-/// (see [`DefinitionKind::unaliased_multipart_import_name`]).
-pub fn dotted_starts_with(path: &str, prefix: &str) -> bool {
-    path == prefix || (path.starts_with(prefix) && path.as_bytes().get(prefix.len()) == Some(&b'.'))
+/// Returns `true` if the dotted path given by `path_segments` starts with `prefix` at a
+/// segment boundary: `os.path.join` starts with `os.path` and `os`, but not with `os.pa`.
+pub fn dotted_starts_with<'a>(
+    mut path_segments: impl Iterator<Item = &'a str>,
+    prefix: &str,
+) -> bool {
+    prefix
+        .split('.')
+        .all(|part| path_segments.next() == Some(part))
 }
 
 #[derive(Copy, Clone, Debug)]

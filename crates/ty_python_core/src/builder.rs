@@ -10,7 +10,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
-use ruff_python_ast::name::Name;
+use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_keyword, walk_pattern, walk_stmt};
 use ruff_python_ast::{self as ast, AtomicNodeIndex, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
@@ -227,6 +227,19 @@ impl ConditionFlowSnapshot {
     }
 }
 
+/// Whether any unaliased multipart import (`import a.b`) has been recorded so far.
+#[derive(Copy, Clone)]
+enum MultipartImportTracking {
+    Inactive,
+    Active,
+}
+
+impl MultipartImportTracking {
+    const fn is_inactive(self) -> bool {
+        matches!(self, MultipartImportTracking::Inactive)
+    }
+}
+
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Builder state
     db: &'db dyn Db,
@@ -274,6 +287,9 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     condition_flow_snapshots_by_node: FxHashMap<ExpressionNodeKey, ConditionFlowSnapshots>,
     statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
     imported_modules: FxHashSet<ModuleName>,
+    /// Lets dotted-use tracking return early, as eager resolution can only credit
+    /// imports that precede the use.
+    multipart_import_tracking: MultipartImportTracking,
     seen_submodule_imports: FxHashSet<String>,
     // A map from a lambda expression to its enclosing statement.
     enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
@@ -336,6 +352,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             seen_submodule_imports: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
+            multipart_import_tracking: MultipartImportTracking::Inactive,
             generator_functions: FxHashSet::default(),
             async_comprehensions: FxHashSet::default(),
 
@@ -1384,10 +1401,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn record_multipart_import_use(&mut self, expr: &ast::Expr) {
-        let Some(dotted_name) = dotted_attribute_name(expr) else {
+        if self.multipart_import_tracking.is_inactive() {
+            return;
+        }
+        let Some(dotted_name) = UnqualifiedName::from_expr(expr) else {
             return;
         };
-        let Some(imported_root) = dotted_name.split('.').next() else {
+        let segments = dotted_name.segments();
+        let [imported_root, ..] = segments else {
             return;
         };
 
@@ -1402,44 +1423,29 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 continue;
             }
 
-            let live_definition_ids = self.use_def_maps[scope_id]
-                .symbol_binding_definition_ids(symbol_id)
-                .collect::<Vec<_>>();
-            let all_live_definitions_are_multipart_imports =
-                live_definition_ids.iter().all(|definition_id| {
-                    let DefinitionState::Defined(definition) =
-                        self.use_def_maps[scope_id].definition(*definition_id)
-                    else {
-                        return false;
-                    };
+            let use_def = &self.use_def_maps[scope_id];
+            let mut all_live_definitions_are_multipart_imports = true;
+            let mut matching_definitions = SmallVec::<[ScopedDefinitionId; 4]>::new();
+            for definition_id in use_def.symbol_binding_definition_ids(symbol_id) {
+                match self.multipart_import_matches(scope_id, definition_id, segments) {
+                    None => all_live_definitions_are_multipart_imports = false,
+                    Some(true) => matching_definitions.push(definition_id),
+                    Some(false) => {}
+                }
+            }
 
-                    definition
-                        .kind(self.db)
-                        .unaliased_multipart_import_name(self.module)
-                        .is_some()
-                });
-            let candidate_definition_ids = if all_live_definitions_are_multipart_imports {
-                self.use_def_maps[scope_id].reachable_symbol_binding_definition_ids(symbol_id)
-            } else {
-                live_definition_ids
-            };
-
-            let matching_definitions = candidate_definition_ids
-                .into_iter()
-                .filter(|definition_id| {
-                    let DefinitionState::Defined(definition) =
-                        self.use_def_maps[scope_id].definition(*definition_id)
-                    else {
-                        return false;
-                    };
-
-                    let kind = definition.kind(self.db);
-                    kind.unaliased_multipart_import_name(self.module)
-                        .is_some_and(|imported_name| {
-                            dotted_starts_with(&dotted_name, imported_name)
-                        })
-                })
-                .collect::<Vec<_>>();
+            // When every live definition is a multipart import, also credit reachable
+            // sibling imports of the same root (`import a.b, a.c` used as `a.b.x`).
+            if all_live_definitions_are_multipart_imports {
+                matching_definitions = self.use_def_maps[scope_id]
+                    .reachable_symbol_binding_definition_ids(symbol_id)
+                    .into_iter()
+                    .filter(|definition_id| {
+                        self.multipart_import_matches(scope_id, *definition_id, segments)
+                            == Some(true)
+                    })
+                    .collect();
+            }
 
             for definition_id in matching_definitions {
                 self.use_def_maps[scope_id].mark_multipart_import_definition_used(definition_id);
@@ -1449,6 +1455,27 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             // resolves to. Even if it is not a multipart import, it shadows outer imports.
             break;
         }
+    }
+
+    /// Returns `None` if the definition is not an unaliased multipart import, otherwise
+    /// whether the dotted use `segments` goes through the imported submodule.
+    fn multipart_import_matches(
+        &self,
+        scope_id: FileScopeId,
+        definition_id: ScopedDefinitionId,
+        segments: &[&str],
+    ) -> Option<bool> {
+        let DefinitionState::Defined(definition) =
+            self.use_def_maps[scope_id].definition(definition_id)
+        else {
+            return None;
+        };
+
+        let imported_name = definition
+            .kind(self.db)
+            .unaliased_multipart_import_name(self.module)?;
+
+        Some(dotted_starts_with(segments.iter().copied(), imported_name))
     }
 
     fn record_place_definition(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
@@ -2957,6 +2984,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             .record_expression(asname, self.current_scope());
                         (asname.id.clone(), asname.id == alias.name.id)
                     } else {
+                        if alias.name.contains('.') {
+                            self.multipart_import_tracking = MultipartImportTracking::Active;
+                        }
                         (Name::new(alias.name.id.split('.').next().unwrap()), false)
                     };
 
@@ -5226,19 +5256,6 @@ fn is_if_type_checking(expr: &ast::Expr) -> bool {
             attr == "TYPE_CHECKING" && is_dotted_name(value)
         }
         _ => false,
-    }
-}
-
-fn dotted_attribute_name(expr: &ast::Expr) -> Option<String> {
-    match expr {
-        ast::Expr::Name(name) => Some(name.id.to_string()),
-        ast::Expr::Attribute(attribute) => {
-            let mut name = dotted_attribute_name(&attribute.value)?;
-            name.push('.');
-            name.push_str(attribute.attr.id.as_str());
-            Some(name)
-        }
-        _ => None,
     }
 }
 
