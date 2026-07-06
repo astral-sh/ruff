@@ -68,17 +68,20 @@ pub(super) fn visible_reachable_definitions_for_name<'db>(
     let file = model.program_file();
     let index = semantic_index(db, file);
 
+    // Get the scope for this name expression
     let Some(file_scope) = model.scope(node) else {
         return FxIndexSet::default();
     };
 
-    let mut definitions = FxIndexSet::default();
+    let mut all_definitions = FxIndexSet::default();
 
+    // Search through the scope hierarchy: start from the current scope and
+    // traverse up through parent scopes to find definitions
     for (scope_id, _scope) in index.visible_ancestor_scopes(file_scope) {
         let place_table = index.place_table(scope_id);
 
         let Some(symbol_id) = place_table.symbol_id(name_str) else {
-            continue;
+            continue; // Name not found in this scope, try parent scope
         };
 
         let use_def_map = index.use_def_map(scope_id);
@@ -91,7 +94,7 @@ pub(super) fn visible_reachable_definitions_for_name<'db>(
         if is_global || is_nonlocal {
             // Assignments in a forwarding scope remain valid navigation targets, including eager
             // walrus bindings exported from comprehensions.
-            definitions.extend(user_visible_definitions(
+            all_definitions.extend(user_visible_definitions(
                 db,
                 use_def_map
                     .reachable_symbol_bindings(symbol_id)
@@ -111,13 +114,15 @@ pub(super) fn visible_reachable_definitions_for_name<'db>(
         // this name using a nonlocal or global binding. The semantic analyzer
         // doesn't appear to track these in a way that we can easily access
         // them from here without walking all scopes in the module.
+
+        // If marked as global, skip to global scope
         if is_global {
             let global_scope_id = global_scope(db, file);
             let global_place_table = ty_python_core::place_table(db, global_scope_id);
 
             if let Some(global_symbol_id) = global_place_table.symbol_id(name_str) {
                 let global_use_def_map = ty_python_core::use_def_map(db, global_scope_id);
-                definitions.extend(user_visible_definitions(
+                all_definitions.extend(user_visible_definitions(
                     db,
                     global_use_def_map
                         .reachable_symbol_bindings(global_symbol_id)
@@ -132,12 +137,14 @@ pub(super) fn visible_reachable_definitions_for_name<'db>(
             break;
         }
 
+        // If marked as nonlocal, skip current scope and search in ancestor scopes
         if is_nonlocal {
+            // Continue searching in parent scopes, but skip the current scope
             continue;
         }
 
         // Get all definitions (both bindings and declarations) for this place
-        definitions.extend(user_visible_definitions(
+        all_definitions.extend(user_visible_definitions(
             db,
             use_def_map
                 .reachable_symbol_bindings(symbol_id)
@@ -149,12 +156,13 @@ pub(super) fn visible_reachable_definitions_for_name<'db>(
                 ),
         ));
 
-        if !definitions.is_empty() {
+        // If we found definitions in this scope, we can stop searching
+        if !all_definitions.is_empty() {
             break;
         }
     }
 
-    definitions
+    all_definitions
 }
 
 /// Returns all definitions for a name. If any definitions are imports, they
