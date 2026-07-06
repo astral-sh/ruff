@@ -572,7 +572,7 @@ impl<'db> TypeVarInstance<'db> {
                 Type::NominalInstance(nominal_instance) => nominal_instance
                     .own_tuple_spec(db)
                     .map_or_else(Parameters::unknown, |tuple_spec| {
-                        Parameters::new(
+                        Parameters::from_annotation(
                             db,
                             tuple_spec
                                 .iter_all_elements()

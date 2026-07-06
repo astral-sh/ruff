@@ -2716,7 +2716,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // TODO: `Unpack`
                     Parameters::todo()
                 } else {
-                    Parameters::new(
+                    Parameters::from_annotation(
                         self.db(),
                         parameter_types.iter().map(|param_type| {
                             Parameter::positional_only(None).with_annotated_type(*param_type)

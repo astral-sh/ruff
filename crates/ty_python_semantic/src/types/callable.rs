@@ -251,7 +251,7 @@ impl<'db> Type<'db> {
                 Some(CallableTypes::one(CallableType::single(
                     db,
                     Signature::new(
-                        Parameters::new(
+                        Parameters::from_annotation(
                             db,
                             [Parameter::positional_only(None)
                                 .with_annotated_type(newtype.base(db).instance_type(db))],

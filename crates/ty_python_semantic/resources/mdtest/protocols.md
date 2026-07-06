@@ -3476,6 +3476,25 @@ static_assert(is_subtype_of(TypeOf[tuple[str, ...]], SequenceMaker[str]))  # err
 static_assert(is_subtype_of(TypeOf[tuple[str, ...]], SequenceMaker[int | str]))  # error: [static-assert-error]
 ```
 
+Specializing a type variable to `Any` does not make variadic parameters gradual. The gradual form
+requires the parameters to be explicitly or implicitly annotated with `Any` in the function
+definition:
+
+```py
+from typing import Any, Protocol, TypeVar
+
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Variadic(Protocol[T_contra]):
+    def __call__(self, *args: T_contra, **kwargs: T_contra) -> None: ...
+
+class NoArgs(Protocol):
+    def __call__(self) -> None: ...
+
+def _(source: NoArgs):
+    target: Variadic[Any] = source  # error: [invalid-assignment]
+```
+
 ## Generic protocols and union arguments
 
 When a union is passed to a parameter annotated as a generic protocol, each union element can

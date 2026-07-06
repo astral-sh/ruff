@@ -625,6 +625,12 @@ static EMPTY_CONSTRAINT_TABLES: LazyLock<ConstraintTables<'static>> =
         narrowing_constraints: NarrowingConstraintsBuilder::default().build(),
     });
 
+static ALWAYS_UNBOUND_BINDINGS: LazyLock<Bindings> =
+    LazyLock::new(|| Bindings::unbound(ScopedReachabilityConstraintId::ALWAYS_TRUE));
+
+static ALWAYS_UNDECLARED_DECLARATIONS: LazyLock<Declarations> =
+    LazyLock::new(|| Declarations::undeclared(ScopedReachabilityConstraintId::ALWAYS_TRUE));
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 enum RetainedDefinitionState<'db> {
     Unused(Definition<'db>),
@@ -754,6 +760,10 @@ pub struct UseDefMap<'db> {
     ///
     /// If we see a binding to a `Final`-qualified symbol, we also need the bindings to find
     /// previous bindings to that symbol. If there are any, the assignment is invalid.
+    ///
+    /// Entries whose prior state is the start-of-scope default (always unbound and, if present,
+    /// always undeclared) are omitted. Lookups use [`ALWAYS_UNBOUND_BINDINGS`] and
+    /// [`ALWAYS_UNDECLARED_DECLARATIONS`], which are initialized lazily and shared by every map.
     definitions_by_definition: FrozenMap<
         Definition<'db>,
         DefinitionsAtDefinition<InternedBindingsId, InternedDeclarationsId>,
@@ -790,6 +800,15 @@ pub struct UseDefMap<'db> {
 struct RangeInfo {
     reachability: ScopedReachabilityConstraintId,
     in_type_checking_block: bool,
+}
+
+impl Default for RangeInfo {
+    fn default() -> Self {
+        Self {
+            reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            in_type_checking_block: false,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
@@ -1042,24 +1061,26 @@ impl<'db> UseDefMap<'db> {
         &self,
         definition: Definition<'db>,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings_id = self.definitions_by_definition[&definition].bindings;
-        self.bindings_iterator(
-            &self.interned_bindings[bindings_id],
-            BoundnessAnalysis::BasedOnUnboundVisibility,
-        )
+        let bindings = self.definitions_by_definition.get(&definition).map_or_else(
+            || ALWAYS_UNBOUND_BINDINGS.as_slice(),
+            |definitions| &self.interned_bindings[definitions.bindings],
+        );
+        self.bindings_iterator(bindings, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
 
     pub fn declarations_at_binding(
         &self,
         binding: Definition<'db>,
     ) -> DeclarationsIterator<'_, 'db> {
-        let declarations_id = self.definitions_by_definition[&binding]
-            .declarations
-            .expect("binding definition should have retained declarations");
-        self.declarations_iterator(
-            &self.interned_declarations[declarations_id],
-            BoundnessAnalysis::BasedOnUnboundVisibility,
-        )
+        let declarations = self.definitions_by_definition.get(&binding).map_or_else(
+            || ALWAYS_UNDECLARED_DECLARATIONS.as_slice(),
+            |definitions| {
+                &self.interned_declarations[definitions
+                    .declarations
+                    .expect("binding definition should have retained declarations")]
+            },
+        );
+        self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
 
     pub fn end_of_scope_declarations<'map>(
@@ -2583,6 +2604,11 @@ impl<'db> UseDefMapBuilder<'db> {
                 &mut self.reachability_constraints,
             );
         }
+        // Keep default entries while building so they remain barriers between non-contiguous
+        // ranges with the same metadata. Once construction is complete, absence represents the
+        // default of reachable code outside a `TYPE_CHECKING` block.
+        self.range_reachability
+            .retain(|(_, info)| *info != RangeInfo::default());
         for &(_, RangeInfo { reachability, .. }) in &self.range_reachability {
             self.reachability_constraints.mark_used(reachability);
         }
@@ -2681,6 +2707,15 @@ impl<'db> UseDefMapBuilder<'db> {
             },
         ) in definitions_by_definition
         {
+            // Lookups use the shared start-of-scope defaults for these omitted entries.
+            if bindings.is_always_unbound()
+                && declarations
+                    .as_ref()
+                    .is_none_or(Declarations::is_always_undeclared)
+            {
+                continue;
+            }
+
             let bindings = place_state_interner.intern_bindings(&bindings);
             let declarations = declarations
                 .map(|declarations| place_state_interner.intern_declarations(declarations));
