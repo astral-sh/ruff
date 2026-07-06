@@ -7,7 +7,7 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug, Clone, Default, CacheKey)]
 pub struct Settings {
     pub extend_immutable_calls: Vec<String>,
-    pub check_immutable_argument_defaults: bool,
+    pub strict_argument_defaults: bool,
 }
 
 impl Display for Settings {
@@ -17,7 +17,7 @@ impl Display for Settings {
             namespace = "linter.flake8_bugbear",
             fields = [
                 self.extend_immutable_calls | array,
-                self.check_immutable_argument_defaults,
+                self.strict_argument_defaults,
             ]
         }
         Ok(())

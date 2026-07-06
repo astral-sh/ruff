@@ -224,13 +224,13 @@ mod tests {
     }
 
     #[test]
-    fn check_immutable_argument_defaults() -> Result<()> {
-        let snapshot = "check_immutable_argument_defaults".to_string();
+    fn strict_argument_defaults() -> Result<()> {
+        let snapshot = "strict_argument_defaults".to_string();
         let diagnostics = test_path(
-            Path::new("flake8_bugbear/B008_check_immutable.py"),
+            Path::new("flake8_bugbear/B008_strict.py"),
             &LinterSettings {
                 flake8_bugbear: super::settings::Settings {
-                    check_immutable_argument_defaults: true,
+                    strict_argument_defaults: true,
                     ..super::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(Rule::FunctionCallInDefaultArgument)

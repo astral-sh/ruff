@@ -1,6 +1,6 @@
-"""Fixture for the `check-immutable-argument-defaults` option (B008).
+"""Fixture for the `strict-argument-defaults` option (B008).
 
-With `check-immutable-argument-defaults = true`, function calls in argument
+With `strict-argument-defaults = true`, function calls in argument
 defaults are flagged even when the parameter's annotation is an immutable type.
 Immutable calls and `NewType` calls over immutable types remain exempt.
 """
@@ -18,7 +18,7 @@ def foo() -> Sequence[int]:
 
 
 # Errors: annotation is immutable, but the default is a (non-immutable) call.
-# These are only flagged when `check-immutable-argument-defaults` is enabled.
+# These are only flagged when `strict-argument-defaults` is enabled.
 def get_random_number(num: int = random.randint(1, 100)) -> int:
     return num
 

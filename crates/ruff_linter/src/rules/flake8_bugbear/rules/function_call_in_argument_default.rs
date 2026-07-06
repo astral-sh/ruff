@@ -23,7 +23,7 @@ use crate::checkers::ast::Checker;
 /// Those whose default arguments are `NewType` calls where the original type
 /// is immutable are also ignored. To flag function calls in argument defaults
 /// regardless of the parameter's annotation, enable the
-/// [`lint.flake8-bugbear.check-immutable-argument-defaults`] option.
+/// [`lint.flake8-bugbear.strict-argument-defaults`] option.
 ///
 /// Calls and types outside of the standard library can be marked as an exception
 /// to this rule with the [`lint.flake8-bugbear.extend-immutable-calls`] configuration option.
@@ -63,7 +63,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Options
 /// - `lint.flake8-bugbear.extend-immutable-calls`
-/// - `lint.flake8-bugbear.check-immutable-argument-defaults`
+/// - `lint.flake8-bugbear.strict-argument-defaults`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.102")]
 pub(crate) struct FunctionCallInDefaultArgument {
@@ -144,10 +144,7 @@ pub(crate) fn function_call_in_argument_default(checker: &Checker, parameters: &
         .collect();
 
     let mut visitor = ArgumentDefaultVisitor::new(checker, &extend_immutable_calls);
-    let check_immutable_argument_defaults = checker
-        .settings()
-        .flake8_bugbear
-        .check_immutable_argument_defaults;
+    let strict_argument_defaults = checker.settings().flake8_bugbear.strict_argument_defaults;
     for parameter in parameters.iter_non_variadic_params() {
         if let Some(default) = parameter.default() {
             // Unless the user has opted in to checking all argument defaults,
@@ -155,7 +152,7 @@ pub(crate) fn function_call_in_argument_default(checker: &Checker, parameters: &
             let annotation_is_immutable = parameter.annotation().is_some_and(|expr| {
                 is_immutable_annotation(expr, checker.semantic(), &extend_immutable_calls)
             });
-            if check_immutable_argument_defaults || !annotation_is_immutable {
+            if strict_argument_defaults || !annotation_is_immutable {
                 visitor.visit_expr(default);
             }
         }

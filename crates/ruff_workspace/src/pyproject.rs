@@ -463,13 +463,13 @@ strict-checking = false
             r"
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = ['fastapi.Depends']
-check-immutable-argument-defaults = true
+strict-argument-defaults = true
 ",
         )?;
 
         let expected = Flake8BugbearOptions {
             extend_immutable_calls: Some(vec!["fastapi.Depends".to_string()]),
-            check_immutable_argument_defaults: Some(true),
+            strict_argument_defaults: Some(true),
         };
 
         assert_eq!(
@@ -494,7 +494,7 @@ check-immutable-argument-defaults = true
             settings.extend_immutable_calls,
             vec!["fastapi.Depends".to_string()]
         );
-        assert!(settings.check_immutable_argument_defaults);
+        assert!(settings.strict_argument_defaults);
 
         assert!(
             toml::from_str::<Pyproject>(
