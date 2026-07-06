@@ -2,6 +2,8 @@
 
 This repository contains both Ruff (a Python linter and formatter) and ty (a Python type checker). The crates follow a naming convention: `ruff_*` for Ruff-specific code and `ty_*` for ty-specific code. ty reuses several Ruff crates, including the Python parser (`ruff_python_parser`) and AST definitions (`ruff_python_ast`).
 
+The `ruff_*_spo` crates (`ruff_ruby_spo`, `ruff_python_spo`, `ruff_csharp_spo`, `ruff_cpp_spo`, `ruff_spo_triplet`, …) are the AdaWorldAPI **SPO/transcode** side — AST → `(subject, predicate, object)` fact harvest feeding the OGAR transpiler. Methods for that side are curated in `.claude/knowledge/` (each with a `READ BY:` header) and applied by agents in `.claude/agents/`. **Before harvesting method-body facts or lowering a behaviour arm, read `.claude/knowledge/fuzzy-recipe-codebook.md`** — it teaches how to cook a `(verb, criteria)` recipe codebook and correlate fuzzy imperative bodies to declarative recipes, rather than transcribing bodies. The `fuzzy-proposer` agent carries that method.
+
 ## Running Tests
 
 Run all tests (using `nextest` for faster execution, setting `CARGO_PROFILE_DEV_OPT_LEVEL=1 CARGO_PROFILE_DEV_DEBUG="line-tables-only"` to enable optimizations while retaining some debug info, and setting `INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1` to ensure all snapshots are updated):
