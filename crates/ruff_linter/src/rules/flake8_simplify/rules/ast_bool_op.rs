@@ -41,6 +41,15 @@ use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 ///     pass
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe. Merging the `isinstance` calls into a
+/// single call with a tuple of types requires evaluating every type
+/// expression up front, whereas the original `or` expression only evaluates
+/// them until the first `isinstance` call that returns `True`. If a later
+/// type expression has a side effect (or would raise), the fix causes it to
+/// run unconditionally instead of being skipped by short-circuiting. The fix
+/// may also remove comments contained within the merged expression.
+///
 /// ## References
 /// - [Python documentation: `isinstance`](https://docs.python.org/3/library/functions.html#isinstance)
 #[derive(ViolationMetadata)]
@@ -90,6 +99,15 @@ impl Violation for DuplicateIsinstanceCall {
 ///     ...
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it might change the behaviour if
+/// the compared values override `__eq__` in a way that isn't reflexive.
+/// Unlike the original chain of `==` comparisons, Python's `in` operator
+/// checks identity (`is`) before falling back to `==` for each element of
+/// the tuple, so the rewritten expression can evaluate to `True` even though
+/// every individual `==` comparison in the original expression would have
+/// returned a falsy value.
+///
 /// ## References
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 #[derive(ViolationMetadata)]
@@ -124,6 +142,14 @@ impl AlwaysFixableViolation for CompareWithTuple {
 /// x and not x
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it assumes that both references
+/// to `x` evaluate identically. If `x`'s type overrides `__bool__` (or
+/// `__len__`) such that its truthiness isn't stable across multiple
+/// evaluations, replacing the expression with `False` can change the
+/// program's behavior. The fix may also remove comments contained within the
+/// expression.
+///
 /// ## References
 /// - [Python documentation: Boolean operations](https://docs.python.org/3/reference/expressions.html#boolean-operations)
 #[derive(ViolationMetadata)]
@@ -156,6 +182,14 @@ impl AlwaysFixableViolation for ExprAndNotExpr {
 /// ```python
 /// x or not x
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it assumes that both references
+/// to `x` evaluate identically. If `x`'s type overrides `__bool__` (or
+/// `__len__`) such that its truthiness isn't stable across multiple
+/// evaluations, replacing the expression with `True` can change the
+/// program's behavior. The fix may also remove comments contained within the
+/// expression.
 ///
 /// ## References
 /// - [Python documentation: Boolean operations](https://docs.python.org/3/reference/expressions.html#boolean-operations)
@@ -212,6 +246,17 @@ pub(crate) enum ContentAround {
 ///
 /// a = x or [1]
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe. To decide how much of the expression
+/// can be dropped, the rule assumes that an operand whose truthiness can't
+/// be determined statically has no side effects, as long as the whole
+/// expression is used in a boolean context (e.g., an `if` test). This
+/// assumption doesn't hold for expressions like attribute accesses, which
+/// aren't treated as having side effects even though they can run arbitrary
+/// code (e.g., through a property) or raise, so such an operand can be
+/// silently dropped without being evaluated. The fix may also remove
+/// comments contained within the replaced range.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct ExprOrTrue {
@@ -265,6 +310,17 @@ impl AlwaysFixableViolation for ExprOrTrue {
 ///
 /// a = x and []
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe. To decide how much of the expression
+/// can be dropped, the rule assumes that an operand whose truthiness can't
+/// be determined statically has no side effects, as long as the whole
+/// expression is used in a boolean context (e.g., an `if` test). This
+/// assumption doesn't hold for expressions like attribute accesses, which
+/// aren't treated as having side effects even though they can run arbitrary
+/// code (e.g., through a property) or raise, so such an operand can be
+/// silently dropped without being evaluated. The fix may also remove
+/// comments contained within the replaced range.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct ExprAndFalse {

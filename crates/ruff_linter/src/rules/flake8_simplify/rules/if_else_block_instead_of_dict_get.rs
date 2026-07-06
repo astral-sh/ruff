@@ -50,6 +50,18 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// value = foo.get("bar", 0)
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe. `dict.get(key, default)` evaluates
+/// `default` unconditionally, as an argument to the call, whereas the
+/// original `if`-`else` block (or ternary) only evaluates the default value
+/// when the key is actually missing. Although the rule avoids rewriting
+/// cases where the default value is a call or other obviously effectful
+/// expression, it doesn't treat attribute access as effectful, so a default
+/// like a property can end up being evaluated unconditionally, changing the
+/// program's behavior if that property raises or has side effects. The fix
+/// is only offered when the `if` statement or expression contains no
+/// comments.
+///
 /// ## Options
 ///
 /// The rule will avoid flagging cases where using the resulting `dict.get` call would exceed the
