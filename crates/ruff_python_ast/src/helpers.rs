@@ -1569,7 +1569,6 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
             Expr::ListComp(_) => true,
             Expr::SetComp(_) => true,
             Expr::DictComp(_) => true,
-            Expr::Compare(_) => true,
             Expr::NumberLiteral(_) => true,
             Expr::BooleanLiteral(_) => true,
             Expr::NoneLiteral(_) => true,
@@ -1586,6 +1585,8 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
             Expr::BoolOp(ast::ExprBoolOp { .. }) => false,
             Expr::BinOp(ast::ExprBinOp { .. }) => false,
             Expr::UnaryOp(ast::ExprUnaryOp { .. }) => false,
+            // Rich comparison methods can return arbitrary objects.
+            Expr::Compare(_) => false,
             Expr::Generator(_) => false,
             Expr::Await(_) => false,
             Expr::Yield(_) => false,
@@ -1615,7 +1616,8 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
             f_string.elements.iter().any(|element| match element {
                 InterpolatedStringElement::Literal(string_literal) => !string_literal.is_empty(),
                 InterpolatedStringElement::Interpolation(f_string) => {
-                    f_string.debug_text.is_some() || inner(&f_string.expression)
+                    f_string.debug_text.is_some()
+                        || (f_string.format_spec.is_none() && inner(&f_string.expression))
                 }
             })
         }

@@ -1076,68 +1076,14 @@ SIM222 [*] Use `f"{x}abc"` instead of `f"{x}abc" or ...`
 232 | # An f-string is guaranteed non-empty if any element is non-empty, even if others are indeterminate
 233 | print(f"{x}abc" or "bar")  # SIM222
     |       ^^^^^^^^^^^^^^^^^^
-234 | print(f"abc{x}" or "bar")  # SIM222
-235 | print(f"{x}" f"abc" or "bar")  # SIM222
+234 | # An empty f-string part in an implicit concatenation guarantees nothing
+235 | print(f"" f"{x}" or "bar")  # OK
     |
 help: Replace with `f"{x}abc"`
     |
 232 | # An f-string is guaranteed non-empty if any element is non-empty, even if others are indeterminate
     - print(f"{x}abc" or "bar")  # SIM222
 233 + print(f"{x}abc")  # SIM222
-234 | print(f"abc{x}" or "bar")  # SIM222
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-SIM222 [*] Use `f"abc{x}"` instead of `f"abc{x}" or ...`
-   --> SIM222.py:234:7
-    |
-232 | # An f-string is guaranteed non-empty if any element is non-empty, even if others are indeterminate
-233 | print(f"{x}abc" or "bar")  # SIM222
-234 | print(f"abc{x}" or "bar")  # SIM222
-    |       ^^^^^^^^^^^^^^^^^^
-235 | print(f"{x}" f"abc" or "bar")  # SIM222
-236 | print(f"{x}{y}" or "bar")  # OK
-    |
-help: Replace with `f"abc{x}"`
-    |
-233 | print(f"{x}abc" or "bar")  # SIM222
-    - print(f"abc{x}" or "bar")  # SIM222
-234 + print(f"abc{x}")  # SIM222
-235 | print(f"{x}" f"abc" or "bar")  # SIM222
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-SIM222 [*] Use `f"{x}" f"abc"` instead of `f"{x}" f"abc" or ...`
-   --> SIM222.py:235:7
-    |
-233 | print(f"{x}abc" or "bar")  # SIM222
-234 | print(f"abc{x}" or "bar")  # SIM222
-235 | print(f"{x}" f"abc" or "bar")  # SIM222
-    |       ^^^^^^^^^^^^^^^^^^^^^^
-236 | print(f"{x}{y}" or "bar")  # OK
-237 | # An empty f-string part in an implicit concatenation guarantees nothing
-    |
-help: Replace with `f"{x}" f"abc"`
-    |
-234 | print(f"abc{x}" or "bar")  # SIM222
-    - print(f"{x}" f"abc" or "bar")  # SIM222
-235 + print(f"{x}" f"abc")  # SIM222
-236 | print(f"{x}{y}" or "bar")  # OK
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-SIM222 [*] Use `"bar"` instead of `... or "bar"`
-   --> SIM222.py:239:7
-    |
-237 | # An empty f-string part in an implicit concatenation guarantees nothing
-238 | print(f"" f"{x}" or "bar")  # OK
-239 | print(f"{f''}" or "bar")  # SIM222 (the f-string is provably empty, so `or` yields "bar")
-    |       ^^^^^^^^^^^^^^^^^
-    |
-help: Replace with `"bar"`
-    |
-238 | print(f"" f"{x}" or "bar")  # OK
-    - print(f"{f''}" or "bar")  # SIM222 (the f-string is provably empty, so `or` yields "bar")
-239 + print("bar")  # SIM222 (the f-string is provably empty, so `or` yields "bar")
+234 | # An empty f-string part in an implicit concatenation guarantees nothing
     |
 note: This is an unsafe fix and may change runtime behavior
