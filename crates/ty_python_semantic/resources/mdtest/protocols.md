@@ -2819,6 +2819,15 @@ class ReorderedPairImplementation:
     def f[S, R](self, first: R, second: S) -> tuple[R, S]:
         return first, second
 
+class IntBoundIdentityProtocol(Protocol):
+    def f[T: int](self, input: T) -> T: ...
+
+class GenericListReturnImplementation:
+    def f[S](self, input: S) -> list[S]:
+        return [input]
+
+def requires_int_bound_identity(value: IntBoundIdentityProtocol) -> None: ...
+
 class NominalReturningSelfNotGeneric:
     def g(self) -> "NominalReturningSelfNotGeneric":
         return self
@@ -2860,10 +2869,11 @@ static_assert(is_assignable_to(ObjectBoundImplementation, StrBoundProtocol))
 static_assert(not is_subtype_of(StrBoundImplementation, ObjectBoundProtocol))
 static_assert(not is_assignable_to(StrBoundImplementation, ObjectBoundProtocol))
 
-static_assert(is_subtype_of(GenericListImplementation, NestedListProtocol))
 static_assert(is_assignable_to(GenericListImplementation, NestedListProtocol))
 static_assert(is_subtype_of(ReorderedPairImplementation, PairProtocol))
 static_assert(is_assignable_to(ReorderedPairImplementation, PairProtocol))
+
+requires_int_bound_identity(GenericListReturnImplementation())  # error: [invalid-argument-type]
 
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, LegacyFunctionScoped))
