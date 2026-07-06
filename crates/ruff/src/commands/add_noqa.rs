@@ -6,7 +6,7 @@ use log::{debug, error};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 
-use ruff_linter::linter::add_noqa_to_path;
+use ruff_linter::linter::add_suppressions_to_path;
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
@@ -85,7 +85,7 @@ pub(crate) fn add_noqa(
                     return None;
                 }
             };
-            match add_noqa_to_path(
+            match add_suppressions_to_path(
                 path,
                 package,
                 &source_kind,

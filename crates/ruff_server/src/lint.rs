@@ -18,7 +18,7 @@ use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_linter::{
     Locator, SuppressionKind,
     directives::{Flags, extract_directives},
-    generate_noqa_edits,
+    generate_suppression_edits,
     linter::check_path,
     package::PackageRoot,
     packaging::detect_package_root,
@@ -154,7 +154,7 @@ pub(crate) fn check(
         &suppressions,
     );
 
-    let noqa_edits = generate_noqa_edits(
+    let suppression_edits = generate_suppression_edits(
         &document_path,
         &diagnostics,
         &locator,
@@ -197,7 +197,7 @@ pub(crate) fn check(
     let lsp_diagnostics =
         diagnostics
             .into_iter()
-            .zip(noqa_edits)
+            .zip(suppression_edits)
             .filter_map(|(message, noqa_edit)| {
                 if message.is_invalid_syntax() && !show_syntax_errors {
                     None

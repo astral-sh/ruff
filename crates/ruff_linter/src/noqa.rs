@@ -21,15 +21,15 @@ use crate::Locator;
 use crate::fs::relativize_path;
 use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
-use crate::suppression::{SuppressionComment, Suppressions};
+use crate::suppression::{self, Suppressions};
 
-/// Generates an array of edits that matches the length of `messages`.
+/// Generates an array of edits that matches the length of `diagnostics`.
 /// Each potential edit in the array is paired, in order, with the associated diagnostic.
 /// Each edit will add a suppression comment to the appropriate line in the source to hide
 /// the diagnostic. These edits may conflict with each other and should not be applied
 /// simultaneously.
 #[expect(clippy::too_many_arguments)]
-pub fn generate_noqa_edits(
+pub fn generate_suppression_edits(
     path: &Path,
     diagnostics: &[Diagnostic],
     locator: &Locator,
@@ -43,7 +43,7 @@ pub fn generate_noqa_edits(
     let file_directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&file_directives);
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
-    let comments = find_noqa_comments(
+    let comments = find_suppression_comments(
         diagnostics,
         locator,
         &exemption,
@@ -52,7 +52,7 @@ pub fn generate_noqa_edits(
         suppressions,
         suppression_kind,
     );
-    build_noqa_edits_by_diagnostic(comments, locator, line_ending, None, suppression_kind)
+    build_suppression_edits_by_diagnostic(comments, locator, line_ending, None, suppression_kind)
 }
 
 /// A directive to ignore a set of rules either for a given line of Python source code or an entire file (e.g.,
@@ -756,7 +756,7 @@ pub enum SuppressionKind {
 
 /// Adds suppression comments to suppress all messages of a file.
 #[expect(clippy::too_many_arguments)]
-pub(crate) fn add_noqa(
+pub(crate) fn add_suppression(
     path: &Path,
     diagnostics: &[Diagnostic],
     locator: &Locator,
@@ -768,7 +768,7 @@ pub(crate) fn add_noqa(
     suppressions: &Suppressions,
     suppression_kind: SuppressionKind,
 ) -> Result<usize> {
-    let (count, output) = add_noqa_inner(
+    let (count, output) = add_suppression_inner(
         path,
         diagnostics,
         locator,
@@ -786,7 +786,7 @@ pub(crate) fn add_noqa(
 }
 
 #[expect(clippy::too_many_arguments)]
-fn add_noqa_inner(
+fn add_suppression_inner(
     path: &Path,
     diagnostics: &[Diagnostic],
     locator: &Locator,
@@ -806,7 +806,7 @@ fn add_noqa_inner(
 
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
 
-    let comments = find_noqa_comments(
+    let comments = find_suppression_comments(
         diagnostics,
         locator,
         &exemption,
@@ -816,7 +816,8 @@ fn add_noqa_inner(
         suppression_kind,
     );
 
-    let edits = build_noqa_edits_by_line(comments, locator, line_ending, reason, suppression_kind);
+    let edits =
+        build_suppression_edits_by_line(comments, locator, line_ending, reason, suppression_kind);
 
     let contents = locator.contents();
 
@@ -838,8 +839,8 @@ fn add_noqa_inner(
     (count, output)
 }
 
-fn build_noqa_edits_by_diagnostic(
-    comments: Vec<Option<NoqaComment>>,
+fn build_suppression_edits_by_diagnostic(
+    comments: Vec<Option<SuppressionComment>>,
     locator: &Locator,
     line_ending: LineEnding,
     reason: Option<&str>,
@@ -849,7 +850,7 @@ fn build_noqa_edits_by_diagnostic(
     for comment in comments {
         match comment {
             Some(comment) => {
-                let noqa_edit = generate_noqa_edit(
+                let suppression_edit = generate_suppression_edit(
                     comment.directive,
                     comment.line,
                     FxHashSet::from_iter([comment.identifier]),
@@ -858,7 +859,7 @@ fn build_noqa_edits_by_diagnostic(
                     reason,
                     suppression_kind,
                 );
-                edits.push(Some(noqa_edit.into_edit()));
+                edits.push(Some(suppression_edit.into_edit()));
             }
             None => edits.push(None),
         }
@@ -866,13 +867,13 @@ fn build_noqa_edits_by_diagnostic(
     edits
 }
 
-fn build_noqa_edits_by_line<'a>(
-    comments: Vec<Option<NoqaComment<'a>>>,
+fn build_suppression_edits_by_line<'a>(
+    comments: Vec<Option<SuppressionComment<'a>>>,
     locator: &Locator<'a>,
     line_ending: LineEnding,
     reason: Option<&'a str>,
     suppression_kind: SuppressionKind,
-) -> BTreeMap<TextSize, NoqaEdit<'a>> {
+) -> BTreeMap<TextSize, SuppressionEdit<'a>> {
     let mut comments_by_line = BTreeMap::default();
     for comment in comments.into_iter().flatten() {
         comments_by_line
@@ -886,7 +887,7 @@ fn build_noqa_edits_by_line<'a>(
             continue;
         };
         let directive = first_match.directive;
-        let noqa_edit = generate_noqa_edit(
+        let suppression_edit = generate_suppression_edit(
             directive,
             offset,
             matches
@@ -898,12 +899,12 @@ fn build_noqa_edits_by_line<'a>(
             reason,
             suppression_kind,
         );
-        edits.insert(offset, noqa_edit);
+        edits.insert(offset, suppression_edit);
     }
     edits
 }
 
-struct NoqaComment<'a> {
+struct SuppressionComment<'a> {
     line: TextSize,
     identifier: &'a str,
     directive: Option<ExistingDirective<'a>>,
@@ -912,7 +913,7 @@ struct NoqaComment<'a> {
 #[derive(Copy, Clone)]
 enum ExistingDirective<'a> {
     Noqa(&'a Codes<'a>),
-    Ignore(&'a SuppressionComment),
+    Ignore(&'a suppression::SuppressionComment),
 }
 
 impl Ranged for ExistingDirective<'_> {
@@ -924,7 +925,7 @@ impl Ranged for ExistingDirective<'_> {
     }
 }
 
-fn find_noqa_comments<'a>(
+fn find_suppression_comments<'a>(
     diagnostics: &'a [Diagnostic],
     locator: &'a Locator,
     exemption: &'a FileExemption,
@@ -932,9 +933,9 @@ fn find_noqa_comments<'a>(
     noqa_line_for: &NoqaMapping,
     suppressions: &'a Suppressions,
     suppression_kind: SuppressionKind,
-) -> Vec<Option<NoqaComment<'a>>> {
+) -> Vec<Option<SuppressionComment<'a>>> {
     // List of suppression comments, ordered to match up with `messages`
-    let mut comments_by_line: Vec<Option<NoqaComment<'a>>> = vec![];
+    let mut comments_by_line: Vec<Option<SuppressionComment<'a>>> = vec![];
 
     // Mark any non-ignored diagnostics.
     for message in diagnostics {
@@ -1010,7 +1011,7 @@ fn find_noqa_comments<'a>(
             SuppressionKind::Ignore => message.name(),
         };
 
-        comments_by_line.push(Some(NoqaComment {
+        comments_by_line.push(Some(SuppressionComment {
             line: locator.line_start(directive.map_or(noqa_offset, |directive| directive.start())),
             identifier,
             directive,
@@ -1020,7 +1021,7 @@ fn find_noqa_comments<'a>(
     comments_by_line
 }
 
-struct NoqaEdit<'a> {
+struct SuppressionEdit<'a> {
     edit_range: TextRange,
     noqa_codes: FxHashSet<&'a str>,
     existing_codes: Vec<&'a str>,
@@ -1030,7 +1031,7 @@ struct NoqaEdit<'a> {
     suppression_kind: SuppressionKind,
 }
 
-impl NoqaEdit<'_> {
+impl SuppressionEdit<'_> {
     fn into_edit(self) -> Edit {
         let mut edit_content = String::new();
         self.write(&mut edit_content);
@@ -1064,13 +1065,13 @@ impl NoqaEdit<'_> {
     }
 }
 
-impl Ranged for NoqaEdit<'_> {
+impl Ranged for SuppressionEdit<'_> {
     fn range(&self) -> TextRange {
         self.edit_range
     }
 }
 
-fn generate_noqa_edit<'a>(
+fn generate_suppression_edit<'a>(
     directive: Option<ExistingDirective<'a>>,
     offset: TextSize,
     noqa_codes: FxHashSet<&'a str>,
@@ -1078,7 +1079,7 @@ fn generate_noqa_edit<'a>(
     line_ending: LineEnding,
     reason: Option<&'a str>,
     suppression_kind: SuppressionKind,
-) -> NoqaEdit<'a> {
+) -> SuppressionEdit<'a> {
     let line_range = locator.full_line_range(offset);
 
     let edit_range;
@@ -1102,7 +1103,7 @@ fn generate_noqa_edit<'a>(
         }
     }
 
-    NoqaEdit {
+    SuppressionEdit {
         edit_range,
         noqa_codes,
         existing_codes,
@@ -1333,15 +1334,15 @@ mod tests {
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use crate::noqa::{
-        Directive, LexicalError, NoqaLexerOutput, NoqaMapping, SuppressionKind, add_noqa_inner,
-        lex_codes, lex_file_exemption, lex_inline_noqa,
+        Directive, LexicalError, NoqaLexerOutput, NoqaMapping, SuppressionKind,
+        add_suppression_inner, lex_codes, lex_file_exemption, lex_inline_noqa,
     };
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
     use crate::suppression::Suppressions;
     use crate::{Edit, Violation};
-    use crate::{Locator, generate_noqa_edits};
+    use crate::{Locator, generate_suppression_edits};
 
     fn assert_lexed_ranges_match_slices(
         directive: Result<Option<NoqaLexerOutput>, LexicalError>,
@@ -2926,7 +2927,7 @@ mod tests {
 
         let contents = "x = 1";
         let noqa_line_for = NoqaMapping::default();
-        let (count, output) = add_noqa_inner(
+        let (count, output) = add_suppression_inner(
             path,
             &[],
             &Locator::new(contents),
@@ -2952,7 +2953,7 @@ mod tests {
 
         let contents = "x = 1";
         let noqa_line_for = NoqaMapping::default();
-        let (count, output) = add_noqa_inner(
+        let (count, output) = add_suppression_inner(
             path,
             &messages,
             &Locator::new(contents),
@@ -2985,7 +2986,7 @@ mod tests {
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges =
             CommentRanges::new(vec![TextRange::new(TextSize::from(7), TextSize::from(19))]);
-        let (count, output) = add_noqa_inner(
+        let (count, output) = add_suppression_inner(
             path,
             &messages,
             &Locator::new(contents),
@@ -3018,7 +3019,7 @@ mod tests {
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges =
             CommentRanges::new(vec![TextRange::new(TextSize::from(7), TextSize::from(13))]);
-        let (count, output) = add_noqa_inner(
+        let (count, output) = add_suppression_inner(
             path,
             &messages,
             &Locator::new(contents),
@@ -3052,7 +3053,7 @@ print(
             .into_diagnostic(TextRange::new(12.into(), 79.into()), &source_file)];
         let comment_ranges = CommentRanges::default();
         let suppressions = Suppressions::default();
-        let edits = generate_noqa_edits(
+        let edits = generate_suppression_edits(
             path,
             &messages,
             &Locator::new(source),
@@ -3086,7 +3087,7 @@ bar =
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges = CommentRanges::default();
         let suppressions = Suppressions::default();
-        let edits = generate_noqa_edits(
+        let edits = generate_suppression_edits(
             path,
             &messages,
             &Locator::new(source),

@@ -23,7 +23,7 @@ use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
-use crate::noqa::add_noqa;
+use crate::noqa::add_suppression;
 use crate::package::PackageRoot;
 use crate::preview::{is_human_readable_names_enabled, is_py315_support_enabled};
 use crate::registry::Rule;
@@ -372,7 +372,7 @@ pub fn check_path(
 const MAX_ITERATIONS: usize = 100;
 
 /// Add any missing suppression comments to the source code at the given `Path`.
-pub fn add_noqa_to_path(
+pub fn add_suppressions_to_path(
     path: &Path,
     package: Option<PackageRoot<'_>>,
     source_kind: &SourceKind,
@@ -429,7 +429,7 @@ pub fn add_noqa_to_path(
     } else {
         SuppressionKind::Noqa
     };
-    add_noqa(
+    add_suppression(
         path,
         &diagnostics,
         &locator,
