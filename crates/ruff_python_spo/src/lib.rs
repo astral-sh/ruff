@@ -209,6 +209,7 @@ fn build_graph(classes: &[RawClass], namespace: &str) -> ModelGraph {
                         inverse_name: f.inverse_name.clone(),
                         relation_kind: f.relation_kind.clone(),
                         field_type: f.field_type.clone(),
+                        not_null: None,
                     })
                     .collect(),
                 functions: methods
@@ -437,8 +438,8 @@ class AccountCashRounding(models.Model):
         assert!(!t.iter().any(|tr| tr.p == "emitted_by"));
 
         // The ndjson round-trips through the closed-vocab parser.
-        let nd = to_ndjson(&graph);
-        let parsed = ruff_spo_triplet::from_ndjson(&nd).expect("ndjson round-trips");
+        let and = to_ndjson(&graph);
+        let parsed = ruff_spo_triplet::from_ndjson(&and).expect("ndjson round-trips");
         assert_eq!(parsed, t);
     }
 
@@ -552,7 +553,7 @@ class FooExt(models.Model):
     }
 
     #[test]
-    fn unparseable_source_yields_empty_graph() {
+    fn unparsable_source_yields_empty_graph() {
         let graph = extract_from_source("class Broken(:  # not valid python\n");
         assert!(graph.models.is_empty());
     }
@@ -626,8 +627,8 @@ class ResUsers(models.Model):
 
         // The ndjson round-trips through the closed-vocab parser (relation_kind
         // is now a recognised predicate).
-        let nd = to_ndjson(&graph);
-        let parsed = ruff_spo_triplet::from_ndjson(&nd).expect("ndjson round-trips");
+        let and = to_ndjson(&graph);
+        let parsed = ruff_spo_triplet::from_ndjson(&and).expect("ndjson round-trips");
         assert_eq!(parsed, t);
     }
 

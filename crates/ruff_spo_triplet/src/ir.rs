@@ -248,6 +248,16 @@ pub struct Field {
     /// constructor here, so the two predicates never double-emit for one field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub field_type: Option<String>,
+    /// For a **DB-column** field (D-AR-3.5 schema stratum: extracted from
+    /// the Rails migration DSL, `db/migrate/tables/*.rb`), `Some(true)`
+    /// when the column carries `null: false`. Emitted as
+    /// `(field, column_not_null, "true")` — only for `Some(true)`; `None`
+    /// / `Some(false)` emit nothing (nullable is the Rails default, and
+    /// absence-means-nullable keeps the triple volume proportional to the
+    /// constraint count). Downstream this is the `required` axis of
+    /// `DEFINE FIELD` (`TYPE <t>` vs `TYPE option<t>`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub not_null: Option<bool>,
 }
 
 /// One method / function.
