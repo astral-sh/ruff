@@ -50,10 +50,9 @@ pub fn hints(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Hint> {
 
     let unreachable = unreachable_ranges(db, file);
     let is_inside_unreachable = |range: TextRange| {
-        !unreachable.is_empty()
-            && unreachable
-                .iter()
-                .any(|unreachable| unreachable.range.contains_range(range))
+        unreachable
+            .iter()
+            .any(|unreachable| unreachable.range.contains_range(range))
     };
 
     let mut hints = unused_bindings(db, file)
