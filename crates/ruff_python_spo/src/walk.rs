@@ -8,7 +8,7 @@
 use ruff_python_ast::{Arguments, Expr, Stmt, StmtAssign, StmtClassDef};
 
 use crate::functions::analyze_method;
-use crate::{RawClass, RawField, expr_str, name_id};
+use crate::{RawClass, RawField, bool_literal, expr_str, name_id};
 
 /// Walk a class definition into a [`RawClass`], or `None` if it isn't a model.
 pub(crate) fn walk_class(class: &StmtClassDef) -> Option<RawClass> {
@@ -121,6 +121,10 @@ fn field_from_assign(name: &str, value: &Expr) -> Option<RawField> {
         inverse_name,
         relation_kind,
         field_type,
+        stored: call
+            .arguments
+            .find_keyword("store")
+            .and_then(|kw| bool_literal(&kw.value)),
     })
 }
 
