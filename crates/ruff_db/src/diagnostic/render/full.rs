@@ -156,58 +156,55 @@ impl std::fmt::Display for Diff<'_> {
         for (cell, offset) in cells {
             let range = TextRange::new(last_end, offset);
             last_end = offset;
+
+            // For non-notebooks, construct and diff only the source surrounding the edits.
+            let (range, line_offset) = if cell.is_none()
+                && let Some(first) = self.fix.edits().first()
+                && let Some(last) = self.fix.edits().last()
+            {
+                let start_line = source_code
+                    .line_index(first.start())
+                    .saturating_sub(DIFF_CONTEXT_WINDOW);
+                let last_source_line = source_code.line_index(source_text.text_len());
+                let end_line = source_code
+                    .line_index(last.end())
+                    .saturating_add(DIFF_CONTEXT_WINDOW)
+                    .min(last_source_line);
+
+                (
+                    TextRange::new(
+                        source_code.line_start(start_line),
+                        source_code.line_end(end_line),
+                    ),
+                    start_line.to_zero_indexed(),
+                )
+            } else {
+                (range, 0)
+            };
+
             let input = source_code.slice(range);
 
             let mut output = String::with_capacity(input.len());
             let mut last_end = range.start();
 
-            let mut first = None;
+            let mut applied = 0;
             for edit in self.fix.edits() {
                 if range.contains_range(edit.range()) {
-                    first.get_or_insert(edit);
                     output.push_str(source_code.slice(TextRange::new(last_end, edit.start())));
                     output.push_str(edit.content().unwrap_or_default());
                     last_end = edit.end();
+                    applied += 1;
                 }
             }
 
             // No edits were applied, so there's no need to diff.
-            if first.is_none() {
+            if applied == 0 {
                 continue;
             }
 
-            // Length of edited output
-            let edit_end = output.text_len();
-
             output.push_str(&source_text[usize::from(last_end)..usize::from(range.end())]);
 
-            // For non-notebooks, only diff a context window around the edit
-            // rather than the entire file. `line_offset` here is required for
-            // adjusting the line numbers in the displayed diff
-            let (old_slice, new_slice, line_offset) = if cell.is_none() {
-                // Unwrap ok here because we applied at least one edit
-                let both_start = first.unwrap().start();
-
-                // Both slices start from the same point
-                let both_line_start = source_code
-                    .line_index(both_start)
-                    .saturating_sub(DIFF_CONTEXT_WINDOW);
-                let both_start = source_code.line_start(both_line_start);
-
-                // Offsets at the end of the context windows
-                let old_end = line_end_after(source_text, last_end);
-                let new_end = line_end_after(&output, edit_end);
-
-                // Slices just around the changes
-                let old_slice = source_code.slice(TextRange::new(both_start, old_end));
-                let new_slice = &output[TextRange::new(both_start, new_end)];
-
-                (old_slice, new_slice, both_line_start.to_zero_indexed())
-            } else {
-                (input, output.as_str(), 0)
-            };
-
-            let diff = TextDiff::from_lines(old_slice, new_slice);
+            let diff = TextDiff::from_lines(input, &output);
 
             let mut grouped_ops: Vec<Vec<DiffOp>> = Vec::new();
             for group in diff.grouped_ops(FIX_CONTEXT) {
@@ -344,18 +341,6 @@ impl std::fmt::Display for Diff<'_> {
 
         Ok(())
     }
-}
-
-fn line_end_after(source: &str, offset: TextSize) -> TextSize {
-    let bytes = &source.as_bytes()[usize::from(offset)..];
-
-    let line_end = memchr::memchr2_iter(b'\r', b'\n', bytes)
-        // Skip `\r` in `\r\n` sequences (only count the `\n`).
-        .filter(|&i| bytes[i] == b'\n' || !(bytes[i] == b'\r' && bytes.get(i + 1) == Some(&b'\n')))
-        .nth(DIFF_CONTEXT_WINDOW)
-        .map(|end| offset.to_u32().saturating_add(end.try_into().unwrap()) as usize)
-        .unwrap_or(source.len());
-    TextSize::try_from(line_end).expect("offset should be representable as u32")
 }
 
 struct Line {
