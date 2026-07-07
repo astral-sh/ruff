@@ -76,7 +76,8 @@ use crate::types::function::{
 };
 pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{
-    ApplySpecialization, InferableTypeVars, Specialization, bind_typevar,
+    ApplySpecialization, InferableTypeVars, Specialization, SpecializationMaterialization,
+    bind_typevar,
 };
 use crate::types::infer::InferenceFlags;
 use crate::types::known_instance::{
@@ -6117,13 +6118,13 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         specialization: Specialization<'db>,
     ) -> Type<'db> {
-        let type_mapping = match specialization.materialization_kind(db) {
+        let type_mapping = match specialization.materialization(db) {
             None => TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
                 specialization,
             )),
-            Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
+            Some(materialization) => TypeMapping::ApplySpecializationWithMaterialization {
                 specialization: ApplySpecialization::Specialization(specialization),
-                materialization_kind,
+                materialization,
             },
         };
 
@@ -6365,12 +6366,12 @@ impl<'db> Type<'db> {
                     {
                         let mut current_specialization = specialization.as_specialization(db).unwrap();
                         if let TypeMapping::ApplySpecializationWithMaterialization {
-                            materialization_kind,
+                            materialization,
                             ..
                         } = type_mapping
                         {
                             current_specialization = current_specialization
-                                .with_materialization_kind(db, Some(*materialization_kind));
+                                .with_materialization(db, *materialization);
                         }
                         Type::TypeAlias(alias.apply_specialization(
                             db,
@@ -7472,10 +7473,10 @@ pub enum TypeMapping<'a, 'db> {
     ApplySpecialization(ApplySpecialization<'a, 'db>),
     /// Applies a specialization and materializes only substituted typevars.
     ///
-    /// The `materialization_kind` is flipped in contravariant positions.
+    /// The materialization kind is flipped in contravariant positions.
     ApplySpecializationWithMaterialization {
         specialization: ApplySpecialization<'a, 'db>,
-        materialization_kind: MaterializationKind,
+        materialization: SpecializationMaterialization<'db>,
     },
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
@@ -7580,10 +7581,10 @@ impl<'db> TypeMapping<'_, 'db> {
             }
             TypeMapping::ApplySpecializationWithMaterialization {
                 specialization,
-                materialization_kind,
+                materialization,
             } => TypeMapping::ApplySpecializationWithMaterialization {
                 specialization: *specialization,
-                materialization_kind: materialization_kind.flip(),
+                materialization: materialization.flip(),
             },
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
             TypeMapping::ApplySpecialization(_)

@@ -284,7 +284,7 @@ impl<'db> ConstructorBinding<'db> {
                         db,
                         specialization.generic_context(db),
                         types,
-                        specialization.materialization_kind(db),
+                        specialization.materialization(db),
                         None,
                     )
                 });
@@ -483,7 +483,7 @@ impl<'db> ConstructorBinding<'db> {
             db,
             specialization.generic_context(db),
             types,
-            specialization.materialization_kind(db),
+            specialization.materialization(db),
             None,
         )
     }

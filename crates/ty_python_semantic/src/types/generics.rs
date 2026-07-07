@@ -1072,6 +1072,139 @@ impl<'db> GenericContext<'db> {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
+struct InvariantArgumentBounds<'db> {
+    bottom: Type<'db>,
+    top: Type<'db>,
+}
+
+#[derive(Copy, Clone)]
+struct InvariantArgumentRange<'db> {
+    ty: Type<'db>,
+    kind: MaterializationKind,
+    bounds: Option<InvariantArgumentBounds<'db>>,
+}
+
+impl<'db> InvariantArgumentRange<'db> {
+    const fn new(
+        ty: Type<'db>,
+        kind: MaterializationKind,
+        bounds: Option<InvariantArgumentBounds<'db>>,
+    ) -> Self {
+        Self { ty, kind, bounds }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
+struct MaterializedInvariantArgument<'db> {
+    index: usize,
+    bounds: InvariantArgumentBounds<'db>,
+}
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct MaterializedInvariantArguments<'db> {
+    #[returns(deref)]
+    arguments: Box<[MaterializedInvariantArgument<'db>]>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for MaterializedInvariantArguments<'_> {}
+
+/// Describes which invariant arguments participate in a materialized specialization.
+///
+/// Arguments not present in `arguments` are fixed substitutions. In particular, an unrelated
+/// `Any` remains `Any` instead of being materialized along with another argument.
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
+pub struct SpecializationMaterialization<'db> {
+    kind: MaterializationKind,
+    arguments: MaterializedInvariantArguments<'db>,
+}
+
+impl<'db> SpecializationMaterialization<'db> {
+    fn new(
+        db: &'db dyn Db,
+        kind: MaterializationKind,
+        arguments: Vec<MaterializedInvariantArgument<'db>>,
+    ) -> Option<Self> {
+        debug_assert!(
+            arguments
+                .windows(2)
+                .all(|arguments| arguments[0].index < arguments[1].index)
+        );
+        (!arguments.is_empty()).then(|| Self {
+            kind,
+            arguments: MaterializedInvariantArguments::new(db, arguments.into_boxed_slice()),
+        })
+    }
+
+    pub(crate) const fn kind(self) -> MaterializationKind {
+        self.kind
+    }
+
+    pub(crate) const fn flip(self) -> Self {
+        Self {
+            kind: self.kind.flip(),
+            arguments: self.arguments,
+        }
+    }
+
+    fn with_kind(self, kind: MaterializationKind) -> Self {
+        Self { kind, ..self }
+    }
+
+    fn argument(self, db: &'db dyn Db, index: usize) -> Option<InvariantArgumentBounds<'db>> {
+        self.arguments
+            .arguments(db)
+            .binary_search_by_key(&index, |argument| argument.index)
+            .ok()
+            .map(|index| self.arguments.arguments(db)[index].bounds)
+    }
+
+    fn entries(self, db: &'db dyn Db) -> &'db [MaterializedInvariantArgument<'db>] {
+        self.arguments.arguments(db)
+    }
+
+    pub(crate) fn project(self, db: &'db dyn Db, index: usize, fallback: Type<'db>) -> Type<'db> {
+        self.argument(db, index)
+            .map_or(fallback, |bounds| match self.kind {
+                MaterializationKind::Top => bounds.top,
+                MaterializationKind::Bottom => bounds.bottom,
+            })
+    }
+
+    fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        let normalize = |ty: Type<'db>| {
+            if nested {
+                ty.recursive_type_normalized_impl(db, div, true)
+            } else {
+                Some(
+                    ty.recursive_type_normalized_impl(db, div, true)
+                        .unwrap_or(div),
+                )
+            }
+        };
+        let arguments = self
+            .entries(db)
+            .iter()
+            .map(|argument| {
+                Some(MaterializedInvariantArgument {
+                    index: argument.index,
+                    bounds: InvariantArgumentBounds {
+                        bottom: normalize(argument.bounds.bottom)?,
+                        top: normalize(argument.bounds.top)?,
+                    },
+                })
+            })
+            .collect::<Option<Vec<_>>>()?;
+        Self::new(db, self.kind, arguments)
+    }
+}
+
 /// An assignment of a specific type to each type variable in a generic scope.
 ///
 /// TODO: Handle nested specializations better, with actual parent links to the specialization of
@@ -1081,14 +1214,9 @@ pub struct Specialization<'db> {
     pub(crate) generic_context: GenericContext<'db>,
     #[returns(deref)]
     pub(crate) types: Box<[Type<'db>]>,
-    /// The materialization kind of the specialization. For example, given an invariant
-    /// generic type `A`, `Top[A[Any]]` is a supertype of all materializations of `A[Any]`,
-    /// and is represented here with `Some(MaterializationKind::Top)`. Similarly,
-    /// `Bottom[A[Any]]` is a subtype of all materializations of `A[Any]`, and is represented
-    /// with `Some(MaterializationKind::Bottom)`.
-    /// The `materialization_kind` field may be non-`None` only if the specialization contains
-    /// dynamic types in invariant positions.
-    pub(crate) materialization_kind: Option<MaterializationKind>,
+    /// The materialized invariant arguments of this specialization. This is `None` for the common
+    /// case and only allocates a sparse sidecar for top/bottom materialized specializations.
+    pub(crate) materialization: Option<SpecializationMaterialization<'db>>,
 
     /// For specializations of `tuple`, we also store more detailed information about the tuple's
     /// elements, above what the class's (single) typevar can represent.
@@ -1107,6 +1235,12 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
     for ty in specialization.types(db) {
         visitor.visit_type(db, *ty);
     }
+    if let Some(materialization) = specialization.materialization(db) {
+        for argument in materialization.entries(db) {
+            visitor.visit_type(db, argument.bounds.bottom);
+            visitor.visit_type(db, argument.bounds.top);
+        }
+    }
     if let Some(tuple) = specialization.tuple_inner(db) {
         walk_tuple_type(db, tuple, visitor);
     }
@@ -1119,7 +1253,7 @@ impl<'db> Specialization<'db> {
     /// type variables; the caller must retain the outer semantic union in that case.
     pub(super) fn merge_cycle_recovery(self, db: &'db dyn Db, previous: Self) -> Option<Self> {
         if self.generic_context(db) != previous.generic_context(db)
-            || self.materialization_kind(db) != previous.materialization_kind(db)
+            || self.materialization(db) != previous.materialization(db)
             || self.tuple_inner(db) != previous.tuple_inner(db)
         {
             return None;
@@ -1144,7 +1278,7 @@ impl<'db> Specialization<'db> {
             db,
             self.generic_context(db),
             types,
-            self.materialization_kind(db),
+            self.materialization(db),
             self.tuple_inner(db),
         ))
     }
@@ -1188,18 +1322,33 @@ impl<'db> Specialization<'db> {
     ) -> Option<Self> {
         let self_variables = self.generic_context(db).variables_inner(db);
         let self_types = self.types(db);
-        let restricted_variables = generic_context.variables(db);
+        let restricted_variables: Box<[_]> = generic_context.variables(db).collect();
         let restricted_types: Option<Box<[_]>> = restricted_variables
+            .iter()
             .map(|variable| {
                 let index = self_variables.get_index_of(&variable.identity(db))?;
                 self_types.get(index).copied()
             })
             .collect();
+        let restricted_materialization = self.materialization(db).and_then(|materialization| {
+            let arguments = restricted_variables
+                .iter()
+                .enumerate()
+                .filter_map(|(new_index, variable)| {
+                    let old_index = self_variables.get_index_of(&variable.identity(db))?;
+                    Some(MaterializedInvariantArgument {
+                        index: new_index,
+                        bounds: materialization.argument(db, old_index)?,
+                    })
+                })
+                .collect();
+            SpecializationMaterialization::new(db, materialization.kind(), arguments)
+        });
         Some(Self::new(
             db,
             generic_context,
             restricted_types?,
-            self.materialization_kind(db),
+            restricted_materialization,
             None,
         ))
     }
@@ -1216,11 +1365,19 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Option<Type<'db>> {
+        self.get_with_index(db, bound_typevar).map(|(_, ty)| ty)
+    }
+
+    fn get_with_index(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> Option<(usize, Type<'db>)> {
         let index = self
             .generic_context(db)
             .variables_inner(db)
             .get_index_of(&bound_typevar.identity(db))?;
-        self.types(db).get(index).copied()
+        self.types(db).get(index).copied().map(|ty| (index, ty))
     }
 
     /// Applies a specialization to this specialization. This is used, for instance, when a generic
@@ -1237,30 +1394,27 @@ impl<'db> Specialization<'db> {
     /// That lets us produce the generic alias `A[int]`, which is the corresponding entry in the
     /// MRO of `B[int]`.
     pub(crate) fn apply_specialization(self, db: &'db dyn Db, other: Specialization<'db>) -> Self {
-        let new_specialization = self.apply_type_mapping(
-            db,
-            &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(other)),
+        let apply = ApplySpecialization::Specialization(other);
+        let mapping = other.materialization(db).map_or(
+            TypeMapping::ApplySpecialization(apply),
+            |materialization| TypeMapping::ApplySpecializationWithMaterialization {
+                specialization: apply,
+                materialization,
+            },
         );
-        match other.materialization_kind(db) {
-            None => new_specialization,
-            Some(materialization_kind) => new_specialization.materialize_impl(
-                db,
-                materialization_kind,
-                &ApplyTypeMappingVisitor::default(),
-            ),
-        }
+        self.apply_type_mapping(db, &mapping)
     }
 
-    pub(crate) fn with_materialization_kind(
+    pub(crate) fn with_materialization(
         self,
         db: &'db dyn Db,
-        materialization_kind: Option<MaterializationKind>,
+        materialization: SpecializationMaterialization<'db>,
     ) -> Self {
         Specialization::new(
             db,
             self.generic_context(db),
             self.types(db),
-            materialization_kind,
+            Some(materialization),
             self.tuple_inner(db),
         )
     }
@@ -1284,7 +1438,38 @@ impl<'db> Specialization<'db> {
             return self.materialize_impl(db, *materialization_kind, visitor);
         }
 
-        let mut new_materialization_kind = self.materialization_kind(db);
+        let original_materialization = self.materialization(db);
+        let mut materialization_kind =
+            original_materialization.map(SpecializationMaterialization::kind);
+        let mut materialized_arguments: Vec<MaterializedInvariantArgument<'db>> =
+            original_materialization
+                .map(|materialization| {
+                    materialization
+                        .entries(db)
+                        .iter()
+                        .map(|argument| {
+                            let tcx = TypeContext::new(tcx.get(argument.index).copied());
+                            MaterializedInvariantArgument {
+                                index: argument.index,
+                                bounds: InvariantArgumentBounds {
+                                    bottom: argument.bounds.bottom.apply_type_mapping_impl(
+                                        db,
+                                        type_mapping,
+                                        tcx,
+                                        visitor,
+                                    ),
+                                    top: argument.bounds.top.apply_type_mapping_impl(
+                                        db,
+                                        type_mapping,
+                                        tcx,
+                                        visitor,
+                                    ),
+                                },
+                            }
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
         let types = self.map_types(db, |i, typevar, ty| {
             let tcx = TypeContext::new(tcx.get(i).copied());
             match (typevar.variance(db), type_mapping) {
@@ -1292,7 +1477,7 @@ impl<'db> Specialization<'db> {
                     TypeVarVariance::Invariant,
                     TypeMapping::ApplySpecializationWithMaterialization {
                         specialization,
-                        materialization_kind,
+                        materialization,
                     },
                 ) => {
                     // An invariant type argument cannot be materialized in isolation. Keep the
@@ -1307,15 +1492,33 @@ impl<'db> Specialization<'db> {
                         &ApplyTypeMappingVisitor::default(),
                     );
 
-                    if new_materialization_kind.is_none() {
-                        let materialized = ty.apply_type_mapping_impl(
+                    if original_materialization.is_none() {
+                        let bottom = ty.apply_type_mapping_impl(
                             db,
-                            type_mapping,
+                            &TypeMapping::ApplySpecializationWithMaterialization {
+                                specialization: *specialization,
+                                materialization: materialization
+                                    .with_kind(MaterializationKind::Bottom),
+                            },
                             tcx,
                             &ApplyTypeMappingVisitor::default(),
                         );
-                        if specialized != materialized {
-                            new_materialization_kind = Some(*materialization_kind);
+                        let top = ty.apply_type_mapping_impl(
+                            db,
+                            &TypeMapping::ApplySpecializationWithMaterialization {
+                                specialization: *specialization,
+                                materialization: materialization
+                                    .with_kind(MaterializationKind::Top),
+                            },
+                            tcx,
+                            &ApplyTypeMappingVisitor::default(),
+                        );
+                        if specialized != bottom || specialized != top {
+                            materialization_kind = Some(materialization.kind());
+                            materialized_arguments.push(MaterializedInvariantArgument {
+                                index: i,
+                                bounds: InvariantArgumentBounds { bottom, top },
+                            });
                         }
                     }
 
@@ -1332,11 +1535,13 @@ impl<'db> Specialization<'db> {
         let tuple_inner = original_tuple_inner.and_then(|tuple| {
             tuple.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
         });
+        let materialization = materialization_kind
+            .and_then(|kind| SpecializationMaterialization::new(db, kind, materialized_arguments));
 
         // Keep this check in sync with every field that can be transformed above.
         let specialization_unchanged = matches!(&types, Cow::Borrowed(_))
             && tuple_inner == original_tuple_inner
-            && new_materialization_kind == self.materialization_kind(db);
+            && materialization == original_materialization;
         if specialization_unchanged {
             self
         } else {
@@ -1344,7 +1549,7 @@ impl<'db> Specialization<'db> {
                 db,
                 self.generic_context(db),
                 types,
-                new_materialization_kind,
+                materialization,
                 tuple_inner,
             )
         }
@@ -1414,14 +1619,14 @@ impl<'db> Specialization<'db> {
             Some(tuple) => Some(tuple.recursive_type_normalized_impl(db, div, nested)?),
             None => None,
         };
+        let materialization = match self.materialization(db) {
+            Some(materialization) => {
+                Some(materialization.recursive_type_normalized_impl(db, div, nested)?)
+            }
+            None => None,
+        };
         let context = self.generic_context(db);
-        Some(Self::new(
-            db,
-            context,
-            types,
-            self.materialization_kind(db),
-            tuple_inner,
-        ))
+        Some(Self::new(db, context, types, materialization, tuple_inner))
     }
 
     pub(super) fn materialize_impl(
@@ -1432,11 +1637,11 @@ impl<'db> Specialization<'db> {
     ) -> Self {
         // The top and bottom materializations are fully static types already, so materializing them
         // further does nothing.
-        if self.materialization_kind(db).is_some() {
+        if self.materialization(db).is_some() {
             return self;
         }
-        let mut has_dynamic_invariant_typevar = false;
-        let types = self.map_types(db, |_, bound_typevar, vartype| {
+        let mut materialized_arguments = Vec::new();
+        let types = self.map_types(db, |index, bound_typevar, vartype| {
             match specialization_variance(db, bound_typevar) {
                 TypeVarVariance::Bivariant => {
                     // With bivariance, all specializations are subtypes of each other,
@@ -1450,10 +1655,13 @@ impl<'db> Specialization<'db> {
                     vartype.materialize(db, materialization_kind.flip(), visitor)
                 }
                 TypeVarVariance::Invariant => {
-                    let top_materialization =
-                        vartype.materialize(db, MaterializationKind::Top, visitor);
-                    if !visitor.is_equivalent_to_materialization(db, vartype, top_materialization) {
-                        has_dynamic_invariant_typevar = true;
+                    let bottom = vartype.materialize(db, MaterializationKind::Bottom, visitor);
+                    let top = vartype.materialize(db, MaterializationKind::Top, visitor);
+                    if !visitor.is_equivalent_to_materialization(db, vartype, top) {
+                        materialized_arguments.push(MaterializedInvariantArgument {
+                            index,
+                            bounds: InvariantArgumentBounds { bottom, top },
+                        });
                     }
                     vartype
                 }
@@ -1469,15 +1677,12 @@ impl<'db> Specialization<'db> {
                 visitor,
             )
         });
-        let new_materialization_kind = if has_dynamic_invariant_typevar {
-            Some(materialization_kind)
-        } else {
-            None
-        };
+        let materialization =
+            SpecializationMaterialization::new(db, materialization_kind, materialized_arguments);
         // Keep this check in sync with every field that can be transformed above.
         let specialization_unchanged = matches!(&types, Cow::Borrowed(_))
             && tuple_inner == original_tuple_inner
-            && new_materialization_kind == self.materialization_kind(db);
+            && materialization == self.materialization(db);
         if specialization_unchanged {
             self
         } else {
@@ -1485,7 +1690,7 @@ impl<'db> Specialization<'db> {
                 db,
                 self.generic_context(db),
                 types,
-                new_materialization_kind,
+                materialization,
                 tuple_inner,
             )
         }
@@ -1548,19 +1753,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.check_tuple_type_pair(db, source_tuple, target_tuple);
         }
 
-        let source_materialization_kind = source.materialization_kind(db);
-        let target_materialization_kind = target.materialization_kind(db);
-
         let types = itertools::izip!(
             generic_context.variables(db),
             source.types(db),
             target.types(db)
-        );
+        )
+        .enumerate();
 
         types.when_all(
             db,
             self.constraints,
-            |(bound_typevar, source_type, target_type)| {
+            |(index, (bound_typevar, source_type, target_type))| {
                 // Subtyping/assignability of each type in the specialization depends on the variance
                 // of the corresponding typevar:
                 //   - covariant: verify that source_type <: target_type
@@ -1571,9 +1774,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     TypeVarVariance::Invariant => self.check_relation_in_invariant_position(
                         db,
                         *source_type,
-                        source_materialization_kind,
+                        source.materialization(db).and_then(|materialization| {
+                            materialization
+                                .argument(db, index)
+                                .map(|bounds| (materialization.kind(), bounds))
+                        }),
                         *target_type,
-                        target_materialization_kind,
+                        target.materialization(db).and_then(|materialization| {
+                            materialization
+                                .argument(db, index)
+                                .map(|bounds| (materialization.kind(), bounds))
+                        }),
                     ),
                     TypeVarVariance::Covariant => {
                         self.check_type_pair(db, *source_type, *target_type)
@@ -1594,9 +1805,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         &self,
         db: &'db dyn Db,
         source_type: Type<'db>,
-        source_materialization: Option<MaterializationKind>,
+        source_materialization: Option<(MaterializationKind, InvariantArgumentBounds<'db>)>,
         target_type: Type<'db>,
-        target_materialization: Option<MaterializationKind>,
+        target_materialization: Option<(MaterializationKind, InvariantArgumentBounds<'db>)>,
     ) -> ConstraintSet<'db, 'c> {
         match (
             source_materialization,
@@ -1605,13 +1816,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ) {
             // Top and bottom materializations are fully static types, so subtyping
             // is the same as assignability.
-            (Some(source_mat), Some(target_mat), _) => self.check_subtyping_in_invariant_position(
-                db,
-                source_type,
-                source_mat,
-                target_type,
-                target_mat,
-            ),
+            (Some((source_mat, source_bounds)), Some((target_mat, target_bounds)), _) => self
+                .check_subtyping_in_invariant_position(
+                    db,
+                    InvariantArgumentRange::new(source_type, source_mat, Some(source_bounds)),
+                    InvariantArgumentRange::new(target_type, target_mat, Some(target_bounds)),
+                ),
             // Subtyping between invariant type parameters without a top/bottom materialization necessitates
             // checking the subtyping relation both ways: `A` must be a subtype of `B` *and* `B` must be a
             // subtype of `A`. The same applies to assignability.
@@ -1633,46 +1843,38 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // For gradual types, A <: B (subtyping) is defined as Top[A] <: Bottom[B]
             (
                 None,
-                Some(target_mat),
+                Some((target_mat, target_bounds)),
                 TypeRelation::Subtyping
                 | TypeRelation::Redundancy { .. }
                 | TypeRelation::SubtypingAssuming,
             ) => self.check_subtyping_in_invariant_position(
                 db,
-                source_type,
-                MaterializationKind::Top,
-                target_type,
-                target_mat,
+                InvariantArgumentRange::new(source_type, MaterializationKind::Top, None),
+                InvariantArgumentRange::new(target_type, target_mat, Some(target_bounds)),
             ),
             (
-                Some(source_mat),
+                Some((source_mat, source_bounds)),
                 None,
                 TypeRelation::Subtyping
                 | TypeRelation::Redundancy { .. }
                 | TypeRelation::SubtypingAssuming,
             ) => self.check_subtyping_in_invariant_position(
                 db,
-                source_type,
-                source_mat,
-                target_type,
-                MaterializationKind::Bottom,
+                InvariantArgumentRange::new(source_type, source_mat, Some(source_bounds)),
+                InvariantArgumentRange::new(target_type, MaterializationKind::Bottom, None),
             ),
             // And A <~ B (assignability) is Bottom[A] <: Top[B]
-            (None, Some(target_mat), TypeRelation::Assignability) => self
+            (None, Some((target_mat, target_bounds)), TypeRelation::Assignability) => self
                 .check_subtyping_in_invariant_position(
                     db,
-                    source_type,
-                    MaterializationKind::Bottom,
-                    target_type,
-                    target_mat,
+                    InvariantArgumentRange::new(source_type, MaterializationKind::Bottom, None),
+                    InvariantArgumentRange::new(target_type, target_mat, Some(target_bounds)),
                 ),
-            (Some(source_mat), None, TypeRelation::Assignability) => self
+            (Some((source_mat, source_bounds)), None, TypeRelation::Assignability) => self
                 .check_subtyping_in_invariant_position(
                     db,
-                    source_type,
-                    source_mat,
-                    target_type,
-                    MaterializationKind::Top,
+                    InvariantArgumentRange::new(source_type, source_mat, Some(source_bounds)),
+                    InvariantArgumentRange::new(target_type, MaterializationKind::Top, None),
                 ),
         }
     }
@@ -1680,24 +1882,44 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     fn check_subtyping_in_invariant_position(
         &self,
         db: &'db dyn Db,
-        source_type: Type<'db>,
-        source_materialization: MaterializationKind,
-        target_type: Type<'db>,
-        target_materialization: MaterializationKind,
+        source: InvariantArgumentRange<'db>,
+        target: InvariantArgumentRange<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let source_top =
-            source_type.materialize(db, MaterializationKind::Top, self.materialization_visitor);
-        let source_bottom = source_type.materialize(
-            db,
-            MaterializationKind::Bottom,
-            self.materialization_visitor,
+        let source_top = source.bounds.map_or_else(
+            || {
+                source
+                    .ty
+                    .materialize(db, MaterializationKind::Top, self.materialization_visitor)
+            },
+            |bounds| bounds.top,
         );
-        let target_top =
-            target_type.materialize(db, MaterializationKind::Top, self.materialization_visitor);
-        let target_bottom = target_type.materialize(
-            db,
-            MaterializationKind::Bottom,
-            self.materialization_visitor,
+        let source_bottom = source.bounds.map_or_else(
+            || {
+                source.ty.materialize(
+                    db,
+                    MaterializationKind::Bottom,
+                    self.materialization_visitor,
+                )
+            },
+            |bounds| bounds.bottom,
+        );
+        let target_top = target.bounds.map_or_else(
+            || {
+                target
+                    .ty
+                    .materialize(db, MaterializationKind::Top, self.materialization_visitor)
+            },
+            |bounds| bounds.top,
+        );
+        let target_bottom = target.bounds.map_or_else(
+            || {
+                target.ty.materialize(
+                    db,
+                    MaterializationKind::Bottom,
+                    self.materialization_visitor,
+                )
+            },
+            |bounds| bounds.bottom,
         );
 
         let is_subtype_of = |source: Type<'db>, target: Type<'db>| {
@@ -1714,7 +1936,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
             self.check_type_pair(db, source, target)
         };
-        match (source_materialization, target_materialization) {
+        match (source.kind, target.kind) {
             // `source` is a subtype of `target` if the range of materializations covered by `source`
             // is a subset of the range covered by `target`.
             (MaterializationKind::Top, MaterializationKind::Top) => {
@@ -1811,10 +2033,12 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     self.as_relation_checker(TypeRelation::Subtyping)
                         .check_subtyping_in_invariant_position(
                             db,
-                            left_type,
-                            MaterializationKind::Bottom,
-                            right_type,
-                            MaterializationKind::Top,
+                            InvariantArgumentRange::new(
+                                left_type,
+                                MaterializationKind::Bottom,
+                                None,
+                            ),
+                            InvariantArgumentRange::new(right_type, MaterializationKind::Top, None),
                         )
                         .negate(db, self.constraints)
                 }
@@ -1861,11 +2085,20 @@ impl<'db> ApplySpecialization<'_, 'db> {
         db: &'db dyn Db,
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Option<Type<'db>> {
+        self.get_with_index(db, bound_typevar)
+            .map(|(_, mapped)| mapped)
+    }
+
+    pub(crate) fn get_with_index(
+        &self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> Option<(Option<usize>, Type<'db>)> {
         match self {
             ApplySpecialization::Specialization(specialization)
-            | ApplySpecialization::TypeAlias(specialization) => {
-                specialization.get(db, bound_typevar)
-            }
+            | ApplySpecialization::TypeAlias(specialization) => specialization
+                .get_with_index(db, bound_typevar)
+                .map(|(index, mapped)| (Some(index), mapped)),
             ApplySpecialization::Partial {
                 generic_context,
                 types,
@@ -1875,16 +2108,21 @@ impl<'db> ApplySpecialization<'_, 'db> {
                     .variables_inner(db)
                     .get_index_of(&bound_typevar.identity(db))?;
                 if skip.is_some_and(|skip| skip == index) {
-                    return Some(Type::Never);
+                    return Some((Some(index), Type::Never));
                 }
-                types.get(index).copied()
+                types
+                    .get(index)
+                    .copied()
+                    .map(|mapped| (Some(index), mapped))
             }
-            ApplySpecialization::ReturnCallables(replacements) => {
-                replacements.get(&bound_typevar).copied().map(Type::TypeVar)
-            }
+            ApplySpecialization::ReturnCallables(replacements) => replacements
+                .get(&bound_typevar)
+                .copied()
+                .map(Type::TypeVar)
+                .map(|mapped| (None, mapped)),
             ApplySpecialization::Single(typevar, ty) => {
                 if bound_typevar.is_same_typevar_as(db, *typevar) {
-                    Some(*ty)
+                    Some((None, *ty))
                 } else {
                     None
                 }

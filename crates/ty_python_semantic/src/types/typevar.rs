@@ -1094,42 +1094,44 @@ impl<'db> BoundTypeVarInstance<'db> {
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
         let mapped_specialization_type =
-            |specialization: &ApplySpecialization<'a, 'db>| -> Option<Type<'db>> {
+            |specialization: &ApplySpecialization<'a, 'db>| -> Option<(Option<usize>, Type<'db>)> {
                 let typevar = if self.is_paramspec(db) {
                     self.without_paramspec_attr(db)
                 } else {
                     self
                 };
-                specialization.get(db, typevar).map(|ty| {
-                    if let Some(attr) = self.paramspec_attr(db)
-                        && let Type::TypeVar(typevar) = ty
-                        && typevar.is_paramspec(db)
-                    {
-                        return Type::TypeVar(typevar.with_paramspec_attr(db, attr));
-                    }
-                    ty
-                })
+                specialization
+                    .get_with_index(db, typevar)
+                    .map(|(index, ty)| {
+                        if let Some(attr) = self.paramspec_attr(db)
+                            && let Type::TypeVar(typevar) = ty
+                            && typevar.is_paramspec(db)
+                        {
+                            return (index, Type::TypeVar(typevar.with_paramspec_attr(db, attr)));
+                        }
+                        (index, ty)
+                    })
             };
 
         match type_mapping {
             TypeMapping::ApplySpecialization(specialization) => {
-                mapped_specialization_type(specialization).unwrap_or(Type::TypeVar(self))
+                mapped_specialization_type(specialization)
+                    .map(|(_, mapped)| mapped)
+                    .unwrap_or(Type::TypeVar(self))
             }
             TypeMapping::ApplySpecializationWithMaterialization {
                 specialization,
-                materialization_kind,
+                materialization,
             } => mapped_specialization_type(specialization)
-                .map(|mapped| {
-                    // Only materialize if the specialization actually substituted this
-                    // typevar with a different type. A typevar that maps back to itself
-                    // hasn't been substituted and should not be materialized.
+                .map(|(index, mapped)| {
+                    // Only project a materialized argument if the specialization actually
+                    // substituted this typevar. An identity mapping remains a typevar.
                     if mapped == Type::TypeVar(self) {
                         mapped
+                    } else if let Some(index) = index {
+                        materialization.project(db, index, mapped)
                     } else {
-                        // Materialization uses a different mapping mode. Reuse of the outer
-                        // visitor can incorrectly hit a cache entry from specialization.
-                        let materialization_visitor = ApplyTypeMappingVisitor::default();
-                        mapped.materialize(db, *materialization_kind, &materialization_visitor)
+                        mapped
                     }
                 })
                 .unwrap_or(Type::TypeVar(self)),
