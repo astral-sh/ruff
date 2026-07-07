@@ -3314,8 +3314,27 @@ impl<'db> CallableBinding<'db> {
             return None;
         }
 
-        let signature_arguments = application.arguments.with_self(self.bound_type);
         let bound_argument_offset = usize::from(self.bound_type.is_some());
+        if selected_overload_indexes.iter().any(|index| {
+            let Some(overload) = self.overloads().get(*index) else {
+                return false;
+            };
+            let parameters = overload.signature.parameters().as_slice();
+            overload.argument_matches.iter().enumerate().any(
+                |(argument_index, argument_matches)| {
+                    application.is_placeholder_argument(argument_index, bound_argument_offset)
+                        && argument_matches.iter().any(|matched_parameter| {
+                            parameters[matched_parameter.index].is_variadic()
+                                && parameters[matched_parameter.index].has_starred_annotation()
+                        })
+                },
+            )
+        }) {
+            // A starred variadic annotation can provide a different type for each position.
+            return None;
+        }
+
+        let signature_arguments = application.arguments.with_self(self.bound_type);
         let applications: SmallVec<_> = selected_overload_indexes
             .into_iter()
             .filter_map(|index| {

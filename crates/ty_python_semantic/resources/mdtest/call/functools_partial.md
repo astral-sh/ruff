@@ -978,6 +978,13 @@ reveal_type(variadic)  # revealed: partial[(str, /, *values: str) -> tuple[str, 
 reveal_type(variadic("first"))  # revealed: tuple[str, ...]
 variadic()  # error: [missing-argument]
 
+def unpacked_variadic(*values: *tuple[int, str]) -> tuple[int, str]:
+    return values
+
+unpacked_hole = partial(unpacked_variadic, _, "bound")
+reveal_type(unpacked_hole)  # revealed: partial[Unknown]
+reveal_type(unpacked_hole(1))  # revealed: Unknown
+
 def defaulted(value: int = 1, suffix: str = "default") -> int:
     return value
 
