@@ -662,15 +662,8 @@ impl<'a> SuppressionsBuilder<'a> {
                 continue;
             }
 
-            // Matched suppression comments. A notebook cell closing an indented block emits a
-            // zero-width `Dedent` at the cell boundary, sharing its offset with a comment opening
-            // the next cell. Split on `end <= offset` rather than `Tokens::split_at` so that
-            // `Dedent` stays in `before`; otherwise `after` starts with it and the loop below spins
-            // on the dedent's `continue 'comments` without ever consuming the comment.
-            let tokens_slice: &[Token] = tokens;
-            let comment_start = suppression.token_range.start();
-            let split = tokens_slice.partition_point(|token| token.end() <= comment_start);
-            let (before, after) = tokens_slice.split_at(split);
+            // Matched suppression comments
+            let (before, after) = tokens.split_at(suppression.token_range.start());
 
             let mut count = 0;
             let last_indent = before

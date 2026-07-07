@@ -822,7 +822,7 @@ mod tests {
     }
 
     #[test]
-    fn test_cell_boundary_syntax_error() -> Result<(), NotebookError> {
+    fn notebook_cell_boundary_syntax_error() -> Result<(), NotebookError> {
         // A decorator whose definition lives in the next cell parses cleanly once the cells are
         // concatenated, but is invalid on its own. Per-cell parsing must report it.
         let path = notebook_path("cell_boundary_syntax_error.ipynb");
@@ -837,10 +837,12 @@ mod tests {
     }
 
     #[test]
-    fn test_notebook_cell_boundary_no_spurious_diagnostics() -> Result<(), NotebookError> {
+    fn notebook_cell_boundary_tokens_preserve_linting() -> Result<(), NotebookError> {
         // `valid_multicell.ipynb` ends a cell with an indented `def` block right before the next
-        // cell, so per-cell parsing emits a trailing `Dedent` at that boundary. Ensure those
-        // synthetic boundary tokens don't trigger spurious blank-line or whitespace diagnostics.
+        // cell, so per-cell parsing emits a trailing `Dedent` at that boundary. It also places a
+        // range-suppression comment and its suppressed import in separate cells. Ensure the
+        // boundary tokens preserve suppression without introducing blank-line or whitespace
+        // diagnostics.
         let path = notebook_path("valid_multicell.ipynb");
         let source_kind = SourceKind::ipy_notebook(Notebook::from_path(&path)?);
         let settings = LinterSettings::for_rules([
@@ -852,31 +854,12 @@ mod tests {
             Rule::TrailingWhitespace,
             Rule::BlankLineWithWhitespace,
             Rule::TooManyNewlinesAtEndOfFile,
+            Rule::UnusedImport,
         ]);
         let diagnostics = test_contents_syntax_errors(&source_kind, &path, &settings);
         assert!(
             diagnostics.is_empty(),
-            "per-cell parsing introduced spurious diagnostics: {diagnostics:?}"
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn test_notebook_cell_boundary_suppression() -> Result<(), NotebookError> {
-        // A cell that closes an indented block emits a trailing `Dedent` at the cell boundary,
-        // which shares its offset with a `# ruff: disable` comment opening the next cell. Range
-        // suppression handling used to get stuck on that dedent and loop forever; it must finish
-        // and apply the suppression so the following `import os` isn't reported as F401.
-        let path = notebook_path("cell_boundary_suppression.ipynb");
-        let source_kind = SourceKind::ipy_notebook(Notebook::from_path(&path)?);
-        let diagnostics = test_contents_syntax_errors(
-            &source_kind,
-            &path,
-            &LinterSettings::for_rule(Rule::UnusedImport),
-        );
-        assert!(
-            diagnostics.is_empty(),
-            "expected the cell-boundary `# ruff: disable` to suppress F401, got: {diagnostics:?}"
+            "cell-boundary tokens changed lint results: {diagnostics:?}"
         );
         Ok(())
     }

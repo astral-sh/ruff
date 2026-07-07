@@ -372,6 +372,11 @@ pub fn parse_cells_unchecked(
         });
     }
 
+    body.shrink_to_fit();
+    tokens.shrink_to_fit();
+    errors.shrink_to_fit();
+    unsupported_syntax_errors.shrink_to_fit();
+
     Parsed {
         syntax: ModModule {
             node_index: AtomicNodeIndex::NONE,
