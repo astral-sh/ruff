@@ -1,8 +1,10 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{PythonVersion, Stmt, StmtImport, StmtImportFrom};
+use ruff_python_ast::{AtomicNodeIndex, PythonVersion, Stmt, StmtImport, StmtImportFrom};
+use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_tidy_imports::matchers::{MatchNameOrParent, NameMatchPolicy};
 use crate::rules::flake8_tidy_imports::rules::BannedModuleImportPolicies;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -95,7 +97,7 @@ pub(crate) fn lazy_import_mismatch(checker: &Checker, stmt: &Stmt) {
 
     for (import_policy, node) in &BannedModuleImportPolicies::new(stmt, checker) {
         if let Some(m) = selector.find(&import_policy) {
-            report_lazy_import_policy(checker, stmt, node.range(), m.name(), policy);
+            report_lazy_import_policy(checker, stmt, node.range(), m.name(), policy, selector);
         }
     }
 }
@@ -143,14 +145,21 @@ fn report_all_matching_imports(
         Stmt::Import(_) => {
             for (import_policy, node) in &BannedModuleImportPolicies::new(stmt, checker) {
                 if let Some(m) = selector.find(&import_policy) {
-                    report_lazy_import_policy(checker, stmt, node.range(), m.name(), policy);
+                    report_lazy_import_policy(
+                        checker,
+                        stmt,
+                        node.range(),
+                        m.name(),
+                        policy,
+                        selector,
+                    );
                 }
             }
         }
         Stmt::ImportFrom(_) => {
             for (import_policy, node) in &BannedModuleImportPolicies::new(stmt, checker) {
                 if !node.is_alias() && selector.find(&import_policy).is_some() {
-                    report_lazy_import_policy(checker, stmt, node.range(), None, policy);
+                    report_lazy_import_policy(checker, stmt, node.range(), None, policy, selector);
                     break;
                 }
             }
@@ -165,8 +174,16 @@ fn report_lazy_import_policy(
     range: ruff_text_size::TextRange,
     name: Option<String>,
     policy: LazyImportPolicy,
+    selector: &crate::rules::flake8_tidy_imports::settings::ImportSelector,
 ) {
     let mut diagnostic = checker.report_diagnostic(LazyImportMismatch { policy, name }, range);
+    if let Stmt::Import(import) = stmt
+        && let Some(fix) = split_import_fix(checker, stmt, import, policy, selector)
+    {
+        diagnostic.set_fix(fix);
+        return;
+    }
+
     match policy {
         LazyImportPolicy::RequireLazy => {
             diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
@@ -180,5 +197,72 @@ fn report_lazy_import_policy(
                 TextSize::from(5),
             ))));
         }
+    }
+}
+
+fn split_import_fix(
+    checker: &Checker,
+    stmt: &Stmt,
+    import: &StmtImport,
+    policy: LazyImportPolicy,
+    selector: &crate::rules::flake8_tidy_imports::settings::ImportSelector,
+) -> Option<Fix> {
+    if import.names.len() < 2 {
+        return None;
+    }
+
+    let mut matching = Vec::new();
+    let mut non_matching = Vec::new();
+    for alias in &import.names {
+        let import_policy = NameMatchPolicy::MatchNameOrParent(MatchNameOrParent {
+            module: &alias.name,
+        });
+        if selector.find(&import_policy).is_some() {
+            matching.push(alias.clone());
+        } else {
+            non_matching.push(alias.clone());
+        }
+    }
+
+    if matching.is_empty() || non_matching.is_empty() {
+        return None;
+    }
+
+    let matching_is_lazy = matches!(policy, LazyImportPolicy::RequireLazy);
+    let matching_stmt = import_stmt(matching, matching_is_lazy);
+    let non_matching_stmt = import_stmt(non_matching, !matching_is_lazy);
+
+    let first_alias = import.names.first()?;
+    let first_matches = selector
+        .find(&NameMatchPolicy::MatchNameOrParent(MatchNameOrParent {
+            module: &first_alias.name,
+        }))
+        .is_some();
+    let (first, second) = if first_matches {
+        (&matching_stmt, &non_matching_stmt)
+    } else {
+        (&non_matching_stmt, &matching_stmt)
+    };
+
+    let indentation = indentation_at_offset(stmt.start(), checker.source()).unwrap_or_default();
+    let line_ending = checker.stylist().line_ending().as_str();
+    let replacement = format!(
+        "{}{line_ending}{indentation}{}",
+        checker.generator().stmt(&Stmt::Import(first.clone())),
+        checker.generator().stmt(&Stmt::Import(second.clone()))
+    );
+
+    Some(Fix::unsafe_edit(Edit::range_replacement(
+        replacement,
+        stmt.range(),
+    )))
+}
+
+fn import_stmt(names: Vec<ruff_python_ast::Alias>, is_lazy: bool) -> StmtImport {
+    StmtImport {
+        node_index: AtomicNodeIndex::NONE,
+        range: TextRange::default(),
+        names,
+        is_lazy,
     }
 }
