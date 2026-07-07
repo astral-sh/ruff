@@ -109,6 +109,12 @@ impl Member {
         self.as_instance_attribute() == Some(name)
     }
 
+    /// Returns the name of the first attribute segment, e.g. `y` in `x.y.z` or `x.y[0]`.
+    pub fn first_attribute_name(&self) -> Option<&str> {
+        let first_segment = self.expression().segments().next()?;
+        (first_segment.kind == SegmentKind::Attribute).then_some(first_segment.text)
+    }
+
     /// Return `Some(<ATTRIBUTE>)` if the place expression is an instance attribute.
     pub fn as_instance_attribute(&self) -> Option<&str> {
         if self.is_instance_attribute() {
