@@ -38,6 +38,7 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Box<[UnusedImport]> {
     let index = semantic_index(db, file);
     let mut string_annotation_definitions = None;
     let mut explicit_exports = None;
+    let mut member_attribute_names: Option<FxHashSet<&str>> = None;
     let mut unused = Vec::new();
 
     for scope_id in index.scope_ids() {
@@ -81,6 +82,27 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Box<[UnusedImport]> {
             };
 
             if is_intentionally_unused_name(&display_name) {
+                continue;
+            }
+
+            // Class-body imports can be used as attributes (`self.os`), which records
+            // a member place without marking the class-scope symbol used.
+            // TODO: Match by the accessed object's type instead of by name alone.
+            if scope.kind().is_class()
+                && member_attribute_names
+                    .get_or_insert_with(|| {
+                        index
+                            .scope_ids()
+                            .flat_map(|scope_id| {
+                                index
+                                    .place_table(scope_id.file_scope_id(db))
+                                    .members()
+                                    .filter_map(|member| member.first_attribute_name())
+                            })
+                            .collect()
+                    })
+                    .contains(display_name.as_str())
+            {
                 continue;
             }
 
@@ -1076,6 +1098,55 @@ mod tests {
         )?;
 
         assert_eq!(names, vec!["os"]);
+        Ok(())
+    }
+
+    #[test]
+    fn skips_class_scope_import_used_via_instance_attribute() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            class C:
+                import os
+
+                def m(self):
+                    return self.os.getcwd()
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_class_scope_import_used_via_class_attribute() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            class C:
+                import os
+
+            C.os.getcwd()
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn class_scope_import_attribute_suppression_is_name_based() -> anyhow::Result<()> {
+        // Accepted false negative: any attribute access with a matching name
+        // suppresses the hint, even on an unrelated object.
+        let names = UnusedImportTest::new().names(
+            r#"
+            class C:
+                import os
+
+            def f(x):
+                return x.os
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
         Ok(())
     }
 
