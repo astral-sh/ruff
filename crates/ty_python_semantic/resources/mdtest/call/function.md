@@ -1899,6 +1899,7 @@ def ok(content: str) -> None:
         "input": [{"role": "user", "content": content}],
     }
     reveal_type(create(**kwargs))  # revealed: int
+    reveal_type(create(**{"input": [{"role": "user", "content": content}]}))  # revealed: int
 ```
 
 Known fields matched to a keyword-variadic parameter use its annotation as context:

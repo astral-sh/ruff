@@ -5160,7 +5160,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             continue;
                         }
 
-                        let ty = if has_unique_context {
+                        let ty = if value.is_dict_expr() {
+                            let tcx = TypeContext::new(Some(context_ty));
+                            let mut builder = if has_unique_context {
+                                self.speculate()
+                            } else {
+                                self.speculate_without_diagnostics()
+                            };
+                            let ty = infer_argument_ty(&mut builder, (argument_index, value, tcx));
+                            if has_unique_context {
+                                self.extend(builder);
+                            }
+                            Some(ty)
+                        } else if has_unique_context {
                             self.try_narrow_dict_kwargs(
                                 argument_type,
                                 keyword,
