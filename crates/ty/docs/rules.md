@@ -174,9 +174,6 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.55">0.0.55</a
 
 Checks for `ty: ignore` comments that don't specify which rules to ignore.
 
-Blanket comments are reported whether or not they suppress a diagnostic. If
-[`unused-ignore-comment`](#unused-ignore-comment) is also enabled, unused blanket comments emit both diagnostics.
-
 **Why is this bad?**
 
 
