@@ -191,15 +191,17 @@ fn check_class_declaration<'db>(
                 diagnostic.info("This will cause the class creation to fail at runtime");
             }
         }
-        Some(policy @ CodeGeneratorKind::DataclassLike(_)) => check_post_init_signature(
-            context,
-            configuration,
-            class,
-            member,
-            *first_reachable_definition,
-            policy,
-        ),
-        Some(CodeGeneratorKind::TypedDict) | None => {}
+        Some(policy @ CodeGeneratorKind::DataclassLike(_)) => {
+            check_post_init_signature(
+                context,
+                configuration,
+                class,
+                member,
+                *first_reachable_definition,
+                policy,
+            );
+        }
+        Some(CodeGeneratorKind::Pydantic(_) | CodeGeneratorKind::TypedDict) | None => {}
     }
 
     if configuration.check_invalid_named_tuple_field_overrides()

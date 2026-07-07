@@ -137,6 +137,8 @@ impl<'db> StaticClassLiteral<'db> {
     ///
     /// This covers `@dataclass`-decorated classes, as well as classes created via
     /// `dataclass_transform` (function-based, metaclass-based, and base-class-based).
+    /// This specifically excludes Pydantic models, even though their metaclass also uses
+    /// `dataclass_transform`.
     pub(crate) fn is_dataclass_like(self, db: &'db dyn Db) -> bool {
         matches!(
             CodeGeneratorKind::from_class(db, ClassLiteral::Static(self)),
@@ -787,14 +789,11 @@ impl<'db> StaticClassLiteral<'db> {
         let dataclass_params = self.dataclass_params(db);
 
         let mut transformer_params =
-            if let CodeGeneratorKind::DataclassLike(Some(transformer_params)) = field_policy {
-                Some(DataclassParams::from_transformer_params(
-                    db,
-                    transformer_params,
-                ))
-            } else {
-                None
-            };
+            field_policy
+                .dataclass_transformer_params()
+                .map(|transformer_params| {
+                    DataclassParams::from_transformer_params(db, transformer_params)
+                });
 
         // Dataclass transformer flags can be overwritten using class arguments.
         if let Some(transformer_params) = transformer_params.as_mut() {
@@ -857,6 +856,16 @@ impl<'db> StaticClassLiteral<'db> {
         } else {
             None
         }
+    }
+
+    /// Return `true` if Pydantic's dataclass-transform metadata marks this model as frozen.
+    fn is_frozen_pydantic_model(
+        self,
+        db: &'db dyn Db,
+        field_policy: CodeGeneratorKind<'db>,
+    ) -> bool {
+        matches!(field_policy, CodeGeneratorKind::Pydantic(_))
+            && self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN)
     }
 
     /// Checks if the given dataclass parameter flag is set for this class.
@@ -1344,6 +1353,9 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let field_policy = CodeGeneratorKind::from_class(db, self.into())?;
+        let pydantic_constructor_fields_are_keyword_only =
+            matches!(field_policy, CodeGeneratorKind::Pydantic(_))
+                && pydantic::constructor_fields_are_keyword_only(db, self);
 
         let instance_ty =
             Type::instance(db, self.apply_optional_specialization(db, specialization));
@@ -1433,8 +1445,9 @@ impl<'db> StaticClassLiteral<'db> {
                     field_ty = converter_input_ty;
                 }
 
-                let is_kw_only =
-                    matches!(name, "__replace__" | "_replace") || kw_only.unwrap_or(false);
+                let is_kw_only = matches!(name, "__replace__" | "_replace")
+                    || pydantic_constructor_fields_are_keyword_only
+                    || kw_only.unwrap_or(false);
 
                 // Use the alias name if provided, otherwise use the field name
                 let parameter_name =
@@ -1464,7 +1477,11 @@ impl<'db> StaticClassLiteral<'db> {
             // so that the keyword-only parameters appear after positional parameters.
             parameters.sort_by_key(Parameter::is_keyword_only);
 
-            if name == "__init__" && pydantic::uses_base_model_init(db, self) {
+            if name == "__init__"
+                && field_policy
+                    .pydantic_metadata()
+                    .is_some_and(|metadata| pydantic::model_init_accepts_extra(db, self, metadata))
+            {
                 let extra = pydantic::extra_parameter(&parameters);
                 parameters.push(extra);
             }
@@ -1481,7 +1498,9 @@ impl<'db> StaticClassLiteral<'db> {
         };
 
         match (field_policy, name) {
-            (CodeGeneratorKind::DataclassLike(_), "__init__") => {
+            (field_policy, "__init__")
+                if field_policy.synthesizes_constructor_signature_from_fields() =>
+            {
                 if !self.has_dataclass_param(db, field_policy, DataclassFlags::INIT) {
                     return None;
                 }
@@ -1538,7 +1557,10 @@ impl<'db> StaticClassLiteral<'db> {
                     specialization.map(|s| s.generic_context(db)),
                 )
             }
-            (CodeGeneratorKind::DataclassLike(_), "__lt__" | "__le__" | "__gt__" | "__ge__") => {
+            (
+                field_policy @ CodeGeneratorKind::DataclassLike(_),
+                "__lt__" | "__le__" | "__gt__" | "__ge__",
+            ) => {
                 if !self.has_dataclass_param(db, field_policy, DataclassFlags::ORDER) {
                     return None;
                 }
@@ -1557,7 +1579,7 @@ impl<'db> StaticClassLiteral<'db> {
 
                 Some(Type::function_like_callable(db, signature))
             }
-            (CodeGeneratorKind::DataclassLike(_), "__hash__") => {
+            (field_policy @ CodeGeneratorKind::DataclassLike(_), "__hash__") => {
                 let unsafe_hash =
                     self.has_dataclass_param(db, field_policy, DataclassFlags::UNSAFE_HASH);
                 let frozen = self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN);
@@ -1580,7 +1602,7 @@ impl<'db> StaticClassLiteral<'db> {
                     None
                 }
             }
-            (CodeGeneratorKind::DataclassLike(_), "__match_args__")
+            (field_policy @ CodeGeneratorKind::DataclassLike(_), "__match_args__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
             {
                 if !self.has_dataclass_param(db, field_policy, DataclassFlags::MATCH_ARGS) {
@@ -1603,7 +1625,7 @@ impl<'db> StaticClassLiteral<'db> {
                     .map(|(name, _)| Type::string_literal(db, name));
                 Some(Type::heterogeneous_tuple(db, match_args))
             }
-            (CodeGeneratorKind::DataclassLike(_), "__weakref__")
+            (field_policy @ CodeGeneratorKind::DataclassLike(_), "__weakref__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY311 =>
             {
                 if !self.has_dataclass_param(db, field_policy, DataclassFlags::WEAKREF_SLOT)
@@ -1652,8 +1674,14 @@ impl<'db> StaticClassLiteral<'db> {
 
                 signature_from_fields(vec![self_parameter], instance_ty)
             }
-            (CodeGeneratorKind::DataclassLike(_), "__setattr__") => {
-                if self.is_frozen_dataclass(db) == Some(true) {
+            (
+                field_policy @ (CodeGeneratorKind::DataclassLike(_)
+                | CodeGeneratorKind::Pydantic(_)),
+                "__setattr__",
+            ) => {
+                if self.is_frozen_dataclass(db) == Some(true)
+                    || self.is_frozen_pydantic_model(db, field_policy)
+                {
                     let signature = Signature::new(
                         Parameters::standard([
                             Parameter::positional_or_keyword(Name::new_static("self"))
@@ -1668,7 +1696,7 @@ impl<'db> StaticClassLiteral<'db> {
                 }
                 None
             }
-            (CodeGeneratorKind::DataclassLike(_), "__slots__")
+            (field_policy @ CodeGeneratorKind::DataclassLike(_), "__slots__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
             {
                 self.has_dataclass_param(db, field_policy, DataclassFlags::SLOTS)
@@ -1927,7 +1955,7 @@ impl<'db> StaticClassLiteral<'db> {
 
             match name.as_str() {
                 "__setattr__" | "__delattr__" => {
-                    if let CodeGeneratorKind::DataclassLike(_) = field_policy
+                    if matches!(field_policy, CodeGeneratorKind::DataclassLike(_))
                         && self.is_frozen_dataclass(db) == Some(true)
                     {
                         if let Some(builder) = context.report_lint(
@@ -1944,7 +1972,7 @@ impl<'db> StaticClassLiteral<'db> {
                     }
                 }
                 "__lt__" | "__le__" | "__gt__" | "__ge__" => {
-                    if let CodeGeneratorKind::DataclassLike(_) = field_policy
+                    if matches!(field_policy, CodeGeneratorKind::DataclassLike(_))
                         && self.has_dataclass_param(db, field_policy, DataclassFlags::ORDER)
                     {
                         if let Some(builder) = context.report_lint(
@@ -2095,14 +2123,16 @@ impl<'db> StaticClassLiteral<'db> {
 
                 let kind = match field_policy {
                     CodeGeneratorKind::NamedTuple => FieldKind::NamedTuple { default_ty },
-                    CodeGeneratorKind::DataclassLike(_) => FieldKind::Dataclass {
-                        default_ty,
-                        init_only: attr.is_init_var(),
-                        init,
-                        kw_only,
-                        alias,
-                        converter,
-                    },
+                    CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Pydantic(_) => {
+                        FieldKind::Dataclass {
+                            default_ty,
+                            init_only: attr.is_init_var(),
+                            init,
+                            kw_only,
+                            alias,
+                            converter,
+                        }
+                    }
                     CodeGeneratorKind::TypedDict => {
                         let is_required = if attr.is_required() {
                             // Explicit Required[T] annotation - always required
@@ -2605,9 +2635,10 @@ impl<'db> StaticClassLiteral<'db> {
 
                     // `KW_ONLY` sentinels are markers, not real instance attributes.
                     if declared_ty.is_instance_of(db, KnownClass::KwOnly)
-                        && CodeGeneratorKind::from_static_class(db, self).is_some_and(|policy| {
-                            matches!(policy, CodeGeneratorKind::DataclassLike(_))
-                        })
+                        && matches!(
+                            CodeGeneratorKind::from_static_class(db, self),
+                            Some(CodeGeneratorKind::DataclassLike(_))
+                        )
                     {
                         return Member::unbound();
                     }
@@ -2756,7 +2787,7 @@ impl<'db> StaticClassLiteral<'db> {
         let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self) else {
             return false;
         };
-        if !matches!(field_policy, CodeGeneratorKind::DataclassLike(_)) {
+        if !field_policy.treats_fields_as_instance_attributes() {
             return false;
         }
 
@@ -2780,10 +2811,11 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         name: &str,
     ) -> Option<Type<'db>> {
-        let field_policy = CodeGeneratorKind::from_static_class(db, self)?;
-        if !matches!(field_policy, CodeGeneratorKind::DataclassLike(_)) {
+        let field_policy @ CodeGeneratorKind::DataclassLike(_) =
+            CodeGeneratorKind::from_static_class(db, self)?
+        else {
             return None;
-        }
+        };
         let fields = self.fields(db, None, field_policy);
         let field = fields.get(name)?;
         if let FieldKind::Dataclass { converter, .. } = field.kind {
