@@ -8,6 +8,7 @@ use rustc_hash::FxHashMap;
 use crate::Db;
 use crate::types::enums::enum_metadata;
 use crate::types::tuple::Tuple;
+use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
 use crate::types::{KnownClass, Type, TypeContext, expand_type};
 
 /// Maximum total number of expanded argument type combinations across all arguments
@@ -42,22 +43,6 @@ pub(crate) struct CallArguments<'a, 'db> {
 struct CallArgument<'a, 'db> {
     argument: Argument<'a>,
     types: CallArgumentTypes<'db>,
-    /// Types of explicit values in a `**{...}` argument.
-    explicit_keyword_value_types: Box<[Type<'db>]>,
-}
-
-impl<'a, 'db> CallArgument<'a, 'db> {
-    fn new(
-        argument: Argument<'a>,
-        ty: Option<Type<'db>>,
-        explicit_keyword_value_types: Vec<Type<'db>>,
-    ) -> Self {
-        Self {
-            argument,
-            types: CallArgumentTypes::new(ty),
-            explicit_keyword_value_types: explicit_keyword_value_types.into_boxed_slice(),
-        }
-    }
 }
 
 /// Inferred types for a given argument.
@@ -134,28 +119,27 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         };
 
         for arg_or_keyword in arguments.iter_source_order() {
-            let (argument, ty, explicit_keyword_value_types) = match arg_or_keyword {
+            let (argument, ty) = match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
                         let ty = infer_argument_type(&arg_or_keyword, value);
-                        (Argument::Variadic, Some(ty), vec![])
+                        (Argument::Variadic, Some(ty))
                     }
-                    _ => (Argument::Positional, None, vec![]),
+                    _ => (Argument::Positional, None),
                 },
                 ast::ArgOrKeyword::Keyword(ast::Keyword { arg, value, .. }) => {
                     if let Some(arg) = arg {
-                        (Argument::Keyword(&arg.id), None, vec![])
+                        (Argument::Keyword(&arg.id), None)
                     } else {
                         let ty = infer_argument_type(&arg_or_keyword, value);
-                        (Argument::Keywords, Some(ty), vec![])
+                        (Argument::Keywords, Some(ty))
                     }
                 }
             };
-            call_arguments.items.push(CallArgument::new(
+            call_arguments.items.push(CallArgument {
                 argument,
-                ty,
-                explicit_keyword_value_types,
-            ));
+                types: CallArgumentTypes::new(ty),
+            });
         }
 
         call_arguments
@@ -238,7 +222,10 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     pub(crate) fn with_self(&self, bound_self: Option<Type<'db>>) -> Cow<'_, Self> {
         if bound_self.is_some() {
             let mut items = Vec::with_capacity(self.items.len() + 1);
-            items.push(CallArgument::new(Argument::Synthetic, bound_self, vec![]));
+            items.push(CallArgument {
+                argument: Argument::Synthetic,
+                types: CallArgumentTypes::new(bound_self),
+            });
             items.extend(self.items.iter().cloned());
             Cow::Owned(CallArguments { items })
         } else {
@@ -282,26 +269,40 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         self.items[index].types = CallArgumentTypes::new(Some(ty));
     }
 
-    pub(super) fn is_definitely_nonempty(&self, index: usize) -> bool {
-        !self.items[index].explicit_keyword_value_types.is_empty()
-    }
-
-    pub(super) fn explicit_keyword_value_types(
+    /// Returns the `functools.partial(...)` bound-argument slice and whether it is concrete enough
+    /// to synthesize a precise partial signature.
+    pub(crate) fn functools_partial_bound_arguments(
         &self,
-        index: usize,
-    ) -> impl Iterator<Item = Type<'db>> + '_ {
-        self.items[index]
-            .explicit_keyword_value_types
-            .iter()
-            .copied()
-    }
+        db: &'db dyn Db,
+    ) -> Option<(Self, bool)> {
+        let bound_call_arguments = self.start_from(1);
+        let mut can_synthesize_signature = true;
 
-    pub(crate) fn set_explicit_keyword_value_types(
-        &mut self,
-        index: usize,
-        types: impl IntoIterator<Item = Type<'db>>,
-    ) {
-        self.items[index].explicit_keyword_value_types = types.into_iter().collect();
+        for (argument, argument_ty) in bound_call_arguments.iter() {
+            let argument_ty = argument_ty.get_default().unwrap_or_else(Type::unknown);
+            match argument {
+                Argument::Variadic => {
+                    if !matches!(
+                        argument_ty
+                            .as_nominal_instance()
+                            .and_then(|nominal| nominal.tuple_spec(db)),
+                        Some(spec) if spec.as_fixed_length().is_some()
+                    ) {
+                        return None;
+                    }
+                }
+                Argument::Keywords => {
+                    // Known `TypedDict` items can still be checked against their target
+                    // parameters, even though possible hidden items prevent us from synthesizing
+                    // a precise partial signature.
+                    extract_unpacked_typed_dict_keys_from_value_type(db, argument_ty)?;
+                    can_synthesize_signature = false;
+                }
+                Argument::Positional | Argument::Synthetic | Argument::Keyword(_) => {}
+            }
+        }
+
+        Some((bound_call_arguments, can_synthesize_signature))
     }
 
     /// Returns an iterator on performing [argument type expansion].
@@ -504,7 +505,10 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
         let mut items = Vec::with_capacity(upper.unwrap_or(lower));
 
         for (argument, ty) in iter {
-            items.push(CallArgument::new(argument, ty, vec![]));
+            items.push(CallArgument {
+                argument,
+                types: CallArgumentTypes::new(ty),
+            });
         }
 
         Self { items }

@@ -931,9 +931,9 @@ reveal_type(p2)  # revealed: partial[(c: int | float) -> bool]
 ### Placeholder arguments
 
 `functools.Placeholder` reserves positional arguments in Python 3.14 and later. Placeholder slots
-must be filled positionally, and a partial cannot end in a placeholder. ty only synthesizes a
-precise signature when every placeholder is an exact, direct positional argument; ambiguous or
-unpacked placeholders fall back to the gradual `partial` signature.
+must be filled positionally, and a partial cannot end in a placeholder. ty only interprets exact,
+direct positional arguments as placeholders. Uncertain values, unpacked arguments, `ParamSpec`s,
+unpacked variadics, and callable unions retain the existing gradual `partial` behavior.
 
 ```toml
 [environment]
@@ -942,7 +942,7 @@ python-version = "3.14"
 
 ```py
 from functools import Placeholder as _, partial
-from typing import Callable, ParamSpec, TypedDict, TypeVar, overload
+from typing import Callable, ParamSpec, TypeVar, overload
 
 def combine(left: int, middle: str, right: float) -> tuple[int, str, float]:
     return left, middle, right
@@ -964,11 +964,6 @@ partial(pending, _)  # error: [invalid-argument-type]
 partial(combine, 1, _)  # error: [invalid-argument-type]
 partial(combine, _, "value", _)  # error: [invalid-argument-type]
 partial(combine, *(1, _))  # error: [invalid-argument-type]
-
-bound = (_, "value")
-starred = partial(combine, *bound)
-reveal_type(starred)  # revealed: partial[tuple[int, str, int | float]]
-starred(1, 2.0)
 
 def collect(prefix: int, *values: str) -> tuple[str, ...]:
     return values
@@ -1050,16 +1045,14 @@ partial(consume, maybe_placeholder, "bad")  # error: [invalid-argument-type]
 maybe_placeholder_tuple = (maybe_placeholder,)
 partial(consume, *maybe_placeholder_tuple, "bad")  # error: [invalid-argument-type]
 
-def expects_int(value: int, sentinel: int) -> None:
+unpacked_placeholder = partial(consume, *(_, 1))
+reveal_type(unpacked_placeholder)  # revealed: partial[None]
+unpacked_placeholder("value")
+
+def consume_integers(value: int, count: int) -> None:
     pass
 
-def bind_object(value: object) -> None:
-    partial(expects_int, value, 1)  # error: [invalid-argument-type]
-
-def three_integers(first: int, second: int, third: int) -> None:
-    pass
-
-partial(three_integers, *(_, "bad", 1))  # error: [invalid-argument-type]
+partial(consume_integers, *(maybe_placeholder, 1))  # error: [invalid-argument-type]
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -1089,20 +1082,20 @@ def no_args() -> str:
 
 mixed_paramspec(no_args)
 
-partial(accepts_object, **{"value": _})  # error: [invalid-argument-type]
+def fixed(value: int, suffix: str) -> int:
+    return value
 
-def accepts_keywords(*, value: object, count: int) -> None:
+def unpacked(*args: *tuple[int, str]) -> str:
+    return args[1]
+
+wrapped = fixed if runtime_bool() else unpacked
+union_partial = partial(wrapped, _, "bound")
+reveal_type(union_partial)  # revealed: partial[int | str]
+
+def accepts_string(*, value: str) -> None:
     pass
 
-partial(accepts_keywords, **{"value": _, "count": 1})  # error: [invalid-argument-type]
-partial(accepts_keywords, **{"value": _, **{"value": 1}, "count": 1})
-
-class BroadKeywords(TypedDict):
-    value: object
-    count: str
-
-def validate_broad_keywords(kwargs: BroadKeywords) -> None:
-    partial(accepts_keywords, **kwargs)  # error: [invalid-argument-type]
+partial(accepts_string, value=maybe_placeholder)  # error: [invalid-argument-type]
 ```
 
 ## Constructors and advanced signatures

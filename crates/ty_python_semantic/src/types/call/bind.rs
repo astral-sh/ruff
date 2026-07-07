@@ -64,11 +64,10 @@ use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
-    InternedConstraintSet, IntersectionBuilder, IntersectionType, KnownBoundMethodType, KnownClass,
-    KnownInstanceType, LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
-    SpecialFormType, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
-    list_members,
+    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType,
+    TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
+    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -177,7 +176,6 @@ fn generic_context_has_paramspec<'db>(
 struct FunctoolsPartialApplicationPlan<'a, 'db> {
     arguments: CallArguments<'a, 'db>,
     placeholder_arguments: Box<[bool]>,
-    unpacked_placeholder_arguments: Box<[bool]>,
     can_synthesize_signature: bool,
 }
 
@@ -186,180 +184,93 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
         db: &'db dyn Db,
         call_arguments: &CallArguments<'a, 'db>,
     ) -> Result<Option<Self>, InvalidPartialPlaceholder> {
-        #[derive(Clone, Copy, PartialEq, Eq)]
-        enum PlaceholderPossibility {
-            No,
-            Possible,
-            Exactly,
-        }
-
         let placeholder_ty = known_module_symbol(db, KnownModule::Functools, "Placeholder")
             .place
             .ignore_possibly_undefined();
-        let classify = |ty: Type<'db>| {
-            let Some(placeholder_ty) = placeholder_ty else {
-                return PlaceholderPossibility::No;
-            };
-            if ty == placeholder_ty {
-                PlaceholderPossibility::Exactly
-            } else if ty.is_disjoint_from(db, placeholder_ty) {
-                PlaceholderPossibility::No
-            } else {
-                PlaceholderPossibility::Possible
-            }
-        };
-        let without_placeholder = |ty: Type<'db>| {
-            placeholder_ty.map_or(ty, |placeholder_ty| {
-                IntersectionBuilder::new(db)
-                    .add_positive(ty)
-                    .add_negative(placeholder_ty)
-                    .build()
-            })
-        };
+        let source_arguments = call_arguments.start_from(1);
+        let mut placeholder_arguments = vec![false; source_arguments.len()];
+        let mut has_variadic_argument = false;
+        let mut has_unsupported_placeholder = false;
+        let mut last_direct_positional_placeholder = None;
 
-        let mut arguments = call_arguments.start_from(1);
-        let mut placeholder_arguments = vec![false; arguments.len()];
-        let mut replacement_argument_types = vec![None; arguments.len()];
-        let mut unpacked_placeholder_arguments = vec![false; arguments.len()];
-        let mut can_validate = true;
-        let mut can_synthesize_signature = true;
-        let mut last_positional = None;
-        let mut invalid_keyword = None;
-
-        for (argument_index, (argument, argument_types)) in arguments.iter().enumerate() {
+        for (argument_index, (argument, argument_types)) in source_arguments.iter().enumerate() {
             let argument_ty = argument_types.get_default().unwrap_or_else(Type::unknown);
             match argument {
                 Argument::Positional => {
-                    let possibility = classify(argument_ty);
-                    last_positional = Some((argument_index, possibility));
-                    match possibility {
-                        PlaceholderPossibility::No => {}
-                        PlaceholderPossibility::Exactly => {
-                            placeholder_arguments[argument_index] = true;
-                        }
-                        PlaceholderPossibility::Possible => {
-                            replacement_argument_types[argument_index] =
-                                Some(without_placeholder(argument_ty));
-                            can_synthesize_signature = false;
-                        }
+                    let is_placeholder = placeholder_ty == Some(argument_ty);
+                    last_direct_positional_placeholder = Some((argument_index, is_placeholder));
+                    placeholder_arguments[argument_index] = is_placeholder;
+                    if !is_placeholder
+                        && placeholder_ty.is_some_and(|placeholder| {
+                            !argument_ty.is_disjoint_from(db, placeholder)
+                        })
+                    {
+                        has_unsupported_placeholder = true;
                     }
                 }
                 Argument::Variadic => {
-                    let tuple_spec = argument_ty
+                    has_variadic_argument = true;
+                    last_direct_positional_placeholder = None;
+                    has_unsupported_placeholder |= argument_ty
                         .as_nominal_instance()
-                        .and_then(|nominal| nominal.tuple_spec(db));
-                    let Some(fixed) = tuple_spec
+                        .and_then(|nominal| nominal.tuple_spec(db))
                         .as_deref()
                         .and_then(|spec| spec.as_fixed_length())
-                    else {
-                        can_validate = false;
-                        last_positional = Some((argument_index, PlaceholderPossibility::Possible));
-                        continue;
-                    };
-                    for element_ty in fixed.iter_all_elements() {
-                        let possibility = classify(element_ty);
-                        last_positional = Some((argument_index, possibility));
-                        if possibility != PlaceholderPossibility::No {
-                            // Precisely rewriting holes inside an unpacked tuple would require a
-                            // per-element plan rather than the source-argument plan used here.
-                            can_synthesize_signature = false;
-                            unpacked_placeholder_arguments[argument_index] = true;
-                        }
-                    }
+                        .is_some_and(|tuple| {
+                            placeholder_ty.is_some_and(|placeholder| {
+                                tuple
+                                    .iter_all_elements()
+                                    .any(|element| !element.is_disjoint_from(db, placeholder))
+                            })
+                        });
                 }
-                Argument::Keyword(_) => match classify(argument_ty) {
-                    PlaceholderPossibility::No => {}
-                    PlaceholderPossibility::Possible => {
-                        replacement_argument_types[argument_index] =
-                            Some(without_placeholder(argument_ty));
-                        can_synthesize_signature = false;
+                Argument::Keyword(_) => {
+                    if placeholder_ty == Some(argument_ty) {
+                        return Err(InvalidPartialPlaceholder {
+                            argument_index,
+                            reason: InvalidPartialPlaceholderReason::Keyword,
+                        });
                     }
-                    PlaceholderPossibility::Exactly => {
-                        invalid_keyword.get_or_insert(argument_index);
-                    }
-                },
-                Argument::Keywords => {
-                    can_synthesize_signature = false;
-                    for value_ty in arguments.explicit_keyword_value_types(argument_index) {
-                        match classify(value_ty) {
-                            PlaceholderPossibility::No => {}
-                            PlaceholderPossibility::Possible => {
-                                unpacked_placeholder_arguments[argument_index] = true;
-                            }
-                            PlaceholderPossibility::Exactly => {
-                                invalid_keyword.get_or_insert(argument_index);
-                            }
-                        }
-                    }
-                    if let Some(unpacked) =
-                        extract_unpacked_typed_dict_from_value_type(db, argument_ty)
+                    if placeholder_ty
+                        .is_some_and(|placeholder| !argument_ty.is_disjoint_from(db, placeholder))
                     {
-                        for unpacked_key in unpacked.keys.values() {
-                            match classify(unpacked_key.value_ty) {
-                                PlaceholderPossibility::No => {}
-                                PlaceholderPossibility::Possible => {
-                                    unpacked_placeholder_arguments[argument_index] = true;
-                                }
-                                PlaceholderPossibility::Exactly if unpacked_key.is_required => {
-                                    invalid_keyword.get_or_insert(argument_index);
-                                }
-                                PlaceholderPossibility::Exactly => {
-                                    unpacked_placeholder_arguments[argument_index] = true;
-                                }
-                            }
-                        }
-                    } else if let Some((_, value_ty)) = argument_ty.unpack_keys_and_items(db) {
-                        match classify(value_ty) {
-                            PlaceholderPossibility::No | PlaceholderPossibility::Possible => {
-                                can_validate = false;
-                            }
-                            PlaceholderPossibility::Exactly
-                                if arguments.is_definitely_nonempty(argument_index) =>
-                            {
-                                invalid_keyword.get_or_insert(argument_index);
-                            }
-                            PlaceholderPossibility::Exactly => {
-                                can_validate = false;
-                            }
-                        }
-                    } else {
-                        can_validate = false;
+                        has_unsupported_placeholder = true;
                     }
                 }
+                Argument::Keywords => {}
                 Argument::Synthetic => {}
             }
         }
 
-        if let Some((argument_index, PlaceholderPossibility::Exactly)) = last_positional {
+        if let Some((argument_index, true)) = last_direct_positional_placeholder {
             return Err(InvalidPartialPlaceholder {
                 argument_index,
                 reason: InvalidPartialPlaceholderReason::Trailing,
             });
         }
-        if let Some(argument_index) = invalid_keyword {
-            return Err(InvalidPartialPlaceholder {
-                argument_index,
-                reason: InvalidPartialPlaceholderReason::Keyword,
-            });
-        }
-        if !can_validate {
-            return Ok(None);
-        }
 
-        for argument_index in 0..arguments.len() {
-            if placeholder_arguments[argument_index] {
+        let Some((mut arguments, mut can_synthesize_signature)) =
+            call_arguments.functools_partial_bound_arguments(db)
+        else {
+            return Ok(None);
+        };
+        let has_placeholders = placeholder_arguments
+            .iter()
+            .any(|is_placeholder| *is_placeholder);
+        can_synthesize_signature &=
+            !(has_unsupported_placeholder || has_variadic_argument && has_placeholders);
+
+        for (argument_index, is_placeholder) in placeholder_arguments.iter().copied().enumerate() {
+            if is_placeholder {
                 // Let ordinary call binding consume the argument without constraining inference.
                 // The bitmap above restores the consumed parameter as a placeholder afterward.
                 arguments.replace_type(argument_index, Type::Never);
-            } else if let Some(replacement_ty) = replacement_argument_types[argument_index] {
-                arguments.replace_type(argument_index, replacement_ty);
             }
         }
 
         Ok(Some(Self {
             arguments,
             placeholder_arguments: placeholder_arguments.into_boxed_slice(),
-            unpacked_placeholder_arguments: unpacked_placeholder_arguments.into_boxed_slice(),
             can_synthesize_signature,
         }))
     }
@@ -374,30 +285,6 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
         argument_index
             .checked_sub(bound_argument_offset)
             .is_some_and(|index| self.placeholder_arguments[index])
-    }
-
-    fn suppresses_error(&self, db: &'db dyn Db, error: &BindingError<'db>) -> bool {
-        let Some(argument_index) = error.argument_index() else {
-            return false;
-        };
-        if !self
-            .unpacked_placeholder_arguments
-            .get(argument_index)
-            .copied()
-            .unwrap_or(false)
-        {
-            return false;
-        }
-        let Some(provided_ty) = error.provided_type() else {
-            return false;
-        };
-        let Some(placeholder_ty) = known_module_symbol(db, KnownModule::Functools, "Placeholder")
-            .place
-            .ignore_possibly_undefined()
-        else {
-            return false;
-        };
-        !provided_ty.is_disjoint_from(db, placeholder_ty)
     }
 }
 
@@ -3268,11 +3155,7 @@ impl<'db> CallableBinding<'db> {
     /// If step 1 of overload resolution identified a single arity match, we keep using that
     /// overload as the diagnostic source. Otherwise, we rank failing overloads by error quality:
     /// fewer unknown-argument errors and fewer relevant errors are preferred.
-    fn best_failing_overload_index(
-        &self,
-        selection: FailingOverloadSelection,
-        ignore_error: impl Fn(&BindingError<'db>) -> bool,
-    ) -> Option<usize> {
+    fn best_failing_overload_index(&self, selection: FailingOverloadSelection) -> Option<usize> {
         self.matching_overload_before_type_checking.or_else(|| {
             self.overloads
                 .iter()
@@ -3282,7 +3165,7 @@ impl<'db> CallableBinding<'db> {
                     let mut unknown_argument_count = 0;
 
                     for error in &overload.errors {
-                        if ignore_error(error) || !selection.includes(error) {
+                        if !selection.includes(error) {
                             continue;
                         }
                         relevant_count += 1;
@@ -3306,16 +3189,12 @@ impl<'db> CallableBinding<'db> {
 
     /// Returns the matching overload indexes when `functools.partial(...)` ignores errors that are
     /// only relevant at invocation time.
-    fn matching_partial_overload_index(
-        &self,
-        db: &'db dyn Db,
-        application: &FunctoolsPartialApplicationPlan<'_, 'db>,
-    ) -> MatchingOverloadIndex {
+    fn matching_partial_overload_index(&self) -> MatchingOverloadIndex {
         let mut matching_overloads = self.overloads.iter().enumerate().filter(|(_, overload)| {
-            !overload.errors.iter().any(|error| {
-                error.is_relevant_for_partial_application()
-                    && !application.suppresses_error(db, error)
-            })
+            !overload
+                .errors
+                .iter()
+                .any(BindingError::is_relevant_for_partial_application)
         });
         match matching_overloads.next() {
             None => MatchingOverloadIndex::None,
@@ -3347,22 +3226,16 @@ impl<'db> CallableBinding<'db> {
             return None;
         }
 
-        let selected_overload_indexes = match self.matching_partial_overload_index(db, application)
-        {
+        let selected_overload_indexes = match self.matching_partial_overload_index() {
             MatchingOverloadIndex::Single(index) => vec![index],
             MatchingOverloadIndex::Multiple(indexes) => indexes,
             MatchingOverloadIndex::None => {
                 let source_overload_index = self
-                    .best_failing_overload_index(
-                        FailingOverloadSelection::ReportableForPartial,
-                        |error| application.suppresses_error(db, error),
-                    )
+                    .best_failing_overload_index(FailingOverloadSelection::ReportableForPartial)
                     .unwrap_or(0);
                 let source_errors = &self.overloads()[source_overload_index].errors;
                 for error in source_errors {
-                    if error.is_relevant_for_partial_application()
-                        && !application.suppresses_error(db, error)
-                    {
+                    if error.is_relevant_for_partial_application() {
                         let error = error.clone().maybe_apply_argument_index_offset(Some(1));
                         if !partial_overload.errors.contains(&error) {
                             partial_overload.errors.push(error);
@@ -5746,7 +5619,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     let index = callable_binding
                         .best_failing_overload_index(
                             FailingOverloadSelection::AffectsOverloadResolution,
-                            |_| false,
                         )
                         .unwrap_or(0);
                     // TODO: We should also update the specialization for the `ParamSpec` to reflect
@@ -6664,6 +6536,9 @@ impl<'db> Binding<'db> {
                     return Some(imprecise_return_type);
                 }
             };
+        if application.has_placeholders() && (func_ty.is_union() || func_ty.is_intersection()) {
+            application.can_synthesize_signature = false;
+        }
         let partial_bindings =
             Bindings::functools_partial_matched_bindings(db, func_ty, &application.arguments)?;
         partial_bindings.add_functools_partial_placeholder_contexts(
@@ -7289,39 +7164,6 @@ pub(crate) enum BindingError<'db> {
 }
 
 impl BindingError<'_> {
-    fn argument_index(&self) -> Option<usize> {
-        match self {
-            BindingError::InvalidArgumentType { argument_index, .. }
-            | BindingError::InvalidPartialPlaceholder { argument_index, .. }
-            | BindingError::InvalidKeyType { argument_index, .. }
-            | BindingError::UnknownArgument { argument_index, .. }
-            | BindingError::UnknownKeywordVariadicArgument { argument_index }
-            | BindingError::PositionalOnlyParameterAsKwarg { argument_index, .. }
-            | BindingError::ParameterAlreadyAssigned { argument_index, .. }
-            | BindingError::SpecializationError { argument_index, .. } => *argument_index,
-            BindingError::TooManyPositionalArguments {
-                first_excess_argument_index,
-                ..
-            } => *first_excess_argument_index,
-            BindingError::CalledTopCallable(..)
-            | BindingError::InternalCallError(..)
-            | BindingError::InvalidDataclassApplication(..)
-            | BindingError::InvalidDataclassArgument(..)
-            | BindingError::MissingArguments { .. }
-            | BindingError::UnmatchedOverload
-            | BindingError::PropertyHasNoSetter(..)
-            | BindingError::PropertyHasNoDeleter(..) => None,
-        }
-    }
-
-    fn provided_type(&self) -> Option<Type<'_>> {
-        match self {
-            BindingError::InvalidArgumentType { provided_ty, .. } => Some(*provided_ty),
-            BindingError::SpecializationError { error, .. } => Some(error.argument_type()),
-            _ => None,
-        }
-    }
-
     /// Returns whether this error is relevant to `functools.partial(...)` construction.
     ///
     /// These errors are used both to filter incompatible wrapped overloads and to report

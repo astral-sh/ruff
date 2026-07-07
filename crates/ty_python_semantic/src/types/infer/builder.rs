@@ -7553,54 +7553,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ))
     }
 
-    /// Returns the value types for dict-literal keys whose final values are statically known.
-    fn final_dict_literal_value_types(&mut self, dict: &ast::ExprDict) -> Vec<Type<'db>> {
-        fn collect<'db>(
-            builder: &mut TypeInferenceBuilder<'db, '_>,
-            dict: &ast::ExprDict,
-        ) -> (FxHashMap<CompactString, Type<'db>>, bool) {
-            let mut values = FxHashMap::default();
-            let mut exhaustive = true;
-
-            for item in &dict.items {
-                if let Some(key) = &item.key {
-                    if let Some(key) = key.as_string_literal_expr() {
-                        values.insert(
-                            CompactString::new(key.value.to_str()),
-                            builder.get_or_infer_expression(&item.value, TypeContext::default()),
-                        );
-                    } else {
-                        // A dynamic key can overwrite any entry collected so far.
-                        values.clear();
-                        exhaustive = false;
-                    }
-                } else if let ast::Expr::Dict(unpacked) = &item.value {
-                    let (unpacked_values, unpacked_is_exhaustive) = collect(builder, unpacked);
-                    if !unpacked_is_exhaustive {
-                        values.clear();
-                        exhaustive = false;
-                    }
-                    values.extend(unpacked_values);
-                } else {
-                    // An unknown unpack can overwrite any entry collected so far.
-                    values.clear();
-                    exhaustive = false;
-                }
-            }
-
-            (values, exhaustive)
-        }
-
-        collect(self, dict).0.into_values().collect()
-    }
-
     /// Infer the variadic argument types needed for call binding and emit the shared diagnostics
     /// for invalid `*args` and `**kwargs` inputs.
     fn prepare_call_arguments<'a>(
         &mut self,
         arguments: &'a ast::Arguments,
     ) -> CallArguments<'a, 'db> {
-        let mut call_arguments =
+        let call_arguments =
             CallArguments::from_arguments(arguments, |arg_or_keyword, splatted_value| {
                 let ty = self.get_or_infer_expression(splatted_value, TypeContext::default());
                 if let ast::ArgOrKeyword::Arg(argument) = arg_or_keyword
@@ -7613,17 +7572,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 ty
             });
-
-        for (argument_index, arg_or_keyword) in arguments.iter_source_order().enumerate() {
-            if let ast::ArgOrKeyword::Keyword(ast::Keyword {
-                arg: None, value, ..
-            }) = arg_or_keyword
-                && let ast::Expr::Dict(dict) = value
-            {
-                let value_types = self.final_dict_literal_value_types(dict);
-                call_arguments.set_explicit_keyword_value_types(argument_index, value_types);
-            }
-        }
 
         for arg in &arguments.args {
             if let ast::Expr::Starred(ast::ExprStarred { value, .. }) = arg {
