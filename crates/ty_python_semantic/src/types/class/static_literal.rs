@@ -1363,8 +1363,15 @@ impl<'db> StaticClassLiteral<'db> {
 
         let signature_from_fields = |mut parameters: Vec<_>, return_ty: Type<'db>| {
             for (field_name, field) in self.fields(db, specialization, field_policy) {
-                let (init, mut default_ty, kw_only, alias, converter) = match &field.kind {
-                    FieldKind::NamedTuple { default_ty } => (true, *default_ty, None, None, None),
+                let (init, mut default_ty, kw_only, alias, converter, strict) = match &field.kind {
+                    FieldKind::NamedTuple { default_ty } => (
+                        true,
+                        *default_ty,
+                        None,
+                        None,
+                        None,
+                        pydantic::StrictMode::Unspecified,
+                    ),
                     FieldKind::Dataclass {
                         init,
                         default_ty,
@@ -1372,7 +1379,20 @@ impl<'db> StaticClassLiteral<'db> {
                         alias,
                         converter,
                         ..
-                    } => (*init, *default_ty, *kw_only, alias.as_ref(), *converter),
+                    } => (
+                        *init,
+                        *default_ty,
+                        *kw_only,
+                        alias.as_ref(),
+                        *converter,
+                        pydantic::StrictMode::Unspecified,
+                    ),
+                    FieldKind::Pydantic {
+                        init,
+                        default_ty,
+                        alias,
+                        strict,
+                    } => (*init, *default_ty, None, alias.as_ref(), None, *strict),
                     FieldKind::TypedDict { .. } => continue,
                 };
                 let mut field_ty = field.declared_ty;
@@ -1444,6 +1464,12 @@ impl<'db> StaticClassLiteral<'db> {
 
                 if let Some((converter_input_ty, _)) = converter {
                     field_ty = converter_input_ty;
+                }
+
+                if name == "__init__"
+                    && let Some(metadata) = field_policy.pydantic_metadata()
+                {
+                    field_ty = pydantic::constructor_parameter_type(db, field_ty, strict, metadata);
                 }
 
                 let is_kw_only = matches!(name, "__replace__" | "_replace")
@@ -2114,26 +2140,32 @@ impl<'db> StaticClassLiteral<'db> {
                 let mut kw_only = None;
                 let mut alias = None;
                 let mut converter = None;
+                let mut strict = pydantic::StrictMode::Unspecified;
                 if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
                     default_ty = field.default_type(db);
                     init = field.init(db);
                     kw_only = field.kw_only(db);
                     alias.clone_from(field.alias(db));
                     converter = field.converter(db);
+                    strict = field.strict(db);
                 }
 
                 let kind = match field_policy {
                     CodeGeneratorKind::NamedTuple => FieldKind::NamedTuple { default_ty },
-                    CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Pydantic(_) => {
-                        FieldKind::Dataclass {
-                            default_ty,
-                            init_only: attr.is_init_var(),
-                            init,
-                            kw_only,
-                            alias,
-                            converter,
-                        }
-                    }
+                    CodeGeneratorKind::DataclassLike(_) => FieldKind::Dataclass {
+                        default_ty,
+                        init_only: attr.is_init_var(),
+                        init,
+                        kw_only,
+                        alias,
+                        converter,
+                    },
+                    CodeGeneratorKind::Pydantic(_) => FieldKind::Pydantic {
+                        default_ty,
+                        init,
+                        alias,
+                        strict,
+                    },
                     CodeGeneratorKind::TypedDict => {
                         let is_required = if attr.is_required() {
                             // Explicit Required[T] annotation - always required
@@ -2801,7 +2833,7 @@ impl<'db> StaticClassLiteral<'db> {
             FieldKind::Dataclass {
                 init_only: false,
                 ..
-            }
+            } | FieldKind::Pydantic { .. }
         )
     }
 

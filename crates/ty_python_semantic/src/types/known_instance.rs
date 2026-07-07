@@ -10,6 +10,7 @@ use crate::{
         TypeMapping, TypeVarNonce, TypeVarVariance, UnionBuilder,
         class::NamedTupleSpec,
         constraints::OwnedConstraintSet,
+        dedicated::pydantic::StrictMode,
         generics::{Specialization, walk_generic_context},
         newtype::NewType,
         typevar::TypeVarInstance,
@@ -493,6 +494,9 @@ pub struct FieldInstance<'db> {
     /// The first element is the input type (first positional parameter), the second is the
     /// output type (return type of the converter callable).
     pub converter: Option<(Type<'db>, Type<'db>)>,
+
+    /// The mode selected by Pydantic's `strict` argument.
+    pub strict: StrictMode,
 }
 
 // The Salsa heap is tracked separately.
@@ -536,6 +540,7 @@ impl<'db> FieldInstance<'db> {
             self.kw_only(db),
             self.alias(db),
             converter,
+            self.strict(db),
         ))
     }
 }

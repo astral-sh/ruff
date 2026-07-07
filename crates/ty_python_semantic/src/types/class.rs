@@ -2420,6 +2420,17 @@ pub(crate) enum FieldKind<'db> {
         /// output type (return type of the converter callable).
         converter: Option<(Type<'db>, Type<'db>)>,
     },
+    /// Pydantic model field metadata
+    Pydantic {
+        /// The type of the default value for this field
+        default_ty: Option<Type<'db>>,
+        /// Whether or not this field should appear in the synthesized constructor signature.
+        init: bool,
+        /// The name for this field in the synthesized constructor signature, if specified.
+        alias: Option<Box<str>>,
+        /// The mode selected by Pydantic's `strict` argument.
+        strict: pydantic::StrictMode,
+    },
     /// `TypedDict` field metadata
     TypedDict {
         /// Whether this field is required
@@ -2448,6 +2459,9 @@ impl Field<'_> {
             // A dataclass field is NOT required if `default` (or `default_factory`) is set
             // or if `init` has been set to `False`.
             FieldKind::Dataclass {
+                init, default_ty, ..
+            } => default_ty.is_none() && *init,
+            FieldKind::Pydantic {
                 init, default_ty, ..
             } => default_ty.is_none() && *init,
             FieldKind::TypedDict { is_required, .. } => *is_required,
