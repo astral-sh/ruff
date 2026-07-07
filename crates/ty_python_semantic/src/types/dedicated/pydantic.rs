@@ -1,8 +1,8 @@
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::name::Name;
+use ruff_python_ast::{Keyword, name::Name};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, file_to_module};
-use ty_python_core::definition::DefinitionKind;
+use ty_python_core::definition::{Definition, DefinitionKind};
 
 use crate::Db;
 use crate::place::{DefinedPlace, Definedness, Place, Provenance, known_module_symbol};
@@ -42,6 +42,23 @@ impl<'db> ModelMetadata<'db> {
     const fn accepts_extra(self) -> bool {
         !matches!(self.config.extra, Some(ExtraBehavior::Forbid))
     }
+
+    pub(in crate::types) const fn validates_by_alias(self) -> bool {
+        self.config.validate_by_alias.enabled_or(true)
+    }
+
+    pub(in crate::types) const fn validates_by_name(self) -> bool {
+        let validate_by_name = self.config.validate_by_name;
+        // If `validate_by_alias=False` is set without specifying `validate_by_name`, Pydantic
+        // implicitly enables validation by name.
+        if matches!(validate_by_name, ConfigBoolean::Unspecified)
+            && matches!(self.config.validate_by_alias, ConfigBoolean::Disabled)
+        {
+            true
+        } else {
+            validate_by_name.enabled_or(false)
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
@@ -51,14 +68,20 @@ struct ModelConfig {
     extra: Option<ExtraBehavior>,
     /// The `strict` configuration controls whether constructor parameters accept values that
     /// Pydantic can coerce to the declared field type.
-    strict: StrictMode,
+    strict: ConfigBoolean,
+    /// Whether fields with aliases can be initialized by their alias.
+    validate_by_alias: ConfigBoolean,
+    /// Whether fields with aliases can be initialized by their field name.
+    validate_by_name: ConfigBoolean,
 }
 
 impl ModelConfig {
     const fn unknown() -> Self {
         Self {
             extra: Some(ExtraBehavior::Unknown),
-            strict: StrictMode::Unknown,
+            strict: ConfigBoolean::Unknown,
+            validate_by_alias: ConfigBoolean::Unknown,
+            validate_by_name: ConfigBoolean::Unknown,
         }
     }
 
@@ -66,6 +89,8 @@ impl ModelConfig {
     fn merge(&mut self, other: Self) {
         self.extra = other.extra.or(self.extra);
         self.strict = other.strict.or(self.strict);
+        self.validate_by_alias = other.validate_by_alias.or(self.validate_by_alias);
+        self.validate_by_name = other.validate_by_name.or(self.validate_by_name);
     }
 }
 
@@ -89,17 +114,19 @@ impl ExtraBehavior {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub enum StrictMode {
+pub enum ConfigBoolean {
     /// No value was specified at this precedence level, so a lower-precedence value can apply.
     #[default]
     Unspecified,
-    Lax,
-    Strict,
+    /// The setting was explicitly disabled.
+    Disabled,
+    /// The setting was explicitly enabled.
+    Enabled,
     /// A value was specified, but it could not be resolved statically.
     Unknown,
 }
 
-impl StrictMode {
+impl ConfigBoolean {
     const fn or(self, other: Self) -> Self {
         if matches!(self, Self::Unspecified) {
             other
@@ -108,31 +135,37 @@ impl StrictMode {
         }
     }
 
-    /// Resolve a strictness value from the type inferred for the model-global `strict` configuration.
-    ///
-    /// `model_config = ConfigDict(strict=None)` means that the model overrides inherited strictness
-    /// configuration with `Unknown`, which is treated as `Lax`.
+    /// Resolve a boolean configuration value from its inferred type.
     pub(in crate::types) fn from_type(value: Type<'_>) -> Self {
         if value == Type::bool_literal(true) {
-            Self::Strict
+            Self::Enabled
         } else if value == Type::bool_literal(false) {
-            Self::Lax
+            Self::Disabled
         } else {
             Self::Unknown
         }
     }
 
-    /// Resolve a strictness value from the type inferred for the `strict` configuration on the field.
+    /// Resolve this value to a boolean, using `default` when it is unspecified.
     ///
-    /// `Field(strict=None)` means that the field should inherit the model-global strictness configuration,
-    /// so it is treated as `Unspecified`.
-    pub(in crate::types) fn from_field_type(db: &dyn Db, value: Type<'_>) -> Self {
-        if value.is_none(db) {
-            Self::Unspecified
-        } else {
-            Self::from_type(value)
+    /// An unknown value resolves to `true`.
+    const fn enabled_or(self, default: bool) -> bool {
+        match self {
+            Self::Unspecified => default,
+            Self::Disabled => false,
+            Self::Enabled | Self::Unknown => true,
         }
     }
+}
+
+fn config_boolean(
+    db: &dyn Db,
+    definition: Definition<'_>,
+    keyword: Option<&Keyword>,
+) -> ConfigBoolean {
+    keyword.map_or(ConfigBoolean::Unspecified, |keyword| {
+        ConfigBoolean::from_type(definition_expression_type(db, definition, &keyword.value))
+    })
 }
 
 pub(in crate::types) fn is_model(db: &dyn Db, class: StaticClassLiteral<'_>) -> bool {
@@ -186,9 +219,7 @@ fn model_config<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelCo
     if let Some(own_config) = own_model_config(db, class) {
         config.merge(own_config);
     }
-    if let Some(class_keyword_config) = class_keyword_config(db, class) {
-        config.merge(class_keyword_config);
-    }
+    config.merge(class_keyword_config(db, class));
     config
 }
 
@@ -262,28 +293,43 @@ fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelC
             .map(|literal| literal.value(db));
         ExtraBehavior::from_value(extra)
     });
-    let strict = call
-        .arguments
-        .find_keyword("strict")
-        .map_or(StrictMode::Unspecified, |strict| {
-            StrictMode::from_type(definition_expression_type(db, definition, &strict.value))
-        });
+    let strict = config_boolean(db, definition, call.arguments.find_keyword("strict"));
+    let validate_by_alias = config_boolean(
+        db,
+        definition,
+        call.arguments.find_keyword("validate_by_alias"),
+    );
+    let validate_by_name = config_boolean(
+        db,
+        definition,
+        call.arguments.find_keyword("validate_by_name"),
+    );
 
-    Some(ModelConfig { extra, strict })
+    Some(ModelConfig {
+        extra,
+        strict,
+        validate_by_alias,
+        validate_by_name,
+    })
 }
 
-fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelConfig> {
+fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConfig {
     let definition = class.definition(db);
     let module = parsed_module(db, class.file(db)).load(db);
     let kind = definition.kind(db);
-    let class_node = kind.as_class()?.node(&module);
-    let arguments = class_node.arguments.as_ref()?;
+    let Some(class) = kind.as_class() else {
+        return ModelConfig::default();
+    };
+    let class_node = class.node(&module);
+    let Some(arguments) = class_node.arguments.as_ref() else {
+        return ModelConfig::default();
+    };
     if arguments
         .keywords
         .iter()
         .any(|keyword| keyword.arg.is_none())
     {
-        return Some(ModelConfig::unknown());
+        return ModelConfig::unknown();
     }
     let extra = arguments.find_keyword("extra").map(|extra| {
         let extra = definition_expression_type(db, definition, &extra.value)
@@ -291,24 +337,28 @@ fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<Mo
             .map(|literal| literal.value(db));
         ExtraBehavior::from_value(extra)
     });
-    let strict = arguments
-        .find_keyword("strict")
-        .map_or(StrictMode::Unspecified, |strict| {
-            StrictMode::from_type(definition_expression_type(db, definition, &strict.value))
-        });
+    let strict = config_boolean(db, definition, arguments.find_keyword("strict"));
+    let validate_by_alias =
+        config_boolean(db, definition, arguments.find_keyword("validate_by_alias"));
+    let validate_by_name =
+        config_boolean(db, definition, arguments.find_keyword("validate_by_name"));
 
-    (extra.is_some() || !matches!(strict, StrictMode::Unspecified))
-        .then_some(ModelConfig { extra, strict })
+    ModelConfig {
+        extra,
+        strict,
+        validate_by_alias,
+        validate_by_name,
+    }
 }
 
 /// Return the input type accepted by a Pydantic field's synthesized constructor parameter.
 pub(in crate::types) fn constructor_parameter_type<'db>(
     db: &'db dyn Db,
     field_type: Type<'db>,
-    field_strict: StrictMode,
+    field_strict: ConfigBoolean,
     metadata: ModelMetadata<'db>,
 ) -> Type<'db> {
-    if field_strict.or(metadata.config.strict) == StrictMode::Strict {
+    if field_strict.or(metadata.config.strict) == ConfigBoolean::Enabled {
         return field_type;
     }
 
