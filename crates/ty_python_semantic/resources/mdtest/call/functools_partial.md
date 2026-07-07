@@ -1095,6 +1095,7 @@ def accepts_keywords(*, value: object, count: int) -> None:
     pass
 
 partial(accepts_keywords, **{"value": _, "count": 1})  # error: [invalid-argument-type]
+partial(accepts_keywords, **{"value": _, **{"value": 1}, "count": 1})
 
 class BroadKeywords(TypedDict):
     value: object
