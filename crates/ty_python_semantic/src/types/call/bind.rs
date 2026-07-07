@@ -5355,13 +5355,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         argument_index: usize,
         argument_types: &CallArgumentTypes<'db>,
     ) -> Option<Type<'db>> {
-        synthesized_typed_dict_type_from_fields(
-            self.db,
-            self.argument_matches[argument_index]
-                .keyword_parameter_types(self.signature.parameters()),
-            TypedDictOpenness::Closed,
-        )
-        .and_then(|context_ty| argument_types.get_inferred_for_declared_type(context_ty))
+        let context_ty = self.argument_matches[argument_index]
+            .keyword_context_type(self.db, self.signature.parameters())?;
+        argument_types.get_inferred_for_declared_type(context_ty)
     }
 
     /// Invoke a sub-call for the given `ParamSpec` type variable, using the forwarded arguments.
@@ -5723,6 +5719,36 @@ impl<'db> MatchedArgument<'db> {
                     .map(|name| (name.clone(), parameter.annotated_type()))
             }
         })
+    }
+
+    pub(crate) fn keyword_variadic_parameter_type(
+        &self,
+        parameters: &Parameters<'db>,
+    ) -> Option<Type<'db>> {
+        self.parameters.iter().find_map(|matched_parameter| {
+            let parameter = &parameters[matched_parameter.index];
+            parameter
+                .is_keyword_variadic()
+                .then(|| parameter.annotated_type())
+        })
+    }
+
+    pub(crate) fn keyword_context_type(
+        &self,
+        db: &'db dyn Db,
+        parameters: &Parameters<'db>,
+    ) -> Option<Type<'db>> {
+        let variadic_ty = self.keyword_variadic_parameter_type(parameters);
+        let openness = variadic_ty.map_or(TypedDictOpenness::Closed, |ty| {
+            TypedDictOpenness::extra(db, ty, false)
+        });
+
+        synthesized_typed_dict_type_from_fields(
+            db,
+            self.keyword_parameter_types(parameters),
+            openness,
+        )
+        .or(variadic_ty)
     }
 }
 

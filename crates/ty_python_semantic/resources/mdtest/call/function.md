@@ -1901,6 +1901,23 @@ def ok(content: str) -> None:
     reveal_type(create(**kwargs))  # revealed: int
 ```
 
+Known fields matched to a keyword-variadic parameter use its annotation as context:
+
+```py
+from typing import Any, overload
+
+@overload
+def variadic_context(**kwargs: str) -> str: ...
+@overload
+def variadic_context(**kwargs: int) -> int: ...
+def variadic_context(**kwargs: object) -> object: ...
+def takes_strings(**kwargs: str) -> None: ...
+def check_variadic_context() -> None:
+    kwargs: dict[str, Any] = {"x": 1}
+    reveal_type(variadic_context(**kwargs))  # revealed: int
+    takes_strings(**kwargs)  # error: [invalid-argument-type]
+```
+
 Known dictionary fields are matched to parameters by name, not by iteration order:
 
 ```py

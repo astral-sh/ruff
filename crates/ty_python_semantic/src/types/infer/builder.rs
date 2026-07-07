@@ -5149,12 +5149,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let expected_fields: FxHashMap<_, _> = argument_matches
                             .keyword_parameter_types(overload.signature.parameters())
                             .collect();
-
-                        let Some(context_ty) = synthesized_typed_dict_type_from_fields(
-                            db,
-                            expected_fields.iter().map(|(name, ty)| (name.clone(), *ty)),
-                            TypedDictOpenness::Closed,
-                        ) else {
+                        let expected_variadic_ty = argument_matches
+                            .keyword_variadic_parameter_type(overload.signature.parameters());
+                        let Some(context_ty) = argument_matches
+                            .keyword_context_type(db, overload.signature.parameters())
+                        else {
                             continue;
                         };
                         if !seen.insert(context_ty) {
@@ -5166,12 +5165,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 argument_type,
                                 keyword,
                                 Some(&expected_fields),
+                                expected_variadic_ty,
                             )
                         } else {
                             self.speculate_without_diagnostics().try_narrow_dict_kwargs(
                                 argument_type,
                                 keyword,
                                 Some(&expected_fields),
+                                expected_variadic_ty,
                             )
                         };
                         if let Some(ty) = ty {
@@ -7544,6 +7545,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         argument_type: Type<'db>,
         keyword: &ast::Keyword,
         expected_fields: Option<&FxHashMap<Name, Type<'db>>>,
+        expected_variadic_ty: Option<Type<'db>>,
     ) -> Option<Type<'db>> {
         let db = self.db();
         let file_scope_id = self.scope().file_scope_id(db);
@@ -7571,12 +7573,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             };
             let contextual_ty = expected_fields.and_then(|expected_fields| {
+                let expected_ty = expected_fields
+                    .get(&key)
+                    .copied()
+                    .or(expected_variadic_ty)?;
                 bindings
                     .filter_map(|binding| binding.binding.definition())
                     .exactly_one()
                     .ok()
                     .and_then(|definition| {
-                        self.contextualized_kwargs_field_type(definition, &key, expected_fields)
+                        self.contextualized_kwargs_field_type(definition, expected_ty)
                     })
             });
 
@@ -7668,14 +7674,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Some(Name::new(key.as_string_literal_expr()?.value.to_str()))
     }
 
-    /// Re-infer a fresh dictionary literal field with its matched keyword parameter type.
+    /// Re-infer a fresh dictionary literal field with its matched parameter type.
     fn contextualized_kwargs_field_type(
         &mut self,
         definition: Definition<'db>,
-        key: &Name,
-        expected_fields: &FxHashMap<Name, Type<'db>>,
+        expected_ty: Type<'db>,
     ) -> Option<Type<'db>> {
-        let expected_ty = expected_fields.get(key).copied()?;
         let DefinitionKind::DictKeyAssignment(assignment) = definition.kind(self.db()) else {
             return None;
         };
@@ -7699,7 +7703,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.store_expression_type(argument, ty);
                 } else if let ast::ArgOrKeyword::Keyword(keyword) = arg_or_keyword
                     && keyword.arg.is_none()
-                    && let Some(ty) = self.try_narrow_dict_kwargs(ty, keyword, None)
+                    && let Some(ty) = self.try_narrow_dict_kwargs(ty, keyword, None, None)
                 {
                     return ty;
                 }
