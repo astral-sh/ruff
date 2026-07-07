@@ -227,19 +227,6 @@ impl ConditionFlowSnapshot {
     }
 }
 
-/// Whether any unaliased multipart import (`import a.b`) has been recorded so far.
-#[derive(Copy, Clone)]
-enum MultipartImportTracking {
-    Inactive,
-    Active,
-}
-
-impl MultipartImportTracking {
-    const fn is_inactive(self) -> bool {
-        matches!(self, MultipartImportTracking::Inactive)
-    }
-}
-
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Builder state
     db: &'db dyn Db,
@@ -287,9 +274,10 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     condition_flow_snapshots_by_node: FxHashMap<ExpressionNodeKey, ConditionFlowSnapshots>,
     statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
     imported_modules: FxHashSet<ModuleName>,
-    /// Lets dotted-use tracking return early, as eager resolution can only credit
-    /// imports that precede the use.
-    multipart_import_tracking: MultipartImportTracking,
+    /// Root names bound by unaliased multipart imports (`import a.b` binds `a`).
+    /// Checking against the names seen so far is sound, as eager resolution can
+    /// only credit imports that precede the use.
+    multipart_import_roots: FxHashSet<Name>,
     seen_submodule_imports: FxHashSet<String>,
     // A map from a lambda expression to its enclosing statement.
     enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
@@ -352,7 +340,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             seen_submodule_imports: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
-            multipart_import_tracking: MultipartImportTracking::Inactive,
+            multipart_import_roots: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
             async_comprehensions: FxHashSet::default(),
 
@@ -1401,7 +1389,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn record_multipart_import_use(&mut self, expr: &ast::Expr) {
-        if self.multipart_import_tracking.is_inactive() {
+        if self.multipart_import_roots.is_empty() {
             return;
         }
         let Some(dotted_name) = UnqualifiedName::from_expr(expr) else {
@@ -1411,6 +1399,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let [imported_root, ..] = segments else {
             return;
         };
+        if !self.multipart_import_roots.contains(*imported_root) {
+            return;
+        }
 
         for (scope_id, _) in self.visible_ancestor_scopes(self.current_scope()) {
             let place_table = &self.place_tables[scope_id];
@@ -2984,10 +2975,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             .record_expression(asname, self.current_scope());
                         (asname.id.clone(), asname.id == alias.name.id)
                     } else {
+                        let root = Name::new(alias.name.id.split('.').next().unwrap());
                         if alias.name.contains('.') {
-                            self.multipart_import_tracking = MultipartImportTracking::Active;
+                            self.multipart_import_roots.insert(root.clone());
                         }
-                        (Name::new(alias.name.id.split('.').next().unwrap()), false)
+                        (root, false)
                     };
 
                     let symbol = self.add_symbol(symbol_name);
