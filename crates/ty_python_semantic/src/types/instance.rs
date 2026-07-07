@@ -568,8 +568,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.type_satisfies_protocol_member(db, ty, &member)
                 })
         };
-        if structurally_satisfied.is_never_satisfied(db) {
-            self.provide_context(|| ErrorContext::TypeNotCompatibleWithProtocol {
+        if let Some(context) = self.report_context()
+            && structurally_satisfied.is_never_satisfied(db)
+        {
+            context.push(ErrorContext::TypeNotCompatibleWithProtocol {
                 ty,
                 protocol: Type::ProtocolInstance(protocol),
             });
