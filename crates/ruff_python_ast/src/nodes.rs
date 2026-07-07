@@ -1624,6 +1624,11 @@ impl StringLiteralFlags {
         self
     }
 
+    /// Returns `true` if the parser deemed the string literal invalid.
+    pub const fn is_invalid(self) -> bool {
+        self.0.contains(StringLiteralFlagsInner::INVALID)
+    }
+
     pub const fn prefix(self) -> StringLiteralPrefix {
         if self.0.contains(StringLiteralFlagsInner::U_PREFIX) {
             debug_assert!(
@@ -2043,6 +2048,11 @@ impl BytesLiteralFlags {
     pub fn with_invalid(mut self) -> Self {
         self.0 |= BytesLiteralFlagsInner::INVALID;
         self
+    }
+
+    /// Returns `true` if the parser deemed the bytes literal invalid.
+    pub const fn is_invalid(self) -> bool {
+        self.0.contains(BytesLiteralFlagsInner::INVALID)
     }
 
     pub const fn prefix(self) -> ByteStringPrefix {

@@ -9,7 +9,7 @@ use crate::Db;
 /// The first range in the list is the largest range containing the cursor position.
 pub fn selection_range(db: &dyn Db, file: File, offset: TextSize) -> Vec<TextRange> {
     let parsed = parsed_module(db, file).load(db);
-    let range = TextRange::new(offset, offset);
+    let range = TextRange::empty(offset);
 
     let covering = covering_node(parsed.syntax().into(), range);
 
@@ -22,7 +22,6 @@ pub fn selection_range(db: &dyn Db, file: File, offset: TextSize) -> Vec<TextRan
             if ranges.last() != Some(&range) {
                 ranges.push(range);
             }
-            // Appends additional range if node content is encased by quotes
             if let Some(literal_range) = literal_content_range(node, offset) {
                 ranges.push(literal_range);
             }
@@ -47,12 +46,12 @@ fn should_include_in_selection(node: ruff_python_ast::AnyNodeRef) -> bool {
     }
 }
 
-/// Determines the content range of a string or byte literal if it's non-empty.
+/// Determines the content range of a valid string or byte literal if it's non-empty.
 fn literal_content_range(node: ruff_python_ast::AnyNodeRef, offset: TextSize) -> Option<TextRange> {
     use ruff_python_ast::AnyNodeRef;
     let range = match node {
-        AnyNodeRef::StringLiteral(s) => Some(s.content_range()),
-        AnyNodeRef::BytesLiteral(b) => Some(b.content_range()),
+        AnyNodeRef::StringLiteral(s) if !s.flags.is_invalid() => Some(s.content_range()),
+        AnyNodeRef::BytesLiteral(b) if !b.flags.is_invalid() => Some(b.content_range()),
         _ => None,
     };
     range.filter(|&range| !range.is_empty() && range.contains_inclusive(offset))
@@ -158,6 +157,60 @@ print(\"he<CURSOR>llo\")
           |
         2 | print("hello")
           |        ^^^^^
+          |
+        "#);
+    }
+
+    /// Test selection range when the cursor is in a string literal prefix
+    #[test]
+    fn selection_range_string_literal_prefix() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+r<CURSOR>"hello"
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.selection_range(), @r#"
+        info[selection-range]: Selection Range 0
+         --> main.py:1:1
+          |
+        1 | /
+        2 | | r"hello"
+          | |_________^
+          |
+
+        info[selection-range]: Selection Range 1
+         --> main.py:2:1
+          |
+        2 | r"hello"
+          | ^^^^^^^^
+          |
+        "#);
+    }
+
+    /// Test selection range on a string literal created during parser recovery
+    #[test]
+    fn selection_range_recovered_invalid_string_literal() {
+        let test = CursorTest::builder()
+            .source("main.py", "f\"foo\" b\"b<CURSOR>ar\"")
+            .build();
+
+        assert_snapshot!(test.selection_range(), @r#"
+        info[selection-range]: Selection Range 0
+         --> main.py:1:1
+          |
+        1 | f"foo" b"bar"
+          | ^^^^^^^^^^^^^
+          |
+
+        info[selection-range]: Selection Range 1
+         --> main.py:1:8
+          |
+        1 | f"foo" b"bar"
+          |        ^^^^^^
           |
         "#);
     }
@@ -380,6 +433,36 @@ b"he<CURSOR>llo"
           |
         2 | b"hello"
           |   ^^^^^
+          |
+        "#);
+    }
+
+    /// Test selection range on an invalid bytes literal
+    #[test]
+    fn selection_range_invalid_bytes_literal() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+b"123a𝐁<CURSOR>c"
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.selection_range(), @r#"
+        info[selection-range]: Selection Range 0
+         --> main.py:1:1
+          |
+        1 | /
+        2 | | b"123a𝐁c"
+          | |__________^
+          |
+
+        info[selection-range]: Selection Range 1
+         --> main.py:2:1
+          |
+        2 | b"123a𝐁c"
+          | ^^^^^^^^^
           |
         "#);
     }
