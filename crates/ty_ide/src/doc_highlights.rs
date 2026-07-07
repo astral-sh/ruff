@@ -1,26 +1,31 @@
 use crate::goto::find_goto_target;
 use crate::references::{ReferencesMode, references};
 use crate::{Db, ReferenceTarget};
-use ruff_db::files::File;
 use ruff_text_size::TextSize;
+use ty_python_core::environment::ProgramFile;
 use ty_python_semantic::SemanticModel;
 
 /// Find all document highlights for a symbol at the given position.
 /// Document highlights are limited to the current file only.
 pub fn document_highlights(
     db: &dyn Db,
-    file: File,
+    program_file: ProgramFile<'_>,
     offset: TextSize,
 ) -> Option<Vec<ReferenceTarget>> {
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let parsed = program_file.parsed(db);
     let module = parsed.load(db);
-    let model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db, program_file);
 
     // Get the definitions for the symbol at the cursor position
     let goto_target = find_goto_target(&model, &module, offset)?;
 
     // Use DocumentHighlights mode which limits search to current file only
-    references(db, file, &goto_target, ReferencesMode::DocumentHighlights)
+    references(
+        db,
+        program_file,
+        &goto_target,
+        ReferencesMode::DocumentHighlights,
+    )
 }
 
 #[cfg(test)]
@@ -35,7 +40,7 @@ mod tests {
     impl CursorTest {
         fn document_highlights(&self) -> String {
             let Some(highlight_results) =
-                document_highlights(&self.db, self.cursor.file, self.cursor.offset)
+                document_highlights(&self.db, self.cursor_program_file(), self.cursor.offset)
             else {
                 return "No highlights found".to_string();
             };

@@ -6,7 +6,6 @@ use ruff_python_ast as ast;
 use std::iter::{FusedIterator, once};
 use std::sync::Arc;
 
-use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{FrozenIndexVec, IndexSlice};
 use ruff_python_ast::NodeIndex;
@@ -24,6 +23,7 @@ use ast_ids::AstIds;
 pub use ast_ids::ExpressionNodeKey;
 use builder::SemanticIndexBuilder;
 use definition::{Definition, DefinitionNodeKey, Definitions};
+use environment::ProgramFile;
 use expression::Expression;
 use narrowing_constraints::ScopedNarrowingConstraint;
 pub use place::{PlaceExprRef, PlaceTable};
@@ -43,6 +43,7 @@ pub mod ast_node_ref;
 mod builder;
 mod db;
 pub mod definition;
+pub mod environment;
 pub mod expression;
 pub mod frozen;
 pub(crate) mod member;
@@ -66,12 +67,14 @@ pub mod program;
 ///
 /// Prefer using [`symbol_table`] when working with symbols from a single scope.
 #[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size)]
-pub fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
+pub fn semantic_index<'db>(db: &'db dyn Db, program_file: ProgramFile<'db>) -> SemanticIndex<'db> {
+    let versioned_file = program_file.versioned_file(db);
+    let file = program_file.file(db);
     let _span = tracing::trace_span!("semantic_index", ?file).entered();
 
-    let module = parsed_module(db, file).load(db);
+    let module = parsed_module(db, versioned_file).load(db);
 
-    SemanticIndexBuilder::new(db, file, &module).build()
+    SemanticIndexBuilder::new(db, program_file, &module).build()
 }
 
 /// Returns the place table for a specific `scope`.
@@ -81,9 +84,10 @@ pub fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
 /// is unchanged.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 pub fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<PlaceTable> {
-    let file = scope.file(db);
+    let program_file = scope.program_file(db);
+    let file = program_file.file(db);
     let _span = tracing::trace_span!("place_table", scope=?scope.as_id(), ?file).entered();
-    let index = semantic_index(db, file);
+    let index = semantic_index(db, program_file);
     Arc::clone(&index.place_tables[scope.file_scope_id(db)])
 }
 
@@ -94,9 +98,10 @@ pub fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<PlaceTable>
 /// is unchanged.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 pub fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'db>> {
-    let file = scope.file(db);
+    let program_file = scope.program_file(db);
+    let file = program_file.file(db);
     let _span = tracing::trace_span!("use_def_map", scope=?scope.as_id(), ?file).entered();
-    let index = semantic_index(db, file);
+    let index = semantic_index(db, program_file);
     Arc::clone(&index.use_def_maps[scope.file_scope_id(db)])
 }
 
@@ -171,8 +176,7 @@ pub fn attribute_scopes<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
 ) -> impl Iterator<Item = FileScopeId> + 'db {
-    let file = class_body_scope.file(db);
-    let index = semantic_index(db, file);
+    let index = semantic_index(db, class_body_scope.program_file(db));
     let class_scope_id = class_body_scope.file_scope_id(db);
     ChildrenIter::new(&index.scopes, class_scope_id)
         .filter_map(move |(child_scope_id, scope)| {
@@ -221,7 +225,7 @@ pub fn attribute_scopes<'db>(
 
 /// Returns the module global scope of `file`.
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-pub fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
+pub fn global_scope<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> ScopeId<'db> {
     let _span = tracing::trace_span!("global_scope", ?file).entered();
 
     FileScopeId::global().to_scope_id(db, file)
@@ -1069,7 +1073,10 @@ impl HasTrackedScope for ast::Identifier {}
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::{files::system_path_to_file, parsed::ParsedModuleRef};
+    use ruff_db::{
+        files::{File, system_path_to_file},
+        parsed::ParsedModuleRef,
+    };
     use ruff_python_ast as ast;
     use ruff_text_size::{Ranged, TextRange};
 
@@ -1082,6 +1089,18 @@ mod tests {
             DefinitionKind, LambdaParameterDefinitionNodeKind, ParameterDefinitionNodeKind,
         },
     };
+
+    fn program_file(db: &TestDb, file: File) -> ProgramFile<'_> {
+        ProgramFile::new(db, db.program(), file)
+    }
+
+    fn global_scope(db: &TestDb, file: File) -> ScopeId<'_> {
+        super::global_scope(db, program_file(db, file))
+    }
+
+    fn semantic_index(db: &TestDb, file: File) -> &SemanticIndex<'_> {
+        super::semantic_index(db, program_file(db, file))
+    }
 
     impl UseDefMap<'_> {
         fn first_public_binding(&self, symbol: ScopedSymbolId) -> Option<Definition<'_>> {
@@ -1266,7 +1285,7 @@ y = 2
 
         assert_eq!(names(global_table), vec!["C", "y"]);
 
-        let module = parsed_module(&db, file).load(&db);
+        let module = program_file(&db, file).parsed(&db).load(&db);
         let index = semantic_index(&db, file);
 
         let [(class_scope_id, class_scope)] = index
@@ -1277,7 +1296,9 @@ y = 2
         };
         assert_eq!(class_scope.kind(), ScopeKind::Class);
         assert_eq!(
-            class_scope_id.to_scope_id(&db, file).name(&db, &module),
+            class_scope_id
+                .to_scope_id(&db, program_file(&db, file))
+                .name(&db, &module),
             "C"
         );
 
@@ -1300,7 +1321,7 @@ def func():
 y = 2
 ",
         );
-        let module = parsed_module(&db, file).load(&db);
+        let module = program_file(&db, file).parsed(&db).load(&db);
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
@@ -1314,7 +1335,9 @@ y = 2
         };
         assert_eq!(function_scope.kind(), ScopeKind::Function);
         assert_eq!(
-            function_scope_id.to_scope_id(&db, file).name(&db, &module),
+            function_scope_id
+                .to_scope_id(&db, program_file(&db, file))
+                .name(&db, &module),
             "func"
         );
 
@@ -1448,7 +1471,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 ",
         );
 
-        let module = parsed_module(&db, file).load(&db);
+        let module = program_file(&db, file).parsed(&db).load(&db);
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
@@ -1464,7 +1487,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         assert_eq!(comprehension_scope.kind(), ScopeKind::Comprehension);
         assert_eq!(
             comprehension_scope_id
-                .to_scope_id(&db, file)
+                .to_scope_id(&db, program_file(&db, file))
                 .name(&db, &module),
             "<listcomp>"
         );
@@ -1509,7 +1532,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 
         let use_def = index.use_def_map(comprehension_scope_id);
 
-        let module = parsed_module(&db, file).load(&db);
+        let module = program_file(&db, file).parsed(&db).load(&db);
         let syntax = module.syntax();
         let element = syntax.body[0]
             .as_expr_stmt()
@@ -1520,7 +1543,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             .elt
             .as_name_expr()
             .unwrap();
-        let element_use_id = element.scoped_use_id(&db, file);
+        let element_use_id = element.scoped_use_id(&db, program_file(&db, file));
 
         let binding = use_def.first_binding_at_use(element_use_id).unwrap();
         let DefinitionKind::Comprehension(comprehension) = binding.kind(&db) else {
@@ -1544,7 +1567,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 ",
         );
 
-        let module = parsed_module(&db, file).load(&db);
+        let module = program_file(&db, file).parsed(&db).load(&db);
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
@@ -1560,7 +1583,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         assert_eq!(comprehension_scope.kind(), ScopeKind::Comprehension);
         assert_eq!(
             comprehension_scope_id
-                .to_scope_id(&db, file)
+                .to_scope_id(&db, program_file(&db, file))
                 .name(&db, &module),
             "<listcomp>"
         );
@@ -1579,7 +1602,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         assert_eq!(inner_comprehension_scope.kind(), ScopeKind::Comprehension);
         assert_eq!(
             inner_comprehension_scope_id
-                .to_scope_id(&db, file)
+                .to_scope_id(&db, program_file(&db, file))
                 .name(&db, &module),
             "<setcomp>"
         );
@@ -1645,7 +1668,7 @@ def func():
     y = 2
 ",
         );
-        let module = parsed_module(&db, file).load(&db);
+        let module = program_file(&db, file).parsed(&db).load(&db);
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
@@ -1663,12 +1686,16 @@ def func():
         assert_eq!(func_scope_1.kind(), ScopeKind::Function);
 
         assert_eq!(
-            func_scope1_id.to_scope_id(&db, file).name(&db, &module),
+            func_scope1_id
+                .to_scope_id(&db, program_file(&db, file))
+                .name(&db, &module),
             "func"
         );
         assert_eq!(func_scope_2.kind(), ScopeKind::Function);
         assert_eq!(
-            func_scope2_id.to_scope_id(&db, file).name(&db, &module),
+            func_scope2_id
+                .to_scope_id(&db, program_file(&db, file))
+                .name(&db, &module),
             "func"
         );
 
@@ -1693,7 +1720,7 @@ def func[T]():
 ",
         );
 
-        let module = parsed_module(&db, file).load(&db);
+        let module = program_file(&db, file).parsed(&db).load(&db);
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
@@ -1708,7 +1735,9 @@ def func[T]():
 
         assert_eq!(ann_scope.kind(), ScopeKind::TypeParams);
         assert_eq!(
-            ann_scope_id.to_scope_id(&db, file).name(&db, &module),
+            ann_scope_id
+                .to_scope_id(&db, program_file(&db, file))
+                .name(&db, &module),
             "func"
         );
         let ann_table = index.place_table(ann_scope_id);
@@ -1721,7 +1750,9 @@ def func[T]():
         };
         assert_eq!(func_scope.kind(), ScopeKind::Function);
         assert_eq!(
-            func_scope_id.to_scope_id(&db, file).name(&db, &module),
+            func_scope_id
+                .to_scope_id(&db, program_file(&db, file))
+                .name(&db, &module),
             "func"
         );
         let func_table = index.place_table(func_scope_id);
@@ -1737,7 +1768,7 @@ class C[T]:
 ",
         );
 
-        let module = parsed_module(&db, file).load(&db);
+        let module = program_file(&db, file).parsed(&db).load(&db);
         let index = semantic_index(&db, file);
         let global_table = index.place_table(FileScopeId::global());
 
@@ -1751,7 +1782,12 @@ class C[T]:
         };
 
         assert_eq!(ann_scope.kind(), ScopeKind::TypeParams);
-        assert_eq!(ann_scope_id.to_scope_id(&db, file).name(&db, &module), "C");
+        assert_eq!(
+            ann_scope_id
+                .to_scope_id(&db, program_file(&db, file))
+                .name(&db, &module),
+            "C"
+        );
         let ann_table = index.place_table(ann_scope_id);
         assert_eq!(names(ann_table), vec!["T"]);
         assert!(
@@ -1769,7 +1805,9 @@ class C[T]:
 
         assert_eq!(class_scope.kind(), ScopeKind::Class);
         assert_eq!(
-            class_scope_id.to_scope_id(&db, file).name(&db, &module),
+            class_scope_id
+                .to_scope_id(&db, program_file(&db, file))
+                .name(&db, &module),
             "C"
         );
         assert_eq!(names(index.place_table(class_scope_id)), vec!["x"]);
@@ -1778,7 +1816,7 @@ class C[T]:
     #[test]
     fn reachability_trivial() {
         let TestCase { db, file } = test_case("x = 1; x");
-        let module = parsed_module(&db, file).load(&db);
+        let module = program_file(&db, file).parsed(&db).load(&db);
         let scope = global_scope(&db, file);
         let ast = module.syntax();
         let ast::Stmt::Expr(ast::StmtExpr {
@@ -1790,7 +1828,7 @@ class C[T]:
         let ast::Expr::Name(x_use_expr_name) = x_use_expr.as_ref() else {
             panic!("expected a Name");
         };
-        let x_use_id = x_use_expr_name.scoped_use_id(&db, file);
+        let x_use_id = x_use_expr_name.scoped_use_id(&db, program_file(&db, file));
         let use_def = use_def_map(&db, scope);
         let binding = use_def.first_binding_at_use(x_use_id).unwrap();
         let DefinitionKind::Assignment(assignment) = binding.kind(&db) else {
@@ -1811,7 +1849,7 @@ class C[T]:
         let TestCase { db, file } = test_case("x = 1;\ndef test():\n  y = 4");
 
         let index = semantic_index(&db, file);
-        let module = parsed_module(&db, file).load(&db);
+        let module = program_file(&db, file).parsed(&db).load(&db);
         let ast = module.syntax();
 
         let x_stmt = ast.body[0].as_assign_stmt().unwrap();
@@ -1832,12 +1870,12 @@ class C[T]:
         fn scope_names<'a, 'db>(
             scopes: impl Iterator<Item = (FileScopeId, &'db Scope)>,
             db: &'db dyn Db,
-            file: File,
+            program_file: ProgramFile<'db>,
             module: &'a ParsedModuleRef,
         ) -> Vec<&'a str> {
             scopes
                 .into_iter()
-                .map(|(scope_id, _)| scope_id.to_scope_id(db, file).name(db, module))
+                .map(|(scope_id, _)| scope_id.to_scope_id(db, program_file).name(db, module))
                 .collect()
         }
 
@@ -1854,22 +1892,26 @@ def x():
     pass",
         );
 
-        let module = parsed_module(&db, file).load(&db);
+        let module = program_file(&db, file).parsed(&db).load(&db);
         let index = semantic_index(&db, file);
+        let program_file = program_file(&db, file);
 
         let descendants = index.descendent_scopes(FileScopeId::global());
         assert_eq!(
-            scope_names(descendants, &db, file, &module),
+            scope_names(descendants, &db, program_file, &module),
             vec!["Test", "foo", "bar", "baz", "x"]
         );
 
         let children = index.child_scopes(FileScopeId::global());
-        assert_eq!(scope_names(children, &db, file, &module), vec!["Test", "x"]);
+        assert_eq!(
+            scope_names(children, &db, program_file, &module),
+            vec!["Test", "x"]
+        );
 
         let test_class = index.child_scopes(FileScopeId::global()).next().unwrap().0;
         let test_child_scopes = index.child_scopes(test_class);
         assert_eq!(
-            scope_names(test_child_scopes, &db, file, &module),
+            scope_names(test_child_scopes, &db, program_file, &module),
             vec!["foo", "baz"]
         );
 
@@ -1881,7 +1923,7 @@ def x():
         let ancestors = index.ancestor_scopes(bar_scope);
 
         assert_eq!(
-            scope_names(ancestors, &db, file, &module),
+            scope_names(ancestors, &db, program_file, &module),
             vec!["bar", "foo", "Test", "<module>"]
         );
     }

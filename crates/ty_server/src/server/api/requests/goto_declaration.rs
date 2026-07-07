@@ -48,7 +48,8 @@ impl BackgroundDocumentRequestHandler for GotoDeclarationRequestHandler {
             return Ok(None);
         };
 
-        let Some(ranged) = goto_declaration(db, file, offset) else {
+        let Some(ranged) = goto_declaration(db, crate::server::api::program_file(db, file), offset)
+        else {
             return Ok(None);
         };
 

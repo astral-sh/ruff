@@ -1,10 +1,10 @@
 use crate::ast_node_ref::AstNodeRef;
 use crate::db::Db;
 use crate::definition::Definition;
+use crate::environment::ProgramFile;
 use crate::expression::Expression;
 use crate::node_key::NodeKey;
 use crate::scope::{FileScopeId, ScopeId};
-use ruff_db::files::File;
 use ruff_python_ast as ast;
 use salsa;
 
@@ -38,7 +38,7 @@ pub enum Statement<'db> {
 pub struct StatementInner<'db> {
     /// The file in which the statement occurs.
     #[returns(copy)]
-    pub file: File,
+    pub program_file: ProgramFile<'db>,
 
     /// The scope in which the statement occurs.
     #[returns(copy)]
@@ -55,8 +55,12 @@ pub struct StatementInner<'db> {
 impl get_size2::GetSize for StatementInner<'_> {}
 
 impl<'db> StatementInner<'db> {
+    pub fn file(self, db: &'db dyn Db) -> ruff_db::files::File {
+        self.program_file(db).file(db)
+    }
+
     pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        self.file_scope(db).to_scope_id(db, self.file(db))
+        self.file_scope(db).to_scope_id(db, self.program_file(db))
     }
 }
 

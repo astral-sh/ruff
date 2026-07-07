@@ -14,16 +14,16 @@ use super::{Type, TypeCheckDiagnostics, infer_definition_types};
 use crate::diagnostic::DiagnosticGuard;
 use crate::lint::LintSource;
 use crate::reachability::is_range_reachable;
+use crate::suppression::suppressions;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNBOUND_TYPE_VARIABLE};
 use crate::types::function::FunctionDecorators;
 use crate::types::infer::InferenceFlags;
 use crate::{
-    Db,
+    Db, Program,
     lint::{LintId, LintMetadata},
-    suppression::suppressions,
 };
 use ty_python_core::scope::ScopeId;
-use ty_python_core::semantic_index;
+use ty_python_core::{environment::ProgramFile, semantic_index};
 
 /// Context for inferring the types of a single file.
 ///
@@ -40,6 +40,8 @@ use ty_python_core::semantic_index;
 pub(crate) struct InferContext<'db, 'ast> {
     db: &'db dyn Db,
     scope: ScopeId<'db>,
+    program_file: ProgramFile<'db>,
+    program: Program,
     file: File,
     module: &'ast ParsedModuleRef,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
@@ -51,11 +53,14 @@ pub(crate) struct InferContext<'db, 'ast> {
 
 impl<'db, 'ast> InferContext<'db, 'ast> {
     pub(crate) fn new(db: &'db dyn Db, scope: ScopeId<'db>, module: &'ast ParsedModuleRef) -> Self {
+        let program_file = scope.program_file(db);
         Self {
             db,
             scope,
+            program_file,
+            program: program_file.program(db),
             module,
-            file: scope.file(db),
+            file: program_file.file(db),
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
             diagnostics_suppressed: false,
             inference_flags: InferenceFlags::empty(),
@@ -68,6 +73,14 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     /// The file for which the types are inferred.
     pub(crate) fn file(&self) -> File {
         self.file
+    }
+
+    pub(crate) fn program_file(&self) -> ProgramFile<'db> {
+        self.program_file
+    }
+
+    pub(crate) fn program(&self) -> Program {
+        self.program
     }
 
     /// The module for which the types are inferred.
@@ -187,7 +200,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
 
         // Accessing the semantic index here is fine because
         // the index belongs to the same file as for which we emit the diagnostic.
-        let index = semantic_index(self.db, self.file);
+        let index = semantic_index(self.db, self.program_file);
 
         let scope_id = self.scope.file_scope_id(self.db);
 
@@ -214,7 +227,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     /// This checks both whether the scope itself is reachable and whether the
     /// specific statement or expression containing this range is reachable.
     fn is_range_reachable(&self, range: TextRange) -> bool {
-        let index = semantic_index(self.db, self.file);
+        let index = semantic_index(self.db, self.program_file);
         let scope_id = self.scope.file_scope_id(self.db);
         is_range_reachable(self.db, index, scope_id, range)
     }
@@ -469,7 +482,7 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
 
         let (severity, source) = Self::severity_and_source(ctx, lint_id)?;
 
-        let suppressions = suppressions(ctx.db(), ctx.file());
+        let suppressions = suppressions(ctx.db(), ctx.program_file().versioned_file(ctx.db()));
         if let Some(suppression) = suppressions.find_suppression(range, lint_id) {
             ctx.diagnostics.borrow_mut().mark_used(suppression.id());
             return None;
@@ -549,6 +562,7 @@ impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
         if !ctx.db.should_check_file(ctx.file) {
             return None;
         }
+
         Some(DiagnosticGuardBuilder { ctx, id, severity })
     }
 

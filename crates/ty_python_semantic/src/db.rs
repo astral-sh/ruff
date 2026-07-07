@@ -3,11 +3,12 @@ use crate::lint::{LintRegistry, RuleSelection};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
 use ty_python_core::Db as PythonCoreDb;
+use ty_python_core::environment::ProgramFile;
 
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
 pub trait Db: PythonCoreDb {
-    fn check_file(&self, file: File) -> Vec<Diagnostic>;
+    fn check_file(&self, program_file: ProgramFile<'_>) -> Vec<Diagnostic>;
 
     /// Resolves the rule selection for a given file.
     fn rule_selection(&self, file: File) -> &RuleSelection;
@@ -39,7 +40,7 @@ pub(crate) mod tests {
     };
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_python_ast::PythonVersion;
-    use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings, SearchPaths};
+    use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings};
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
     use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
@@ -55,11 +56,13 @@ pub(crate) mod tests {
         events: Events,
         rule_selection: Arc<RuleSelection>,
         analysis_settings: Arc<AnalysisSettings>,
+        program: Option<Program>,
     }
 
     impl TestDb {
         pub(crate) fn new() -> Self {
             let events = Events::default();
+            let vendored = ty_vendored::file_system().clone();
             Self {
                 storage: salsa::Storage::new(Some(Box::new({
                     let events = events.clone();
@@ -70,12 +73,30 @@ pub(crate) mod tests {
                     }
                 }))),
                 system: TestSystem::default(),
-                vendored: ty_vendored::file_system().clone(),
+                program: None,
+                vendored,
                 events,
                 files: Files::default(),
                 rule_selection: Arc::new(RuleSelection::from_registry(default_lint_registry())),
                 analysis_settings: AnalysisSettings::default().into(),
             }
+        }
+
+        pub(crate) fn program(&self) -> Program {
+            self.program.expect("test database has a program")
+        }
+
+        pub(crate) fn set_python_version(&mut self, version: PythonVersion) {
+            let program = self.program();
+            let settings = ProgramSettings {
+                python_version: PythonVersionWithSource {
+                    version,
+                    source: program.python_version_source(self).clone(),
+                },
+                python_platform: program.python_platform(self).clone(),
+                search_paths: program.search_paths(self).clone(),
+            };
+            self.program = Some(program.with_program_settings(self, settings));
         }
 
         /// Takes the salsa events.
@@ -119,7 +140,7 @@ pub(crate) mod tests {
         }
 
         fn python_version(&self) -> PythonVersion {
-            Program::get(self).python_version(self)
+            self.program().python_version(self)
         }
     }
 
@@ -132,12 +153,13 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl Db for TestDb {
-        fn check_file(&self, file: File) -> Vec<Diagnostic> {
+        fn check_file(&self, program_file: ProgramFile<'_>) -> Vec<Diagnostic> {
+            let file = program_file.file(self);
             if !self.should_check_file(file) {
                 return Vec::new();
             }
 
-            check_file_unwrap(self, file)
+            check_file_unwrap(self, program_file)
         }
 
         fn rule_selection(&self, _file: File) -> &RuleSelection {
@@ -162,11 +184,7 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl ModuleResolverDb for TestDb {
-        fn search_paths(&self) -> &SearchPaths {
-            Program::get(self).search_paths(self)
-        }
-    }
+    impl ModuleResolverDb for TestDb {}
 
     #[salsa::db]
     impl salsa::Database for TestDb {}
@@ -217,19 +235,17 @@ pub(crate) mod tests {
             db.write_files(self.files)
                 .context("Failed to write test files")?;
 
-            Program::from_settings(
-                &db,
-                ProgramSettings {
-                    python_version: PythonVersionWithSource {
-                        version: self.python_version,
-                        source: PythonVersionSource::default(),
-                    },
-                    python_platform: self.python_platform,
-                    search_paths: SearchPathSettings::new(vec![src_root])
-                        .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-                        .context("Invalid search path settings")?,
+            let settings = ProgramSettings {
+                python_version: PythonVersionWithSource {
+                    version: self.python_version,
+                    source: PythonVersionSource::default(),
                 },
-            );
+                python_platform: self.python_platform,
+                search_paths: SearchPathSettings::new(vec![src_root])
+                    .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+                    .context("Invalid search path settings")?,
+            };
+            db.program = Some(Program::create(&db, &settings));
 
             Ok(db)
         }

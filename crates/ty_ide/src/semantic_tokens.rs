@@ -28,8 +28,6 @@
 
 use crate::Db;
 use bitflags::bitflags;
-use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, TraversalSignal, walk_arguments, walk_expr,
     walk_interpolated_string_element, walk_stmt,
@@ -41,6 +39,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
+use ty_python_core::environment::ProgramFile;
 use ty_python_semantic::{
     HasType, ImportAliasResolution, ResolvedDefinition, SemanticModel, definitions_for_attribute,
     definitions_for_imported_symbol,
@@ -183,9 +182,13 @@ impl Deref for SemanticTokens {
 
 /// Generates semantic tokens for a Python file within the specified range.
 /// Pass None to get tokens for the entire file.
-pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> SemanticTokens {
-    let parsed = parsed_module(db, file).load(db);
-    let model = SemanticModel::new(db, file);
+pub fn semantic_tokens(
+    db: &dyn Db,
+    program_file: ProgramFile<'_>,
+    range: Option<TextRange>,
+) -> SemanticTokens {
+    let parsed = program_file.parsed(db).load(db);
+    let model = SemanticModel::new(db, program_file);
 
     let mut visitor = SemanticTokenVisitor::new(&model, range);
     visitor.expecting_docstring = true;
@@ -299,7 +302,7 @@ impl<'db> SemanticTokenVisitor<'db> {
     ) -> Option<(SemanticTokenType, SemanticTokenModifier)> {
         let mut modifiers = SemanticTokenModifier::empty();
         let db = self.model.db();
-        let model = SemanticModel::new(db, definition.file(db));
+        let model = SemanticModel::new(db, definition.program_file(db));
 
         if model.is_type_alias_definition(definition) {
             return Some((SemanticTokenType::Class, modifiers));
@@ -319,7 +322,7 @@ impl<'db> SemanticTokenVisitor<'db> {
                 Some((SemanticTokenType::TypeParameter, modifiers))
             }
             DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) => {
-                let parsed = parsed_module(db, definition.file(db));
+                let parsed = definition.program_file(db).parsed(db);
                 let ty = parameter.node(&parsed.load(db)).inferred_type(&model);
 
                 if let Some(ty) = ty {
@@ -361,7 +364,7 @@ impl<'db> SemanticTokenVisitor<'db> {
                     modifiers |= SemanticTokenModifier::READONLY;
                 }
 
-                let parsed = parsed_module(db, definition.file(db));
+                let parsed = definition.program_file(db).parsed(db);
                 let parsed = parsed.load(db);
                 let value = match definition.kind(db) {
                     DefinitionKind::Assignment(assignment) => Some(assignment.value(&parsed)),
@@ -1283,11 +1286,12 @@ mod tests {
     use super::*;
 
     use insta::assert_snapshot;
+    use ruff_db::files::File;
     use ruff_db::{
         files::system_path_to_file,
         system::{DbWithWritableSystem, SystemPath, SystemPathBuf},
     };
-    use ty_project::ProjectMetadata;
+    use ty_project::{Db as _, ProjectMetadata};
 
     #[test]
     fn semantic_tokens_basic() {
@@ -4708,12 +4712,16 @@ from pathlib import Missing as Alias
 
         /// Get semantic tokens for the entire file
         fn highlight_file(&self) -> SemanticTokens {
-            semantic_tokens(&self.db, self.file, None)
+            let program_file =
+                ProgramFile::new(&self.db, self.db.project().program(&self.db), self.file);
+            semantic_tokens(&self.db, program_file, None)
         }
 
         /// Get semantic tokens for a specific range in the file
         fn highlight_range(&self, range: TextRange) -> SemanticTokens {
-            semantic_tokens(&self.db, self.file, Some(range))
+            let program_file =
+                ProgramFile::new(&self.db, self.db.project().program(&self.db), self.file);
+            semantic_tokens(&self.db, program_file, Some(range))
         }
 
         /// Helper function to convert semantic tokens to a snapshot-friendly text format

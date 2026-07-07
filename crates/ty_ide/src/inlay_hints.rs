@@ -4,14 +4,14 @@ use rustc_hash::FxHashMap;
 
 use crate::importer::{ImportAction, ImportRequest, Importer, MembersInScope};
 use crate::{Db, HasNavigationTargets, NavigationTarget};
-use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Stmt, UnaryOp};
 use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::file_to_module;
+use ty_python_core::environment::ProgramFile;
+use ty_python_core::program::Program;
 use ty_python_semantic::types::ide_support::inlay_hint_call_argument_details;
 use ty_python_semantic::types::{Type, TypeDetail};
 use ty_python_semantic::{HasType, SemanticModel};
@@ -34,14 +34,16 @@ impl InlayHint {
     ) -> Option<Self> {
         let InlayHintImportContext {
             db,
-            file,
+            program_file,
             importer,
             dynamic_imports,
         } = context;
+        let program = program_file.program(db);
+        let file = program_file.file(db);
 
         let position = expr.range().end();
         // Render the type to a string, and get subspans for all the types that make it up
-        let details = ty.display(db).to_string_parts();
+        let details = ty.display(db, program).to_string_parts();
 
         // Filter out repetitive hints like `x: T = T()`
         if call_matches_name(rhs, &details.label) {
@@ -78,7 +80,7 @@ impl InlayHint {
 
                     // Possibly import the current type and return the qualified name
                     let mut qualified_name = |dynamic_importer: &mut DynamicImporter| {
-                        let type_definition = ty.definition(db)?;
+                        let type_definition = ty.definition(db, program)?;
                         let definition = type_definition.definition()?;
 
                         // Only module-level names can be imported with `from <module> import <name>`.
@@ -100,9 +102,10 @@ impl InlayHint {
                             .as_deref()
                             .unwrap_or(&details.label[start..end]);
 
-                        let module = file_to_module(db, definition.file(db))?;
+                        let module =
+                            file_to_module(db, program.resolver_file(db, definition.file(db)))?;
 
-                        if should_skip_import(db, module, *ty) {
+                        if should_skip_import(db, program, module, *ty) {
                             return None;
                         }
 
@@ -129,7 +132,7 @@ impl InlayHint {
                                 qualified_name.len().cast_signed() - (end - start).cast_signed();
                         }
 
-                        let target = ty.navigation_targets(db).into_iter().next();
+                        let target = ty.navigation_targets(db, program).into_iter().next();
 
                         // Always use original text for the label part
                         label_parts.push(
@@ -287,17 +290,18 @@ pub struct InlayHintTextEdit {
 
 pub fn inlay_hints(
     db: &dyn Db,
-    file: File,
+    program_file: ProgramFile<'_>,
     range: TextRange,
     settings: &InlayHintSettings,
 ) -> Vec<InlayHint> {
-    let ast = parsed_module(db, file).load(db);
+    let file = program_file.file(db);
+    let ast = program_file.parsed(db).load(db);
 
     let source = source_text(db, file);
     let stylist = Stylist::from_tokens(ast.tokens(), source.as_str());
-    let importer = Importer::new(db, &stylist, file, source.as_str(), &ast);
+    let importer = Importer::new(db, &stylist, program_file, source.as_str(), &ast);
 
-    let mut visitor = InlayHintVisitor::new(db, file, importer, range, settings);
+    let mut visitor = InlayHintVisitor::new(db, program_file, importer, range, settings);
 
     visitor.visit_body(ast.suite());
 
@@ -343,7 +347,7 @@ impl Default for InlayHintSettings {
 
 struct InlayHintImportContext<'a, 'db> {
     db: &'db dyn Db,
-    file: File,
+    program_file: ProgramFile<'db>,
     importer: &'a Importer<'db>,
     dynamic_imports: &'a mut FxHashMap<DynamicallyImportedMember, ImportAction>,
 }
@@ -365,14 +369,14 @@ struct InlayHintVisitor<'a, 'db> {
 impl<'a, 'db> InlayHintVisitor<'a, 'db> {
     fn new(
         db: &'db dyn Db,
-        file: File,
+        program_file: ProgramFile<'db>,
         importer: Importer<'db>,
         range: TextRange,
         settings: &'a InlayHintSettings,
     ) -> Self {
         Self {
             db,
-            model: SemanticModel::new(db, file),
+            model: SemanticModel::new(db, program_file),
             dynamic_imports: FxHashMap::default(),
             importer,
             hints: Vec::new(),
@@ -394,7 +398,7 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
 
         let context = InlayHintImportContext {
             db: self.db,
-            file: self.model.file(),
+            program_file: self.model.program_file(),
             importer: &self.importer,
             dynamic_imports: &mut self.dynamic_imports,
         };
@@ -635,8 +639,13 @@ fn type_hint_is_excessive_for_expr(expr: &Expr) -> bool {
     }
 }
 
-fn should_skip_import(db: &dyn Db, module: ty_module_resolver::Module, ty: Type) -> bool {
-    module.is_known(db, ty_module_resolver::KnownModule::Builtins) || ty.is_none(db)
+fn should_skip_import(
+    db: &dyn Db,
+    program: Program,
+    module: ty_module_resolver::Module,
+    ty: Type,
+) -> bool {
+    module.is_known(db, ty_module_resolver::KnownModule::Builtins) || ty.is_none(db, program)
 }
 
 fn annotations_are_valid_syntax(stmt_assign: &ruff_python_ast::StmtAssign) -> bool {
@@ -720,7 +729,8 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
         let mut is_possibly_qualified_name = label_text.contains('.');
 
         if let Some(member) = members.find_member(symbol_name) {
-            if member.ty.definition(db) == ty.definition(db) {
+            let program = self.importer.program_file().program(db);
+            if member.ty.definition(db, program) == ty.definition(db, program) {
                 return None;
             }
 
@@ -803,7 +813,7 @@ mod tests {
     use ruff_text_size::{TextLen, TextSize};
 
     use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
-    use ty_project::ProjectMetadata;
+    use ty_project::{Db as _, ProjectMetadata};
 
     pub(super) fn inlay_hint_test(source: &str) -> InlayHintTest {
         const START: &str = "<START>";
@@ -874,7 +884,9 @@ mod tests {
 
         /// Returns the inlay hints for the given test case with custom settings.
         fn inlay_hints_with_settings(&mut self, settings: &InlayHintSettings) -> String {
-            let hints = inlay_hints(&self.db, self.file, self.range, settings);
+            let program_file =
+                ProgramFile::new(&self.db, self.db.project().program(&self.db), self.file);
+            let hints = inlay_hints(&self.db, program_file, self.range, settings);
 
             let mut inlay_hint_buf = source_text(&self.db, self.file).as_str().to_string();
             let mut text_edit_buf = inlay_hint_buf.clone();

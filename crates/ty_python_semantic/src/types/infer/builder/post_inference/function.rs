@@ -62,20 +62,26 @@ fn check_pep695_function_legacy_typevars<'db>(
 
     let mut has_legacy_default = false;
     for default in type_params.iter().filter_map(ast::TypeParam::default) {
-        let Some(typevar) = find_over_type(db, file_expression_type(default), false, |ty| {
-            if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty
-                && matches!(
-                    typevar.kind(db),
-                    TypeVarKind::LegacyTypeVar
-                        | TypeVarKind::Pep613Alias
-                        | TypeVarKind::LegacyParamSpec
-                )
-            {
-                Some(typevar)
-            } else {
-                None
-            }
-        }) else {
+        let Some(typevar) = find_over_type(
+            db,
+            context.program(),
+            file_expression_type(default),
+            false,
+            |ty| {
+                if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty
+                    && matches!(
+                        typevar.kind(db),
+                        TypeVarKind::LegacyTypeVar
+                            | TypeVarKind::Pep613Alias
+                            | TypeVarKind::LegacyParamSpec
+                    )
+                {
+                    Some(typevar)
+                } else {
+                    None
+                }
+            },
+        ) else {
             continue;
         };
 
@@ -217,7 +223,7 @@ fn check_legacy_typevar_defaults<'db>(
             continue;
         };
 
-        let first_bad_tvar = find_over_type(db, default_ty, false, |t| {
+        let first_bad_tvar = find_over_type(db, context.program(), default_ty, false, |t| {
             let tvar = match t {
                 Type::TypeVar(tvar) => tvar.typevar(db),
                 Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,
@@ -272,11 +278,12 @@ fn check_legacy_typevar_defaults<'db>(
         }
 
         if let Some(typevar_definition) = typevar.definition(db) {
-            let file = typevar_definition.file(db);
+            let program_file = typevar_definition.program_file(db);
             diagnostic.annotate(
-                Annotation::secondary(Span::from(
-                    typevar_definition.full_range(db, &parsed_module(db, file).load(db)),
-                ))
+                Annotation::secondary(Span::from(typevar_definition.full_range(
+                    db,
+                    &parsed_module(db, program_file.versioned_file(db)).load(db),
+                )))
                 .message(format_args!("`{typevar_name}` defined here")),
             );
         }
@@ -298,7 +305,7 @@ fn find_typevar_annotation_range<'db>(
         .iter()
         .filter_map(ast::AnyParameterRef::annotation)
         .chain(node.returns.as_deref())
-        .find(|ann| file_expression_type(ann).references_typevar(db, typevar_id))
+        .find(|ann| file_expression_type(ann).references_typevar(db, context.program(), typevar_id))
         .map(Ranged::range)
         .unwrap_or_else(|| node.name.range())
 }
@@ -413,11 +420,12 @@ fn check_legacy_typevar_ordering<'db>(
         let Some(definition) = tvar.definition(db) else {
             continue;
         };
-        let file = definition.file(db);
+        let program_file = definition.program_file(db);
         diagnostic.annotate(
-            Annotation::secondary(Span::from(
-                definition.full_range(db, &parsed_module(db, file).load(db)),
-            ))
+            Annotation::secondary(Span::from(definition.full_range(
+                db,
+                &parsed_module(db, program_file.versioned_file(db)).load(db),
+            )))
             .message(format_args!("`{}` defined here", tvar.name(db))),
         );
     }

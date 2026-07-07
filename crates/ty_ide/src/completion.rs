@@ -2,8 +2,7 @@ use std::cmp::Ordering;
 use std::collections::{BinaryHeap, binary_heap};
 
 use compact_str::CompactString;
-use ruff_db::files::File;
-use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::{SourceText, source_text};
 use ruff_diagnostics::Edit;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
@@ -16,6 +15,8 @@ use ruff_python_literal::escape::{Escape, UnicodeEscape};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, Module, ModuleName};
+use ty_python_core::environment::ProgramFile;
+use ty_python_core::program::Program;
 use ty_python_semantic::HasType;
 use ty_python_semantic::types::{SpecialFormType, UnionType};
 use ty_python_semantic::{
@@ -33,24 +34,30 @@ pub fn completion<'db>(
     db: &'db dyn Db,
     settings: &CompletionSettings,
     capabilities: CompletionCapabilities,
-    file: File,
+    program_file: ProgramFile<'db>,
     offset: TextSize,
 ) -> Vec<Completion<'db>> {
-    let parsed = parsed_module(db, file).load(db);
+    let file = program_file.file(db);
+    let parsed = program_file.parsed(db).load(db);
     let source = source_text(db, file);
 
-    let Some(context) = Context::new(db, file, &parsed, &source, offset) else {
+    let Some(context) = Context::new(db, program_file, &parsed, &source, offset) else {
         return vec![];
     };
-    let model = SemanticModel::new(db, file);
+    let program = program_file.program(db);
+    let model = SemanticModel::new(db, program_file);
 
     if !matches!(context.kind, ContextKind::Keywords(_)) && context.cursor.is_in_string() {
         let Some(string_expr) = context.cursor.enclosing_string_literal_expr() else {
             return vec![];
         };
 
-        let mut completions =
-            Completions::new(db, CollectionContext::none(), UserQuery::fuzzy(None));
+        let mut completions = Completions::new(
+            db,
+            program,
+            CollectionContext::none(),
+            UserQuery::fuzzy(None),
+        );
 
         add_string_literal_completions(
             &model,
@@ -65,6 +72,7 @@ pub fn completion<'db>(
     let query = UserQuery::fuzzy(context.cursor.typed);
     let mut completions = Completions::new(
         db,
+        program,
         context.collection_context(db, &model, settings, capabilities),
         query,
     );
@@ -76,7 +84,7 @@ pub fn completion<'db>(
             }
         }
         ContextKind::Import(ref import) => {
-            import.add_completions(db, file, &mut completions);
+            import.add_completions(db, program_file, &mut completions);
         }
         ContextKind::NonImport(ref non_import) => match non_import.target {
             CompletionTargetAst::ObjectDot { expr } => {
@@ -90,16 +98,20 @@ pub fn completion<'db>(
                         ModuleDependencyKind::Current
                     };
                     completions.add(
-                        CompletionBuilder::from_semantic_completion(db, semantic_completion)
-                            .module_dependency_kind(module_dependency_kind),
+                        CompletionBuilder::from_semantic_completion(
+                            db,
+                            program,
+                            semantic_completion,
+                        )
+                        .module_dependency_kind(module_dependency_kind),
                     );
                 }
-                add_keyword_completions(db, &mut completions);
+                add_keyword_completions(db, program, &mut completions);
                 add_argument_completions(db, &model, &context.cursor, &mut completions);
                 if settings.auto_import {
                     add_unimported_completions(
                         db,
-                        file,
+                        program_file,
                         &parsed,
                         scoped,
                         |module_name: &ModuleName, symbol: &str| {
@@ -131,6 +143,7 @@ impl CompletionCapabilities {
 /// A collection of completions built up from various sources.
 struct Completions<'db> {
     db: &'db dyn Db,
+    program: Program,
     context: CollectionContext<'db>,
     items: BinaryHeap<CompletionRanker<'db>>,
     /// The query used to match against candidate completions.
@@ -154,9 +167,15 @@ impl<'db> Completions<'db> {
     /// the user has typed as part of the next symbol they are writing.
     /// This collection will treat it as a query when present, and only
     /// add completions that match it.
-    fn new(db: &'db dyn Db, context: CollectionContext<'db>, query: UserQuery) -> Completions<'db> {
+    fn new(
+        db: &'db dyn Db,
+        program: Program,
+        context: CollectionContext<'db>,
+        query: UserQuery,
+    ) -> Completions<'db> {
         Completions {
             db,
+            program,
             context,
             items: BinaryHeap::new(),
             query,
@@ -228,7 +247,9 @@ impl<'db> Completions<'db> {
     /// When added, `true` is returned.
     fn add_semantic(&mut self, completion: SemanticCompletion<'db>) -> bool {
         self.add(CompletionBuilder::from_semantic_completion(
-            self.db, completion,
+            self.db,
+            self.program,
+            completion,
         ))
     }
 
@@ -243,10 +264,11 @@ impl<'db> Completions<'db> {
     /// when the completion context determines that the given suggestion
     /// is never valid.
     fn add_skip_query(&mut self, builder: CompletionBuilder<'db>) -> bool {
-        if self.context.exclude(self.db, &builder) {
+        if self.context.exclude(self.db, self.program, &builder) {
             return false;
         }
-        let completion = CompletionRanker(builder.build(self.db, &self.context, &self.query));
+        let completion =
+            CompletionRanker(builder.build(self.db, self.program, &self.context, &self.query));
         if self.items.len() >= Completions::LIMIT {
             // OK because `self.items` is guaranteed to be non-empty here.
             let worst = self.items.peek_mut().unwrap();
@@ -403,10 +425,13 @@ impl<'db> CompletionBuilder<'db> {
 
     fn from_semantic_completion(
         db: &'db dyn Db,
+        program: Program,
         semantic: SemanticCompletion<'db>,
     ) -> CompletionBuilder<'db> {
-        let definition = semantic.ty.and_then(|ty| Definitions::from_ty(db, ty));
-        let documentation = definition.and_then(|def| def.docstring(db));
+        let definition = semantic
+            .ty
+            .and_then(|ty| Definitions::from_ty(db, program, ty));
+        let documentation = definition.and_then(|def| def.docstring(db, program));
         Completion::builder(semantic.name)
             .ty(semantic.ty)
             .builtin(semantic.builtin)
@@ -444,6 +469,7 @@ impl<'db> CompletionBuilder<'db> {
     fn build(
         mut self,
         db: &'db dyn Db,
+        program: Program,
         ctx: &CollectionContext<'db>,
         query: &UserQuery,
     ) -> Completion<'db> {
@@ -457,7 +483,7 @@ impl<'db> CompletionBuilder<'db> {
             // but aren't marked here. That is, false negatives are
             // possible but false positives are not.
             if let Some(exception_ty) = ctx.exception_ty {
-                self.is_context_specific |= ty.is_assignable_to(db, exception_ty);
+                self.is_context_specific |= ty.is_assignable_to(db, program, exception_ty);
             }
             if ctx.is_in_class_def() {
                 self.is_context_specific |= ty.is_class_literal()
@@ -570,9 +596,9 @@ impl<'db> CompletionBuilder<'db> {
 
     /// Returns true when this completion refers to the
     /// `NotImplemented` builtin.
-    fn is_notimplemented(&self, db: &dyn Db) -> bool {
+    fn is_notimplemented(&self, db: &dyn Db, program: Program) -> bool {
         let Some(ty) = self.ty else { return false };
-        ty.is_notimplemented(db)
+        ty.is_notimplemented(db, program)
     }
 }
 
@@ -710,7 +736,7 @@ impl<'m> Context<'m> {
     /// Create a new context for finding completions.
     fn new(
         db: &'_ dyn Db,
-        file: File,
+        program_file: ProgramFile<'_>,
         parsed: &'m ParsedModuleRef,
         source: &'m SourceText,
         offset: TextSize,
@@ -724,7 +750,7 @@ impl<'m> Context<'m> {
             ContextKind::Keywords(keywords)
         } else if cursor.is_in_definition_place() {
             return None;
-        } else if let Some(import) = ImportStatement::detect(db, file, &cursor) {
+        } else if let Some(import) = ImportStatement::detect(db, program_file, &cursor) {
             ContextKind::Import(import)
         } else {
             let target_token = CompletionTargetTokens::find(&cursor)?;
@@ -746,7 +772,9 @@ impl<'m> Context<'m> {
         match self.kind {
             ContextKind::Keywords(_) | ContextKind::Import(_) => CollectionContext::none(),
             ContextKind::NonImport(_) => {
-                let exception_ty = self.cursor.exception_ty(db);
+                let exception_ty = self
+                    .cursor
+                    .exception_ty(db, model.program_file().program(db));
                 let complete_callable_parentheses = settings.complete_function_parentheses
                     && !self.cursor.suppress_callable_parentheses();
                 let existing_class_bases = self.cursor.enclosing_class_def().map(|class_def| {
@@ -1281,13 +1309,15 @@ impl<'m> ContextCursor<'m> {
     ///
     /// The return value is always `None` if the cursor is not
     /// inside a `raise` or `except` context.
-    fn exception_ty<'db>(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let base_exception_ty = KnownClass::BaseException.to_subclass_of(db);
-        let base_exception_instance = KnownClass::BaseException.to_instance(db);
-        let raise_ty = UnionType::from_elements(db, [base_exception_ty, base_exception_instance]);
-        let cause_ty = UnionType::from_elements(db, [raise_ty, Type::none(db)]);
+    fn exception_ty<'db>(&self, db: &'db dyn Db, program: Program) -> Option<Type<'db>> {
+        let base_exception_ty = KnownClass::BaseException.to_subclass_of(db, program);
+        let base_exception_instance = KnownClass::BaseException.to_instance(db, program);
+        let raise_ty =
+            UnionType::from_elements(db, program, [base_exception_ty, base_exception_instance]);
+        let cause_ty = UnionType::from_elements(db, program, [raise_ty, Type::none(db, program)]);
         let except_ty = UnionType::from_elements(
             db,
+            program,
             [
                 base_exception_ty,
                 Type::homogeneous_tuple(db, base_exception_ty),
@@ -1574,8 +1604,8 @@ impl<'db> CollectionContext<'db> {
     ///
     /// This only returns `true` when it is definitively known that the
     /// completion would never be valid for this context.
-    fn exclude(&self, db: &dyn Db, builder: &CompletionBuilder<'_>) -> bool {
-        if self.is_raising_exception && builder.is_notimplemented(db) {
+    fn exclude(&self, db: &dyn Db, program: Program, builder: &CompletionBuilder<'_>) -> bool {
+        if self.is_raising_exception && builder.is_notimplemented(db, program) {
             return true;
         }
         if builder.kind == Some(CompletionKind::Keyword)
@@ -1898,7 +1928,7 @@ fn add_argument_completions<'db>(
             }
             ast::AnyNodeRef::ExprCall(_) => {
                 if in_arguments {
-                    add_function_arg_completions(db, model.file(), cursor, completions);
+                    add_function_arg_completions(db, model.program_file(), cursor, completions);
                 }
                 return;
             }
@@ -1938,7 +1968,8 @@ fn add_class_arg_completions<'db>(
     };
 
     if !is_set("metaclass") {
-        let ty = KnownClass::Type.to_subclass_of(model.db());
+        let ty =
+            KnownClass::Type.to_subclass_of(model.db(), model.program_file().program(model.db()));
         completions.add(CompletionBuilder::argument("metaclass").ty(ty));
     }
 
@@ -1952,7 +1983,7 @@ fn add_class_arg_completions<'db>(
     //
     // See https://peps.python.org/pep-0728/
     if is_typed_dict && !is_set("total") {
-        let ty = KnownClass::Bool.to_instance(model.db());
+        let ty = KnownClass::Bool.to_instance(model.db(), model.program_file().program(model.db()));
         completions.add(CompletionBuilder::argument("total").ty(ty));
     }
 }
@@ -1964,7 +1995,7 @@ fn add_class_arg_completions<'db>(
 /// set and 2) been defined as positional-only.
 fn add_function_arg_completions<'db>(
     db: &'db dyn Db,
-    file: File,
+    program_file: ProgramFile<'db>,
     cursor: &ContextCursor<'_>,
     completions: &mut Completions<'db>,
 ) {
@@ -1978,7 +2009,7 @@ fn add_function_arg_completions<'db>(
         adding completions for something like `(<CURSOR>)(arg1, arg2)`-style expressions"
     );
 
-    let Some(sig_help) = signature_help(db, file, cursor.offset) else {
+    let Some(sig_help) = signature_help(db, program_file, cursor.offset) else {
         return;
     };
     let mut set_function_args = detect_set_function_args(cursor);
@@ -2045,7 +2076,7 @@ pub(crate) struct ImportEdit {
 /// Get fixes that would resolve an unresolved reference
 pub(crate) fn unresolved_fixes(
     db: &dyn Db,
-    file: File,
+    program_file: ProgramFile<'_>,
     parsed: &ParsedModuleRef,
     symbol: &str,
     node: AnyNodeRef,
@@ -2054,12 +2085,13 @@ pub(crate) fn unresolved_fixes(
     let scoped = ScopedTarget { node };
     let query = UserQuery::exactly(symbol);
     let ctx = CollectionContext::none();
+    let program = program_file.program(db);
 
     // Request imports we could add to put the symbol in scope
-    let mut completions = Completions::new(db, ctx.clone(), query.clone());
+    let mut completions = Completions::new(db, program, ctx.clone(), query.clone());
     add_unimported_completions(
         db,
-        file,
+        program_file,
         parsed,
         scoped,
         |module_name: &ModuleName, symbol: &str| {
@@ -2070,10 +2102,10 @@ pub(crate) fn unresolved_fixes(
     results.extend(completions.into_imports());
 
     // Request qualifications we could apply to the symbol to make it resolve
-    let mut completions = Completions::new(db, ctx, query);
+    let mut completions = Completions::new(db, program, ctx, query);
     add_unimported_completions(
         db,
-        file,
+        program_file,
         parsed,
         scoped,
         |module_name: &ModuleName, symbol: &str| {
@@ -2091,9 +2123,13 @@ pub(crate) fn unresolved_fixes(
 /// This should generally only be used when offering "scoped" completions.
 /// This will include keywords corresponding to Python values (like `None`)
 /// and general language keywords (like `raise`).
-fn add_keyword_completions<'db>(db: &'db dyn Db, completions: &mut Completions<'db>) {
+fn add_keyword_completions<'db>(
+    db: &'db dyn Db,
+    program: Program,
+    completions: &mut Completions<'db>,
+) {
     let keyword_values = [
-        ("None", Type::none(db)),
+        ("None", Type::none(db, program)),
         ("True", Type::bool_literal(true)),
         ("False", Type::bool_literal(false)),
     ];
@@ -2184,7 +2220,7 @@ fn add_string_literal_completions<'db>(
 /// when selected into `File`.
 fn add_unimported_completions<'db>(
     db: &'db dyn Db,
-    file: File,
+    program_file: ProgramFile<'db>,
     parsed: &ParsedModuleRef,
     scoped: ScopedTarget<'_>,
     create_import_request: impl for<'a> Fn(&'a ModuleName, &'a str) -> ImportRequest<'a>,
@@ -2198,12 +2234,14 @@ fn add_unimported_completions<'db>(
         return;
     }
 
+    let file = program_file.file(db);
     let source = source_text(db, file);
     let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
-    let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
+    let importer = Importer::new(db, &stylist, program_file, source.as_str(), parsed);
     let members = importer.members_in_scope_at(scoped.node, scoped.node.start());
+    let resolver_file = program_file.resolver_file(db);
 
-    for symbol in all_symbols(db, file, &completions.query.pattern) {
+    for symbol in all_symbols(db, program_file, &completions.query.pattern) {
         if symbol.file() == file || symbol.module().is_known(db, KnownModule::Builtins) {
             continue;
         }
@@ -2218,7 +2256,7 @@ fn add_unimported_completions<'db>(
             });
 
         // Don't suggest symbols that are already imported.
-        if members.satisfies(db, file, &request) {
+        if members.satisfies(db, resolver_file, &request) {
             continue;
         }
 
@@ -2483,7 +2521,7 @@ impl<'a> ImportStatement<'a> {
     /// `tokens`.
     fn detect(
         db: &'_ dyn Db,
-        file: File,
+        program_file: ProgramFile<'_>,
         cursor: &ContextCursor<'a>,
     ) -> Option<ImportStatement<'a>> {
         use TokenKind as TK;
@@ -2606,6 +2644,7 @@ impl<'a> ImportStatement<'a> {
             ImportFinal,
         }
 
+        let file = program_file.resolver_file(db);
         let mut state = S::Start;
         // The token immediate before (or at) the cursor.
         let last = cursor.tokens_before.last()?;
@@ -2881,10 +2920,10 @@ impl<'a> ImportStatement<'a> {
     fn add_completions<'db>(
         &self,
         db: &'db dyn Db,
-        file: File,
+        program_file: ProgramFile<'db>,
         completions: &mut Completions<'db>,
     ) {
-        let model = SemanticModel::new(db, file);
+        let model = SemanticModel::new(db, program_file);
         match *self {
             ImportStatement::Import(Import { ref kind, .. }) => match *kind {
                 ImportKind::Module => {
@@ -2980,7 +3019,8 @@ fn add_import_completions_impl<'db>(
 ) {
     for semantic in semantic_completions {
         let module_dependency_kind = module_dependency_kind(&semantic);
-        let mut builder = CompletionBuilder::from_semantic_completion(db, semantic);
+        let mut builder =
+            CompletionBuilder::from_semantic_completion(db, completions.program, semantic);
         if let Some(module_dependency_kind) = module_dependency_kind {
             builder = builder.module_dependency_kind(module_dependency_kind);
         }
@@ -3194,6 +3234,7 @@ mod tests {
     use ruff_python_ast::token::{TokenKind, Tokens};
     use ruff_python_parser::{Mode, ParseOptions};
     use ty_module_resolver::ModuleName;
+    use ty_python_core::program::Program;
 
     use crate::CompletionCapabilities;
     use crate::completion::{Completion, completion};
@@ -10727,7 +10768,7 @@ raise <CURSOR>
                 &self.cursor_test.db,
                 &self.settings,
                 self.capabilities,
-                self.cursor_test.cursor.file,
+                self.cursor_test.cursor_program_file(),
                 self.cursor_test.cursor.offset,
             );
             let filtered = original
@@ -10745,6 +10786,7 @@ raise <CURSOR>
                 .collect();
             CompletionTest {
                 db: self.db(),
+                program: self.cursor_test.program(),
                 original,
                 filtered,
                 type_signatures: self.type_signatures,
@@ -10860,6 +10902,7 @@ raise <CURSOR>
 
     struct CompletionTest<'db> {
         db: &'db ty_project::TestDb,
+        program: Program,
         /// The original completions returned before any additional
         /// test-specific filtering. We keep this around in order to
         /// slightly modify the test snapshot generated. This
@@ -10900,7 +10943,7 @@ raise <CURSOR>
                     let mut snapshot = c.insert.as_deref().unwrap_or(c.label.as_str()).to_string();
                     if self.type_signatures {
                         let ty =
-                            c.ty.map(|ty| ty.display(self.db).to_string())
+                            c.ty.map(|ty| ty.display(self.db, self.program).to_string())
                                 .unwrap_or_else(|| "Unavailable".to_string());
                         snapshot = format!("{snapshot} :: {ty}");
                     }

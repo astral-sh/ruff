@@ -1,12 +1,7 @@
 use ruff_db::Db as SourceDb;
 
-use crate::resolve::SearchPaths;
-
 #[salsa::db]
-pub trait Db: SourceDb {
-    /// Returns the search paths for module resolution.
-    fn search_paths(&self) -> &SearchPaths;
-}
+pub trait Db: SourceDb {}
 
 #[cfg(test)]
 pub(crate) mod tests {
@@ -19,7 +14,7 @@ pub(crate) mod tests {
     use ruff_python_ast::PythonVersion;
 
     use super::Db;
-    use crate::resolve::SearchPaths;
+    use crate::{ResolverProgram, resolve::SearchPaths};
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
 
@@ -32,13 +27,14 @@ pub(crate) mod tests {
         vendored: VendoredFileSystem,
         search_paths: Arc<SearchPaths>,
         python_version: PythonVersion,
+        resolver_program: Option<ResolverProgram>,
         events: Events,
     }
 
     impl TestDb {
         pub(crate) fn new() -> Self {
             let events = Events::default();
-            Self {
+            let mut db = Self {
                 storage: salsa::Storage::new(Some(Box::new({
                     let events = events.clone();
                     move |event| {
@@ -52,8 +48,15 @@ pub(crate) mod tests {
                 files: Files::default(),
                 search_paths: Arc::new(SearchPaths::empty(ty_vendored::file_system())),
                 python_version: PythonVersion::default(),
+                resolver_program: None,
                 events,
-            }
+            };
+            db.resolver_program = Some(ResolverProgram::create(
+                &db,
+                db.python_version,
+                &db.search_paths,
+            ));
+            db
         }
 
         pub(crate) fn with_search_paths(mut self, search_paths: SearchPaths) -> Self {
@@ -62,13 +65,32 @@ pub(crate) mod tests {
         }
 
         pub(crate) fn with_python_version(mut self, python_version: PythonVersion) -> Self {
+            let search_paths = self.search_paths().clone();
+            self.resolver_program = Some(self.resolver_program().with_settings(
+                &self,
+                python_version,
+                search_paths,
+            ));
             self.python_version = python_version;
             self
         }
 
         pub(crate) fn set_search_paths(&mut self, search_paths: SearchPaths) {
-            search_paths.try_register_static_roots(self);
+            let python_version = self.python_version;
+            self.resolver_program = Some(self.resolver_program().with_settings(
+                self,
+                python_version,
+                search_paths.clone(),
+            ));
             self.search_paths = Arc::new(search_paths);
+        }
+
+        pub(crate) fn search_paths(&self) -> &SearchPaths {
+            &self.search_paths
+        }
+
+        pub(crate) fn resolver_program(&self) -> ResolverProgram {
+            self.resolver_program.expect("resolver program initialized")
         }
 
         /// Takes the salsa events.
@@ -113,11 +135,7 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl Db for TestDb {
-        fn search_paths(&self) -> &SearchPaths {
-            &self.search_paths
-        }
-    }
+    impl Db for TestDb {}
 
     #[salsa::db]
     impl salsa::Database for TestDb {}

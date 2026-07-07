@@ -1,7 +1,7 @@
 use crate::{SuppressFix, is_unused_ignore_comment_lint, suppress_all};
 use ruff_db::cancellation::{Canceled, CancellationToken};
 use ruff_db::diagnostic::{DisplayDiagnosticConfig, DisplayDiagnostics};
-use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::parsed::{ParsedModuleRef, VersionedFile};
 use ruff_db::source::SourceText;
 use ruff_db::system::{SystemPath, SystemPathBuf, WritableSystem};
 use ruff_db::{
@@ -17,7 +17,8 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 use thiserror::Error;
 
-use crate::Db;
+use crate::{Db, ProgramFile};
+use ty_python_core::program::Program;
 
 pub struct FixAllResults {
     /// The non-lint diagnostics that can't be fixed or the diagnostics of files
@@ -37,15 +38,17 @@ pub struct FixAllResults {
 /// If the `db`'s system isn't [writable](WritableSystem).
 pub fn suppress_all_diagnostics(
     db: &mut dyn Db,
+    program: Program,
     diagnostics: Vec<Diagnostic>,
     cancellation_token: &CancellationToken,
 ) -> Result<FixAllResults, Canceled> {
     fix_all(
         db,
+        program,
         diagnostics,
         FixMode::Suppress,
         cancellation_token,
-        Db::check_file,
+        |db, file| Db::check_file(db, ProgramFile::new(db, program, file)),
     )
 }
 
@@ -57,16 +60,18 @@ pub fn suppress_all_diagnostics(
 /// If the `db`'s system isn't [writable](WritableSystem).
 pub fn fix_all_diagnostics(
     db: &mut dyn Db,
+    program: Program,
     diagnostics: Vec<Diagnostic>,
     applicability: Applicability,
     cancellation_token: &CancellationToken,
 ) -> Result<FixAllResults, Canceled> {
     fix_all(
         db,
+        program,
         diagnostics,
         FixMode::ApplyFixes(applicability),
         cancellation_token,
-        Db::check_file,
+        |db, file| Db::check_file(db, ProgramFile::new(db, program, file)),
     )
 }
 
@@ -77,6 +82,7 @@ const MAX_ITERATIONS: usize = 10;
 /// `check_file` is a separate parameter so that tests can easily mock out a file's diagnostics.
 fn fix_all<F>(
     db: &mut dyn Db,
+    program: Program,
     mut diagnostics: Vec<Diagnostic>,
     fix_mode: FixMode,
     cancellation_token: &CancellationToken,
@@ -128,13 +134,14 @@ where
             continue;
         };
 
-        let parsed = parsed_module(db, file);
+        let program_file = ProgramFile::new(db, program, file);
+        let parsed = program_file.parsed(db);
         if parsed.load(db).has_syntax_errors() {
             tracing::warn!("Skipping file `{path}` with syntax errors");
             continue;
         }
 
-        let fixes = fix_mode.fixes(db, file, diagnostics);
+        let fixes = fix_mode.fixes(db, program_file.versioned_file(db), diagnostics);
 
         if fixes.is_empty() {
             tracing::debug!("Skipping file `{path}` without applicable fixes.");
@@ -176,6 +183,7 @@ where
         // This is done outside the above loop so that it can run in parallel.
         let check_results = recheck_files(
             &*db,
+            program,
             unstaged_fixes,
             fix_mode,
             cancellation_token,
@@ -379,7 +387,12 @@ impl FixMode {
         }
     }
 
-    fn fixes(self, db: &dyn Db, file: File, file_diagnostics: &[Diagnostic]) -> Vec<ApplicableFix> {
+    fn fixes(
+        self,
+        db: &dyn Db,
+        versioned_file: VersionedFile<'_>,
+        file_diagnostics: &[Diagnostic],
+    ) -> Vec<ApplicableFix> {
         match self {
             FixMode::Suppress => {
                 let suppressable_diagnostics: Vec<_> = file_diagnostics
@@ -400,7 +413,7 @@ impl FixMode {
                     })
                     .collect();
 
-                suppress_all(db, file, &suppressable_diagnostics)
+                suppress_all(db, versioned_file, &suppressable_diagnostics)
                     .into_iter()
                     .map(
                         |SuppressFix {
@@ -743,6 +756,7 @@ enum CheckResult<'a> {
 
 fn recheck_files<'a, F>(
     db: &dyn Db,
+    program: Program,
     changes: Vec<(QueuedFile<'a>, usize)>,
     fix_mode: FixMode,
     cancellation_token: &CancellationToken,
@@ -768,8 +782,8 @@ where
 
                     let db = &*db;
 
-                    let parsed = parsed_module(db, file.file);
-                    let parsed = parsed.load(db);
+                    let program_file = ProgramFile::new(db, program, file.file);
+                    let parsed = program_file.parsed(db).load(db);
 
                     let result = if parsed.has_syntax_errors() {
                         let diagnostic =
@@ -778,7 +792,8 @@ where
                         CheckResult::SyntaxError { diagnostic, file }
                     } else {
                         let diagnostics = check_file(db, file.file);
-                        let fixes = fix_mode.fixes(db, file.file, &diagnostics);
+                        let fixes =
+                            fix_mode.fixes(db, program_file.versioned_file(db), &diagnostics);
 
                         file.applied_fixes += applied_fixes;
                         file.diagnostics = Some(diagnostics);
@@ -807,7 +822,6 @@ mod tests {
         Severity, Span,
     };
     use ruff_db::files::{File, system_path_to_file};
-    use ruff_db::parsed::parsed_module;
     use ruff_db::source::source_text;
     use ruff_db::system::SystemPath;
     use ruff_diagnostics::{Applicability, Edit, Fix};
@@ -815,9 +829,9 @@ mod tests {
     use rustc_hash::FxHashMap;
 
     use super::suppress_all_diagnostics;
-    use crate::Db;
     use crate::db::tests::TestDbBuilder;
     use crate::fixes::{FixMode, fix_all};
+    use crate::{Db, ProgramFile};
 
     #[test]
     fn simple_suppression() {
@@ -1148,9 +1162,11 @@ class B(A):
 
         let initial_diagnostics = check_file(&db, file);
 
+        let program = db.program();
         let cancellation_token_source = CancellationTokenSource::new();
         let fixes = fix_all(
             &mut db,
+            program,
             initial_diagnostics,
             FixMode::ApplyFixes(Applicability::Safe),
             &cancellation_token_source.token(),
@@ -1225,9 +1241,11 @@ class B(A):
 
         let initial_diagnostics = check_file(&db, file);
 
+        let program = db.program();
         let cancellation_token_source = CancellationTokenSource::new();
         let fixes = fix_all(
             &mut db,
+            program,
             initial_diagnostics,
             FixMode::ApplyFixes(Applicability::Safe),
             &cancellation_token_source.token(),
@@ -1299,8 +1317,10 @@ class B(A):
             create_diagnostics(file)
         };
 
+        let program = db.program();
         let result = fix_all(
             &mut db,
+            program,
             initial_diagnostics,
             FixMode::ApplyFixes(Applicability::Safe),
             &cancellation_token_source.token(),
@@ -1400,9 +1420,11 @@ class B(A):
 
         let initial_diagnostics = check_file(&db, file);
 
+        let program = db.program();
         let cancellation_token_source = CancellationTokenSource::new();
         let fixes = fix_all(
             &mut db,
+            program,
             initial_diagnostics,
             FixMode::ApplyFixes(Applicability::Safe),
             &cancellation_token_source.token(),
@@ -1434,15 +1456,19 @@ class B(A):
 
         let file = system_path_to_file(&db, "test.py").unwrap();
 
-        let parsed_before = parsed_module(&db, file);
-        let had_syntax_errors = parsed_before.load(&db).has_syntax_errors();
-
-        let diagnostics = db.check_file(file);
+        let program = db.program();
+        let program_file = ProgramFile::new(&db, program, file);
+        let had_syntax_errors = program_file.parsed(&db).load(&db).has_syntax_errors();
+        let diagnostics = db.check_file(program_file);
         let total_diagnostics = diagnostics.len();
         let cancellation_token_source = CancellationTokenSource::new();
-        let fixes =
-            suppress_all_diagnostics(&mut db, diagnostics, &cancellation_token_source.token())
-                .expect("operation never gets cancelled");
+        let fixes = suppress_all_diagnostics(
+            &mut db,
+            program,
+            diagnostics,
+            &cancellation_token_source.token(),
+        )
+        .expect("operation never gets cancelled");
 
         assert_eq!(fixes.count, total_diagnostics - fixes.diagnostics.len());
 
@@ -1450,10 +1476,9 @@ class B(A):
 
         let fixed = source_text(&db, file);
 
-        let parsed = parsed_module(&db, file);
-        let parsed = parsed.load(&db);
-
-        let diagnostics_after_applying_fixes = db.check_file(file);
+        let program_file = ProgramFile::new(&db, program, file);
+        let parsed = program_file.parsed(&db).load(&db);
+        let diagnostics_after_applying_fixes = db.check_file(program_file);
 
         let mut output = String::new();
 

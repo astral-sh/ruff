@@ -50,6 +50,7 @@ use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
 use crate::path::{ModulePath, SearchPath, SystemOrVendoredPathRef};
+use crate::program::{ResolverFile, ResolverProgram};
 use crate::strategy::MisconfigurationStrategy;
 use crate::typeshed::{TypeshedVersions, vendored_typeshed_versions};
 use crate::{SearchPathSettings, SearchPathSettingsError};
@@ -57,13 +58,18 @@ use crate::{SearchPathSettings, SearchPathSettingsError};
 /// Resolves a module name to a module.
 pub fn resolve_module<'db>(
     db: &'db dyn Db,
-    importing_file: File,
+    importing_file: ResolverFile<'db>,
     module_name: &ModuleName,
 ) -> Option<Module<'db>> {
-    let interned_name = ModuleNameIngredient::new(db, module_name, ModuleResolveMode::Typing);
+    let interned_name = ModuleNameIngredient::new(
+        db,
+        importing_file.program(db),
+        module_name,
+        ModuleResolveMode::Typing,
+    );
 
     resolve_module_query(db, interned_name)
-        .or_else(|| desperately_resolve_module(db, importing_file, interned_name))
+        .or_else(|| desperately_resolve_module(db, importing_file.file(db), interned_name))
 }
 
 /// Resolves a module name to a module, without desperate resolution available.
@@ -72,9 +78,11 @@ pub fn resolve_module<'db>(
 /// we don't have a well-defined importing file.
 pub fn resolve_module_confident<'db>(
     db: &'db dyn Db,
+    program: ResolverProgram,
     module_name: &ModuleName,
 ) -> Option<Module<'db>> {
-    let interned_name = ModuleNameIngredient::new(db, module_name, ModuleResolveMode::Typing);
+    let interned_name =
+        ModuleNameIngredient::new(db, program, module_name, ModuleResolveMode::Typing);
 
     resolve_module_query(db, interned_name)
 }
@@ -82,13 +90,18 @@ pub fn resolve_module_confident<'db>(
 /// Resolves a module name to a module (stubs not allowed).
 pub fn resolve_real_module<'db>(
     db: &'db dyn Db,
-    importing_file: File,
+    importing_file: ResolverFile<'db>,
     module_name: &ModuleName,
 ) -> Option<Module<'db>> {
-    let interned_name = ModuleNameIngredient::new(db, module_name, ModuleResolveMode::Runtime);
+    let interned_name = ModuleNameIngredient::new(
+        db,
+        importing_file.program(db),
+        module_name,
+        ModuleResolveMode::Runtime,
+    );
 
     resolve_module_query(db, interned_name)
-        .or_else(|| desperately_resolve_module(db, importing_file, interned_name))
+        .or_else(|| desperately_resolve_module(db, importing_file.file(db), interned_name))
 }
 
 /// Resolves a module name to a module, without desperate resolution available (stubs not allowed).
@@ -97,9 +110,11 @@ pub fn resolve_real_module<'db>(
 /// we don't have a well-defined importing file.
 pub fn resolve_real_module_confident<'db>(
     db: &'db dyn Db,
+    program: ResolverProgram,
     module_name: &ModuleName,
 ) -> Option<Module<'db>> {
-    let interned_name = ModuleNameIngredient::new(db, module_name, ModuleResolveMode::Runtime);
+    let interned_name =
+        ModuleNameIngredient::new(db, program, module_name, ModuleResolveMode::Runtime);
 
     resolve_module_query(db, interned_name)
 }
@@ -117,17 +132,18 @@ pub fn resolve_real_module_confident<'db>(
 /// are involved in an import cycle with `builtins`.
 pub fn resolve_real_shadowable_module<'db>(
     db: &'db dyn Db,
-    importing_file: File,
+    importing_file: ResolverFile<'db>,
     module_name: &ModuleName,
 ) -> Option<Module<'db>> {
     let interned_name = ModuleNameIngredient::new(
         db,
+        importing_file.program(db),
         module_name,
         ModuleResolveMode::RuntimeSomeShadowingAllowed,
     );
 
     resolve_module_query(db, interned_name)
-        .or_else(|| desperately_resolve_module(db, importing_file, interned_name))
+        .or_else(|| desperately_resolve_module(db, importing_file.file(db), interned_name))
 }
 
 /// Selects typing or runtime module-resolution semantics.
@@ -158,6 +174,8 @@ pub enum ModuleResolveMode {
 #[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
 #[derive(Debug)]
 pub(crate) struct ModuleResolveModeIngredient<'db> {
+    #[returns(copy)]
+    program: ResolverProgram,
     #[returns(copy)]
     mode: ModuleResolveMode,
 }
@@ -212,9 +230,10 @@ fn resolve_module_query<'db>(
 ) -> Option<Module<'db>> {
     let name = module_name.name(db);
     let mode = module_name.mode(db);
+    let program = module_name.program(db);
     let _span = tracing::trace_span!("resolve_module", %name).entered();
 
-    let Some(resolved) = resolve_name(db, name, mode) else {
+    let Some(resolved) = resolve_name(db, program, name, mode) else {
         tracing::debug!("Module `{name}` not found in search paths");
         return None;
     };
@@ -222,7 +241,7 @@ fn resolve_module_query<'db>(
     resolved
         .into_iter()
         .next()
-        .map(|candidate| candidate.into_module(db, name.clone()))
+        .map(|candidate| candidate.into_module(db, program, name.clone()))
 }
 
 /// Like `resolve_module_query` but for cases where it failed to resolve the module
@@ -243,6 +262,8 @@ fn desperately_resolve_module<'db>(
     importing_file: File,
     module_name: ModuleNameIngredient<'db>,
 ) -> Option<Module<'db>> {
+    let program = module_name.program(db);
+    let importing_file = ResolverFile::new(db, program, importing_file);
     let name = module_name.name(db);
     let mode = module_name.mode(db);
     let _span = tracing::trace_span!("desperately_resolve_module", %name).entered();
@@ -262,14 +283,18 @@ fn desperately_resolve_module<'db>(
     resolved
         .into_iter()
         .next()
-        .map(|candidate| candidate.into_module(db, name.clone()))
+        .map(|candidate| candidate.into_module(db, program, name.clone()))
 }
 
 /// Resolves the module for the given path.
 ///
 /// Returns `None` if the path is not a module locatable via any of the known search paths.
 #[allow(unused)]
-pub(crate) fn path_to_module<'db>(db: &'db dyn Db, path: &FilePath) -> Option<Module<'db>> {
+pub(crate) fn path_to_module<'db>(
+    db: &'db dyn Db,
+    program: ResolverProgram,
+    path: &FilePath,
+) -> Option<Module<'db>> {
     // It's not entirely clear on first sight why this method calls `file_to_module` instead of
     // it being the other way round, considering that the first thing that `file_to_module` does
     // is to retrieve the file's path.
@@ -279,7 +304,7 @@ pub(crate) fn path_to_module<'db>(db: &'db dyn Db, path: &FilePath) -> Option<Mo
     // `VfsFile` is. So what we do here is to retrieve the `path`'s `VfsFile` so that we can make
     // use of Salsa's caching and invalidation.
     let file = path.to_file(db)?;
-    file_to_module(db, file)
+    file_to_module(db, ResolverFile::new(db, program, file))
 }
 
 /// Resolves the module for the file with the given id.
@@ -291,23 +316,37 @@ pub(crate) fn path_to_module<'db>(db: &'db dyn Db, path: &FilePath) -> Option<Mo
 /// This intuition is particularly useful for understanding why it's correct that we pass
 /// the file itself as `importing_file` to various subroutines.
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-pub fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
+pub fn file_to_module<'db>(
+    db: &'db dyn Db,
+    resolver_file: ResolverFile<'db>,
+) -> Option<Module<'db>> {
+    let file = resolver_file.file(db);
+    let program = resolver_file.program(db);
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
     let path = SystemOrVendoredPathRef::try_from_file(db, file)?;
 
-    file_to_module_impl(db, file, path, search_paths(db, ModuleResolveMode::Typing)).or_else(|| {
+    file_to_module_impl(
+        db,
+        resolver_file,
+        file,
+        path,
+        search_paths(db, program, ModuleResolveMode::Typing),
+    )
+    .or_else(|| {
         file_to_module_impl(
             db,
+            resolver_file,
             file,
             path,
-            relative_desperate_search_paths(db, file).iter(),
+            relative_desperate_search_paths(db, resolver_file).iter(),
         )
     })
 }
 
 fn file_to_module_impl<'db, 'a>(
     db: &'db dyn Db,
+    resolver_file: ResolverFile<'db>,
     file: File,
     path: SystemOrVendoredPathRef<'a>,
     mut search_paths: impl Iterator<Item = &'a SearchPath>,
@@ -324,7 +363,7 @@ fn file_to_module_impl<'db, 'a>(
     // If it doesn't, then that means that multiple modules have the same name in different
     // root paths, but that the module corresponding to `path` is in a lower priority search path,
     // in which case we ignore it.
-    let module = resolve_module(db, file, &module_name)?;
+    let module = resolve_module(db, resolver_file, &module_name)?;
     let module_file = module.file(db)?;
 
     if file.path(db) == module_file.path(db) {
@@ -335,7 +374,7 @@ fn file_to_module_impl<'db, 'a>(
         // If a .py and .pyi are both defined, the .pyi will be the one returned by `resolve_module().file`,
         // which would make us erroneously believe the `.py` is *not* also this module (breaking things
         // like relative imports). So here we try `resolve_real_module().file` to cover both cases.
-        let module = resolve_real_module(db, file, &module_name)?;
+        let module = resolve_real_module(db, resolver_file, &module_name)?;
         let module_file = module.file(db)?;
         if file.path(db) == module_file.path(db) {
             return Some(module);
@@ -351,8 +390,12 @@ fn file_to_module_impl<'db, 'a>(
     None
 }
 
-pub fn search_paths(db: &dyn Db, resolve_mode: ModuleResolveMode) -> SearchPathIterator<'_> {
-    db.search_paths().iter(db, resolve_mode)
+pub fn search_paths(
+    db: &dyn Db,
+    program: ResolverProgram,
+    resolve_mode: ModuleResolveMode,
+) -> SearchPathIterator<'_> {
+    program.search_paths(db).iter(db, program, resolve_mode)
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -441,8 +484,8 @@ impl StubPackageIndex {
 /// Returns an index of search paths that may contain a top-level stub package, preserving their
 /// resolution order relative to stdlib.
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-fn stub_package_index(db: &dyn Db) -> StubPackageIndex {
-    StubPackageIndex::from_search_paths(db, search_paths(db, ModuleResolveMode::Typing))
+fn stub_package_index(db: &dyn Db, program: ResolverProgram) -> StubPackageIndex {
+    StubPackageIndex::from_search_paths(db, search_paths(db, program, ModuleResolveMode::Typing))
 }
 
 fn search_path_may_contain_stub_package(db: &dyn Db, search_path: &SearchPath) -> bool {
@@ -464,21 +507,27 @@ fn search_path_may_contain_stub_package(db: &dyn Db, search_path: &SearchPath) -
 ///
 /// We exclude `__init__.py(i)` dirs to avoid truncating packages.
 #[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
-fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<Box<[SearchPath]>> {
+fn absolute_desperate_search_paths(
+    db: &dyn Db,
+    importing_file: ResolverFile<'_>,
+) -> Option<Box<[SearchPath]>> {
     let system = db.system();
-    let importing_path = importing_file.path(db).as_system_path()?;
+    let file = importing_file.file(db);
+    let importing_path = file.path(db).as_system_path()?;
 
     // Only allow this if the importing_file is under the first-party search path
     let (base_path, rel_path) =
-        search_paths(db, ModuleResolveMode::Typing).find_map(|search_path| {
-            if !search_path.is_first_party() {
-                return None;
-            }
-            Some((
-                search_path.as_system_path()?,
-                search_path.relativize_system_path_only(importing_path)?,
-            ))
-        })?;
+        search_paths(db, importing_file.program(db), ModuleResolveMode::Typing).find_map(
+            |search_path| {
+                if !search_path.is_first_party() {
+                    return None;
+                }
+                Some((
+                    search_path.as_system_path()?,
+                    search_path.relativize_system_path_only(importing_path)?,
+                ))
+            },
+        )?;
 
     // Only allow searching up to the first-party path's root
     let mut search_paths = Vec::new();
@@ -528,21 +577,26 @@ fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<
 /// chaotic things. In particular, all files under a given pyproject.toml will currently
 /// agree on this being their desperate search-path, which is really nice.
 #[salsa::tracked(returns(clone), heap_size=ruff_memory_usage::heap_size)]
-fn relative_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<SearchPath> {
+fn relative_desperate_search_paths(
+    db: &dyn Db,
+    importing_file: ResolverFile<'_>,
+) -> Option<SearchPath> {
     let system = db.system();
-    let importing_path = importing_file.path(db).as_system_path()?;
+    let importing_path = importing_file.file(db).path(db).as_system_path()?;
 
     // Only allow this if the importing_file is under the first-party search path
     let (base_path, rel_path) =
-        search_paths(db, ModuleResolveMode::Typing).find_map(|search_path| {
-            if !search_path.is_first_party() {
-                return None;
-            }
-            Some((
-                search_path.as_system_path()?,
-                search_path.relativize_system_path_only(importing_path)?,
-            ))
-        })?;
+        search_paths(db, importing_file.program(db), ModuleResolveMode::Typing).find_map(
+            |search_path| {
+                if !search_path.is_first_party() {
+                    return None;
+                }
+                Some((
+                    search_path.as_system_path()?,
+                    search_path.relativize_system_path_only(importing_path)?,
+                ))
+            },
+        )?;
 
     // Only allow searching up to the first-party path's root
     for rel_dir in rel_path.ancestors() {
@@ -791,6 +845,7 @@ impl SearchPaths {
     pub(super) fn iter<'a>(
         &'a self,
         db: &'a dyn Db,
+        program: ResolverProgram,
         mode: ModuleResolveMode,
     ) -> SearchPathIterator<'a> {
         let stdlib_path = self.stdlib(mode);
@@ -799,7 +854,7 @@ impl SearchPaths {
             static_paths: self.static_paths.iter(),
             stdlib_path,
             dynamic_paths: None,
-            mode: ModuleResolveModeIngredient::new(db, mode),
+            mode: ModuleResolveModeIngredient::new(db, program, mode),
         }
     }
 
@@ -815,11 +870,13 @@ impl SearchPaths {
     pub fn display<'a>(
         &'a self,
         db: &'a dyn Db,
+        program: ResolverProgram,
         mode: ModuleResolveMode,
     ) -> DisplaySearchPaths<'a> {
         DisplaySearchPaths {
             search_paths: self,
             db,
+            program,
             mode,
         }
     }
@@ -838,12 +895,16 @@ impl SearchPaths {
 pub struct DisplaySearchPaths<'a> {
     search_paths: &'a SearchPaths,
     db: &'a dyn Db,
+    program: ResolverProgram,
     mode: ModuleResolveMode,
 }
 
 impl fmt::Display for DisplaySearchPaths<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut paths = self.search_paths.iter(self.db, self.mode).peekable();
+        let mut paths = self
+            .search_paths
+            .iter(self.db, self.program, self.mode)
+            .peekable();
 
         if paths.peek().is_none() {
             return f.write_str("[]");
@@ -878,7 +939,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
         site_packages,
         typeshed_versions: _,
         real_stdlib_path,
-    } = db.search_paths();
+    } = mode.program(db).search_paths(db);
 
     let mut dynamic_paths = Vec::new();
 
@@ -1052,6 +1113,8 @@ impl FusedIterator for SearchPathIterator<'_> {}
 /// This is needed because Salsa requires that all query arguments are salsa ingredients.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct ModuleNameIngredient<'db> {
+    #[returns(copy)]
+    pub(super) program: ResolverProgram,
     #[returns(ref)]
     pub(super) name: ModuleName,
     #[returns(copy)]
@@ -1060,13 +1123,18 @@ struct ModuleNameIngredient<'db> {
 
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
-fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Option<ResolvedNames> {
-    let resolver = NameResolver::new(db, name, mode);
+fn resolve_name(
+    db: &dyn Db,
+    program: ResolverProgram,
+    name: &ModuleName,
+    mode: ModuleResolveMode,
+) -> Option<ResolvedNames> {
+    let resolver = NameResolver::new(db, program, name, mode);
 
     match mode {
-        ModuleResolveMode::Typing => resolver.resolve_typing(stub_package_index(db)),
+        ModuleResolveMode::Typing => resolver.resolve_typing(stub_package_index(db, program)),
         ModuleResolveMode::Runtime | ModuleResolveMode::RuntimeSomeShadowingAllowed => {
-            resolver.resolve_runtime(search_paths(db, mode))
+            resolver.resolve_runtime(search_paths(db, program, mode))
         }
     }
 }
@@ -1077,12 +1145,12 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
 /// to this import.
 fn desperately_resolve_name(
     db: &dyn Db,
-    importing_file: File,
+    importing_file: ResolverFile<'_>,
     name: &ModuleName,
     mode: ModuleResolveMode,
 ) -> Option<ResolvedNames> {
     let search_paths = absolute_desperate_search_paths(db, importing_file).unwrap_or_default();
-    let resolver = NameResolver::new(db, name, mode);
+    let resolver = NameResolver::new(db, importing_file.program(db), name, mode);
 
     match mode {
         ModuleResolveMode::Typing => resolver.resolve_desperate_typing(search_paths),
@@ -1166,11 +1234,11 @@ impl ModuleResolutionCandidate {
     }
 
     // This is the module we were actually interested in resolving, complete the resolution
-    fn into_module(self, db: &'_ dyn Db, name: ModuleName) -> Module<'_> {
+    fn into_module(self, db: &dyn Db, program: ResolverProgram, name: ModuleName) -> Module<'_> {
         match self.module {
             ResolvedModule::NamespacePackage => {
                 tracing::trace!("Resolve namespace package `{name}`");
-                Module::namespace_package(db, name)
+                Module::namespace_package(db, program, name)
             }
             ResolvedModule::LegacyNamespacePackage(file) => {
                 // legacy namespace packages behave like regular packages
@@ -1181,6 +1249,7 @@ impl ModuleResolutionCandidate {
                 );
                 Module::file_module(
                     db,
+                    program,
                     name,
                     ModuleKind::Package,
                     self.path.into_search_path(),
@@ -1194,6 +1263,7 @@ impl ModuleResolutionCandidate {
                 );
                 Module::file_module(
                     db,
+                    program,
                     name,
                     ModuleKind::Package,
                     self.path.into_search_path(),
@@ -1204,6 +1274,7 @@ impl ModuleResolutionCandidate {
                 tracing::trace!("Resolved module `{name}` to `{path}`", path = file.path(db));
                 Module::file_module(
                     db,
+                    program,
                     name,
                     ModuleKind::Module,
                     self.path.into_search_path(),
@@ -1241,16 +1312,28 @@ impl ModuleResolutionCandidate {
 }
 
 struct NameResolver<'db, 'name> {
+    program: ResolverProgram,
     context: ResolverContext<'db>,
     name: &'name ModuleName,
     is_non_shadowable: bool,
 }
 
 impl<'db, 'name> NameResolver<'db, 'name> {
-    fn new(db: &'db dyn Db, name: &'name ModuleName, mode: ModuleResolveMode) -> Self {
-        let python_version = db.python_version();
+    fn new(
+        db: &'db dyn Db,
+        program: ResolverProgram,
+        name: &'name ModuleName,
+        mode: ModuleResolveMode,
+    ) -> Self {
+        let python_version = program.python_version(db);
         Self {
-            context: ResolverContext::new(db, python_version, mode),
+            program,
+            context: ResolverContext::new(
+                db,
+                python_version,
+                program.search_paths(db).typeshed_versions(),
+                mode,
+            ),
             name,
             is_non_shadowable: mode.is_non_shadowable(python_version.minor, name.as_str()),
         }
@@ -1262,11 +1345,11 @@ impl<'db, 'name> NameResolver<'db, 'name> {
     /// a fallback when no stub provides the requested module. A stub overlay may use runtime
     /// packages as parents, but its final module must come from a stub file.
     fn resolve_typing(&self, stub_packages: &StubPackageIndex) -> Option<ResolvedNames> {
-        let search_paths = self.context.db.search_paths();
+        let search_paths = self.program.search_paths(self.context.db);
 
         if self.name.components().nth(1).is_none() {
             let candidates = self.discover_roots(
-                search_paths.iter(self.context.db, ModuleResolveMode::Typing),
+                search_paths.iter(self.context.db, self.program, ModuleResolveMode::Typing),
                 stub_packages.all(),
             );
             return self.resolve_remaining(candidates, ComponentFileFilter::ByMode);
@@ -1278,7 +1361,7 @@ impl<'db, 'name> NameResolver<'db, 'name> {
         let (overlay_stub_packages, remaining_stub_packages) = stub_packages.split_overlay();
         let mut candidates = self.discover_roots(
             search_paths
-                .iter(self.context.db, ModuleResolveMode::Typing)
+                .iter(self.context.db, self.program, ModuleResolveMode::Typing)
                 .take_while(|search_path| search_path.is_extra()),
             overlay_stub_packages,
         );
@@ -1290,7 +1373,7 @@ impl<'db, 'name> NameResolver<'db, 'name> {
 
         let remaining_candidates = self.discover_roots(
             search_paths
-                .iter(self.context.db, ModuleResolveMode::Typing)
+                .iter(self.context.db, self.program, ModuleResolveMode::Typing)
                 .skip_while(|search_path| search_path.is_extra()),
             remaining_stub_packages,
         );
@@ -1695,7 +1778,9 @@ fn is_legacy_namespace_package(
     //
     // The downside is if you write slightly different syntax we will fail to detect the idiom,
     // but hey, this is better than nothing!
-    let parsed = ruff_db::parsed::parsed_module(context.db, init);
+    let versioned_file =
+        ruff_db::parsed::VersionedFile::new(context.db, init, context.python_version);
+    let parsed = ruff_db::parsed::parsed_module(context.db, versioned_file);
     let mut visitor = LegacyNamespacePackageVisitor::default();
     visitor.visit_body(parsed.load(context.db).suite());
 
@@ -1731,6 +1816,7 @@ impl PyTyped {
 pub(super) struct ResolverContext<'db> {
     pub(super) db: &'db dyn Db,
     pub(super) python_version: PythonVersion,
+    pub(super) typeshed_versions: &'db TypeshedVersions,
     pub(super) mode: ModuleResolveMode,
 }
 
@@ -1738,11 +1824,13 @@ impl<'db> ResolverContext<'db> {
     pub(super) fn new(
         db: &'db dyn Db,
         python_version: PythonVersion,
+        typeshed_versions: &'db TypeshedVersions,
         mode: ModuleResolveMode,
     ) -> Self {
         Self {
             db,
             python_version,
+            typeshed_versions,
             mode,
         }
     }
@@ -1969,6 +2057,48 @@ mod tests {
 
     use super::*;
 
+    fn resolver_program(db: &TestDb) -> ResolverProgram {
+        db.resolver_program()
+    }
+
+    fn resolver_file(db: &TestDb, file: File) -> ResolverFile<'_> {
+        ResolverFile::new(db, resolver_program(db), file)
+    }
+
+    fn resolve_module_confident<'db>(
+        db: &'db TestDb,
+        module_name: &ModuleName,
+    ) -> Option<Module<'db>> {
+        super::resolve_module_confident(db, resolver_program(db), module_name)
+    }
+
+    fn resolve_real_module_confident<'db>(
+        db: &'db TestDb,
+        module_name: &ModuleName,
+    ) -> Option<Module<'db>> {
+        super::resolve_real_module_confident(db, resolver_program(db), module_name)
+    }
+
+    fn resolve_module<'db>(
+        db: &'db TestDb,
+        importing_file: File,
+        module_name: &ModuleName,
+    ) -> Option<Module<'db>> {
+        super::resolve_module(db, resolver_file(db, importing_file), module_name)
+    }
+
+    fn file_to_module(db: &TestDb, file: File) -> Option<Module<'_>> {
+        super::file_to_module(db, resolver_file(db, file))
+    }
+
+    fn path_to_module<'db>(db: &'db TestDb, path: &FilePath) -> Option<Module<'db>> {
+        super::path_to_module(db, resolver_program(db), path)
+    }
+
+    fn search_paths(db: &TestDb, mode: ModuleResolveMode) -> SearchPathIterator<'_> {
+        super::search_paths(db, resolver_program(db), mode)
+    }
+
     #[test]
     fn first_party_module() {
         let TestCase { db, src, .. } = TestCaseBuilder::new()
@@ -1992,6 +2122,36 @@ mod tests {
         assert_eq!(
             Some(foo_module),
             path_to_module(&db, &FilePath::from(expected_foo_path))
+        );
+    }
+
+    #[test]
+    fn same_name_resolves_independently_in_two_programs() {
+        let TestCase { mut db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("foo.py", "source = 'first'")])
+            .build();
+        let alternate = src.parent().unwrap().join("alternate");
+        db.write_file(alternate.join("foo.py"), "source = 'second'")
+            .unwrap();
+
+        let first_paths = SearchPathSettings::new(vec![src.clone()])
+            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+            .unwrap();
+        let second_paths = SearchPathSettings::new(vec![alternate.clone()])
+            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+            .unwrap();
+        let first_program = ResolverProgram::create(&db, PythonVersion::PY313, &first_paths);
+        let second_program = ResolverProgram::create(&db, PythonVersion::PY313, &second_paths);
+        let name = ModuleName::new_static("foo").unwrap();
+
+        let first = super::resolve_module_confident(&db, first_program, &name).unwrap();
+        let second = super::resolve_module_confident(&db, second_program, &name).unwrap();
+
+        assert_ne!(first, second);
+        assert_eq!(first.file(&db).unwrap().path(&db), &src.join("foo.py"));
+        assert_eq!(
+            second.file(&db).unwrap().path(&db),
+            &alternate.join("foo.py")
         );
     }
 
@@ -2771,7 +2931,12 @@ mod tests {
         assert_function_query_was_not_run(
             &db,
             resolve_module_query,
-            ModuleNameIngredient::new(&db, functools_module_name, ModuleResolveMode::Typing),
+            ModuleNameIngredient::new(
+                &db,
+                resolver_program(&db),
+                functools_module_name,
+                ModuleResolveMode::Typing,
+            ),
             &events,
         );
         assert_eq!(&functools_search_path, &stdlib);
@@ -3029,7 +3194,7 @@ not_a_directory
         assert_function_query_was_not_run(
             &db,
             dynamic_resolution_paths,
-            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::Typing),
+            ModuleResolveModeIngredient::new(&db, resolver_program(&db), ModuleResolveMode::Typing),
             &events,
         );
     }
@@ -3048,7 +3213,7 @@ not_a_directory
 
         dynamic_resolution_paths(
             &db,
-            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::Typing),
+            ModuleResolveModeIngredient::new(&db, resolver_program(&db), ModuleResolveMode::Typing),
         );
         db.clear_salsa_events();
 
@@ -3056,14 +3221,14 @@ not_a_directory
             .unwrap();
         dynamic_resolution_paths(
             &db,
-            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::Typing),
+            ModuleResolveModeIngredient::new(&db, resolver_program(&db), ModuleResolveMode::Typing),
         );
 
         let events = db.take_salsa_events();
         assert_function_query_was_not_run(
             &db,
             dynamic_resolution_paths,
-            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::Typing),
+            ModuleResolveModeIngredient::new(&db, resolver_program(&db), ModuleResolveMode::Typing),
             &events,
         );
     }

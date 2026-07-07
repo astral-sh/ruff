@@ -1,11 +1,9 @@
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
-use ty_module_resolver::{
-    ModuleName, ModuleNameResolutionError, ModuleResolveMode, resolve_module, search_paths,
-};
+use ty_module_resolver::{ModuleName, ModuleNameResolutionError, ModuleResolveMode};
 
 use crate::{
-    Program, TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
+    TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
     place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
         ModuleLiteralType, Type, TypeAndQualifiers,
@@ -45,13 +43,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(module_name) = &module_name
             && (self
-                .settings()
-                .allowed_unresolved_imports
+                .allowed_unresolved_imports()
                 .matches(module_name)
                 .is_include()
                 || self
-                    .settings()
-                    .replace_imports_with_any
+                    .replace_imports_with_any()
                     .matches(module_name)
                     .is_include())
         {
@@ -69,7 +65,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if level == 0 {
             if let Some(module_name) = module_name {
-                let program = Program::get(db);
+                let program = self.program;
                 let typeshed_versions = program.search_paths(db).typeshed_versions();
 
                 // Loop over ancestors in case we have info on the parent module but not submodule
@@ -85,6 +81,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ));
                             add_inferred_python_version_hint_to_diagnostic(
                                 db,
+                                program,
                                 &mut diagnostic,
                                 "resolving modules",
                             );
@@ -96,13 +93,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         } else {
+            let resolver_file = self.program_file().resolver_file(db);
             if let Some(better_level) = (0..level).rev().find(|reduced_level| {
                 let Ok(module_name) =
-                    ModuleName::from_identifier_parts(db, self.file(), module, *reduced_level)
+                    ModuleName::from_identifier_parts(db, resolver_file, module, *reduced_level)
                 else {
                     return false;
                 };
-                resolve_module(db, self.file(), &module_name).is_some()
+                ty_module_resolver::resolve_module(db, resolver_file, &module_name).is_some()
             }) {
                 diagnostic
                     .help("The module can be resolved if the number of leading dots is reduced");
@@ -121,7 +119,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Add search paths information to the diagnostic
         // Use the same search paths function that is used in actual module resolution
         let verbose = db.verbose();
-        let search_paths = search_paths(db, ModuleResolveMode::Typing);
+        let search_paths = ty_module_resolver::search_paths(
+            db,
+            self.program.resolver(db),
+            ModuleResolveMode::Typing,
+        );
 
         diagnostic.info(format_args!(
             "Searched in the following paths during module resolution:"
@@ -171,8 +173,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         if self
-            .settings()
-            .replace_imports_with_any
+            .replace_imports_with_any()
             .matches(&full_module_name)
             .is_include()
         {
@@ -268,7 +269,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             format_import_from_module(*level, module),
             self.file().path(db),
         );
-        let module_name = ModuleName::from_import_statement(db, self.file(), import_from);
+        let resolver_file = self.program_file().resolver_file(db);
+        let module_name = ModuleName::from_import_statement(db, resolver_file, import_from);
 
         let module_name = match module_name {
             Ok(module_name) => module_name,
@@ -297,7 +299,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        if resolve_module(db, self.file(), &module_name).is_none() {
+        if ty_module_resolver::resolve_module(db, resolver_file, &module_name).is_none() {
             self.report_unresolved_import(module_ref.range(), *level, module, Some(&module_name));
         }
     }
@@ -309,16 +311,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         let db = self.db();
+        let resolver_file = self.program_file().resolver_file(db);
 
-        let Ok(module_name) = ModuleName::from_import_statement(db, self.file(), import_from)
+        let Ok(module_name) = ModuleName::from_import_statement(db, resolver_file, import_from)
         else {
             self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
         };
 
         if self
-            .settings()
-            .replace_imports_with_any
+            .replace_imports_with_any()
             .matches(&module_name)
             .is_include()
         {
@@ -330,7 +332,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        let Some(module) = resolve_module(db, self.file(), &module_name) else {
+        let Some(module) = ty_module_resolver::resolve_module(db, resolver_file, &module_name)
+        else {
             self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
         };
@@ -338,6 +341,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let module_literal = ModuleLiteralType::new(
             db,
             module,
+            self.program,
             module.kind(db).is_package().then_some(self.file()),
         );
         let module_ty = Type::ModuleLiteral(module_literal);
@@ -473,8 +477,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if self
-            .settings()
-            .allowed_unresolved_imports
+            .allowed_unresolved_imports()
             .matches(full_submodule_name.as_ref().unwrap_or(&module_name))
             .is_include()
         {
@@ -491,12 +494,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Module `{module_name}` has no member `{name}`"
         ));
-
         let mut submodule_hint_added = false;
 
         if let Some(full_submodule_name) = full_submodule_name {
             submodule_hint_added = hint_if_stdlib_submodule_exists_on_other_versions(
                 db,
+                self.program,
                 &mut diagnostic,
                 &full_submodule_name,
                 module,
@@ -533,15 +536,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         let db = self.db();
+        let resolver_file = self.program_file().resolver_file(db);
 
         // Get this package's absolute module name by resolving `.`, and make sure it exists
-        let Ok(thispackage_name) = ModuleName::package_for_file(db, self.file()) else {
+        let Ok(thispackage_name) = ModuleName::package_for_file(db, resolver_file) else {
             self.add_binding(import_from.into(), definition)
                 .insert(self, Type::unknown());
             return;
         };
 
-        let Some(module) = resolve_module(db, self.file(), &thispackage_name) else {
+        let Some(module) = ty_module_resolver::resolve_module(db, resolver_file, &thispackage_name)
+        else {
             self.add_binding(import_from.into(), definition)
                 .insert(self, Type::unknown());
             return;
@@ -553,7 +558,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // First we normalize to `whatever.thispackage.x.y`
         let Some(final_part) = ModuleName::from_identifier_parts(
             db,
-            self.file(),
+            resolver_file,
             import_from.module.as_deref(),
             import_from.level,
         )
@@ -593,8 +598,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .insert(self, Type::unknown());
 
         if self
-            .settings()
-            .allowed_unresolved_imports
+            .allowed_unresolved_imports()
             .matches(&full_submodule_name)
             .is_include()
         {
@@ -611,9 +615,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut diagnostic = builder.into_diagnostic(format_args!(
             "Module `{thispackage_name}` has no submodule `{final_part}`"
         ));
-
         hint_if_stdlib_submodule_exists_on_other_versions(
             db,
+            self.program,
             &mut diagnostic,
             &full_submodule_name,
             module,

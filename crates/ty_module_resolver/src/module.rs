@@ -10,6 +10,7 @@ use salsa::plumbing::AsId;
 use crate::Db;
 use crate::module_name::ModuleName;
 use crate::path::{SearchPath, SystemOrVendoredPathRef};
+use crate::program::ResolverProgram;
 
 /// Representation of a Python module.
 #[derive(Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype, salsa::SalsaValue)]
@@ -25,6 +26,7 @@ impl get_size2::GetSize for Module<'_> {}
 impl<'db> Module<'db> {
     pub(crate) fn file_module(
         db: &'db dyn Db,
+        program: ResolverProgram,
         name: ModuleName,
         kind: ModuleKind,
         search_path: SearchPath,
@@ -32,11 +34,30 @@ impl<'db> Module<'db> {
     ) -> Self {
         let known = KnownModule::try_from_search_path_and_name(&search_path, &name);
 
-        Self::File(FileModule::new(db, name, kind, search_path, file, known))
+        Self::File(FileModule::new(
+            db,
+            program,
+            name,
+            kind,
+            search_path,
+            file,
+            known,
+        ))
     }
 
-    pub(crate) fn namespace_package(db: &'db dyn Db, name: ModuleName) -> Self {
-        Self::Namespace(NamespacePackage::new(db, name))
+    pub(crate) fn namespace_package(
+        db: &'db dyn Db,
+        program: ResolverProgram,
+        name: ModuleName,
+    ) -> Self {
+        Self::Namespace(NamespacePackage::new(db, program, name))
+    }
+
+    pub fn program(self, db: &'db dyn Database) -> ResolverProgram {
+        match self {
+            Module::File(module) => module.program(db),
+            Module::Namespace(package) => package.program(db),
+        }
     }
 
     /// The absolute name of the module (e.g. `foo.bar`)
@@ -171,14 +192,18 @@ fn all_submodule_names_for_package<'db>(
 
     Some(match path.parent()? {
         SystemOrVendoredPathRef::System(parent_directory) => {
-            directory_listing(db, parent_directory)
+            let listing = directory_listing(db, parent_directory)
                 .inspect_err(|error| {
                     tracing::debug!(
                         "Failed to read {parent_directory:?} when looking for \
                          its possible submodules: {error}"
                     );
                 })
-                .ok()?
+                .ok()?;
+            let program = module.program(db);
+            let module_name = module.name(db);
+            let search_path = module.search_path(db);
+            listing
                 .iter()
                 .filter(|(name, ty)| {
                     let path = SystemPath::new(name);
@@ -193,7 +218,7 @@ fn all_submodule_names_for_package<'db>(
                     let relative = SystemPath::new(entry_name);
                     let stem = relative.file_stem()?;
                     let path = parent_directory.join(relative);
-                    let mut name = module.name(db).clone();
+                    let mut name = module_name.clone();
                     name.extend(&ModuleName::new(stem)?);
 
                     let (kind, file) = if file_type.is_directory() {
@@ -204,56 +229,64 @@ fn all_submodule_names_for_package<'db>(
                     };
                     Some(Module::file_module(
                         db,
+                        program,
                         name,
                         kind,
-                        module.search_path(db).clone(),
+                        search_path.clone(),
                         file,
                     ))
                 })
                 .collect()
         }
-        SystemOrVendoredPathRef::Vendored(parent_directory) => db
-            .vendored()
-            .read_directory(parent_directory)
-            .filter(|entry| {
-                let ty = entry.file_type();
-                let path = entry.path();
-                is_submodule(
-                    ty.is_directory(),
-                    ty.is_file(),
-                    path.file_name(),
-                    path.extension(),
-                )
-            })
-            .filter_map(|entry| {
-                let stem = entry.path().file_stem()?;
-                let mut name = module.name(db).clone();
-                name.extend(&ModuleName::new(stem)?);
-
-                let (kind, file) = if entry.file_type().is_directory() {
-                    (
-                        ModuleKind::Package,
-                        find_package_init_vendored(db, entry.path())?,
+        SystemOrVendoredPathRef::Vendored(parent_directory) => {
+            let program = module.program(db);
+            let module_name = module.name(db);
+            let search_path = module.search_path(db);
+            db.vendored()
+                .read_directory(parent_directory)
+                .filter(|entry| {
+                    let ty = entry.file_type();
+                    let path = entry.path();
+                    is_submodule(
+                        ty.is_directory(),
+                        ty.is_file(),
+                        path.file_name(),
+                        path.extension(),
                     )
-                } else {
-                    let file = vendored_path_to_file(db, entry.path()).ok()?;
-                    (ModuleKind::Module, file)
-                };
-                Some(Module::file_module(
-                    db,
-                    name,
-                    kind,
-                    module.search_path(db).clone(),
-                    file,
-                ))
-            })
-            .collect(),
+                })
+                .filter_map(|entry| {
+                    let stem = entry.path().file_stem()?;
+                    let mut name = module_name.clone();
+                    name.extend(&ModuleName::new(stem)?);
+
+                    let (kind, file) = if entry.file_type().is_directory() {
+                        (
+                            ModuleKind::Package,
+                            find_package_init_vendored(db, entry.path())?,
+                        )
+                    } else {
+                        let file = vendored_path_to_file(db, entry.path()).ok()?;
+                        (ModuleKind::Module, file)
+                    };
+                    Some(Module::file_module(
+                        db,
+                        program,
+                        name,
+                        kind,
+                        search_path.clone(),
+                        file,
+                    ))
+                })
+                .collect()
+        }
     })
 }
 
 /// A module that resolves to a file (`lib.py` or `package/__init__.py`)
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FileModule<'db> {
+    #[returns(copy)]
+    pub(super) program: ResolverProgram,
     #[returns(ref)]
     pub(super) name: ModuleName,
     #[returns(copy)]
@@ -272,6 +305,8 @@ pub struct FileModule<'db> {
 /// multiple possible paths and they have no corresponding code file.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct NamespacePackage<'db> {
+    #[returns(copy)]
+    pub(super) program: ResolverProgram,
     #[returns(ref)]
     pub(super) name: ModuleName,
 }

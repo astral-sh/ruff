@@ -87,6 +87,7 @@ impl<'db> Mro<'db> {
             resolved_bases.push(ClassBase::Generic);
         }
 
+        let program = class_literal.program(db);
         let class = class_literal.apply_optional_specialization(db, specialization);
 
         let original_bases = class_literal.explicit_bases(db);
@@ -118,10 +119,13 @@ impl<'db> Mro<'db> {
                     Ok(Self::from([
                         ClassBase::Class(class),
                         ClassBase::Generic,
-                        ClassBase::object(db),
+                        ClassBase::object(db, program),
                     ]))
                 } else {
-                    Ok(Self::from([ClassBase::Class(class), ClassBase::object(db)]))
+                    Ok(Self::from([
+                        ClassBase::Class(class),
+                        ClassBase::object(db, program),
+                    ]))
                 }
             }
 
@@ -143,6 +147,7 @@ impl<'db> Mro<'db> {
             {
                 ClassBase::try_from_explicit_base(
                     db,
+                    program,
                     *single_base,
                     Some(ClassLiteral::Static(class_literal)),
                 )
@@ -158,7 +163,7 @@ impl<'db> Mro<'db> {
                             Err(StaticMroErrorKind::InheritanceCycle)
                         } else {
                             Ok(std::iter::once(ClassBase::Class(class))
-                                .chain(single_base.mro(db, specialization))
+                                .chain(single_base.mro(db, program, specialization))
                                 .collect())
                         }
                     },
@@ -189,6 +194,7 @@ impl<'db> Mro<'db> {
                     } else {
                         match ClassBase::try_from_explicit_base(
                             db,
+                            program,
                             *base,
                             Some(ClassLiteral::Static(class_literal)),
                         ) {
@@ -216,7 +222,7 @@ impl<'db> Mro<'db> {
                     if base.has_cyclic_mro(db) {
                         return Err(StaticMroErrorKind::InheritanceCycle.into_mro_error(db, class));
                     }
-                    seqs.push(base.mro(db, specialization).collect());
+                    seqs.push(base.mro(db, program, specialization).collect());
                 }
                 seqs.push(
                     resolved_bases
@@ -264,6 +270,7 @@ impl<'db> Mro<'db> {
                     for (index, base) in original_bases.iter().enumerate() {
                         let Some(base) = ClassBase::try_from_explicit_base(
                             db,
+                            program,
                             *base,
                             Some(ClassLiteral::Static(class_literal)),
                         ) else {
@@ -312,6 +319,7 @@ impl<'db> Mro<'db> {
                             bases_list: original_bases.iter().copied().collect(),
                             generic_index: check_generic_reorder_fixes_mro(
                                 db,
+                                program,
                                 resolved_bases.as_slice(),
                                 original_bases,
                             ),
@@ -329,10 +337,11 @@ impl<'db> Mro<'db> {
     }
 
     pub(super) fn from_error(db: &'db dyn Db, class: ClassType<'db>) -> Self {
+        let program = class.program(db);
         Self::from([
             ClassBase::Class(class),
             ClassBase::unknown(),
-            ClassBase::object(db),
+            ClassBase::object(db, program),
         ])
     }
 
@@ -343,6 +352,7 @@ impl<'db> Mro<'db> {
         db: &'db dyn Db,
         dynamic: DynamicClassLiteral<'db>,
     ) -> Result<Self, DynamicMroError<'db>> {
+        let program = dynamic.scope(db).program(db);
         let original_bases = dynamic.explicit_bases(db);
 
         // Convert Types to ClassBases, tracking any that fail conversion.
@@ -350,7 +360,7 @@ impl<'db> Mro<'db> {
         let mut invalid_bases = Vec::new();
 
         for (i, base_type) in original_bases.iter().enumerate() {
-            match ClassBase::try_from_explicit_base(db, *base_type, None) {
+            match ClassBase::try_from_explicit_base(db, program, *base_type, None) {
                 Some(class_base) => resolved_bases.push(class_base),
                 None => invalid_bases.push((i, *base_type)),
             }
@@ -373,7 +383,7 @@ impl<'db> Mro<'db> {
 
         // Handle empty bases case: MRO is just [self, object].
         if resolved_bases.is_empty() {
-            return Ok(Self::from([self_base, ClassBase::object(db)]));
+            return Ok(Self::from([self_base, ClassBase::object(db, program)]));
         }
 
         // Build MRO sequences and check for inheritance cycles.
@@ -382,7 +392,7 @@ impl<'db> Mro<'db> {
             if base.has_cyclic_mro(db) {
                 return Err(DynamicMroErrorKind::InheritanceCycle.into_error(db, dynamic));
             }
-            seqs.push(base.mro(db, None).collect());
+            seqs.push(base.mro(db, program, None).collect());
         }
         seqs.push(resolved_bases.iter().copied().collect());
 
@@ -434,6 +444,7 @@ impl<'db> Mro<'db> {
         db: &'db dyn Db,
         dynamic_enum: DynamicEnumLiteral<'db>,
     ) -> Result<Self, DynamicMroError<'db>> {
+        let program = dynamic_enum.scope(db).program(db);
         let self_base = ClassBase::Class(ClassType::NonGeneric(dynamic_enum.into()));
 
         // Convert the functional enum bases (`type=` mixin first, enum base second)
@@ -442,7 +453,7 @@ impl<'db> Mro<'db> {
         let original_bases = dynamic_enum.explicit_bases(db);
         let mut resolved_bases: Vec<ClassBase<'db>> = Vec::with_capacity(original_bases.len());
         for base_type in original_bases.iter().copied() {
-            if let Some(base) = ClassBase::try_from_explicit_base(db, base_type, None) {
+            if let Some(base) = ClassBase::try_from_explicit_base(db, program, base_type, None) {
                 resolved_bases.push(base);
             }
         }
@@ -464,7 +475,7 @@ impl<'db> Mro<'db> {
             let mut seen = FxHashSet::default();
             seen.insert(self_base);
             for base in &resolved_bases {
-                for item in base.mro(db, None) {
+                for item in base.mro(db, program, None) {
                     if seen.insert(item) {
                         result.push(item);
                     }
@@ -484,7 +495,7 @@ impl<'db> Mro<'db> {
                     fallback_mro: fallback_mro(),
                 });
             }
-            seqs.push(base.mro(db, None).collect());
+            seqs.push(base.mro(db, program, None).collect());
         }
         seqs.push(resolved_bases.iter().copied().collect());
 
@@ -498,6 +509,7 @@ impl<'db> Mro<'db> {
     ///
     /// Iterates over base MROs sequentially with deduplication.
     pub(super) fn dynamic_fallback(db: &'db dyn Db, dynamic: DynamicClassLiteral<'db>) -> Self {
+        let program = dynamic.scope(db).program(db);
         let self_base = ClassBase::Class(ClassType::NonGeneric(dynamic.into()));
         let mut result = vec![self_base];
         let mut seen = FxHashSet::default();
@@ -505,10 +517,10 @@ impl<'db> Mro<'db> {
 
         for base_type in dynamic.explicit_bases(db) {
             // Convert `Type` to `ClassBase`, falling back to `Unknown` if conversion fails.
-            let base = ClassBase::try_from_explicit_base(db, *base_type, None)
+            let base = ClassBase::try_from_explicit_base(db, program, *base_type, None)
                 .unwrap_or_else(ClassBase::unknown);
 
-            for item in base.mro(db, None) {
+            for item in base.mro(db, program, None) {
                 if seen.insert(item) {
                     result.push(item);
                 }
@@ -835,6 +847,7 @@ fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
 /// the `Generic[]` base. If not, this function will return `None`.
 fn check_generic_reorder_fixes_mro<'db>(
     db: &'db dyn Db,
+    program: crate::Program,
     resolved_bases: &[ClassBase<'db>],
     original_bases: &[Type<'db>],
 ) -> Option<usize> {
@@ -866,7 +879,7 @@ fn check_generic_reorder_fixes_mro<'db>(
         if base.has_cyclic_mro(db) {
             return None;
         }
-        seqs.push(base.mro(db, None).collect());
+        seqs.push(base.mro(db, program, None).collect());
     }
     seqs.push(reordered);
     c3_merge(seqs)?;

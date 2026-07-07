@@ -7,6 +7,7 @@ pub use module::KnownModule;
 pub use module::Module;
 pub use module_name::{ModuleName, ModuleNameResolutionError};
 pub use path::{SearchPath, SearchPathError};
+pub use program::{ResolverFile, ResolverProgram};
 pub use resolve::{
     SearchPaths, file_to_module, resolve_module, resolve_module_confident, resolve_real_module,
     resolve_real_module_confident, resolve_real_shadowable_module,
@@ -27,6 +28,7 @@ mod module;
 mod module_glob;
 mod module_name;
 mod path;
+mod program;
 mod resolve;
 mod settings;
 mod strategy;
@@ -36,11 +38,14 @@ mod typeshed;
 mod testing;
 
 /// Returns an iterator over all search paths pointing to a system path
-pub fn system_module_search_paths(db: &dyn Db) -> SystemModuleSearchPathsIter<'_> {
+pub fn system_module_search_paths(
+    db: &dyn Db,
+    program: ResolverProgram,
+) -> SystemModuleSearchPathsIter<'_> {
     SystemModuleSearchPathsIter {
         // Always run in `Typing` mode because we want to include as much as possible
         // and we don't care about the "real" stdlib
-        inner: search_paths(db, ModuleResolveMode::Typing),
+        inner: search_paths(db, program, ModuleResolveMode::Typing),
     }
 }
 

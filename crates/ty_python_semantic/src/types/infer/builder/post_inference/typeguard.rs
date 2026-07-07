@@ -20,22 +20,17 @@ pub(crate) fn check_type_guard_definition<'db>(
     let signature = overload.signature(db);
     let return_ty = signature.return_ty;
 
-    // Check if this is a `TypeIs` or `TypeGuard` return type.
     let (type_guard_form_name, narrowed_type) = match return_ty {
-        Type::TypeIs(type_is) => ("TypeIs", Some(type_is.return_type(db))),
+        Type::TypeIs(type_is) => ("TypeIs", Some(type_is.return_type(db, context.program()))),
         Type::TypeGuard(_) => ("TypeGuard", None),
         _ => return,
     };
 
-    // The return type annotation must exist since we matched `TypeIs`/`TypeGuard`.
     let Some(returns_expr) = node.returns.as_deref() else {
         return;
     };
 
-    // Check if this is a non-static method (first parameter is implicit `self`/`cls`).
     let has_implicit_receiver = overload.has_implicit_receiver(db);
-
-    // Find the first positional parameter to narrow (skip implicit `self`/`cls`).
     let positional_params: Vec<_> = signature.parameters().positional().collect();
     let first_narrowed_param_index = usize::from(has_implicit_receiver);
     let first_narrowed_param = positional_params.get(first_narrowed_param_index);
@@ -49,17 +44,16 @@ pub(crate) fn check_type_guard_definition<'db>(
         return;
     };
 
-    // For `TypeIs`, check that the narrowed type is assignable to the parameter type.
     if let Some(narrowed_ty) = narrowed_type {
         let param_ty = first_narrowed_param.annotated_type();
-        if !narrowed_ty.is_assignable_to(db, param_ty)
+        if !narrowed_ty.is_assignable_to(db, context.program(), param_ty)
             && let Some(builder) = context.report_lint(&INVALID_TYPE_GUARD_DEFINITION, returns_expr)
         {
             builder.into_diagnostic(format_args!(
                 "Narrowed type `{narrowed}` is not assignable \
                     to the declared parameter type `{param}`",
-                narrowed = narrowed_ty.display(db),
-                param = param_ty.display(db)
+                narrowed = narrowed_ty.display(db, context.program()),
+                param = param_ty.display(db, context.program())
             ));
         }
     }

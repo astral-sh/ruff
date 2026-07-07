@@ -11,7 +11,7 @@ use ruff_db::system::{
 };
 use ruff_python_ast::PythonVersion;
 use ruff_ranged_value::{RangedValue, ValueSource};
-use ty_module_resolver::{Module, ModuleName, resolve_module_confident};
+use ty_module_resolver::{Module, ModuleName};
 use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions};
 use ty_project::metadata::pyproject::{PyProject, Tool};
 use ty_project::metadata::python_version::SupportedPythonVersion;
@@ -20,6 +20,13 @@ use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
 use ty_project::{ChangeResult, Db, ProjectDatabase, ProjectMetadata};
 use ty_python_core::platform::PythonPlatform;
 use ty_static::EnvVars;
+
+fn resolve_module_confident<'db>(
+    db: &'db ProjectDatabase,
+    name: &ModuleName,
+) -> Option<Module<'db>> {
+    ty_module_resolver::resolve_module_confident(db, db.project().program(db).resolver(db), name)
+}
 
 struct TestCase {
     db: ProjectDatabase,

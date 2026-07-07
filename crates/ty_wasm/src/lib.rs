@@ -27,7 +27,8 @@ use ty_project::metadata::options::Options;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use ty_project::{CheckMode, ProjectMetadata};
 use ty_project::{Db, ProjectDatabase};
-use ty_python_core::program::{FallibleStrategy, Program};
+use ty_python_core::environment::ProgramFile;
+use ty_python_core::program::FallibleStrategy;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -112,6 +113,12 @@ pub struct Workspace {
     system: WasmSystem,
 }
 
+impl Workspace {
+    fn program_file(&self, file: File) -> ProgramFile<'_> {
+        ProgramFile::new(&self.db, self.db.project().program(&self.db), file)
+    }
+}
+
 #[wasm_bindgen]
 impl Workspace {
     #[wasm_bindgen(constructor)]
@@ -169,16 +176,15 @@ impl Workspace {
         let (program_settings, program_settings_diagnostics) = merged_options
             .to_program_settings(&self.system, self.db.vendored(), &FallibleStrategy)
             .map_err(into_error)?;
-        Program::get(&self.db).update_from_settings(&mut self.db, program_settings);
 
         let (settings, settings_diagnostics) = merged_options
             .to_settings(&self.db, &FallibleStrategy)
             .map_err(into_error)?;
-
         self.db.project().reload(
             &mut self.db,
             project,
             Some(settings),
+            Some(program_settings),
             settings_diagnostics,
             program_settings_diagnostics,
         );
@@ -275,7 +281,7 @@ impl Workspace {
 
     #[wasm_bindgen(js_name = "hints")]
     pub fn hints(&self, file_id: &FileHandle) -> Result<Vec<Hint>, Error> {
-        Ok(hints(&self.db, file_id.file)
+        Ok(hints(&self.db, self.program_file(file_id.file))
             .into_iter()
             .map(|hint| Hint::from_ide_hint(&self.db, file_id.file, self.position_encoding, &hint))
             .collect())
@@ -290,18 +296,28 @@ impl Workspace {
 
     /// Returns the parsed AST for `path`
     pub fn parsed(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file).load(&self.db);
+        let parsed = self
+            .program_file(file_id.file)
+            .parsed(&self.db)
+            .load(&self.db);
 
         Ok(format!("{:#?}", parsed.syntax()))
     }
 
     pub fn format(&self, file_id: &FileHandle) -> Result<Option<String>, Error> {
-        formatted_file(&self.db, file_id.file).map_err(into_error)
+        formatted_file(
+            &self.db,
+            self.program_file(file_id.file).versioned_file(&self.db),
+        )
+        .map_err(into_error)
     }
 
     /// Returns the token stream for `path` serialized as a string.
     pub fn tokens(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file).load(&self.db);
+        let parsed = self
+            .program_file(file_id.file)
+            .parsed(&self.db)
+            .load(&self.db);
 
         Ok(format!("{:#?}", parsed.tokens()))
     }
@@ -324,7 +340,8 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = goto_type_definition(&self.db, file_id.file, offset) else {
+        let Some(targets) = goto_type_definition(&self.db, self.program_file(file_id.file), offset)
+        else {
             return Ok(Vec::new());
         };
 
@@ -348,7 +365,8 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = goto_declaration(&self.db, file_id.file, offset) else {
+        let Some(targets) = goto_declaration(&self.db, self.program_file(file_id.file), offset)
+        else {
             return Ok(Vec::new());
         };
 
@@ -372,7 +390,8 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = goto_definition(&self.db, file_id.file, offset) else {
+        let Some(targets) = goto_definition(&self.db, self.program_file(file_id.file), offset)
+        else {
             return Ok(Vec::new());
         };
 
@@ -396,7 +415,9 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = find_references(&self.db, file_id.file, offset, true) else {
+        let Some(targets) =
+            find_references(&self.db, self.program_file(file_id.file), offset, true)
+        else {
             return Ok(Vec::new());
         };
 
@@ -435,7 +456,7 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(range) = can_rename(&self.db, file_id.file, offset) else {
+        let Some(range) = can_rename(&self.db, self.program_file(file_id.file), offset) else {
             return Ok(None);
         };
 
@@ -459,11 +480,13 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        if can_rename(&self.db, file_id.file, offset).is_none() {
+        if can_rename(&self.db, self.program_file(file_id.file), offset).is_none() {
             return Ok(Vec::new());
         }
 
-        let Some(rename_results) = rename(&self.db, file_id.file, offset, new_name) else {
+        let Some(rename_results) =
+            rename(&self.db, self.program_file(file_id.file), offset, new_name)
+        else {
             return Ok(Vec::new());
         };
 
@@ -488,7 +511,7 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(range_info) = hover(&self.db, file_id.file, offset) else {
+        let Some(range_info) = hover(&self.db, self.program_file(file_id.file), offset) else {
             return Ok(None);
         };
 
@@ -523,7 +546,7 @@ impl Workspace {
             &self.db,
             &settings,
             CompletionCapabilities::default(),
-            file_id.file,
+            self.program_file(file_id.file),
             offset,
         );
 
@@ -532,7 +555,8 @@ impl Workspace {
             .map(|comp| {
                 let name = comp.label.to_string();
                 let kind = comp.kind.map(CompletionKind::from);
-                let type_display = comp.ty.map(|ty| ty.display(&self.db).to_string());
+                let program = self.db.project().program(&self.db);
+                let type_display = comp.ty.map(|ty| ty.display(&self.db, program).to_string());
                 let import_edit = comp.import.as_ref().map(|edit| {
                     let range = Range::from_text_range(
                         edit.range(),
@@ -567,7 +591,7 @@ impl Workspace {
 
         let result = inlay_hints(
             &self.db,
-            file_id.file,
+            self.program_file(file_id.file),
             range.to_text_range(&index, &source, self.position_encoding)?,
             // TODO: Provide a way to configure this
             &InlayHintSettings {
@@ -624,7 +648,8 @@ impl Workspace {
         let index = line_index(&self.db, file_id.file);
         let source = source_text(&self.db, file_id.file);
 
-        let semantic_token = ty_ide::semantic_tokens(&self.db, file_id.file, None);
+        let semantic_token =
+            ty_ide::semantic_tokens(&self.db, self.program_file(file_id.file), None);
 
         let result = semantic_token
             .iter()
@@ -649,7 +674,7 @@ impl Workspace {
 
         let semantic_token = ty_ide::semantic_tokens(
             &self.db,
-            file_id.file,
+            self.program_file(file_id.file),
             Some(range.to_text_range(&index, &source, self.position_encoding)?),
         );
 
@@ -686,7 +711,7 @@ impl Workspace {
             actions.extend(
                 ty_ide::code_actions(
                     &self.db,
-                    file_id.file,
+                    self.program_file(file_id.file),
                     range,
                     diagnostic.inner.id().as_str(),
                 )
@@ -721,7 +746,9 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(signature_help_info) = signature_help(&self.db, file_id.file, offset) else {
+        let Some(signature_help_info) =
+            signature_help(&self.db, self.program_file(file_id.file), offset)
+        else {
             return Ok(None);
         };
 
@@ -768,7 +795,8 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = document_highlights(&self.db, file_id.file, offset) else {
+        let Some(targets) = document_highlights(&self.db, self.program_file(file_id.file), offset)
+        else {
             return Ok(Vec::new());
         };
 

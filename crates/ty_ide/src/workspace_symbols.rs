@@ -2,10 +2,12 @@ use crate::symbols::{QueryPattern, SymbolInfo, symbols_for_file};
 use rayon::prelude::*;
 use ruff_db::files::File;
 use ty_project::{Db, parallel::ParallelIteratorExt};
+use ty_python_core::environment::ProgramFile;
+use ty_python_core::program::Program;
 
 /// Get all workspace symbols matching the query string.
 /// Returns symbols from all files in the workspace, filtered by the query.
-pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
+pub fn workspace_symbols(db: &dyn Db, program: Program, query: &str) -> Vec<WorkspaceSymbolInfo> {
     // If the query is empty, return immediately to avoid expensive file scanning
     if query.is_empty() {
         return Vec::new();
@@ -30,7 +32,7 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
             );
             let _entered = symbols_for_file_span.entered();
 
-            symbols_for_file(db, file)
+            symbols_for_file(db, ProgramFile::new(db, program, file))
                 .search(&query)
                 .map(|(_, symbol)| WorkspaceSymbolInfo {
                     symbol: symbol.to_owned(),
@@ -198,7 +200,7 @@ foo = 1
 
     impl CursorTest {
         fn workspace_symbols(&self, query: &str) -> String {
-            let symbols = workspace_symbols(&self.db, query);
+            let symbols = workspace_symbols(&self.db, self.program(), query);
 
             if symbols.is_empty() {
                 return "No symbols found".to_string();

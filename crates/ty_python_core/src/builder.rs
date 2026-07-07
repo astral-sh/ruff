@@ -19,7 +19,7 @@ use ruff_python_parser::semantic_errors::{
 };
 use ruff_text_size::{Ranged, TextRange};
 use smallvec::SmallVec;
-use ty_module_resolver::{ModuleName, resolve_module};
+use ty_module_resolver::ModuleName;
 
 use crate::HasTrackedScope;
 use crate::ast_ids::node_key::ExpressionNodeKey;
@@ -35,6 +35,7 @@ use crate::definition::{
     MatchPatternDefinitionNodeRef, NestedBindingsDefinitionKind, ParameterDefinitionNodeRef,
     StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
+use crate::environment::ProgramFile;
 use crate::expression::{Expression, ExpressionKind};
 use crate::frozen::{FrozenMap, FrozenSet};
 use crate::member::MemberExprBuilder;
@@ -48,7 +49,6 @@ use crate::predicate::{
     PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral, ScopedPredicateId,
     SequencePatternPredicateKind, StarImportPlaceholderPredicate, SubjectElementPatternPredicate,
 };
-use crate::program::Program;
 use crate::re_exports::exported_names;
 use crate::reachability_constraints::{
     ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
@@ -230,6 +230,7 @@ impl ConditionFlowSnapshot {
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     // Builder state
     db: &'db dyn Db,
+    program_file: ProgramFile<'db>,
     file: File,
     source_type: PySourceType,
     module: &'ast ParsedModuleRef,
@@ -301,9 +302,16 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 }
 
 impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
-    pub(super) fn new(db: &'db dyn Db, file: File, module_ref: &'ast ParsedModuleRef) -> Self {
+    pub(super) fn new(
+        db: &'db dyn Db,
+        program_file: ProgramFile<'db>,
+        module_ref: &'ast ParsedModuleRef,
+    ) -> Self {
+        let file = program_file.file(db);
+        let python_version = program_file.program(db).python_version(db);
         let mut builder = Self {
             db,
+            program_file,
             file,
             source_type: file.source_type(db),
             module: module_ref,
@@ -341,7 +349,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             enclosing_snapshots: FxHashMap::default(),
 
-            python_version: Program::get(db).python_version(db),
+            python_version,
             source_text: OnceCell::new(),
             semantic_checker: SemanticSyntaxChecker::default(),
             in_try: false,
@@ -512,7 +520,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .push(Box::new(UseDefMapBuilder::new(is_class_scope)));
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
 
-        let scope_id = ScopeId::new(self.db, self.file, file_scope_id);
+        let scope_id = ScopeId::new(self.db, self.program_file, file_scope_id);
 
         self.scope_ids_by_scope.push(scope_id);
         let previous = self.scopes_by_node.insert(node.node_key(), file_scope_id);
@@ -2161,7 +2169,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         PatternPredicate::new(
             self.db,
-            self.file,
+            self.program_file,
             self.current_scope(),
             subject,
             kind,
@@ -2303,7 +2311,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         } else {
             Statement::Other(StatementInner::new(
                 self.db,
-                self.file,
+                self.program_file,
                 self.current_scope(),
                 AstNodeRef::new(self.module, statement_node),
             ))
@@ -2606,7 +2614,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     };
                 let unpack = Unpack::new(
                     self.db,
-                    self.file,
+                    self.program_file,
                     value_file_scope,
                     self.current_scope(),
                     // Note `target` belongs to the `self.module` tree
@@ -2921,14 +2929,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // that `x` can be freely overwritten, and that we don't assume that an import
                 // in one function is visible in another function.
                 let mut is_self_import = false;
-                if self.file.is_package(self.db)
+                let package_program_file = self
+                    .file
+                    .is_package(self.db)
+                    .then(|| self.program_file.resolver_file(self.db));
+                if let Some(resolver_file) = package_program_file
                     && let Ok(module_name) = ModuleName::from_identifier_parts(
                         self.db,
-                        self.file,
+                        resolver_file,
                         node.module.as_deref(),
                         node.level,
                     )
-                    && let Ok(thispackage) = ModuleName::package_for_file(self.db, self.file)
+                    && let Ok(thispackage) = ModuleName::package_for_file(self.db, resolver_file)
                 {
                     // Record whether this is equivalent to `from . import ...`
                     is_self_import = module_name == thispackage;
@@ -3001,13 +3013,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             continue;
                         }
 
+                        let program = self.program_file.program(self.db);
+                        let resolver_file = package_program_file
+                            .unwrap_or_else(|| program.resolver_file(self.db, self.file));
                         let Ok(module_name) =
-                            ModuleName::from_import_statement(self.db, self.file, node)
+                            ModuleName::from_import_statement(self.db, resolver_file, node)
                         else {
                             continue;
                         };
 
-                        let Some(module) = resolve_module(self.db, self.file, &module_name) else {
+                        let Some(module) = ty_module_resolver::resolve_module(
+                            self.db,
+                            resolver_file,
+                            &module_name,
+                        ) else {
                             continue;
                         };
 
@@ -3029,14 +3048,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         // ```
                         //
                         // For more details, see the doc-comment on `StarImportPlaceholderPredicate`.
-                        for export in exported_names(self.db, referenced_module) {
+                        let referenced_program_file =
+                            ProgramFile::new(self.db, program, referenced_module);
+                        for export in exported_names(self.db, referenced_program_file) {
                             let symbol_id = self.add_symbol(export.clone());
                             let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
                             let star_import = StarImportPlaceholderPredicate::new(
                                 self.db,
-                                self.file,
+                                self.program_file,
                                 symbol_id,
-                                referenced_module,
+                                referenced_program_file,
                             );
 
                             let star_import_predicate = self.add_predicate(star_import.into());

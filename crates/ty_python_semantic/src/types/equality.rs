@@ -7,7 +7,7 @@
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
-use crate::{Db, place::PlaceAndQualifiers};
+use crate::{Db, Program, place::PlaceAndQualifiers};
 
 use super::{
     EnumLiteralType, IntersectionBuilder, KnownBoundMethodType, KnownClass, LiteralValueType,
@@ -126,6 +126,7 @@ impl<'db> ComparisonResult<'db> {
 /// constrain `left`.
 pub(super) fn evaluate_type_equality<'db>(
     db: &'db dyn Db,
+    program: Program,
     left: Type<'db>,
     right: Type<'db>,
     is_positive: bool,
@@ -136,6 +137,7 @@ pub(super) fn evaluate_type_equality<'db>(
         ComparisonOperator::Equality.condition_expects_equality(branch);
     enum_literal_constraint(
         db,
+        program,
         left,
         right,
         ComparisonOperator::Equality,
@@ -144,6 +146,7 @@ pub(super) fn evaluate_type_equality<'db>(
     .or_else(|| {
         builtin_literal_constraint(
             db,
+            program,
             left,
             right,
             ComparisonOperator::Equality,
@@ -151,14 +154,21 @@ pub(super) fn evaluate_type_equality<'db>(
         )
     })
     .or_else(|| {
-        evaluate_enum_domains(db, left, right, branch, ComparisonOperator::Equality)
-            .and_then(|result| result.constraint(branch))
+        evaluate_enum_domains(
+            db,
+            program,
+            left,
+            right,
+            branch,
+            ComparisonOperator::Equality,
+        )
+        .and_then(|result| result.constraint(branch))
     })
     .or_else(|| {
-        if comparison_domain(db, left, right, ComparisonOperator::Equality)
+        if comparison_domain(db, program, left, right, ComparisonOperator::Equality)
             == ComparisonDomain::Known
         {
-            ComparisonEvaluator::new(db, soundness_policy)
+            ComparisonEvaluator::new(db, program, soundness_policy)
                 .evaluate(left, right, branch, ComparisonOperator::Equality)
                 .constraint(branch)
         } else {
@@ -170,19 +180,23 @@ pub(super) fn evaluate_type_equality<'db>(
 /// Return a constraint excluding every value known to compare equal to `ty`.
 pub(super) fn equality_exclusion_constraint<'db>(
     db: &'db dyn Db,
+    program: Program,
     ty: Type<'db>,
 ) -> Option<Type<'db>> {
     let ty = ty.resolve_type_alias(db);
-    builtin_literal_constraint(db, ty, ty, ComparisonOperator::Equality, false)
-        .or_else(|| ty.is_single_valued(db).then(|| ty.negate(db)))
+    builtin_literal_constraint(db, program, ty, ty, ComparisonOperator::Equality, false)
         .or_else(|| {
-            (ComparisonEvaluator::conservative(db).evaluate(
+            ty.is_single_valued(db, program)
+                .then(|| ty.negate(db, program))
+        })
+        .or_else(|| {
+            (ComparisonEvaluator::conservative(db, program).evaluate(
                 ty,
                 ty,
                 ComparisonBranch::Positive,
                 ComparisonOperator::Equality,
             ) == ComparisonResult::AlwaysTrue)
-                .then(|| ty.negate(db))
+                .then(|| ty.negate(db, program))
         })
 }
 
@@ -208,6 +222,7 @@ pub(super) fn equality_exclusion_constraint<'db>(
 /// ```
 pub(super) fn evaluate_type_inequality<'db>(
     db: &'db dyn Db,
+    program: Program,
     left: Type<'db>,
     right: Type<'db>,
     is_positive: bool,
@@ -218,6 +233,7 @@ pub(super) fn evaluate_type_inequality<'db>(
         ComparisonOperator::Inequality.condition_expects_equality(branch);
     enum_literal_constraint(
         db,
+        program,
         left,
         right,
         ComparisonOperator::Inequality,
@@ -226,6 +242,7 @@ pub(super) fn evaluate_type_inequality<'db>(
     .or_else(|| {
         builtin_literal_constraint(
             db,
+            program,
             left,
             right,
             ComparisonOperator::Inequality,
@@ -233,7 +250,7 @@ pub(super) fn evaluate_type_inequality<'db>(
         )
     })
     .or_else(|| {
-        ComparisonEvaluator::new(db, soundness_policy)
+        ComparisonEvaluator::new(db, program, soundness_policy)
             .evaluate(left, right, branch, ComparisonOperator::Inequality)
             .constraint(branch)
     })
@@ -244,10 +261,11 @@ pub(super) fn evaluate_type_inequality<'db>(
 /// A result that only permits narrowing remains ambiguous because it can still evaluate either way.
 pub(crate) fn equality_truthiness<'db>(
     db: &'db dyn Db,
+    program: Program,
     left: Type<'db>,
     right: Type<'db>,
 ) -> Truthiness {
-    comparison_truthiness(db, left, right, ComparisonOperator::Equality)
+    comparison_truthiness(db, program, left, right, ComparisonOperator::Equality)
 }
 
 /// Return the truthiness of `left != right` when it is known for every represented runtime value.
@@ -255,19 +273,21 @@ pub(crate) fn equality_truthiness<'db>(
 /// A result that only permits narrowing remains ambiguous because it can still evaluate either way.
 pub(super) fn inequality_truthiness<'db>(
     db: &'db dyn Db,
+    program: Program,
     left: Type<'db>,
     right: Type<'db>,
 ) -> Truthiness {
-    comparison_truthiness(db, left, right, ComparisonOperator::Inequality)
+    comparison_truthiness(db, program, left, right, ComparisonOperator::Inequality)
 }
 
 fn comparison_truthiness<'db>(
     db: &'db dyn Db,
+    program: Program,
     left: Type<'db>,
     right: Type<'db>,
     operator: ComparisonOperator,
 ) -> Truthiness {
-    match ComparisonEvaluator::for_truthiness(db).evaluate(
+    match ComparisonEvaluator::for_truthiness(db, program).evaluate(
         left,
         right,
         ComparisonBranch::Positive,
@@ -339,28 +359,31 @@ struct ComparisonKey<'db> {
 /// Tracks comparisons that are already in progress so recursive evaluation terminates.
 struct ComparisonEvaluator<'db> {
     db: &'db dyn Db,
+    program: Program,
     active: FxHashSet<ComparisonKey<'db>>,
     goal: ComparisonGoal,
     soundness_policy: ComparisonSoundnessPolicy,
 }
 
 impl<'db> ComparisonEvaluator<'db> {
-    fn new(db: &'db dyn Db, soundness_policy: ComparisonSoundnessPolicy) -> Self {
+    fn new(db: &'db dyn Db, program: Program, soundness_policy: ComparisonSoundnessPolicy) -> Self {
         Self {
             db,
+            program,
             active: FxHashSet::default(),
             goal: ComparisonGoal::Constraint,
             soundness_policy,
         }
     }
 
-    fn conservative(db: &'db dyn Db) -> Self {
-        Self::new(db, ComparisonSoundnessPolicy::Conservative)
+    fn conservative(db: &'db dyn Db, program: Program) -> Self {
+        Self::new(db, program, ComparisonSoundnessPolicy::Conservative)
     }
 
-    fn for_truthiness(db: &'db dyn Db) -> Self {
+    fn for_truthiness(db: &'db dyn Db, program: Program) -> Self {
         Self {
             db,
+            program,
             active: FxHashSet::default(),
             goal: ComparisonGoal::Truthiness,
             soundness_policy: ComparisonSoundnessPolicy::Conservative,
@@ -426,15 +449,16 @@ fn evaluate_comparison_once<'db>(
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
     let db = evaluator.db;
+    let program = evaluator.program;
 
-    if let Some(result) = evaluate_enum_domains(db, left, right, branch, operator) {
+    if let Some(result) = evaluate_enum_domains(db, program, left, right, branch, operator) {
         return result;
     }
 
-    if let Some(alternatives) = finite_alternatives(db, left, operator) {
+    if let Some(alternatives) = finite_alternatives(db, program, left, operator) {
         return evaluate_union_left(evaluator, &alternatives, right, branch, operator);
     }
-    if let Some(alternatives) = finite_alternatives(db, right, operator) {
+    if let Some(alternatives) = finite_alternatives(db, program, right, operator) {
         return evaluate_union_right(evaluator, left, &alternatives, branch, operator);
     }
 
@@ -467,7 +491,7 @@ fn evaluate_comparison_once<'db>(
                 && all_values_compare_equal(evaluator, other, operator)
             {
                 ComparisonResult::CanNarrow(
-                    IntersectionBuilder::new(db)
+                    IntersectionBuilder::new(db, program)
                         .add_positive(left)
                         .add_negative(other)
                         .build(),
@@ -484,18 +508,18 @@ fn evaluate_comparison_once<'db>(
                 if !operator.condition_expects_equality(branch)
                     && all_values_compare_equal(evaluator, other, operator)
                 {
-                    ComparisonResult::CanNarrow(other.negate(db))
+                    ComparisonResult::CanNarrow(other.negate(db, program))
                 } else {
                     ComparisonResult::Ambiguous
                 }
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                evaluator.evaluate(constraints.as_type(db), other, branch, operator)
+                evaluator.evaluate(constraints.as_type(db, program), other, branch, operator)
             }
         },
         (other, Type::TypeVar(var)) => match var.typevar(db).bound_or_constraints(db) {
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                evaluator.evaluate(other, constraints.as_type(db), branch, operator)
+                evaluator.evaluate(other, constraints.as_type(db, program), branch, operator)
             }
             None | Some(TypeVarBoundOrConstraints::UpperBound(_)) => ComparisonResult::Ambiguous,
         },
@@ -523,10 +547,17 @@ fn evaluate_comparison_once<'db>(
         ),
 
         (Type::LiteralValue(left_literal), Type::LiteralValue(right_literal)) => {
-            match known_literal_equality(db, left_literal.kind(), right_literal.kind(), operator) {
+            match known_literal_equality(
+                db,
+                program,
+                left_literal.kind(),
+                right_literal.kind(),
+                operator,
+            ) {
                 Some(equal) => operator.result_from_equality(equal),
                 None => narrow_literal_comparison(
                     db,
+                    program,
                     left,
                     right,
                     left_literal.kind(),
@@ -557,7 +588,7 @@ fn evaluate_comparison_once<'db>(
 
         (Type::TypedDict(_), Type::TypedDict(_)) => ComparisonResult::Ambiguous,
         (Type::TypedDict(_), other) | (other, Type::TypedDict(_)) => {
-            match KnownComparisonSemantics::of_type(db, other, operator) {
+            match KnownComparisonSemantics::of_type(db, program, other, operator) {
                 Some(KnownComparisonSemantics::Dict) | None => ComparisonResult::Ambiguous,
                 Some(_) => operator.result_from_equality(false),
             }
@@ -586,20 +617,20 @@ fn evaluate_comparison_once<'db>(
         ) if left_function == right_function => operator.result_from_equality(true),
         (Type::KnownInstance(left_instance), Type::KnownInstance(right_instance))
             if left_instance == right_instance
-                && left.is_single_valued(db)
+                && left.is_single_valued(db, program)
                 && operator == ComparisonOperator::Equality =>
         {
             ComparisonResult::AlwaysTrue
         }
         (left, right)
-            if has_known_identity_comparison_semantics(db, left, operator)
-                && has_known_identity_comparison_semantics(db, right, operator) =>
+            if has_known_identity_comparison_semantics(db, program, left, operator)
+                && has_known_identity_comparison_semantics(db, program, right, operator) =>
         {
             operator.result_from_equality(left == right)
         }
 
         (Type::NominalInstance(left_instance), Type::NominalInstance(right_instance)) => {
-            compare_nominal_instances(db, left_instance, right_instance, operator)
+            compare_nominal_instances(db, program, left_instance, right_instance, operator)
         }
 
         _ => ComparisonResult::Ambiguous,
@@ -659,6 +690,7 @@ fn is_builtin_literal_type(db: &dyn Db, ty: Type) -> bool {
 /// both `Literal[0]` and `Literal[False]`, while `x != 1` excludes `Literal[1]` and `Literal[True]`.
 fn builtin_literal_constraint<'db>(
     db: &'db dyn Db,
+    program: Program,
     left: Type<'db>,
     right: Type<'db>,
     operator: ComparisonOperator,
@@ -668,18 +700,30 @@ fn builtin_literal_constraint<'db>(
         return None;
     };
 
-    let equal_to_right = builtin_literals_equal_to(db, Type::LiteralValue(right), right.kind())?;
+    let mut equal_to_right = match right.kind() {
+        LiteralValueTypeKind::Int(value) => {
+            let mut builder = UnionBuilder::new(db, program).add(Type::LiteralValue(right));
+            if matches!(value.as_i64(), 0 | 1) {
+                builder = builder.add(Type::bool_literal(value.as_i64() == 1));
+            }
+            builder
+        }
+        LiteralValueTypeKind::Bool(value) => UnionBuilder::new(db, program)
+            .add(Type::LiteralValue(right))
+            .add(Type::int_literal(i64::from(value))),
+        LiteralValueTypeKind::String(_) | LiteralValueTypeKind::Bytes(_) => {
+            UnionBuilder::new(db, program).add(Type::LiteralValue(right))
+        }
+        LiteralValueTypeKind::LiteralString | LiteralValueTypeKind::Enum(_) => return None,
+    };
 
     if !condition_expects_equality {
-        let equal_to_right = add_equal_enum_literals(
-            db,
-            left,
-            right.kind(),
-            operator,
-            UnionBuilder::new(db).add(equal_to_right),
-        );
-        return Some(equal_to_right.build().negate(db));
+        equal_to_right =
+            add_equal_enum_literals(db, program, left, right.kind(), operator, equal_to_right);
+        return Some(equal_to_right.build().negate(db, program));
     }
+
+    let equal_to_right = equal_to_right.build();
 
     match left.resolve_type_alias(db) {
         Type::Union(union) => union
@@ -695,22 +739,23 @@ fn builtin_literal_constraint<'db>(
 /// Return the builtin literal values that compare equal to `literal_type`.
 fn builtin_literals_equal_to<'db>(
     db: &'db dyn Db,
+    program: Program,
     literal_type: Type<'db>,
     literal: LiteralValueTypeKind<'db>,
 ) -> Option<Type<'db>> {
     let builder = match literal {
         LiteralValueTypeKind::Int(value) => {
-            let mut builder = UnionBuilder::new(db).add(literal_type);
+            let mut builder = UnionBuilder::new(db, program).add(literal_type);
             if matches!(value.as_i64(), 0 | 1) {
                 builder = builder.add(Type::bool_literal(value.as_i64() == 1));
             }
             builder
         }
-        LiteralValueTypeKind::Bool(value) => UnionBuilder::new(db)
+        LiteralValueTypeKind::Bool(value) => UnionBuilder::new(db, program)
             .add(literal_type)
             .add(Type::int_literal(i64::from(value))),
         LiteralValueTypeKind::String(_) | LiteralValueTypeKind::Bytes(_) => {
-            UnionBuilder::new(db).add(literal_type)
+            UnionBuilder::new(db, program).add(literal_type)
         }
         LiteralValueTypeKind::LiteralString | LiteralValueTypeKind::Enum(_) => return None,
     };
@@ -720,6 +765,7 @@ fn builtin_literals_equal_to<'db>(
 /// Add finite enum members in `ty` that are known to compare equal to `right`.
 fn add_equal_enum_literals<'db>(
     db: &'db dyn Db,
+    program: crate::Program,
     ty: Type<'db>,
     right: LiteralValueTypeKind<'db>,
     operator: ComparisonOperator,
@@ -728,20 +774,22 @@ fn add_equal_enum_literals<'db>(
     match ty.resolve_type_alias(db) {
         Type::Union(union) => {
             for element in union.elements(db) {
-                builder = add_equal_enum_literals(db, *element, right, operator, builder);
+                builder = add_equal_enum_literals(db, program, *element, right, operator, builder);
             }
         }
         Type::LiteralValue(literal) => {
             if matches!(literal.kind(), LiteralValueTypeKind::Enum(_))
-                && known_literal_equality(db, literal.kind(), right, operator) == Some(true)
+                && known_literal_equality(db, program, literal.kind(), right, operator)
+                    == Some(true)
             {
                 builder = builder.add(Type::LiteralValue(literal));
             }
         }
         ty => {
-            if let Some(alternatives) = finite_alternatives(db, ty, operator) {
+            if let Some(alternatives) = finite_alternatives(db, program, ty, operator) {
                 for alternative in alternatives {
-                    builder = add_equal_enum_literals(db, alternative, right, operator, builder);
+                    builder =
+                        add_equal_enum_literals(db, program, alternative, right, operator, builder);
                 }
             }
         }
@@ -771,6 +819,7 @@ fn add_equal_enum_literals<'db>(
 /// because those methods can change whether two members compare equal.
 fn enum_literal_constraint<'db>(
     db: &'db dyn Db,
+    program: crate::Program,
     left: Type<'db>,
     right: Type<'db>,
     operator: ComparisonOperator,
@@ -782,9 +831,14 @@ fn enum_literal_constraint<'db>(
     let LiteralValueTypeKind::Enum(right) = right_literal.kind() else {
         return None;
     };
-    if !is_same_enum_domain(db, left, right)
-        || KnownComparisonSemantics::of_instance(db, right.enum_class_instance(db), operator)
-            .is_none()
+    if !is_same_enum_domain(db, program, left, right)
+        || KnownComparisonSemantics::of_instance(
+            db,
+            program,
+            right.enum_class_instance(db),
+            operator,
+        )
+        .is_none()
     {
         return None;
     }
@@ -797,12 +851,13 @@ fn enum_literal_constraint<'db>(
         EnumLiteralType::new(db, enum_class_literal, name),
         right_literal.is_promotable(),
     ));
-    Some(equal_to_right.negate_if(db, !condition_expects_equality))
+    Some(equal_to_right.negate_if(db, program, !condition_expects_equality))
 }
 
 /// Return whether every possible value of `ty` belongs to the same enum as `right`.
 pub(super) fn is_same_enum_domain<'db>(
     db: &'db dyn Db,
+    program: crate::Program,
     ty: Type<'db>,
     right: EnumLiteralType<'db>,
 ) -> bool {
@@ -815,11 +870,13 @@ pub(super) fn is_same_enum_domain<'db>(
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .all(|element| is_same_enum_domain(db, *element, right)),
-        Type::NominalInstance(instance) => instance.class_literal(db) == right.enum_class(db),
+            .all(|element| is_same_enum_domain(db, program, *element, right)),
+        Type::NominalInstance(instance) => {
+            instance.class_literal(db, program) == right.enum_class(db)
+        }
         Type::EnumComplement(complement) => complement.enum_class(db) == right.enum_class(db),
         Type::Intersection(intersection) => intersection
-            .enum_complement(db)
+            .enum_complement(db, program)
             .is_some_and(|complement| complement.enum_class(db) == right.enum_class(db)),
         _ => false,
     }
@@ -842,7 +899,7 @@ fn evaluate_union_left<'db>(
     }
 
     let db = evaluator.db;
-    evaluate_target_union(db, elements, branch, |element| {
+    evaluate_target_union(db, evaluator.program, elements, branch, |element| {
         evaluator.evaluate(element, other, branch, operator)
     })
 }
@@ -853,6 +910,7 @@ fn evaluate_union_left<'db>(
 /// negative constraints for removed arms so that the result still describes the branch predicate.
 fn evaluate_target_union<'db>(
     db: &'db dyn Db,
+    program: Program,
     elements: &[Type<'db>],
     branch: ComparisonBranch,
     mut evaluate: impl FnMut(Type<'db>) -> ComparisonResult<'db>,
@@ -864,7 +922,7 @@ fn evaluate_target_union<'db>(
     let mut all_true = true;
     let mut all_false = true;
     let mut narrowed = Vec::with_capacity(elements.len());
-    let mut removed = UnionBuilder::new(db);
+    let mut removed = UnionBuilder::new(db, program);
     let mut removed_any = false;
 
     for element in elements {
@@ -910,13 +968,13 @@ fn evaluate_target_union<'db>(
     }
 
     let removed = removed_any.then(|| removed.build());
-    let mut builder = UnionBuilder::new(db);
+    let mut builder = UnionBuilder::new(db, program);
     for narrowed in narrowed {
         let Some(mut narrowed) = narrowed else {
             continue;
         };
         if let Some(removed) = removed {
-            narrowed = IntersectionBuilder::new(db)
+            narrowed = IntersectionBuilder::new(db, program)
                 .add_positive(narrowed)
                 .add_negative(removed)
                 .build();
@@ -945,6 +1003,7 @@ fn evaluate_union_right<'db>(
     let db = evaluator.db;
     evaluate_against_results(
         db,
+        evaluator.program,
         left,
         branch,
         elements
@@ -987,13 +1046,14 @@ fn combine_definite_truthiness<'db>(
 /// truthiness is reported only when every alternative agrees.
 fn evaluate_against_results<'db>(
     db: &'db dyn Db,
+    program: Program,
     target: Type<'db>,
     branch: ComparisonBranch,
     results: impl IntoIterator<Item = ComparisonResult<'db>>,
 ) -> ComparisonResult<'db> {
     let mut all_true = true;
     let mut all_false = true;
-    let mut builder = UnionBuilder::new(db);
+    let mut builder = UnionBuilder::new(db, program);
     let mut any = false;
 
     for result in results {
@@ -1053,11 +1113,12 @@ fn evaluate_intersection_left<'db>(
     }
 
     let db = evaluator.db;
+    let program = evaluator.program;
     let mut any_true = false;
     let mut any_false = false;
     let mut any_ambiguous = false;
     let mut any_narrowing = false;
-    let mut builder = IntersectionBuilder::new(db).add_positive(original);
+    let mut builder = IntersectionBuilder::new(db, program).add_positive(original);
 
     for element in positive {
         match evaluator.evaluate(*element, other, branch, operator) {
@@ -1089,16 +1150,19 @@ fn evaluate_intersection_left<'db>(
 /// may compare equal to values outside the enum domain.
 fn finite_alternatives<'db>(
     db: &'db dyn Db,
+    program: crate::Program,
     ty: Type<'db>,
     operator: ComparisonOperator,
 ) -> Option<Vec<Type<'db>>> {
     match ty {
-        Type::EnumComplement(complement) => KnownComparisonSemantics::of_type(db, ty, operator)
-            .is_some()
-            .then(|| complement.remaining_literal_types(db)),
+        Type::EnumComplement(complement) => {
+            KnownComparisonSemantics::of_type(db, program, ty, operator)
+                .is_some()
+                .then(|| complement.remaining_literal_types(db))
+        }
         Type::Intersection(intersection) => {
-            let complement = intersection.enum_complement(db)?;
-            KnownComparisonSemantics::of_type(db, ty, operator)
+            let complement = intersection.enum_complement(db, program)?;
+            KnownComparisonSemantics::of_type(db, program, ty, operator)
                 .is_some()
                 .then(|| complement.remaining_literal_types(db))
         }
@@ -1106,9 +1170,10 @@ fn finite_alternatives<'db>(
             Some(vec![Type::bool_literal(true), Type::bool_literal(false)])
         }
         Type::NominalInstance(instance)
-            if KnownComparisonSemantics::of_type(db, ty, operator).is_some() =>
+            if KnownComparisonSemantics::of_type(db, program, ty, operator).is_some() =>
         {
-            enum_member_literals(db, instance.class_literal(db), None).map(Iterator::collect)
+            enum_member_literals(db, instance.class_literal(db, program), None)
+                .map(Iterator::collect)
         }
         _ => None,
     }
@@ -1120,6 +1185,7 @@ fn finite_alternatives<'db>(
 /// or a string-valued enum member without having a single statically known runtime value.
 fn narrow_literal_comparison<'db>(
     db: &'db dyn Db,
+    program: Program,
     left: Type<'db>,
     right: Type<'db>,
     left_literal: LiteralValueTypeKind<'db>,
@@ -1128,16 +1194,16 @@ fn narrow_literal_comparison<'db>(
 ) -> ComparisonResult<'db> {
     match (left_literal, right_literal) {
         (LiteralValueTypeKind::LiteralString, LiteralValueTypeKind::String(_)) => {
-            ComparisonResult::CanNarrow(right.negate_if(db, !equality_is_positive))
+            ComparisonResult::CanNarrow(right.negate_if(db, program, !equality_is_positive))
         }
         (LiteralValueTypeKind::String(_), LiteralValueTypeKind::LiteralString) => {
-            ComparisonResult::CanNarrow(left.negate_if(db, !equality_is_positive))
+            ComparisonResult::CanNarrow(left.negate_if(db, program, !equality_is_positive))
         }
         (LiteralValueTypeKind::LiteralString, LiteralValueTypeKind::Enum(enum_literal)) => {
-            narrow_literal_string_against_enum(db, enum_literal, equality_is_positive)
+            narrow_literal_string_against_enum(db, program, enum_literal, equality_is_positive)
         }
         (LiteralValueTypeKind::Enum(enum_literal), LiteralValueTypeKind::LiteralString) => {
-            narrow_literal_string_against_enum(db, enum_literal, equality_is_positive)
+            narrow_literal_string_against_enum(db, program, enum_literal, equality_is_positive)
         }
         _ => ComparisonResult::Ambiguous,
     }
@@ -1146,28 +1212,30 @@ fn narrow_literal_comparison<'db>(
 /// Narrow `LiteralString` against a string-valued enum member with inherited `str` semantics.
 fn narrow_literal_string_against_enum<'db>(
     db: &'db dyn Db,
+    program: Program,
     enum_literal: EnumLiteralType<'db>,
     equality_is_positive: bool,
 ) -> ComparisonResult<'db> {
     if KnownComparisonSemantics::of_type(
         db,
+        program,
         Type::enum_literal(enum_literal),
         ComparisonOperator::Equality,
     ) != Some(KnownComparisonSemantics::Str)
     {
         return ComparisonResult::Ambiguous;
     }
-    let Some(value @ Type::LiteralValue(_)) = enum_literal_value(db, enum_literal) else {
+    let Some(value @ Type::LiteralValue(_)) = enum_literal_value(db, program, enum_literal) else {
         return ComparisonResult::Ambiguous;
     };
     let Some(LiteralValueTypeKind::String(_)) = value.as_literal_value_kind() else {
         return ComparisonResult::Ambiguous;
     };
-    let narrowed = UnionBuilder::new(db)
+    let narrowed = UnionBuilder::new(db, program)
         .add(value)
         .add(Type::enum_literal(enum_literal))
         .build()
-        .negate_if(db, !equality_is_positive);
+        .negate_if(db, program, !equality_is_positive);
     ComparisonResult::CanNarrow(narrowed)
 }
 
@@ -1202,16 +1270,18 @@ fn compare_literal_to_other<'db>(
     literal_operand: LiteralOperand,
 ) -> ComparisonResult<'db> {
     let db = evaluator.db;
+    let program = evaluator.program;
 
     if matches!(literal, LiteralValueTypeKind::LiteralString) {
-        return match KnownComparisonSemantics::of_type(db, other, operator) {
+        return match KnownComparisonSemantics::of_type(db, program, other, operator) {
             Some(KnownComparisonSemantics::Str) => ComparisonResult::Ambiguous,
             Some(_) => ComparisonResult::from_bool(operator == ComparisonOperator::Inequality),
             None => ComparisonResult::Ambiguous,
         };
     }
 
-    let Some(literal_semantics) = KnownComparisonSemantics::of_literal(db, literal, operator)
+    let Some(literal_semantics) =
+        KnownComparisonSemantics::of_literal(db, program, literal, operator)
     else {
         return ComparisonResult::Ambiguous;
     };
@@ -1223,7 +1293,8 @@ fn compare_literal_to_other<'db>(
     if evaluator.soundness_policy == ComparisonSoundnessPolicy::UnsafeLiteralNarrowing
         && condition_expects_equality
         && literal_operand == LiteralOperand::Other
-        && let Some(equal_to_literal) = builtin_literals_equal_to(db, literal_type, literal)
+        && let Some(equal_to_literal) =
+            builtin_literals_equal_to(db, program, literal_type, literal)
         && let Some(other_semantics) = unsafe_narrowable_builtin_semantics(db, other)
     {
         return if literal_semantics == other_semantics {
@@ -1233,13 +1304,13 @@ fn compare_literal_to_other<'db>(
         };
     }
 
-    match KnownComparisonSemantics::of_type(db, other, operator) {
+    match KnownComparisonSemantics::of_type(db, program, other, operator) {
         Some(other_semantics) if literal_semantics != other_semantics => {
             ComparisonResult::from_bool(operator == ComparisonOperator::Inequality)
         }
         Some(KnownComparisonSemantics::Object)
             if literal_semantics == KnownComparisonSemantics::Object
-                && other.is_disjoint_from(db, literal_type) =>
+                && other.is_disjoint_from(db, program, literal_type) =>
         {
             ComparisonResult::from_bool(operator == ComparisonOperator::Inequality)
         }
@@ -1247,17 +1318,21 @@ fn compare_literal_to_other<'db>(
         // `int` subclass can compare equal to `1` despite being disjoint from `Literal[1]`.
         Some(_)
             if literal_operand == LiteralOperand::Other
-                && literal_type.is_single_valued(db)
-                && !other.is_disjoint_from(db, literal_type) =>
+                && literal_type.is_single_valued(db, program)
+                && !other.is_disjoint_from(db, program, literal_type) =>
         {
-            ComparisonResult::CanNarrow(literal_type.negate_if(db, !condition_expects_equality))
+            ComparisonResult::CanNarrow(literal_type.negate_if(
+                db,
+                program,
+                !condition_expects_equality,
+            ))
         }
         Some(_) => ComparisonResult::Ambiguous,
         None if literal_operand == LiteralOperand::Other
             && !condition_expects_equality
-            && literal_type.is_single_valued(db) =>
+            && literal_type.is_single_valued(db, program) =>
         {
-            ComparisonResult::CanNarrow(literal_type.negate(db))
+            ComparisonResult::CanNarrow(literal_type.negate(db, program))
         }
         None => ComparisonResult::Ambiguous,
     }
@@ -1269,20 +1344,24 @@ fn compare_literal_to_other<'db>(
 /// denote the same singleton.
 fn compare_nominal_instances<'db>(
     db: &'db dyn Db,
+    program: crate::Program,
     left_instance: super::NominalInstanceType<'db>,
     right_instance: super::NominalInstanceType<'db>,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
     let left = Type::NominalInstance(left_instance);
     let right = Type::NominalInstance(right_instance);
-    let Some(left_semantics) = KnownComparisonSemantics::of_type(db, left, operator) else {
+    let Some(left_semantics) = KnownComparisonSemantics::of_type(db, program, left, operator)
+    else {
         return ComparisonResult::Ambiguous;
     };
-    let Some(right_semantics) = KnownComparisonSemantics::of_type(db, right, operator) else {
+    let Some(right_semantics) = KnownComparisonSemantics::of_type(db, program, right, operator)
+    else {
         return ComparisonResult::Ambiguous;
     };
 
-    let classes_differ = left_instance.class_literal(db) != right_instance.class_literal(db);
+    let classes_differ =
+        left_instance.class_literal(db, program) != right_instance.class_literal(db, program);
 
     if left_semantics != right_semantics
         || (left_semantics == KnownComparisonSemantics::Object && classes_differ)
@@ -1290,7 +1369,7 @@ fn compare_nominal_instances<'db>(
         return ComparisonResult::from_bool(operator == ComparisonOperator::Inequality);
     }
 
-    if left == right && left.is_singleton(db) {
+    if left == right && left.is_singleton(db, program) {
         ComparisonResult::from_bool(operator == ComparisonOperator::Equality)
     } else {
         ComparisonResult::Ambiguous
@@ -1332,7 +1411,7 @@ impl ComparisonOperator {
 ///
 /// Two types with different known semantics cannot compare equal. Types with custom or otherwise
 /// unknown comparison methods are not assigned a value of this enum.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::SalsaValue, get_size2::GetSize)]
 enum KnownComparisonSemantics {
     Object,
     Int,
@@ -1346,19 +1425,26 @@ impl KnownComparisonSemantics {
     /// Determine the builtin comparison implementation inherited by `ty`.
     ///
     /// Returns `None` when dunder lookup finds custom or conflicting comparison behavior.
-    fn of_type<'db>(db: &'db dyn Db, ty: Type<'db>, operator: ComparisonOperator) -> Option<Self> {
+    fn of_type<'db>(
+        db: &'db dyn Db,
+        program: crate::Program,
+        ty: Type<'db>,
+        operator: ComparisonOperator,
+    ) -> Option<Self> {
         match ty {
-            Type::LiteralValue(literal) => Self::of_literal(db, literal.kind(), operator),
+            Type::LiteralValue(literal) => Self::of_literal(db, program, literal.kind(), operator),
             Type::TypedDict(_) => Some(Self::Dict),
             Type::EnumComplement(complement) => Self::of_instance(
                 db,
+                program,
                 complement.enum_class(db).to_non_generic_instance(db),
                 operator,
             ),
             Type::Intersection(intersection) => {
-                if let Some(complement) = intersection.enum_complement(db) {
+                if let Some(complement) = intersection.enum_complement(db, program) {
                     return Self::of_instance(
                         db,
+                        program,
                         complement.enum_class(db).to_non_generic_instance(db),
                         operator,
                     );
@@ -1366,16 +1452,17 @@ impl KnownComparisonSemantics {
                 let mut semantics = intersection
                     .positive(db)
                     .iter()
-                    .filter_map(|element| Self::of_type(db, *element, operator));
+                    .filter_map(|element| Self::of_type(db, program, *element, operator));
                 let first = semantics.next()?;
                 semantics
                     .all(|semantics| semantics == first)
                     .then_some(first)
             }
             Type::NominalInstance(instance)
-                if instance.class(db).is_final(db) || instance.tuple_spec(db).is_some() =>
+                if instance.class(db, program).is_final(db)
+                    || instance.tuple_spec(db, program).is_some() =>
             {
-                Self::of_instance(db, ty, operator)
+                Self::of_instance(db, program, ty, operator)
             }
             _ => None,
         }
@@ -1384,6 +1471,7 @@ impl KnownComparisonSemantics {
     /// Return the builtin comparison implementation used by a literal value.
     fn of_literal<'db>(
         db: &'db dyn Db,
+        program: crate::Program,
         literal: LiteralValueTypeKind<'db>,
         operator: ComparisonOperator,
     ) -> Option<Self> {
@@ -1394,7 +1482,7 @@ impl KnownComparisonSemantics {
             }
             LiteralValueTypeKind::Bytes(_) => Some(Self::Bytes),
             LiteralValueTypeKind::Enum(enum_literal) => {
-                Self::of_instance(db, enum_literal.enum_class_instance(db), operator)
+                Self::of_instance(db, program, enum_literal.enum_class_instance(db), operator)
             }
         }
     }
@@ -1404,15 +1492,18 @@ impl KnownComparisonSemantics {
     /// Returns `None` when lookup finds custom comparison behavior.
     fn of_instance<'db>(
         db: &'db dyn Db,
+        program: crate::Program,
         instance: Type<'db>,
         operator: ComparisonOperator,
     ) -> Option<Self> {
-        let class = instance.to_meta_type(db);
-        let dunder = lookup_dunder(db, class, operator.dunder());
+        let class = instance.to_meta_type(db, program);
+        let dunder = lookup_dunder(db, program, class, operator.dunder());
 
         if dunder.place.is_undefined() {
             if operator == ComparisonOperator::Inequality
-                && !lookup_dunder(db, class, "__eq__").place.is_undefined()
+                && !lookup_dunder(db, program, class, "__eq__")
+                    .place
+                    .is_undefined()
             {
                 return None;
             }
@@ -1426,7 +1517,14 @@ impl KnownComparisonSemantics {
             (KnownClass::Tuple, Self::Tuple),
             (KnownClass::Dict, Self::Dict),
         ] {
-            if dunder == lookup_dunder(db, known_class.to_class_literal(db), operator.dunder()) {
+            if dunder
+                == lookup_dunder(
+                    db,
+                    program,
+                    known_class.to_class_literal(db, program),
+                    operator.dunder(),
+                )
+            {
                 return Some(semantics);
             }
         }
@@ -1449,6 +1547,7 @@ enum ComparisonDomain {
 /// analysis, which is only useful here when it can eliminate an arm from a union target.
 fn comparison_domain<'db>(
     db: &'db dyn Db,
+    program: crate::Program,
     target: Type<'db>,
     ty: Type<'db>,
     operator: ComparisonOperator,
@@ -1459,7 +1558,8 @@ fn comparison_domain<'db>(
     match ty {
         Type::Union(union) => {
             if union.elements(db).iter().all(|element| {
-                comparison_domain(db, target, *element, operator) == ComparisonDomain::Known
+                comparison_domain(db, program, target, *element, operator)
+                    == ComparisonDomain::Known
             }) {
                 ComparisonDomain::Known
             } else {
@@ -1469,22 +1569,22 @@ fn comparison_domain<'db>(
         Type::LiteralValue(_) | Type::EnumComplement(_) | Type::TypedDict(_) => {
             ComparisonDomain::Known
         }
-        Type::Intersection(intersection) if intersection.enum_complement(db).is_some() => {
+        Type::Intersection(intersection) if intersection.enum_complement(db, program).is_some() => {
             ComparisonDomain::Known
         }
         Type::NominalInstance(instance) => {
-            if instance.tuple_spec(db).is_some()
-                || ty.is_singleton(db)
+            if instance.tuple_spec(db, program).is_some()
+                || ty.is_singleton(db, program)
                 || instance.has_known_class(db, KnownClass::Bool)
                 || target.is_union()
-                    && KnownComparisonSemantics::of_type(db, ty, operator).is_some()
+                    && KnownComparisonSemantics::of_type(db, program, ty, operator).is_some()
             {
                 ComparisonDomain::Known
             } else {
                 ComparisonDomain::Unknown
             }
         }
-        _ if ty.is_single_valued(db) => ComparisonDomain::Known,
+        _ if ty.is_single_valued(db, program) => ComparisonDomain::Known,
         _ => ComparisonDomain::Unknown,
     }
 }
@@ -1492,18 +1592,23 @@ fn comparison_domain<'db>(
 /// Return whether `ty` is a singleton whose comparison uses object identity semantics.
 fn has_known_identity_comparison_semantics<'db>(
     db: &'db dyn Db,
+    program: crate::Program,
     ty: Type<'db>,
     operator: ComparisonOperator,
 ) -> bool {
     match ty {
         Type::FunctionLiteral(_) | Type::ModuleLiteral(_) | Type::SpecialForm(_) => true,
         Type::ClassLiteral(class) => {
-            KnownComparisonSemantics::of_instance(db, class.metaclass_instance_type(db), operator)
-                == Some(KnownComparisonSemantics::Object)
+            KnownComparisonSemantics::of_instance(
+                db,
+                program,
+                class.metaclass_instance_type(db),
+                operator,
+            ) == Some(KnownComparisonSemantics::Object)
         }
         _ => {
-            ty.is_singleton(db)
-                && KnownComparisonSemantics::of_type(db, ty, operator)
+            ty.is_singleton(db, program)
+                && KnownComparisonSemantics::of_type(db, program, ty, operator)
                     == Some(KnownComparisonSemantics::Object)
         }
     }
@@ -1512,11 +1617,13 @@ fn has_known_identity_comparison_semantics<'db>(
 /// Look up a comparison method without falling back to `object`.
 fn lookup_dunder<'db>(
     db: &'db dyn Db,
+    program: crate::Program,
     ty: Type<'db>,
     name: &'static str,
 ) -> PlaceAndQualifiers<'db> {
     ty.member_lookup_with_policy(
         db,
+        program,
         Name::new_static(name),
         MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
     )
@@ -1528,6 +1635,7 @@ fn lookup_dunder<'db>(
 /// or insufficiently known comparison behavior prevents a definitive result.
 fn known_literal_equality<'db>(
     db: &'db dyn Db,
+    program: crate::Program,
     left: LiteralValueTypeKind<'db>,
     right: LiteralValueTypeKind<'db>,
     operator: ComparisonOperator,
@@ -1550,10 +1658,18 @@ fn known_literal_equality<'db>(
             Some(left.value(db) == right.value(db))
         }
         (LiteralValueTypeKind::Enum(left), LiteralValueTypeKind::Enum(right)) => {
-            let left_semantics =
-                KnownComparisonSemantics::of_instance(db, left.enum_class_instance(db), operator)?;
-            let right_semantics =
-                KnownComparisonSemantics::of_instance(db, right.enum_class_instance(db), operator)?;
+            let left_semantics = KnownComparisonSemantics::of_instance(
+                db,
+                program,
+                left.enum_class_instance(db),
+                operator,
+            )?;
+            let right_semantics = KnownComparisonSemantics::of_instance(
+                db,
+                program,
+                right.enum_class_instance(db),
+                operator,
+            )?;
             if left_semantics != right_semantics {
                 return Some(false);
             }
@@ -1569,8 +1685,9 @@ fn known_literal_equality<'db>(
             }
             known_literal_equality(
                 db,
-                enum_literal_value(db, left)?.as_literal_value_kind()?,
-                enum_literal_value(db, right)?.as_literal_value_kind()?,
+                program,
+                enum_literal_value(db, program, left)?.as_literal_value_kind()?,
+                enum_literal_value(db, program, right)?.as_literal_value_kind()?,
                 ComparisonOperator::Equality,
             )
         }
@@ -1578,15 +1695,18 @@ fn known_literal_equality<'db>(
         | (other, LiteralValueTypeKind::Enum(enum_literal)) => {
             let enum_semantics = KnownComparisonSemantics::of_instance(
                 db,
+                program,
                 enum_literal.enum_class_instance(db),
                 operator,
             )?;
-            if enum_semantics != KnownComparisonSemantics::of_literal(db, other, operator)? {
+            if enum_semantics != KnownComparisonSemantics::of_literal(db, program, other, operator)?
+            {
                 return Some(false);
             }
             known_literal_equality(
                 db,
-                enum_literal_value(db, enum_literal)?.as_literal_value_kind()?,
+                program,
+                enum_literal_value(db, program, enum_literal)?.as_literal_value_kind()?,
                 other,
                 ComparisonOperator::Equality,
             )
@@ -1597,8 +1717,9 @@ fn known_literal_equality<'db>(
         )
         | (LiteralValueTypeKind::String(_), LiteralValueTypeKind::LiteralString) => None,
         (left, right) => {
-            let left_semantics = KnownComparisonSemantics::of_literal(db, left, operator)?;
-            let right_semantics = KnownComparisonSemantics::of_literal(db, right, operator)?;
+            let left_semantics = KnownComparisonSemantics::of_literal(db, program, left, operator)?;
+            let right_semantics =
+                KnownComparisonSemantics::of_literal(db, program, right, operator)?;
             (left_semantics != right_semantics).then_some(false)
         }
     }
@@ -1607,11 +1728,15 @@ fn known_literal_equality<'db>(
 /// Return the statically known runtime value of an enum member.
 ///
 /// Custom enum construction can replace the declared value, so members of such enums return `None`.
-fn enum_literal_value<'db>(db: &'db dyn Db, literal: EnumLiteralType<'db>) -> Option<Type<'db>> {
+fn enum_literal_value<'db>(
+    db: &'db dyn Db,
+    program: crate::Program,
+    literal: EnumLiteralType<'db>,
+) -> Option<Type<'db>> {
     let enum_class_literal = literal.enum_class_literal(db);
     let metadata = enum_metadata(db, enum_class_literal.class_literal(db))?;
     let name = enum_class_literal.resolve_member(db, literal.name(db))?;
-    metadata.concrete_value_type(db, name)
+    metadata.concrete_value_type(db, program, name)
 }
 
 /// Return whether two enum literals resolve to the same member, including aliases.

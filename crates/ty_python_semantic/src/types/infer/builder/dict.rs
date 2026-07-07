@@ -47,13 +47,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .into_iter()
                 .flatten()
                 .all(|keyword_ty| {
-                    keyword_ty
-                        .is_assignable_to(speculative_builder.db(), Type::TypedDict(typed_dict))
-                        || extract_unpacked_typed_dict_keys_from_value_type(
-                            speculative_builder.db(),
-                            keyword_ty,
-                        )
-                        .is_some()
+                    keyword_ty.is_assignable_to(
+                        speculative_builder.db(),
+                        self.program,
+                        Type::TypedDict(typed_dict),
+                    ) || extract_unpacked_typed_dict_keys_from_value_type(
+                        speculative_builder.db(),
+                        self.program,
+                        keyword_ty,
+                    )
+                    .is_some()
                 })
             };
 

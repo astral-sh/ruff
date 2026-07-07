@@ -320,7 +320,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                                 return None;
                             }
                             let required_variance =
-                                base_alias.variance_of(db, typevar.identity(db));
+                                base_alias.variance_of(db, context.program(), typevar.identity(db));
                             if declared_variance.join(required_variance) != declared_variance {
                                 Some((typevar, declared_variance, required_variance))
                             } else {
@@ -436,7 +436,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     for base in class_node.bases() {
         if let ast::Expr::Starred(starred) = base
             && let starred_ty = definition_expression_type(db, class_definition, &starred.value)
-            && let Some(tuple_spec) = starred_ty.tuple_instance_spec(db)
+            && let Some(tuple_spec) = starred_ty.tuple_instance_spec(db, context.program())
             && !matches!(tuple_spec.as_ref(), Tuple::Fixed(_))
         {
             report_unsupported_base(context, base, starred_ty, class);
@@ -468,7 +468,10 @@ pub(crate) fn check_static_class_definitions<'db>(
                         "Cannot create a consistent method resolution order (MRO) \
                                     for class `{}` with bases list `[{}]`",
                         class.name(db),
-                        bases_list.iter().map(|base| base.display(db)).join(", ")
+                        bases_list
+                            .iter()
+                            .map(|base| base.display(db, context.program()))
+                            .join(", ")
                     ));
                     let can_rewrite_bases = bases_list.len() == class_node.bases().len()
                         && !class_node.bases().iter().any(ast::Expr::is_starred_expr);
@@ -579,7 +582,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 {
                     builder.into_diagnostic(format_args!(
                         "Metaclass type `{}` is not callable",
-                        ty.display(db)
+                        ty.display(db, context.program())
                     ));
                 }
             }
@@ -589,7 +592,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 {
                     builder.into_diagnostic(format_args!(
                         "Metaclass type `{}` is partly not callable",
-                        ty.display(db)
+                        ty.display(db, context.program())
                     ));
                 }
             }
@@ -653,7 +656,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                             ));
                             diagnostic.set_primary_message(format_args!(
                                 "Expected either `True` or `False`, got object of type `{}`",
-                                passed_type.display(db)
+                                passed_type.display(db, context.program())
                             ));
                         }
                     }
@@ -719,7 +722,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
             if let Some(init_subclass) = init_subclass_type {
                 let call_args = call_args.with_self(Some(Type::from(class)));
-                if let Err(call_error) = init_subclass.try_call(db, &call_args) {
+                if let Err(call_error) = init_subclass.try_call(db, context.program(), &call_args) {
                     report_subclass_of_class_with_non_callable_init_subclass(
                         context, call_error, class, class_node,
                     );
@@ -822,18 +825,19 @@ pub(crate) fn check_static_class_definitions<'db>(
                     continue;
                 };
 
-                let first_bad_tvar = find_over_type(db, default_ty, false, |t| {
-                    let tvar = match t {
-                        Type::TypeVar(tvar) => tvar.typevar(db),
-                        Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,
-                        _ => return None,
-                    };
-                    if !typevars.clone().take(i).contains(&tvar) {
-                        Some(tvar)
-                    } else {
-                        None
-                    }
-                });
+                let first_bad_tvar =
+                    find_over_type(db, context.program(), default_ty, false, |t| {
+                        let tvar = match t {
+                            Type::TypeVar(tvar) => tvar.typevar(db),
+                            Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,
+                            _ => return None,
+                        };
+                        if !typevars.clone().take(i).contains(&tvar) {
+                            Some(tvar)
+                        } else {
+                            None
+                        }
+                    });
                 if let Some(bad_typevar) = first_bad_tvar {
                     let is_later_in_list = typevars.clone().skip(i).contains(&bad_typevar);
                     report_invalid_typevar_default_reference(
@@ -904,7 +908,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         let mut has_seen_default_field = false;
 
         for (name, field) in class.own_fields(db, specialization, field_policy) {
-            if field.is_kw_only_sentinel(db) {
+            if field.is_kw_only_sentinel(db, context.program()) {
                 kw_only_sentinel_fields.push(name);
                 continue;
             }
@@ -1023,11 +1027,11 @@ fn check_class_namespace_against_metaclass_members<'db>(
 ) {
     let db = context.db();
     let metaclass = class.metaclass(db);
-    if metaclass == KnownClass::Type.to_class_literal(db) {
+    if metaclass == KnownClass::Type.to_class_literal(db, context.program()) {
         return;
     }
 
-    let Some(metaclass_instance) = metaclass.to_instance(db) else {
+    let Some(metaclass_instance) = metaclass.to_instance(db, context.program()) else {
         return;
     };
 
@@ -1049,23 +1053,23 @@ fn check_class_namespace_against_metaclass_members<'db>(
         .filter_map(|class| class.static_class_literal(db).map(|(literal, _)| literal))
     {
         let body_scope = metaclass.body_scope(db);
-        let metaclass_index = semantic_index(db, body_scope.file(db));
-        let body_scope = body_scope.file_scope_id(db);
-        let metaclass_table = metaclass_index.place_table(body_scope);
-        let metaclass_use_def = metaclass_index.use_def_map(body_scope);
+        let metaclass_index = semantic_index(db, body_scope.program_file(db));
+        let body_scope_id = body_scope.file_scope_id(db);
+        let metaclass_table = metaclass_index.place_table(body_scope_id);
+        let metaclass_use_def = metaclass_index.use_def_map(body_scope_id);
 
         for (symbol_id, _) in metaclass_use_def.all_end_of_scope_symbol_declarations() {
             metaclass_instance_members.insert(metaclass_table.symbol(symbol_id).name().clone());
         }
 
-        for function_scope in attribute_scopes(db, metaclass.body_scope(db)) {
+        for function_scope in attribute_scopes(db, body_scope) {
             for member in metaclass_index.place_table(function_scope).members() {
                 if let Some(name) = member.as_instance_attribute() {
                     // A method-scope member may only be declared, as in `cls.attr: int`.
                     // Only an assignment such as `cls.attr: int = 1` writes a value onto the
                     // newly created class object, potentially overwriting a class-body value.
-                    let is_assigned = attribute_assignments(db, metaclass.body_scope(db), name)
-                        .any(|(bindings, _)| {
+                    let is_assigned =
+                        attribute_assignments(db, body_scope, name).any(|(bindings, _)| {
                             bindings
                                 .into_iter()
                                 .any(|binding| binding.binding.definition().is_some())
@@ -1092,7 +1096,9 @@ fn check_class_namespace_against_metaclass_members<'db>(
             ty: metaclass_member_ty,
             origin,
             ..
-        }) = metaclass_instance.instance_member(db, name.as_str()).place
+        }) = metaclass_instance
+            .instance_member(db, context.program(), name.as_str())
+            .place
         else {
             continue;
         };
@@ -1109,7 +1115,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
                 }
 
                 let assigned_ty = binding_type(db, definition);
-                if !assigned_ty.is_assignable_to(db, metaclass_member_ty) {
+                if !assigned_ty.is_assignable_to(db, context.program(), metaclass_member_ty) {
                     reported_incompatible_binding = true;
                     report_invalid_attribute_assignment(
                         context,
@@ -1132,8 +1138,11 @@ fn check_class_namespace_against_metaclass_members<'db>(
             continue;
         }
 
-        let result =
-            place_from_declarations(db, use_def.end_of_scope_symbol_declarations(symbol_id));
+        let result = place_from_declarations(
+            db,
+            context.program(),
+            use_def.end_of_scope_symbol_declarations(symbol_id),
+        );
         let Some(definition) = result.first_declaration else {
             continue;
         };
@@ -1150,7 +1159,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
         if !matches!(definition_kind, DefinitionKind::AnnotatedAssignment(_)) {
             continue;
         }
-        if !metaclass_member_ty.is_assignable_to(db, class_declared_ty) {
+        if !metaclass_member_ty.is_assignable_to(db, context.program(), class_declared_ty) {
             report_invalid_attribute_assignment(
                 context,
                 definition_kind.target_range(context.module()),
@@ -1329,14 +1338,21 @@ fn check_final_class_abstract_methods<'db>(
         if kind.is_implicit_due_to_stub_body() && db.should_check_file(definition.file(db)) {
             let function_type_as_callable = infer_definition_types(db, *definition)
                 .binding_type(*definition)
-                .try_upcast_to_callable(db);
+                .try_upcast_to_callable(db, context.program());
 
             if let Some(callables) = function_type_as_callable
                 && Type::function_like_callable(
                     db,
-                    Signature::new(Parameters::gradual_form(), Type::none(db)),
+                    Signature::new(
+                        Parameters::gradual_form(),
+                        Type::none(db, context.program()),
+                    ),
                 )
-                .is_assignable_to(db, callables.into_type(db))
+                .is_assignable_to(
+                    db,
+                    context.program(),
+                    callables.into_type(db, context.program()),
+                )
             {
                 diagnostic.help(format_args!(
                     "Change the body of `{first_method_name}` to `return` \
@@ -1374,7 +1390,7 @@ fn check_class_final_without_value<'db>(
     }
 
     for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
-        let result = place_from_declarations(db, declarations);
+        let result = place_from_declarations(db, context.program(), declarations);
         let first_declaration = result.first_declaration;
         let (place_and_quals, _) = result.into_place_and_conflicting_declarations();
 
@@ -1384,7 +1400,7 @@ fn check_class_final_without_value<'db>(
 
         // Check if the symbol has any bindings at class level.
         let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-        let binding_place = place_from_bindings(db, bindings);
+        let binding_place = place_from_bindings(db, context.program(), bindings);
 
         if !binding_place.place.is_undefined() {
             continue;

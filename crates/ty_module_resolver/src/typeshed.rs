@@ -8,7 +8,6 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::{PythonVersion, PythonVersionDeserializationError};
 use rustc_hash::FxHashMap;
 
-use crate::db::Db;
 use crate::module_name::ModuleName;
 
 pub fn vendored_typeshed_versions(vendored: &VendoredFileSystem) -> TypeshedVersions {
@@ -18,10 +17,6 @@ pub fn vendored_typeshed_versions(vendored: &VendoredFileSystem) -> TypeshedVers
             .expect("The vendored typeshed stubs should contain a VERSIONS file"),
     )
     .expect("The VERSIONS file in the vendored typeshed stubs should be well-formed")
-}
-
-pub(crate) fn typeshed_versions(db: &dyn Db) -> &TypeshedVersions {
-    db.search_paths().typeshed_versions()
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

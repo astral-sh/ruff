@@ -126,7 +126,8 @@ impl<'db> FieldMetadata<'db> {
         definition: Definition<'db>,
         specialization: Option<Specialization<'db>>,
     ) {
-        let module = parsed_module(db, definition.file(db)).load(db);
+        let program_file = definition.program_file(db);
+        let module = program_file.parsed(db).load(db);
         let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) else {
             return;
         };
@@ -144,7 +145,7 @@ impl<'db> FieldMetadata<'db> {
         // using `StrictInt = Annotated[int, Strict()]`. Since we don't retain the `Annotated`
         // metadata, we need to follow the alias back to its definition and parse the metadata
         // from there.
-        let model = SemanticModel::new(db, definition.file(db));
+        let model = SemanticModel::new(db, program_file);
         let Some(alias_definition) = definitions_for_name(
             &model,
             name.id.as_str(),
@@ -156,7 +157,8 @@ impl<'db> FieldMetadata<'db> {
             return;
         };
 
-        let module = parsed_module(db, alias_definition.file(db)).load(db);
+        let module =
+            parsed_module(db, alias_definition.program_file(db).versioned_file(db)).load(db);
         let kind = alias_definition.kind(db);
         let value = match &kind {
             DefinitionKind::Assignment(assignment) => assignment.value(&module),
@@ -260,9 +262,10 @@ impl<'db> FieldMetadata<'db> {
         call_type: Type<'db>,
         specialization: Option<Specialization<'db>>,
     ) {
+        let program = definition.program_file(db).program(db);
         if let Some(default) = call.arguments.find_argument_value("default", 0) {
             let default_type = definition_expression_type(db, definition, default);
-            if !default_type.is_instance_of(db, KnownClass::EllipsisType) {
+            if !default_type.is_instance_of(db, program, KnownClass::EllipsisType) {
                 self.default_ty =
                     Some(default_type.apply_optional_specialization(db, specialization));
             }
@@ -272,7 +275,7 @@ impl<'db> FieldMetadata<'db> {
 
         if let Some(init) = call.arguments.find_keyword("init") {
             let init = definition_expression_type(db, definition, &init.value);
-            self.init &= !init.bool(db).is_always_false();
+            self.init &= !init.bool(db, program).is_always_false();
         }
 
         if let Some(alias) = call
@@ -287,7 +290,7 @@ impl<'db> FieldMetadata<'db> {
 
         if let Some(strict) = call.arguments.find_keyword("strict") {
             let strict = definition_expression_type(db, definition, &strict.value);
-            if !strict.is_none(db) {
+            if !strict.is_none(db, program) {
                 self.merge_strict(ConfigBoolean::from_type(strict));
             }
         }
@@ -470,10 +473,11 @@ pub(in crate::types) fn is_model(db: &dyn Db, class: StaticClassLiteral<'_>) -> 
 /// a default value.
 pub(in crate::types) fn field_provides_default(
     db: &dyn Db,
+    program: crate::Program,
     function: FunctionType<'_>,
     default: Type<'_>,
 ) -> bool {
-    !default.is_instance_of(db, KnownClass::EllipsisType)
+    !default.is_instance_of(db, program, KnownClass::EllipsisType)
         || !function.is_known(db, KnownFunction::PydanticField)
 }
 
@@ -558,9 +562,8 @@ fn inherited_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<
 }
 
 fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelConfig> {
-    let model_config = class_member(db, class.body_scope(db), "model_config")
-        .inner
-        .place;
+    let body_scope = class.body_scope(db);
+    let model_config = class_member(db, body_scope, "model_config").inner.place;
     let Place::Defined(DefinedPlace {
         definedness: Definedness::AlwaysDefined,
         provenance: Provenance::SingleDefinition(definition),
@@ -574,7 +577,7 @@ fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelC
         };
     };
 
-    let module = parsed_module(db, class.file(db)).load(db);
+    let module = body_scope.program_file(db).parsed(db).load(db);
     let kind = definition.kind(db);
     let value = match &kind {
         DefinitionKind::Assignment(assignment) => assignment.value(&module),
@@ -685,7 +688,8 @@ fn model_config_from_dict(db: &dyn Db, definition: Definition<'_>, dict: &ExprDi
 
 fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConfig {
     let definition = class.definition(db);
-    let module = parsed_module(db, class.file(db)).load(db);
+    let module =
+        parsed_module(db, class.body_scope(db).program_file(db).versioned_file(db)).load(db);
     let kind = definition.kind(db);
     let Some(class) = kind.as_class() else {
         return ModelConfig::default();
@@ -731,6 +735,7 @@ fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConf
 /// Return the input type accepted by a Pydantic field's synthesized constructor parameter.
 pub(in crate::types) fn constructor_parameter_type<'db>(
     db: &'db dyn Db,
+    program: crate::Program,
     field_type: Type<'db>,
     field_strict: ConfigBoolean,
     metadata: ModelMetadata<'db>,
@@ -739,20 +744,27 @@ pub(in crate::types) fn constructor_parameter_type<'db>(
         return field_type;
     }
 
-    lax_input_type(db, field_type)
+    lax_input_type(db, program, field_type)
 }
 
 /// Return the documented Python input type accepted by Pydantic for `field_type` in lax mode.
-fn lax_input_type<'db>(db: &'db dyn Db, field_type: Type<'db>) -> Type<'db> {
-    lax_input_type_impl(db, field_type, &mut FxHashSet::default())
+fn lax_input_type<'db>(
+    db: &'db dyn Db,
+    program: crate::Program,
+    field_type: Type<'db>,
+) -> Type<'db> {
+    lax_input_type_impl(db, program, field_type, &mut FxHashSet::default())
 }
 
 fn lax_input_type_impl<'db>(
     db: &'db dyn Db,
+    program: crate::Program,
     field_type: Type<'db>,
     expanding_types: &mut FxHashSet<Type<'db>>,
 ) -> Type<'db> {
-    if field_type.is_none(db) || matches!(field_type, Type::LiteralValue(_) | Type::SubclassOf(_)) {
+    if field_type.is_none(db, program)
+        || matches!(field_type, Type::LiteralValue(_) | Type::SubclassOf(_))
+    {
         return field_type;
     }
 
@@ -760,31 +772,32 @@ fn lax_input_type_impl<'db>(
         if !expanding_types.insert(field_type) {
             return Type::any();
         }
-        let result = lax_input_type_impl(db, alias.value_type(db), expanding_types);
+        let result = lax_input_type_impl(db, program, alias.value_type(db), expanding_types);
         expanding_types.remove(&field_type);
         return result;
     }
 
     if field_type.as_union().and_then(|union| union.known(db)) == Some(KnownUnion::Float) {
-        return lax_alias(db, "LaxFloat");
+        return lax_alias(db, program, "LaxFloat");
     }
 
     if let Type::Union(union) = field_type {
         return UnionType::from_elements_leave_aliases(
             db,
+            program,
             union
                 .elements(db)
                 .iter()
-                .map(|element| lax_input_type_impl(db, *element, expanding_types)),
+                .map(|element| lax_input_type_impl(db, program, *element, expanding_types)),
         );
     }
 
-    if let Some(input_type) = root_model_input_type(db, field_type, expanding_types) {
+    if let Some(input_type) = root_model_input_type(db, program, field_type, expanding_types) {
         return input_type;
     }
 
     let known_class = field_type
-        .nominal_class(db)
+        .nominal_class(db, program)
         .and_then(|class| class.known(db));
 
     if matches!(
@@ -799,25 +812,29 @@ fn lax_input_type_impl<'db>(
                 | KnownClass::Tuple
         )
     ) {
-        let Ok(elements) = field_type.try_iterate(db) else {
+        let Ok(elements) = field_type.try_iterate(db, program) else {
             return Type::any();
         };
-        let element_type =
-            lax_input_type_impl(db, elements.homogeneous_element_type(db), expanding_types);
-        return KnownClass::Iterable.to_specialized_instance(db, &[element_type]);
+        let element_type = lax_input_type_impl(
+            db,
+            program,
+            elements.homogeneous_element_type(db, program),
+            expanding_types,
+        );
+        return KnownClass::Iterable.to_specialized_instance(db, program, &[element_type]);
     }
 
     if matches!(known_class, Some(KnownClass::Dict | KnownClass::Mapping)) {
-        let Some(specialization) =
-            known_class.and_then(|known_class| field_type.known_specialization(db, known_class))
+        let Some(specialization) = known_class
+            .and_then(|known_class| field_type.known_specialization(db, program, known_class))
         else {
             return Type::any();
         };
         let [key_type, value_type] = specialization.types(db) else {
             return Type::any();
         };
-        let value_type = lax_input_type_impl(db, *value_type, expanding_types);
-        return KnownClass::Mapping.to_specialized_instance(db, &[*key_type, value_type]);
+        let value_type = lax_input_type_impl(db, program, *value_type, expanding_types);
+        return KnownClass::Mapping.to_specialized_instance(db, program, &[*key_type, value_type]);
     }
 
     let builtin_alias = match known_class {
@@ -830,10 +847,10 @@ fn lax_input_type_impl<'db>(
         _ => None,
     };
     if let Some(alias) = builtin_alias {
-        return lax_alias(db, alias);
+        return lax_alias(db, program, alias);
     }
 
-    let Some((module, symbol, class)) = instance_symbol(db, field_type) else {
+    let Some((module, symbol, class)) = instance_symbol(db, program, field_type) else {
         return Type::any();
     };
     let symbol_alias = match (module, symbol) {
@@ -853,7 +870,7 @@ fn lax_input_type_impl<'db>(
         _ => None,
     };
     if let Some(alias) = symbol_alias {
-        return lax_alias(db, alias);
+        return lax_alias(db, program, alias);
     }
 
     let alias = if (module, symbol) == (KnownModule::Re, "Pattern") {
@@ -864,12 +881,12 @@ fn lax_input_type_impl<'db>(
             return Type::any();
         };
         if pattern_type
-            .nominal_class(db)
+            .nominal_class(db, program)
             .is_some_and(|class| class.is_known(db, KnownClass::Str))
         {
             "LaxStrPattern"
         } else if pattern_type
-            .nominal_class(db)
+            .nominal_class(db, program)
             .is_some_and(|class| class.is_known(db, KnownClass::Bytes))
         {
             "LaxBytesPattern"
@@ -880,7 +897,7 @@ fn lax_input_type_impl<'db>(
         return Type::any();
     };
 
-    lax_alias(db, alias)
+    lax_alias(db, program, alias)
 }
 
 /// Return the input type accepted for a Pydantic root model field.
@@ -890,10 +907,13 @@ fn lax_input_type_impl<'db>(
 /// `IntList` instance and an `Iterable[LaxInt]`.
 fn root_model_input_type<'db>(
     db: &'db dyn Db,
+    program: crate::Program,
     field_type: Type<'db>,
     expanding_types: &mut FxHashSet<Type<'db>>,
 ) -> Option<Type<'db>> {
-    let (class, specialization) = field_type.nominal_class(db)?.static_class_literal(db)?;
+    let (class, specialization) = field_type
+        .nominal_class(db, program)?
+        .static_class_literal(db)?;
     if !is_root_model(db, class) {
         return None;
     }
@@ -910,11 +930,12 @@ fn root_model_input_type<'db>(
     if !expanding_types.insert(field_type) {
         return Some(Type::any());
     }
-    let root_input_type = lax_input_type_impl(db, root_field.declared_ty, expanding_types);
+    let root_input_type = lax_input_type_impl(db, program, root_field.declared_ty, expanding_types);
 
     expanding_types.remove(&field_type);
     Some(UnionType::from_two_elements(
         db,
+        program,
         field_type,
         root_input_type,
     ))
@@ -923,16 +944,21 @@ fn root_model_input_type<'db>(
 /// Return the known module, name, and class literal for an instance's nominal class.
 fn instance_symbol<'db>(
     db: &'db dyn Db,
+    program: crate::Program,
     ty: Type<'db>,
 ) -> Option<(KnownModule, &'db str, StaticClassLiteral<'db>)> {
-    let class = ty.nominal_class(db)?.class_literal(db).as_static()?;
-    let module = file_to_module(db, class.file(db))?.known(db)?;
+    let class = ty
+        .nominal_class(db, program)?
+        .class_literal(db)
+        .as_static()?;
+    let module =
+        file_to_module(db, class.body_scope(db).program_file(db).resolver_file(db))?.known(db)?;
     Some((module, class.name(db).as_str(), class))
 }
 
 /// Return a lax-input alias like `LaxInt` from `ty_extensions.pydantic`.
-fn lax_alias<'db>(db: &'db dyn Db, name: &str) -> Type<'db> {
-    match known_module_symbol(db, KnownModule::TyExtensionsPydantic, name)
+fn lax_alias<'db>(db: &'db dyn Db, program: crate::Program, name: &str) -> Type<'db> {
+    match known_module_symbol(db, program, KnownModule::TyExtensionsPydantic, name)
         .place
         .ignore_possibly_undefined()
     {

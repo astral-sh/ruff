@@ -179,8 +179,9 @@ Settings: Settings {
 
 Memory report:
 =======SALSA STRUCTS=======
-`Program`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+`ResolverProgram`                                  metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `Project`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+`Program`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `FileRoot`                                         metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `ModuleResolveModeIngredient`                      metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 =======SALSA QUERIES=======

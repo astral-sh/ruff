@@ -9,7 +9,7 @@ use ruff_db::Db as _;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
-use ty_python_core::program::{FallibleStrategy, Program};
+use ty_python_core::program::FallibleStrategy;
 
 /// Represents the result of applying changes to the project database.
 pub struct ChangeResult {
@@ -35,8 +35,8 @@ impl ProjectDatabase {
         let project = self.project();
         let project_root = project.root(self).to_path_buf();
         let configuration_paths = ConfigurationPaths::from_metadata(project.metadata(self));
-        let program = Program::get(self);
-        let custom_stdlib_versions_path = program
+        let custom_stdlib_versions_path = project
+            .program(self)
             .custom_stdlib_search_path(self)
             .map(|path| path.join("VERSIONS"));
 
@@ -245,21 +245,17 @@ impl ProjectDatabase {
                     metadata.try_add_project_root(self);
                     let merged_options = metadata.to_merged_options();
 
-                    let program_settings_diagnostics = match merged_options.to_program_settings(
-                        self.system(),
-                        self.vendored(),
-                        &FallibleStrategy,
-                    ) {
+                    let (program_settings, program_settings_diagnostics) = match merged_options
+                        .to_program_settings(self.system(), self.vendored(), &FallibleStrategy)
+                    {
                         Ok((program_settings, diagnostics)) => {
-                            let program = Program::get(self);
-                            program.update_from_settings(self, program_settings);
-                            diagnostics
+                            (Some(program_settings), diagnostics)
                         }
                         Err(error) => {
                             tracing::error!(
                                 "Failed to convert metadata to program settings, continuing without applying them: {error}"
                             );
-                            Vec::new()
+                            (None, Vec::new())
                         }
                     };
 
@@ -280,6 +276,7 @@ impl ProjectDatabase {
                         self,
                         metadata,
                         settings,
+                        program_settings,
                         settings_diagnostics,
                         program_settings_diagnostics,
                     ) {
@@ -328,7 +325,7 @@ impl ProjectDatabase {
                             Ok((_, diagnostics)) => diagnostics,
                             Err(error) => vec![error.into_diagnostic()],
                         };
-                    program.update_from_settings(self, program_settings);
+                    project.update_program_settings(self, program_settings);
                     project.update_settings_diagnostics(
                         self,
                         settings_diagnostics,

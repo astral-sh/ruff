@@ -519,7 +519,7 @@ mod tests {
     use super::*;
     use crate::tests::TestDb;
     use ruff_db::files::system_path_to_file;
-    use ruff_db::parsed::parsed_module;
+    use ruff_db::parsed::{VersionedFile, parsed_module};
     use ruff_db::source::line_index;
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_python_trivia::textwrap::dedent;
@@ -529,7 +529,9 @@ mod tests {
         let mut db = TestDb::setup();
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
+        let versioned_file =
+            VersionedFile::new(&db, file, ruff_python_ast::PythonVersion::latest_ty());
+        let parsed = parsed_module(&db, versioned_file).load(&db);
         InlineFileAssertions::from_file(source, &parsed, &line_index(&db, file))
     }
 

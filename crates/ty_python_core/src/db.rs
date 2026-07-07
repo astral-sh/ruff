@@ -21,9 +21,7 @@ pub(crate) mod tests {
     };
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_python_ast::PythonVersion;
-    use ty_module_resolver::{
-        Db as ModuleResolverDb, FallibleStrategy, SearchPathSettings, SearchPaths,
-    };
+    use ty_module_resolver::{Db as ModuleResolverDb, FallibleStrategy, SearchPathSettings};
     use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
     use crate::platform::PythonPlatform;
@@ -40,11 +38,13 @@ pub(crate) mod tests {
         files: Files,
         system: TestSystem,
         vendored: VendoredFileSystem,
+        program: Option<Program>,
     }
 
     impl TestDb {
         pub(crate) fn new() -> Self {
             let events = Events::default();
+            let vendored = ty_vendored::file_system().clone();
             Self {
                 storage: salsa::Storage::new(Some(Box::new({
                     move |event| {
@@ -54,9 +54,14 @@ pub(crate) mod tests {
                     }
                 }))),
                 system: TestSystem::default(),
-                vendored: ty_vendored::file_system().clone(),
+                program: None,
+                vendored,
                 files: Files::default(),
             }
+        }
+
+        pub(crate) fn program(&self) -> Program {
+            self.program.expect("test database has a program")
         }
     }
 
@@ -85,7 +90,7 @@ pub(crate) mod tests {
         }
 
         fn python_version(&self) -> PythonVersion {
-            Program::get(self).python_version(self)
+            self.program().python_version(self)
         }
     }
 
@@ -97,11 +102,7 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl ModuleResolverDb for TestDb {
-        fn search_paths(&self) -> &SearchPaths {
-            Program::get(self).search_paths(self)
-        }
-    }
+    impl ModuleResolverDb for TestDb {}
 
     #[salsa::db]
     impl salsa::Database for TestDb {}
@@ -142,19 +143,21 @@ pub(crate) mod tests {
             db.write_files(self.files)
                 .context("Failed to write test files")?;
 
-            Program::from_settings(
-                &db,
-                ProgramSettings {
-                    python_version: PythonVersionWithSource {
-                        version: self.python_version,
-                        source: PythonVersionSource::default(),
-                    },
-                    python_platform: self.python_platform,
-                    search_paths: SearchPathSettings::new(vec![src_root])
-                        .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-                        .context("Invalid search path settings")?,
+            let settings = ProgramSettings {
+                python_version: PythonVersionWithSource {
+                    version: self.python_version,
+                    source: PythonVersionSource::default(),
                 },
-            );
+                python_platform: self.python_platform,
+                search_paths: SearchPathSettings::new(vec![src_root])
+                    .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+                    .context("Invalid search path settings")?,
+            };
+            db.program = Some(Program::from_settings(
+                &db,
+                &settings,
+                &crate::environment::InferenceSettings::default(),
+            ));
 
             Ok(db)
         }

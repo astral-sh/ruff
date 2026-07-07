@@ -8,7 +8,7 @@ use ruff_db::files::Files;
 use ruff_db::system::{System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
 use ruff_python_ast::PythonVersion;
-use ty_module_resolver::{FallibleStrategy, SearchPathSettings, SearchPaths};
+use ty_module_resolver::{FallibleStrategy, ResolverProgram, SearchPathSettings};
 use ty_site_packages::{PythonEnvironment, SysPrefixPathOrigin};
 
 static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {
@@ -23,8 +23,7 @@ pub struct ModuleDb {
     storage: salsa::Storage<Self>,
     files: Files,
     system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
-    search_paths: Arc<SearchPaths>,
-    python_version: PythonVersion,
+    resolver_program: Option<ResolverProgram>,
 }
 
 impl ModuleDb {
@@ -52,18 +51,20 @@ impl ModuleDb {
             .to_search_paths(&system, &EMPTY_VENDORED, &FallibleStrategy)
             .context("Invalid search path settings")?;
 
-        let db = Self {
+        let mut db = Self {
             storage: salsa::Storage::new(None),
             files: Files::default(),
             system: Arc::new(system),
-            search_paths: Arc::new(search_paths),
-            python_version,
+            resolver_program: None,
         };
-
-        // Register the static roots for salsa durability
-        db.search_paths.try_register_static_roots(&db);
+        db.resolver_program = Some(ResolverProgram::create(&db, python_version, &search_paths));
 
         Ok(db)
+    }
+
+    pub(crate) fn resolver_program(&self) -> ResolverProgram {
+        self.resolver_program
+            .expect("module database has a resolver program")
     }
 }
 
@@ -82,16 +83,12 @@ impl SourceDb for ModuleDb {
     }
 
     fn python_version(&self) -> PythonVersion {
-        self.python_version
+        self.resolver_program().python_version(self)
     }
 }
 
 #[salsa::db]
-impl ty_module_resolver::Db for ModuleDb {
-    fn search_paths(&self) -> &SearchPaths {
-        &self.search_paths
-    }
-}
+impl ty_module_resolver::Db for ModuleDb {}
 
 #[salsa::db]
 impl salsa::Database for ModuleDb {}

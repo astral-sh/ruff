@@ -6,19 +6,23 @@ use ruff_python_ast::{self as ast};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{ModuleName, resolve_module};
 
-use crate::Db;
 use crate::types::{Type, TypeContext, infer_expression_types};
+use crate::{Db, ProgramFile};
 use ty_python_core::{SemanticIndex, Truthiness, semantic_index};
 
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
 /// if it contains invalid elements.
 #[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<FxHashSet<Name>> {
+pub(crate) fn dunder_all_names(
+    db: &dyn Db,
+    program_file: ProgramFile<'_>,
+) -> Option<FxHashSet<Name>> {
+    let file = program_file.file(db);
     let _span = tracing::trace_span!("dunder_all_names", file=?file.path(db)).entered();
 
-    let module = parsed_module(db, file).load(db);
-    let index = semantic_index(db, file);
-    let mut collector = DunderAllNamesCollector::new(db, file, index);
+    let module = parsed_module(db, program_file.versioned_file(db)).load(db);
+    let index = semantic_index(db, program_file);
+    let mut collector = DunderAllNamesCollector::new(db, program_file, index);
     collector.visit_body(module.suite());
     collector.into_names()
 }
@@ -27,6 +31,7 @@ pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<FxHashSet<Name
 struct DunderAllNamesCollector<'db> {
     db: &'db dyn Db,
     file: File,
+    program_file: ProgramFile<'db>,
 
     /// The semantic index for the module.
     index: &'db SemanticIndex<'db>,
@@ -43,10 +48,16 @@ struct DunderAllNamesCollector<'db> {
 }
 
 impl<'db> DunderAllNamesCollector<'db> {
-    fn new(db: &'db dyn Db, file: File, index: &'db SemanticIndex<'db>) -> Self {
+    fn new(
+        db: &'db dyn Db,
+        program_file: ProgramFile<'db>,
+        index: &'db SemanticIndex<'db>,
+    ) -> Self {
+        let file = program_file.file(db);
         Self {
             db,
             file,
+            program_file,
             index,
             origin: None,
             invalid: false,
@@ -90,7 +101,12 @@ impl<'db> DunderAllNamesCollector<'db> {
                 let Some(module_dunder_all_names) = module_literal
                     .module(self.db)
                     .file(self.db)
-                    .and_then(|file| dunder_all_names(self.db, file))
+                    .and_then(|file| {
+                        dunder_all_names(
+                            self.db,
+                            ProgramFile::new(self.db, self.program_file.program(self.db), file),
+                        )
+                    })
                 else {
                     // The module either does not have a `__all__` variable or it is invalid.
                     return false;
@@ -156,10 +172,18 @@ impl<'db> DunderAllNamesCollector<'db> {
         &self,
         import_from: &ast::StmtImportFrom,
     ) -> Option<&'db FxHashSet<Name>> {
+        let resolver_file = self.program_file.resolver_file(self.db);
         let module_name =
-            ModuleName::from_import_statement(self.db, self.file, import_from).ok()?;
-        let module = resolve_module(self.db, self.file, &module_name)?;
-        dunder_all_names(self.db, module.file(self.db)?)
+            ModuleName::from_import_statement(self.db, resolver_file, import_from).ok()?;
+        let module = resolve_module(self.db, resolver_file, &module_name)?;
+        dunder_all_names(
+            self.db,
+            ProgramFile::new(
+                self.db,
+                self.program_file.program(self.db),
+                module.file(self.db)?,
+            ),
+        )
     }
 
     /// Infer the type of a standalone expression.
@@ -176,7 +200,9 @@ impl<'db> DunderAllNamesCollector<'db> {
     ///
     /// Returns [`None`] if the expression type doesn't implement `__bool__` correctly.
     fn evaluate_test_expr(&self, expr: &ast::Expr) -> Option<Truthiness> {
-        self.standalone_expression_type(expr).try_bool(self.db).ok()
+        self.standalone_expression_type(expr)
+            .try_bool(self.db, self.program_file.program(self.db))
+            .ok()
     }
 
     /// Add valid names to the set.

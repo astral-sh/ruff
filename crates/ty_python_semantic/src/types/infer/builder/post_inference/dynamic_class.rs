@@ -87,9 +87,9 @@ pub(crate) fn check_dynamic_class_definition<'db>(
             call_expr.into(),
             dynamic_class.name(db),
             metaclass1,
-            base1.display(db),
+            base1.display(db, context.program()),
             metaclass2,
-            base2.display(db),
+            base2.display(db, context.program()),
         );
     }
 }

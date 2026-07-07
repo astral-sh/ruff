@@ -1,5 +1,4 @@
 use crate::{
-    Program,
     reachability::is_reachable,
     types::{
         BindingContext, KnownClass, KnownInstanceType, LintDiagnosticGuard, Truthiness, Type,
@@ -107,7 +106,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .iter()
                     .map(|expr| {
                         let constraint = self.infer_type_expression(expr);
-                        if constraint.has_typevar_or_typevar_instance(db)
+                        if constraint.has_typevar_or_typevar_instance(db, self.program)
                             && let Some(builder) = self
                                 .context
                                 .report_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS, expr)
@@ -133,7 +132,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             Some(expr) => {
                 let bound_ty = self.infer_type_expression(expr);
-                if bound_ty.has_typevar_or_typevar_instance(db)
+                if bound_ty.has_typevar_or_typevar_instance(db, self.program)
                     && let Some(builder) =
                         self.context.report_lint(&INVALID_TYPE_VARIABLE_BOUND, expr)
                 {
@@ -241,11 +240,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Annotate the diagnostic with the definition span of the default TypeVar.
             let annotate_default_definition = |diagnostic: &mut LintDiagnosticGuard<'_, '_>| {
                 if let Some(definition) = default_typevar.definition(db) {
-                    let file = definition.file(db);
+                    let program_file = definition.program_file(db);
                     diagnostic.annotate(
-                        Annotation::secondary(Span::from(
-                            definition.full_range(db, &parsed_module(db, file).load(db)),
-                        ))
+                        Annotation::secondary(Span::from(definition.full_range(
+                            db,
+                            &parsed_module(db, program_file.versioned_file(db)).load(db),
+                        )))
                         .message(format_args!("`{default_name}` defined here")),
                     );
                 }
@@ -258,7 +258,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // to the outer bound.
                     if let Some(default_constraints) = default_typevar.constraints(db) {
                         for constraint in default_constraints {
-                            if !constraint.is_assignable_to(db, outer_bound) {
+                            if !constraint.is_assignable_to(db, self.program, outer_bound) {
                                 if let Some(mut diagnostic) = not_assignable_to_upper_bound() {
                                     annotate_default_definition(&mut diagnostic);
                                     if let Some(name) = name {
@@ -266,7 +266,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             "Constraint `{constraint}` of default \
                                             `{default_name}` is not assignable to upper \
                                             bound of `{name}`",
-                                            constraint = constraint.display(db),
+                                            constraint = constraint.display(db, self.program),
                                         ));
                                         diagnostic.set_concise_message(format_args!(
                                             "Default `{default_name}` of TypeVar `{name}` \
@@ -274,23 +274,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             of `{name}` because constraint `{constraint}` \
                                             of `{default_name}` is not assignable to \
                                             `{bound}`",
-                                            bound = outer_bound.display(db),
-                                            constraint = constraint.display(db),
+                                            bound = outer_bound.display(db, self.program),
+                                            constraint = constraint.display(db, self.program),
                                         ));
                                     } else {
                                         diagnostic.set_primary_message(format_args!(
                                             "Constraint `{constraint}` of `{default_name}` is \
                                             not assignable to upper bound `{bound}` of \
                                             outer TypeVar",
-                                            constraint = constraint.display(db),
-                                            bound = outer_bound.display(db),
+                                            constraint = constraint.display(db, self.program),
+                                            bound = outer_bound.display(db, self.program),
                                         ));
                                         diagnostic.set_concise_message(format_args!(
                                             "Default of TypeVar is not assignable its upper \
                                             bound `{bound}` because constraint `{constraint}` \
                                             of `{default_name}` is not assignable to `{bound}`",
-                                            bound = outer_bound.display(db),
-                                            constraint = constraint.display(db),
+                                            bound = outer_bound.display(db, self.program),
+                                            constraint = constraint.display(db, self.program),
                                         ));
                                     }
                                 }
@@ -300,7 +300,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     } else {
                         let default_bound =
                             default_typevar.upper_bound(db).unwrap_or_else(Type::object);
-                        if !default_bound.is_assignable_to(db, outer_bound) {
+                        if !default_bound.is_assignable_to(db, self.program, outer_bound) {
                             if let Some(mut diagnostic) = not_assignable_to_upper_bound() {
                                 annotate_default_definition(&mut diagnostic);
                                 if let Some(name) = name {
@@ -308,7 +308,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         "Upper bound `{default_bound}` of default \
                                             `{default_name}` is not assignable to upper \
                                             bound of `{name}`",
-                                        default_bound = default_bound.display(db),
+                                        default_bound = default_bound.display(db, self.program),
                                     ));
                                     diagnostic.set_concise_message(format_args!(
                                         "Default `{default_name}` of TypeVar `{name}` \
@@ -316,15 +316,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             of `{name}` because its upper bound \
                                             `{default_bound}` is not assignable to \
                                             `{bound}`",
-                                        bound = outer_bound.display(db),
-                                        default_bound = default_bound.display(db),
+                                        bound = outer_bound.display(db, self.program),
+                                        default_bound = default_bound.display(db, self.program),
                                     ));
                                 } else {
                                     diagnostic.set_primary_message(format_args!(
                                         "Upper bound `{default_bound}` of default \
                                             `{default_name}` is not assignable to upper \
                                             bound of outer TypeVar",
-                                        default_bound = default_bound.display(db),
+                                        default_bound = default_bound.display(db, self.program),
                                     ));
                                     diagnostic.set_concise_message(format_args!(
                                         "TypeVar default `{default_name}` is not \
@@ -332,8 +332,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             because upper bound of `{default_name}`
                                             (`{default_bound}`) is not assignable
                                             to `{bound}`",
-                                        bound = outer_bound.display(db),
-                                        default_bound = default_bound.display(db),
+                                        bound = outer_bound.display(db, self.program),
+                                        default_bound = default_bound.display(db, self.program),
                                     ));
                                 }
                             }
@@ -348,7 +348,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         for default_constraint in default_constraints {
                             if !outer
                                 .iter()
-                                .any(|o| default_constraint.is_equivalent_to(db, *o))
+                                .any(|o| default_constraint.is_equivalent_to(db, self.program, *o))
                             {
                                 if let Some(mut diagnostic) = inconsistent_with_constraints() {
                                     annotate_default_definition(&mut diagnostic);
@@ -357,7 +357,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             "Constraint `{constraint}` of default \
                                                 `{default_name}` is not one of the constraints \
                                                 of `{name}`",
-                                            constraint = default_constraint.display(db),
+                                            constraint =
+                                                default_constraint.display(db, self.program),
                                         ));
                                         diagnostic.set_concise_message(format_args!(
                                             "Default `{default_name}` of TypeVar `{name}` \
@@ -365,14 +366,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                 `{name}` because constraint `{constraint}` of \
                                                 `{default_name}` is not one of the constraints \
                                                 of `{name}`",
-                                            constraint = default_constraint.display(db),
+                                            constraint =
+                                                default_constraint.display(db, self.program),
                                         ));
                                     } else {
                                         diagnostic.set_primary_message(format_args!(
                                             "Constraint `{constraint}` of outer TypeVar default \
                                                 `{default_name}` is not one of the constraints \
                                                 of the outer TypeVar",
-                                            constraint = default_constraint.display(db),
+                                            constraint =
+                                                default_constraint.display(db, self.program),
                                         ));
                                         diagnostic.set_concise_message(format_args!(
                                             "Default `{default_name}` of outer TypeVar is \
@@ -380,7 +383,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             TypeVar because constraint `{constraint}` of \
                                             default `{default_name}` is not one of the \
                                             constraints of the outer TypeVar",
-                                            constraint = default_constraint.display(db),
+                                            constraint =
+                                                default_constraint.display(db, self.program),
                                         ));
                                     }
                                 }
@@ -399,7 +403,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 );
                                 diagnostic.info(format_args!(
                                     "`{default_name}` has bound `{default_bound}` but is not constrained",
-                                    default_bound = default_bound.display(db),
+                                    default_bound = default_bound.display(db, self.program),
                                 ));
                             } else {
                                 diagnostic.set_primary_message(
@@ -420,7 +424,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Concrete default type checks.
         match bound_or_constraints {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
-                if !default_ty.is_assignable_to(db, bound) {
+                if !default_ty.is_assignable_to(db, self.program, bound) {
                     if let Some(mut diagnostic) = not_assignable_to_upper_bound() {
                         if let Some(name) = name {
                             diagnostic.set_primary_message(format_args!("Default of `{name}`"));
@@ -436,18 +440,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     && !constraints
                         .elements(db)
                         .iter()
-                        .any(|c| default_ty.is_equivalent_to(db, *c))
+                        .any(|c| default_ty.is_equivalent_to(db, self.program, *c))
                 {
                     if let Some(mut diagnostic) = inconsistent_with_constraints() {
                         if let Some(name) = name {
                             diagnostic.set_primary_message(format_args!(
                                 "`{default}` is not one of the constraints of `{name}`",
-                                default = default_ty.display(db),
+                                default = default_ty.display(db, self.program),
                             ));
                         } else {
                             diagnostic.set_primary_message(format_args!(
                                 "`{default}` is not one of the constraints",
-                                default = default_ty.display(db),
+                                default = default_ty.display(db, self.program),
                             ));
                         }
                     }
@@ -487,7 +491,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let expected_binding = BindingContext::Definition(expected_binding_def);
 
-        let outer_tv = find_over_type(db, default_ty, false, |ty| {
+        let outer_tv = find_over_type(db, self.program, default_ty, false, |ty| {
             if let Type::TypeVar(bound_tv) = ty
                 && bound_tv.binding_context(db) != expected_binding
             {
@@ -519,11 +523,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 outer-scope type parameter `{outer_name}` as its default"
         ));
         if let Some(definition) = outer_typevar.definition(db) {
-            let file = definition.file(db);
+            let program_file = definition.program_file(db);
             diagnostic.annotate(
-                Annotation::secondary(Span::from(
-                    definition.full_range(db, &parsed_module(db, file).load(db)),
-                ))
+                Annotation::secondary(Span::from(definition.full_range(
+                    db,
+                    &parsed_module(db, program_file.versioned_file(db)).load(db),
+                )))
                 .message(format_args!("`{outer_name}` defined here")),
             );
         }
@@ -693,14 +698,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             // If the call doesn't create a valid paramspec, we'll emit diagnostics and fall back to
             // just creating a regular instance of `typing.ParamSpec`.
-            KnownClass::ParamSpec.to_instance(context.db())
+            KnownClass::ParamSpec.to_instance(context.db(), context.program())
         }
 
         let db = self.db();
         let arguments = &call_expr.arguments;
         let is_typing_extensions = known_class == KnownClass::ExtensionsParamSpec;
         let assume_all_features = self.in_stub() || is_typing_extensions;
-        let python_version = Program::get(db).python_version(db);
+        let python_version = self.program.python_version(db);
         let have_features_from =
             |version: PythonVersion| assume_all_features || python_version >= version;
 
@@ -767,7 +772,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                     match self
                         .infer_expression(&kwarg.value, TypeContext::default())
-                        .bool(db)
+                        .bool(db, self.program)
                     {
                         Truthiness::AlwaysTrue => infer_variance = true,
                         Truthiness::AlwaysFalse => {}
@@ -784,7 +789,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "covariant" => {
                     match self
                         .infer_expression(&kwarg.value, TypeContext::default())
-                        .bool(db)
+                        .bool(db, self.program)
                     {
                         Truthiness::AlwaysTrue => covariant = true,
                         Truthiness::AlwaysFalse => {}
@@ -801,7 +806,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "contravariant" => {
                     match self
                         .infer_expression(&kwarg.value, TypeContext::default())
-                        .bool(db)
+                        .bool(db, self.program)
                     {
                         Truthiness::AlwaysTrue => contravariant = true,
                         Truthiness::AlwaysFalse => {}
@@ -940,14 +945,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             // If the call doesn't create a valid typevar, we'll emit diagnostics and fall back to
             // just creating a regular instance of `typing.TypeVar`.
-            KnownClass::TypeVar.to_instance(context.db())
+            KnownClass::TypeVar.to_instance(context.db(), context.program())
         }
 
         let db = self.db();
         let arguments = &call_expr.arguments;
         let is_typing_extensions = known_class == KnownClass::ExtensionsTypeVar;
         let assume_all_features = self.in_stub() || is_typing_extensions;
-        let python_version = Program::get(db).python_version(db);
+        let python_version = self.program.python_version(db);
         let have_features_from =
             |version: PythonVersion| assume_all_features || python_version >= version;
 
@@ -994,7 +999,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "covariant" => {
                     match self
                         .infer_expression(&kwarg.value, TypeContext::default())
-                        .bool(db)
+                        .bool(db, self.program)
                     {
                         Truthiness::AlwaysTrue => covariant = true,
                         Truthiness::AlwaysFalse => {}
@@ -1011,7 +1016,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "contravariant" => {
                     match self
                         .infer_expression(&kwarg.value, TypeContext::default())
-                        .bool(db)
+                        .bool(db, self.program)
                     {
                         Truthiness::AlwaysTrue => contravariant = true,
                         Truthiness::AlwaysFalse => {}
@@ -1050,7 +1055,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                     match self
                         .infer_expression(&kwarg.value, TypeContext::default())
-                        .bool(db)
+                        .bool(db, self.program)
                     {
                         Truthiness::AlwaysTrue => infer_variance = true,
                         Truthiness::AlwaysFalse => {}

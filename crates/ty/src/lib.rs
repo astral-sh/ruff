@@ -395,12 +395,17 @@ impl MainLoop {
                             }
                         }
                         MainLoopMode::Fix(mode) => {
+                            let program = db.project().program(db);
                             let result = match mode {
-                                FixMode::AddIgnore => {
-                                    suppress_all_diagnostics(db, result, &self.cancellation_token)
-                                }
+                                FixMode::AddIgnore => suppress_all_diagnostics(
+                                    db,
+                                    program,
+                                    result,
+                                    &self.cancellation_token,
+                                ),
                                 FixMode::ApplyFixes => fix_all_diagnostics(
                                     db,
+                                    program,
                                     result,
                                     Applicability::Safe,
                                     &self.cancellation_token,

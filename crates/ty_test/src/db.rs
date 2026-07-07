@@ -13,9 +13,10 @@ use salsa::Setter as _;
 use std::borrow::Cow;
 use std::sync::Arc;
 use tempfile::TempDir;
-use ty_module_resolver::{ModuleGlobSetBuilder, SearchPaths};
+use ty_module_resolver::ModuleGlobSetBuilder;
 use ty_python_core::Db as _;
-use ty_python_core::program::Program;
+use ty_python_core::environment::InferenceSettings;
+use ty_python_core::program::{Program, ProgramSettings};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
     AnalysisSettings, Db as SemanticDb, check_file_unwrap, default_lint_registry,
@@ -29,10 +30,12 @@ pub(crate) struct Db {
     system: MdtestSystem,
     vendored: VendoredFileSystem,
     settings: Option<Settings>,
+    program: Option<Program>,
 }
 
 impl Db {
     pub(crate) fn setup() -> Self {
+        let vendored = ty_vendored::file_system().clone();
         let mut db = Self {
             system: MdtestSystem::in_memory(),
             storage: salsa::Storage::new(Some(Box::new({
@@ -40,7 +43,8 @@ impl Db {
                     tracing::trace!("event: {:?}", event);
                 }
             }))),
-            vendored: ty_vendored::file_system().clone(),
+            program: None,
+            vendored,
             files: Files::default(),
             settings: None,
         };
@@ -51,6 +55,17 @@ impl Db {
 
     fn settings(&self) -> Settings {
         self.settings.unwrap()
+    }
+
+    pub(crate) fn program(&self) -> Program {
+        self.program.expect("mdtest database has a program")
+    }
+
+    pub(crate) fn set_program_settings(&mut self, settings: ProgramSettings) {
+        self.program = Some(match self.program {
+            Some(program) => program.with_program_settings(self, settings),
+            None => Program::create(self, &settings),
+        });
     }
 
     pub(crate) fn set_verbosity(&mut self, verbose: bool) {
@@ -108,10 +123,17 @@ impl Db {
             AnalysisSettings::default()
         };
 
+        let inference_settings = InferenceSettings {
+            replace_imports_with_any: analysis.replace_imports_with_any.clone(),
+        };
         let settings = self.settings();
         if settings.analysis(self) != &analysis {
             settings.set_analysis(self).to(analysis);
         }
+        self.program = Some(
+            self.program()
+                .with_inference_settings(self, inference_settings),
+        );
     }
 
     pub(crate) fn update_mdtest_rule_selection(
@@ -159,16 +181,12 @@ impl SourceDb for Db {
     }
 
     fn python_version(&self) -> ruff_python_ast::PythonVersion {
-        Program::get(self).python_version(self)
+        self.program().python_version(self)
     }
 }
 
 #[salsa::db]
-impl ty_module_resolver::Db for Db {
-    fn search_paths(&self) -> &SearchPaths {
-        Program::get(self).search_paths(self)
-    }
-}
+impl ty_module_resolver::Db for Db {}
 
 #[salsa::db]
 impl ty_python_core::Db for Db {
@@ -179,12 +197,16 @@ impl ty_python_core::Db for Db {
 
 #[salsa::db]
 impl SemanticDb for Db {
-    fn check_file(&self, file: File) -> Vec<Diagnostic> {
+    fn check_file(
+        &self,
+        program_file: ty_python_core::environment::ProgramFile<'_>,
+    ) -> Vec<Diagnostic> {
+        let file = program_file.file(self);
         if !self.should_check_file(file) {
             return Vec::new();
         }
 
-        check_file_unwrap(self, file)
+        check_file_unwrap(self, program_file)
     }
 
     fn rule_selection(&self, _file: File) -> &RuleSelection {

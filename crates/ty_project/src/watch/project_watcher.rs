@@ -40,7 +40,8 @@ impl ProjectWatcher {
     }
 
     pub fn update(&mut self, db: &ProjectDatabase) {
-        let search_paths: Vec<_> = system_module_search_paths(db).collect();
+        let program = db.project().program(db).resolver(db);
+        let search_paths: Vec<_> = system_module_search_paths(db, program).collect();
         let project_path = db.project().root(db);
 
         let new_cache_key = Self::compute_cache_key(project_path, &search_paths);

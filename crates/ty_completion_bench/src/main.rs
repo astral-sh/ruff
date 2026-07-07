@@ -17,7 +17,8 @@ use ty_ide::{Completion, CompletionCapabilities};
 use ty_project::metadata::Options;
 use ty_project::metadata::options::EnvironmentOptions;
 use ty_project::metadata::value::RelativePathBuf;
-use ty_project::{ProjectDatabase, ProjectMetadata};
+use ty_project::{Db as _, ProjectDatabase, ProjectMetadata};
+use ty_python_core::environment::ProgramFile;
 
 #[derive(Debug, clap::Parser)]
 #[command(
@@ -142,7 +143,7 @@ fn get_completions<'db>(
         db,
         &settings,
         CompletionCapabilities::default(),
-        file,
+        ProgramFile::new(db, db.project().program(db), file),
         offset,
     ))
 }

@@ -8,7 +8,7 @@ use std::fmt;
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, LintName, Severity, Span,
 };
-use ruff_db::{files::File, parsed::parsed_module, source::source_text};
+use ruff_db::{files::File, parsed::VersionedFile, parsed::parsed_module, source::source_text};
 use ruff_python_ast::token::TokenKind;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -72,8 +72,12 @@ pub fn is_unused_ignore_comment_lint(name: LintName) -> bool {
 }
 
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
-    let parsed = parsed_module(db, file).load(db);
+pub(crate) fn suppressions<'db>(
+    db: &'db dyn Db,
+    versioned_file: VersionedFile<'db>,
+) -> Suppressions {
+    let file = versioned_file.file(db);
+    let parsed = parsed_module(db, versioned_file).load(db);
     let source = source_text(db, file);
 
     let respect_type_ignore = db.analysis_settings(file).respect_type_ignore_comments;
@@ -129,10 +133,10 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
 
 pub(crate) fn check_suppressions(
     db: &dyn Db,
-    file: File,
+    versioned_file: VersionedFile<'_>,
     diagnostics: TypeCheckDiagnostics,
 ) -> Vec<Diagnostic> {
-    let mut context = CheckSuppressionsContext::new(db, file, diagnostics);
+    let mut context = CheckSuppressionsContext::new(db, versioned_file, diagnostics);
 
     check_unknown_rule(&mut context);
     check_invalid_suppression(&mut context);
@@ -206,8 +210,13 @@ struct CheckSuppressionsContext<'a> {
 }
 
 impl<'a> CheckSuppressionsContext<'a> {
-    fn new(db: &'a dyn Db, file: File, diagnostics: TypeCheckDiagnostics) -> Self {
-        let suppressions = suppressions(db, file);
+    fn new(
+        db: &'a dyn Db,
+        versioned_file: VersionedFile<'a>,
+        diagnostics: TypeCheckDiagnostics,
+    ) -> Self {
+        let file = versioned_file.file(db);
+        let suppressions = suppressions(db, versioned_file);
         Self {
             db,
             file,

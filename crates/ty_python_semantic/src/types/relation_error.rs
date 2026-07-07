@@ -153,11 +153,14 @@ impl<'db> ErrorContext<'db> {
     fn render(
         &self,
         db: &'db dyn Db,
+        program: crate::Program,
         help_messages: &mut FxOrderSet<HelpMessages>,
     ) -> Option<String> {
         let typed_dict_name = |typed_dict: &TypedDictType<'db>| match typed_dict {
             TypedDictType::Class(class) => format!("TypedDict `{}`", class.name(db)),
-            TypedDictType::Synthesized(_) => Type::TypedDict(*typed_dict).display(db).to_string(),
+            TypedDictType::Synthesized(_) => Type::TypedDict(*typed_dict)
+                .display(db, program)
+                .to_string(),
         };
 
         Some(match self {
@@ -170,14 +173,14 @@ impl<'db> ErrorContext<'db> {
                 target,
             } => format!(
                 "element `{}` of union `{}` is not assignable to `{}`",
-                element.display(db),
-                union.display(db),
-                target.display(db),
+                element.display(db, program),
+                union.display(db, program),
+                target.display(db, program),
             ),
             Self::NotAssignableToAnyUnionElement { source, union } => format!(
                 "type `{}` is not assignable to any element of the union `{}`",
-                source.display(db),
-                union.display(db),
+                source.display(db, program),
+                union.display(db, program),
             ),
             Self::NotAssignableToNOtherUnionElements { n } => format!(
                 "... omitted {n} union element{} without additional context",
@@ -189,17 +192,17 @@ impl<'db> ErrorContext<'db> {
                 intersection,
             } => format!(
                 "type `{}` is not assignable to element `{}` of intersection `{}`",
-                source.display(db),
-                element.display(db),
-                intersection.display(db),
+                source.display(db, program),
+                element.display(db, program),
+                intersection.display(db, program),
             ),
             Self::NoIntersectionElementAssignableToTarget {
                 intersection,
                 target,
             } => format!(
                 "no element of intersection `{}` is assignable to `{}`",
-                intersection.display(db),
-                target.display(db),
+                intersection.display(db, program),
+                target.display(db, program),
             ),
             Self::TypedDictFieldMissing { field_name, source } => {
                 format!(
@@ -251,8 +254,8 @@ impl<'db> ErrorContext<'db> {
                 "field \"{field_name}\" on {source} has type `{source_field}` which is not assignable to type `{target_field}` expected by {target}",
                 source = typed_dict_name(source),
                 target = typed_dict_name(target),
-                source_field = source_field.display(db),
-                target_field = target_field.display(db),
+                source_field = source_field.display(db, program),
+                target_field = target_field.display(db, program),
             ),
             Self::TypedDictNotAssignableToDict(typed_dict) => {
                 help_messages.insert(HelpMessages::TypedDictNotAssignableToDict);
@@ -265,8 +268,8 @@ impl<'db> ErrorContext<'db> {
             }
             Self::IncompatibleReturnTypes { source, target } => format!(
                 "incompatible return types: `{source}` is not assignable to `{target}`",
-                source = source.display(db),
-                target = target.display(db),
+                source = source.display(db, program),
+                target = target.display(db, program),
             ),
             Self::IncompatibleParameterTypes {
                 source,
@@ -276,14 +279,14 @@ impl<'db> ErrorContext<'db> {
                 // reversed order due to contravariance of parameter types
                 format!(
                     "{parameter} has an incompatible type: `{target}` is not assignable to `{source}`",
-                    source = source.display(db),
-                    target = target.display(db),
+                    source = source.display(db, program),
+                    target = target.display(db, program),
                 )
             }
             Self::InferredCallableType { source, callable } => format!(
                 "type `{}` has inferred callable type `{}`",
-                source.display(db),
-                callable.display(db),
+                source.display(db, program),
+                callable.display(db, program),
             ),
             Self::ExtraRequiredParameter { parameter } => match parameter {
                 ParameterDescription::Named(name) => format!("unexpected extra parameter `{name}`"),
@@ -332,41 +335,41 @@ impl<'db> ErrorContext<'db> {
                 };
                 format!(
                     "{which} is not compatible: `{source}` is not assignable to `{target}`",
-                    source = source.display(db),
-                    target = target.display(db)
+                    source = source.display(db, program),
+                    target = target.display(db, program)
                 )
             }
             Self::TypeNotCompatibleWithProtocol { ty, protocol } => {
                 if let Type::ProtocolInstance(_) = ty {
                     format!(
                         "protocol `{}` is not assignable to protocol `{}`",
-                        ty.display(db),
-                        protocol.display(db),
+                        ty.display(db, program),
+                        protocol.display(db, program),
                     )
                 } else {
                     format!(
                         "type `{}` is not assignable to protocol `{}`",
-                        ty.display(db),
-                        protocol.display(db),
+                        ty.display(db, program),
+                        protocol.display(db, program),
                     )
                 }
             }
             Self::ProtocolMemberNotDefined { member_name, ty } => format!(
                 "protocol member `{member_name}` is not defined on type `{}`",
-                ty.display(db),
+                ty.display(db, program),
             ),
             Self::ProtocolMemberIncompatible { member_name } => {
                 format!("protocol member `{member_name}` is incompatible")
             }
             Self::ProtocolMemberReadTypeIncompatible { source, target } => format!(
                 "read type `{source}` is not assignable to `{target}`",
-                source = source.display(db),
-                target = target.display(db),
+                source = source.display(db, program),
+                target = target.display(db, program),
             ),
             Self::ProtocolMemberNotWritable => "the member is not writable".to_string(),
             Self::ProtocolMemberWriteTypeIncompatible { target } => format!(
                 "the member does not accept writes of type `{}`",
-                target.display(db),
+                target.display(db, program),
             ),
         })
     }
@@ -419,12 +422,13 @@ impl<'db> ErrorContextNode<'db> {
     fn render_tree(
         &self,
         db: &'db dyn Db,
+        program: crate::Program,
         output_lines: &mut Vec<String>,
         help_messages: &mut FxOrderSet<HelpMessages>,
         prefix: &str,
         continuation: &str,
     ) {
-        if let Some(line) = self.context.render(db, help_messages) {
+        if let Some(line) = self.context.render(db, program, help_messages) {
             output_lines.push(format!("{prefix}{line}"));
         }
 
@@ -438,6 +442,7 @@ impl<'db> ErrorContextNode<'db> {
             };
             child.render_tree(
                 db,
+                program,
                 output_lines,
                 help_messages,
                 &child_prefix,
@@ -536,13 +541,14 @@ impl<'db> ErrorContextTree<'db> {
     pub(in crate::types) fn attach_to(
         &self,
         db: &'db dyn Db,
+        program: crate::Program,
         diag: &mut LintDiagnosticGuard<'_, '_>,
     ) {
         let mut output_lines = Vec::new();
         let mut help_messages = FxOrderSet::default();
         self.root
             .borrow()
-            .render_tree(db, &mut output_lines, &mut help_messages, "", "");
+            .render_tree(db, program, &mut output_lines, &mut help_messages, "", "");
         for line in output_lines {
             diag.info(line);
         }
