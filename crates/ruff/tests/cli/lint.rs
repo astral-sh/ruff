@@ -2182,6 +2182,54 @@ import a
 }
 
 #[test]
+fn add_noqa_existing_noqa() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+select = ["ANN001", "ANN201", "ARG001", "D103"]
+"#,
+    )?;
+
+    fixture.write_file(
+        "noqa.py",
+        r#"
+def unused(x):  # noqa: ANN001, ARG001, D103
+    pass
+"#,
+    )?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .args(["--config", "ruff.toml"])
+        .arg("noqa.py")
+        .args(["--add-noqa"])
+        .arg("-")
+        .pass_stdin(r#"
+
+"#), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 1 noqa directive.
+    ");
+
+    let test_code =
+        fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
+
+    insta::assert_snapshot!(test_code, @"
+
+    def unused(x):  # noqa: ANN001, ANN201, ARG001, D103
+        pass
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn add_noqa_existing_file_level_noqa() -> Result<()> {
     let fixture = CliTest::new()?;
     fixture.write_file(
@@ -2606,132 +2654,6 @@ fn add_ignore_requires_preview() -> Result<()> {
 
     let test_code = fixture.read_file("noqa.py")?;
     insta::assert_snapshot!(test_code, @"import os");
-
-    Ok(())
-}
-
-#[test]
-fn add_ignore_multiple_codes() -> Result<()> {
-    let fixture = CliTest::new()?;
-    fixture.write_file(
-        "noqa.py",
-        r#"
-        def unused(x):
-            pass
-        "#,
-    )?;
-
-    assert_cmd_snapshot!(
-        fixture
-            .check_command()
-            .arg("--select=ANN001,ANN201,ARG001,D103")
-            .arg("--preview")
-            .arg("--add-ignore"),
-        @"
-        success: true
-        exit_code: 0
-        ----- stdout -----
-
-        ----- stderr -----
-        Added 1 ignore comment.
-        ",
-    );
-
-    let test_code = fixture.read_file("noqa.py")?;
-
-    insta::assert_snapshot!(
-        test_code,
-        @"
-
-        def unused(x):  # ruff:ignore[missing-return-type-undocumented-public-function, missing-type-function-argument, undocumented-public-function]
-            pass
-        ",
-    );
-
-    Ok(())
-}
-
-#[test]
-fn add_ignore_multiline_diagnostic() -> Result<()> {
-    let fixture = CliTest::new()?;
-    fixture.write_file(
-        "noqa.py",
-        r#"
-        import z
-        import c
-        import a
-        "#,
-    )?;
-
-    assert_cmd_snapshot!(
-        fixture
-            .check_command()
-            .arg("--select=I")
-            .arg("--preview")
-            .arg("--add-ignore"),
-        @"
-        success: true
-        exit_code: 0
-        ----- stdout -----
-
-        ----- stderr -----
-        Added 1 ignore comment.
-        ",
-    );
-
-    let test_code = fixture.read_file("noqa.py")?;
-
-    insta::assert_snapshot!(
-        test_code,
-        @"
-
-        import z  # ruff:ignore[unsorted-imports]
-        import c
-        import a
-        ",
-    );
-
-    Ok(())
-}
-
-#[test]
-fn add_ignore_existing_own_line_ignore() -> Result<()> {
-    let fixture = CliTest::new()?;
-    fixture.write_file(
-        "noqa.py",
-        r#"
-        # ruff:ignore[ANN001]
-        def public(x):
-            pass
-        "#,
-    )?;
-
-    assert_cmd_snapshot!(
-        fixture
-            .check_command()
-            .arg("--select=ANN001,ANN201")
-            .arg("--preview")
-            .arg("--add-ignore"),
-        @"
-        success: true
-        exit_code: 0
-        ----- stdout -----
-
-        ----- stderr -----
-        Added 1 ignore comment.
-        ",
-    );
-
-    let test_code = fixture.read_file("noqa.py")?;
-    insta::assert_snapshot!(
-        test_code,
-        @"
-
-        # ruff:ignore[ANN001, missing-return-type-undocumented-public-function]
-        def public(x):
-            pass
-        ",
-    );
 
     Ok(())
 }

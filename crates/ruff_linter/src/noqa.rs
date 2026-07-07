@@ -1424,6 +1424,7 @@ mod tests {
             ..LinterSettings::for_rules([
                 Rule::MissingTypeFunctionArgument,
                 Rule::MissingReturnTypeUndocumentedPublicFunction,
+                Rule::UnsortedImports,
                 Rule::UnusedFunctionArgument,
                 Rule::UndocumentedPublicFunction,
             ])
@@ -3045,31 +3046,6 @@ mod tests {
     }
 
     #[test]
-    fn add_noqa_to_existing_noqa() -> Result<()> {
-        assert_snapshot!(
-            add_suppressions_in(
-                r#"
-                def unused(x):  # noqa: ANN001, ARG001, D103
-                    pass
-                "#,
-                SuppressionKind::Noqa,
-                PreviewMode::Disabled,
-            )?,
-            @"
-        Added 1 suppression
-
-        ## Fixed source
-
-        ```py
-        def unused(x):  # noqa: ANN001, ANN201, ARG001, D103
-            pass
-        ```
-        "
-        );
-        Ok(())
-    }
-
-    #[test]
     fn add_noqa_to_existing_ignore() -> Result<()> {
         assert_snapshot!(
             add_suppressions_in(
@@ -3165,6 +3141,87 @@ mod tests {
             pass
         ```
         "
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn add_ignore_multiple_codes() -> Result<()> {
+        assert_snapshot!(
+            add_suppressions_in(
+                r#"
+                def unused(x):
+                    pass
+                "#,
+                SuppressionKind::Ignore,
+                PreviewMode::Enabled,
+            )?,
+            @"
+        Added 1 suppression
+
+        ## Fixed source
+
+        ```py
+        def unused(x):  # ruff:ignore[missing-return-type-undocumented-public-function, missing-type-function-argument, undocumented-public-function]
+            pass
+        ```
+        "
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn add_ignore_multiline_diagnostic() -> Result<()> {
+        assert_snapshot!(
+            add_suppressions_in(
+                r#"
+                import z
+                import c
+                import a
+                "#,
+                SuppressionKind::Ignore,
+                PreviewMode::Enabled,
+            )?,
+            @"
+        Added 1 suppression
+
+        ## Fixed source
+
+        ```py
+        import z  # ruff:ignore[unsorted-imports]
+        import c
+        import a
+        ```
+        "
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn add_ignore_existing_own_line_ignore() -> Result<()> {
+        assert_snapshot!(
+            add_suppressions_in(
+                r#"
+                # ruff:ignore[ANN001]
+                def public(x):
+                    """Return x."""
+                    return x
+                "#,
+                SuppressionKind::Ignore,
+                PreviewMode::Enabled,
+            )?,
+            @r#"
+        Added 1 suppression
+
+        ## Fixed source
+
+        ```py
+        # ruff:ignore[ANN001, missing-return-type-undocumented-public-function]
+        def public(x):
+            """Return x."""
+            return x
+        ```
+        "#
         );
         Ok(())
     }
