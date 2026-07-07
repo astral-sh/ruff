@@ -960,8 +960,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             .begin_visit(db, (source, target, self.relation, self.typevar_evaluation))
         {
             CycleDetectorVisit::Ready(result) => result,
-            CycleDetectorVisit::Cycle((source, target, _, _)) => {
-                self.recursive_type_pair_fallback(db, source, target)
+            CycleDetectorVisit::Cycle { current, .. } => {
+                self.recursive_type_pair_fallback(db, current.0, current.1)
             }
             CycleDetectorVisit::Pending(item) => {
                 let result = work();
@@ -980,6 +980,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return self.never();
         }
 
+        // Mixed recursive cycles (for example, alias vs. protocol) keep the existing
+        // coinductive fallback. Alias pairs are rejected above instead of generating another
+        // recursive obligation.
         self.always()
     }
 
@@ -1974,31 +1977,35 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 })
             }
 
-            (Type::TypedDict(typed_dict), _) => self.with_recursion_guard(db, source, target, || {
-                let dict_value_type = if self.relation.is_assignability() {
-                    typed_dict.assignable_dict_value_type(db)
-                } else {
-                    typed_dict.dict_value_type(db)
-                };
-                let fallback = if let Some(value_ty) = dict_value_type {
-                    KnownClass::Dict
-                        .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), value_ty])
-                } else {
-                    KnownClass::Mapping.to_specialized_instance(
-                        db,
-                        &[KnownClass::Str.to_instance(db), typed_dict.value_type(db)],
-                    )
-                };
-                let result = self.check_type_pair(db, fallback, target);
-                if let Some(context) = self.report_context()
-                    && result.is_never_satisfied(db)
-                    && let Type::NominalInstance(instance) = target
-                    && instance.class(db).is_known(db, KnownClass::Dict)
-                {
-                    context.push(ErrorContext::TypedDictNotAssignableToDict(typed_dict));
-                }
-                result
-            }),
+            (Type::TypedDict(typed_dict), _) => {
+                self.with_recursion_guard(db, source, target, || {
+                    let dict_value_type = if self.relation.is_assignability() {
+                        typed_dict.assignable_dict_value_type(db)
+                    } else {
+                        typed_dict.dict_value_type(db)
+                    };
+                    let fallback = if let Some(value_ty) = dict_value_type {
+                        KnownClass::Dict.to_specialized_instance(
+                            db,
+                            &[KnownClass::Str.to_instance(db), value_ty],
+                        )
+                    } else {
+                        KnownClass::Mapping.to_specialized_instance(
+                            db,
+                            &[KnownClass::Str.to_instance(db), typed_dict.value_type(db)],
+                        )
+                    };
+                    let result = self.check_type_pair(db, fallback, target);
+                    if let Some(context) = self.report_context()
+                        && result.is_never_satisfied(db)
+                        && let Type::NominalInstance(instance) = target
+                        && instance.class(db).is_known(db, KnownClass::Dict)
+                    {
+                        context.push(ErrorContext::TypedDictNotAssignableToDict(typed_dict));
+                    }
+                    result
+                })
+            }
 
             // A non-`TypedDict` cannot subtype a `TypedDict`
             (_, Type::TypedDict(_)) => self.never(),
