@@ -59,7 +59,8 @@ use ruff_spo_triplet::{
 mod clang_walker;
 #[cfg(feature = "libclang")]
 pub use clang_walker::{
-    MAPPED_CURSOR_KINDS, WalkError, class_body_cursor_histogram, walk_free_functions, walk_tu,
+    MAPPED_CURSOR_KINDS, WalkError, class_body_cursor_histogram, walk_enums, walk_free_functions,
+    walk_tu,
 };
 
 /// The namespace prefix for C++ machine-plane subjects/objects.
@@ -135,6 +136,30 @@ pub struct CppFunction {
     pub calls: Vec<String>,
 }
 
+/// A C or C++ enum declaration, with fully-explicit variant values.
+///
+/// libclang exposes each `EnumConstantDecl` child with its resolved
+/// `i64` value (respecting explicit `= 5`, C-style auto-increment, and
+/// `enum class` scoped variants); we capture that value verbatim so the
+/// consumer never re-derives it from the source token.
+#[cfg(feature = "libclang")]
+#[derive(Debug, Clone, Default)]
+pub struct CppEnum {
+    /// Enclosing namespace, outermost first (empty at global scope, or the
+    /// enclosing struct's namespace for a class-body enum).
+    pub namespace: Vec<String>,
+    /// The enum name as written (`PermuterType`, `DawgType`). Empty for a
+    /// truly anonymous enum (skip those — nothing useful to harvest).
+    pub name: String,
+    /// True for `enum class Foo : Underlying { ... }` (scoped enums).
+    pub is_class: bool,
+    /// The underlying integer type name if declared (e.g. `int32_t`,
+    /// `uint8_t`), else empty.
+    pub underlying_type: String,
+    /// (`variant_name`, value) in source order.
+    pub variants: Vec<(String, i64)>,
+}
+
 /// One class-body declaration, discriminated by category.
 ///
 /// **Frontend-local IR** (mirrors `ruff_ruby_spo::Declaration`): the shared
@@ -160,6 +185,11 @@ pub enum Declaration {
     MacroUse(CppMacroUse),
     /// A `static_assert` in class scope.
     StaticAssert(CppStaticAssert),
+    /// A nested (class-body) enum declaration. Namespace-scope enums are
+    /// harvested separately via [`walk_enums`] (feature `libclang`), since
+    /// they are not part of any [`CppClass`].
+    #[cfg(feature = "libclang")]
+    Enum(CppEnum),
 }
 
 /// Top-level entry: walk a C++ corpus **tree** and produce the IR.
@@ -321,6 +351,15 @@ fn unpack_declaration(model: &mut Model, decl: &Declaration) {
         Declaration::Friend(fr) => model.friends.push(fr.clone()),
         Declaration::MacroUse(mu) => model.macro_uses.push(mu.clone()),
         Declaration::StaticAssert(sa) => model.static_asserts.push(sa.clone()),
+        // `ruff_spo_triplet::Model` has no `enums` sibling slot yet — extending
+        // the shared cross-frontend IR schema is a separate decision from this
+        // harvest addition (deliberately deferred, per the doc comment on
+        // `Declaration::Enum`). The enum facts stay available on
+        // `CppClass::declarations` for callers that inspect it directly (see
+        // `examples/harvest_tesseract_dict.rs`); they do not yet flow into
+        // `Model`/the SPO triples.
+        #[cfg(feature = "libclang")]
+        Declaration::Enum(_) => {}
     }
 }
 

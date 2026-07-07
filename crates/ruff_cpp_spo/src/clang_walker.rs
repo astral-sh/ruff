@@ -38,7 +38,7 @@ use ruff_spo_triplet::{
     CppAccess, CppBase, CppField, CppFriend, CppMethod, CppTemplate, CppTemplateKind,
 };
 
-use crate::{CppClass, CppFunction, Declaration};
+use crate::{CppClass, CppEnum, CppFunction, Declaration};
 
 /// A failure walking a translation unit.
 #[derive(Debug)]
@@ -164,6 +164,89 @@ fn collect_calls(node: &Entity, out: &mut Vec<String>) {
     }
 }
 
+/// Walk ONE translation unit and collect free-standing ENUM DECLARATIONS at
+/// namespace scope (`enum DawgType { ... }` / `enum class Foo : int8_t { ... }`
+/// directly inside a namespace or at global scope).
+///
+/// Nested class-body enums are NOT collected here — they are covered by the
+/// extended [`build_class`], which pushes them onto the owning
+/// [`CppClass::declarations`] as `Declaration::Enum` alongside its fields and
+/// methods. This split mirrors [`walk_tu`] vs the class-body arm of
+/// [`build_class`]: a free-standing enum has no owning class to attach to, so
+/// it needs its own top-level collection.
+///
+/// # Errors
+///
+/// [`WalkError::Libclang`] if libclang fails to initialise (non-recoverable);
+/// [`WalkError::Parse`] if the TU fails to parse.
+#[cfg(feature = "libclang")]
+pub fn walk_enums(path: &Path, args: &[String]) -> Result<Vec<CppEnum>, WalkError> {
+    let clang = Clang::new().map_err(WalkError::Libclang)?;
+    let index = Index::new(&clang, false, false);
+    let tu = index
+        .parser(path)
+        .arguments(args)
+        .skip_function_bodies(true)
+        .parse()
+        .map_err(|e| WalkError::Parse(e.to_string()))?;
+
+    let mut out = Vec::new();
+    collect_enums(&tu.get_entity(), &mut out);
+    Ok(out)
+}
+
+/// Recurse the AST (namespaces only — class-body enums are handled by
+/// [`build_class`]), emitting a [`CppEnum`] for every enum DEFINITION found
+/// directly in a namespace or at global scope.
+#[cfg(feature = "libclang")]
+fn collect_enums(entity: &Entity, out: &mut Vec<CppEnum>) {
+    for child in entity.get_children() {
+        match child.get_kind() {
+            EntityKind::EnumDecl => {
+                if child.is_definition()
+                    && !in_system_header(&child)
+                    && let Some(e) = build_enum(&child)
+                {
+                    out.push(e);
+                }
+            }
+            EntityKind::Namespace => collect_enums(&child, out),
+            _ => {}
+        }
+    }
+}
+
+/// Build a [`CppEnum`] from an enum DEFINITION cursor: namespace, name
+/// (`None`/empty for a truly anonymous enum — skipped, nothing to key it by),
+/// scoped-ness (`enum class`), the declared underlying integer type if any,
+/// and every `EnumConstantDecl` child with its resolved signed value.
+#[cfg(feature = "libclang")]
+fn build_enum(e: &Entity) -> Option<CppEnum> {
+    let name = e.get_name().filter(|n| !n.is_empty())?;
+    let namespace = enclosing_scopes(e);
+    let is_class = e.is_scoped();
+    let underlying_type = e
+        .get_enum_underlying_type()
+        .map(|t| t.get_display_name())
+        .unwrap_or_default();
+    let mut variants = Vec::new();
+    for c in e.get_children() {
+        if c.get_kind() == EntityKind::EnumConstantDecl
+            && let Some(vname) = c.get_name()
+            && let Some((signed, _unsigned)) = c.get_enum_constant_value()
+        {
+            variants.push((vname, signed));
+        }
+    }
+    Some(CppEnum {
+        namespace,
+        name,
+        is_class,
+        underlying_type,
+        variants,
+    })
+}
+
 /// Coverage instrumentation for `CPP-SCHEMA-FIT`: tally the libclang
 /// `EntityKind` of every DIRECT class-body child cursor across all
 /// (non-system-header) class/struct definitions in the TU.
@@ -200,8 +283,9 @@ pub fn class_body_cursor_histogram(
 /// function-like kinds (`Method` / `Constructor` / `Destructor` /
 /// `ConversionFunction` / `FunctionTemplate`) become a `has_function`;
 /// `FieldDecl` + `VarDecl` (static members) become `has_field`; `FriendDecl`
-/// becomes `is_friend_of`; `BaseSpecifier` becomes `inherits_from`.
-pub const MAPPED_CURSOR_KINDS: [&str; 9] = [
+/// becomes `is_friend_of`; `BaseSpecifier` becomes `inherits_from`; `EnumDecl`
+/// (a nested class-body enum) becomes a `Declaration::Enum`.
+pub const MAPPED_CURSOR_KINDS: [&str; 10] = [
     "BaseSpecifier",
     "FieldDecl",
     "VarDecl",
@@ -211,6 +295,7 @@ pub const MAPPED_CURSOR_KINDS: [&str; 9] = [
     "ConversionFunction",
     "FunctionTemplate",
     "FriendDecl",
+    "EnumDecl",
 ];
 
 /// Mirror of [`collect_classes`] that tallies direct class-body child kinds
@@ -341,6 +426,15 @@ fn build_class(e: &Entity) -> Option<CppClass> {
             EntityKind::FriendDecl => {
                 if let Some(friend) = build_friend(&m) {
                     declarations.push(Declaration::Friend(friend));
+                }
+            }
+            // A nested (class-body) enum — e.g. Tesseract's `enum PermuterType`
+            // members declared inside a class. Namespace-scope enums are
+            // harvested separately via `walk_enums`, since they have no
+            // owning `CppClass` to attach to.
+            EntityKind::EnumDecl => {
+                if let Some(en) = build_enum(&m) {
+                    declarations.push(Declaration::Enum(en));
                 }
             }
             _ => {}
