@@ -357,16 +357,13 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         )?;
         if modifications > 0 && config_arguments.log_level >= LogLevel::Default {
             let s = if modifications == 1 { "" } else { "s" };
+            let suppression = match suppression_kind {
+                SuppressionKind::Noqa => "noqa directive",
+                SuppressionKind::Ignore => "ignore comment",
+            };
             #[expect(clippy::print_stderr)]
             {
-                match suppression_kind {
-                    SuppressionKind::Noqa => {
-                        eprintln!("Added {modifications} noqa directive{s}.");
-                    }
-                    SuppressionKind::Ignore => {
-                        eprintln!("Added {modifications} ignore comment{s}.");
-                    }
-                }
+                eprintln!("Added {modifications} {suppression}{s}.");
             }
         }
         return Ok(ExitStatus::Success);
