@@ -64,10 +64,11 @@ use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
-    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType,
-    TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    InternedConstraintSet, IntersectionBuilder, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
+    SpecialFormType, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
+    list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -207,9 +208,18 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
                 PlaceholderPossibility::Possible
             }
         };
+        let without_placeholder = |ty: Type<'db>| {
+            placeholder_ty.map_or(ty, |placeholder_ty| {
+                IntersectionBuilder::new(db)
+                    .add_positive(ty)
+                    .add_negative(placeholder_ty)
+                    .build()
+            })
+        };
 
         let mut arguments = call_arguments.start_from(1);
         let mut placeholder_arguments = vec![false; arguments.len()];
+        let mut replacement_argument_types = vec![None; arguments.len()];
         let mut unpacked_placeholder_arguments = vec![false; arguments.len()];
         let mut can_validate = true;
         let mut can_synthesize_signature = true;
@@ -228,7 +238,8 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
                             placeholder_arguments[argument_index] = true;
                         }
                         PlaceholderPossibility::Possible => {
-                            placeholder_arguments[argument_index] = true;
+                            replacement_argument_types[argument_index] =
+                                Some(without_placeholder(argument_ty));
                             can_synthesize_signature = false;
                         }
                     }
@@ -259,7 +270,8 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
                 Argument::Keyword(_) => match classify(argument_ty) {
                     PlaceholderPossibility::No => {}
                     PlaceholderPossibility::Possible => {
-                        placeholder_arguments[argument_index] = true;
+                        replacement_argument_types[argument_index] =
+                            Some(without_placeholder(argument_ty));
                         can_synthesize_signature = false;
                     }
                     PlaceholderPossibility::Exactly => {
@@ -334,11 +346,13 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
             return Ok(None);
         }
 
-        for (argument_index, is_placeholder) in placeholder_arguments.iter().copied().enumerate() {
-            if is_placeholder {
+        for argument_index in 0..arguments.len() {
+            if placeholder_arguments[argument_index] {
                 // Let ordinary call binding consume the argument without constraining inference.
                 // The bitmap above restores the consumed parameter as a placeholder afterward.
                 arguments.replace_type(argument_index, Type::Never);
+            } else if let Some(replacement_ty) = replacement_argument_types[argument_index] {
+                arguments.replace_type(argument_index, replacement_ty);
             }
         }
 

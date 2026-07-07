@@ -1050,6 +1050,12 @@ partial(consume, maybe_placeholder, "bad")  # error: [invalid-argument-type]
 maybe_placeholder_tuple = (maybe_placeholder,)
 partial(consume, *maybe_placeholder_tuple, "bad")  # error: [invalid-argument-type]
 
+def expects_int(value: int, sentinel: int) -> None:
+    pass
+
+def bind_object(value: object) -> None:
+    partial(expects_int, value, 1)  # error: [invalid-argument-type]
+
 def three_integers(first: int, second: int, third: int) -> None:
     pass
 
