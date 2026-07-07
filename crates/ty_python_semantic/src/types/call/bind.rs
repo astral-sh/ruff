@@ -34,6 +34,7 @@ use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, PathBound, PathBounds, Solutions,
 };
+use crate::types::dedicated::pydantic::StrictMode;
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_DATACLASS,
     MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
@@ -1714,6 +1715,10 @@ impl<'db> Bindings<'db> {
                         let kw_only = get_argument_type("kw_only", true);
                         let alias = get_argument_type("alias", true);
                         let converter = get_argument_type("converter", true);
+                        let strict = get_argument_type("strict", false)
+                            .map_or(StrictMode::Unspecified, |strict| {
+                                StrictMode::from_field_type(db, strict)
+                            });
 
                         // `dataclasses.field` and field-specifier functions of commonly used
                         // libraries like `pydantic`, `attrs`, and `SQLAlchemy` all return
@@ -1844,7 +1849,9 @@ impl<'db> Bindings<'db> {
                         // are assignable to `T` if the default type of the field is assignable
                         // to `T`. Otherwise, we would error on `name: str = field(default="")`.
                         overload.set_return_type(Type::KnownInstance(KnownInstanceType::Field(
-                            FieldInstance::new(db, default_ty, init, kw_only, alias, converter),
+                            FieldInstance::new(
+                                db, default_ty, init, kw_only, alias, converter, strict,
+                            ),
                         )));
                     }
 

@@ -307,6 +307,10 @@ pub enum KnownModule {
     Os,
     Tempfile,
     Pathlib,
+    Datetime,
+    Decimal,
+    Ipaddress,
+    Re,
     Abc,
     Dataclasses,
     Functools,
@@ -323,6 +327,8 @@ pub enum KnownModule {
     TyExtensions,
     #[strum(serialize = "ty_extensions._internal")]
     TyExtensionsInternal,
+    #[strum(serialize = "ty_extensions.pydantic")]
+    TyExtensionsPydantic,
     #[strum(serialize = "importlib")]
     ImportLib,
     #[strum(serialize = "unittest.mock")]
@@ -339,6 +345,8 @@ pub enum KnownModule {
     PydanticMain,
     #[strum(serialize = "pydantic.root_model")]
     PydanticRootModel,
+    #[strum(serialize = "pydantic.types")]
+    PydanticTypes,
 }
 
 impl KnownModule {
@@ -354,6 +362,10 @@ impl KnownModule {
             Self::Os => "os",
             Self::Tempfile => "tempfile",
             Self::Pathlib => "pathlib",
+            Self::Datetime => "datetime",
+            Self::Decimal => "decimal",
+            Self::Ipaddress => "ipaddress",
+            Self::Re => "re",
             Self::Abc => "abc",
             Self::Dataclasses => "dataclasses",
             Self::Functools => "functools",
@@ -364,6 +376,7 @@ impl KnownModule {
             Self::TypeCheckerInternals => "_typeshed._type_checker_internals",
             Self::TyExtensions => "ty_extensions",
             Self::TyExtensionsInternal => "ty_extensions._internal",
+            Self::TyExtensionsPydantic => "ty_extensions.pydantic",
             Self::ImportLib => "importlib",
             Self::Warnings => "warnings",
             Self::UnittestMock => "unittest.mock",
@@ -374,6 +387,7 @@ impl KnownModule {
             Self::PydanticConfig => "pydantic.config",
             Self::PydanticMain => "pydantic.main",
             Self::PydanticRootModel => "pydantic.root_model",
+            Self::PydanticTypes => "pydantic.types",
         }
     }
 
@@ -397,7 +411,10 @@ impl KnownModule {
     /// Return `true` if this module is provided by a supported third-party package.
     pub const fn is_third_party(self) -> bool {
         match self {
-            Self::PydanticConfig | Self::PydanticMain | Self::PydanticRootModel => true,
+            Self::PydanticConfig
+            | Self::PydanticMain
+            | Self::PydanticRootModel
+            | Self::PydanticTypes => true,
             Self::Builtins
             | Self::Enum
             | Self::Types
@@ -408,6 +425,10 @@ impl KnownModule {
             | Self::Os
             | Self::Tempfile
             | Self::Pathlib
+            | Self::Datetime
+            | Self::Decimal
+            | Self::Ipaddress
+            | Self::Re
             | Self::Abc
             | Self::Dataclasses
             | Self::Functools
@@ -419,6 +440,7 @@ impl KnownModule {
             | Self::TypeCheckerInternals
             | Self::TyExtensions
             | Self::TyExtensionsInternal
+            | Self::TyExtensionsPydantic
             | Self::ImportLib
             | Self::UnittestMock
             | Self::Uuid

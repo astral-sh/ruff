@@ -2419,6 +2419,8 @@ pub(crate) enum FieldKind<'db> {
         /// The first element is the input type (first positional parameter), the second is the
         /// output type (return type of the converter callable).
         converter: Option<(Type<'db>, Type<'db>)>,
+        /// The mode selected by Pydantic's `strict` argument.
+        strict: pydantic::StrictMode,
     },
     /// `TypedDict` field metadata
     TypedDict {
