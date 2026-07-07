@@ -23,7 +23,7 @@ pub fn selection_range(db: &dyn Db, file: File, offset: TextSize) -> Vec<TextRan
                 ranges.push(range);
             }
             // Appends additional range if node content is encased by quotes
-            if let Some(literal_range) = literal_content_range(node) {
+            if let Some(literal_range) = literal_content_range(node, offset) {
                 ranges.push(literal_range);
             }
         }
@@ -48,14 +48,14 @@ fn should_include_in_selection(node: ruff_python_ast::AnyNodeRef) -> bool {
 }
 
 /// Determines the content range of a string or byte literal if it's non-empty.
-fn literal_content_range(node: ruff_python_ast::AnyNodeRef) -> Option<TextRange> {
+fn literal_content_range(node: ruff_python_ast::AnyNodeRef, offset: TextSize) -> Option<TextRange> {
     use ruff_python_ast::AnyNodeRef;
     let range = match node {
         AnyNodeRef::StringLiteral(s) => Some(s.content_range()),
         AnyNodeRef::BytesLiteral(b) => Some(b.content_range()),
         _ => None,
     };
-    range.filter(|&range| range.len() > 0.into())
+    range.filter(|&range| !range.is_empty() && range.contains_inclusive(offset))
 }
 
 #[cfg(test)]
