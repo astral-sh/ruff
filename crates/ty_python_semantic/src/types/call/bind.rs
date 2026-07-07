@@ -22,12 +22,13 @@ use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec, smallvec_inline};
+use ty_module_resolver::KnownModule;
 
 use self::constructor::{ConstructorBinding, ConstructorContext};
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
-use crate::place::{DefinedPlace, Definedness, Place};
+use crate::place::{DefinedPlace, Definedness, Place, known_module_symbol};
 use crate::subscript::PyIndex;
 use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
 use crate::types::callable::CallableTypeKind;
@@ -171,6 +172,181 @@ fn generic_context_has_paramspec<'db>(
         .any(|typevar| typevar.is_paramspec(db))
 }
 
+/// Partial-specific view of the arguments bound by a `functools.partial(...)` call.
+struct FunctoolsPartialApplicationPlan<'a, 'db> {
+    arguments: CallArguments<'a, 'db>,
+    placeholder_arguments: Box<[bool]>,
+    can_synthesize_signature: bool,
+}
+
+impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
+    fn from_call_arguments(
+        db: &'db dyn Db,
+        call_arguments: &CallArguments<'a, 'db>,
+    ) -> Result<Option<Self>, InvalidPartialPlaceholder> {
+        #[derive(Clone, Copy, PartialEq, Eq)]
+        enum PlaceholderPossibility {
+            No,
+            Possible,
+            Exactly,
+        }
+
+        let placeholder_ty = known_module_symbol(db, KnownModule::Functools, "Placeholder")
+            .place
+            .ignore_possibly_undefined();
+        let classify = |ty: Type<'db>| {
+            let Some(placeholder_ty) = placeholder_ty else {
+                return PlaceholderPossibility::No;
+            };
+            if ty == placeholder_ty {
+                PlaceholderPossibility::Exactly
+            } else if ty.is_disjoint_from(db, placeholder_ty) {
+                PlaceholderPossibility::No
+            } else {
+                PlaceholderPossibility::Possible
+            }
+        };
+
+        let mut arguments = call_arguments.start_from(1);
+        let mut placeholder_arguments = vec![false; arguments.len()];
+        let mut can_bind = true;
+        let mut can_synthesize_signature = true;
+        let mut last_positional = None;
+        let mut invalid_keyword = None;
+
+        for (argument_index, (argument, argument_types)) in arguments.iter().enumerate() {
+            let argument_ty = argument_types.get_default().unwrap_or_else(Type::unknown);
+            match argument {
+                Argument::Positional => {
+                    let possibility = classify(argument_ty);
+                    last_positional = Some((argument_index, possibility));
+                    match possibility {
+                        PlaceholderPossibility::No => {}
+                        PlaceholderPossibility::Exactly => {
+                            placeholder_arguments[argument_index] = true;
+                        }
+                        PlaceholderPossibility::Possible => can_bind = false,
+                    }
+                }
+                Argument::Variadic => {
+                    let tuple_spec = argument_ty
+                        .as_nominal_instance()
+                        .and_then(|nominal| nominal.tuple_spec(db));
+                    let Some(fixed) = tuple_spec
+                        .as_deref()
+                        .and_then(|spec| spec.as_fixed_length())
+                    else {
+                        can_bind = false;
+                        last_positional = Some((argument_index, PlaceholderPossibility::Possible));
+                        continue;
+                    };
+                    for element_ty in fixed.iter_all_elements() {
+                        let possibility = classify(element_ty);
+                        last_positional = Some((argument_index, possibility));
+                        if possibility != PlaceholderPossibility::No {
+                            // Precisely rewriting holes inside an unpacked tuple would require a
+                            // per-element plan rather than the source-argument plan used here.
+                            can_bind = false;
+                        }
+                    }
+                }
+                Argument::Keyword(_) => match classify(argument_ty) {
+                    PlaceholderPossibility::No => {}
+                    PlaceholderPossibility::Possible => can_bind = false,
+                    PlaceholderPossibility::Exactly => {
+                        invalid_keyword.get_or_insert(argument_index);
+                    }
+                },
+                Argument::Keywords => {
+                    can_synthesize_signature = false;
+                    if let Some(unpacked) =
+                        extract_unpacked_typed_dict_from_value_type(db, argument_ty)
+                    {
+                        for unpacked_key in unpacked.keys.values() {
+                            match classify(unpacked_key.value_ty) {
+                                PlaceholderPossibility::No => {}
+                                PlaceholderPossibility::Possible => can_bind = false,
+                                PlaceholderPossibility::Exactly if unpacked_key.is_required => {
+                                    invalid_keyword.get_or_insert(argument_index);
+                                }
+                                PlaceholderPossibility::Exactly => can_bind = false,
+                            }
+                        }
+                    } else if let Some((_, value_ty)) = argument_ty.unpack_keys_and_items(db) {
+                        match classify(value_ty) {
+                            PlaceholderPossibility::No => can_bind = false,
+                            PlaceholderPossibility::Possible => can_bind = false,
+                            PlaceholderPossibility::Exactly
+                                if arguments.is_definitely_nonempty(argument_index) =>
+                            {
+                                invalid_keyword.get_or_insert(argument_index);
+                            }
+                            PlaceholderPossibility::Exactly => can_bind = false,
+                        }
+                    } else {
+                        can_bind = false;
+                    }
+                }
+                Argument::Synthetic => {}
+            }
+        }
+
+        if let Some((argument_index, PlaceholderPossibility::Exactly)) = last_positional {
+            return Err(InvalidPartialPlaceholder {
+                argument_index,
+                reason: InvalidPartialPlaceholderReason::Trailing,
+            });
+        }
+        if let Some(argument_index) = invalid_keyword {
+            return Err(InvalidPartialPlaceholder {
+                argument_index,
+                reason: InvalidPartialPlaceholderReason::Keyword,
+            });
+        }
+        if !can_bind {
+            return Ok(None);
+        }
+
+        for (argument_index, is_placeholder) in placeholder_arguments.iter().copied().enumerate() {
+            if is_placeholder {
+                // Let ordinary call binding consume the argument without constraining inference.
+                // The bitmap above restores the consumed parameter as a placeholder afterward.
+                arguments.replace_type(argument_index, Type::Never);
+            }
+        }
+
+        Ok(Some(Self {
+            arguments,
+            placeholder_arguments: placeholder_arguments.into_boxed_slice(),
+            can_synthesize_signature,
+        }))
+    }
+
+    fn has_placeholders(&self) -> bool {
+        self.placeholder_arguments
+            .iter()
+            .any(|is_placeholder| *is_placeholder)
+    }
+
+    fn is_placeholder_argument(&self, argument_index: usize, bound_argument_offset: usize) -> bool {
+        argument_index
+            .checked_sub(bound_argument_offset)
+            .is_some_and(|index| self.placeholder_arguments[index])
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct InvalidPartialPlaceholder {
+    argument_index: usize,
+    reason: InvalidPartialPlaceholderReason,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum InvalidPartialPlaceholderReason {
+    Keyword,
+    Trailing,
+}
+
 /// A single callable item within the union/intersection structure.
 /// Either a regular callable, or a constructor callable.
 #[derive(Debug, Clone)]
@@ -294,16 +470,12 @@ impl<'db> CallableItem<'db> {
         &self,
         db: &'db dyn Db,
         partial_overload: &mut Binding<'db>,
-        bound_call_arguments: &CallArguments<'a, 'db>,
+        application: &FunctoolsPartialApplicationPlan<'a, 'db>,
     ) -> Option<CallableType<'db>> {
         match self {
             CallableItem::Regular(binding) => CallableType::partially_apply(
                 db,
-                binding.partial_signature_applications(
-                    db,
-                    partial_overload,
-                    bound_call_arguments,
-                )?,
+                binding.partial_signature_applications(db, partial_overload, application)?,
             ),
             CallableItem::Constructor(_) => None,
         }
@@ -862,17 +1034,14 @@ impl<'db> Bindings<'db> {
     pub(crate) fn functools_partial_matched_bindings<'a>(
         db: &'db dyn Db,
         wrapped_callable_ty: Type<'db>,
-        call_arguments: &CallArguments<'a, 'db>,
-    ) -> Option<(CallArguments<'a, 'db>, Bindings<'db>, bool)> {
+        bound_call_arguments: &CallArguments<'a, 'db>,
+    ) -> Option<Bindings<'db>> {
         // We can only infer bound-argument context from an actual callable.
         wrapped_callable_ty.try_upcast_to_callable(db)?;
 
-        let (bound_call_arguments, can_synthesize_signature) =
-            call_arguments.functools_partial_bound_arguments(db)?;
-
         let mut partial_bindings = wrapped_callable_ty
             .bindings(db)
-            .match_parameters(db, &bound_call_arguments);
+            .match_parameters(db, bound_call_arguments);
         for binding in partial_bindings.iter_flat_mut() {
             binding.clear_missing_argument_errors_for_partial_application();
         }
@@ -881,11 +1050,7 @@ impl<'db> Bindings<'db> {
                 downstream.clear_deferred_constructor_errors_for_partial_application();
             }
         }
-        Some((
-            bound_call_arguments,
-            partial_bindings,
-            can_synthesize_signature,
-        ))
+        Some(partial_bindings)
     }
 
     /// Synthesizes the precise `functools.partial(...)` type for the already-matched bindings.
@@ -898,12 +1063,12 @@ impl<'db> Bindings<'db> {
         db: &'db dyn Db,
         wrapped_callable_ty: Type<'db>,
         partial_overload: &mut Binding<'db>,
-        bound_call_arguments: &CallArguments<'a, 'db>,
+        application: &FunctoolsPartialApplicationPlan<'a, 'db>,
     ) -> Type<'db> {
         if wrapped_callable_ty.is_union() || wrapped_callable_ty.is_intersection() {
             return self.map_item_types(db, |partial_item| {
                 partial_item
-                    .functools_partial_callable(db, partial_overload, bound_call_arguments)
+                    .functools_partial_callable(db, partial_overload, application)
                     .map(|callable| {
                         callable.into_precise_functools_partial_instance(db, wrapped_callable_ty)
                     })
@@ -913,7 +1078,7 @@ impl<'db> Bindings<'db> {
         let partial_callables: SmallVec<[CallableType<'db>; 1]> = self
             .iter_callable_items()
             .filter_map(|partial_item| {
-                partial_item.functools_partial_callable(db, partial_overload, bound_call_arguments)
+                partial_item.functools_partial_callable(db, partial_overload, application)
             })
             .collect();
 
@@ -3071,7 +3236,7 @@ impl<'db> CallableBinding<'db> {
         &self,
         db: &'db dyn Db,
         partial_overload: &mut Binding<'db>,
-        bound_call_arguments: &CallArguments<'a, 'db>,
+        application: &FunctoolsPartialApplicationPlan<'a, 'db>,
     ) -> Option<SmallVec<[PartialSignatureApplication<'db>; 1]>> {
         if self.overloads().is_empty() {
             return None;
@@ -3104,13 +3269,28 @@ impl<'db> CallableBinding<'db> {
             }
         };
 
-        let signature_arguments = bound_call_arguments.with_self(self.bound_type);
+        let signature_arguments = application.arguments.with_self(self.bound_type);
+        let bound_argument_offset = usize::from(self.bound_type.is_some());
         let applications: SmallVec<_> = selected_overload_indexes
             .into_iter()
             .filter_map(|index| {
-                self.overloads().get(index).map(|overload| {
-                    overload.partial_signature_application(signature_arguments.as_ref(), db)
-                })
+                let overload = self.overloads().get(index)?;
+                if application.has_placeholders()
+                    && overload
+                        .signature
+                        .generic_context
+                        .is_some_and(|generic_context| {
+                            generic_context_has_paramspec(db, generic_context)
+                        })
+                {
+                    return None;
+                }
+                Some(overload.partial_signature_application(
+                    signature_arguments.as_ref(),
+                    application,
+                    bound_argument_offset,
+                    db,
+                ))
             })
             .collect();
         (!applications.is_empty()).then_some(applications)
@@ -6335,15 +6515,29 @@ impl<'db> Binding<'db> {
         let failed_synthesis_return_type =
             KnownClass::FunctoolsPartial.to_specialized_instance(db, &[Type::unknown()]);
 
-        let (bound_call_arguments, partial_bindings, can_synthesize_signature) =
-            Bindings::functools_partial_matched_bindings(db, func_ty, call_arguments)?;
+        let application =
+            match FunctoolsPartialApplicationPlan::from_call_arguments(db, call_arguments) {
+                Ok(Some(application)) => application,
+                Ok(None) => return Some(imprecise_return_type),
+                Err(error) => {
+                    self.errors.push(BindingError::InvalidPartialPlaceholder {
+                        // Account for the wrapped callable, which precedes the bound arguments in
+                        // the outer `partial(...)` call.
+                        argument_index: Some(error.argument_index + 1),
+                        reason: error.reason,
+                    });
+                    return Some(imprecise_return_type);
+                }
+            };
+        let partial_bindings =
+            Bindings::functools_partial_matched_bindings(db, func_ty, &application.arguments)?;
 
         // Reuse call-binding machinery to resolve which wrapped overloads are compatible with
         // bound arguments and to surface binding diagnostics.
         let partial_bindings = match partial_bindings.check_types(
             db,
             &ConstraintSetBuilder::new(),
-            &bound_call_arguments,
+            &application.arguments,
             TypeContext::default(),
             &[],
         ) {
@@ -6351,9 +6545,9 @@ impl<'db> Binding<'db> {
             Err(CallError(_, bindings)) => *bindings,
         };
         let new_return_type =
-            partial_bindings.functools_partial_type(db, func_ty, self, &bound_call_arguments);
+            partial_bindings.functools_partial_type(db, func_ty, self, &application);
 
-        Some(if !can_synthesize_signature {
+        Some(if !application.can_synthesize_signature {
             imprecise_return_type
         } else if new_return_type.is_never() {
             failed_synthesis_return_type
@@ -6384,18 +6578,34 @@ impl<'db> Binding<'db> {
     }
 
     /// Collects the parameter-level effects of a `functools.partial(...)` application.
-    fn partial_application(&self, arguments: &CallArguments<'_, 'db>) -> PartialApplication<'db> {
+    fn partial_application(
+        &self,
+        arguments: &CallArguments<'_, 'db>,
+        application: &FunctoolsPartialApplicationPlan<'_, 'db>,
+        bound_argument_offset: usize,
+    ) -> PartialApplication<'db> {
         let parameters = self.signature.parameters().as_slice();
         let mut partial_application = PartialApplication::new(parameters.len());
 
-        for ((argument, argument_ty), argument_matches) in
-            arguments.iter().zip(&self.argument_matches)
+        for (argument_index, ((argument, argument_ty), argument_matches)) in
+            arguments.iter().zip(&self.argument_matches).enumerate()
         {
             match argument {
                 Argument::Positional | Argument::Synthetic | Argument::Variadic => {
                     for matched_parameter in argument_matches.iter() {
                         let parameter_index = matched_parameter.index;
                         let parameter = &parameters[parameter_index];
+                        let is_placeholder = application
+                            .is_placeholder_argument(argument_index, bound_argument_offset);
+                        if is_placeholder {
+                            if parameter.is_variadic() {
+                                partial_application.add_variadic_placeholder();
+                            } else {
+                                partial_application.add_positional_placeholder(parameter_index);
+                            }
+                            continue;
+                        }
+
                         if parameter.is_positional()
                             && parameter.annotated_type() != Type::Never
                             && !parameter.is_variadic()
@@ -6440,11 +6650,13 @@ impl<'db> Binding<'db> {
     fn partial_signature_application(
         &self,
         arguments: &CallArguments<'_, 'db>,
+        application: &FunctoolsPartialApplicationPlan<'_, 'db>,
+        bound_argument_offset: usize,
         db: &'db dyn Db,
     ) -> PartialSignatureApplication<'db> {
         PartialSignatureApplication::new(
             self.signature.clone(),
-            self.partial_application(arguments),
+            self.partial_application(arguments, application, bound_argument_offset),
             self.inference,
             self.unspecialized_return_type(db),
         )
@@ -6870,6 +7082,11 @@ pub(crate) enum BindingError<'db> {
         provided_ty: Type<'db>,
         provenance: InvalidArgumentTypeProvenance,
     },
+    /// `functools.Placeholder` was used in a position rejected by `functools.partial(...)`.
+    InvalidPartialPlaceholder {
+        argument_index: Option<usize>,
+        reason: InvalidPartialPlaceholderReason,
+    },
     /// The type of the keyword-variadic argument's key is not `str`.
     InvalidKeyType {
         argument_index: Option<usize>,
@@ -6945,6 +7162,7 @@ impl BindingError<'_> {
         matches!(
             self,
             Self::InvalidArgumentType { .. }
+                | Self::InvalidPartialPlaceholder { .. }
                 | Self::InvalidKeyType { .. }
                 | Self::UnknownArgument { .. }
                 | Self::UnknownKeywordVariadicArgument { .. }
@@ -6994,6 +7212,7 @@ impl BindingError<'_> {
         };
         match self {
             BindingError::InvalidArgumentType { argument_index, .. }
+            | BindingError::InvalidPartialPlaceholder { argument_index, .. }
             | BindingError::InvalidKeyType { argument_index, .. }
             | BindingError::UnknownArgument { argument_index, .. }
             | BindingError::UnknownKeywordVariadicArgument { argument_index }
@@ -7075,6 +7294,7 @@ impl<'db> BindingError<'db> {
             // Semantic errors: the overload matched, but the usage is invalid
             Self::InvalidDataclassApplication(_)
             | Self::InvalidDataclassArgument(_)
+            | Self::InvalidPartialPlaceholder { .. }
             | Self::PropertyHasNoSetter(_)
             | Self::PropertyHasNoDeleter(_)
             | Self::CalledTopCallable(_)
@@ -7256,6 +7476,23 @@ impl<'db> BindingError<'db> {
                 }
 
                 add_invariant_generic_hints(context.db(), &mut diag, *expected_ty, *provided_ty);
+            }
+
+            Self::InvalidPartialPlaceholder {
+                argument_index,
+                reason,
+            } => {
+                let range = Self::get_node(node, *argument_index);
+                if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) {
+                    builder.into_diagnostic(match reason {
+                        InvalidPartialPlaceholderReason::Keyword => {
+                            "`functools.Placeholder` cannot be passed by keyword to `functools.partial`"
+                        }
+                        InvalidPartialPlaceholderReason::Trailing => {
+                            "Trailing `functools.Placeholder` arguments are not allowed"
+                        }
+                    });
+                }
             }
 
             Self::InvalidKeyType {

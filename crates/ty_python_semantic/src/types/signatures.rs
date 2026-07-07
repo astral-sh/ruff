@@ -563,8 +563,10 @@ pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
 #[derive(Clone, Debug)]
 pub(crate) struct PartialApplication<'db> {
     positionally_bound: Box<[bool]>,
+    positional_placeholders: Box<[bool]>,
     keyword_defaults: Box<[Option<Type<'db>>]>,
     keyword_bound: Box<[bool]>,
+    variadic_placeholders: usize,
 }
 
 impl<'db> PartialApplication<'db> {
@@ -573,14 +575,26 @@ impl<'db> PartialApplication<'db> {
     pub(crate) fn new(parameter_count: usize) -> Self {
         Self {
             positionally_bound: vec![false; parameter_count].into_boxed_slice(),
+            positional_placeholders: vec![false; parameter_count].into_boxed_slice(),
             keyword_defaults: vec![None; parameter_count].into_boxed_slice(),
             keyword_bound: vec![false; parameter_count].into_boxed_slice(),
+            variadic_placeholders: 0,
         }
     }
 
     /// Marks the parameter at `parameter_index` as consumed by a positional binding.
     pub(crate) fn bind_positionally(&mut self, parameter_index: usize) {
         self.positionally_bound[parameter_index] = true;
+    }
+
+    /// Marks a fixed parameter as a required placeholder in the reduced signature.
+    pub(crate) fn add_positional_placeholder(&mut self, parameter_index: usize) {
+        self.positional_placeholders[parameter_index] = true;
+    }
+
+    /// Records a placeholder that must be filled before additional variadic arguments.
+    pub(crate) fn add_variadic_placeholder(&mut self) {
+        self.variadic_placeholders += 1;
     }
 
     /// Marks the parameter at `parameter_index` as bound by keyword and records the synthesized
@@ -600,12 +614,20 @@ impl<'db> PartialApplication<'db> {
         self.positionally_bound[parameter_index]
     }
 
+    fn is_positional_placeholder(&self, parameter_index: usize) -> bool {
+        self.positional_placeholders[parameter_index]
+    }
+
     fn keyword_default(&self, parameter_index: usize) -> Option<Type<'db>> {
         self.keyword_defaults[parameter_index]
     }
 
     fn is_keyword_bound(&self, parameter_index: usize) -> bool {
         self.keyword_bound[parameter_index]
+    }
+
+    fn variadic_placeholders(&self) -> usize {
+        self.variadic_placeholders
     }
 }
 
@@ -1109,17 +1131,29 @@ impl<'db> Signature<'db> {
             |specialization| unspecialized_return_ty.apply_specialization(db, specialization),
         );
 
-        let mut remaining = Vec::with_capacity(parameters.len());
+        let mut remaining =
+            Vec::with_capacity(parameters.len() + partial_application.variadic_placeholders());
         let mut first_keyword_bound_positional_or_keyword = None;
         for (index, parameter) in parameters.iter().enumerate() {
             if partial_application.is_positionally_bound(index) {
                 continue;
             }
 
+            if parameter.is_variadic() {
+                remaining.extend((0..partial_application.variadic_placeholders()).map(|_| {
+                    Parameter::positional_only(None).with_annotated_type(parameter.annotated_type())
+                }));
+            }
+
             let parameter = partial_application.keyword_default(index).map_or_else(
                 || parameter.clone(),
                 |default_ty| parameter.clone().with_default_type(default_ty),
             );
+            let parameter = if partial_application.is_positional_placeholder(index) {
+                parameter.into_required_positional_only()
+            } else {
+                parameter
+            };
 
             if first_keyword_bound_positional_or_keyword.is_none()
                 && partial_application.is_keyword_bound(index)
@@ -4063,6 +4097,21 @@ impl<'db> Parameter<'db> {
         } else {
             self
         }
+    }
+
+    fn into_required_positional_only(mut self) -> Self {
+        self.kind = match self.kind {
+            ParameterKind::PositionalOnly { name, .. } => ParameterKind::PositionalOnly {
+                name,
+                default_type: None,
+            },
+            ParameterKind::PositionalOrKeyword { name, .. } => ParameterKind::PositionalOnly {
+                name: Some(name),
+                default_type: None,
+            },
+            kind => kind,
+        };
+        self
     }
 
     /// Set the source definition represented by this parameter.

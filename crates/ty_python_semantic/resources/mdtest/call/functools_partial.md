@@ -928,6 +928,126 @@ p2 = partial(p1, "hello")
 reveal_type(p2)  # revealed: partial[(c: int | float) -> bool]
 ```
 
+### Placeholder arguments
+
+`functools.Placeholder` reserves positional arguments in Python 3.14 and later. Placeholder slots
+must be filled positionally, and a partial cannot end in a placeholder. ty only synthesizes a
+precise signature when every placeholder is an exact, direct positional argument; ambiguous or
+unpacked placeholders fall back to the gradual `partial` signature.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from functools import Placeholder as _, partial
+from typing import Callable, ParamSpec, TypeVar, overload
+
+def combine(left: int, middle: str, right: float) -> tuple[int, str, float]:
+    return left, middle, right
+
+pending = partial(combine, _, "value")
+reveal_type(pending)  # revealed: partial[(left: int, /, right: int | float) -> tuple[int, str, int | float]]
+reveal_type(pending(1, 2.0))  # revealed: tuple[int, str, int | float]
+pending("bad", 2.0)  # error: [invalid-argument-type]
+pending(1)  # error: [missing-argument]
+pending(left=1, right=2.0)  # error: [positional-only-parameter-as-kwarg]
+combine(_, "value", 2.0)  # error: [invalid-argument-type]
+
+retained = partial(pending, _, 3.0)
+reveal_type(retained)  # revealed: partial[(left: int, /) -> tuple[int, str, int | float]]
+filled = partial(pending, 1, 3.0)
+reveal_type(filled)  # revealed: partial[() -> tuple[int, str, int | float]]
+partial(pending, _)  # error: [invalid-argument-type]
+
+partial(combine, 1, _)  # error: [invalid-argument-type]
+partial(combine, _, "value", _)  # error: [invalid-argument-type]
+partial(combine, *(1, _))  # error: [invalid-argument-type]
+
+bound = (_, "value")
+starred = partial(combine, *bound)
+reveal_type(starred)  # revealed: partial[tuple[int, str, int | float]]
+starred(1, 2.0)
+
+def collect(prefix: int, *values: str) -> tuple[str, ...]:
+    return values
+
+variadic = partial(collect, 1, _, "bound")
+reveal_type(variadic)  # revealed: partial[(str, /, *values: str) -> tuple[str, ...]]
+reveal_type(variadic("first"))  # revealed: tuple[str, ...]
+variadic()  # error: [missing-argument]
+
+def defaulted(value: int = 1, suffix: str = "default") -> int:
+    return value
+
+required = partial(defaulted, _, "bound")
+reveal_type(required)  # revealed: partial[(value: int, /) -> int]
+required()  # error: [missing-argument]
+
+T = TypeVar("T")
+
+def pair(left: T, right: T) -> tuple[T, T]:
+    return left, right
+
+generic = partial(pair, _, 1)
+reveal_type(generic)  # revealed: partial[(left: int, /) -> tuple[int, int]]
+
+def generic_collect(*values: T) -> tuple[T, ...]:
+    return values
+
+generic_variadic = partial(generic_collect, _, 1)
+reveal_type(generic_variadic)  # revealed: partial[(int, /, *values: int) -> tuple[int, ...]]
+
+@overload
+def convert(value: int, suffix: str) -> int: ...
+@overload
+def convert(value: str, suffix: int) -> str: ...
+def convert(value: int | str, suffix: int | str) -> int | str:
+    return value
+
+overloaded = partial(convert, _, "suffix")
+reveal_type(overloaded)  # revealed: partial[(value: int, /) -> int]
+
+def accepts_object(value: object) -> None:
+    pass
+
+accepts_object(_)
+partial(accepts_object, value=_)  # error: [invalid-argument-type]
+
+def imprecise_target(*args: object, **kwargs: object) -> object:
+    return object()
+
+imprecise: Callable[..., object] = imprecise_target
+partial(imprecise, value=_)  # error: [invalid-argument-type]
+
+def runtime_bool() -> bool:
+    raise NotImplementedError
+
+def consume(value: object, count: int) -> None:
+    pass
+
+maybe_placeholder = _ if runtime_bool() else "bound"
+ambiguous = partial(consume, maybe_placeholder, 1)
+reveal_type(ambiguous)  # revealed: partial[None]
+ambiguous()
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def invoke(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+    raise NotImplementedError
+
+def takes_int(value: int) -> str:
+    return str(value)
+
+via_paramspec = partial(invoke, _, 1)
+reveal_type(via_paramspec)  # revealed: partial[Unknown]
+via_paramspec(takes_int)
+
+partial(accepts_object, **{"value": _})  # error: [invalid-argument-type]
+```
+
 ## Constructors and advanced signatures
 
 ### Class constructor
