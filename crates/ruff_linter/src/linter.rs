@@ -23,7 +23,7 @@ use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
-use crate::noqa::add_noqa;
+use crate::noqa::add_suppression;
 use crate::package::PackageRoot;
 use crate::preview::is_py315_support_enabled;
 use crate::registry::Rule;
@@ -33,7 +33,7 @@ use crate::settings::types::UnsafeFixes;
 use crate::settings::{LinterSettings, TargetVersion, flags};
 use crate::source_kind::SourceKind;
 use crate::suppression::Suppressions;
-use crate::{Locator, directives, fs, warn_user_once};
+use crate::{Locator, SuppressionKind, directives, fs, warn_user_once};
 
 pub(crate) mod float;
 
@@ -371,14 +371,15 @@ pub fn check_path(
 
 const MAX_ITERATIONS: usize = 100;
 
-/// Add any missing `# noqa` pragmas to the source code at the given `Path`.
-pub fn add_noqa_to_path(
+/// Add any missing suppression comments to the source code at the given `Path`.
+pub fn add_suppressions_to_path(
     path: &Path,
     package: Option<PackageRoot<'_>>,
     source_kind: &SourceKind,
     source_type: PySourceType,
     settings: &LinterSettings,
     reason: Option<&str>,
+    suppression_kind: SuppressionKind,
 ) -> Result<usize> {
     // Parse once.
     let target_version = settings.resolve_target_version(path);
@@ -422,9 +423,9 @@ pub fn add_noqa_to_path(
         &suppressions,
     );
 
-    // Add any missing `# noqa` pragmas.
+    // Add any missing suppression comments.
     // TODO(dhruvmanila): Add support for Jupyter Notebooks
-    add_noqa(
+    add_suppression(
         path,
         &diagnostics,
         &locator,
@@ -434,6 +435,7 @@ pub fn add_noqa_to_path(
         stylist.line_ending(),
         reason,
         &suppressions,
+        suppression_kind,
     )
 }
 

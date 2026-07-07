@@ -16,9 +16,9 @@ use crate::{
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic};
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_linter::{
-    Locator,
+    Locator, SuppressionKind,
     directives::{Flags, extract_directives},
-    generate_noqa_edits,
+    generate_suppression_edits,
     linter::{check_path, parse_unchecked_source},
     package::PackageRoot,
     packaging::detect_package_root,
@@ -43,7 +43,7 @@ pub(crate) struct AssociatedDiagnosticData {
     pub(crate) edits: Vec<lsp_types::TextEdit>,
     /// The identifier displayed for the diagnostic.
     pub(crate) code: String,
-    /// Possible edit to add a `noqa` comment which will disable this diagnostic.
+    /// Possible edit to add a suppression comment which will disable this diagnostic.
     pub(crate) noqa_edit: Option<lsp_types::TextEdit>,
 }
 
@@ -60,7 +60,7 @@ pub(crate) struct DiagnosticFix {
     /// Edits to fix the diagnostic. If this is empty, a fix
     /// does not exist.
     pub(crate) edits: Vec<lsp_types::TextEdit>,
-    /// Possible edit to add a `noqa` comment which will disable this diagnostic.
+    /// Possible edit to add a suppression comment which will disable this diagnostic.
     pub(crate) noqa_edit: Option<lsp_types::TextEdit>,
 }
 
@@ -148,7 +148,7 @@ pub(crate) fn check(
         &suppressions,
     );
 
-    let noqa_edits = generate_noqa_edits(
+    let suppression_edits = generate_suppression_edits(
         &document_path,
         &diagnostics,
         &locator,
@@ -157,6 +157,11 @@ pub(crate) fn check(
         &directives.noqa_line_for,
         stylist.line_ending(),
         &suppressions,
+        if is_human_readable_names_enabled(settings.linter.preview) {
+            SuppressionKind::Ignore
+        } else {
+            SuppressionKind::Noqa
+        },
     );
     let context = LspDiagnosticContext {
         source_kind: &source_kind,
@@ -186,7 +191,7 @@ pub(crate) fn check(
     let lsp_diagnostics =
         diagnostics
             .into_iter()
-            .zip(noqa_edits)
+            .zip(suppression_edits)
             .filter_map(|(message, noqa_edit)| {
                 if message.is_invalid_syntax() && !show_syntax_errors {
                     None
