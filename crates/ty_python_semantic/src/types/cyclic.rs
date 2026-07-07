@@ -33,6 +33,7 @@ use ty_python_core::definition::Definition;
 use crate::Db;
 use crate::types::Type;
 use crate::types::function::FunctionLiteral;
+use crate::types::visitor::any_over_type;
 
 /// The type identity used for recursive checks/transformations.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
@@ -45,16 +46,32 @@ pub enum TypeIdentity<'db> {
 
 impl<'db> Type<'db> {
     pub(crate) fn to_type_identity(self, db: &'db dyn Db) -> TypeIdentity<'db> {
+        self.recursive_identity(db)
+            .unwrap_or(TypeIdentity::Other(self))
+    }
+
+    pub(crate) fn recursive_identity(self, db: &'db dyn Db) -> Option<TypeIdentity<'db>> {
         match self {
             // We can create a self-referential function type: e.g. `def f(x: "TypeOf[f]"): reveal_type(x)`
             // To avoid the difficulty of equality checking for function types containing this, we simply use `literal` for equality checking.
-            Type::FunctionLiteral(function) => TypeIdentity::FunctionLiteral(function.literal(db)),
+            Type::FunctionLiteral(function) => {
+                Some(TypeIdentity::FunctionLiteral(function.literal(db)))
+            }
             // Similarly, we can create a self-referential NewType: e.g. `T = NewType("T", list["T"])`
-            Type::NewTypeInstance(newtype) => TypeIdentity::NewTypeInstance(newtype.definition(db)),
+            Type::NewTypeInstance(newtype) => {
+                Some(TypeIdentity::NewTypeInstance(newtype.definition(db)))
+            }
             // Type aliases can be self-referential: e.g. `type RecursiveT = int | tuple[RecursiveT, ...]`
-            Type::TypeAlias(alias) => TypeIdentity::TypeAlias(alias.definition(db)),
-            _ => TypeIdentity::Other(self),
+            Type::TypeAlias(alias) => Some(TypeIdentity::TypeAlias(alias.definition(db))),
+            _ => None,
         }
+    }
+
+    const fn needs_recursive_identity(self) -> bool {
+        matches!(
+            self,
+            Type::FunctionLiteral(_) | Type::NewTypeInstance(_) | Type::TypeAlias(_)
+        )
     }
 }
 
@@ -62,6 +79,11 @@ pub trait HasIdentity<'db> {
     type Id: Sized + PartialEq;
 
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id;
+
+    /// Return `true` if an in-progress item with the same identity should be treated as a cycle.
+    fn needs_recursive_identity(&self) -> bool {
+        true
+    }
 }
 
 impl<'db> HasIdentity<'db> for Type<'db> {
@@ -69,6 +91,10 @@ impl<'db> HasIdentity<'db> for Type<'db> {
 
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
         self.to_type_identity(db)
+    }
+
+    fn needs_recursive_identity(&self) -> bool {
+        Type::needs_recursive_identity(*self)
     }
 }
 
@@ -80,31 +106,25 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>) {
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
         (self.0.to_identity(db), self.1.to_identity(db))
     }
+
+    fn needs_recursive_identity(&self) -> bool {
+        self.0.needs_recursive_identity() || self.1.needs_recursive_identity()
+    }
 }
 
 /// `CycleDetector` is temporary, so callers should choose the capacity that keeps observed cycle
 /// paths inline even when that makes `seen` slightly larger than an `FxIndexSet<T>`.
 #[derive(Debug)]
 pub struct CycleDetector<'db, Tag, T: HasIdentity<'db>, R, const INLINE_CAPACITY: usize> {
-    /// If the type we're visiting is present in `seen`, it indicates that we've hit a cycle (due
-    /// to a recursive type); we need to immediately short circuit the whole operation and return
-    /// the fallback value. That's why we pop items off the end of `seen` after we've visited them.
-    /// Actually, what is contained here is not the `Type` itself, but its identity.
-    /// `Type` has extra data than the type structure that should be equated,
-    /// so it is compared using identity, which removes extra data.
-    seen: RefCell<SmallVec<[T::Id; INLINE_CAPACITY]>>,
+    /// The active recursion stack. Completed visits are removed from the end of the stack.
+    seen: RefCell<SmallVec<[T; INLINE_CAPACITY]>>,
 
-    /// Unlike `seen`, this field is a pure performance optimisation (and an essential one). If the
-    /// type we're trying to normalize is present in `cache`, it doesn't necessarily mean we've hit
-    /// a cycle: it just means that we've already visited this inner type as part of a bigger call
-    /// chain we're currently in. Since this cache is just a performance optimisation, it doesn't
-    /// make sense to pop items off the end of the cache after they've been visited (it would
-    /// sort-of defeat the point of a cache if we did!)
+    /// Memoized results from earlier visits in the current recursive operation.
     cache: RefCell<CycleDetectorCache<T, R>>,
 
     fallback: R,
 
-    _tag: PhantomData<fn() -> Tag>,
+    _tag: PhantomData<fn(&'db ()) -> Tag>,
 }
 
 impl<'db, Tag, T, R, const INLINE_CAPACITY: usize> CycleDetector<'db, Tag, T, R, INLINE_CAPACITY>
@@ -130,7 +150,7 @@ where
     pub fn visit(&self, db: &'db dyn Db, item: T, compute: impl FnOnce() -> R) -> R {
         match self.begin_visit(db, item) {
             CycleDetectorVisit::Ready(result) => result,
-            CycleDetectorVisit::Cycle(_) => self.fallback.clone(),
+            CycleDetectorVisit::Cycle { .. } => self.fallback.clone(),
             CycleDetectorVisit::Pending(item) => {
                 let result = compute();
                 self.finish_visit(item, result)
@@ -145,29 +165,46 @@ where
             return CycleDetectorVisit::Ready(result.clone());
         }
 
-        let identity = item.to_identity(db);
-        if self.seen.borrow().contains(&identity) {
-            return CycleDetectorVisit::Cycle(item);
+        let seen = self.seen.borrow();
+        if seen.contains(&item) {
+            return CycleDetectorVisit::Ready(self.fallback.clone());
         }
 
-        self.seen.borrow_mut().push(identity);
+        if item.needs_recursive_identity() {
+            let identity = item.to_identity(db);
+            if let Some(active) = seen.iter().find(|active| {
+                active.needs_recursive_identity() && active.to_identity(db) == identity
+            }) {
+                return CycleDetectorVisit::Cycle {
+                    active: active.clone(),
+                    current: item,
+                };
+            }
+        }
+        drop(seen);
+
+        self.seen.borrow_mut().push(item.clone());
         CycleDetectorVisit::Pending(item)
     }
 
     /// Finish a [`CycleDetectorVisit::Pending`] visit and cache its result.
     pub(crate) fn finish_visit(&self, item: T, result: R) -> R {
-        self.seen.borrow_mut().pop();
-        self.cache.borrow_mut().insert_new(item, result.clone());
+        let active = self.seen.borrow_mut().pop();
+        debug_assert!(active.as_ref().is_some_and(|active| active == &item));
+        self.cache
+            .borrow_mut()
+            .insert_completed(item, result.clone());
         result
     }
 }
 
 /// Result of starting a cycle-detector visit.
 pub(crate) enum CycleDetectorVisit<T, R> {
-    /// The item was already completed in this recursive operation.
+    /// The item already has a completed result or hit an exact recursive edge.
     Ready(R),
-    /// The item is already active on the recursion stack.
-    Cycle(T),
+    /// A different item with the same abstract identity is already pending.
+    /// The active item is the pending obligation; the current item is the input that hit it.
+    Cycle { active: T, current: T },
     /// The caller should compute the result and pass it to [`CycleDetector::finish_visit`].
     Pending(T),
 }
@@ -175,7 +212,7 @@ pub(crate) enum CycleDetectorVisit<T, R> {
 pub(crate) struct TypeTransformer<'db, Tag> {
     /// A type already present in `seen` forms a recursive cycle and is returned unchanged.
     /// Completed visits are removed from the end of the stack.
-    seen: RefCell<SmallVec<[TypeIdentity<'db>; 3]>>,
+    seen: RefCell<SmallVec<[Type<'db>; 3]>>,
 
     /// Memoized transformations from earlier visits in the current recursive operation.
     cache: RefCell<CycleDetectorCache<Type<'db>, Type<'db>>>,
@@ -202,40 +239,131 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         compute: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
         match self.begin_visit(db, ty) {
-            BeginVisit::Ready(result) => result,
-            BeginVisit::Pending(ty) => {
+            CycleDetectorVisit::Ready(result)
+            | CycleDetectorVisit::Cycle {
+                current: result, ..
+            } => result,
+            CycleDetectorVisit::Pending(ty) => {
                 let result = compute();
                 self.finish_visit(ty, result)
             }
         }
     }
 
-    fn begin_visit(&self, db: &'db dyn Db, ty: Type<'db>) -> BeginVisit<Type<'db>, Type<'db>> {
+    fn begin_visit(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> CycleDetectorVisit<Type<'db>, Type<'db>> {
         if let Some(result) = self.cache.borrow().get(&ty) {
-            return BeginVisit::Ready(*result);
+            return CycleDetectorVisit::Ready(*result);
         }
 
-        let identity = ty.to_identity(db);
-        if self.seen.borrow().contains(&identity) {
+        let seen = self.seen.borrow();
+        if seen.contains(&ty) || Self::is_growing_recursive_alias(db, ty, &seen) {
             // When a cycle is encountered, the type being visited is returned as a fallback
             // (typically a recursive type alias).
-            return BeginVisit::Ready(ty);
+            return CycleDetectorVisit::Cycle {
+                active: ty,
+                current: ty,
+            };
+        }
+        drop(seen);
+
+        self.seen.borrow_mut().push(ty);
+        CycleDetectorVisit::Pending(ty)
+    }
+
+    fn is_growing_recursive_alias(db: &'db dyn Db, ty: Type<'db>, seen: &[Type<'db>]) -> bool {
+        let Type::TypeAlias(alias) = ty else {
+            let Some(identity) = ty.recursive_identity(db) else {
+                return false;
+            };
+            return seen
+                .iter()
+                .any(|active| active.recursive_identity(db) == Some(identity));
+        };
+
+        let identity = TypeIdentity::TypeAlias(alias.definition(db));
+        if !seen
+            .iter()
+            .any(|active| active.recursive_identity(db) == Some(identity))
+        {
+            return false;
         }
 
-        self.seen.borrow_mut().push(identity);
-        BeginVisit::Pending(ty)
+        let active_alias_count = seen
+            .iter()
+            .filter(|active| active.recursive_identity(db) == Some(identity))
+            .count();
+
+        let Some(generic_context) = alias.generic_context(db) else {
+            return true;
+        };
+        if generic_context
+            .variables(db)
+            .any(|typevar| typevar.is_paramspec(db))
+        {
+            return true;
+        }
+        let specialization = alias
+            .specialization(db)
+            .unwrap_or_else(|| generic_context.default_specialization(db, None));
+        let nested_alias_application = Self::is_nested_alias_application(db, ty, seen);
+
+        // Same-identity aliases whose arguments refer back to an active recursive type are
+        // growing through the alias application itself, not merely unpacking a nested alias.
+        if !nested_alias_application
+            && specialization.types(db).iter().copied().any(|argument| {
+                any_over_type(db, argument, false, |nested| {
+                    nested.recursive_identity(db).is_some_and(|identity| {
+                        seen.iter()
+                            .any(|active| active.recursive_identity(db) == Some(identity))
+                    })
+                })
+            })
+        {
+            return true;
+        }
+
+        // `Alias[Alias[T]] -> Alias[T]` should keep transforming the nested alias. Other
+        // same-identity specializations get one non-exact unfolding so constant specializations
+        // can stabilize before genuinely growing aliases are cut off.
+        active_alias_count > 1 && !nested_alias_application
+    }
+
+    fn is_nested_alias_application(db: &'db dyn Db, ty: Type<'db>, seen: &[Type<'db>]) -> bool {
+        let Some(identity) = ty.recursive_identity(db) else {
+            return false;
+        };
+
+        seen.iter().any(|active| {
+            let Type::TypeAlias(active_alias) = active else {
+                return false;
+            };
+            if active.recursive_identity(db) != Some(identity) {
+                return false;
+            }
+
+            let Some(generic_context) = active_alias.generic_context(db) else {
+                return false;
+            };
+            let specialization = active_alias
+                .specialization(db)
+                .unwrap_or_else(|| generic_context.default_specialization(db, None));
+            specialization
+                .types(db)
+                .iter()
+                .copied()
+                .any(|argument| any_over_type(db, argument, false, |nested| nested == ty))
+        })
     }
 
     fn finish_visit(&self, ty: Type<'db>, result: Type<'db>) -> Type<'db> {
         self.seen.borrow_mut().pop();
-        self.cache.borrow_mut().insert_new(ty, result);
+        self.cache.borrow_mut().insert_completed(ty, result);
         result
     }
-}
-
-enum BeginVisit<T, R> {
-    Ready(R),
-    Pending(T),
 }
 
 impl<'db, Tag, T, R: Default, const INLINE_CAPACITY: usize> Default
@@ -280,12 +408,19 @@ impl<T, R> CycleDetectorCache<T, R> {
         }
     }
 
-    /// Inserts a result after the caller has checked that `item` is not already cached.
-    fn insert_new(&mut self, item: T, result: R)
+    /// Inserts a completed item after the caller has checked that `item` is not already cached.
+    fn insert_completed(&mut self, item: T, result: R)
     where
         T: Hash + Eq,
     {
         debug_assert!(self.get(&item).is_none());
+        self.insert_new(item, result);
+    }
+
+    fn insert_new(&mut self, item: T, result: R)
+    where
+        T: Hash + Eq,
+    {
         let entry = (item, result);
         *self = match mem::replace(self, Self::Empty) {
             Self::Empty => Self::One(entry),
@@ -365,17 +500,54 @@ impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CycleDetector, Db, HasIdentity};
+    use super::{CycleDetector, CycleDetectorVisit, Db, HasIdentity};
     use crate::db::tests::setup_db;
 
     struct TestCycleDetector;
     type Detector<'db> = CycleDetector<'db, TestCycleDetector, u8, u8, 1>;
+    type IdentityDetector<'db> = CycleDetector<'db, TestCycleDetector, TestItem, u8, 1>;
 
     impl<'db> HasIdentity<'db> for u8 {
         type Id = u8;
 
         fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
             *self
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    struct TestItem {
+        value: u8,
+        identity: u8,
+    }
+
+    impl<'db> HasIdentity<'db> for TestItem {
+        type Id = u8;
+
+        fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
+            self.identity
+        }
+    }
+
+    type ExactIdentityDetector<'db> =
+        CycleDetector<'db, TestCycleDetector, ExactIdentityItem, u8, 1>;
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    struct ExactIdentityItem {
+        value: u8,
+        identity: u8,
+        recursive_identity: bool,
+    }
+
+    impl<'db> HasIdentity<'db> for ExactIdentityItem {
+        type Id = u8;
+
+        fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
+            self.identity
+        }
+
+        fn needs_recursive_identity(&self) -> bool {
+            self.recursive_identity
         }
     }
 
@@ -404,5 +576,94 @@ mod tests {
             detector.visit(&db, 1, || detector.visit(&db, 1, || 20) + 10),
             10
         );
+    }
+
+    #[test]
+    fn nested_visit_short_circuits_on_identity_cycle_without_caching_it() {
+        let db = setup_db();
+        let detector = IdentityDetector::new(0);
+        let first = TestItem {
+            value: 1,
+            identity: 1,
+        };
+        let second = TestItem {
+            value: 2,
+            identity: 1,
+        };
+
+        assert_eq!(
+            detector.visit(&db, first, || detector.visit(&db, second, || 20) + 10),
+            10
+        );
+        assert_eq!(detector.visit(&db, second, || 30), 30);
+    }
+
+    #[test]
+    fn exact_identity_items_ignore_shared_abstract_identity() {
+        let db = setup_db();
+        let detector = ExactIdentityDetector::new(0);
+        let first = ExactIdentityItem {
+            value: 1,
+            identity: 1,
+            recursive_identity: false,
+        };
+        let second = ExactIdentityItem {
+            value: 2,
+            identity: 1,
+            recursive_identity: false,
+        };
+
+        assert_eq!(
+            detector.visit(&db, first, || detector.visit(&db, second, || 20) + 10),
+            30
+        );
+    }
+
+    #[test]
+    fn active_items_that_skip_recursive_identity_do_not_trigger_identity_cycles() {
+        let db = setup_db();
+        let detector = ExactIdentityDetector::new(0);
+        let first = ExactIdentityItem {
+            value: 1,
+            identity: 1,
+            recursive_identity: false,
+        };
+        let second = ExactIdentityItem {
+            value: 2,
+            identity: 1,
+            recursive_identity: true,
+        };
+
+        assert_eq!(
+            detector.visit(&db, first, || detector.visit(&db, second, || 20) + 10),
+            30
+        );
+    }
+
+    #[test]
+    fn identity_cycle_reports_active_and_current_items() {
+        let db = setup_db();
+        let detector = IdentityDetector::new(0);
+        let first = TestItem {
+            value: 1,
+            identity: 1,
+        };
+        let second = TestItem {
+            value: 2,
+            identity: 1,
+        };
+
+        let CycleDetectorVisit::Pending(active_item) = detector.begin_visit(&db, first) else {
+            panic!("first visit should be pending");
+        };
+
+        let CycleDetectorVisit::Cycle { active, current } = detector.begin_visit(&db, second)
+        else {
+            panic!("second visit should detect an identity cycle");
+        };
+        assert_eq!(active, first);
+        assert_eq!(current, second);
+
+        detector.finish_visit(active_item, 10);
     }
 }
