@@ -62,7 +62,7 @@ declare_lint! {
     #[doc = include_str!("../resources/lint_docs/blanket-ignore-comment.md")]
     pub(crate) static BLANKET_IGNORE_COMMENT = {
         summary: "detects blanket `ty: ignore` comments",
-        status: LintStatus::stable("0.0.55"),
+        status: LintStatus::stable("0.0.57"),
         default_level: Level::Ignore,
     }
 }

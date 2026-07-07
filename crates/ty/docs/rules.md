@@ -163,7 +163,7 @@ def _(x: int):
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.55">0.0.55</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.57">0.0.57</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22blanket-ignore-comment%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Fsuppression.rs#L61" target="_blank">View source</a>
 </small>
