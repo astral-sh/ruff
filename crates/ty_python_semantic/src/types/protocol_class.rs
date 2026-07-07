@@ -21,8 +21,8 @@ use crate::{
         place_from_declarations,
     },
     types::{
-        ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ClassBase,
-        ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
+        ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
+        CallableType, ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
         InstanceFallbackShadowsNonDataDescriptor, KnownFunction, MemberLookupPolicy,
         PropertyInstanceType, ProtocolInstanceType, SelfBinding, StaticClassLiteral, Type,
         TypeMapping, TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable,
@@ -434,7 +434,7 @@ impl<'db> ProtocolInterface<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         self.members(db)
             .flat_map(|member| {
                 let capabilities = member.capabilities(db);

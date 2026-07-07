@@ -31,12 +31,13 @@ use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
-use crate::types::typevar::{BoundTypeVarIdentity, max_typevar_freshness_matching_generic_context};
+use crate::types::typevar::max_typevar_freshness_matching_generic_context;
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
-    ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind,
-    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping, TypeVarNonce,
-    TypedDictType, UnionBuilder, VarianceInferable, infer_complete_scope_types, todo_type,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
+    CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
+    MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
+    TypeMapping, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
+    infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -460,7 +461,7 @@ impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
 
 impl<'db> VarianceInferable<'db> for &CallableSignature<'db> {
     // TODO: possibly need to replace self
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         self.overloads
             .iter()
             .map(|signature| signature.variance_of(db, typevar))
@@ -1405,10 +1406,10 @@ impl<'db> Signature<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for &Signature<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         tracing::trace!(
             "Checking variance of `{tvar}` in `{self:?}`",
-            tvar = typevar.typevar(db).name(db)
+            tvar = typevar.identity.name(db)
         );
 
         let parameter_variance = |parameter: &Parameter<'db>| {

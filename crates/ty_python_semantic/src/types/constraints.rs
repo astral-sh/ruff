@@ -5708,8 +5708,10 @@ impl SequentMap {
             |bound_constraint: ConstraintId, constrained_constraint: ConstraintId| {
                 let bound_data = builder.constraint_data(bound_constraint);
                 let bound_typevar = bound_data.typevar;
+                let bound_identity = bound_typevar.identity(db);
                 let constrained_data = builder.constraint_data(constrained_constraint);
                 let constrained_typevar = constrained_data.typevar;
+                let constrained_identity = constrained_typevar.identity(db);
                 let constrained_lower = constrained_data.bounds.materialized_lower();
                 let constrained_upper = constrained_data.bounds.materialized_upper();
 
@@ -5723,8 +5725,8 @@ impl SequentMap {
                 // instead of calling `variance_of` on them. This avoids a large number of tiny
                 // tracked `variance_of` queries in hot paths.
                 let replacement_mentions_bound_or_constrained = |replacement: Type<'db>| {
-                    replacement.variance_of(db, bound_typevar) != TypeVarVariance::Bivariant
-                        || replacement.variance_of(db, constrained_typevar)
+                    replacement.variance_of(db, bound_identity) != TypeVarVariance::Bivariant
+                        || replacement.variance_of(db, constrained_identity)
                             != TypeVarVariance::Bivariant
                 };
 
@@ -5738,7 +5740,7 @@ impl SequentMap {
                 // need an alternative representation for "typevar not present"
                 // (e.g., `Option<TypeVarVariance>`).
                 let upper_replacement = match (
-                    constrained_upper.variance_of(db, bound_typevar),
+                    constrained_upper.variance_of(db, bound_identity),
                     bound_data.bounds.lower,
                     bound_data.bounds.upper,
                 ) {
@@ -5808,7 +5810,7 @@ impl SequentMap {
 
                 // Check the lower bound of the constrained constraint for nested occurrences.
                 let lower_replacement = match (
-                    constrained_lower.variance_of(db, bound_typevar),
+                    constrained_lower.variance_of(db, bound_identity),
                     bound_data.bounds.lower,
                     bound_data.bounds.upper,
                 ) {
@@ -5934,7 +5936,7 @@ impl SequentMap {
                         && !constrained_upper.is_never()
                         && !constrained_upper.is_object()
                         && !constrained_upper.is_dynamic()
-                        && match constrained_upper.variance_of(db, nested_typevar) {
+                        && match constrained_upper.variance_of(db, nested_typevar.identity(db)) {
                             TypeVarVariance::Bivariant => false,
                             TypeVarVariance::Covariant => !is_upper_bound,
                             TypeVarVariance::Contravariant => is_upper_bound,
@@ -5979,7 +5981,7 @@ impl SequentMap {
                         && !constrained_lower.is_never()
                         && !constrained_lower.is_object()
                         && !constrained_lower.is_dynamic()
-                        && match constrained_lower.variance_of(db, nested_typevar) {
+                        && match constrained_lower.variance_of(db, nested_typevar.identity(db)) {
                             TypeVarVariance::Bivariant => false,
                             TypeVarVariance::Covariant => is_upper_bound,
                             TypeVarVariance::Contravariant => !is_upper_bound,
