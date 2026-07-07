@@ -1333,20 +1333,21 @@ impl FromIterator<TextRange> for NoqaMapping {
 mod tests {
 
     use std::fmt::Write;
-    use std::fs;
     use std::path::Path;
 
     use anyhow::{Result, anyhow};
     use insta::{assert_debug_snapshot, assert_snapshot};
-    use tempfile::tempdir;
 
+    use ruff_diagnostics::SourceMap;
     use ruff_python_ast::{PySourceType, SourceType};
+    use ruff_python_codegen::Stylist;
+    use ruff_python_index::Indexer;
     use ruff_python_trivia::{CommentRanges, textwrap::dedent};
     use ruff_source_file::{LineEnding, SourceFileBuilder};
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use crate::codes::Rule;
-    use crate::linter::add_suppressions_to_path;
+    use crate::linter::{check_path, parse_unchecked_source};
     use crate::noqa::{
         Directive, LexicalError, NoqaLexerOutput, NoqaMapping, SuppressionKind,
         add_suppression_inner, lex_codes, lex_file_exemption, lex_inline_noqa,
@@ -1354,12 +1355,63 @@ mod tests {
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
-    use crate::settings::{LinterSettings, types::PreviewMode};
+    use crate::settings::{LinterSettings, flags, types::PreviewMode};
     use crate::source_kind::SourceKind;
     use crate::suppression::Suppressions;
     use crate::test::{print_messages, test_contents};
-    use crate::{Edit, Violation};
+    use crate::{Edit, Violation, directives};
     use crate::{Locator, generate_suppression_edits};
+
+    fn add_suppressions(
+        path: &Path,
+        source_kind: &SourceKind,
+        settings: &LinterSettings,
+        suppression_kind: SuppressionKind,
+    ) -> (usize, String) {
+        let source_type = source_kind.py_source_type();
+        let target_version = settings.resolve_target_version(path);
+        let parsed =
+            parse_unchecked_source(source_kind, source_type, target_version.parser_version());
+        let locator = Locator::new(source_kind.source_code());
+        let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
+        let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
+        let directives = directives::extract_directives(
+            parsed.tokens(),
+            directives::Flags::from_settings(settings),
+            &locator,
+            &indexer,
+        );
+        let suppressions =
+            Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer, settings);
+        let diagnostics = check_path(
+            path,
+            None,
+            &locator,
+            &stylist,
+            &indexer,
+            &directives,
+            settings,
+            flags::Noqa::Disabled,
+            source_kind,
+            source_type,
+            &parsed,
+            target_version,
+            &suppressions,
+        );
+
+        add_suppression_inner(
+            path,
+            &diagnostics,
+            &locator,
+            indexer.comment_ranges(),
+            &settings.external,
+            &directives.noqa_line_for,
+            stylist.line_ending(),
+            None,
+            &suppressions,
+            suppression_kind,
+        )
+    }
 
     #[track_caller]
     fn add_suppressions_in(
@@ -1367,11 +1419,6 @@ mod tests {
         suppression_kind: SuppressionKind,
         preview: PreviewMode,
     ) -> Result<String> {
-        let directory = tempdir()?;
-        let path = directory.path().join("test.py");
-        fs::write(&path, dedent(source).trim())?;
-
-        let source_type = PySourceType::Python;
         let settings = LinterSettings {
             preview,
             ..LinterSettings::for_rules([
@@ -1381,26 +1428,15 @@ mod tests {
                 Rule::UndocumentedPublicFunction,
             ])
         };
+        let path = Path::new("<filename>");
+        let source_map = SourceMap::default();
+        let source_kind = SourceKind::from_source_code(
+            dedent(source).trim().to_string(),
+            SourceType::Python(PySourceType::Python),
+        )?
+        .ok_or_else(|| anyhow!("test file should be Python"))?;
 
-        let read_source = || -> Result<SourceKind> {
-            SourceKind::from_path(&path, SourceType::Python(source_type))?
-                .ok_or_else(|| anyhow!("test file should be Python"))
-        };
-        let add_suppressions = |source_kind: &SourceKind| {
-            add_suppressions_to_path(
-                &path,
-                None,
-                source_kind,
-                source_type,
-                &settings,
-                None,
-                suppression_kind,
-            )
-        };
-
-        let count = add_suppressions(&read_source()?)?;
-
-        let fixed = fs::read_to_string(&path)?;
+        let (count, fixed) = add_suppressions(path, &source_kind, &settings, suppression_kind);
         let plural = if count == 1 { "" } else { "s" };
         let mut output = String::new();
         writeln!(
@@ -1408,16 +1444,18 @@ mod tests {
             "Added {count} suppression{plural}\n\n## Fixed source\n\n```py\n{fixed}\n```\n"
         )?;
 
-        let second_count = add_suppressions(&read_source()?)?;
+        let source_kind = source_kind.updated(fixed, &source_map);
+        let (second_count, fixed) =
+            add_suppressions(path, &source_kind, &settings, suppression_kind);
         if second_count > 0 {
-            let fixed = fs::read_to_string(&path)?;
             writeln!(
                 output,
                 "## Additional suppressions added on a second pass: {second_count}\n\n```py\n{fixed}\n```\n"
             )?;
         }
 
-        let (diagnostics, _) = test_contents(&read_source()?, &path, &settings);
+        let source_kind = source_kind.updated(fixed, &source_map);
+        let (diagnostics, _) = test_contents(&source_kind, path, &settings);
         if !diagnostics.is_empty() {
             writeln!(
                 output,
