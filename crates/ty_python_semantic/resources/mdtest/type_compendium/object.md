@@ -1,5 +1,10 @@
 # `object`
 
+```toml
+[environment]
+python-version = "3.14"
+```
+
 The `object` type represents the set of all Python objects.
 
 ## `object` is a supertype of all types
@@ -7,7 +12,8 @@ The `object` type represents the set of all Python objects.
 It is the top type in Python's type system, i.e., it is a supertype of all other types:
 
 ```py
-from ty_extensions import static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 static_assert(is_subtype_of(int, object))
 static_assert(is_subtype_of(str, object))
@@ -21,7 +27,8 @@ Everything can be assigned to the type `object`. This fact can be used to create
 collections of objects (but also erases more specific type information):
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 from typing_extensions import Any, Never
 
 static_assert(is_assignable_to(int, object))
@@ -39,7 +46,8 @@ x: list[object] = [1, "a", ()]
 There is no type that is disjoint from `object` except for `Never`:
 
 ```py
-from ty_extensions import static_assert, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 from typing_extensions import Any, Never
 
 static_assert(not is_disjoint_from(int, object))
@@ -55,7 +63,8 @@ static_assert(is_disjoint_from(Never, object))
 Unions with `object` are equivalent to `object`:
 
 ```py
-from ty_extensions import static_assert, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(int | object | None, object))
 ```
@@ -64,13 +73,14 @@ static_assert(is_equivalent_to(int | object | None, object))
 
 Intersecting with `object` is equivalent to the original type:
 
-```py
-from ty_extensions import static_assert, is_equivalent_to, Intersection
+```pyi
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 class P: ...
 class Q: ...
 
-static_assert(is_equivalent_to(Intersection[P, object, Q], Intersection[P, Q]))
+static_assert(is_equivalent_to(P & object & Q, P & Q))
 ```
 
 ## `object` is the complement of `Never`

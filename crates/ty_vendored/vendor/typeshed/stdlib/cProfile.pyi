@@ -1,5 +1,7 @@
-"""Python interface for the 'lsprof' profiler.
-Compatible with the 'profile' module.
+"""Compatibility wrapper for cProfile module.
+
+This module maintains backward compatibility by importing from the new
+profiling.tracing module.
 """
 
 import _lsprof

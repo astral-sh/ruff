@@ -46,6 +46,11 @@ pub(crate) const fn is_bad_version_info_in_non_stub_enabled(settings: &LinterSet
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/issues/4460
+pub(crate) const fn is_legacy_type_comment_in_non_stub_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 /// <https://github.com/astral-sh/ruff/pull/19303>
 pub(crate) const fn is_fix_f_string_logging_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
@@ -335,11 +340,6 @@ pub(crate) const fn is_up006_future_annotations_fix_enabled(settings: &LinterSet
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/23845
-pub const fn is_warning_severity_enabled(preview: PreviewMode) -> bool {
-    preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/24071
 // Make sure to stabilize the corresponding formatter preview behavior when stabilizing this preview style.
 pub(crate) const fn is_trailing_pragma_in_line_length_enabled(preview: PreviewMode) -> bool {
@@ -359,4 +359,14 @@ pub(crate) const fn is_ruff_ignore_enabled(settings: &LinterSettings) -> bool {
 // https://github.com/astral-sh/ruff/pull/23259
 pub(crate) const fn is_pep604_future_annotations_fix_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/25614
+pub const fn is_human_readable_names_enabled(preview: PreviewMode) -> bool {
+    preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/26113
+pub const fn is_warn_on_unknown_selectors_enabled(preview: PreviewMode) -> bool {
+    preview.is_enabled()
 }

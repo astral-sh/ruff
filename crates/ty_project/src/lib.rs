@@ -4,6 +4,7 @@
 )]
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
 use crate::metadata::options::{OptionDiagnostic, ProgramSettingsDiagnostic};
+use crate::parallel::ParallelIteratorExt;
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 #[cfg(feature = "testing")]
 pub use db::testing::TestDb;
@@ -12,6 +13,7 @@ use files::{Index, Indexed, IndexedFiles};
 
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
+use rayon::prelude::*;
 use ruff_db::diagnostic::{
     Diagnostic, DiagnosticId, Severity, SubDiagnostic, SubDiagnosticSeverity,
 };
@@ -31,6 +33,7 @@ mod db;
 mod files;
 pub mod glob;
 pub mod metadata;
+pub mod parallel;
 mod walk;
 pub mod watch;
 
@@ -190,6 +193,44 @@ impl Project {
             .new(db)
     }
 
+    /// Permanently freezes the most heavily read immutable project inputs.
+    ///
+    /// This is intentionally not exhaustive.
+    pub(crate) fn freeze(self, db: &mut dyn Db) {
+        let durability = Durability::NEVER_CHANGE;
+        let metadata = Box::new(self.metadata(db).clone());
+        let settings = Box::new(self.settings(db).clone());
+        let included_paths = self.included_paths_list(db).to_vec();
+        let open_files = self.open_fileset(db).clone();
+        let check_mode = self.check_mode(db);
+        let verbose = self.verbose_flag(db);
+        let force_exclude = self.force_exclude_flag(db);
+
+        self.set_metadata(db)
+            .with_durability(durability)
+            .to(metadata);
+        self.set_settings(db)
+            .with_durability(durability)
+            .to(settings);
+        self.set_included_paths_list(db)
+            .with_durability(durability)
+            .to(included_paths);
+        self.set_open_fileset(db)
+            .with_durability(durability)
+            .to(open_files);
+        self.set_check_mode(db)
+            .with_durability(durability)
+            .to(check_mode);
+        self.set_verbose_flag(db)
+            .with_durability(durability)
+            .to(verbose);
+        self.set_force_exclude_flag(db)
+            .with_durability(durability)
+            .to(force_exclude);
+
+        IndexedFiles::freeze(db, self);
+    }
+
     pub fn root(self, db: &dyn Db) -> &SystemPath {
         self.metadata(db).root()
     }
@@ -342,51 +383,39 @@ impl Project {
         let open_files = self.open_files(db);
         let check_start = ruff_db::Instant::now();
 
-        {
-            let db = db.clone();
-            let project_span = &project_span;
+        let files: Vec<_> = (&files).into_iter().collect();
 
-            rayon::scope(move |scope| {
-                for file in &files {
-                    let db = db.clone();
-                    let reporter = &*reporter;
+        files
+            .into_par_iter()
+            .for_each_with_project_db(db, |db, file| {
+                db.unwind_if_revision_cancelled();
 
-                    db.unwind_if_revision_cancelled();
+                let check_file_span =
+                    tracing::debug_span!(parent: &project_span, "check_file", ?file);
+                let _entered = check_file_span.entered();
 
-                    scope.spawn(move |_| {
-                        let check_file_span =
-                            tracing::debug_span!(parent: project_span, "check_file", ?file);
-                        let _entered = check_file_span.entered();
+                match check_file_impl(db, file) {
+                    Ok(diagnostics) => {
+                        reporter.report_checked_file(db, file, diagnostics);
 
-                        match check_file_impl(&db, file) {
-                            Ok(diagnostics) => {
-                                reporter.report_checked_file(&db, file, diagnostics);
+                        // This is outside `check_file_impl` to avoid that opening or closing
+                        // a file invalidates the `check_file_impl` query of every file!
+                        if !open_files.contains(&file) {
+                            // The module has already been parsed by `check_file_impl`.
+                            // We only retrieve it here so that we can call `clear` on it.
+                            let parsed = parsed_module(db, file);
 
-                                // This is outside `check_file_impl` to avoid that opening or closing
-                                // a file invalidates the `check_file_impl` query of every file!
-                                if !open_files.contains(&file) {
-                                    // The module has already been parsed by `check_file_impl`.
-                                    // We only retrieve it here so that we can call `clear` on it.
-                                    let parsed = parsed_module(&db, file);
-
-                                    // Drop the AST now that we are done checking this file. It is not currently open,
-                                    // so it is unlikely to be accessed again soon. If any queries need to access the AST
-                                    // from across files, it will be re-parsed.
-                                    parsed.clear();
-                                }
-                            }
-                            Err(io_error) => {
-                                reporter.report_checked_file(
-                                    &db,
-                                    file,
-                                    std::slice::from_ref(io_error),
-                                );
-                            }
+                            // Drop the AST now that we are done checking this file. It is not currently open,
+                            // so it is unlikely to be accessed again soon. If any queries need to access the AST
+                            // from across files, it will be re-parsed.
+                            parsed.clear();
                         }
-                    });
+                    }
+                    Err(io_error) => {
+                        reporter.report_checked_file(db, file, std::slice::from_ref(io_error));
+                    }
                 }
             });
-        };
 
         tracing::debug!(
             "Checking all files took {:.3}s",

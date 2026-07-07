@@ -58,6 +58,7 @@ class TextTestResult(unittest.result.TestResult, Generic[_StreamT]):
             """Construct a TextTestResult. Subclasses should accept **kwargs
             to ensure compatibility as the interface changes.
             """
+
     else:
         def __init__(self, stream: _StreamT, descriptions: bool, verbosity: int) -> None: ...
 
@@ -105,6 +106,7 @@ class TextTestRunner:
             Subclasses should accept **kwargs to ensure compatibility as the
             interface changes.
             """
+
     else:
         def __init__(
             self,

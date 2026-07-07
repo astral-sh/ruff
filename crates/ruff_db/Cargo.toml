@@ -1,7 +1,7 @@
 [package]
 name = "ruff_db"
-version = "0.0.0"
-publish = false
+version = "0.0.3"
+description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -26,6 +26,7 @@ ty_static = { workspace = true }
 anstyle = { workspace = true }
 arc-swap = { workspace = true }
 camino = { workspace = true }
+compact_str = { workspace = true }
 dashmap = { workspace = true }
 dunce = { workspace = true }
 filetime = { workspace = true }
@@ -37,6 +38,7 @@ pathdiff = { workspace = true }
 quick-junit = { workspace = true, optional = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
+same-file = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
@@ -61,7 +63,7 @@ tempfile = { workspace = true }
 [features]
 cache = ["ruff_cache"]
 junit = ["dep:quick-junit"]
-os = ["ignore", "dep:etcetera", "dep:which"]
+os = ["ignore", "dep:etcetera", "dep:same-file", "dep:which"]
 serde = [
     "camino/serde1",
     "dep:serde",

@@ -100,24 +100,6 @@ methods, even though it is not available on `types.MethodType`:
 reveal_type(bound_method.__kwdefaults__)  # revealed: dict[str, Any] | None
 ```
 
-Bound-method attributes are resolved in two stages: first on `types.MethodType`, then, if absent, on
-the underlying function object. A protocol refinement of the bound method must not be used as the
-receiver for that underlying-function fallback:
-
-```py
-from typing import Protocol, runtime_checkable
-
-@runtime_checkable
-class ReturnsStr(Protocol):
-    def __call__(self, x: str) -> str: ...
-
-def narrowed_bound_method_attribute():
-    method = C().f
-    if isinstance(method, ReturnsStr):
-        reveal_type(method)  # revealed: (bound method C.f(x: int) -> str) & ReturnsStr
-        reveal_type(method.__globals__)  # revealed: dict[str, Any]
-```
-
 ## Basic method calls on class objects and instances
 
 ```py
@@ -262,6 +244,8 @@ class SubclassOfAny(Any):
 
 a = SubclassOfAny()
 assert_type(a.method(), int)
+
+value: str = a.method()  # error: [invalid-assignment]
 
 assert_type(a.non_existing_method(), Any)
 ```
@@ -432,6 +416,29 @@ reveal_type(Derived().f)  # revealed: bound method type[Derived].f(x: int) -> st
 
 reveal_type(Derived.f(1))  # revealed: str
 reveal_type(Derived().f(1))  # revealed: str
+```
+
+### Implicit receivers in generic final classes
+
+For a generic final class, an implicit `type[Self]` receiver can bind to another classmethod on the
+exact generic class object:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import final
+
+@final
+class GenericFinal[T]:
+    @classmethod
+    def call_method(cls) -> None:
+        cls.method()
+
+    @classmethod
+    def method(cls) -> None: ...
 ```
 
 ### Accessing the classmethod as a static member
@@ -979,6 +986,30 @@ class X:
         return self.__new__(type(self))
 ```
 
+## Bound-method attribute fallback
+
+Bound-method attributes are resolved first on `types.MethodType`, then, if absent, on the underlying
+function object. A protocol refinement of the bound method must not be used as the receiver for that
+underlying-function fallback:
+
+```py
+from typing import Protocol, runtime_checkable
+
+class C:
+    def f(self, x: int) -> str:
+        return "a"
+
+@runtime_checkable
+class ReturnsStr(Protocol):
+    def __call__(self, x: str) -> str: ...
+
+def narrowed_bound_method_attribute():
+    method = C().f
+    if isinstance(method, ReturnsStr):
+        reveal_type(method)  # revealed: (bound method C.f(x: int) -> str) & ReturnsStr
+        reveal_type(method.__globals__)  # revealed: dict[str, Any]
+```
+
 ## Builtin functions and methods
 
 Some builtin functions and methods are heavily special-cased by ty. This mdtest checks that various
@@ -987,7 +1018,8 @@ properties are understood correctly for these functions and methods.
 ```py
 import types
 from typing import Any, Callable
-from ty_extensions import static_assert, RegularCallableTypeOf, is_assignable_to, TypeOf
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, TypeOf, is_assignable_to
 
 def f(obj: type) -> None: ...
 

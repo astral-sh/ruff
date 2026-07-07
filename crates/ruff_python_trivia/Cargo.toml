@@ -1,7 +1,7 @@
 [package]
 name = "ruff_python_trivia"
-version = "0.0.0"
-publish = false
+version = "0.0.3"
+description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -17,6 +17,7 @@ ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 
 itertools = { workspace = true }
+rustc-hash = { workspace = true }
 unicode-ident = { workspace = true }
 
 [lints]

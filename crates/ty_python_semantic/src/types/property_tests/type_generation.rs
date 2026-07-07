@@ -93,7 +93,7 @@ impl CallableParams {
     pub(crate) fn into_parameters(self, db: &TestDb) -> Parameters<'_> {
         match self {
             CallableParams::GradualForm => Parameters::gradual_form(),
-            CallableParams::List(params) => Parameters::new(
+            CallableParams::List(params) => Parameters::from_annotation(
                 db,
                 params.into_iter().map(|param| {
                     let parameter = match param.kind {
@@ -161,14 +161,15 @@ impl Ty {
             Ty::BooleanLiteral(b) => Type::bool_literal(b),
             Ty::LiteralString => Type::literal_string(),
             Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
-            Ty::EnumLiteral(name) => Type::enum_literal(EnumLiteralType::new(
-                db,
-                known_module_symbol(db, KnownModule::Uuid, "SafeUUID")
+            Ty::EnumLiteral(name) => {
+                let enum_class = known_module_symbol(db, KnownModule::Uuid, "SafeUUID")
                     .place
                     .expect_type()
-                    .expect_class_literal(),
-                Name::new(name),
-            )),
+                    .expect_class_literal()
+                    .into_enum_class(db)
+                    .expect("`uuid.SafeUUID` is an enum");
+                Type::enum_literal(EnumLiteralType::new(db, enum_class, Name::new(name)))
+            }
             Ty::SingleMemberEnumLiteral => {
                 let ty = known_module_symbol(db, KnownModule::Dataclasses, "MISSING")
                     .place

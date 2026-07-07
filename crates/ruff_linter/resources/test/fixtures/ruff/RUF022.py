@@ -46,7 +46,7 @@ __all__ = [
 ]
 
 # we implement an "isort-style sort":
-# SCEAMING_CASE constants first,
+# SCREAMING_CASE constants first,
 # then CamelCase classes,
 # then anything that's lowercase_snake_case.
 # This (which is currently alphabetically sorted)

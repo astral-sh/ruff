@@ -146,6 +146,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let system = OsSystem::new(&cwd);
     let watch = args.watch;
     let exit_zero = args.exit_zero;
+    let memory_report = std::env::var(EnvVars::TY_MEMORY_REPORT).ok();
     let config_file = args
         .config_file
         .as_ref()
@@ -174,6 +175,20 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         project.set_included_paths(&mut db, check_paths);
     }
 
+    // Disabling LRU only assumes that the database is short-lived; unlike freezing below, it does
+    // not require immutable inputs.
+    if !watch {
+        ruff_db::disable_lru(&mut db);
+    }
+
+    // A one-shot check never mutates these heavily read inputs, so freezing them avoids recording
+    // unnecessary Salsa dependencies. Watch mode updates inputs incrementally, fix modes apply
+    // source-text overrides, and memory reports measure the database without this optimization, so
+    // they must keep the inputs mutable.
+    if !watch && matches!(mode, MainLoopMode::Check) && memory_report.is_none() {
+        db.freeze();
+    }
+
     let (main_loop, main_loop_cancellation_token) =
         MainLoop::new(mode, project_options_overrides, printer);
 
@@ -194,19 +209,23 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     };
 
     let mut stdout = printer.stream_for_requested_summary().lock();
-    match std::env::var(EnvVars::TY_MEMORY_REPORT).as_deref() {
-        Ok("short") => write!(stdout, "{}", db.salsa_memory_dump().display_short())?,
-        Ok("full") => write!(stdout, "{}", db.salsa_memory_dump().display_full())?,
-        Ok("json") => writeln!(stdout, "{}", db.salsa_memory_dump().to_json())?,
-        Ok(other) => {
+    match memory_report.as_deref() {
+        Some("short") => write!(stdout, "{}", db.salsa_memory_dump().display_short())?,
+        Some("full") => write!(stdout, "{}", db.salsa_memory_dump().display_full())?,
+        Some("json") => writeln!(stdout, "{}", db.salsa_memory_dump().to_json())?,
+        Some(other) => {
             tracing::warn!(
                 "Unknown value for `TY_MEMORY_REPORT`: `{other}`. Valid values are `short`, `full`, and `json`."
             );
         }
-        Err(_) => {}
+        None => {}
     }
 
     std::mem::forget(db);
+
+    if matches!(exit_status, ExitStatus::Interrupted) {
+        return Ok(ExitStatus::Interrupted);
+    }
 
     if exit_zero {
         Ok(ExitStatus::Success)
@@ -229,6 +248,9 @@ pub enum ExitStatus {
     /// Internal ty error (panic, or any other error that isn't due to the user using the
     /// program incorrectly or transient environment errors).
     InternalError = 101,
+
+    /// Checking was interrupted by Ctrl+C.
+    Interrupted = 130,
 }
 
 impl ExitStatus {
@@ -302,9 +324,7 @@ impl MainLoop {
         })?;
 
         self.watcher = Some(ProjectWatcher::new(watcher, db));
-        self.run(db)?;
-
-        Ok(ExitStatus::Success)
+        self.run(db)
     }
 
     fn run(self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
@@ -435,7 +455,7 @@ impl MainLoop {
                             let terminal_settings = db.project().settings(db).terminal();
                             exit_status_from_diagnostics(diagnostics, terminal_settings)
                         }
-                        Err(Canceled) => ExitStatus::Success,
+                        Err(Canceled) => ExitStatus::Interrupted,
                     };
 
                     if exit_status.is_internal_error() {
@@ -466,7 +486,7 @@ impl MainLoop {
                 MainLoopMessage::Exit => {
                     // Cancel any pending queries and wait for them to complete.
                     db.trigger_cancellation();
-                    return Ok(ExitStatus::Success);
+                    return Ok(ExitStatus::Interrupted);
                 }
             }
 

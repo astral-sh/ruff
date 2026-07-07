@@ -966,6 +966,7 @@ fn has_simple_shadowed_bindings(scope: &Scope, id: BindingId, semantic: &Semanti
 fn symbol_used_in_dunder_all(semantic: &SemanticModel<'_>, binding: &ImportBinding) -> bool {
     semantic
         .lookup_symbol_in_scope(binding.symbol_stored_in_outer_scope(), binding.scope, false)
+        .binding_id()
         .is_some_and(|bdg| {
             semantic
                 .binding(bdg)

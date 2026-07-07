@@ -1,8 +1,8 @@
 use super::PositionEncoding;
 use crate::Db;
-use crate::system::file_to_url;
+use crate::system::file_to_uri;
 
-use lsp_types::Url;
+use lsp_types::Uri;
 use ruff_db::files::{File, FileRange, system_path_to_file, vendored_path_to_file};
 use ruff_db::source::{line_index, source_text};
 use ruff_db::system::SystemPathBuf;
@@ -17,7 +17,7 @@ pub(crate) struct LspRange {
     range: lsp_types::Range,
 
     /// The URI of this range's text document
-    uri: Option<lsp_types::Url>,
+    uri: Option<lsp_types::Uri>,
 }
 
 impl LspRange {
@@ -58,7 +58,7 @@ pub(crate) struct LspPosition {
     position: lsp_types::Position,
 
     /// The URI of this range's text document
-    uri: Option<lsp_types::Url>,
+    uri: Option<lsp_types::Uri>,
 }
 
 impl LspPosition {
@@ -75,7 +75,7 @@ impl LspPosition {
 
     /// Returns the uri of the text document this position belongs to.
     #[expect(unused)]
-    pub(crate) fn uri(&self) -> Option<&lsp_types::Url> {
+    pub(crate) fn uri(&self) -> Option<&lsp_types::Uri> {
         self.uri.as_ref()
     }
 }
@@ -84,13 +84,13 @@ pub(crate) trait RangeExt {
     /// Convert an LSP Range to a [`TextRange`].
     ///
     /// Returns `None` if `file` is a notebook and the
-    /// cell identified by `url` can't be looked up or if the notebook
+    /// cell identified by `uri` can't be looked up or if the notebook
     /// isn't open in the editor.
     fn to_text_range(
         &self,
         db: &dyn Db,
         file: File,
-        url: &lsp_types::Url,
+        uri: &lsp_types::Uri,
         encoding: PositionEncoding,
     ) -> Option<TextRange>;
 }
@@ -100,11 +100,11 @@ impl RangeExt for lsp_types::Range {
         &self,
         db: &dyn Db,
         file: File,
-        url: &lsp_types::Url,
+        uri: &lsp_types::Uri,
         encoding: PositionEncoding,
     ) -> Option<TextRange> {
-        let start = self.start.to_text_size(db, file, url, encoding)?;
-        let end = self.end.to_text_size(db, file, url, encoding)?;
+        let start = self.start.to_text_size(db, file, uri, encoding)?;
+        let end = self.end.to_text_size(db, file, uri, encoding)?;
 
         Some(TextRange::new(start, end))
     }
@@ -118,13 +118,13 @@ pub(crate) trait PositionExt {
     /// concatenated notebook file.
     ///
     /// Returns `None` if `file` is a notebook and the
-    /// cell identified by `url` can't be looked up or if the notebook
+    /// cell identified by `uri` can't be looked up or if the notebook
     /// isn't open in the editor.
     fn to_text_size(
         &self,
         db: &dyn Db,
         file: File,
-        url: &lsp_types::Url,
+        uri: &lsp_types::Uri,
         encoding: PositionEncoding,
     ) -> Option<TextSize>;
 }
@@ -134,7 +134,7 @@ impl PositionExt for lsp_types::Position {
         &self,
         db: &dyn Db,
         file: File,
-        url: &lsp_types::Url,
+        uri: &lsp_types::Uri,
         encoding: PositionEncoding,
     ) -> Option<TextSize> {
         let source = source_text(db, file);
@@ -142,7 +142,7 @@ impl PositionExt for lsp_types::Position {
 
         if let Some(notebook) = source.as_notebook() {
             let notebook_document = db.notebook_document(file)?;
-            let cell_index = notebook_document.cell_index_by_uri(url)?;
+            let cell_index = notebook_document.cell_index_by_uri(uri)?;
 
             let cell_start_offset = notebook.cell_offset(cell_index).unwrap_or_default();
             let cell_relative_line = OneIndexed::from_zero_indexed(u32_index_to_usize(self.line));
@@ -206,7 +206,7 @@ impl TextSizeExt for TextSize {
             });
         }
 
-        let uri = file_to_url(db, file);
+        let uri = file_to_uri(db, file);
         let position = text_size_to_lsp_position(*self, &source, &index, encoding);
 
         Some(LspPosition { position, uri })
@@ -323,7 +323,7 @@ impl ToRangeExt for TextRange {
 
         let range = text_range_to_lsp_range(*self, &source, &index, encoding);
 
-        let uri = file_to_url(db, file);
+        let uri = file_to_uri(db, file);
         Some(LspRange { range, uri })
     }
 }
@@ -353,7 +353,7 @@ impl FileRangeExt for FileRange {
 /// path types (if applicable).
 pub(crate) fn resolve_file_uri_range(
     db: &ProjectDatabase,
-    file_uri: &Url,
+    file_uri: &Uri,
     range: lsp_types::Range,
     encoding: PositionEncoding,
 ) -> Option<(File, TextSize)> {

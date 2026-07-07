@@ -26,7 +26,7 @@ python-version = "3.12"
 
 ```py
 from __future__ import annotations
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class A:
     def a(self): ...
@@ -495,7 +495,7 @@ super objects are combined into a union.
 
 ```py
 from typing import Literal
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class A: ...
 
@@ -562,7 +562,8 @@ python-version = "3.12"
 ```
 
 ```py
-from ty_extensions import TypeOf, static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 class A[T]:
     def f(self, a: T) -> T:
@@ -758,6 +759,31 @@ reveal_type(A()[0])  # revealed: int
 reveal_type(super(B, B()).__getitem__)  # revealed: bound method B.__getitem__(key: int) -> int
 # error: [not-subscriptable] "Cannot subscript object of type `<super: <class 'B'>, B>` with no `__getitem__` method"
 super(B, B())[0]
+```
+
+### Generic base initializer
+
+A generic base initializer can inherit both its own class's generic context and the subclass's
+generic context. The merged context is not the same as the subclass's enclosing context and should
+not be freshened as a recursive reference.
+
+```py
+from collections.abc import Callable
+from typing import Generic
+from typing_extensions import TypeVar
+
+T = TypeVar("T", bound=BaseException, covariant=True)
+S = TypeVar("S", bound=BaseException, default=BaseException, covariant=True)
+
+class Base(Generic[T]):
+    def __init__(self, check: Callable[[T], bool] | None) -> None:
+        self.check = check
+
+class Child(Base[S], Generic[S]):
+    def __init__(self, check: Callable[[S], bool] | None) -> None:
+        # Regression test: Freshening the merged context made this expect
+        # `Callable[[BaseException], bool]` instead of `Callable[[S], bool]`.
+        super().__init__(check)
 ```
 
 ## Subclass Using Concrete Type Instead of `Self`

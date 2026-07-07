@@ -80,7 +80,8 @@ def _(a: MyGenericAlias1, b: MyGenericAlias2, c: MyGenericAlias3) -> None:
 
 ```py
 from typing import TypeAlias
-from ty_extensions import is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 MyList: TypeAlias = list["int"]
 
@@ -238,6 +239,13 @@ MyAlias4: TypeAlias = Callable[Concatenate[dict[str, T], ...], list[U]]
 
 def _(c: MyAlias4[int, str]):
     reveal_type(c)  # revealed: (dict[str, int], /, *args: Any, **kwargs: Any) -> list[str]
+```
+
+## Explicit aliases using `TypeAliasType`
+
+```py
+from typing import TypeAlias, TypeVar
+from typing_extensions import Callable, Concatenate, TypeAliasType
 
 T = TypeVar("T")
 
@@ -351,7 +359,8 @@ my_isinstance(1, (int, (str, 1)))
 
 ```py
 from typing import TypeAlias, TypeVar, Union
-from ty_extensions import Bottom, Top, is_subtype_of, static_assert
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_subtype_of
 
 K = TypeVar("K")
 V = TypeVar("V")

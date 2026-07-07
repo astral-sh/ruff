@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
-use lsp_types::Url;
+use lsp_types::Uri;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_macros::Combine;
 use ruff_python_ast::PythonVersion;
+use ruff_ranged_value::{RangedValue, ValueSource};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use strum::IntoEnumIterator;
@@ -13,7 +14,7 @@ use ty_project::CheckMode;
 use ty_project::metadata::Options as TyOptions;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::python_version::SupportedPythonVersion;
-use ty_project::metadata::value::{RangedValue, RelativePathBuf, ValueSource};
+use ty_project::metadata::value::RelativePathBuf;
 
 use super::settings::{ExperimentalSettings, GlobalSettings, WorkspaceSettings};
 use crate::logging::LogLevel;
@@ -504,7 +505,7 @@ pub(crate) struct EnvironmentVersion {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonEnvironment {
     #[deprecated]
-    pub(crate) folder_uri: Option<Url>,
+    pub(crate) folder_uri: Option<Uri>,
     #[deprecated]
     #[serde(rename = "type")]
     pub(crate) kind: Option<String>,
@@ -516,6 +517,6 @@ pub(crate) struct PythonEnvironment {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonExecutable {
     #[deprecated]
-    pub(crate) uri: Option<Url>,
+    pub(crate) uri: Option<Uri>,
     pub(crate) sys_prefix: SystemPathBuf,
 }

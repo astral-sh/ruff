@@ -178,8 +178,8 @@ fn create_class_def_stmt(
         arguments: Some(Box::new(Arguments {
             args: Box::from([base_class.clone()]),
             keywords: match total_keyword {
-                Some(keyword) => Box::from([keyword.clone()]),
-                None => Box::from([]),
+                Some(keyword) => std::iter::once(keyword.clone()).collect(),
+                None => std::iter::empty().collect(),
             },
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,

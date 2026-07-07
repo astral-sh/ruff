@@ -156,6 +156,54 @@ p = partial(f, 1)
 reveal_type(p)  # revealed: partial[(**kwargs: str) -> bool]
 ```
 
+### Specialized generic variadics remain non-gradual
+
+Specializing variadic parameter types to `Any` does not make them gradual when constructing a
+`partial`:
+
+```py
+from functools import partial
+from typing import Any, Callable, Generic, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+T = TypeVar("T")
+
+class C(Generic[T]):
+    def method(self, *args: T, **kwargs: T) -> None: ...
+
+callback = partial(C[Any]().method)
+reveal_type(callback)  # revealed: partial[(*args: Any, **kwargs: Any) -> None]
+# Unlike a gradual callable, this standard variadic callable is a subtype of a no-argument callable.
+static_assert(is_subtype_of(TypeOf[callback], Callable[[], None]))
+```
+
+### Expanded ParamSpec variadics preserve non-gradual parameters
+
+When a `partial` expands specialized `P.args` and `P.kwargs`, it preserves the kind of the
+parameters inferred for `P`:
+
+```py
+from functools import partial
+from typing import Any, Callable, Generic, ParamSpec, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+class C(Generic[T]):
+    def method(self, *args: T, **kwargs: T) -> None: ...
+
+def invoke(callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None:
+    callback(*args, **kwargs)
+
+callback = partial(invoke, C[Any]().method)
+reveal_type(callback)  # revealed: partial[(*args: Any, **kwargs: Any) -> None]
+# Unlike a gradual callable, this standard variadic callable is a subtype of a no-argument callable.
+static_assert(is_subtype_of(TypeOf[callback], Callable[[], None]))
+```
+
 ### Defaults preserved
 
 ```py
@@ -1573,9 +1621,9 @@ reveal_type(p.__call__("hello"))  # revealed: bool
 
 ### Attribute access on partial results
 
-Standard `partial` attributes like `.func`, `.args`, and `.keywords` should be accessible. Runtime
-protocol narrowing can add a refinement to the concrete `partial` object, but attributes provided by
-`partial` must remain precise when looked up through that intersection.
+Standard `partial` attributes like `.func`, `.args`, and `.keywords` should be accessible. As with
+other intersection types, runtime protocol narrowing preserves the full receiver while looking up
+attributes provided by `partial`.
 
 ```py
 from functools import partial
@@ -1595,6 +1643,9 @@ class PartialMarker(Protocol):
     def __call__(self, value: str) -> bool: ...
 
 if isinstance(p, PartialMarker):
+    reveal_type(p)  # revealed: partial[(b: str) -> bool] & PartialMarker
+    # revealed: bound method (partial[(b: str) -> bool] & PartialMarker).__str__() -> str
+    reveal_type(p.__str__)
     reveal_type(p.args)  # revealed: tuple[Any, ...]
     reveal_type(p.keywords)  # revealed: dict[str, Any]
 ```

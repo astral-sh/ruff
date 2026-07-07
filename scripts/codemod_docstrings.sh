@@ -6,10 +6,10 @@
 # so that we codemod in docstrings that only exist on certain versions.
 #
 # The codemod will only add docstrings to functions/classes that do not
-# already have docstrings. We run with Python 3.14 before running with
-# any other Python version so that we get the Python 3.14 version of the
+# already have docstrings. We run with Python 3.15 before running with
+# any other Python version so that we get the Python 3.15 version of the
 # docstring for a definition that exists on all Python versions: if we
-# ran with Python 3.9 first, then the later runs with Python 3.10+ would
+# ran with Python 3.10 first, then the later runs with Python 3.11+ would
 # not modify the docstring that had already been added using the old version of Python.
 #
 # Note that the codemod can only add docstrings if they exist on the Python platform
@@ -18,10 +18,10 @@
 
 set -eu
 
-docstring_adder="git+https://github.com/astral-sh/docstring-adder.git@1628984426d65ae0549fc43ed182d7a6157648cc"
+docstring_adder="git+https://github.com/astral-sh/docstring-adder.git@701ead71db935e67c25756b9cb1617d58d85bb84"
 stdlib_path="./crates/ty_vendored/vendor/typeshed/stdlib"
 
-for python_version in 3.14 3.13 3.12 3.11 3.10
+for python_version in 3.15 3.14 3.13 3.12 3.11 3.10
 do
   PYTHONUTF8=1 uvx --python="$python_version" --force-reinstall --from="${docstring_adder}" add-docstrings --stdlib-path="${stdlib_path}"
 done

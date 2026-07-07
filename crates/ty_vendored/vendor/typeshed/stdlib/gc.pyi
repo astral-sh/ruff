@@ -62,16 +62,17 @@ def get_objects(generation: int | None = None) -> list[Any]:
       generation
         Generation to extract the objects from.
 
-    If generation is not None, return only the objects tracked by the collector
-    that are in that generation.
+    If generation is not None, return only the objects tracked by the
+    collector that are in that generation.
     """
 
 def freeze() -> None:
     """Freeze all current tracked objects and ignore them for future collections.
 
-    This can be used before a POSIX fork() call to make the gc copy-on-write friendly.
-    Note: collection before a POSIX fork() call may free pages for future allocation
-    which can cause copy-on-write.
+    This can be used before a POSIX fork() call to make the gc copy-on-write
+    friendly.
+    Note: collection before a POSIX fork() call may free pages for future
+    allocation which can cause copy-on-write.
     """
 
 def unfreeze() -> None:

@@ -5,8 +5,8 @@ use crate::types::protocol_class::ProtocolClass;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::variance::VarianceInferable;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, ClassType, DynamicType,
-    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral, ClassType,
+    DynamicType, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
     SpecialFormType, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
     TypedDictType, UnionType, todo_type,
 };
@@ -133,6 +133,18 @@ impl<'db> SubclassOfType<'db> {
 
     pub const fn into_type_var(self) -> Option<BoundTypeVarInstance<'db>> {
         self.subclass_of.into_type_var()
+    }
+
+    /// Return the exact class-object type of this `type[T]` `TypeVar`'s upper bound, if it has one.
+    ///
+    /// This can only succeed when the upper bound normalizes to a final class.
+    pub(crate) fn exact_typevar_upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.into_type_var()
+            .and_then(|typevar| typevar.typevar(db).upper_bound(db))
+            .and_then(|bound| {
+                let bound = Self::try_from_instance(db, bound.resolve_type_alias(db))?;
+                matches!(bound, Type::ClassLiteral(_) | Type::GenericAlias(_)).then_some(bound)
+            })
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(
@@ -281,7 +293,7 @@ impl<'db> SubclassOfType<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for SubclassOfType<'db> {
-    fn variance_of(self, db: &dyn Db, typevar: BoundTypeVarInstance<'_>) -> TypeVarVariance {
+    fn variance_of(self, db: &dyn Db, typevar: BoundTypeVarIdentity<'_>) -> TypeVarVariance {
         match self.subclass_of {
             SubclassOfInner::Class(class) => class.variance_of(db, typevar),
             SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => TypeVarVariance::Bivariant,
@@ -304,11 +316,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(target_class)) => {
                 ConstraintSet::from_bool(
                     self.constraints,
-                    target_class.is_object(db) || self.relation.is_assignability(),
+                    target_class.is_object(db) || self.is_eager_assignability(),
                 )
             }
             (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
+                ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
             }
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,

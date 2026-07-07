@@ -61,6 +61,26 @@ reveal_type(Valid[int, str, None]())  # revealed: Valid[int, str, None]
 class Invalid[S = T]: ...
 ```
 
+Traditional type variables cannot be used as defaults for functions with PEP 695 type parameters:
+
+```py
+from typing import ParamSpec, TypeVar
+
+K = TypeVar("K")
+P = ParamSpec("P")
+
+# error: [unbound-type-variable] "Legacy type variable `K` cannot be used in a function with PEP 695 type parameters"
+def legacy_default[T = K](): ...
+
+# error: [unbound-type-variable] "Legacy type variable `P` cannot be used in a function with PEP 695 type parameters"
+def paramspec_default[**Q = P](): ...
+
+# error: [unbound-type-variable] "Legacy type variable `K` cannot be used in a function with PEP 695 type parameters"
+# error: [unbound-type-variable] "Legacy type variable `K` cannot be used in a function with PEP 695 type parameters"
+def multiple_legacy_defaults[T = K, U = K](value: K) -> K:
+    return value
+```
+
 ### Invalid defaults
 
 A TypeVar default must be compatible with its bound or constraints.
@@ -99,18 +119,13 @@ def i[T: (int, str) = Any](): ...
 When the default is a TypeVar, its upper bound must be assignable to the outer TypeVar's bound:
 
 ```py
-from typing import TypeVar
-
-T1 = TypeVar("T1", bound=int)
-T3 = TypeVar("T3", bound=str)
-
 # OK: `float` in a type expression means `int | float`,
 # and the upper bound of `T1` (`int`) is assignable to `int | float`
-def f[S: float = T1](): ...
+def f[T1: int, S: float = T1](): ...
 
 # `T3` has bound `str`, which is not assignable to `int | float`
 # error: [invalid-type-variable-default] "Default `T3` of TypeVar `U` is not assignable to upper bound `int | float` of `U` because its upper bound `str` is not assignable to `int | float`"
-def g[U: float = T3](): ...
+def g[T3: str, U: float = T3](): ...
 ```
 
 #### An unbounded default TypeVar has an implicit `object` bound
@@ -119,12 +134,8 @@ An unbounded TypeVar has an implicit upper bound of `object`, which is not assig
 restrictive bound:
 
 ```py
-from typing import TypeVar
-
-T1 = TypeVar("T1")
-
 # error: [invalid-type-variable-default] "Default `T1` of TypeVar `S` is not assignable to upper bound `int` of `S` because its upper bound `object` is not assignable to `int`"
-def f[S: int = T1](): ...
+def f[T1, S: int = T1](): ...
 ```
 
 #### A constrained default TypeVar's constraints must all be assignable to the outer bound
@@ -132,22 +143,17 @@ def f[S: int = T1](): ...
 When the default TypeVar has constraints, every constraint must be assignable to the outer bound:
 
 ```py
-from typing import TypeVar
-
-T1 = TypeVar("T1", int, str)
-T2 = TypeVar("T2", int, bool)
-
 # OK: `T1`'s constraints are `int` and `str`,
 # which are both assignable to `object`
-def f[S: object = T1](): ...
+def f[T1: (int, str), S: object = T1](): ...
 
 # `T1` has constraint `str`, which is not assignable to bound `int`
 # error: [invalid-type-variable-default] "Default `T1` of TypeVar `U` is not assignable to upper bound `int` of `U` because constraint `str` of `T1` is not assignable to `int`"
-def g[U: int = T1](): ...
+def g[T1: (int, str), U: int = T1](): ...
 
 # OK: `T2`'s constraints are `int` and `bool`,
 # which are both assignable to `int`
-def h[V: int = T2](): ...
+def h[T2: (int, bool), V: int = T2](): ...
 ```
 
 #### Local type-parameter defaults
@@ -176,17 +182,13 @@ When the default TypeVar has constraints, they must all appear in the outer Type
 list:
 
 ```py
-from typing import TypeVar
-
-T1 = TypeVar("T1", int, str)
-
 # OK: `T1`'s constraints ({int, str}) are a subset
 # of `S`'s constraints ({int, str, bool})
-def f[S: (int, str, bool) = T1](): ...
+def f[T1: (int, str), S: (int, str, bool) = T1](): ...
 
 # `T1` has constraint `int` which is not one of `U`'s constraints ({bool, complex})
 # error: [invalid-type-variable-default]
-def g[U: (bool, complex) = T1](): ...
+def g[T1: (int, str), U: (bool, complex) = T1](): ...
 ```
 
 #### Invalid constraints with default (no cascading diagnostic)
@@ -205,18 +207,13 @@ A bounded or unbounded TypeVar (one without constraints) cannot be used as the d
 constrained TypeVar, because there is no guarantee it will satisfy any of the constraints:
 
 ```py
-from typing import TypeVar
-
-T1 = TypeVar("T1", bound=int)
-T2 = TypeVar("T2")
-
 # `T1` has a bound but no constraints
 # error: [invalid-type-variable-default]
-def f[S: (float, str) = T1](): ...
+def f[T1: int, S: (float, str) = T1](): ...
 
 # `T2` has no bound or constraints
 # error: [invalid-type-variable-default]
-def g[U: (str, bytes) = T2](): ...
+def g[T2, U: (str, bytes) = T2](): ...
 ```
 
 ### Type variables with an upper bound
@@ -307,7 +304,8 @@ specialization. Thus, the typevar is a subtype of itself and of `object`, but no
 (including other typevars).
 
 ```py
-from ty_extensions import is_assignable_to, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
 
 class Super: ...
 class Base(Super): ...
@@ -535,7 +533,8 @@ def union_with_dynamic[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
 And an intersection of a typevar with another type is always a subtype of the TypeVar:
 
 ```py
-from ty_extensions import Intersection, Not, is_disjoint_from
+from ty_extensions import Intersection, Not
+from ty_extensions._internal import is_disjoint_from
 
 class A: ...
 
@@ -560,7 +559,8 @@ that final class.)
 
 ```py
 from typing import final
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 @final
 class FinalClass: ...
@@ -585,7 +585,8 @@ TypeVars which have non-fully-static bounds or constraints are also self-equival
 
 ```py
 from typing import final, Any
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 # fmt: off
 
@@ -612,7 +613,8 @@ An unbounded, unconstrained typevar is not a singleton, because it can be specia
 non-singleton type.
 
 ```py
-from ty_extensions import is_singleton, is_single_valued, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_singleton, is_single_valued
 
 def unbounded_unconstrained[T](t: T) -> None:
     static_assert(not is_singleton(T))
@@ -840,7 +842,8 @@ The intersection of a typevar with any other type is assignable to (and if fully
 of) itself.
 
 ```py
-from ty_extensions import is_assignable_to, is_subtype_of, Not, static_assert
+from ty_extensions import Not, static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
 
 def intersection_is_assignable[T](t: T) -> None:
     static_assert(is_assignable_to(Intersection[T, None], T))

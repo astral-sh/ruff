@@ -13,9 +13,8 @@ use ruff_python_ast::{ModModule, PySourceType, PythonVersion};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{ParseError, ParseOptions, Parsed, UnsupportedSyntaxError};
-use ruff_source_file::SourceFile;
 
-use crate::checkers::ast::{LintContext, check_ast};
+use crate::checkers::ast::{LazySourceFile, LintContext, check_ast};
 use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
 use crate::checkers::noqa::check_noqa;
@@ -24,7 +23,7 @@ use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
-use crate::noqa::add_noqa;
+use crate::noqa::add_suppression;
 use crate::package::PackageRoot;
 use crate::preview::is_py315_support_enabled;
 use crate::registry::Rule;
@@ -34,7 +33,7 @@ use crate::settings::types::UnsafeFixes;
 use crate::settings::{LinterSettings, TargetVersion, flags};
 use crate::source_kind::SourceKind;
 use crate::suppression::Suppressions;
-use crate::{Locator, directives, fs, warn_user_once};
+use crate::{Locator, SuppressionKind, directives, fs, warn_user_once};
 
 pub(crate) mod float;
 
@@ -360,12 +359,10 @@ pub fn check_path(
         }
     }
 
-    let syntax_errors = parsed.unsupported_syntax_errors();
-
     diagnostics_to_messages(
         diagnostics,
         parsed.errors(),
-        syntax_errors,
+        parsed.unsupported_syntax_errors(),
         &semantic_syntax_errors,
         directives,
         &source_file,
@@ -374,14 +371,15 @@ pub fn check_path(
 
 const MAX_ITERATIONS: usize = 100;
 
-/// Add any missing `# noqa` pragmas to the source code at the given `Path`.
-pub fn add_noqa_to_path(
+/// Add any missing suppression comments to the source code at the given `Path`.
+pub fn add_suppressions_to_path(
     path: &Path,
     package: Option<PackageRoot<'_>>,
     source_kind: &SourceKind,
     source_type: PySourceType,
     settings: &LinterSettings,
     reason: Option<&str>,
+    suppression_kind: SuppressionKind,
 ) -> Result<usize> {
     // Parse once.
     let target_version = settings.resolve_target_version(path);
@@ -425,9 +423,9 @@ pub fn add_noqa_to_path(
         &suppressions,
     );
 
-    // Add any missing `# noqa` pragmas.
+    // Add any missing suppression comments.
     // TODO(dhruvmanila): Add support for Jupyter Notebooks
-    add_noqa(
+    add_suppression(
         path,
         &diagnostics,
         &locator,
@@ -437,6 +435,7 @@ pub fn add_noqa_to_path(
         stylist.line_ending(),
         reason,
         &suppressions,
+        suppression_kind,
     )
 }
 
@@ -515,20 +514,20 @@ fn diagnostics_to_messages(
     unsupported_syntax_errors: &[UnsupportedSyntaxError],
     semantic_syntax_errors: &[SemanticSyntaxError],
     directives: &Directives,
-    source_file: &SourceFile,
+    source_file: &LazySourceFile<'_>,
 ) -> Vec<Diagnostic> {
     parse_errors
         .iter()
         .map(|parse_error| {
-            Diagnostic::invalid_syntax(source_file.clone(), &parse_error.error, parse_error)
+            Diagnostic::invalid_syntax(source_file.get().clone(), &parse_error.error, parse_error)
         })
         .chain(unsupported_syntax_errors.iter().map(|syntax_error| {
-            Diagnostic::invalid_syntax(source_file.clone(), syntax_error, syntax_error)
+            Diagnostic::invalid_syntax(source_file.get().clone(), syntax_error, syntax_error)
         }))
         .chain(
             semantic_syntax_errors
                 .iter()
-                .map(|error| Diagnostic::invalid_syntax(source_file.clone(), error, error)),
+                .map(|error| Diagnostic::invalid_syntax(source_file.get().clone(), error, error)),
         )
         .chain(diagnostics.into_iter().map(|mut diagnostic| {
             if let Some(range) = diagnostic.range() {
@@ -770,9 +769,11 @@ impl ParseSource {
     }
 }
 
-/// Like [`ruff_python_parser::parse_unchecked_source`] but with an additional [`PythonVersion`]
-/// argument.
-fn parse_unchecked_source(
+/// Like [`ruff_python_parser::parse_unchecked_source`], but with an explicit [`PythonVersion`] and
+/// per-cell notebook parsing.
+///
+/// Per-cell modules are merged so definitions remain visible across cells.
+pub fn parse_unchecked_source(
     source_kind: &SourceKind,
     source_type: PySourceType,
     target_version: PythonVersion,
@@ -781,9 +782,16 @@ fn parse_unchecked_source(
     // SAFETY: Safe because `PySourceType` always parses to a `ModModule`. See
     // `ruff_python_parser::parse_unchecked_source`. We use `parse_unchecked` (and thus
     // have to unwrap) in order to pass the `PythonVersion` via `ParseOptions`.
-    ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
-        .try_into_module()
-        .expect("PySourceType always parses into a module")
+    match source_kind.as_ipy_notebook() {
+        Some(notebook) => ruff_python_parser::parse_cells_unchecked(
+            source_kind.source_code(),
+            notebook.cell_offsets().content_ranges(),
+            &options,
+        ),
+        None => ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
+            .try_into_module()
+            .expect("PySourceType always parses into a module"),
+    }
 }
 
 #[cfg(test)]
@@ -794,14 +802,13 @@ mod tests {
     use ruff_python_ast::{PySourceType, PythonVersion};
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
-    use ruff_python_parser::ParseOptions;
     use ruff_python_trivia::textwrap::dedent;
     use test_case::test_case;
 
     use ruff_db::diagnostic::Diagnostic;
     use ruff_notebook::{Notebook, NotebookError};
 
-    use crate::linter::check_path;
+    use crate::linter::{check_path, parse_unchecked_source};
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
     use crate::source_kind::SourceKind;
@@ -967,11 +974,9 @@ mod tests {
     ) -> Vec<Diagnostic> {
         let source_type = PySourceType::from(path);
         let target_version = settings.resolve_target_version(path);
-        let options =
-            ParseOptions::from(source_type).with_target_version(target_version.parser_version());
-        let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
-            .try_into_module()
-            .expect("PySourceType always parses into a module");
+        // Mirror the production parse path so notebooks are validated cell by cell.
+        let parsed =
+            parse_unchecked_source(source_kind, source_type, target_version.parser_version());
         let locator = Locator::new(source_kind.source_code());
         let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
         let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());

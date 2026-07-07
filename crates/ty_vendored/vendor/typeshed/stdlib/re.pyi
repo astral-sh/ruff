@@ -69,17 +69,18 @@ resulting RE will match the second character.
     \\\\       Matches a literal backslash.
 
 This module exports the following functions:
-    match     Match a regular expression pattern to the beginning of a string.
-    fullmatch Match a regular expression pattern to all of a string.
-    search    Search a string for the presence of a pattern.
-    sub       Substitute occurrences of a pattern found in a string.
-    subn      Same as sub, but also return the number of substitutions made.
-    split     Split a string by the occurrences of a pattern.
-    findall   Find all occurrences of a pattern in a string.
-    finditer  Return an iterator yielding a Match object for each match.
-    compile   Compile a pattern into a Pattern object.
-    purge     Clear the regular expression cache.
-    escape    Backslash all non-alphanumerics in a string.
+    prefixmatch Match a regular expression pattern to the beginning of a str.
+    match       The original name of prefixmatch prior to 3.15.
+    fullmatch   Match a regular expression pattern to all of a string.
+    search      Search a string for the presence of a pattern.
+    sub         Substitute occurrences of a pattern found in a string.
+    subn        Same as sub, but also return the number of substitutions made.
+    split       Split a string by the occurrences of a pattern.
+    findall     Find all occurrences of a pattern in a string.
+    finditer    Return an iterator yielding a Match object for each match.
+    compile     Compile a pattern into a Pattern object.
+    purge       Clear the regular expression cache.
+    escape      Backslash all non-alphanumerics in a string.
 
 Each function other than purge and escape can take an optional 'flags' argument
 consisting of one or more of the following module constants, joined by "|".
@@ -183,7 +184,7 @@ if sys.version_info >= (3, 13):
 
 @final
 class Match(Generic[AnyStr]):
-    """The result of re.match() and re.search().
+    """The result of re.search(), re.prefixmatch(), and re.fullmatch().
     Match objects always have a boolean value of True.
     """
 
@@ -279,7 +280,7 @@ class Match(Generic[AnyStr]):
     def __copy__(self) -> Match[AnyStr]: ...
     def __deepcopy__(self, memo: Any, /) -> Match[AnyStr]: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """Matches are generic over the type of string which was matched (str or bytes)"""
 
 @final
 class Pattern(Generic[AnyStr]):
@@ -314,7 +315,11 @@ class Pattern(Generic[AnyStr]):
 
     @overload
     def match(self: Pattern[str], string: str, pos: int = 0, endpos: int = sys.maxsize) -> Match[str] | None:
-        """Matches zero or more characters at the beginning of the string."""
+        """prefixmatch($self, /, string, pos=0, endpos=sys.maxsize)
+        --
+
+        Matches zero or more characters at the beginning of the string.
+        """
     @overload
     def match(self: Pattern[bytes], string: ReadableBuffer, pos: int = 0, endpos: int = sys.maxsize) -> Match[bytes] | None: ...
     @overload
@@ -322,6 +327,7 @@ class Pattern(Generic[AnyStr]):
 
     if sys.version_info >= (3, 15):
         prefixmatch = match
+        """Matches zero or more characters at the beginning of the string."""
 
     @overload
     def fullmatch(self: Pattern[str], string: str, pos: int = 0, endpos: int = sys.maxsize) -> Match[str] | None:
@@ -394,7 +400,7 @@ class Pattern(Generic[AnyStr]):
     def __eq__(self, value: object, /) -> bool: ...
     def __hash__(self) -> int: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """Patterns are generic over the type of string they handle (str or bytes)"""
 
 # ----- re variables and constants -----
 
@@ -475,7 +481,10 @@ def match(pattern: bytes | Pattern[bytes], string: ReadableBuffer, flags: _Flags
 
 if sys.version_info >= (3, 15):
     @overload
-    def prefixmatch(pattern: str | Pattern[str], string: str, flags: _FlagsType = 0) -> Match[str] | None: ...
+    def prefixmatch(pattern: str | Pattern[str], string: str, flags: _FlagsType = 0) -> Match[str] | None:
+        """Try to apply the pattern at the start of the string, returning
+        a Match object, or None if no match was found.
+        """
     @overload
     def prefixmatch(pattern: bytes | Pattern[bytes], string: ReadableBuffer, flags: _FlagsType = 0) -> Match[bytes] | None: ...
 

@@ -111,8 +111,8 @@ class BaseEventLoop(AbstractEventLoop):
     def stop(self) -> None:
         """Stop running the event loop.
 
-        Every callback already scheduled will still run.  This simply informs
-        run_forever to stop looping after a complete iteration.
+        Every callback already scheduled will still run.  This simply
+        informs run_forever to stop looping after a complete iteration.
         """
 
     def is_running(self) -> bool:
@@ -132,6 +132,7 @@ class BaseEventLoop(AbstractEventLoop):
 
     async def shutdown_asyncgens(self) -> None:
         """Shutdown all active asynchronous generators."""
+
     # Methods scheduling callbacks.  All these return Handles.
     def call_soon(self, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None) -> Handle:
         """Arrange for a callback to be called as soon as possible.
@@ -178,9 +179,11 @@ class BaseEventLoop(AbstractEventLoop):
         epoch, precision, accuracy and drift are unspecified and may
         differ per event loop.
         """
+
     # Future methods
     def create_future(self) -> Future[Any]:
         """Create a Future object attached to the loop."""
+
     # Tasks methods
     if sys.version_info >= (3, 14):
         def create_task(
@@ -195,12 +198,14 @@ class BaseEventLoop(AbstractEventLoop):
 
             Return a task object.
             """
+
     elif sys.version_info >= (3, 11):
         def create_task(self, coro: _CoroutineLike[_T], *, name: object = None, context: Context | None = None) -> Task[_T]:
             """Schedule a coroutine object.
 
             Return a task object.
             """
+
     else:
         def create_task(self, coro: _CoroutineLike[_T], *, name: object = None) -> Task[_T]:
             """Schedule a coroutine object.
@@ -214,14 +219,15 @@ class BaseEventLoop(AbstractEventLoop):
         If factory is None the default task factory will be set.
 
         If factory is a callable, it should have a signature matching
-        '(loop, coro, **kwargs)', where 'loop' will be a reference to the active
-        event loop, 'coro' will be a coroutine object, and **kwargs will be
-        arbitrary keyword arguments that should be passed on to Task.
-        The callable must return a Task.
+        '(loop, coro, **kwargs)', where 'loop' will be a reference to the
+        active event loop, 'coro' will be a coroutine object, and **kwargs
+        will be arbitrary keyword arguments that should be passed on to
+        Task.  The callable must return a Task.
         """
 
     def get_task_factory(self) -> _TaskFactory | None:
         """Return a task factory, or None if the default one is in use."""
+
     # Methods for interacting with threads
     def call_soon_threadsafe(
         self, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None
@@ -268,12 +274,12 @@ class BaseEventLoop(AbstractEventLoop):
 
             Create a streaming transport connection to a given internet host and
             port: socket family AF_INET or socket.AF_INET6 depending on host (or
-            family if specified), socket type SOCK_STREAM. protocol_factory must be
-            a callable returning a protocol instance.
+            family if specified), socket type SOCK_STREAM. protocol_factory must
+            be a callable returning a protocol instance.
 
-            This method is a coroutine which will try to establish the connection
-            in the background.  When successful, the coroutine returns a
-            (transport, protocol) pair.
+            This method is a coroutine which will try to establish the
+            connection in the background.  When successful, the coroutine
+            returns a (transport, protocol) pair.
             """
         @overload
         async def create_connection(
@@ -420,11 +426,11 @@ class BaseEventLoop(AbstractEventLoop):
             The host parameter can be a string, in that case the TCP server is
             bound to host and port.
 
-            The host parameter can also be a sequence of strings and in that case
-            the TCP server is bound to all hosts of the sequence. If a host
-            appears multiple times (possibly indirectly e.g. when hostnames
-            resolve to the same IP address), the server is only bound once to that
-            host.
+            The host parameter can also be a sequence of strings and in that
+            case the TCP server is bound to all hosts of the sequence.  If
+            a host appears multiple times (possibly indirectly e.g. when
+            hostnames resolve to the same IP address), the server is only bound
+            once to that host.
 
             Return a Server object which can be used to stop the service.
 
@@ -633,6 +639,7 @@ class BaseEventLoop(AbstractEventLoop):
         Raise SendfileNotAvailableError if the system does not support
         sendfile syscall and fallback is False.
         """
+
     if sys.version_info >= (3, 11):
         async def create_datagram_endpoint(  # type: ignore[override]
             self,
@@ -648,6 +655,7 @@ class BaseEventLoop(AbstractEventLoop):
             sock: socket | None = None,
         ) -> tuple[DatagramTransport, _ProtocolT]:
             """Create datagram connection."""
+
     else:
         async def create_datagram_endpoint(
             self,
@@ -664,6 +672,7 @@ class BaseEventLoop(AbstractEventLoop):
             sock: socket | None = None,
         ) -> tuple[DatagramTransport, _ProtocolT]:
             """Create datagram connection."""
+
     # Pipes and subprocesses.
     async def connect_read_pipe(
         self, protocol_factory: Callable[[], _ProtocolT], pipe: Any
@@ -778,6 +787,7 @@ class BaseEventLoop(AbstractEventLoop):
         For custom exception handling, use the
         `set_exception_handler()` method.
         """
+
     # Debug flag management.
     def get_debug(self) -> bool: ...
     def set_debug(self, enabled: bool) -> None: ...
@@ -789,6 +799,7 @@ class BaseEventLoop(AbstractEventLoop):
             be given to finish joining. The default value is None, which means
             that the executor will be given an unlimited amount of time.
             """
+
     else:
         async def shutdown_default_executor(self) -> None:
             """Schedule the shutdown of the default executor."""

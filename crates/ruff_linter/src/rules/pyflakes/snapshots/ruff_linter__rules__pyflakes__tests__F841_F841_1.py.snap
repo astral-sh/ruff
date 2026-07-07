@@ -9,14 +9,12 @@ F841 [*] Local variable `x` is assigned to but never used
   |     ^
   |
 help: Remove assignment to unused variable `x`
-3 |
-4 |
+  |
 5 | def f():
   -     x, y = 1, 2  # this triggers F841 as it's just a simple assignment where unpacking isn't needed
 6 +     _x, y = 1, 2  # this triggers F841 as it's just a simple assignment where unpacking isn't needed
 7 |
-8 |
-9 | def f():
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `y` is assigned to but never used
@@ -27,14 +25,12 @@ F841 [*] Local variable `y` is assigned to but never used
   |        ^
   |
 help: Remove assignment to unused variable `y`
-3 |
-4 |
+  |
 5 | def f():
   -     x, y = 1, 2  # this triggers F841 as it's just a simple assignment where unpacking isn't needed
 6 +     x, _y = 1, 2  # this triggers F841 as it's just a simple assignment where unpacking isn't needed
 7 |
-8 |
-9 | def f():
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `coords` is assigned to but never used
@@ -45,14 +41,12 @@ F841 [*] Local variable `coords` is assigned to but never used
    |              ^^^^^^
    |
 help: Remove assignment to unused variable `coords`
-13 |
-14 |
+   |
 15 | def f():
    -     (x, y) = coords = 1, 2
 16 +     (x, y) = 1, 2
 17 |
-18 |
-19 | def f():
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `coords` is assigned to but never used
@@ -63,14 +57,12 @@ F841 [*] Local variable `coords` is assigned to but never used
    |     ^^^^^^
    |
 help: Remove assignment to unused variable `coords`
-17 |
-18 |
+   |
 19 | def f():
    -     coords = (x, y) = 1, 2
 20 +     (x, y) = 1, 2
 21 |
-22 |
-23 | def f():
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `a` is assigned to but never used
@@ -81,11 +73,11 @@ F841 [*] Local variable `a` is assigned to but never used
    |      ^
    |
 help: Remove assignment to unused variable `a`
-21 |
-22 |
+   |
 23 | def f():
    -     (a, b) = (x, y) = 1, 2  # this triggers F841 on everything
 24 +     (_a, b) = (x, y) = 1, 2  # this triggers F841 on everything
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `b` is assigned to but never used
@@ -96,11 +88,11 @@ F841 [*] Local variable `b` is assigned to but never used
    |         ^
    |
 help: Remove assignment to unused variable `b`
-21 |
-22 |
+   |
 23 | def f():
    -     (a, b) = (x, y) = 1, 2  # this triggers F841 on everything
 24 +     (a, _b) = (x, y) = 1, 2  # this triggers F841 on everything
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `x` is assigned to but never used
@@ -111,11 +103,11 @@ F841 [*] Local variable `x` is assigned to but never used
    |               ^
    |
 help: Remove assignment to unused variable `x`
-21 |
-22 |
+   |
 23 | def f():
    -     (a, b) = (x, y) = 1, 2  # this triggers F841 on everything
 24 +     (a, b) = (_x, y) = 1, 2  # this triggers F841 on everything
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 F841 [*] Local variable `y` is assigned to but never used
@@ -126,9 +118,9 @@ F841 [*] Local variable `y` is assigned to but never used
    |                  ^
    |
 help: Remove assignment to unused variable `y`
-21 |
-22 |
+   |
 23 | def f():
    -     (a, b) = (x, y) = 1, 2  # this triggers F841 on everything
 24 +     (a, b) = (x, _y) = 1, 2  # this triggers F841 on everything
+   |
 note: This is an unsafe fix and may change runtime behavior

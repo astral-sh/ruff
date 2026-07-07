@@ -638,6 +638,10 @@ impl SourceTexts {
 
     /// Revert all files with a tracked override back to their original source text.
     fn revert_all(self, db: &mut dyn Db) {
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "source text overrides for distinct files are independent"
+        )]
         for (file, original) in self.originals {
             file.set_source_text_override(db).to(Some(original));
         }

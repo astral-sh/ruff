@@ -11,9 +11,11 @@ I001 [*] Import block is un-sorted or un-formatted
   | |___________________^
   |
 help: Organize imports
+  |
 1 + import short
 2 + import mediuuuuuuma
 3 | import mediuuuuuumb
   - import short
 4 | import looooooooooooooooong
   - import mediuuuuuuma
+  |

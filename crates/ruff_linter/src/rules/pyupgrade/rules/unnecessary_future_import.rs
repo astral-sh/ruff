@@ -165,6 +165,10 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, scope: &Scope) {
         }
     }
 
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "each import statement produces an independent diagnostic and fix"
+    )]
     for (node_id, unused_aliases) in unused_imports {
         let mut diagnostic = checker.report_diagnostic(
             UnnecessaryFutureImport {

@@ -179,6 +179,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     pyupgrade::rules::lru_cache_with_maxsize_none(checker, decorator_list);
                 }
             }
+            if checker.is_rule_enabled(Rule::DeprecatedAbcDecorator) {
+                pyupgrade::rules::deprecated_abc_decorator(checker, decorator_list);
+            }
             if checker.is_rule_enabled(Rule::CachedInstanceMethod) {
                 flake8_bugbear::rules::cached_instance_method(checker, function_def);
             }

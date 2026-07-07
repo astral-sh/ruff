@@ -1,7 +1,7 @@
 [package]
 name = "ty_python_core"
-version = "0.0.0"
-publish = false
+version = "0.0.3"
+description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -16,7 +16,6 @@ ruff_index = { workspace = true, features = ["salsa"] }
 ruff_memory_usage = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["salsa"] }
 ruff_python_parser = { workspace = true }
-ruff_python_trivia = { workspace = true }
 ruff_text_size = { workspace = true }
 ty_module_resolver = { workspace = true }
 ty_vendored = { workspace = true }
@@ -41,7 +40,7 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing", "os"] }
-ruff_python_parser = { workspace = true }
+ruff_python_trivia = { workspace = true }
 
 anyhow = { workspace = true }
 

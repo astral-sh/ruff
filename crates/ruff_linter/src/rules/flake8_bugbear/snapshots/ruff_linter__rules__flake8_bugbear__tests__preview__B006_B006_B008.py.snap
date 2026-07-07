@@ -9,14 +9,12 @@ B006 [*] Do not use mutable data structures for argument defaults
 64 |     ...
    |
 help: Replace with `None`; initialize within function
-60 | # Flag mutable literals/comprehensions
-61 |
+   |
 62 |
    - def this_is_wrong(value=[1, 2, 3]):
 63 + def this_is_wrong(value=None):
 64 |     ...
-65 |
-66 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -27,14 +25,12 @@ B006 [*] Do not use mutable data structures for argument defaults
 68 |     ...
    |
 help: Replace with `None`; initialize within function
-64 |     ...
-65 |
+   |
 66 |
    - def this_is_also_wrong(value={}):
 67 + def this_is_also_wrong(value=None):
 68 |     ...
-69 |
-70 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -47,14 +43,12 @@ B006 [*] Do not use mutable data structures for argument defaults
 74 |         pass
    |
 help: Replace with `None`; initialize within function
-70 |
-71 | class Foo:
+   |
 72 |     @staticmethod
    -     def this_is_also_wrong_and_more_indented(value={}):
 73 +     def this_is_also_wrong_and_more_indented(value=None):
 74 |         pass
-75 |
-76 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -68,16 +62,14 @@ B006 [*] Do not use mutable data structures for argument defaults
 80 |       ...
    |
 help: Replace with `None`; initialize within function
-74 |         pass
-75 |
+   |
 76 |
    - def multiline_arg_wrong(value={
    -
    - }):
 77 + def multiline_arg_wrong(value=None):
 78 |     ...
-79 |
-80 | def single_line_func_wrong(value = {}): ...
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 Do not use mutable data structures for argument defaults
@@ -98,14 +90,12 @@ B006 [*] Do not use mutable data structures for argument defaults
 86 |     ...
    |
 help: Replace with `None`; initialize within function
-82 | def single_line_func_wrong(value = {}): ...
-83 |
+   |
 84 |
    - def and_this(value=set()):
 85 + def and_this(value=None):
 86 |     ...
-87 |
-88 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -116,14 +106,12 @@ B006 [*] Do not use mutable data structures for argument defaults
 90 |     ...
    |
 help: Replace with `None`; initialize within function
-86 |     ...
-87 |
+   |
 88 |
    - def this_too(value=collections.OrderedDict()):
 89 + def this_too(value=None):
 90 |     ...
-91 |
-92 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -134,14 +122,12 @@ B006 [*] Do not use mutable data structures for argument defaults
 94 |     ...
    |
 help: Replace with `None`; initialize within function
-90 |     ...
-91 |
+   |
 92 |
    - async def async_this_too(value=collections.defaultdict()):
 93 + async def async_this_too(value=None):
 94 |     ...
-95 |
-96 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -152,14 +138,12 @@ B006 [*] Do not use mutable data structures for argument defaults
 98 |     ...
    |
 help: Replace with `None`; initialize within function
-94  |     ...
-95  |
-96  |
-    - def dont_forget_me(value=collections.deque()):
-97  + def dont_forget_me(value=None):
-98  |     ...
-99  |
-100 |
+   |
+96 |
+   - def dont_forget_me(value=collections.deque()):
+97 + def dont_forget_me(value=None):
+98 |     ...
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -171,14 +155,12 @@ B006 [*] Do not use mutable data structures for argument defaults
 103 |     pass
     |
 help: Replace with `None`; initialize within function
-99  |
-100 |
+    |
 101 | # N.B. we're also flagging the function call in the comprehension
     - def list_comprehension_also_not_okay(default=[i**2 for i in range(3)]):
 102 + def list_comprehension_also_not_okay(default=None):
 103 |     pass
-104 |
-105 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -189,14 +171,12 @@ B006 [*] Do not use mutable data structures for argument defaults
 107 |     pass
     |
 help: Replace with `None`; initialize within function
-103 |     pass
-104 |
+    |
 105 |
     - def dict_comprehension_also_not_okay(default={i: i**2 for i in range(3)}):
 106 + def dict_comprehension_also_not_okay(default=None):
 107 |     pass
-108 |
-109 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -207,14 +187,12 @@ B006 [*] Do not use mutable data structures for argument defaults
 111 |     pass
     |
 help: Replace with `None`; initialize within function
-107 |     pass
-108 |
+    |
 109 |
     - def set_comprehension_also_not_okay(default={i**2 for i in range(3)}):
 110 + def set_comprehension_also_not_okay(default=None):
 111 |     pass
-112 |
-113 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -225,14 +203,12 @@ B006 [*] Do not use mutable data structures for argument defaults
 115 |     ...
     |
 help: Replace with `None`; initialize within function
-111 |     pass
-112 |
+    |
 113 |
     - def kwonlyargs_mutable(*, value=[]):
 114 + def kwonlyargs_mutable(*, value=None):
 115 |     ...
-116 |
-117 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -245,14 +221,12 @@ B006 [*] Do not use mutable data structures for argument defaults
 243 |     pass
     |
 help: Replace with `None`; initialize within function
-239 |
-240 | # B006 and B008
+    |
 241 | # We should handle arbitrary nesting of these B008.
     - def nested_combo(a=[float(3), dt.datetime.now()]):
 242 + def nested_combo(a=None):
 243 |     pass
-244 |
-245 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -265,14 +239,12 @@ B006 [*] Do not use mutable data structures for argument defaults
 281 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
     |
 help: Replace with `None`; initialize within function
-276 |
-277 |
+    |
 278 | def mutable_annotations(
     -     a: list[int] | None = [],
 279 +     a: list[int] | None = None,
 280 |     b: Optional[Dict[int, int]] = {},
-281 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-282 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -286,14 +258,12 @@ B006 [*] Do not use mutable data structures for argument defaults
 282 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
     |
 help: Replace with `None`; initialize within function
-277 |
-278 | def mutable_annotations(
+    |
 279 |     a: list[int] | None = [],
     -     b: Optional[Dict[int, int]] = {},
 280 +     b: Optional[Dict[int, int]] = None,
 281 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-282 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-283 | ):
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -307,14 +277,12 @@ B006 [*] Do not use mutable data structures for argument defaults
 283 | ):
     |
 help: Replace with `None`; initialize within function
-278 | def mutable_annotations(
-279 |     a: list[int] | None = [],
+    |
 280 |     b: Optional[Dict[int, int]] = {},
     -     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
 281 +     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = None,
 282 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-283 | ):
-284 |     pass
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -328,14 +296,12 @@ B006 [*] Do not use mutable data structures for argument defaults
 284 |     pass
     |
 help: Replace with `None`; initialize within function
-279 |     a: list[int] | None = [],
-280 |     b: Optional[Dict[int, int]] = {},
+    |
 281 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
     -     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
 282 +     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = None,
 283 | ):
-284 |     pass
-285 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -346,14 +312,12 @@ B006 [*] Do not use mutable data structures for argument defaults
 288 |     """Docstring"""
     |
 help: Replace with `None`; initialize within function
-284 |     pass
-285 |
+    |
 286 |
     - def single_line_func_wrong(value: dict[str, str] = {}):
 287 + def single_line_func_wrong(value: dict[str, str] = None):
 288 |     """Docstring"""
-289 |
-290 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -365,14 +329,12 @@ B006 [*] Do not use mutable data structures for argument defaults
 293 |     ...
     |
 help: Replace with `None`; initialize within function
-288 |     """Docstring"""
-289 |
+    |
 290 |
     - def single_line_func_wrong(value: dict[str, str] = {}):
 291 + def single_line_func_wrong(value: dict[str, str] = None):
 292 |     """Docstring"""
-293 |     ...
-294 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -383,14 +345,12 @@ B006 [*] Do not use mutable data structures for argument defaults
 297 |     """Docstring"""; ...
     |
 help: Replace with `None`; initialize within function
-293 |     ...
-294 |
+    |
 295 |
     - def single_line_func_wrong(value: dict[str, str] = {}):
 296 + def single_line_func_wrong(value: dict[str, str] = None):
 297 |     """Docstring"""; ...
-298 |
-299 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -402,14 +362,12 @@ B006 [*] Do not use mutable data structures for argument defaults
 302 |         ...
     |
 help: Replace with `None`; initialize within function
-297 |     """Docstring"""; ...
-298 |
+    |
 299 |
     - def single_line_func_wrong(value: dict[str, str] = {}):
 300 + def single_line_func_wrong(value: dict[str, str] = None):
 301 |     """Docstring"""; \
-302 |         ...
-303 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
@@ -423,16 +381,14 @@ B006 [*] Do not use mutable data structures for argument defaults
 308 |       """Docstring"""
     |
 help: Replace with `None`; initialize within function
-302 |         ...
-303 |
+    |
 304 |
     - def single_line_func_wrong(value: dict[str, str] = {
     -     # This is a comment
     - }):
 305 + def single_line_func_wrong(value: dict[str, str] = None):
 306 |     """Docstring"""
-307 |
-308 |
+    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 Do not use mutable data structures for argument defaults
@@ -453,10 +409,10 @@ B006 [*] Do not use mutable data structures for argument defaults
 317 |     """Docstring without newline"""
     |
 help: Replace with `None`; initialize within function
-313 |     """Docstring"""
-314 |
+    |
 315 |
     - def single_line_func_wrong(value: dict[str, str] = {}):
 316 + def single_line_func_wrong(value: dict[str, str] = None):
 317 |     """Docstring without newline"""
+    |
 note: This is an unsafe fix and may change runtime behavior

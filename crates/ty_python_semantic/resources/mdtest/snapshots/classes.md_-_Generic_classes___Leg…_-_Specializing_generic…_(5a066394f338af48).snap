@@ -84,10 +84,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.
 69 | # error: [invalid-generic-class] "Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`"
 70 | class BadOrder(Generic[WithDefaultT2, WithDefaultT1]): ...
 71 | 
-72 | WithDefaultU = TypeVar("WithDefaultU", default=int)
+72 | WithDefaultU2 = TypeVar("WithDefaultU2", default=int)
 73 | 
 74 | # error: [invalid-generic-class]
-75 | class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU]): ...
+75 | class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU2]): ...
 76 | from typing_extensions import TypeVar, Generic
 77 | 
 78 | StartT = TypeVar("StartT", default=int)
@@ -188,8 +188,8 @@ error[invalid-generic-class]: Default of `WithDefaultT2` cannot reference later 
 error[invalid-generic-class]: Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`
   --> src/mdtest_snippet.py:75:7
    |
-75 | class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU]): ...
-   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+75 | class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU2]): ...
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
   ::: src/mdtest_snippet.py:63:1
    |

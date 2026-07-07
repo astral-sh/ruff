@@ -1,6 +1,7 @@
 [package]
 name = "ty_project"
 version = "0.0.0"
+publish = false
 edition.workspace = true
 rust-version.workspace = true
 homepage.workspace = true
@@ -22,12 +23,13 @@ ruff_memory_usage = { workspace = true }
 ruff_options_metadata = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["serde"] }
 ruff_python_formatter = { workspace = true, optional = true }
+ruff_ranged_value = { workspace = true, features = ["get-size"] }
 ruff_text_size = { workspace = true }
 ty_combine = { workspace = true }
 ty_module_resolver = { workspace = true }
 ty_python_semantic = { workspace = true, features = ["serde"] }
 ty_static = { workspace = true }
-ty_python_core = { workspace = true, features = ["schemars"] }
+ty_python_core = { workspace = true }
 ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
@@ -68,6 +70,7 @@ schemars = [
     "dep:schemars",
     "ruff_db/schemars",
     "ruff_python_ast/schemars",
+    "ruff_ranged_value/schemars",
     "ty_python_semantic/schemars",
     "ty_python_core/schemars",
 ]

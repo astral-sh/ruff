@@ -12,10 +12,10 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 44 |     ordered_dict: collections.OrderedDict[str, int],
    |
 help: Add `from __future__ import annotations`
+  |
 1 + from __future__ import annotations
 2 | import asyncio
-3 | import collections
-4 | import contextlib
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
@@ -29,8 +29,8 @@ FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collect
 45 |     counter_obj: collections.Counter[str],
    |
 help: Add `from __future__ import annotations`
+  |
 1 + from __future__ import annotations
 2 | import asyncio
-3 | import collections
-4 | import contextlib
+  |
 note: This is an unsafe fix and may change runtime behavior

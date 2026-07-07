@@ -10,16 +10,14 @@ F811 [*] Redefinition of unused `BrokerUsecase` from line 2
 3 |
 4 | if TYPE_CHECKING:
 5 |     # See: https://github.com/astral-sh/ruff/issues/22554
-6 |     # shoud detect -------------------------vvvvvvvvvvvvv
+6 |     # should detect -------------------------vvvvvvvvvvvvv
 7 |     from faststream._internal.broker import BrokerUsecase
   |                                             ^^^^^^^^^^^^^ `BrokerUsecase` redefined here
 8 |     from faststream.specification.schema import Contact, License
   |
 help: Remove definition: `BrokerUsecase`
-4 | if TYPE_CHECKING:
-5 |     # See: https://github.com/astral-sh/ruff/issues/22554
-6 |     # shoud detect -------------------------vvvvvvvvvvvvv
+  |
+6 |     # should detect -------------------------vvvvvvvvvvvvv
   -     from faststream._internal.broker import BrokerUsecase
 7 |     from faststream.specification.schema import Contact, License
-8 |
-9 | if TYPE_CHECKING:
+  |

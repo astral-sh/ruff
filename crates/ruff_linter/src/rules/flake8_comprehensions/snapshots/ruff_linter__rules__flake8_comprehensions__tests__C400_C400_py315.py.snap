@@ -10,8 +10,9 @@ C400 [*] Unnecessary generator (rewrite as a list comprehension)
   | ^^^^^^^^^^^^^^^^^^^^
   |
 help: Rewrite as a list comprehension
-1 | xs = [[1], [2]]
+  |
 2 |
   - list(*x for x in xs)
 3 + [*x for x in xs]
+  |
 note: This is an unsafe fix and may change runtime behavior

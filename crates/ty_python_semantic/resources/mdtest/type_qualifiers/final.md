@@ -689,7 +689,7 @@ python-version = "3.12"
 
 ```py
 from typing import Final, ClassVar, Annotated, TypedDict
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 LEGAL_A: Final[int] = 1
 LEGAL_B: Final = 1

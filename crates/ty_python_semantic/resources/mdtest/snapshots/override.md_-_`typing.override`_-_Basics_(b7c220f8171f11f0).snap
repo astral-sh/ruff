@@ -137,10 +137,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/override.md
 122 |     def bad_settable_property(self, x: int) -> None: ...
 123 |     @lossy_decorator
 124 |     @override
-125 |     def lossy(self): ...  # TODO: should emit `invalid-explicit-override` here
+125 |     def lossy(self): ...  # error: [invalid-explicit-override]
 126 |     @override
 127 |     @lossy_decorator
-128 |     def lossy2(self): ...  # TODO: should emit `invalid-explicit-override` here
+128 |     def lossy2(self): ...  # error: [invalid-explicit-override]
 129 | 
 130 | # TODO: all overrides in this class should cause us to emit *Liskov* violations,
 131 | # but not `@override` violations
@@ -296,6 +296,33 @@ error[invalid-explicit-override]: Method `bad_settable_property` is decorated wi
     |         ^^^^^^^^^^^^^^^^^^^^^
     |
 info: No `bad_settable_property` definitions were found on any superclasses of `Invalid`
+
+```
+
+```
+error[invalid-explicit-override]: Method `lossy` is decorated with `@override` but does not override anything
+   --> src/mdtest_snippet.pyi:124:5
+    |
+124 |     @override
+    |     ---------
+125 |     def lossy(self): ...  # error: [invalid-explicit-override]
+    |         ^^^^^
+    |
+info: No `lossy` definitions were found on any superclasses of `Invalid`
+
+```
+
+```
+error[invalid-explicit-override]: Method `lossy2` is decorated with `@override` but does not override anything
+   --> src/mdtest_snippet.pyi:126:5
+    |
+126 |     @override
+    |     ---------
+127 |     @lossy_decorator
+128 |     def lossy2(self): ...  # error: [invalid-explicit-override]
+    |         ^^^^^^
+    |
+info: No `lossy2` definitions were found on any superclasses of `Invalid`
 
 ```
 

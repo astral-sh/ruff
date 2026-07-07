@@ -6,10 +6,10 @@ use crate::reachability::is_range_reachable;
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
 use crate::types::constraints::ConstraintSetBuilder;
-use crate::types::signatures::{ParameterForm, ParametersKind, Signature};
+use crate::types::signatures::{ParametersKind, Signature};
 use crate::types::{
-    CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownUnion,
-    Type, TypeContext, UnionType,
+    CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownFunction,
+    KnownUnion, Type, TypeContext,
 };
 use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticModel};
 use itertools::Either;
@@ -157,11 +157,13 @@ pub fn definitions_for_name<'db>(
         // a type annotation position and `float` or `complex` otherwise.
         //
         // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
-        if matches!(name_str, "float" | "complex")
-            && let Some(expr) = node.expr_name()
+        if let Some(expr) = node.expr_name()
             && let Some(ty) = expr.inferred_type(model)
             && let Some(union) = ty.as_union()
-            && is_float_or_complex_annotation(db, union, name_str)
+            && matches!(
+                (name_str, union.known(db)),
+                ("float", Some(KnownUnion::Float)) | ("complex", Some(KnownUnion::Complex))
+            )
         {
             return union
                 .elements(db)
@@ -193,17 +195,6 @@ pub fn definitions_for_name<'db>(
     } else {
         resolved_definitions
     }
-}
-
-fn is_float_or_complex_annotation(db: &dyn Db, ty: UnionType, name: &str) -> bool {
-    let float_or_complex_ty = match name {
-        "float" => KnownUnion::Float.to_type(db),
-        "complex" => KnownUnion::Complex.to_type(db),
-        _ => return false,
-    }
-    .expect_union();
-
-    ty == float_or_complex_ty
 }
 
 /// Returns all resolved definitions for an attribute expression `x.y`.
@@ -656,7 +647,7 @@ fn displayed_parameters_for_signature<'db>(
     let parameters = signature.parameters();
 
     match parameters.kind() {
-        ParametersKind::Standard | ParametersKind::Concatenate(_) => {
+        ParametersKind::Standard | ParametersKind::Gradual | ParametersKind::Concatenate(_) => {
             let mut displayed_parameters = Vec::new();
             let mut parameter_to_displayed_parameter_mapping = vec![None; parameters.len()];
 
@@ -730,7 +721,7 @@ fn displayed_parameters_for_signature<'db>(
                 vec![Some(0); parameters.len()],
             )
         }
-        ParametersKind::Gradual | ParametersKind::Top => (Vec::new(), vec![None; parameters.len()]),
+        ParametersKind::Top => (Vec::new(), vec![None; parameters.len()]),
     }
 }
 
@@ -866,18 +857,40 @@ fn full_type_bindings_for_call<'db>(
         .unwrap_or_else(|CallError(_, bindings)| *bindings)
 }
 
-/// Returns the form for a single argument from a successful binding.
-fn argument_form_from_successful_binding(
-    binding: &crate::types::call::Binding<'_>,
+// These are the callables whose arguments were historically classified as type expressions.
+// TODO: Generalize this once call binding records the interpretation selected for each argument.
+// Inspecting only the declared annotation is insufficient because `type[T]` values may remain
+// values, while aliases, unions, intersections, and specialized generics require more context.
+// `TypeForm(...)` also bypasses callable bindings and needs separate handling.
+fn known_type_form_parameter_index(db: &dyn Db, callable_type: Type<'_>) -> Option<usize> {
+    match callable_type {
+        Type::FunctionLiteral(function) => match function.known(db) {
+            Some(KnownFunction::Cast) => Some(0),
+            Some(KnownFunction::AssertType) => Some(1),
+            _ => None,
+        },
+        Type::ClassLiteral(class) if class.is_known(db, KnownClass::TypeAliasType) => Some(1),
+        _ => None,
+    }
+}
+
+/// Returns the form for a single argument from a binding.
+fn argument_form_from_binding<'db>(
+    db: &'db dyn Db,
+    callable_binding: &crate::types::call::CallableBinding<'db>,
+    binding: &crate::types::call::Binding<'db>,
     argument_index: usize,
 ) -> CallArgumentForm {
     if let Some(argument_match) = binding.argument_matches().get(argument_index)
         && argument_match.matched
         && let [parameter] = argument_match.parameters.as_slice()
     {
-        return match binding.signature.parameters()[parameter.index].form {
-            ParameterForm::Value => CallArgumentForm::Value,
-            ParameterForm::Type => CallArgumentForm::Type,
+        return if known_type_form_parameter_index(db, callable_binding.callable_type)
+            == Some(parameter.index)
+        {
+            CallArgumentForm::Type
+        } else {
+            CallArgumentForm::Value
         };
     }
 
@@ -897,17 +910,14 @@ pub fn call_argument_forms(
     };
 
     let argument_count = call_expr.arguments.len();
+    let db = model.db();
 
-    // If the function doesn't contain any type forms, for any overloads, short-circuit.
-    if !func_type.bindings(model.db()).iter_flat().any(|binding| {
-        binding.overloads().iter().any(|overload| {
-            overload
-                .signature
-                .parameters()
-                .into_iter()
-                .any(|parameter| parameter.form == ParameterForm::Type)
-        })
-    }) {
+    // Ordinary callables have only value-form arguments for IDE purposes, so skip full binding.
+    if !func_type
+        .bindings(db)
+        .iter_flat()
+        .any(|binding| known_type_form_parameter_index(db, binding.callable_type).is_some())
+    {
         return vec![CallArgumentForm::Value; argument_count];
     }
 
@@ -915,38 +925,42 @@ pub fn call_argument_forms(
 
     let mut argument_forms = vec![CallArgumentForm::Unknown; argument_count];
 
-    // If any bindings are successful, limit analysis to those bindings.
-    let successful_bindings: Vec<_> = bindings
+    let mut candidate_bindings: Vec<_> = bindings
         .iter_flat()
-        .flatten()
-        .filter(|binding| binding.errors().is_empty())
+        .flat_map(|callable_binding| {
+            callable_binding
+                .into_iter()
+                .map(move |binding| (callable_binding, binding))
+        })
         .collect();
 
-    let Some((first_binding, remaining_bindings)) = successful_bindings.split_first() else {
-        // If no binding succeeds, fall back to the merged non-conflicting forms from the full
-        // binding result so callers still get the best conservative answer available.
-        for (arg_index, form) in bindings.non_conflicting_argument_forms().enumerate() {
-            let Some(argument_form) = argument_forms.get_mut(arg_index) else {
-                break;
-            };
-            *argument_form = form.map_or(CallArgumentForm::Unknown, |form| match form {
-                ParameterForm::Value => CallArgumentForm::Value,
-                ParameterForm::Type => CallArgumentForm::Type,
-            });
-        }
+    // If any bindings are successful, limit analysis to those bindings.
+    if candidate_bindings
+        .iter()
+        .any(|(_, binding)| binding.errors().is_empty())
+    {
+        candidate_bindings.retain(|(_, binding)| binding.errors().is_empty());
+    }
+
+    let Some((first_binding, remaining_bindings)) = candidate_bindings.split_first() else {
         return argument_forms;
     };
 
-    // If all successful bindings agree on the argument form, use the agreed-upon form; otherwise,
+    // If all candidate bindings agree on the argument form, use the agreed-upon form; otherwise,
     // fall back to `CallArgumentForm::Unknown`.
     for (arg_index, resolved_argument_form) in argument_forms.iter_mut().enumerate() {
-        let argument_form = argument_form_from_successful_binding(first_binding, arg_index);
+        let argument_form =
+            argument_form_from_binding(db, first_binding.0, first_binding.1, arg_index);
         if argument_form == CallArgumentForm::Unknown {
             continue;
         }
-        if remaining_bindings.iter().all(|binding| {
-            argument_form_from_successful_binding(binding, arg_index) == argument_form
-        }) {
+        if remaining_bindings
+            .iter()
+            .all(|(callable_binding, binding)| {
+                argument_form_from_binding(db, callable_binding, binding, arg_index)
+                    == argument_form
+            })
+        {
             *resolved_argument_form = argument_form;
         }
     }
@@ -1049,14 +1063,14 @@ pub fn definitions_for_unary_op<'db>(
                 Err(CallDunderError::MethodNotAvailable) => return None,
                 Err(
                     CallDunderError::PossiblyUnbound { bindings, .. }
-                    | CallDunderError::CallError(_, bindings),
+                    | CallDunderError::CallError(_, bindings, _),
                 ) => *bindings,
             }
         }
         Err(CallDunderError::MethodNotAvailable) => return None,
         Err(
             CallDunderError::PossiblyUnbound { bindings, .. }
-            | CallDunderError::CallError(_, bindings),
+            | CallDunderError::CallError(_, bindings, _),
         ) => *bindings,
     };
 
@@ -2311,8 +2325,8 @@ f(val="", typ=int)
     }
 
     #[test]
-    fn conditional_special_forms_degrade_to_unknown_for_positional_arguments() -> anyhow::Result<()>
-    {
+    fn conditional_special_forms_use_successful_binding_for_positional_arguments()
+    -> anyhow::Result<()> {
         let db = TestDbBuilder::new()
             .with_file(
                 "/src/foo.py",
@@ -2341,7 +2355,7 @@ f("", int)
 
         assert_eq!(
             call_argument_forms(&model, call),
-            [CallArgumentForm::Unknown, CallArgumentForm::Unknown]
+            [CallArgumentForm::Value, CallArgumentForm::Type]
         );
 
         Ok(())
@@ -2388,18 +2402,24 @@ f(int, x)
     }
 
     #[test]
-    fn call_argument_forms_fast_path_value_only_signatures() -> anyhow::Result<()> {
+    fn call_argument_forms_preserve_known_type_form_parameters() -> anyhow::Result<()> {
         let db = TestDbBuilder::new()
             .with_file(
                 "/src/foo.py",
                 r#"
 from typing import cast
+from typing_extensions import TypeAliasType, TypeForm
 
 def f(x: type[int], y: int) -> None:
     pass
 
+def g(form: TypeForm[int], value: int) -> None:
+    pass
+
 cast(int, 1)
 f(int, 1)
+g(int, 1)
+TypeAliasType("Alias", int)
 "#,
             )
             .build()?;
@@ -2413,7 +2433,7 @@ f(int, 1)
             .collect();
         let model = SemanticModel::new(&db, file);
 
-        assert_eq!(calls.len(), 2);
+        assert_eq!(calls.len(), 4);
         assert_eq!(
             call_argument_forms(&model, calls[0]),
             [CallArgumentForm::Type, CallArgumentForm::Value]
@@ -2421,6 +2441,14 @@ f(int, 1)
         assert_eq!(
             call_argument_forms(&model, calls[1]),
             [CallArgumentForm::Value, CallArgumentForm::Value]
+        );
+        assert_eq!(
+            call_argument_forms(&model, calls[2]),
+            [CallArgumentForm::Value, CallArgumentForm::Value]
+        );
+        assert_eq!(
+            call_argument_forms(&model, calls[3]),
+            [CallArgumentForm::Value, CallArgumentForm::Type]
         );
 
         Ok(())

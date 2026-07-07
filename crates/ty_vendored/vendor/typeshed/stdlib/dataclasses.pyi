@@ -78,7 +78,8 @@ def asdict(obj: DataclassInstance) -> dict[str, Any]:
     If given, 'dict_factory' will be used instead of built-in dict.
     The function applies recursively to field values that are
     dataclass instances. This will also look into built-in containers:
-    tuples, lists, and dicts. Other objects are copied with 'copy.deepcopy()'.
+    tuples, lists, dicts, and frozendicts. Other objects are copied
+    with 'copy.deepcopy()'.
     """
 @overload
 def asdict(obj: DataclassInstance, *, dict_factory: Callable[[list[tuple[str, Any]]], _T]) -> _T: ...
@@ -100,7 +101,8 @@ def astuple(obj: DataclassInstance) -> tuple[Any, ...]:
     If given, 'tuple_factory' will be used instead of built-in tuple.
     The function applies recursively to field values that are
     dataclass instances. This will also look into built-in containers:
-    tuples, lists, and dicts. Other objects are copied with 'copy.deepcopy()'.
+    tuples, lists, dicts, and frozendicts. Other objects are copied
+    with 'copy.deepcopy()'.
     """
 @overload
 def astuple(obj: DataclassInstance, *, tuple_factory: Callable[[list[Any]], _T]) -> _T: ...
@@ -277,7 +279,8 @@ class Field(Generic[_T]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
         """
 
 # NOTE: Actual return type is 'Field[_T]', but we want to help type checkers

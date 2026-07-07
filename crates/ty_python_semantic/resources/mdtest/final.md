@@ -86,7 +86,7 @@ class Child(Parent):
     @property
     def my_property3(self) -> int: ...  # error: [override-of-final-method]
     @my_property3.deleter
-    def my_proeprty3(self) -> None: ...
+    def my_property3(self) -> None: ...
     @classmethod
     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
     @staticmethod
@@ -932,7 +932,8 @@ way as an `@final` non-`Protocol` class:
 
 ```py
 from typing import final, Protocol
-from ty_extensions import static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 class Base(Protocol):
     def abstract(self) -> int: ...
@@ -1063,7 +1064,7 @@ class ConcreteOrdered(AbstractOrdered): ...  # fine
 # exists in the MRO is abstract!
 @final
 @total_ordering
-class AlsoConreteOrdered(AbstractOrdered):  # error: [abstract-method-in-final-class]
+class AlsoConcreteOrdered(AbstractOrdered):  # error: [abstract-method-in-final-class]
     def __gt__(self, other): ...
 ```
 

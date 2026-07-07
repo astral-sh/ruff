@@ -45,6 +45,7 @@ I001 [*] Import block is un-sorted or un-formatted
    | |_^
    |
 help: Organize imports
+   |
 1  | # This has a magic trailing comma, will be sorted, but not rolled into one line
    - from sys import (
    -     stderr,
@@ -87,13 +88,11 @@ help: Organize imports
 21 | from module1 import (
 22 +     member1,
 23 |     member2,
-24 |     member3,
-25 | )
-26 |
+--------------------------------------------------------------------------------
 27 | # These will be combined, _with_ a trailing comma.
    - from module2 import member1, member2
 28 | from module2 import (
 29 +     member1,
 30 +     member2,
 31 |     member3,
-32 | )
+   |

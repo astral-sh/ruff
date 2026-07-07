@@ -1,8 +1,9 @@
 use std::{iter::FusedIterator, ops::Deref};
 
 use super::{Token, TokenKind};
-use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::{CommentRanges, ParenthesizedExpressions, TriviaRanges};
 use ruff_text_size::{Ranged as _, TextRange, TextSize};
+use rustc_hash::FxHashSet;
 
 /// Tokens represents a vector of lexed [`Token`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -225,6 +226,15 @@ impl Tokens {
     }
 }
 
+impl IntoIterator for Tokens {
+    type Item = Token;
+    type IntoIter = std::vec::IntoIter<Token>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.raw.into_iter()
+    }
+}
+
 impl<'a> IntoIterator for &'a Tokens {
     type Item = &'a Token;
     type IntoIter = std::slice::Iter<'a, Token>;
@@ -279,12 +289,59 @@ impl FusedIterator for TokenAt {}
 impl From<&Tokens> for CommentRanges {
     fn from(tokens: &Tokens) -> Self {
         let mut ranges = vec![];
+
         for token in tokens {
             if token.kind() == TokenKind::Comment {
                 ranges.push(token.range());
             }
         }
+
         CommentRanges::new(ranges)
+    }
+}
+
+impl From<&Tokens> for TriviaRanges {
+    fn from(tokens: &Tokens) -> Self {
+        let mut comments = vec![];
+        let mut parenthesized = FxHashSet::default();
+        let mut stack = Vec::<Option<TextSize>>::new();
+        let mut previous_end = None;
+
+        for token in tokens {
+            if token.kind() == TokenKind::Comment {
+                comments.push(token.range());
+            }
+
+            if token.kind().is_trivia() {
+                continue;
+            }
+
+            match token.kind() {
+                TokenKind::Lpar => {
+                    if let Some(start) = stack.last_mut() {
+                        start.get_or_insert(token.start());
+                    }
+                    stack.push(None);
+                }
+                TokenKind::Rpar => {
+                    if let (Some(Some(start)), Some(end)) = (stack.pop(), previous_end) {
+                        parenthesized.insert(TextRange::new(start, end));
+                    }
+                }
+                _ => {
+                    if let Some(start) = stack.last_mut() {
+                        start.get_or_insert(token.start());
+                    }
+                }
+            }
+
+            previous_end = Some(token.end());
+        }
+
+        TriviaRanges::new(
+            CommentRanges::new(comments),
+            ParenthesizedExpressions::new(parenthesized),
+        )
     }
 }
 

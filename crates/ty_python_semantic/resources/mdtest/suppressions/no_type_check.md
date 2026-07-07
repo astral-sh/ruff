@@ -87,6 +87,17 @@ def test() -> Undefined:
     return x + 5
 ```
 
+## Errors in function declarations
+
+Post-inference checks on the function declaration are also suppressed.
+
+```py
+from typing import no_type_check
+
+@no_type_check
+def positional(x: int, __y: str): ...
+```
+
 ## `no_type_check` on classes isn't supported
 
 ty does not support decorating classes with `no_type_check`. The behavior of `no_type_check` when

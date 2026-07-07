@@ -629,6 +629,10 @@ Options:
       --add-noqa[=<REASON>]
           Enable automatic additions of `noqa` directives to failing lines.
           Optionally provide a reason to append after the codes
+      --add-ignore[=<REASON>]
+          Enable automatic additions of `ruff:ignore` comments to failing
+          lines. Optionally provide a reason to append after the rule names.
+          Requires preview mode
       --show-files
           See the files Ruff will be run against with the current settings
       --show-settings
@@ -767,6 +771,9 @@ File selection:
           files. Use `--no-respect-gitignore` to disable
       --exclude <FILE_PATTERN>
           List of paths, used to omit files and/or directories from analysis
+      --extend-exclude <FILE_PATTERN>
+          Like --exclude, but adds additional files and directories on top of
+          those already excluded
       --force-exclude
           Enforce exclusions, even for paths passed to Ruff directly on the
           command-line. Use `--no-force-exclude` to disable

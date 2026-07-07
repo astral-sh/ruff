@@ -1,5 +1,6 @@
 use lsp_server::ErrorCode;
-use lsp_types::{self as types, request as req};
+use lsp_types::CodeActionResolveRequest;
+use lsp_types::{self as types};
 
 use ruff_linter::codes::Rule;
 
@@ -15,7 +16,7 @@ use crate::session::{DocumentQuery, DocumentSnapshot, ResolvedClientCapabilities
 pub(crate) struct CodeActionResolve;
 
 impl super::RequestHandler for CodeActionResolve {
-    type RequestType = req::CodeActionResolveRequest;
+    type RequestType = CodeActionResolveRequest;
 }
 
 impl super::BackgroundRequestHandler for CodeActionResolve {
@@ -27,7 +28,7 @@ impl super::BackgroundRequestHandler for CodeActionResolve {
             .clone()
             .ok_or_else(|| "it doesn't contain Ruff's document URI payload".to_string())?;
 
-        let uri: lsp_types::Url = serde_json::from_value(data)
+        let uri: lsp_types::Uri = serde_json::from_value(data)
             .map_err(|err| format!("its Ruff document URI payload is invalid: {err}"))?;
 
         session

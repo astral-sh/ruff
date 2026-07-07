@@ -9,7 +9,6 @@ use serde::Serialize;
 use strum_macros::EnumIter;
 
 use crate::registry::Linter;
-use crate::rule_selector::is_single_rule_selector;
 use crate::rules;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -24,6 +23,10 @@ impl NoqaCode {
     /// Return the suffix for the [`NoqaCode`], e.g., `101` for `SIM101`.
     pub fn suffix(&self) -> &str {
         self.1
+    }
+
+    pub(crate) const fn into_parts(self) -> (&'static str, &'static str) {
+        (self.0, self.1)
     }
 }
 
@@ -587,6 +590,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "047") => rules::pyupgrade::rules::NonPEP695GenericFunction,
         (Pyupgrade, "049") => rules::pyupgrade::rules::PrivateTypeParameter,
         (Pyupgrade, "050") => rules::pyupgrade::rules::UselessClassMetaclassType,
+        (Pyupgrade, "051") => rules::pyupgrade::rules::DeprecatedAbcDecorator,
 
         // pydocstyle
         (Pydocstyle, "100") => rules::pydocstyle::rules::UndocumentedPublicModule,
@@ -636,6 +640,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pydocstyle, "418") => rules::pydocstyle::rules::OverloadWithDocstring,
         (Pydocstyle, "419") => rules::pydocstyle::rules::EmptyDocstring,
         (Pydocstyle, "420") => rules::pydocstyle::rules::IncorrectSectionOrder,
+        (Pydocstyle, "421") => rules::pydocstyle::rules::PropertyDocstringStartsWithVerb,
 
         // pep8-naming
         (PEP8Naming, "801") => rules::pep8_naming::rules::InvalidClassName,
@@ -821,7 +826,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "029") => rules::flake8_pyi::rules::StrOrReprDefinedInStub,
         (Flake8Pyi, "030") => rules::flake8_pyi::rules::UnnecessaryLiteralUnion,
         (Flake8Pyi, "032") => rules::flake8_pyi::rules::AnyEqNeAnnotation,
-        (Flake8Pyi, "033") => rules::flake8_pyi::rules::TypeCommentInStub,
+        (Flake8Pyi, "033") => rules::flake8_pyi::rules::LegacyTypeComment,
         (Flake8Pyi, "034") => rules::flake8_pyi::rules::NonSelfReturnType,
         (Flake8Pyi, "035") => rules::flake8_pyi::rules::UnassignedSpecialVariableInStub,
         (Flake8Pyi, "036") => rules::flake8_pyi::rules::BadExitAnnotation,
@@ -1225,4 +1230,10 @@ impl std::fmt::Display for Rule {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         f.write_str(self.into())
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum FromNameError {
+    #[error("unknown rule name")]
+    Unknown,
 }

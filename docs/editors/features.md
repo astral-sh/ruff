@@ -42,7 +42,7 @@ alt="Formatting a document in VS Code"
 ### Markdown code blocks
 
 *This feature is currently only available in
-[preview mode](https://docs.astral.sh/ruff/preview/preview.md#preview).*
+[preview mode](https://docs.astral.sh/ruff/preview/#preview).*
 
 The Ruff formatter can also format Python code blocks in Markdown files.
 The Ruff VS Code extension provides the `Format Document` command for

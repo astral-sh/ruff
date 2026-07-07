@@ -1,6 +1,7 @@
 use super::context::InferContext;
-use super::{Signature, Type, TypeContext};
+use super::{Signature, Type, TypeContext, UnionType};
 use crate::Db;
+use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
 use crate::types::{MemberLookupPolicy, PropertyInstanceType};
 use ruff_python_ast as ast;
@@ -9,6 +10,71 @@ mod arguments;
 pub(crate) mod bind;
 pub(super) use arguments::{Argument, CallArguments};
 pub(super) use bind::{Binding, Bindings, CallableBinding, MatchedArgument};
+
+/// Whether the right operand's reflected method has priority based on the possible runtime
+/// classes of both operands.
+///
+/// `Possibly` requires preserving both dispatch results because the static types admit runtime
+/// pairs for which either method has priority.
+#[derive(PartialEq, Eq)]
+enum ReflectedMethodPriority {
+    Never,
+    Possibly,
+    Definitely,
+}
+
+/// Returns whether every inhabitant of `ty` has the same nominal runtime class.
+///
+/// This is intentionally conservative: a false negative only widens a binary operation's result,
+/// while a false positive could discard a valid normal-method result.
+fn has_exact_runtime_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty {
+        Type::LiteralValue(_) => true,
+        Type::NominalInstance(instance) => instance.class(db).is_final(db),
+        Type::TypeAlias(alias) => has_exact_runtime_class(db, alias.value_type(db)),
+        _ => false,
+    }
+}
+
+/// Classifies reflected-method priority from the operands' static types.
+///
+/// For example, an integer literal has exact runtime class `int`, so an `IntFlag` operand is
+/// definitely a strict subclass. By contrast, an inhabitant of `Base` may itself have runtime
+/// class `Child`, making reflected priority for `Base + Child` only possible.
+///
+/// ```python
+/// class Base: ...
+/// class Child(Base): ...
+///
+/// left: Base
+/// right: Child
+/// left + right
+/// ```
+fn reflected_method_priority<'db>(
+    db: &'db dyn Db,
+    left_ty: Type<'db>,
+    right_ty: Type<'db>,
+) -> ReflectedMethodPriority {
+    if left_ty == right_ty {
+        return ReflectedMethodPriority::Never;
+    }
+
+    if let (Some(left_class), Some(right_class)) =
+        (left_ty.nominal_class(db), right_ty.nominal_class(db))
+        && left_class.class_literal(db) != right_class.class_literal(db)
+        && right_class.is_subclass_of(db, left_class)
+    {
+        if has_exact_runtime_class(db, left_ty) {
+            ReflectedMethodPriority::Definitely
+        } else {
+            ReflectedMethodPriority::Possibly
+        }
+    } else if right_ty.is_subtype_of(db, left_ty) {
+        ReflectedMethodPriority::Possibly
+    } else {
+        ReflectedMethodPriority::Never
+    }
+}
 
 impl<'db> Type<'db> {
     /// Memoize the pure return-type part of binary dunder resolution so repeated identical
@@ -61,29 +127,31 @@ impl<'db> Type<'db> {
         //
         // [1] https://docs.python.org/3/reference/datamodel.html#object.__radd__
 
-        // Technically we don't have to check left_ty != right_ty here, since if the types
-        // are the same, they will trivially have the same implementation of the reflected
-        // dunder, and so we'll fail the inner check. But the type equality check will be
-        // faster for the common case, and allow us to skip the (two) class member lookups.
+        // Runtime classes determine reflected priority, but static operand types may only
+        // establish that priority conditionally.
+        let reflected_priority = reflected_method_priority(db, left_ty, right_ty);
+
         let left_class = left_ty.to_meta_type(db);
         let right_class = right_ty.to_meta_type(db);
-        if left_ty != right_ty && right_ty.is_subtype_of(db, left_ty) {
+        if reflected_priority != ReflectedMethodPriority::Never {
             let reflected_dunder = op.reflected_dunder();
             let rhs_reflected = right_class.member(db, reflected_dunder).place;
             // TODO: if `rhs_reflected` is possibly unbound, we should union the two possible
             // Bindings together
             if !rhs_reflected.is_undefined()
-                && rhs_reflected != left_class.member(db, reflected_dunder).place
+                && !rhs_reflected
+                    .is_equal_ignoring_provenance(left_class.member(db, reflected_dunder).place)
             {
-                return Ok(right_ty
-                    .try_call_dunder_with_policy(
-                        db,
-                        reflected_dunder,
-                        &mut CallArguments::positional([left_ty]),
-                        TypeContext::default(),
-                        policy,
-                    )
-                    .or_else(|_| {
+                let call_on_right_instance = right_ty.try_call_dunder_with_policy(
+                    db,
+                    reflected_dunder,
+                    &mut CallArguments::positional([left_ty]),
+                    TypeContext::default(),
+                    policy,
+                );
+
+                if reflected_priority == ReflectedMethodPriority::Definitely {
+                    return Ok(call_on_right_instance.or_else(|_| {
                         left_ty.try_call_dunder_with_policy(
                             db,
                             op.dunder(),
@@ -92,6 +160,31 @@ impl<'db> Type<'db> {
                             policy,
                         )
                     })?);
+                }
+
+                let call_on_left_instance = left_ty.try_call_dunder_with_policy(
+                    db,
+                    op.dunder(),
+                    &mut CallArguments::positional([right_ty]),
+                    TypeContext::default(),
+                    policy,
+                );
+
+                return match (call_on_right_instance, call_on_left_instance) {
+                    (Ok(right_bindings), Ok(left_bindings)) => {
+                        let callable_type = UnionType::from_two_elements(
+                            db,
+                            right_bindings.callable_type(),
+                            left_bindings.callable_type(),
+                        );
+                        Ok(Bindings::from_union(
+                            callable_type,
+                            [right_bindings, left_bindings],
+                        ))
+                    }
+                    (Ok(bindings), Err(_)) | (Err(_), Ok(bindings)) => Ok(bindings),
+                    (Err(_), Err(error)) => Err(error.into()),
+                };
             }
         }
 
@@ -191,7 +284,7 @@ pub(super) enum CallDunderError<'db> {
     /// The dunder attribute exists but it can't be called with the given arguments.
     ///
     /// This includes non-callable dunder attributes that are possibly unbound.
-    CallError(CallErrorKind, Box<Bindings<'db>>),
+    CallError(CallErrorKind, Box<Bindings<'db>>, Provenance<'db>),
 
     /// The type has the specified dunder method and it is callable
     /// with the specified arguments without any binding errors
@@ -211,22 +304,30 @@ pub(super) enum CallDunderError<'db> {
 }
 
 impl<'db> CallDunderError<'db> {
+    pub(super) fn provenance(&self) -> Provenance<'db> {
+        match self {
+            Self::CallError(_, _, provenance) => *provenance,
+            Self::PossiblyUnbound { .. } | Self::MethodNotAvailable => Provenance::Unknown,
+        }
+    }
+
+    pub(super) fn with_provenance(self, provenance: Provenance<'db>) -> Self {
+        match self {
+            Self::CallError(kind, bindings, _) => Self::CallError(kind, bindings, provenance),
+            Self::PossiblyUnbound { .. } | Self::MethodNotAvailable => self,
+        }
+    }
+
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            Self::MethodNotAvailable | Self::CallError(CallErrorKind::NotCallable, _) => None,
-            Self::CallError(_, bindings) => Some(bindings.return_type(db)),
+            Self::MethodNotAvailable | Self::CallError(CallErrorKind::NotCallable, _, _) => None,
+            Self::CallError(_, bindings, _) => Some(bindings.return_type(db)),
             Self::PossiblyUnbound { bindings, .. } => Some(bindings.return_type(db)),
         }
     }
 
     pub(super) fn fallback_return_type(&self, db: &'db dyn Db) -> Type<'db> {
         self.return_type(db).unwrap_or(Type::unknown())
-    }
-}
-
-impl<'db> From<CallError<'db>> for CallDunderError<'db> {
-    fn from(CallError(kind, bindings): CallError<'db>) -> Self {
-        Self::CallError(kind, bindings)
     }
 }
 
@@ -243,7 +344,7 @@ pub(crate) enum CallBinOpError {
 impl From<CallDunderError<'_>> for CallBinOpError {
     fn from(value: CallDunderError<'_>) -> Self {
         match value {
-            CallDunderError::CallError(_, _) => Self::CallError,
+            CallDunderError::CallError(_, _, _) => Self::CallError,
             CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound { .. } => {
                 CallBinOpError::NotSupported
             }

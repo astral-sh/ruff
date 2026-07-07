@@ -10,12 +10,12 @@ Q002 [*] Single quote docstring found but double quotes preferred
 3 |     ''' Not a docstring '''
   |
 help: Replace single quotes docstring with double quotes
+  |
 1 | class SingleLineDocstrings():
   -     ''' Double quotes single line class docstring '''
 2 +     """ Double quotes single line class docstring """
 3 |     ''' Not a docstring '''
-4 |
-5 |     def foo(self, bar='''not a docstring'''):
+  |
 
 Q002 [*] Single quote docstring found but double quotes preferred
  --> docstring_singles_class.py:6:9
@@ -26,14 +26,12 @@ Q002 [*] Single quote docstring found but double quotes preferred
 7 |         pass
   |
 help: Replace single quotes docstring with double quotes
-3 |     ''' Not a docstring '''
-4 |
+  |
 5 |     def foo(self, bar='''not a docstring'''):
   -         ''' Double quotes single line method docstring'''
 6 +         """ Double quotes single line method docstring"""
 7 |         pass
-8 |
-9 |     class Nested(foo()[:]): ''' inline docstring '''; pass
+  |
 
 Q002 [*] Single quote docstring found but double quotes preferred
  --> docstring_singles_class.py:9:29
@@ -44,8 +42,8 @@ Q002 [*] Single quote docstring found but double quotes preferred
   |                             ^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Replace single quotes docstring with double quotes
-6 |         ''' Double quotes single line method docstring'''
-7 |         pass
+  |
 8 |
   -     class Nested(foo()[:]): ''' inline docstring '''; pass
 9 +     class Nested(foo()[:]): """ inline docstring """; pass
+  |

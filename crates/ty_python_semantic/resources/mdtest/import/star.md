@@ -120,7 +120,7 @@ from c import X
 from c import Y  # error: [unresolved-import]
 ```
 
-## Esoteric definitions and redefinintions
+## Esoteric definitions and redefinitions
 
 ```toml
 [environment]
@@ -201,7 +201,7 @@ match 56:
     case x if something_unresolvable:  # error: [unresolved-reference]
         ...
 
-    case object(S):
+    case object(S):  # error: [invalid-match-pattern] "expected 0, got 1"
         pass
 
 match 12345:
@@ -235,8 +235,8 @@ print((
     D,
     E,
     F,
-    G,  # error: [possibly-unresolved-reference]
-    H,  # error: [possibly-unresolved-reference]
+    G,
+    H,
     I,
     J,
     K,
@@ -298,7 +298,7 @@ match 42:
         pass
     case object(foo=G):
         pass
-    case object(H):
+    case object(H):  # error: [invalid-match-pattern] "expected 0, got 1"
         pass
     case I:
         pass
@@ -368,7 +368,7 @@ match 42:
         pass
     case object(foo=G):
         pass
-    case object(H):
+    case object(H):  # error: [invalid-match-pattern] "expected 0, got 1"
         pass
     case I:
         pass

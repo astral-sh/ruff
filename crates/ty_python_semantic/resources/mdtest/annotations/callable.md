@@ -21,7 +21,8 @@ A bare `Callable` without any type arguments:
 
 ```py
 from typing import Callable, Any
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 def _(c: Callable):  # error: [missing-type-argument]
     reveal_type(c)  # revealed: (...) -> Unknown
@@ -488,8 +489,6 @@ If users want to read/write to attributes such as `__qualname__`, they need to c
 of the attribute first:
 
 ```py
-from inspect import getattr_static
-
 def f_okay(c: Callable[[], None]):
     if hasattr(c, "__qualname__"):
         reveal_type(c.__qualname__)  # revealed: object
@@ -503,10 +502,14 @@ def f_okay(c: Callable[[], None]):
         # error: [invalid-assignment] "Object of type `Literal["my_callable"]` is not assignable to attribute `__qualname__` on type `(() -> None) & <Protocol with members '__qualname__'>`"
         c.__qualname__ = "my_callable"
 
-        result = getattr_static(c, "__qualname__")
-        reveal_type(result)  # revealed: property
-        if isinstance(result, property) and result.fset:
-            c.__qualname__ = "my_callable"  # okay
+        # TODO: should we have some way for users to narrow a read-only attribute
+        # into a writable attribute...? What would that look like? Something like this?
+        if (
+            hasattr(type(c), "__qualname__")
+            and isinstance(type(c).__qualname__, property)
+            and type(c).__qualname__.fset is not None
+        ):
+            c.__qualname__ = "my_callable"  # error: [invalid-assignment]
 ```
 
 ## From a class
@@ -514,7 +517,7 @@ def f_okay(c: Callable[[], None]):
 ### Subclasses should return themselves, not superclass
 
 ```py
-from ty_extensions import into_regular_callable
+from ty_extensions._internal import into_regular_callable
 
 class Base:
     def __init__(self) -> None:
@@ -532,7 +535,8 @@ reveal_type(into_regular_callable(A))
 ```py
 from typing import Callable
 
-from ty_extensions import is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 static_assert(
     not is_assignable_to(
@@ -578,7 +582,8 @@ def _(c1: typing.Callable[[int], str], c2: collections.abc.Callable[[int], str])
 ```py
 import typing
 import collections.abc
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(typing.Callable[[int], str], collections.abc.Callable[[int], str]))
 # error: [missing-type-argument]

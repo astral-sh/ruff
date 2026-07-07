@@ -306,6 +306,7 @@ impl DisplaySet<'_> {
         line: &DisplayRawLine<'_>,
         lineno_width: usize,
         stylesheet: &Stylesheet,
+        anonymized_line_numbers: bool,
         buffer: &mut StyledBuffer,
     ) -> fmt::Result {
         match line {
@@ -327,7 +328,11 @@ impl DisplaySet<'_> {
                         buffer.append(line_offset, &format!("cell {cell}"), stylesheet.none);
                     }
                     buffer.append(line_offset, ":", stylesheet.none);
-                    buffer.append(line_offset, row.to_string().as_str(), stylesheet.none);
+                    if anonymized_line_numbers {
+                        buffer.append(line_offset, ANONYMIZED_LINE_NUM, stylesheet.none);
+                    } else {
+                        buffer.append(line_offset, row.to_string().as_str(), stylesheet.none);
+                    }
                     buffer.append(line_offset, ":", stylesheet.none);
                     buffer.append(line_offset, col.to_string().as_str(), stylesheet.none);
                 }
@@ -834,9 +839,14 @@ impl DisplaySet<'_> {
                 }
                 Ok(())
             }
-            DisplayLine::Raw(line) => {
-                self.format_raw_line(line_offset, line, lineno_width, stylesheet, buffer)
-            }
+            DisplayLine::Raw(line) => self.format_raw_line(
+                line_offset,
+                line,
+                lineno_width,
+                stylesheet,
+                anonymized_line_numbers,
+                buffer,
+            ),
         }
     }
 }

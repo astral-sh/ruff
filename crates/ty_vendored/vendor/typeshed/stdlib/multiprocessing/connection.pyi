@@ -96,6 +96,7 @@ class Listener:
 
             Returns a `Connection` object.
             """
+
     else:
         def accept(self) -> Connection[Incomplete, Incomplete] | PipeConnection[Incomplete, Incomplete]:
             """

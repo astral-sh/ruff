@@ -8,12 +8,13 @@ import {
   useState,
 } from "react";
 import {
+  type DiagnosticDetailLocation,
   ErrorMessage,
   HorizontalResizeHandle,
   Theme,
   VerticalResizeHandle,
 } from "shared";
-import { FileHandle, Hint, Workspace } from "ty_wasm";
+import { type DiagnosticTag, FileHandle, Hint, Workspace } from "ty_wasm";
 import {
   Panel,
   Group as PanelGroup,
@@ -25,10 +26,7 @@ import SecondaryPanel, {
   SecondaryPanelResult,
   SecondaryTool,
 } from "./SecondaryPanel";
-import Diagnostics, {
-  type Diagnostic,
-  type DiagnosticLocation,
-} from "./Diagnostics";
+import Diagnostics, { type Diagnostic } from "./Diagnostics";
 import VendoredFileBanner from "./VendoredFileBanner";
 import type { FileId, PlaygroundSession, ReadonlyFiles } from "../Playground";
 import type { EditorHandle } from "./Editor";
@@ -128,7 +126,7 @@ export default function Chrome({
     editorRef.current = handle;
   }, []);
 
-  const handleGoTo = useCallback((location: DiagnosticLocation) => {
+  const handleGoTo = useCallback((location: DiagnosticDetailLocation) => {
     editorRef.current?.goToLocation(location);
   }, []);
 
@@ -332,8 +330,10 @@ function useCheckResult(
       const serializedDiagnostics = diagnostics.map((diagnostic) => ({
         id: diagnostic.id(),
         message: diagnostic.message(),
+        annotations: diagnostic.annotations(workspace),
         subDiagnostics: diagnostic.subDiagnostics(workspace),
         severity: diagnostic.severity(),
+        tags: diagnostic.tags() as DiagnosticTag[],
         range: diagnostic.toRange(workspace) ?? null,
         textRange: diagnostic.textRange() ?? null,
         raw: diagnostic,

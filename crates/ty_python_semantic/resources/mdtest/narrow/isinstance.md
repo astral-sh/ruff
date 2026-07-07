@@ -591,6 +591,22 @@ def i[T: Intersection[type[Bar], type[Baz | Spam]], U: (type[Eggs], type[Ham])](
     return (y, z)
 ```
 
+If some (but not all) positive members of the intersection are not valid `isinstance()` targets --
+for example a parametrized generic alias such as `type[list[int]]`, which raises `TypeError` at
+runtime -- we skip those members and narrow using the remaining valid ones, rather than declining to
+narrow at all:
+
+```py
+from ty_extensions import Intersection
+
+def f(x: Foo, y: Intersection[type[Bar], type[list[int]]]):
+    if isinstance(x, y):
+        # `type[list[int]]` is not a valid `isinstance()` target and contributes no
+        # constraint, but `type[Bar]` still narrows.
+        reveal_type(x)  # revealed: Foo & Bar
+        reveal_type(x.attribute)  # revealed: int
+```
+
 ## Narrowing with generics
 
 ```toml

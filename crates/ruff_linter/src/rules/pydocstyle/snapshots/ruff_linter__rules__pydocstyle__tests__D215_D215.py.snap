@@ -11,8 +11,9 @@ D215 [*] Section underline is over-indented ("TODO")
 4 | """
   |
 help: Remove over-indentation from "TODO" underline
-1 | """
+  |
 2 | TODO:
   -     -
 3 +
 4 | """
+  |

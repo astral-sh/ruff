@@ -719,30 +719,30 @@ mod tests {
         );
         assert_snapshot!(test.outgoing_calls(), @r#"
         info[outgoing-calls]: Outgoing calls from `foo`
-         --> main.py:3:5
-          |
-        3 |     print("hi")  # builtins resolve via stubs, so this *does* appear
-          |     ^^^^^ Call site
-          |
+          --> main.py:LL:5
+           |
+        LL |     print("hi")  # builtins resolve via stubs, so this *does* appear
+           |     ^^^^^ Call site
+           |
         info: Function: `print` (`builtins`)
-            --> stdlib/builtins.pyi:4367:5
-             |
-        4367 | def print(
-             |     ^^^^^
-             |
+          --> stdlib/builtins.pyi:LL:5
+           |
+        LL | def print(
+           |     ^^^^^
+           |
 
         info[outgoing-calls]: Outgoing calls from `foo`
-         --> main.py:3:5
-          |
-        3 |     print("hi")  # builtins resolve via stubs, so this *does* appear
-          |     ^^^^^ Call site
-          |
+          --> main.py:LL:5
+           |
+        LL |     print("hi")  # builtins resolve via stubs, so this *does* appear
+           |     ^^^^^ Call site
+           |
         info: Function: `print` (`builtins`)
-            --> stdlib/builtins.pyi:4386:5
-             |
-        4386 | def print(
-             |     ^^^^^
-             |
+          --> stdlib/builtins.pyi:LL:5
+           |
+        LL | def print(
+           |     ^^^^^
+           |
         "#);
     }
 
@@ -776,17 +776,17 @@ mod tests {
           |
 
         info[outgoing-calls]: Outgoing calls from `m`
-         --> main.py:8:9
-          |
-        8 |         super().m()
-          |         ^^^^^ Call site
-          |
+          --> main.py:LL:9
+           |
+        LL |         super().m()
+           |         ^^^^^ Call site
+           |
         info: Class: `super` (`builtins`)
-           --> stdlib/builtins.pyi:316:7
-            |
-        316 | class super:
-            |       ^^^^^
-            |
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class super:
+           |       ^^^^^
+           |
         ");
     }
 

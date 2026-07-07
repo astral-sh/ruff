@@ -7,7 +7,7 @@ def _(x: int):
     if x in (1, 2, 3):
         reveal_type(x)  # revealed: int
     else:
-        reveal_type(x)  # revealed: int
+        reveal_type(x)  # revealed: int & ~Literal[1] & ~Literal[True] & ~Literal[2] & ~Literal[3]
 ```
 
 ```py
@@ -15,7 +15,7 @@ def _(x: str):
     if x in ("a", "b", "c"):
         reveal_type(x)  # revealed: str
     else:
-        reveal_type(x)  # revealed: str
+        reveal_type(x)  # revealed: str & ~Literal["a"] & ~Literal["b"] & ~Literal["c"]
 ```
 
 ```py
@@ -104,7 +104,7 @@ def _(x: str):
     if x in "abc":
         reveal_type(x)  # revealed: str
     else:
-        reveal_type(x)  # revealed: str
+        reveal_type(x)  # revealed: str & ~Literal["a"] & ~Literal["b"] & ~Literal["c"]
 ```
 
 ```py
@@ -132,6 +132,65 @@ def _(x: Literal[1, "a", "b", "c", "d"]):
         reveal_type(x)  # revealed: Literal["a", "b", "c"]
     else:
         reveal_type(x)  # revealed: Literal[1, "d"]
+
+def empty_string(x: str):
+    if x in "":
+        reveal_type(x)  # revealed: str
+
+def empty_bytes(x: bytes):
+    if x in b"":
+        reveal_type(x)  # revealed: bytes
+```
+
+## Byte containment
+
+`bytes` and `bytearray` accept byte subsequences and objects implementing `__index__`, not only the
+integers described by their iteration type. We therefore leave the subject unchanged in the positive
+branch:
+
+```py
+from typing import Literal, final
+
+@final
+class ByteSubstring(bytes): ...
+
+@final
+class ByteIndex:
+    def __index__(self) -> int:
+        return 97
+
+def bytes_subsequence(value: ByteSubstring | Literal[97]) -> None:
+    if value in b"abc":
+        reveal_type(value)  # revealed: ByteSubstring | Literal[97]
+    else:
+        reveal_type(value)  # revealed: ByteSubstring
+
+def bytes_index(value: ByteIndex | Literal[97], values: bytes) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: ByteIndex | Literal[97]
+    else:
+        reveal_type(value)  # revealed: ByteIndex | Literal[97]
+
+def bytes_union_container(
+    value: Literal[b"a", 97],
+    values: bytes | tuple[int, ...],
+) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: Literal[b"a", 97]
+    else:
+        reveal_type(value)  # revealed: Literal[b"a", 97]
+
+def bytearray_index(value: ByteIndex | Literal[97], values: bytearray) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: ByteIndex | Literal[97]
+    else:
+        reveal_type(value)  # revealed: ByteIndex | Literal[97]
+
+def bytearray_subsequence(value: Literal[b"a", 97], values: bytearray) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: Literal[b"a", 97]
+    else:
+        reveal_type(value)  # revealed: Literal[b"a", 97]
 ```
 
 ## Assignment expressions
@@ -160,12 +219,66 @@ def test(x: Literal["a", "b", "c"] | None | int = None):
         reveal_type(x)  # revealed: Literal["a", "b"] | int
     else:
         reveal_type(x)  # revealed: Literal["c"] | None | int
+
+def broad_element_type(x: str | None, values: dict[str, int]):
+    if x in values:
+        reveal_type(x)  # revealed: str
+    else:
+        reveal_type(x)  # revealed: str | None
+
+def broad_element_type_with_unknown(values: dict[str, int]):
+    x = [None][0]
+    if x in values:
+        reveal_type(x)  # revealed: Unknown
+    else:
+        reveal_type(x)  # revealed: None | Unknown
+```
+
+## Correlated constrained type variables
+
+Membership in a tuple containing a constrained type variable can preserve the relationship between
+that type variable and a broader subject type. In the first example, a successful membership test
+proves that `x` has the same enum-literal constraint as `y`, so returning `x` as `T` is valid.
+Equality compatibility alone is not enough to establish that relationship: `AlwaysEqual` can compare
+equal to every `U`, but it does not become a `U`, so the return in the second example remains
+invalid.
+
+```py
+from enum import Enum
+from typing import Literal, TypeVar
+
+class E(Enum):
+    A = 1
+    B = 2
+
+T = TypeVar("T", Literal[E.A], Literal[E.B])
+
+def correlated_typevar(x: E, y: T) -> T:
+    if x in (y,):
+        reveal_type(x)  # revealed: T@correlated_typevar
+        return x
+    return y
+
+U = TypeVar("U", int, str)
+
+class AlwaysEqual:
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+def unrelated_typevar(x: AlwaysEqual, y: U) -> U:
+    if x in (y,):
+        reveal_type(x)  # revealed: AlwaysEqual
+        # error: [invalid-return-type] "Return type does not match returned value: expected `U@unrelated_typevar`, found `AlwaysEqual`"
+        return x
+    return y
 ```
 
 ## Direct `not in` conditional
 
 ```py
-from typing import Any, Literal
+from typing import Any, Literal, TypeVar
+
+T = TypeVar("T", Literal[1], Literal[2])
 
 def test(x: Literal["a", "b", "c"] | None | int = None):
     if x not in ("a", "c"):
@@ -180,6 +293,12 @@ def broad_set_element(x: Literal[1, 2], values: set[int]) -> None:
         reveal_type(x)  # revealed: Literal[1, 2]
     else:
         reveal_type(x)  # revealed: Literal[1, 2]
+
+def broad_dict_element(x: str | None, values: dict[str, int]) -> None:
+    if x not in values:
+        reveal_type(x)  # revealed: str | None
+    else:
+        reveal_type(x)  # revealed: str
 
 def union_tuple_slot(x: Literal[1, 2], values: tuple[Literal[1, 2]]) -> None:
     if x not in values:
@@ -196,6 +315,19 @@ def union_tuple_slot_with_exact_value(
     else:
         reveal_type(x)  # revealed: Literal[1, 2, 3]
 
+def equality_equivalent_union_slot(
+    x: Literal[0, False, 2],
+    values: tuple[Literal[0, False]],
+) -> None:
+    if x not in values:
+        reveal_type(x)  # revealed: Literal[2]
+    else:
+        reveal_type(x)  # revealed: Literal[0, False]
+
+def correlated_typevar(x: T | None, y: T) -> None:
+    if x not in (y,):
+        reveal_type(x)  # revealed: None
+
 def tuple_with_any_slot(x: str | None, missing: Any) -> None:
     if x not in (missing, None):
         reveal_type(x)  # revealed: str
@@ -209,13 +341,79 @@ def local_literal_rhs(x: str | None) -> None:
         # literal collection has not been mutated or aliased before the test.
         reveal_type(x)  # revealed: str | None
     else:
-        reveal_type(x)  # revealed: None | str
+        reveal_type(x)  # revealed: str | None
 
 def mutable_global_rhs(x: str | None, unavailable: set[str | None]) -> None:
     if x not in unavailable:
         reveal_type(x)  # revealed: str | None
     else:
         reveal_type(x)  # revealed: str | None
+```
+
+## Membership and equality
+
+When containment is known to compare items using equality, we can remove a union member that cannot
+compare equal to any item in the container. A `TypedDict` cannot compare equal to a string, and a
+final class with the default identity-based equality cannot compare equal to an integer. We retain
+types such as `int` and classes with custom equality when they might still match an item.
+
+```py
+from typing import Literal, TypedDict, final
+
+class Payload(TypedDict):
+    value: int
+
+@final
+class Token: ...
+
+@final
+class AlwaysEqual:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def typed_dict(x: Payload | Literal["missing"]):
+    if x in ("missing",):
+        reveal_type(x)  # revealed: Literal["missing"]
+
+def default_equality(x: Token | Literal[1]):
+    if x in (1,):
+        reveal_type(x)  # revealed: Literal[1]
+
+def overlapping_union_member(x: int | Literal["missing"]):
+    if x in ("missing", 1):
+        reveal_type(x)  # revealed: int | Literal["missing"]
+
+def custom_equality(x: AlwaysEqual | Literal[1]):
+    if x in (1,):
+        reveal_type(x)  # revealed: AlwaysEqual | Literal[1]
+
+def empty_tuple(x: Payload | Literal["missing"], values: tuple[()]):
+    if x in values:
+        reveal_type(x)  # revealed: Never
+```
+
+## Custom containment methods
+
+Python uses `__contains__` when a class defines it. The method can return `True` for values that the
+class would never produce during iteration. We don't yet model this distinction. Instead, we
+determine possible membership matches from the class's iterable element type. The inferred type
+below therefore excludes `Payload`, even though `__contains__` returns `True` for it. This documents
+a known limitation:
+
+```py
+from typing import Literal, TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+class ContainsEverything(tuple[Literal["missing"], ...]):
+    def __contains__(self, value: object) -> bool:
+        return True
+
+def custom_contains(x: Payload | Literal["missing"], values: ContainsEverything):
+    if x in values:
+        # TODO: `x` can still be `Payload` because `values.__contains__` always returns `True`.
+        reveal_type(x)  # revealed: Literal["missing"]
 ```
 
 ## No present-key narrowing without a `TypedDict`
@@ -281,6 +479,7 @@ def _(x: LiteralString | int):
 
 ```py
 from enum import Enum
+from typing import Literal
 
 class Color(Enum):
     RED = "red"
@@ -308,6 +507,46 @@ def after_excluding_red_mixed(x: Color | int):
         reveal_type(x)  # revealed: Literal[Color.GREEN] | int
     else:
         reveal_type(x)  # revealed: Literal[Color.BLUE] | int
+```
+
+When the container's element type is a union of enum literals, membership narrows to that union.
+Without the annotation, the tuple's elements are widened to `Color`, so the comprehension remains
+`list[Color]`:
+
+```py
+SelectedColor = Literal[Color.RED, Color.GREEN]
+SELECTED_COLORS: tuple[SelectedColor, ...] = (Color.RED, Color.GREEN)
+
+def selected_colors(colors: list[Color]) -> list[SelectedColor]:
+    result: list[SelectedColor] = []
+    result.extend([color for color in colors if color in SELECTED_COLORS])
+    return result
+
+def _(colors: list[Color]):
+    inline = [color for color in colors if color in (Color.RED, Color.GREEN)]
+    reveal_type(inline)  # revealed: list[Color]
+```
+
+An enum that can have additional runtime members can still be narrowed by a membership test against
+an explicit member. The other branch excludes that member without assuming that the declared members
+are exhaustive.
+
+```py
+from enum import Enum, EnumMeta
+
+class InjectingEnumMeta(EnumMeta):
+    def __new__(metacls, name, bases, namespace, **kwargs):
+        namespace["INJECTED"] = 2
+        return super().__new__(metacls, name, bases, namespace, **kwargs)
+
+class InjectedEnum(Enum, metaclass=InjectingEnumMeta):
+    ONLY = 1
+
+def _(value: InjectedEnum):
+    if value in (InjectedEnum.ONLY,):
+        reveal_type(value)  # revealed: Literal[InjectedEnum.ONLY]
+    else:
+        reveal_type(value)  # revealed: InjectedEnum & ~Literal[InjectedEnum.ONLY]
 ```
 
 ## Union with enum and `int`

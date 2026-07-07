@@ -14,7 +14,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
 
 ```
   1 | from __future__ import annotations
-  2 | from ty_extensions import reveal_mro
+  2 | from ty_extensions._internal import reveal_mro
   3 | 
   4 | class A:
   5 |     def a(self): ...

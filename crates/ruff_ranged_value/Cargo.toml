@@ -1,0 +1,31 @@
+[package]
+name = "ruff_ranged_value"
+version = "0.0.3"
+description = "This is an internal component crate of Ruff"
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[lib]
+test = false
+doctest = false
+
+[dependencies]
+ruff_db = { workspace = true }
+ruff_text_size = { workspace = true }
+
+get-size2 = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true }
+serde = { workspace = true }
+toml = { workspace = true }
+
+[lints]
+workspace = true
+
+[features]
+get-size = ["dep:get-size2"]
+schemars = ["dep:schemars"]

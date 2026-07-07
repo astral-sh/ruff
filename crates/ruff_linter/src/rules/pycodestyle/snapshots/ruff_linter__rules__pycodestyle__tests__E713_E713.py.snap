@@ -11,12 +11,12 @@ E713 [*] Test for membership should be `not in`
 4 | #: E713
   |
 help: Convert to `not in`
+  |
 1 | #: E713
   - if not X in Y:
 2 + if X not in Y:
 3 |     pass
-4 | #: E713
-5 | if not X.B in Y:
+  |
 
 E713 [*] Test for membership should be `not in`
  --> E713.py:5:8
@@ -29,14 +29,12 @@ E713 [*] Test for membership should be `not in`
 7 | #: E713
   |
 help: Convert to `not in`
-2 | if not X in Y:
-3 |     pass
+  |
 4 | #: E713
   - if not X.B in Y:
 5 + if X.B not in Y:
 6 |     pass
-7 | #: E713
-8 | if not X in Y and Z == "zero":
+  |
 
 E713 [*] Test for membership should be `not in`
   --> E713.py:8:8
@@ -49,14 +47,12 @@ E713 [*] Test for membership should be `not in`
 10 | #: E713
    |
 help: Convert to `not in`
-5  | if not X.B in Y:
-6  |     pass
-7  | #: E713
-   - if not X in Y and Z == "zero":
-8  + if X not in Y and Z == "zero":
-9  |     pass
-10 | #: E713
-11 | if X == "zero" or not Y in Z:
+  |
+7 | #: E713
+  - if not X in Y and Z == "zero":
+8 + if X not in Y and Z == "zero":
+9 |     pass
+  |
 
 E713 [*] Test for membership should be `not in`
   --> E713.py:11:23
@@ -69,14 +65,12 @@ E713 [*] Test for membership should be `not in`
 13 | #: E713
    |
 help: Convert to `not in`
-8  | if not X in Y and Z == "zero":
-9  |     pass
+   |
 10 | #: E713
    - if X == "zero" or not Y in Z:
 11 + if X == "zero" or Y not in Z:
 12 |     pass
-13 | #: E713
-14 | if not (X in Y):
+   |
 
 E713 [*] Test for membership should be `not in`
   --> E713.py:14:9
@@ -88,14 +82,12 @@ E713 [*] Test for membership should be `not in`
 15 |     pass
    |
 help: Convert to `not in`
-11 | if X == "zero" or not Y in Z:
-12 |     pass
+   |
 13 | #: E713
    - if not (X in Y):
 14 + if X not in Y:
 15 |     pass
-16 |
-17 | #: Okay
+   |
 
 E713 [*] Test for membership should be `not in`
   --> E713.py:40:12
@@ -106,8 +98,8 @@ E713 [*] Test for membership should be `not in`
    |            ^^^^^^^^^^^^^^^^^
    |
 help: Convert to `not in`
-37 | assert {"x": not foo} in bar
-38 | assert [42, not foo] in bar
+   |
 39 | assert not (re.search(r"^.:\\Users\\[^\\]*\\Downloads\\.*") is None)
    - assert not('name' in request)or not request['name']
 40 + assert 'name' not in request or not request['name']
+   |

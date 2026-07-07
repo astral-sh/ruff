@@ -1,7 +1,7 @@
 use std::fmt::Formatter;
 use std::str::FromStr;
 
-use ruff_db::files::{File, system_path_to_file, vendored_path_to_file};
+use ruff_db::files::{File, directory_listing, system_path_to_file, vendored_path_to_file};
 use ruff_db::system::SystemPath;
 use ruff_db::vendored::VendoredPath;
 use salsa::Database;
@@ -134,9 +134,14 @@ fn all_submodule_names_for_package<'db>(
     }
 
     fn find_package_init_system(db: &dyn Db, dir: &SystemPath) -> Option<File> {
-        system_path_to_file(db, dir.join("__init__.pyi"))
-            .or_else(|_| system_path_to_file(db, dir.join("__init__.py")))
-            .ok()
+        let listing = directory_listing(db, dir).ok()?;
+        if listing.entry_is_file(db, dir, "__init__.pyi") {
+            system_path_to_file(db, dir.join("__init__.pyi")).ok()
+        } else if listing.entry_is_file(db, dir, "__init__.py") {
+            system_path_to_file(db, dir.join("__init__.py")).ok()
+        } else {
+            None
+        }
     }
 
     fn find_package_init_vendored(db: &dyn Db, dir: &VendoredPath) -> Option<File> {
@@ -166,27 +171,17 @@ fn all_submodule_names_for_package<'db>(
 
     Some(match path.parent()? {
         SystemOrVendoredPathRef::System(parent_directory) => {
-            // Read the revision on the corresponding file root to
-            // register an explicit dependency on this directory
-            // tree. When the revision gets bumped, the cache
-            // that Salsa creates does for this routine will be
-            // invalidated.
-            let root = db.files().expect_root(db, parent_directory);
-            let _ = root.revision(db);
-
-            db.system()
-                .read_directory(parent_directory)
-                .inspect_err(|err| {
+            directory_listing(db, parent_directory)
+                .inspect_err(|error| {
                     tracing::debug!(
                         "Failed to read {parent_directory:?} when looking for \
-                         its possible submodules: {err}"
+                         its possible submodules: {error}"
                     );
                 })
                 .ok()?
-                .flatten()
-                .filter(|entry| {
-                    let ty = entry.file_type();
-                    let path = entry.path();
+                .iter()
+                .filter(|(name, ty)| {
+                    let path = SystemPath::new(name);
                     is_submodule(
                         ty.is_directory(),
                         ty.is_file(),
@@ -194,18 +189,17 @@ fn all_submodule_names_for_package<'db>(
                         path.extension(),
                     )
                 })
-                .filter_map(|entry| {
-                    let stem = entry.path().file_stem()?;
+                .filter_map(|(entry_name, file_type)| {
+                    let relative = SystemPath::new(entry_name);
+                    let stem = relative.file_stem()?;
+                    let path = parent_directory.join(relative);
                     let mut name = module.name(db).clone();
                     name.extend(&ModuleName::new(stem)?);
 
-                    let (kind, file) = if entry.file_type().is_directory() {
-                        (
-                            ModuleKind::Package,
-                            find_package_init_system(db, entry.path())?,
-                        )
+                    let (kind, file) = if file_type.is_directory() {
+                        (ModuleKind::Package, find_package_init_system(db, &path)?)
                     } else {
-                        let file = system_path_to_file(db, entry.path()).ok()?;
+                        let file = system_path_to_file(db, &path).ok()?;
                         (ModuleKind::Module, file)
                     };
                     Some(Module::file_module(
@@ -221,7 +215,6 @@ fn all_submodule_names_for_package<'db>(
         SystemOrVendoredPathRef::Vendored(parent_directory) => db
             .vendored()
             .read_directory(parent_directory)
-            .into_iter()
             .filter(|entry| {
                 let ty = entry.file_type();
                 let path = entry.path();
@@ -298,7 +291,7 @@ impl ModuleKind {
     }
 }
 
-/// Enumeration of various core stdlib modules in which important types are located
+/// Enumeration of modules in which types with dedicated semantic behavior are located.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum_macros::EnumString, get_size2::GetSize)]
 #[cfg_attr(test, derive(strum_macros::EnumIter))]
 #[strum(serialize_all = "snake_case")]
@@ -314,8 +307,11 @@ pub enum KnownModule {
     Os,
     Tempfile,
     Pathlib,
+    Datetime,
+    Decimal,
+    Ipaddress,
+    Re,
     Abc,
-    Contextlib,
     Dataclasses,
     Functools,
     Collections,
@@ -329,6 +325,10 @@ pub enum KnownModule {
     #[strum(serialize = "_typeshed._type_checker_internals")]
     TypeCheckerInternals,
     TyExtensions,
+    #[strum(serialize = "ty_extensions._internal")]
+    TyExtensionsInternal,
+    #[strum(serialize = "ty_extensions.pydantic")]
+    TyExtensionsPydantic,
     #[strum(serialize = "importlib")]
     ImportLib,
     #[strum(serialize = "unittest.mock")]
@@ -338,6 +338,15 @@ pub enum KnownModule {
     Numbers,
     #[strum(serialize = "struct", serialize = "_struct")]
     Struct,
+    // Third-party modules
+    #[strum(serialize = "pydantic.config")]
+    PydanticConfig,
+    #[strum(serialize = "pydantic.main")]
+    PydanticMain,
+    #[strum(serialize = "pydantic.root_model")]
+    PydanticRootModel,
+    #[strum(serialize = "pydantic.types")]
+    PydanticTypes,
 }
 
 impl KnownModule {
@@ -353,8 +362,11 @@ impl KnownModule {
             Self::Os => "os",
             Self::Tempfile => "tempfile",
             Self::Pathlib => "pathlib",
+            Self::Datetime => "datetime",
+            Self::Decimal => "decimal",
+            Self::Ipaddress => "ipaddress",
+            Self::Re => "re",
             Self::Abc => "abc",
-            Self::Contextlib => "contextlib",
             Self::Dataclasses => "dataclasses",
             Self::Functools => "functools",
             Self::Collections => "collections",
@@ -363,6 +375,8 @@ impl KnownModule {
             Self::Inspect => "inspect",
             Self::TypeCheckerInternals => "_typeshed._type_checker_internals",
             Self::TyExtensions => "ty_extensions",
+            Self::TyExtensionsInternal => "ty_extensions._internal",
+            Self::TyExtensionsPydantic => "ty_extensions.pydantic",
             Self::ImportLib => "importlib",
             Self::Warnings => "warnings",
             Self::UnittestMock => "unittest.mock",
@@ -370,6 +384,10 @@ impl KnownModule {
             Self::Templatelib => "string.templatelib",
             Self::Numbers => "numbers",
             Self::Struct => "struct",
+            Self::PydanticConfig => "pydantic.config",
+            Self::PydanticMain => "pydantic.main",
+            Self::PydanticRootModel => "pydantic.root_model",
+            Self::PydanticTypes => "pydantic.types",
         }
     }
 
@@ -379,10 +397,56 @@ impl KnownModule {
     }
 
     fn try_from_search_path_and_name(search_path: &SearchPath, name: &ModuleName) -> Option<Self> {
-        if search_path.is_standard_library() {
-            Self::from_str(name.as_str()).ok()
+        let known_module = Self::from_str(name.as_str()).ok()?;
+
+        let is_expected_search_path = if known_module.is_third_party() {
+            search_path.is_third_party()
         } else {
-            None
+            search_path.is_standard_library()
+        };
+
+        is_expected_search_path.then_some(known_module)
+    }
+
+    /// Return `true` if this module is provided by a supported third-party package.
+    pub const fn is_third_party(self) -> bool {
+        match self {
+            Self::PydanticConfig
+            | Self::PydanticMain
+            | Self::PydanticRootModel
+            | Self::PydanticTypes => true,
+            Self::Builtins
+            | Self::Enum
+            | Self::Types
+            | Self::Typeshed
+            | Self::TypingExtensions
+            | Self::Typing
+            | Self::Sys
+            | Self::Os
+            | Self::Tempfile
+            | Self::Pathlib
+            | Self::Datetime
+            | Self::Decimal
+            | Self::Ipaddress
+            | Self::Re
+            | Self::Abc
+            | Self::Dataclasses
+            | Self::Functools
+            | Self::Collections
+            | Self::CollectionsAbc
+            | Self::CollectionsAbcInternal
+            | Self::Inspect
+            | Self::Templatelib
+            | Self::TypeCheckerInternals
+            | Self::TyExtensions
+            | Self::TyExtensionsInternal
+            | Self::TyExtensionsPydantic
+            | Self::ImportLib
+            | Self::UnittestMock
+            | Self::Uuid
+            | Self::Warnings
+            | Self::Numbers
+            | Self::Struct => false,
         }
     }
 
@@ -394,8 +458,16 @@ impl KnownModule {
         matches!(self, Self::Typing)
     }
 
+    pub const fn is_typing_extensions(self) -> bool {
+        matches!(self, Self::TypingExtensions)
+    }
+
     pub const fn is_ty_extensions(self) -> bool {
         matches!(self, Self::TyExtensions)
+    }
+
+    pub const fn is_ty_extensions_internal(self) -> bool {
+        matches!(self, Self::TyExtensionsInternal)
     }
 
     pub const fn is_inspect(self) -> bool {
@@ -430,7 +502,7 @@ mod tests {
     fn known_module_roundtrip_from_str() {
         let stdlib_search_path = SearchPath::vendored_stdlib();
 
-        for module in KnownModule::iter() {
+        for module in KnownModule::iter().filter(|module| !module.is_third_party()) {
             let module_name = module.name();
 
             assert_eq!(

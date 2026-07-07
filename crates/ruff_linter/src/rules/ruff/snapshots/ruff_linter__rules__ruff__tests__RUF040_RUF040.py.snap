@@ -5,7 +5,7 @@ RUF040 Non-string literal used as assert message
  --> RUF040.py:3:21
   |
 1 | fruits = ["apples", "plums", "pear"]
-2 | fruits.filter(lambda fruit: fruit.startwith("p"))
+2 | fruits.filter(lambda fruit: fruit.startswith("p"))
 3 | assert len(fruits), 2
   |                     ^
 4 |

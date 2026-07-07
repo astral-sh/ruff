@@ -21,7 +21,7 @@ impl<'a> ConciseRenderer<'a> {
         diagnostics: &[Diagnostic],
     ) -> std::fmt::Result {
         let stylesheet = if self.config.color {
-            DiagnosticStylesheet::styled()
+            DiagnosticStylesheet::styled().hyperlinks(self.config.hyperlinks)
         } else {
             DiagnosticStylesheet::plain()
         };
@@ -68,7 +68,9 @@ impl<'a> ConciseRenderer<'a> {
             }
 
             if self.config.hide_severity {
-                if let Some(code) = diag.secondary_code() {
+                if !self.config.preview
+                    && let Some(code) = diag.secondary_code()
+                {
                     write!(
                         f,
                         "{code} ",
@@ -98,16 +100,17 @@ impl<'a> ConciseRenderer<'a> {
                     Severity::Error => ("error", stylesheet.error),
                     Severity::Fatal => ("fatal", stylesheet.error),
                 };
+                let id = if self.config.preview {
+                    diag.id().as_str()
+                } else {
+                    diag.secondary_code_or_id()
+                };
                 write!(
                     f,
                     "{severity}[{id}] ",
                     severity = fmt_styled(severity, severity_style),
                     id = fmt_styled(
-                        fmt_with_hyperlink(
-                            &diag.secondary_code_or_id(),
-                            diag.documentation_url(),
-                            &stylesheet
-                        ),
+                        fmt_with_hyperlink(id, diag.documentation_url(), &stylesheet),
                         stylesheet.emphasis
                     )
                 )?;
@@ -171,10 +174,10 @@ mod tests {
         env.fix_applicability(Applicability::DisplayOnly);
         env.preview(true);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
-        fib.py:1:8: F401 [*] `os` imported but unused
-        fib.py:6:5: F841 [*] Local variable `x` is assigned to but never used
-        undef.py:1:4: F821 Undefined name `a`
-        fib.py:12:16: F821 Undefined name `fibonaccii`
+        fib.py:1:8: unused-import: [*] `os` imported but unused
+        fib.py:6:5: unused-variable: [*] Local variable `x` is assigned to but never used
+        undef.py:1:4: undefined-name: Undefined name `a`
+        fib.py:12:16: undefined-name: Undefined name `fibonaccii`
         ");
     }
 

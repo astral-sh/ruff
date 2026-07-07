@@ -24,7 +24,7 @@ mod tests {
     use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
     use crate::source_kind::SourceKind;
     use crate::test::{test_contents, test_path, test_resource_path, test_snippet};
-    use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
+    use crate::{UnresolvedRuleSelector, assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005_slices.py"))]
@@ -588,11 +588,14 @@ mod tests {
         let mut settings =
             settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]);
 
-        settings.per_file_ignores = CompiledPerFileIgnoreList::resolve(vec![PerFileIgnore::new(
-            "RUF100_2.py".to_string(),
-            &["F401".parse().unwrap()],
-            None,
-        )])
+        settings.per_file_ignores = CompiledPerFileIgnoreList::resolve(
+            vec![PerFileIgnore::new(
+                "RUF100_2.py".to_string(),
+                vec![UnresolvedRuleSelector::cli("F401")],
+                None,
+            )],
+            PreviewMode::Disabled,
+        )
         .unwrap();
 
         let diagnostics = test_path(Path::new("ruff/RUF100_2.py"), &settings)?;
@@ -689,11 +692,17 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/ruff_per_file_ignores.py"),
             &settings::LinterSettings {
-                per_file_ignores: CompiledPerFileIgnoreList::resolve(vec![PerFileIgnore::new(
-                    "ruff_per_file_ignores.py".to_string(),
-                    &["F401".parse().unwrap(), "RUF100".parse().unwrap()],
-                    None,
-                )])
+                per_file_ignores: CompiledPerFileIgnoreList::resolve(
+                    vec![PerFileIgnore::new(
+                        "ruff_per_file_ignores.py".to_string(),
+                        vec![
+                            UnresolvedRuleSelector::cli("F401"),
+                            UnresolvedRuleSelector::cli("RUF100"),
+                        ],
+                        None,
+                    )],
+                    PreviewMode::Disabled,
+                )
                 .unwrap(),
                 ..settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedNOQA])
             },
@@ -707,11 +716,14 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/ruff_per_file_ignores.py"),
             &settings::LinterSettings {
-                per_file_ignores: CompiledPerFileIgnoreList::resolve(vec![PerFileIgnore::new(
-                    "ruff_per_file_ignores.py".to_string(),
-                    &["RUF100".parse().unwrap()],
-                    None,
-                )])
+                per_file_ignores: CompiledPerFileIgnoreList::resolve(
+                    vec![PerFileIgnore::new(
+                        "ruff_per_file_ignores.py".to_string(),
+                        vec![UnresolvedRuleSelector::cli("RUF100")],
+                        None,
+                    )],
+                    PreviewMode::Disabled,
+                )
                 .unwrap(),
                 ..settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA])
             },

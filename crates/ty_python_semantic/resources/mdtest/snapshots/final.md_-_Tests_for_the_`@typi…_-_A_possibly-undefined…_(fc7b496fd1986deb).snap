@@ -106,14 +106,12 @@ info: `A.method1` is decorated with `@final`, forbidding overrides
   |             ------- `A.method1` defined here
   |
 help: Remove the override of `method1`
-37 |         def method4(self) -> None: ...
-38 |
+   |
 39 | class B(A):
    -     def method1(self) -> None: ...  # error: [override-of-final-method]
 40 +       # error: [override-of-final-method]
 41 |     def method2(self) -> None: ...  # error: [override-of-final-method]
-42 |     def method3(self) -> None: ...  # error: [override-of-final-method]
-43 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 ```
@@ -134,14 +132,12 @@ info: `A.method2` is decorated with `@final`, forbidding overrides
    |             ------- `A.method2` defined here
    |
 help: Remove the override of `method2`
-38 |
-39 | class B(A):
+   |
 40 |     def method1(self) -> None: ...  # error: [override-of-final-method]
    -     def method2(self) -> None: ...  # error: [override-of-final-method]
 41 +       # error: [override-of-final-method]
 42 |     def method3(self) -> None: ...  # error: [override-of-final-method]
-43 |
-44 |     # check that autofixes don't introduce invalid syntax
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 ```
@@ -162,14 +158,12 @@ info: `A.method3` is decorated with `@final`, forbidding overrides
    |             ------- `A.method3` defined here
    |
 help: Remove the override of `method3`
-39 | class B(A):
-40 |     def method1(self) -> None: ...  # error: [override-of-final-method]
+   |
 41 |     def method2(self) -> None: ...  # error: [override-of-final-method]
    -     def method3(self) -> None: ...  # error: [override-of-final-method]
 42 +       # error: [override-of-final-method]
 43 |
-44 |     # check that autofixes don't introduce invalid syntax
-45 |     # if there are multiple statements on one line
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 ```

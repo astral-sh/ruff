@@ -1,22 +1,26 @@
+use crate::edit::{RangeExt, ToRangeExt};
 use crate::server::Result;
 use crate::session::{Client, DocumentSnapshot};
 use anyhow::Context;
-use lsp_types::{self as types, request as req};
-use regex::Regex;
+use lsp_types::{self as types, HoverRequest};
 use ruff_linter::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
+use ruff_linter::suppression::rule_identifier_range_at_offset;
 use ruff_python_ast::SourceType;
+use ruff_python_ast::token::TokenKind;
+use ruff_python_parser::parse_unchecked_source;
 use ruff_source_file::OneIndexed;
+use ruff_text_size::Ranged;
 use std::fmt::Write;
 
 pub(crate) struct Hover;
 
 impl super::RequestHandler for Hover {
-    type RequestType = req::HoverRequest;
+    type RequestType = HoverRequest;
 }
 
 impl super::BackgroundDocumentRequestHandler for Hover {
-    fn document_url(params: &types::HoverParams) -> std::borrow::Cow<'_, lsp_types::Url> {
+    fn document_uri(params: &types::HoverParams) -> std::borrow::Cow<'_, lsp_types::Uri> {
         std::borrow::Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
@@ -27,9 +31,9 @@ impl super::BackgroundDocumentRequestHandler for Hover {
     ) -> Result<Option<types::Hover>> {
         let snapshot = match snapshot {
             Ok(snapshot) => snapshot,
-            Err(url) => {
+            Err(uri) => {
                 tracing::warn!(
-                    "Returning no hover information because document `{url}` isn't open."
+                    "Returning no hover information because document `{uri}` isn't open."
                 );
                 return Ok(None);
             }
@@ -44,7 +48,7 @@ pub(crate) fn hover(
     position: &types::TextDocumentPositionParams,
 ) -> Option<types::Hover> {
     // Don't show noqa hover for non-Python documents (e.g., markdown files).
-    let SourceType::Python(_) = snapshot.query().source_type_for_lint() else {
+    let SourceType::Python(source_type) = snapshot.query().source_type_for_lint() else {
         return None;
     };
 
@@ -65,35 +69,42 @@ pub(crate) fn hover(
 
     let line = &document.contents()[line_range];
 
-    // Get the list of codes.
-    let noqa_regex = Regex::new(r"(?i:# (?:(?:ruff|flake8): )?(?P<noqa>noqa))(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?").unwrap();
-    let noqa_captures = noqa_regex.captures(line)?;
-    let codes_match = noqa_captures.name("codes")?;
-    let codes_start = codes_match.start();
-    let code_regex = Regex::new(r"[A-Z]+[0-9]+").unwrap();
-    let cursor: usize = position
-        .position
-        .character
-        .try_into()
-        .expect("column number should fit within a usize");
-    let word = code_regex.find_iter(codes_match.as_str()).find(|code| {
-        cursor >= (code.start() + codes_start) && cursor < (code.end() + codes_start)
-    })?;
+    // Avoid parsing the document if the hovered line doesn't contain a comment.
+    memchr::memchr(b'#', line.as_bytes())?;
 
-    // Get rule for the code under the cursor.
-    let rule = Rule::from_code(word.as_str());
-    let output = if let Ok(rule) = rule {
+    let cursor = types::Range::new(position.position, position.position)
+        .to_text_range(document.contents(), document.index(), snapshot.encoding())
+        .start();
+    let parsed = parse_unchecked_source(document.contents(), source_type);
+    let comment = parsed
+        .tokens()
+        .at_offset(cursor)
+        .find(|token| token.kind() == TokenKind::Comment)?;
+    let identifier_range =
+        rule_identifier_range_at_offset(document.contents(), comment.range(), cursor)?;
+
+    // Get the rule for the identifier under the cursor.
+    let identifier = &document.contents()[identifier_range];
+    let rule = Rule::from_code(identifier)
+        .ok()
+        .or_else(|| Rule::from_name(identifier).ok());
+    let output = if let Some(rule) = rule {
         format_rule_text(rule)
     } else {
-        format!("{}: Rule not found", word.as_str())
+        format!("{identifier}: Rule not found")
     };
 
     let hover = types::Hover {
-        contents: types::HoverContents::Markup(types::MarkupContent {
+        contents: types::MarkupContent {
             kind: types::MarkupKind::Markdown,
             value: output,
-        }),
-        range: None,
+        }
+        .into(),
+        range: Some(identifier_range.to_range(
+            document.contents(),
+            document.index(),
+            snapshot.encoding(),
+        )),
     };
 
     Some(hover)

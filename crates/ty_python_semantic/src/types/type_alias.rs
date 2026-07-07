@@ -3,7 +3,7 @@ use std::fmt::Write;
 use crate::{
     Db,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, GenericContext, Type, TypeContext,
+        ApplyTypeMappingVisitor, BoundTypeVarIdentity, GenericContext, Type, TypeContext,
         TypeMapping, TypeVarVariance, definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization},
@@ -310,7 +310,7 @@ impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
         cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         self.value_type(db).variance_of(db, typevar)
     }
 }

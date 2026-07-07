@@ -57,10 +57,19 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
 
             let signature = Signature::new_generic(
                 Some(generic_context),
-                Parameters::new(db, parameters),
+                Parameters::standard(parameters),
                 self_ty,
             );
             Some(Type::function_like_callable(db, signature))
+        }
+        "__match_args__" => {
+            if Program::get(db).python_version(db) < PythonVersion::PY310 {
+                return None;
+            }
+
+            // __match_args__: tuple[Literal["field1"], Literal["field2"], ...]
+            let field_types = fields.map(|field| Type::string_literal(db, &field.name));
+            Some(Type::heterogeneous_tuple(db, field_types))
         }
         "_fields" => {
             // _fields: tuple[Literal["field1"], Literal["field2"], ...]
@@ -93,7 +102,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
                     .with_definition(field.definition)
             }));
 
-            let signature = Signature::new(Parameters::new(db, parameters), self_ty);
+            let signature = Signature::new(Parameters::standard(parameters), self_ty);
             Some(Type::function_like_callable(db, signature))
         }
         "__init__" => {
@@ -161,7 +170,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     ) -> Option<Self> {
         Some(Self::new(
             db,
-            self.name(db).clone(),
+            self.name(db),
             self.anchor(db)
                 .recursive_type_normalized_impl(db, div, nested)?,
         ))
@@ -378,7 +387,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                     return Some(Type::function_like_callable(db, signature));
                 }
                 // For other field-specific methods, fall through to NamedTupleFallback.
-                "_fields" | "_replace" | "__replace__" => {
+                "__match_args__" | "_fields" | "_replace" | "__replace__" => {
                     return KnownClass::NamedTupleFallback
                         .to_class_literal(db)
                         .as_class_literal()?
@@ -411,7 +420,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         // __replace__) don't need this mapping.
         if matches!(
             name,
-            "__new__" | "_fields" | "_replace" | "__replace__" | "__slots__"
+            "__match_args__" | "__new__" | "_fields" | "_replace" | "__replace__" | "__slots__"
         ) {
             result
         } else {
@@ -613,10 +622,7 @@ impl get_size2::GetSize for NamedTupleSpec<'_> {}
 /// Create a property type for a namedtuple field.
 fn create_field_property<'db>(db: &'db dyn Db, field_ty: Type<'db>) -> Type<'db> {
     let property_getter_signature = Signature::new(
-        Parameters::new(
-            db,
-            [Parameter::positional_only(Some(Name::new_static("self")))],
-        ),
+        Parameters::standard([Parameter::positional_only(Some(Name::new_static("self")))]),
         field_ty,
     );
     let property_getter = Type::single_callable(db, property_getter_signature);

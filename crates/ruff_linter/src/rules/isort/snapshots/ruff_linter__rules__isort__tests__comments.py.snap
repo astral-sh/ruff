@@ -40,7 +40,7 @@ I001 [*] Import block is un-sorted or un-formatted
    | |_______________^
    |
 help: Organize imports
-1  | # Comment 1
+   |
 2  | # Comment 2
    - import D
 3  + import B  # Comment 4
@@ -85,3 +85,4 @@ help: Organize imports
 23 +     a,  # Comment 1
 24 +     b,
 25 + )
+   |

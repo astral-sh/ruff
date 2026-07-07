@@ -150,14 +150,16 @@ class chain(Generic[_T]):
         """Alternative chain() constructor taking a single iterable argument that evaluates lazily."""
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """chain is generic over the type of its contents.
+        This is the union of the types of the input iterable contents.
+        """
 
 @disjoint_base
 class compress(Generic[_T]):
     """Return data elements corresponding to true selector elements.
 
-    Forms a shorter iterator from selected data elements using the selectors to
-    choose the data elements.
+    Forms a shorter iterator from selected data elements using the selectors
+    to choose the data elements.
     """
 
     def __new__(cls, data: Iterable[_T], selectors: Iterable[Any]) -> Self: ...

@@ -32,6 +32,116 @@ reveal_type(p.x)  # revealed: int
 reveal_type(p.y)  # revealed: int
 ```
 
+## Unpacking a recursively growing tuple
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3838>.
+
+```py
+while 1:
+    # error: [possibly-unresolved-reference]
+    # error: [possibly-unresolved-reference]
+    x = (*x, x)
+
+while 1:
+    y = (y, *y)
+```
+
+## Generic `NamedTuple` with recursive fields
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3872>. Computing the
+`NamedTuple` fields while building the class's MRO must not try to determine whether the same class
+is a `TypedDict`.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import NamedTuple
+
+class Node[KT, VT](NamedTuple):
+    children: tuple[Node[KT, VT], ...] | tuple[Leaf[VT], ...]
+
+class Leaf[VT](NamedTuple):
+    values: tuple[VT, ...]
+```
+
+## Literal reduction during cycle recovery
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3851>. Constructing a union
+during cycle recovery must not run redundancy checks between a literal and a protocol instance.
+Resolving the protocol interface can depend on the expression inference query that is already being
+recovered, which would introduce a new Salsa cycle.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Protocol, runtime_checkable
+
+_: Any
+
+@property
+def prop(self) -> A:
+    raise NotImplementedError
+
+@runtime_checkable
+class B(Protocol):
+    _: A
+
+x = 5
+
+while isinstance(x, B):
+    x = B()  # error: [call-non-callable]
+
+type(x)
+x = 2
+
+from typing import Any, assert_type
+
+assert_type(prop, property)
+
+if bool:
+    x = 5
+
+while isinstance(x, B):
+    x = B()  # error: [call-non-callable]
+
+class A: ...
+```
+
+## Literal widening during cycle recovery
+
+Once a recursively growing group of integer literals widens to `int`, later iterations must not
+reintroduce individual literals. Otherwise, the inferred type continues changing and the cycle never
+converges. This is a reduced regression test from SciPy's iterative sparse solvers.
+
+```py
+def solve(maxiter, a, b, c, d, e):
+    iteration = 0
+    stop = 0
+    while iteration < maxiter:
+        iteration = iteration + 1
+        if iteration >= maxiter:
+            stop = 7
+        if a:
+            stop = 6
+        if b:
+            stop = 5
+        if c:
+            stop = 4
+        if d:
+            stop = 3
+        if e:
+            stop = 2
+        if stop > 0:
+            break
+    return stop
+```
+
 ## Self-referential bare type alias
 
 ```toml
@@ -76,7 +186,7 @@ falling back to `Unknown` for the type of the default value, which does not have
 impact except for the displayed type. We could also consider inferring `Divergent` when we encounter
 too many layers of nesting (instead of just one), but that would require a type traversal which
 could have performance implications. So for now, we mainly make sure not to panic or stack overflow
-for these seeminly rare cases.
+for these seemingly rare cases.
 
 ### Functions
 
@@ -128,16 +238,16 @@ class C:
         self.c = lambda positional_only=self.c, /: positional_only
         self.d = lambda *, kw_only=self.d: kw_only
 
-        # revealed: (positional: Unknown = ...) -> Unknown | ((positional=...) -> Divergent) | ((positional=...) -> Divergent)
+        # revealed: (positional: Unknown = ...) -> Unknown | ((positional=...) -> Divergent)
         reveal_type(self.a)
 
-        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent) | ((*, kw_only=...) -> Divergent)
+        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent)
         reveal_type(self.b)
 
-        # revealed: (positional_only: Unknown = ..., /) -> Unknown | ((positional_only=..., /) -> Divergent) | ((positional_only=..., /) -> Divergent)
+        # revealed: (positional_only: Unknown = ..., /) -> Unknown | ((positional_only=..., /) -> Divergent)
         reveal_type(self.c)
 
-        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent) | ((*, kw_only=...) -> Divergent)
+        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent)
         reveal_type(self.d)
 ```
 
@@ -154,6 +264,33 @@ class Cyclic:
 
 # revealed: str | dict[Unknown, Unknown] | dict[str, str]
 reveal_type(Cyclic("").data)
+```
+
+## Cycle normalization preserves non-gradual variadic parameters
+
+Normalizing a recursive implicit-attribute type does not reinterpret specialized variadic parameters
+as gradual:
+
+```py
+from typing import Any, Callable, Generic, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+T = TypeVar("T")
+flag: bool
+
+class C(Generic[T]):
+    def method(self, *args: T, **kwargs: T) -> None: ...
+
+c = C[Any]()
+
+class Recursive:
+    def __init__(self, other: "Recursive"):
+        self.callback = c.method if flag else other.callback
+
+def check(value: Recursive):
+    reveal_type(value.callback)  # revealed: bound method C[Any].method(*args: Any, **kwargs: Any) -> None
+    static_assert(is_subtype_of(TypeOf[value.callback], Callable[[], None]))
 ```
 
 ## Decorated methods with implicit class attributes
@@ -185,9 +322,9 @@ class B:
 
 ## Function annotation and dynamic `NamedTuple` / `NewType`
 
-This is a regression test for <https://github.com/astral-sh/ty/issues/3485>. Recursive type
-normalization should not force the lazy base of a `NewType` while Salsa is recovering the cycle
-created by the forward reference to `T`.
+This is a regression test for <https://github.com/astral-sh/ty/issues/3485> and
+<https://github.com/astral-sh/ty/issues/3682>. Type traversal during cycle recovery should not force
+the lazy base of a `NewType`.
 
 ```py
 class C:
@@ -206,9 +343,28 @@ from typing import NamedTuple, NewType
 X = NamedTuple("X", [("x", "X")]), None  # error: [invalid-type-form]
 
 list(X)
+min(X)
 T = f()
 
 X = NewType("X", C)
+```
+
+The runtime callable returned by `NewType` also carries the lazy base and must use the same
+cycle-safe traversal.
+
+```py
+class C: ...
+
+def f(): ...
+def g() -> T: ...
+
+g()
+from typing import NamedTuple, NewType
+
+X = NewType("X", C)
+Y = NamedTuple("Y", [("a", "Y")]), X  # error: [invalid-type-form]
+min(Y)
+T = f()
 ```
 
 ## Lazy cached property behind `hasattr`
@@ -251,7 +407,7 @@ reveal_type(Derived.decorate)
 `derived.py`:
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 import bases
 
 class Derived(bases.GenericBase["Foo", "Bar"]): ...
@@ -277,7 +433,7 @@ reveal_mro(Bar)
 
 ```py
 from typing import Generic, TypeVar, Type
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 T = TypeVar("T")
 B1 = TypeVar("B1", bound="Foo")

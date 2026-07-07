@@ -253,7 +253,7 @@ But if there is a variable annotation with a function or class literal type, the
 `__init__` will include this field:
 
 ```py
-from ty_extensions import TypeOf
+from ty_extensions._internal import TypeOf
 
 class SomeClass: ...
 
@@ -326,6 +326,22 @@ class Person:
 alice = Person("Alice", 30)
 reveal_type(repr(alice))  # revealed: str
 reveal_type(alice == alice)  # revealed: bool
+```
+
+A class is still treated as a dataclass when arguments are unpacked into the decorator:
+
+```py
+from dataclasses import dataclass
+
+SLOTS = {"slots": True}
+
+@dataclass(frozen=True, **SLOTS)
+class C:
+    x: int
+
+reveal_type(C.__init__)  # revealed: (self: C, x: int) -> None
+reveal_type(C.__slots__)  # revealed: tuple[Literal["x"]]
+C(1)
 ```
 
 If `init` is set to `False`, no `__init__` method is generated:
@@ -409,6 +425,22 @@ WithOrder(1) < WithOrder(2)
 WithOrder(1) <= WithOrder(2)
 WithOrder(1) > WithOrder(2)
 WithOrder(1) >= WithOrder(2)
+```
+
+`order=True` requires `eq=True`:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(order=True, eq=False)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
+class InvalidOrder: ...
+
+@dataclass
+@dataclass(order=True, eq=False)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
+class InvalidStackedOrder: ...
+
+@dataclass(order=True, eq=False, unexpected=True)  # error: [no-matching-overload]
+class InvalidArguments: ...
 ```
 
 Comparisons are only allowed for `WithOrder` instances:
@@ -1250,6 +1282,39 @@ class C:
 reveal_type(C.__weakref__)  # revealed: Any | None
 ```
 
+`weakref_slot=True` requires `slots=True`:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(weakref_slot=True)  # error: [invalid-dataclass] "`weakref_slot=True` requires `slots=True`"
+class InvalidWeakrefSlot: ...
+```
+
+When `slots` is a non-literal `bool`, the combination might be valid at runtime, so we don't report
+an error:
+
+```py
+from dataclasses import dataclass
+
+def dynamic_slots(slots: bool):
+    @dataclass(weakref_slot=True, slots=slots)
+    class PossiblyValidWeakrefSlot: ...
+```
+
+An invalid combination is reported when the decorator factory is called, even if the decorator is
+applied later:
+
+```py
+from dataclasses import dataclass
+
+invalid_weakref_slot = dataclass(weakref_slot=True)  # error: [invalid-dataclass] "`weakref_slot=True` requires `slots=True`"
+
+class AppliedWeakrefSlotLater: ...
+
+invalid_weakref_slot(AppliedWeakrefSlotLater)
+```
+
 The `__weakref__` attribute is correctly not modeled as existing on instances of slotted dataclasses
 where the class definition was not marked with `weakref=True`:
 
@@ -1716,6 +1781,7 @@ class Foo:
 foo = Foo(1)
 
 reveal_type(foo.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+reveal_type(type(foo).__dataclass_fields__)  # revealed: dict[str, Field[Any]]
 reveal_type(fields(Foo))  # revealed: tuple[Field[Any], ...]
 reveal_type(asdict(foo))  # revealed: dict[str, Any]
 ```
@@ -1736,8 +1802,7 @@ reveal_type(fields(Foo))  # revealed: tuple[Field[Any], ...]
 But calling `asdict` on the class object is not allowed:
 
 ```py
-# TODO: this should be a invalid-argument-type error, but we don't properly check the
-# types (and more importantly, the `ClassVar` type qualifier) of protocol members yet.
+# error: [invalid-argument-type] "Argument to function `asdict` is incorrect: Expected `DataclassInstance`, found `<class 'Foo'>`"
 asdict(Foo)
 ```
 
@@ -1920,23 +1985,55 @@ class C:
     x: int
 
 C(1) < C(2)  # ok
+
+invalid_order = dataclass(order=True, eq=False)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
+
+@invalid_order
+class IndirectDecorator: ...
 ```
 
 ### Using `dataclass` as a function
 
+Calling `dataclass` with a class returns a class with a generated constructor:
+
 ```py
 from dataclasses import dataclass
 
-class B:
+class Point:
     x: int
 
-# error: [missing-argument]
-dataclass(B)()
+dataclass(Point)()  # error: [missing-argument]
+dataclass(Point)("one")  # error: [invalid-argument-type]
 
-# error: [invalid-argument-type]
-dataclass(B)("a")
+reveal_type(dataclass(Point)(1).x)  # revealed: int
+```
 
-reveal_type(dataclass(B)(3).x)  # revealed: int
+Options can be passed in the same call:
+
+```py
+class Ordered:
+    x: int
+
+ordered = dataclass(Ordered, order=True)
+
+ordered(1) < ordered(2)
+ordered("one")  # error: [invalid-argument-type]
+
+class InvalidDirectApplication: ...
+
+dataclass(InvalidDirectApplication, order=True, eq=False)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
+```
+
+Passing `None` explicitly returns a decorator that uses the supplied options:
+
+```py
+class Item:
+    x: int
+
+ordered_item = dataclass(None, order=True)(Item)
+
+reveal_type(ordered_item)  # revealed: <class 'Item'>
+ordered_item(1) < ordered_item(2)
 ```
 
 ## Internals
@@ -1946,7 +2043,7 @@ and attributes like the MRO are unchanged:
 
 ```py
 from dataclasses import dataclass
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 @dataclass
 class Person:
@@ -1981,7 +2078,8 @@ python-version = "3.12"
 from dataclasses import dataclass
 from typing import Callable
 from types import FunctionType
-from ty_extensions import CallableTypeOf, TypeOf, static_assert, is_subtype_of, is_assignable_to, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import CallableTypeOf, TypeOf, is_subtype_of, is_assignable_to, is_equivalent_to
 
 @dataclass(order=True)
 class C:

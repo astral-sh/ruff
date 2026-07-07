@@ -91,8 +91,8 @@ mod tests {
     #[test_case(Rule::TSuffixedTypeAlias, Path::new("PYI043.pyi"))]
     #[test_case(Rule::TypeAliasWithoutAnnotation, Path::new("PYI026.py"))]
     #[test_case(Rule::TypeAliasWithoutAnnotation, Path::new("PYI026.pyi"))]
-    #[test_case(Rule::TypeCommentInStub, Path::new("PYI033.py"))]
-    #[test_case(Rule::TypeCommentInStub, Path::new("PYI033.pyi"))]
+    #[test_case(Rule::LegacyTypeComment, Path::new("PYI033.py"))]
+    #[test_case(Rule::LegacyTypeComment, Path::new("PYI033.pyi"))]
     #[test_case(Rule::TypedArgumentDefaultInStub, Path::new("PYI011.py"))]
     #[test_case(Rule::TypedArgumentDefaultInStub, Path::new("PYI011.pyi"))]
     #[test_case(Rule::UnaliasedCollectionsAbcSetImport, Path::new("PYI025_1.py"))]
@@ -146,6 +146,7 @@ mod tests {
     #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_2.py"))]
     #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_3.py"))]
     #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_4.py"))]
+    #[test_case(Rule::LegacyTypeComment, Path::new("PYI033.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview_{}_{}",

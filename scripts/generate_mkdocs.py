@@ -66,6 +66,9 @@ LINK_REWRITES: dict[str, str] = {
     "https://docs.astral.sh/ruff/faq/#how-does-ruffs-linter-compare-to-flake8": (
         "faq.md#how-does-ruffs-linter-compare-to-flake8"
     ),
+    "https://docs.astral.sh/ruff/faq/#how-does-ruffs-import-sorting-compare-to-isort": (
+        "faq.md#how-does-ruffs-import-sorting-compare-to-isort"
+    ),
     "https://docs.astral.sh/ruff/faq/#how-does-ruffs-formatter-compare-to-black": (
         "faq.md#how-does-ruffs-formatter-compare-to-black"
     ),

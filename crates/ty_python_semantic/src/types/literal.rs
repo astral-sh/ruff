@@ -3,6 +3,7 @@ use compact_str::CompactString;
 use ruff_python_ast::name::Name;
 
 use crate::Db;
+use crate::types::enums::EnumClassLiteral;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{ClassLiteral, KnownClass, Type};
 use ty_python_core::definition::Definition;
@@ -385,8 +386,8 @@ impl<'db> BytesLiteralType<'db> {
 /// ```
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct EnumLiteralType<'db> {
-    /// A reference to the enum class this literal belongs to
-    pub(crate) enum_class: ClassLiteral<'db>,
+    /// The enum class this literal belongs to.
+    pub(crate) enum_class_literal: EnumClassLiteral<'db>,
     /// The name of the enum member
     #[returns(ref)]
     pub(crate) name: Name,
@@ -396,6 +397,10 @@ pub struct EnumLiteralType<'db> {
 impl get_size2::GetSize for EnumLiteralType<'_> {}
 
 impl<'db> EnumLiteralType<'db> {
+    pub(crate) fn enum_class(self, db: &'db dyn Db) -> ClassLiteral<'db> {
+        self.enum_class_literal(db).class_literal(db)
+    }
+
     pub(crate) fn enum_class_instance(self, db: &'db dyn Db) -> Type<'db> {
         self.enum_class(db).to_non_generic_instance(db)
     }

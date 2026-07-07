@@ -146,7 +146,7 @@ You can't inherit from most of these. `typing.Callable` is an exception.
 ```py
 from typing import Callable
 from typing_extensions import Self, Unpack, TypeGuard, TypeIs, Concatenate, Generic
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class A(Self): ...  # error: [invalid-base]
 class B(Unpack): ...  # error: [invalid-base]

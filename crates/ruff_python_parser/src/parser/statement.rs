@@ -10,12 +10,12 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::error::StarTupleKind;
-use crate::parser::expression::{EXPR_SET, ParsedExpr};
+use crate::parser::expression::{ArgumentsContext, EXPR_SET, ParsedExpr};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{
-    FunctionKind, Parser, RecoveryContext, RecoveryContextKind, WithItemKind, helpers,
+    FunctionKind, IpyEscapeContext, Parser, RecoveryContext, RecoveryContextKind, WithItemKind,
+    helpers,
 };
-use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
 
@@ -354,6 +354,12 @@ impl<'src> Parser<'src> {
                 }
 
                 let start = self.node_start();
+
+                // test_err yield_after_comma
+                // def f(): 1, yield 1
+
+                // test_ok yield_after_comma_parenthesized
+                // def f(): 1, (yield 1)
 
                 // simple_stmt: `... | yield_stmt | star_expressions | ...`
                 let parsed_expr =
@@ -722,6 +728,15 @@ impl<'src> Parser<'src> {
             self.add_error(ParseErrorType::EmptyImportNames, self.current_token_range());
         }
 
+        if seen_star_import && parenthesized.is_yes() {
+            // test_err from_import_parenthesized_star
+            // from x import (*)
+            self.add_error(
+                ParseErrorType::OtherError("Star import cannot be parenthesized".to_string()),
+                self.node_range(names_start),
+            );
+        }
+
         if seen_star_import && names.len() > 1 {
             // test_err from_import_star_with_other_names
             // from x import *, a
@@ -1083,11 +1098,7 @@ impl<'src> Parser<'src> {
     fn parse_ipython_escape_command_statement(&mut self) -> ast::StmtIpyEscapeCommand {
         let start = self.node_start();
 
-        let TokenValue::IpyEscapeCommand { value, kind } =
-            self.bump_value(TokenKind::IpyEscapeCommand)
-        else {
-            unreachable!()
-        };
+        let (value, kind) = self.bump_ipython_escape_command(IpyEscapeContext::LogicalLineStart);
 
         let range = self.node_range(start);
         if self.options.mode != Mode::Ipython {
@@ -2146,9 +2157,14 @@ impl<'src> Parser<'src> {
         // test_ok class_def_arguments
         // class Foo: ...
         // class Foo(): ...
+        // class Foo((base for base in bases)): ...
+        // class Foo(*(base for base in bases)): ...
+
+        // test_err class_def_unparenthesized_generator_argument
+        // class Foo(base for base in bases): ...
         let arguments = self
             .at(TokenKind::Lpar)
-            .then(|| Box::new(self.parse_arguments()));
+            .then(|| Box::new(self.parse_arguments(ArgumentsContext::ClassDefinition)));
 
         self.expect(TokenKind::Colon);
 

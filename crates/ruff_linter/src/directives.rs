@@ -12,7 +12,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
-use crate::comments::shebang::ShebangDirective;
+use crate::comments::shebang::leading_shebang_range;
 use crate::noqa::NoqaMapping;
 use crate::settings::LinterSettings;
 
@@ -125,16 +125,7 @@ fn extract_noqa_line_for(tokens: &Tokens, locator: &Locator, indexer: &Indexer) 
         }
     }
 
-    let mut shebang_mapping = None;
-    if let Some(first_token) = tokens.first()
-        && first_token.kind() == TokenKind::Comment
-        && ShebangDirective::try_extract(locator.slice(first_token)).is_some()
-    {
-        shebang_mapping = Some(TextRange::new(
-            first_token.start(),
-            locator.full_line_end(first_token.end()),
-        ));
-    }
+    let shebang_mapping = leading_shebang_range(locator.contents(), tokens);
 
     // The capacity allocated here might be more than we need if there are
     // nested interpolated strings.

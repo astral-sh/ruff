@@ -5,9 +5,10 @@ This means that it is known that no possible runtime object inhabits both types 
 
 ## Basic builtin types
 
-```py
+```pyi
 from typing_extensions import Literal, LiteralString, Any
-from ty_extensions import Intersection, Not, TypeOf, is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_disjoint_from
 
 static_assert(is_disjoint_from(bool, str))
 static_assert(not is_disjoint_from(bool, bool))
@@ -16,18 +17,31 @@ static_assert(not is_disjoint_from(bool, object))
 
 static_assert(not is_disjoint_from(Any, bool))
 static_assert(not is_disjoint_from(Any, Any))
-static_assert(not is_disjoint_from(Any, Not[Any]))
+static_assert(not is_disjoint_from(Any, ~Any))
 
 static_assert(not is_disjoint_from(LiteralString, LiteralString))
 static_assert(not is_disjoint_from(str, LiteralString))
 ```
 
-## Enum complements
+## Statically empty and non-empty ranges
 
 ```py
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_disjoint_from
+
+static_assert(is_disjoint_from(TypeOf[range(0)], TypeOf[range(1)]))
+static_assert(is_disjoint_from(TypeOf[range(1)], TypeOf[range(0)]))
+static_assert(not is_disjoint_from(TypeOf[range(0)], range))
+static_assert(not is_disjoint_from(TypeOf[range(1)], range))
+```
+
+## Enum complements
+
+```pyi
 from enum import Enum
 from typing import Literal
-from ty_extensions import Intersection, Not, is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 
 class Color(Enum):
     RED = 1
@@ -36,22 +50,23 @@ class Color(Enum):
 
 static_assert(
     is_disjoint_from(
-        Intersection[Color, Not[Literal[Color.RED]]],
-        Intersection[Color, Not[Literal[Color.GREEN, Color.BLUE]]],
+        Color & ~Literal[Color.RED],
+        Color & ~Literal[Color.GREEN, Color.BLUE],
     )
 )
 static_assert(
     is_disjoint_from(
-        Intersection[Color, Not[Literal[Color.GREEN, Color.BLUE]]],
-        Intersection[Color, Not[Literal[Color.RED]]],
+        Color & ~Literal[Color.GREEN, Color.BLUE],
+        Color & ~Literal[Color.RED],
     )
 )
 ```
 
 ## Class hierarchies
 
-```py
-from ty_extensions import is_disjoint_from, static_assert, Intersection, is_subtype_of
+```pyi
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from, is_subtype_of
 from typing import final
 
 class A: ...
@@ -69,7 +84,7 @@ static_assert(not is_disjoint_from(B1, B2))
 class C(B1, B2): ...
 
 # ... which lies in their intersection:
-static_assert(is_subtype_of(C, Intersection[B1, B2]))
+static_assert(is_subtype_of(C, B1 & B2))
 
 # However, if a class is marked final, it cannot be subclassed ...
 @final
@@ -100,7 +115,8 @@ static_assert(is_disjoint_from(UsesMeta1, UsesMeta2))
 Some builtins types are declared as `@final`:
 
 ```py
-from ty_extensions import static_assert, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 
 class Foo: ...
 
@@ -122,7 +138,8 @@ python-version = "3.12"
 
 ```py
 from typing import Any, final
-from ty_extensions import static_assert, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 
 @final
 class Foo[T]:
@@ -146,10 +163,11 @@ static_assert(not is_disjoint_from(Foo[int], Foo[str]))
 Only incompatible invariant generic arguments imply disjointness. Covariant generic arguments do
 not: a covariant container can be inhabited by an empty value.
 
-```py
+```pyi
 from collections.abc import Sequence
 from typing import Any, Generic, TypeVar
-from ty_extensions import Intersection, is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -183,8 +201,8 @@ static_assert(not is_disjoint_from(Invariant[B], Invariant[Any]))
 # `A | Any` cannot materialize to be equivalent to `B`.
 static_assert(is_disjoint_from(Invariant[A | Any], Invariant[B]))
 static_assert(is_disjoint_from(Invariant[B], Invariant[A | Any]))
-static_assert(is_disjoint_from(Invariant[Intersection[A, Any]], Invariant[B]))
-static_assert(is_disjoint_from(Invariant[B], Invariant[Intersection[A, Any]]))
+static_assert(is_disjoint_from(Invariant[A & Any], Invariant[B]))
+static_assert(is_disjoint_from(Invariant[B], Invariant[A & Any]))
 static_assert(is_disjoint_from(InvariantPair[A, A], InvariantPair[A, B]))
 static_assert(not is_disjoint_from(Covariant[A], Covariant[B]))
 static_assert(not is_disjoint_from(Covariant[A], CoSubB))
@@ -200,7 +218,8 @@ python-version = "3.12"
 
 ```py
 from typing import Generic, Never, TypeVar
-from ty_extensions import is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 
 T = TypeVar("T")
 
@@ -245,7 +264,8 @@ generally use the term "disjoint base" for these classes.
 import asyncio
 from typing import Any
 from typing_extensions import disjoint_base
-from ty_extensions import static_assert, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 
 class Foo: ...
 
@@ -285,7 +305,8 @@ As well as certain classes that are implemented in C extensions, any class that 
 ty:
 
 ```py
-from ty_extensions import static_assert, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 
 class A:
     __slots__ = ("a",)
@@ -318,7 +339,8 @@ static_assert(not is_disjoint_from(D, A))
 
 ```py
 from dataclasses import dataclass
-from ty_extensions import is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 
 @dataclass(slots=True)
 class F: ...
@@ -349,7 +371,8 @@ static_assert(is_disjoint_from(I, J))
 
 ```py
 from typing_extensions import Literal, Never
-from ty_extensions import TypeOf, is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_disjoint_from
 
 static_assert(is_disjoint_from(tuple[()], TypeOf[object]))
 static_assert(is_disjoint_from(tuple[()], TypeOf[Literal]))
@@ -375,7 +398,8 @@ static_assert(is_disjoint_from(tuple[int, int], tuple[None, ...]))  # error: [st
 
 ```py
 from typing_extensions import Literal
-from ty_extensions import Intersection, is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 
 static_assert(is_disjoint_from(Literal[1, 2], Literal[3]))
 static_assert(is_disjoint_from(Literal[1, 2], Literal[3, 4]))
@@ -386,9 +410,10 @@ static_assert(not is_disjoint_from(Literal[1, 2], Literal[2, 3]))
 
 ## Intersections
 
-```py
+```pyi
 from typing_extensions import Literal, final, Any, LiteralString
-from ty_extensions import Intersection, is_disjoint_from, static_assert, Not, AlwaysFalsy
+from ty_extensions import static_assert, AlwaysFalsy
+from ty_extensions._internal import is_disjoint_from
 
 @final
 class P: ...
@@ -405,9 +430,9 @@ static_assert(is_disjoint_from(P, R))
 static_assert(is_disjoint_from(Q, R))
 
 # ... their intersections are also disjoint:
-static_assert(is_disjoint_from(Intersection[P, Q], R))
-static_assert(is_disjoint_from(Intersection[P, R], Q))
-static_assert(is_disjoint_from(Intersection[Q, R], P))
+static_assert(is_disjoint_from(P & Q, R))
+static_assert(is_disjoint_from(P & R, Q))
+static_assert(is_disjoint_from(Q & R, P))
 
 # On the other hand, for non-disjoint classes ...
 class X: ...
@@ -419,33 +444,33 @@ static_assert(not is_disjoint_from(X, Z))
 static_assert(not is_disjoint_from(Y, Z))
 
 # ... their intersections are also not disjoint:
-static_assert(not is_disjoint_from(Intersection[X, Y], Z))
-static_assert(not is_disjoint_from(Intersection[X, Z], Y))
-static_assert(not is_disjoint_from(Intersection[Y, Z], X))
+static_assert(not is_disjoint_from(X & Y, Z))
+static_assert(not is_disjoint_from(X & Z, Y))
+static_assert(not is_disjoint_from(Y & Z, X))
 
 # If one side has a positive fully-static element and the other side has a negative of that element, they are disjoint
-static_assert(is_disjoint_from(int, Not[int]))
-static_assert(is_disjoint_from(Intersection[X, Y, Not[Z]], Intersection[X, Z]))
-static_assert(is_disjoint_from(Intersection[X, Not[Literal[1]]], Literal[1]))
+static_assert(is_disjoint_from(int, ~int))
+static_assert(is_disjoint_from(X & Y & ~Z, X & Z))
+static_assert(is_disjoint_from(X & ~Literal[1], Literal[1]))
 
 class Parent: ...
 class Child(Parent): ...
 
 static_assert(not is_disjoint_from(Parent, Child))
-static_assert(not is_disjoint_from(Parent, Not[Child]))
-static_assert(not is_disjoint_from(Not[Parent], Not[Child]))
-static_assert(is_disjoint_from(Not[Parent], Child))
-static_assert(is_disjoint_from(Intersection[X, Not[Parent]], Child))
-static_assert(is_disjoint_from(Intersection[X, Not[Parent]], Intersection[X, Child]))
+static_assert(not is_disjoint_from(Parent, ~Child))
+static_assert(not is_disjoint_from(~Parent, ~Child))
+static_assert(is_disjoint_from(~Parent, Child))
+static_assert(is_disjoint_from(X & ~Parent, Child))
+static_assert(is_disjoint_from(X & ~Parent, X & Child))
 
-static_assert(not is_disjoint_from(Intersection[Any, X], Intersection[Any, Not[Y]]))
-static_assert(not is_disjoint_from(Intersection[Any, Not[Y]], Intersection[Any, X]))
+static_assert(not is_disjoint_from(Any & X, Any & ~Y))
+static_assert(not is_disjoint_from(Any & ~Y, Any & X))
 
-static_assert(is_disjoint_from(Intersection[int, Any], Not[int]))
-static_assert(is_disjoint_from(Not[int], Intersection[int, Any]))
+static_assert(is_disjoint_from(int & Any, ~int))
+static_assert(is_disjoint_from(~int, int & Any))
 
 # TODO https://github.com/astral-sh/ty/issues/216
-static_assert(is_disjoint_from(AlwaysFalsy, Intersection[LiteralString, Not[Literal[""]]]))  # error: [static-assert-error]
+static_assert(is_disjoint_from(AlwaysFalsy, LiteralString & ~Literal[""]))  # error: [static-assert-error]
 ```
 
 ## Special types
@@ -456,7 +481,8 @@ static_assert(is_disjoint_from(AlwaysFalsy, Intersection[LiteralString, Not[Lite
 
 ```py
 from typing_extensions import Never
-from ty_extensions import is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 
 static_assert(is_disjoint_from(Never, Never))
 static_assert(is_disjoint_from(Never, None))
@@ -466,9 +492,10 @@ static_assert(is_disjoint_from(Never, object))
 
 ### `None`
 
-```py
+```pyi
 from typing_extensions import Literal, LiteralString
-from ty_extensions import is_disjoint_from, static_assert, Intersection, Not
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 
 static_assert(is_disjoint_from(None, Literal[True]))
 static_assert(is_disjoint_from(None, Literal[1]))
@@ -482,15 +509,16 @@ static_assert(not is_disjoint_from(None, None))
 static_assert(not is_disjoint_from(None, int | None))
 static_assert(not is_disjoint_from(None, object))
 
-static_assert(is_disjoint_from(Intersection[int, Not[str]], None))
-static_assert(is_disjoint_from(None, Intersection[int, Not[str]]))
+static_assert(is_disjoint_from(int & ~str, None))
+static_assert(is_disjoint_from(None, int & ~str))
 ```
 
 ### Literals
 
-```py
+```pyi
 from typing_extensions import Literal, LiteralString
-from ty_extensions import Intersection, Not, TypeOf, is_disjoint_from, static_assert, AlwaysFalsy, AlwaysTruthy
+from ty_extensions import static_assert, AlwaysFalsy, AlwaysTruthy
+from ty_extensions._internal import TypeOf, is_disjoint_from
 from enum import Enum
 
 class Answer(Enum):
@@ -529,22 +557,22 @@ static_assert(not is_disjoint_from(Literal["a"], str))
 
 # TODO: No errors
 # error: [static-assert-error]
-static_assert(is_disjoint_from(AlwaysFalsy, Intersection[LiteralString, Not[Literal[""]]]))
+static_assert(is_disjoint_from(AlwaysFalsy, LiteralString & ~Literal[""]))
 # error: [static-assert-error]
-static_assert(is_disjoint_from(Intersection[Not[Literal[True]], Not[Literal[False]]], bool))
+static_assert(is_disjoint_from(~Literal[True] & ~Literal[False], bool))
 # error: [static-assert-error]
-static_assert(is_disjoint_from(Intersection[AlwaysFalsy, Not[Literal[False]]], bool))
+static_assert(is_disjoint_from(AlwaysFalsy & ~Literal[False], bool))
 # error: [static-assert-error]
-static_assert(is_disjoint_from(Intersection[AlwaysTruthy, Not[Literal[True]]], bool))
+static_assert(is_disjoint_from(AlwaysTruthy & ~Literal[True], bool))
 
 # TODO: No errors
-# The condition `is_disjoint(T, Not[T])` must still be satisfied after the following transformations:
+# The condition `is_disjoint(T, ~T)` must still be satisfied after the following transformations:
 # `LiteralString & AlwaysTruthy` -> `LiteralString & ~Literal[""]`
 # error: [static-assert-error]
-static_assert(is_disjoint_from(Intersection[LiteralString, AlwaysTruthy], Not[LiteralString] | AlwaysFalsy))
+static_assert(is_disjoint_from(LiteralString & AlwaysTruthy, ~LiteralString | AlwaysFalsy))
 # `LiteralString & ~AlwaysFalsy`  -> `LiteralString & ~Literal[""]`
 # error: [static-assert-error]
-static_assert(is_disjoint_from(Intersection[LiteralString, Not[AlwaysFalsy]], Not[LiteralString] | AlwaysFalsy))
+static_assert(is_disjoint_from(LiteralString & ~AlwaysFalsy, ~LiteralString | AlwaysFalsy))
 ```
 
 ### Class, module and function literals
@@ -556,7 +584,8 @@ python-version = "3.12"
 
 ```py
 from types import ModuleType, FunctionType
-from ty_extensions import TypeOf, is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_disjoint_from
 
 class A: ...
 class B: ...
@@ -597,7 +626,8 @@ static_assert(not is_disjoint_from(TypeOf[f], object))
 
 ```py
 from typing import final
-from ty_extensions import TypeOf, is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_disjoint_from
 
 class A:
     def foo(self) -> None: ...
@@ -634,7 +664,8 @@ Two different `@final` methods are disjoint, even if they share the same name an
 
 ```py
 from typing import final
-from ty_extensions import TypeOf, is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_disjoint_from
 
 class C:
     @final
@@ -678,7 +709,8 @@ static_assert(not is_disjoint_from(TypeOf[F().foo], TypeOf[G().foo]))
 ### `AlwaysTruthy` and `AlwaysFalsy`
 
 ```py
-from ty_extensions import AlwaysFalsy, AlwaysTruthy, is_disjoint_from, static_assert
+from ty_extensions import AlwaysFalsy, AlwaysTruthy, static_assert
+from ty_extensions._internal import is_disjoint_from
 from typing import Literal
 
 static_assert(is_disjoint_from(None, AlwaysTruthy))
@@ -699,7 +731,8 @@ the instance type is not a subclass of `T`'s metaclass.
 
 ```py
 from typing import final
-from ty_extensions import is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 
 @final
 class Foo: ...
@@ -732,7 +765,8 @@ metaclass of `T` is disjoint from the metaclass of `S`.
 
 ```py
 from typing import final
-from ty_extensions import static_assert, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 
 @final
 class Meta1(type): ...
@@ -750,8 +784,9 @@ static_assert(is_disjoint_from(type[UsesMeta1], type[UsesMeta2]))
 ### `property`
 
 ```py
-from ty_extensions import is_disjoint_from, static_assert, TypeOf
-from typing import final
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_disjoint_from
+from typing import final, Protocol, Literal
 
 class C:
     @property
@@ -770,12 +805,36 @@ static_assert(not is_disjoint_from(Whatever, TypeOf[C.prop]))
 static_assert(not is_disjoint_from(TypeOf[C.prop], Whatever))
 static_assert(is_disjoint_from(TypeOf[C.prop], D))
 static_assert(is_disjoint_from(D, TypeOf[C.prop]))
+
+@final
+class E:
+    @property
+    def prop(self) -> int:
+        return 1
+
+class F:
+    prop: Literal["a"]
+
+class HasIntProp(Protocol):
+    @property
+    def prop(self) -> int: ...
+
+class HasReadWriteIntProp(Protocol):
+    @property
+    def prop(self) -> int: ...
+    @prop.setter
+    def prop(self, value: int) -> None: ...
+
+static_assert(not is_disjoint_from(HasIntProp, E))
+static_assert(is_disjoint_from(HasIntProp, F))
+static_assert(is_disjoint_from(HasReadWriteIntProp, E))
 ```
 
 ### `TypeGuard` and `TypeIs`
 
 ```py
-from ty_extensions import static_assert, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 from typing_extensions import TypeGuard, TypeIs
 
 static_assert(not is_disjoint_from(bool, TypeGuard[str]))
@@ -793,7 +852,8 @@ type of the protocol's member.
 
 ```py
 from typing_extensions import Protocol, Literal, final, ClassVar
-from ty_extensions import is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 
 class HasAttrA(Protocol):
     attr: Literal["a"]
@@ -852,7 +912,8 @@ static_assert(is_disjoint_from(type[Foo], BarNone))
 from __future__ import annotations
 
 from typing import NamedTuple, final
-from ty_extensions import is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 
 @final
 class Path(NamedTuple):
@@ -880,7 +941,8 @@ python-version = "3.12"
 
 ```py
 from typing import final
-from ty_extensions import static_assert, is_disjoint_from, TypeOf
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_disjoint_from
 
 class GenericClass[T]:
     x: T  # invariant
@@ -921,7 +983,8 @@ As such, for any two callable types, it is possible to conceive of a runtime cal
 would inhabit both types simultaneously.
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_disjoint_from
 from typing_extensions import Callable, Literal, Never
 
 def mixed(a: int, /, b: str, *args: int, c: int = 2, **kwargs: int) -> None: ...
@@ -942,7 +1005,8 @@ static_assert(not is_disjoint_from(Callable[[Never], str], Callable[[Never], int
 A callable type is disjoint from all literal types.
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_disjoint_from
 from typing_extensions import Callable, Literal, Never
 
 static_assert(is_disjoint_from(Callable[[], None], Literal[""]))
@@ -955,7 +1019,8 @@ A callable type is disjoint from nominal instance types where the classes are fi
 `__call__` is not callable.
 
 ```py
-from ty_extensions import RegularCallableTypeOf, is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_disjoint_from
 from typing_extensions import Any, Callable, final
 
 @final
@@ -1013,7 +1078,8 @@ def possibly_unbound_with_invalid_type(flag: bool):
 A callable type is disjoint from special form types, except for callable special forms.
 
 ```py
-from ty_extensions import is_disjoint_from, static_assert, TypeOf
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_disjoint_from
 from typing_extensions import Any, Callable, TypedDict
 from typing import Literal, Union, Optional, Final, Type, ChainMap, Counter, OrderedDict, DefaultDict, Deque
 from collections.abc import Callable as CollectionsAbcCallable
@@ -1065,7 +1131,8 @@ static_assert(not is_disjoint_from(TypeOf[OrderedDict], Callable[..., Any]))
 
 ```py
 from enum import Enum
-from ty_extensions import is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 from typing_extensions import Literal
 
 class MyEnum(Enum):

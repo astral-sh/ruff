@@ -232,7 +232,7 @@ enum DescriptorReceiverKind {
     Instance,
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
 pub struct ResolvedSuperOwner<'db> {
     /// The resolved second `super()` argument, used when binding descriptors after
     /// attribute lookup. If `receiver` is [`DescriptorReceiverKind::Instance`], this
@@ -286,7 +286,7 @@ impl<'db> ResolvedSuperOwner<'db> {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
 pub enum SuperOwnerKind<'db> {
     Dynamic(DynamicType<'db>),
     Divergent(DivergentType),
@@ -304,7 +304,7 @@ impl<'db> SuperOwnerKind<'db> {
             SuperOwnerKind::Dynamic(dynamic) => {
                 Some(SuperOwnerKind::Dynamic(dynamic.recursive_type_normalized()))
             }
-            SuperOwnerKind::Divergent(_) => Some(self.clone()),
+            SuperOwnerKind::Divergent(_) => Some(*self),
             SuperOwnerKind::Resolved(resolved_owner) => Some(SuperOwnerKind::Resolved(
                 resolved_owner.recursive_type_normalized_impl(db, div, nested)?,
             )),
@@ -375,13 +375,13 @@ impl<'db> BoundSuperType<'db> {
         pivot_class: ClassBase<'db>,
     ) -> bool {
         match pivot_class {
-            ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
+            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
             ClassBase::Class(pivot_class) => {
                 let pivot_class = pivot_class.class_literal(db);
                 class.iter_mro(db).any(|superclass| match superclass {
-                    ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
+                    ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
                     ClassBase::Class(superclass) => superclass.class_literal(db) == pivot_class,
-                    ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict => false,
+                    ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict(_) => false,
                 })
             }
             special_form @ (ClassBase::Generic | ClassBase::Protocol) => {
@@ -391,7 +391,7 @@ impl<'db> BoundSuperType<'db> {
                 })
             }
             // typing.TypedDict never stays in a runtime class' MRO
-            ClassBase::TypedDict => false,
+            ClassBase::TypedDict(_) => false,
         }
     }
 
@@ -541,7 +541,7 @@ impl<'db> BoundSuperType<'db> {
             },
             Type::SpecialForm(SpecialFormType::Protocol) => ClassBase::Protocol,
             Type::SpecialForm(SpecialFormType::Generic) => ClassBase::Generic,
-            Type::SpecialForm(SpecialFormType::TypedDict) => ClassBase::TypedDict,
+            Type::SpecialForm(SpecialFormType::TypedDict(module)) => ClassBase::TypedDict(module),
             Type::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
             Type::Divergent(divergent) => ClassBase::Divergent(divergent),
             _ => {
@@ -814,7 +814,9 @@ impl<'db> BoundSuperType<'db> {
                 return delegate_to(KnownClass::ModuleType.to_instance(db));
             }
             Type::GenericAlias(_) => return delegate_to(KnownClass::GenericAlias.to_instance(db)),
-            Type::PropertyInstance(_) => return delegate_to(KnownClass::Property.to_instance(db)),
+            Type::PropertyInstance(property) => {
+                return delegate_to(property.instance_fallback(db));
+            }
             Type::BoundSuper(_) => return delegate_to(KnownClass::Super.to_instance(db)),
             Type::TypedDict(td) => {
                 // In general it isn't sound to upcast a `TypedDict` to a `dict`,
@@ -932,7 +934,7 @@ impl<'db> BoundSuperType<'db> {
         {
             let item_parameter = Parameter::positional_only(Some(Name::new_static("item")))
                 .with_annotated_type(Type::unknown());
-            let parameters = Parameters::new(db, [item_parameter]);
+            let parameters = Parameters::standard([item_parameter]);
             let return_type = self.owner(db).owner_type();
             let class_getitem = Type::single_callable(db, Signature::new(parameters, return_type));
             return Place::bound(class_getitem).into();
@@ -986,8 +988,10 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
                 ConstraintSet::from_bool(self.constraints, l == r)
             }
             (ClassBase::Divergent(_), _) | (_, ClassBase::Divergent(_)) => self.never(),
-            (ClassBase::Dynamic(_), ClassBase::Dynamic(_)) => self.always(),
-            (ClassBase::Dynamic(_), _) => self.never(),
+            (ClassBase::Any | ClassBase::Dynamic(_), ClassBase::Any | ClassBase::Dynamic(_)) => {
+                self.always()
+            }
+            (ClassBase::Any | ClassBase::Dynamic(_), _) => self.never(),
 
             (ClassBase::Generic, ClassBase::Generic) => self.always(),
             (ClassBase::Generic, _) => self.never(),
@@ -995,8 +999,10 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             (ClassBase::Protocol, ClassBase::Protocol) => self.always(),
             (ClassBase::Protocol, _) => self.never(),
 
-            (ClassBase::TypedDict, ClassBase::TypedDict) => self.always(),
-            (ClassBase::TypedDict, _) => self.never(),
+            (ClassBase::TypedDict(left), ClassBase::TypedDict(right)) => {
+                ConstraintSet::from_bool(self.constraints, left == right)
+            }
+            (ClassBase::TypedDict(_), _) => self.never(),
         };
         if class_equivalence.is_never_satisfied(db) {
             return self.never();
