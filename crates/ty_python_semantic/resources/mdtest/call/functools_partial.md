@@ -942,7 +942,7 @@ python-version = "3.14"
 
 ```py
 from functools import Placeholder as _, partial
-from typing import Callable, ParamSpec, TypeVar, overload
+from typing import Callable, ParamSpec, TypedDict, TypeVar, overload
 
 def combine(left: int, middle: str, right: float) -> tuple[int, str, float]:
     return left, middle, right
@@ -1050,6 +1050,11 @@ partial(consume, maybe_placeholder, "bad")  # error: [invalid-argument-type]
 maybe_placeholder_tuple = (maybe_placeholder,)
 partial(consume, *maybe_placeholder_tuple, "bad")  # error: [invalid-argument-type]
 
+def three_integers(first: int, second: int, third: int) -> None:
+    pass
+
+partial(three_integers, *(_, "bad", 1))  # error: [invalid-argument-type]
+
 P = ParamSpec("P")
 R = TypeVar("R")
 
@@ -1084,6 +1089,13 @@ def accepts_keywords(*, value: object, count: int) -> None:
     pass
 
 partial(accepts_keywords, **{"value": _, "count": 1})  # error: [invalid-argument-type]
+
+class BroadKeywords(TypedDict):
+    value: object
+    count: str
+
+def validate_broad_keywords(kwargs: BroadKeywords) -> None:
+    partial(accepts_keywords, **kwargs)  # error: [invalid-argument-type]
 ```
 
 ## Constructors and advanced signatures

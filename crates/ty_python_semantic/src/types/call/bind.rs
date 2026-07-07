@@ -176,7 +176,7 @@ fn generic_context_has_paramspec<'db>(
 struct FunctoolsPartialApplicationPlan<'a, 'db> {
     arguments: CallArguments<'a, 'db>,
     placeholder_arguments: Box<[bool]>,
-    suppressed_argument_errors: Box<[bool]>,
+    unpacked_placeholder_arguments: Box<[bool]>,
     can_synthesize_signature: bool,
 }
 
@@ -210,7 +210,7 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
 
         let mut arguments = call_arguments.start_from(1);
         let mut placeholder_arguments = vec![false; arguments.len()];
-        let mut suppressed_argument_errors = vec![false; arguments.len()];
+        let mut unpacked_placeholder_arguments = vec![false; arguments.len()];
         let mut can_validate = true;
         let mut can_synthesize_signature = true;
         let mut last_positional = None;
@@ -252,7 +252,7 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
                             // Precisely rewriting holes inside an unpacked tuple would require a
                             // per-element plan rather than the source-argument plan used here.
                             can_synthesize_signature = false;
-                            suppressed_argument_errors[argument_index] = true;
+                            unpacked_placeholder_arguments[argument_index] = true;
                         }
                     }
                 }
@@ -272,7 +272,7 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
                         match classify(value_ty) {
                             PlaceholderPossibility::No => {}
                             PlaceholderPossibility::Possible => {
-                                suppressed_argument_errors[argument_index] = true;
+                                unpacked_placeholder_arguments[argument_index] = true;
                             }
                             PlaceholderPossibility::Exactly => {
                                 invalid_keyword.get_or_insert(argument_index);
@@ -286,13 +286,13 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
                             match classify(unpacked_key.value_ty) {
                                 PlaceholderPossibility::No => {}
                                 PlaceholderPossibility::Possible => {
-                                    suppressed_argument_errors[argument_index] = true;
+                                    unpacked_placeholder_arguments[argument_index] = true;
                                 }
                                 PlaceholderPossibility::Exactly if unpacked_key.is_required => {
                                     invalid_keyword.get_or_insert(argument_index);
                                 }
                                 PlaceholderPossibility::Exactly => {
-                                    suppressed_argument_errors[argument_index] = true;
+                                    unpacked_placeholder_arguments[argument_index] = true;
                                 }
                             }
                         }
@@ -345,7 +345,7 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
         Ok(Some(Self {
             arguments,
             placeholder_arguments: placeholder_arguments.into_boxed_slice(),
-            suppressed_argument_errors: suppressed_argument_errors.into_boxed_slice(),
+            unpacked_placeholder_arguments: unpacked_placeholder_arguments.into_boxed_slice(),
             can_synthesize_signature,
         }))
     }
@@ -362,13 +362,28 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
             .is_some_and(|index| self.placeholder_arguments[index])
     }
 
-    fn suppresses_error(&self, error: &BindingError<'_>) -> bool {
-        error.argument_index().is_some_and(|argument_index| {
-            self.suppressed_argument_errors
-                .get(argument_index)
-                .copied()
-                .unwrap_or(false)
-        })
+    fn suppresses_error(&self, db: &'db dyn Db, error: &BindingError<'db>) -> bool {
+        let Some(argument_index) = error.argument_index() else {
+            return false;
+        };
+        if !self
+            .unpacked_placeholder_arguments
+            .get(argument_index)
+            .copied()
+            .unwrap_or(false)
+        {
+            return false;
+        }
+        let Some(provided_ty) = error.provided_type() else {
+            return false;
+        };
+        let Some(placeholder_ty) = known_module_symbol(db, KnownModule::Functools, "Placeholder")
+            .place
+            .ignore_possibly_undefined()
+        else {
+            return false;
+        };
+        !provided_ty.is_disjoint_from(db, placeholder_ty)
     }
 }
 
@@ -3279,11 +3294,13 @@ impl<'db> CallableBinding<'db> {
     /// only relevant at invocation time.
     fn matching_partial_overload_index(
         &self,
+        db: &'db dyn Db,
         application: &FunctoolsPartialApplicationPlan<'_, 'db>,
     ) -> MatchingOverloadIndex {
         let mut matching_overloads = self.overloads.iter().enumerate().filter(|(_, overload)| {
             !overload.errors.iter().any(|error| {
-                error.is_relevant_for_partial_application() && !application.suppresses_error(error)
+                error.is_relevant_for_partial_application()
+                    && !application.suppresses_error(db, error)
             })
         });
         match matching_overloads.next() {
@@ -3316,20 +3333,21 @@ impl<'db> CallableBinding<'db> {
             return None;
         }
 
-        let selected_overload_indexes = match self.matching_partial_overload_index(application) {
+        let selected_overload_indexes = match self.matching_partial_overload_index(db, application)
+        {
             MatchingOverloadIndex::Single(index) => vec![index],
             MatchingOverloadIndex::Multiple(indexes) => indexes,
             MatchingOverloadIndex::None => {
                 let source_overload_index = self
                     .best_failing_overload_index(
                         FailingOverloadSelection::ReportableForPartial,
-                        |error| application.suppresses_error(error),
+                        |error| application.suppresses_error(db, error),
                     )
                     .unwrap_or(0);
                 let source_errors = &self.overloads()[source_overload_index].errors;
                 for error in source_errors {
                     if error.is_relevant_for_partial_application()
-                        && !application.suppresses_error(error)
+                        && !application.suppresses_error(db, error)
                     {
                         let error = error.clone().maybe_apply_argument_index_offset(Some(1));
                         if !partial_overload.errors.contains(&error) {
@@ -7279,6 +7297,14 @@ impl BindingError<'_> {
             | BindingError::UnmatchedOverload
             | BindingError::PropertyHasNoSetter(..)
             | BindingError::PropertyHasNoDeleter(..) => None,
+        }
+    }
+
+    fn provided_type(&self) -> Option<Type<'_>> {
+        match self {
+            BindingError::InvalidArgumentType { provided_ty, .. } => Some(*provided_ty),
+            BindingError::SpecializationError { error, .. } => Some(error.argument_type()),
+            _ => None,
         }
     }
 
