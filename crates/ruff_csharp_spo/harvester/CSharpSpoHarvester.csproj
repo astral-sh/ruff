@@ -31,4 +31,15 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
   </ItemGroup>
 
+  <!--
+    fixtures/ is harvest INPUT (a C# corpus the tool parses at runtime, as
+    `dotnet run` <fixtures dir> out.ndjson), not tool source. The SDK's
+    default implicit glob compiles every *.cs under the project directory,
+    which would otherwise pull the fixture's Widget/MysqlDal/etc. types into
+    the harvester's own assembly.
+  -->
+  <ItemGroup>
+    <Compile Remove="fixtures/**/*.cs" />
+  </ItemGroup>
+
 </Project>

@@ -4,7 +4,7 @@ version = "0.1.0"
 publish = false
 edition = "2024"
 rust-version = "1.86"
-description = "C# machine-plane frontend for ruff_spo_triplet. A Roslyn (.NET) harvester under `harvester/` walks a C# corpus (MedCare first) via Microsoft.CodeAnalysis and emits SPO `Triple` ndjson in the same shape as the Python/Odoo, Ruby/Rails, and C++/Tesseract frontends. Roslyn is .NET-only, so the parse step is an out-of-process tool (unlike ruff_cpp_spo's in-Rust libclang walk); the seam is the ndjson contract, which this Rust crate loads and validates against the closed Predicate vocabulary. C# source corpora stay UPSTREAM — never vendored."
+description = "C# machine-plane frontend for ruff_spo_triplet. A Roslyn (.NET) harvester under `harvester/` walks a C# corpus via Microsoft.CodeAnalysis and emits SPO `Triple` ndjson in the same shape as the Python/Odoo, Ruby/Rails, and C++/Tesseract frontends. Roslyn is .NET-only, so the parse step is an out-of-process tool (unlike ruff_cpp_spo's in-Rust libclang walk); the seam is the ndjson contract, which this Rust crate loads and validates against the closed Predicate vocabulary. C# source corpora stay UPSTREAM — never vendored."
 license = "MIT"
 
 [lib]
