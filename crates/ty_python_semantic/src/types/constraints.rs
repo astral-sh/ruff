@@ -3879,14 +3879,14 @@ impl<'db> PathBounds<'db> {
         deferred_quantification: InferableTypeVars<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> Self {
-        let node = node.exists(db, builder, deferred_quantification);
-
-        if let Some(path_bounds) =
-            Self::compute_simple_bound_conjunction(db, builder, node, inferable)
+        if matches!(deferred_quantification, InferableTypeVars::None)
+            && let Some(path_bounds) =
+                Self::compute_simple_bound_conjunction(db, builder, node, inferable)
         {
             return path_bounds;
         }
 
+        let node = node.exists(db, builder, deferred_quantification);
         let node = node.remove_noninferable(db, builder, inferable);
         match node.node() {
             Node::AlwaysTrue => return PathBounds::Unconstrained,
