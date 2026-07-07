@@ -444,6 +444,74 @@ def _(x: object, y: type[int]):
         reveal_type(x)  # revealed: int
 ```
 
+Generic `type[]` classinfo arguments are supported for non-final classes whose generic contexts
+contain only ordinary, unbounded type parameters. The runtime class object does not retain the
+specialization from its annotation, so narrowing uses the top materialization of the class:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from ty_extensions import Unknown
+
+class Invariant[T]:
+    value: T
+
+def _(
+    x: object,
+    cls: type[Invariant[int]],
+    y: Invariant[str],
+    unknown_cls: type[Invariant[Unknown]],
+):
+    if isinstance(x, cls):
+        reveal_type(x)  # revealed: Top[Invariant[Unknown]]
+        reveal_type(x.value)  # revealed: object
+
+    if isinstance(x, type(y)):
+        reveal_type(x)  # revealed: Top[Invariant[Unknown]]
+        reveal_type(x.value)  # revealed: object
+
+    if isinstance(x, unknown_cls):
+        reveal_type(x)  # revealed: Top[Invariant[Unknown]]
+        reveal_type(x.value)  # revealed: object
+```
+
+For now, narrowing is declined for generic classes that are final or have defaults, bounds,
+constraints, or `ParamSpec` parameters:
+
+```py
+from typing import final
+
+class Bounded[T: int]: ...
+class Constrained[T: (int, str)]: ...
+class Defaulted[T = int]: ...
+class WithParamSpec[**P]: ...
+
+@final
+class Final[T]: ...
+
+def _(
+    x: object,
+    bounded: type[Bounded[int]],
+    constrained: type[Constrained[int]],
+    defaulted: type[Defaulted[int]],
+    paramspec: type[WithParamSpec[[int]]],
+    final: type[Final[int]],
+):
+    if isinstance(x, bounded):
+        reveal_type(x)  # revealed: object
+    if isinstance(x, constrained):
+        reveal_type(x)  # revealed: object
+    if isinstance(x, defaulted):
+        reveal_type(x)  # revealed: object
+    if isinstance(x, paramspec):
+        reveal_type(x)  # revealed: object
+    if isinstance(x, final):
+        reveal_type(x)  # revealed: object
+```
+
 Negative narrowing is not sound in this case, because `type[A]` includes subclasses of `A`:
 
 ```py
@@ -591,18 +659,17 @@ def i[T: Intersection[type[Bar], type[Baz | Spam]], U: (type[Eggs], type[Ham])](
     return (y, z)
 ```
 
-If some (but not all) positive members of the intersection are not valid `isinstance()` targets --
-for example a parametrized generic alias such as `type[list[int]]`, which raises `TypeError` at
-runtime -- we skip those members and narrow using the remaining valid ones, rather than declining to
-narrow at all:
+If some (but not all) positive members of the intersection do not provide an `isinstance()`
+constraint, we skip those members and narrow using the remaining valid ones, rather than declining
+to narrow at all:
 
 ```py
+from typing import Callable
 from ty_extensions import Intersection
 
-def f(x: Foo, y: Intersection[type[Bar], type[list[int]]]):
+def f(x: Foo, y: Intersection[type[Bar], Callable[[], object]]):
     if isinstance(x, y):
-        # `type[list[int]]` is not a valid `isinstance()` target and contributes no
-        # constraint, but `type[Bar]` still narrows.
+        # The callable component contributes no constraint, but `type[Bar]` still narrows.
         reveal_type(x)  # revealed: Foo & Bar
         reveal_type(x.attribute)  # revealed: int
 ```

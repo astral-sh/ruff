@@ -445,6 +445,30 @@ impl ClassInfoConstraintFunction {
             }
         };
 
+        let constraint_from_class_type = |class: ClassType<'db>| match class {
+            ClassType::NonGeneric(class) => Some(constraint_from_class_literal(class)),
+            ClassType::Generic(generic) => {
+                // A generic `ClassType` here is the type of a runtime class object, e.g.
+                // `cls: type[list[int]]`, not the generic alias expression `list[int]`
+                // itself. Direct generic aliases are rejected by the `Type::GenericAlias`
+                // case below.
+                let origin = generic.origin(db);
+                let generic_context = origin.generic_context(db)?;
+
+                // For now, only handle non-final generics with ordinary, unbounded type
+                // parameters. Defaults, bounds, constraints, and ParamSpecs require a dedicated
+                // runtime-class materialization that does not affect ordinary materialization.
+                (!origin.is_final(db)
+                    && generic_context.variables(db).all(|typevar| {
+                        let typevar = typevar.typevar(db);
+                        !typevar.is_paramspec(db)
+                            && typevar.bound_or_constraints(db).is_none()
+                            && typevar.default_type(db).is_none()
+                    }))
+                .then(|| constraint_from_class_literal(ClassLiteral::Static(origin)))
+            }
+        };
+
         match classinfo {
             Type::TypeAlias(alias) => {
                 self.generate_constraint(db, alias.value_type(db), is_positive)
@@ -459,12 +483,7 @@ impl ClassInfoConstraintFunction {
                 }
 
                 match subclass_of_ty.subclass_of() {
-                    SubclassOfInner::Class(ClassType::NonGeneric(class_literal)) => {
-                        Some(constraint_from_class_literal(class_literal))
-                    }
-                    // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
-                    // e.g. `isinstance(x, list[int])` fails at runtime.
-                    SubclassOfInner::Class(ClassType::Generic(_)) => None,
+                    SubclassOfInner::Class(class) => constraint_from_class_type(class),
                     SubclassOfInner::Dynamic(dynamic) => Some(Type::Dynamic(dynamic)),
                     SubclassOfInner::TypeVar(bound_typevar) => match self {
                         ClassInfoConstraintFunction::IsSubclass => Some(classinfo),

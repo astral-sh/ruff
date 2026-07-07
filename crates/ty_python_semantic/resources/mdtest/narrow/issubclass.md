@@ -445,6 +445,27 @@ def _(x: type, y: type[int]):
         reveal_type(x)  # revealed: type[int]
 ```
 
+Generic `type[]` classinfo arguments with ordinary, unbounded type parameters use the top
+materialization of the instance type. This also applies when the runtime class object comes from
+`type(y)`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Invariant[T]:
+    value: T
+
+def _(x: type[object], cls: type[Invariant[int]], y: Invariant[str]):
+    if issubclass(x, cls):
+        reveal_type(x)  # revealed: type[Top[Invariant[Unknown]]]
+
+    if issubclass(x, type(y)):
+        reveal_type(x)  # revealed: type[Top[Invariant[Unknown]]]
+```
+
 ### Disjoint `type[]` types are narrowed to `Never`
 
 Here, `type[UsesMeta1]` and `type[UsesMeta2]` are disjoint because a common subclass of `UsesMeta1`
