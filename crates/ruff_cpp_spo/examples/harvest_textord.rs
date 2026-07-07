@@ -30,7 +30,7 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use ruff_cpp_spo::{CppClass, Declaration, NAMESPACE, model_from_class, walk_tu};
+use ruff_cpp_spo::{CppClass, Declaration, NAMESPACE, model_from_class, walk_tu_with_diagnostics};
 use ruff_spo_triplet::{ModelGraph, expand, to_ndjson};
 
 /// Focus classes for the per-class method inventory (the 7 layout primitives
@@ -96,6 +96,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Every include root a textord/ccstruct/ccutil/arch TU might need.
     // libclang tolerates unresolved leptonica/generated includes; it still
     // surfaces the class declarations for the headers we CAN resolve.
+    //
+    // `src/viewer` is REQUIRED, not optional: `ccstruct/quspline.h` (pulled in
+    // transitively via ocrrow.h -> blobbox.h -> ...) includes "scrollview.h"
+    // for its GRAPHICS_DISABLED-gated plot()/plotline() declarations, and
+    // scrollview.h lives in src/viewer/. Without it, libclang still reports
+    // "0 failed" (the TU itself parses — clang recovers from the unresolved
+    // include by treating the rest of the file as best-effort) while the
+    // class/method that needed the missing header silently never completes
+    // and simply vanishes from the output — confirmed on `STATS`
+    // (ccstruct/statistc.h) and, more insidiously, as a corruption of the
+    // in-TU call graph for otherwise-healthy classes/functions whose bodies
+    // reference a type from the broken chain (see `call_callee_name` in
+    // `clang_walker.rs`). See `walk_tu_with_diagnostics` below for the
+    // caller-facing visibility into this failure mode.
     let args = [
         "-std=c++17".to_string(),
         "-x".to_string(),
@@ -110,6 +124,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         format!("-I{}", root.join("src/classify").display()),
         format!("-I{}", root.join("src/wordrec").display()),
         format!("-I{}", root.join("src/lstm").display()),
+        format!("-I{}", root.join("src/viewer").display()),
         format!("-I{}", root.join("include").display()),
         "-I/usr/include/leptonica".to_string(),
     ];
@@ -117,17 +132,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut all: Vec<CppClass> = Vec::new();
     let mut seen: BTreeSet<String> = BTreeSet::new();
     let mut failed: Vec<(String, String)> = Vec::new();
+    // Headers where the parse itself succeeded ("0 failed") but libclang
+    // still reported severity>=Error diagnostics — the silent-drop signature
+    // (see the `src/viewer` comment above). Tracked separately from `failed`
+    // because `walk_tu_with_diagnostics` still returns a (possibly partial)
+    // class list here, unlike a hard `WalkError`.
+    let mut warned: Vec<(String, usize)> = Vec::new();
     for h in &headers {
         if !h.exists() {
             eprintln!("[harvest] skip missing {}", h.display());
             continue;
         }
-        match walk_tu(h, &args) {
-            Ok(classes) => {
+        match walk_tu_with_diagnostics(h, &args) {
+            Ok((classes, diagnostics)) => {
                 for c in classes {
                     if seen.insert(c.qualified_name()) {
                         all.push(c);
                     }
+                }
+                if !diagnostics.is_empty() {
+                    eprintln!(
+                        "[harvest] WARNING: {} unresolved-include error(s) in {} — class list may be incomplete",
+                        diagnostics.len(),
+                        h.display()
+                    );
+                    for d in diagnostics.iter().take(5) {
+                        eprintln!("    {d}");
+                    }
+                    warned.push((h.display().to_string(), diagnostics.len()));
                 }
             }
             Err(e) => {
@@ -137,10 +169,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     eprintln!(
-        "[harvest] {} unique classes across {} headers ({} failed)",
+        "[harvest] {} unique classes across {} headers ({} failed, {} with unresolved-include diagnostics)",
         all.len(),
         headers.len(),
-        failed.len()
+        failed.len(),
+        warned.len(),
     );
 
     eprintln!("\n[textord] focus-class method manifest:");
@@ -180,6 +213,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("\n[harvest] failed headers:");
         for (h, e) in &failed {
             eprintln!("  {h}: {e}");
+        }
+    }
+
+    if !warned.is_empty() {
+        eprintln!(
+            "\n[harvest] headers with unresolved-include diagnostics (class list may be incomplete):"
+        );
+        for (h, n) in &warned {
+            eprintln!("  {h}: {n} error(s)");
         }
     }
 
