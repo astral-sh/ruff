@@ -41,41 +41,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let funcs = walk_free_functions(Path::new(&src), &args).map_err(|e| e.to_string())?;
     eprintln!("[harvest] {} free-function definitions in {src}", funcs.len());
 
-    // The pixScale dispatch subtree — the exact functions the byte-exact
-    // transcode must follow, in dispatch order. Filter each function's callees
-    // to the scale family so the graph is the DISPATCH structure, not every
-    // libc/leptonica helper call.
-    let family = [
-        "pixScale",
-        "pixScaleGeneral",
-        "pixScaleGrayLI",
-        "scaleGrayLILow",
-        "pixScaleColorLI",
-        "scaleColorLILow",
-        "pixScaleAreaMap",
-        "pixScaleAreaMap2",
-        "pixScaleSmooth",
-        "pixScaleBinary",
-        "pixUnsharpMasking",
-        "pixUnsharpMaskingGray",
-        "pixScaleGray2xLI",
-        "pixScaleGray4xLI",
-    ];
-    let is_family = |n: &str| family.contains(&n);
+    // The intra-TU dispatch graph: for every harvested function, the callees
+    // that are ALSO defined in this TU. This is the transcode-driving structure
+    // (which functions dispatch to which); a callee with NO in-TU dispatchers of
+    // its own is a LEAF — the essential numeric kernel to hand-port. Filtering
+    // to the in-TU set drops the libc/leptonica-helper noise so the graph is the
+    // dispatch skeleton. General over any C file (scale1.c, enhance.c, …).
+    let defined: std::collections::BTreeSet<&str> =
+        funcs.iter().map(|f| f.name.as_str()).collect();
 
-    println!("# pixScale call-graph manifest (ruff_cpp_spo::walk_free_functions on {src})");
-    println!("# <function>\tdispatches_to\t<scale-family callees>");
-    for name in family {
+    // Optional focus: FAMILY=comma,sep restricts the printed roots (still shows
+    // their full in-TU dispatch). Default: every function.
+    let family_env = std::env::var("FAMILY").unwrap_or_default();
+    let roots: Vec<&str> = if family_env.is_empty() {
+        funcs.iter().map(|f| f.name.as_str()).collect()
+    } else {
+        family_env.split(',').map(str::trim).collect()
+    };
+
+    println!("# intra-TU dispatch manifest (ruff_cpp_spo::walk_free_functions on {src})");
+    println!("# <function>\tdispatches_to\t<in-TU callees>   ([] = LEAF kernel)");
+    for name in roots {
         match funcs.iter().find(|f| f.name == name) {
             Some(f) => {
                 let dispatch: Vec<&String> =
-                    f.calls.iter().filter(|c| is_family(c)).collect();
-                let all = f.calls.len();
+                    f.calls.iter().filter(|c| defined.contains(c.as_str())).collect();
                 println!(
-                    "{}\tdispatches_to\t{:?}\t(+{} non-family callees)",
+                    "{}\tdispatches_to\t{:?}\t(+{} non-TU callees)",
                     f.name,
                     dispatch,
-                    all - dispatch.len()
+                    f.calls.len() - dispatch.len()
                 );
             }
             None => println!("{name}\t(not defined in this TU)"),
