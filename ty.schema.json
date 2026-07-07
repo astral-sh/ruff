@@ -362,7 +362,7 @@
         },
         "blanket-ignore-comment": {
           "title": "detects blanket `ty: ignore` comments",
-          "description": "## What it does\n\nChecks for `ty: ignore` comments that don't specify which rules to ignore.\n\nUnused blanket comments aren't reported by this rule because they don't suppress\nany diagnostics. Enable `unused-ignore-comment` to report them separately.\n\n## Why is this bad?\n\nA blanket `ty: ignore` comment suppresses every type-checking diagnostic on the\napplicable line or file. Specifying rule codes documents which diagnostics are\nexpected and prevents the comment from hiding unrelated errors.\n\n## Examples\n\n```py\n# error\nvalue = unknown  # ty: ignore\n```\n\nUse instead:\n\n```py\nvalue = unknown  # ty: ignore[unresolved-reference]\n```",
+          "description": "## What it does\n\nChecks for `ty: ignore` comments that don't specify which rules to ignore.\n\nBlanket comments are reported whether or not they suppress a diagnostic. If\n`unused-ignore-comment` is also enabled, unused blanket comments emit both diagnostics.\n\n## Why is this bad?\n\nA blanket `ty: ignore` comment suppresses every type-checking diagnostic on the\napplicable line or file. Specifying rule codes documents which diagnostics are\nexpected and prevents the comment from hiding unrelated errors.\n\n## Examples\n\n```py\n# error\nvalue = unknown  # ty: ignore\n```\n\nUse instead:\n\n```py\nvalue = unknown  # ty: ignore[unresolved-reference]\n```",
           "default": "ignore",
           "oneOf": [
             {

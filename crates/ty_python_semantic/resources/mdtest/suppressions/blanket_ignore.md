@@ -1,8 +1,8 @@
 # Blanket `ty: ignore` comments
 
 The optional `blanket-ignore-comment` rule requires `ty: ignore` comments to include specific rule
-codes. Unused blanket comments aren't reported because they don't suppress any diagnostics; use
-`unused-ignore-comment` to report them separately.
+codes, regardless of whether they suppress a diagnostic. If `unused-ignore-comment` is also enabled,
+unused blanket comments emit both diagnostics.
 
 ```toml
 [rules]
@@ -23,35 +23,13 @@ c = unresolved  # type: ignore
 
 ## Unused ignore comments
 
-### Empty ignore comments
-
 ```py
 # error: [unused-ignore-comment] "Unused `ty: ignore` without a code"
 d = 1  # ty: ignore[]
-```
 
-### Blanket ignore comments
-
-```py
+# error: [blanket-ignore-comment]
 # error: [unused-ignore-comment] "Unused blanket `ty: ignore` directive"
 e = 1  # ty: ignore
-```
-
-### When `unused-ignore-comment` is disabled
-
-Unused blanket comments aren't reported by this rule, even when `unused-ignore-comment` is disabled.
-They are harmless because they don't suppress any diagnostics. Leaving all unused suppressions to
-`unused-ignore-comment` also keeps their treatment consistent and avoids overlapping diagnostics
-when that rule is enabled:
-
-```toml
-[rules]
-blanket-ignore-comment = "error"
-unused-ignore-comment = "ignore"
-```
-
-```py
-a = 1  # ty: ignore
 ```
 
 ## Suppression diagnostics

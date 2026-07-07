@@ -148,9 +148,7 @@ fn check_blanket_suppressions(context: &mut CheckSuppressionsContext) {
     }
 
     for suppression in context.suppressions.iter().filter(|suppression| {
-        suppression.kind == SuppressionKind::Ty
-            && suppression.target == SuppressionTarget::All
-            && context.is_suppression_used(suppression.id())
+        suppression.kind == SuppressionKind::Ty && suppression.target == SuppressionTarget::All
     }) {
         // A blanket suppression cannot suppress its own diagnostic, but a code-specific
         // suppression can.
