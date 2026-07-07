@@ -1,4 +1,5 @@
 use rustc_hash::FxHashSet;
+use smallvec::SmallVec;
 
 use crate::{
     Db,
@@ -300,11 +301,53 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
 }
 
 #[derive(Default, Debug)]
-pub(crate) struct TypeCollector<'db>(RefCell<FxHashSet<Type<'db>>>);
+pub(crate) struct TypeCollector<'db>(RefCell<CollectedTypes<'db>>);
 
 impl<'db> TypeCollector<'db> {
     pub(crate) fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
         !self.0.borrow_mut().insert(ty)
+    }
+}
+
+#[derive(Debug)]
+struct CollectedTypes<'db> {
+    inline: SmallVec<[Type<'db>; 8]>,
+    spilled: Option<FxHashSet<Type<'db>>>,
+}
+
+impl Default for CollectedTypes<'_> {
+    fn default() -> Self {
+        Self {
+            inline: SmallVec::new(),
+            spilled: None,
+        }
+    }
+}
+
+impl<'db> CollectedTypes<'db> {
+    // Most guarded walks are shallow; avoid allocating a hash table until linear search is costly.
+    const INLINE_CAPACITY: usize = 8;
+
+    fn insert(&mut self, ty: Type<'db>) -> bool {
+        if let Some(types) = &mut self.spilled {
+            return types.insert(ty);
+        }
+
+        if self.inline.contains(&ty) {
+            return false;
+        }
+        if self.inline.len() < Self::INLINE_CAPACITY {
+            self.inline.push(ty);
+            return true;
+        }
+
+        let mut set = FxHashSet::default();
+        set.reserve(self.inline.len() + 1);
+        set.extend(self.inline.drain(..));
+        let inserted = set.insert(ty);
+        debug_assert!(inserted);
+        self.spilled = Some(set);
+        true
     }
 }
 
@@ -399,4 +442,36 @@ where
     T: Copy + PartialEq,
 {
     any_over_type_impl(db, ty, should_visit_lazy_type_attributes, query)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::types::{DynamicType, Type};
+
+    use super::CollectedTypes;
+
+    #[test]
+    fn collected_types_spills_without_losing_deduplication() {
+        let mut collected = CollectedTypes::default();
+        let types = [
+            Type::Never,
+            Type::AlwaysTruthy,
+            Type::AlwaysFalsy,
+            Type::Dynamic(DynamicType::Any),
+            Type::Dynamic(DynamicType::Unknown),
+            Type::Dynamic(DynamicType::UnspecializedTypeVar),
+            Type::Dynamic(DynamicType::InvalidConcatenateUnknown),
+            Type::Dynamic(DynamicType::AmbiguousOverload),
+            Type::Dynamic(DynamicType::TodoUnpack),
+        ];
+
+        for ty in types {
+            assert!(collected.insert(ty));
+        }
+
+        assert!(collected.spilled.is_some());
+        assert!(!collected.insert(Type::Never));
+        assert!(!collected.insert(Type::Dynamic(DynamicType::TodoUnpack)));
+        assert!(collected.insert(Type::Dynamic(DynamicType::TodoStarredExpression)));
+    }
 }
