@@ -1332,14 +1332,21 @@ impl FromIterator<TextRange> for NoqaMapping {
 #[cfg(test)]
 mod tests {
 
+    use std::fmt::Write;
+    use std::fs;
     use std::path::Path;
 
-    use insta::assert_debug_snapshot;
+    use anyhow::{Result, anyhow};
+    use insta::{assert_debug_snapshot, assert_snapshot};
+    use tempfile::tempdir;
 
-    use ruff_python_trivia::CommentRanges;
+    use ruff_python_ast::{PySourceType, SourceType};
+    use ruff_python_trivia::{CommentRanges, textwrap::dedent};
     use ruff_source_file::{LineEnding, SourceFileBuilder};
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
+    use crate::codes::Rule;
+    use crate::linter::add_suppressions_to_path;
     use crate::noqa::{
         Directive, LexicalError, NoqaLexerOutput, NoqaMapping, SuppressionKind,
         add_suppression_inner, lex_codes, lex_file_exemption, lex_inline_noqa,
@@ -1347,9 +1354,80 @@ mod tests {
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
+    use crate::settings::{LinterSettings, types::PreviewMode};
+    use crate::source_kind::SourceKind;
     use crate::suppression::Suppressions;
+    use crate::test::{print_messages, test_contents};
     use crate::{Edit, Violation};
     use crate::{Locator, generate_suppression_edits};
+
+    #[track_caller]
+    fn add_suppressions_in(
+        source: &str,
+        suppression_kind: SuppressionKind,
+        preview: PreviewMode,
+    ) -> Result<String> {
+        let directory = tempdir()?;
+        let path = directory.path().join("test.py");
+        fs::write(&path, dedent(source).trim())?;
+
+        let source_type = PySourceType::Python;
+        let settings = LinterSettings {
+            preview,
+            ..LinterSettings::for_rules([
+                Rule::MissingTypeFunctionArgument,
+                Rule::MissingReturnTypeUndocumentedPublicFunction,
+                Rule::UnusedFunctionArgument,
+                Rule::UndocumentedPublicFunction,
+            ])
+        };
+
+        let read_source = || -> Result<SourceKind> {
+            SourceKind::from_path(&path, SourceType::Python(source_type))?
+                .ok_or_else(|| anyhow!("test file should be Python"))
+        };
+        let add_suppressions = |source_kind: &SourceKind| {
+            add_suppressions_to_path(
+                &path,
+                None,
+                source_kind,
+                source_type,
+                &settings,
+                None,
+                suppression_kind,
+            )
+        };
+
+        let count = add_suppressions(&read_source()?)?;
+
+        let fixed = fs::read_to_string(&path)?;
+        let plural = if count == 1 { "" } else { "s" };
+        let mut output = String::new();
+        writeln!(
+            output,
+            "Added {count} suppression{plural}\n\n## Fixed source\n\n```py\n{fixed}\n```\n"
+        )?;
+
+        let second_count = add_suppressions(&read_source()?)?;
+        if second_count > 0 {
+            let fixed = fs::read_to_string(&path)?;
+            writeln!(
+                output,
+                "## Additional suppressions added on a second pass: {second_count}\n\n```py\n{fixed}\n```\n"
+            )?;
+        }
+
+        let (diagnostics, _) = test_contents(&read_source()?, &path, &settings);
+        if !diagnostics.is_empty() {
+            writeln!(
+                output,
+                "## New diagnostics after re-checking file\n\n{diagnostics}\n",
+                diagnostics = print_messages(&diagnostics)
+            )?;
+        }
+
+        Ok(output)
+    }
 
     fn assert_lexed_ranges_match_slices(
         directive: Result<Option<NoqaLexerOutput>, LexicalError>,
@@ -2926,6 +3004,131 @@ mod tests {
         )
         ");
         assert_lexed_ranges_match_slices(exemption, source);
+    }
+
+    #[test]
+    fn add_noqa_to_existing_noqa() -> Result<()> {
+        assert_snapshot!(
+            add_suppressions_in(
+                r#"
+                def unused(x):  # noqa: ANN001, ARG001, D103
+                    pass
+                "#,
+                SuppressionKind::Noqa,
+                PreviewMode::Disabled,
+            )?,
+            @"
+        Added 1 suppression
+
+        ## Fixed source
+
+        ```py
+        def unused(x):  # noqa: ANN001, ANN201, ARG001, D103
+            pass
+        ```
+        "
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn add_noqa_to_existing_ignore() -> Result<()> {
+        assert_snapshot!(
+            add_suppressions_in(
+                r#"
+                def unused(x):  # ruff:ignore[ANN001, ARG001, D103]
+                    pass
+                "#,
+                SuppressionKind::Noqa,
+                PreviewMode::Disabled,
+            )?,
+            @"
+        Added 1 suppression
+
+        ## Fixed source
+
+        ```py
+        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]  # noqa: ANN001, ANN201, D103
+            pass
+        ```
+        "
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn add_noqa_to_existing_ignore_preview() -> Result<()> {
+        assert_snapshot!(
+            add_suppressions_in(
+                r#"
+                def unused(x):  # ruff:ignore[ANN001, ARG001, D103]
+                    pass
+                "#,
+                SuppressionKind::Noqa,
+                PreviewMode::Enabled,
+            )?,
+            @"
+        Added 1 suppression
+
+        ## Fixed source
+
+        ```py
+        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]  # noqa: ANN201
+            pass
+        ```
+        "
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn add_ignore_to_existing_noqa() -> Result<()> {
+        assert_snapshot!(
+            add_suppressions_in(
+                r#"
+                def unused(x):  # noqa: ANN001, ARG001, D103
+                    pass
+                "#,
+                SuppressionKind::Ignore,
+                PreviewMode::Enabled,
+            )?,
+            @"
+        Added 1 suppression
+
+        ## Fixed source
+
+        ```py
+        def unused(x):  # noqa: ANN001, ARG001, D103  # ruff:ignore[missing-return-type-undocumented-public-function]
+            pass
+        ```
+        "
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn add_ignore_to_existing_ignore() -> Result<()> {
+        assert_snapshot!(
+            add_suppressions_in(
+                r#"
+                def unused(x):  # ruff:ignore[ANN001, ARG001, D103]
+                    pass
+                "#,
+                SuppressionKind::Ignore,
+                PreviewMode::Enabled,
+            )?,
+            @"
+        Added 1 suppression
+
+        ## Fixed source
+
+        ```py
+        def unused(x):  # ruff:ignore[ANN001, ARG001, D103, missing-return-type-undocumented-public-function]
+            pass
+        ```
+        "
+        );
+        Ok(())
     }
 
     #[test]
