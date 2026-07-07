@@ -628,7 +628,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         )
     }
 
-    #[expect(dead_code)]
     pub(crate) fn with_deferred_quantification(
         mut self,
         db: &'db dyn Db,
@@ -650,24 +649,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ) -> Self {
         let node = self.node.exists(db, builder, self.deferred_quantification);
         Self::from_node(builder, node, InferableTypeVars::None)
-    }
-
-    /// Reduces the set of inferable typevars for this constraint set. You provide the typevars that
-    /// were inferable when this constraint set was created, and which should be abstracted away.
-    /// Those typevars will be removed from the constraint set, and the constraint set will return
-    /// true whenever there was _any_ specialization of those typevars that returned true before.
-    pub(crate) fn reduce_inferable(
-        self,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-        to_remove: InferableTypeVars<'db>,
-    ) -> Self {
-        self.verify_builder(builder);
-        Self::from_node(
-            builder,
-            self.node.exists(db, builder, to_remove),
-            self.deferred_quantification,
-        )
     }
 
     /// Applies a type mapping to every constraint in this constraint set.
@@ -771,9 +752,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Universally abstracts constraints involving the given type variables from this TDD.
     ///
-    /// This is the Boolean dual of [`Self::reduce_inferable`]. Declared type variable bounds and
-    /// constraints are not applied implicitly, and must be encoded as implications in the input
-    /// constraint set.
+    /// Declared type variable bounds and constraints are not applied implicitly, and must be
+    /// encoded as implications in the input constraint set.
     ///
     /// # Preconditions
     ///
@@ -793,14 +773,13 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
         // Universal and existential quantification are duals. Reusing existential abstraction
         // also keeps this operation on its cached, single-pass implementation.
-        Self::from_node(
-            builder,
-            self.node
-                .negate(builder)
-                .exists(db, builder, to_remove)
-                .negate(builder),
-            self.deferred_quantification,
-        )
+        let self_effective = self.apply_deferred_quantification(db, builder);
+        let node = self_effective
+            .node
+            .negate(builder)
+            .exists(db, builder, to_remove)
+            .negate(builder);
+        Self::from_node(builder, node, InferableTypeVars::None)
     }
 
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.

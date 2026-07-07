@@ -356,14 +356,22 @@ def drop(x: X, y: Y) -> Y:
     return y
 
 # TODO: revealed: Literal["x"]
-# We are correctly combining the constraint sets from both arguments of the outer
+# TODO: no errors
+# The deferred-quantification constraint set can now combine both arguments of the outer
 # `partial(partial, drop)` call: one from passing `partial` as `c`, and one from passing `drop` as
-# `a`. However, we do that after having existentially quantified away the typevars from the generic
-# `partial` when it's used as an argument, so this remains `Unknown` even after generic callable
-# occurrences are freshened.
-reveal_type(partial(partial, drop)(1)("x"))  # revealed: Unknown
+# `a`. However, this exposes an existing inference gap that is independent of deferred
+# quantification: typevars from the generic actual callable (`drop`) can leak into the returned
+# callable instead of becoming generic to that returned callable.
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+reveal_type(partial(partial, drop)(1)("x"))  # revealed: Y@drop
 # TODO: revealed: Literal[1]
-reveal_type(partial(partial, drop)("x")(1))  # revealed: Unknown
+# TODO: no errors
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+reveal_type(partial(partial, drop)("x")(1))  # revealed: Y@drop
 ```
 
 ## ParamSpec substitution preserves non-gradual variadic parameters
