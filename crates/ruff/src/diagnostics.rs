@@ -25,7 +25,7 @@ use ruff_text_size::TextRange;
 use ruff_workspace::Settings;
 use rustc_hash::FxHashMap;
 
-use crate::cache::{Cache, FileCache, FileCacheKey, tempfile_in};
+use crate::cache::{Cache, FileCache, FileCacheKey};
 
 /// A collection of [`Diagnostic`]s and additional information needed to render them.
 ///
@@ -269,12 +269,9 @@ pub(crate) fn lint_path(
                 if !fixed.is_empty() {
                     match fix_mode {
                         flags::FixMode::Apply => {
-                            let parent = path.parent().ok_or_else(|| {
-                                io::Error::new(io::ErrorKind::InvalidInput, "path has no parent")
-                            })?;
-                            let mut temp = tempfile_in(parent)?;
-                            transformed.write(&mut temp)?;
-                            temp.persist(path).map_err(|err| err.error)?;
+                            let mut buffer = Vec::new();
+                            transformed.write(&mut buffer)?;
+                            fs::atomic_write(path, &buffer)?;
                         }
                         flags::FixMode::Diff => {
                             write!(

@@ -41,7 +41,7 @@ use ruff_workspace::resolver::{
 };
 
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
-use crate::cache::{Cache, FileCacheKey, PackageCacheMap, PackageCaches, tempfile_in};
+use crate::cache::{Cache, FileCacheKey, PackageCacheMap, PackageCaches};
 use crate::{ExitStatus, resolve_default_files};
 
 #[derive(Debug, Copy, Clone, is_macro::Is)]
@@ -288,22 +288,15 @@ pub(crate) fn format_path(
     // Don't write back to the cache if formatting a range.
     let cache = cache.filter(|_| range.is_none());
 
-    // Format the source.
     let format_result = match format_source(&unformatted, Some(path), settings, range)? {
         FormattedSource::Formatted(formatted) => match mode {
             FormatMode::Write => {
-                let mut temp = tempfile_in(path.parent().ok_or_else(|| {
-                    FormatCommandError::Write(
-                        Some(path.to_path_buf()),
-                        io::Error::new(io::ErrorKind::InvalidInput, "path has no parent").into(),
-                    )
-                })?)
-                .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err.into()))?;
+                let mut buffer = Vec::new();
                 formatted
-                    .write(&mut temp)
+                    .write(&mut buffer)
                     .map_err(|err| FormatCommandError::Write(Some(path.to_path_buf()), err))?;
-                temp.persist(path).map_err(|err| {
-                    FormatCommandError::Write(Some(path.to_path_buf()), err.error.into())
+                fs::atomic_write(path, &buffer).map_err(|err| {
+                    FormatCommandError::Write(Some(path.to_path_buf()), err.into())
                 })?;
 
                 if let Some(cache) = cache {
