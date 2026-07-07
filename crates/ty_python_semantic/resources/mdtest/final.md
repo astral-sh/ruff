@@ -932,7 +932,8 @@ way as an `@final` non-`Protocol` class:
 
 ```py
 from typing import final, Protocol
-from ty_extensions import static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions.internal import is_subtype_of
 
 class Base(Protocol):
     def abstract(self) -> int: ...

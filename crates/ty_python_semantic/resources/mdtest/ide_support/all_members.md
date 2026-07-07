@@ -5,14 +5,15 @@ all members available on a given type. This routine is used for autocomplete sug
 
 ## Basic functionality
 
-The `ty_extensions.all_members` and `ty_extensions.has_member` functions expose a Python-level API
-that can be used to query which attributes `ide_support::all_members` understands as being available
-on a given object. For example, all member functions of `str` are available on `"a"`. The Python API
-`all_members` returns a tuple of all available members; `has_member` returns `Literal[True]` if a
-given member is present in that tuple, and `Literal[False]` if not:
+The `ty_extensions.internal.all_members` and `ty_extensions.internal.has_member` functions expose a
+Python-level API that can be used to query which attributes `ide_support::all_members` understands
+as being available on a given object. For example, all member functions of `str` are available on
+`"a"`. The Python API `all_members` returns a tuple of all available members; `has_member` returns
+`Literal[True]` if a given member is present in that tuple, and `Literal[False]` if not:
 
 ```py
-from ty_extensions import static_assert, has_member
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 static_assert(has_member("a", "replace"))
 static_assert(has_member("a", "startswith"))
@@ -43,7 +44,7 @@ The full list of all members is relatively long, but `reveal_type` can be used i
 `all_members` to see them all:
 
 ```py
-from ty_extensions import all_members
+from ty_extensions.internal import all_members
 
 # revealed: tuple[Literal["__add__"], Literal["__annotations__"], Literal["__class__"], Literal["__contains__"], Literal["__delattr__"], Literal["__dict__"], Literal["__dir__"], Literal["__doc__"], Literal["__eq__"], Literal["__format__"], Literal["__ge__"], Literal["__getattribute__"], Literal["__getitem__"], Literal["__getnewargs__"], Literal["__gt__"], Literal["__hash__"], Literal["__init__"], Literal["__init_subclass__"], Literal["__iter__"], Literal["__le__"], Literal["__len__"], Literal["__lt__"], Literal["__mod__"], Literal["__module__"], Literal["__mul__"], Literal["__ne__"], Literal["__new__"], Literal["__reduce__"], Literal["__reduce_ex__"], Literal["__repr__"], Literal["__reversed__"], Literal["__rmul__"], Literal["__setattr__"], Literal["__sizeof__"], Literal["__str__"], Literal["__subclasshook__"], Literal["capitalize"], Literal["casefold"], Literal["center"], Literal["count"], Literal["encode"], Literal["endswith"], Literal["expandtabs"], Literal["find"], Literal["format"], Literal["format_map"], Literal["index"], Literal["isalnum"], Literal["isalpha"], Literal["isascii"], Literal["isdecimal"], Literal["isdigit"], Literal["isidentifier"], Literal["islower"], Literal["isnumeric"], Literal["isprintable"], Literal["isspace"], Literal["istitle"], Literal["isupper"], Literal["join"], Literal["ljust"], Literal["lower"], Literal["lstrip"], Literal["maketrans"], Literal["partition"], Literal["removeprefix"], Literal["removesuffix"], Literal["replace"], Literal["rfind"], Literal["rindex"], Literal["rjust"], Literal["rpartition"], Literal["rsplit"], Literal["rstrip"], Literal["split"], Literal["splitlines"], Literal["startswith"], Literal["strip"], Literal["swapcase"], Literal["title"], Literal["translate"], Literal["upper"], Literal["zfill"]]
 reveal_type(all_members("a"))
@@ -57,7 +58,8 @@ For instances of classes, class members and implicit instance members of all sup
 understood as being available:
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 class Base:
     base_class_attr: int = 1
@@ -112,7 +114,8 @@ Recursive attribute inference can fall back to `Divergent`, but should still pre
 were available before the cycle was introduced:
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 class Base:
     def flip(self) -> "Base":
@@ -141,7 +144,8 @@ python-version = "3.12"
 Class-level attributes can also be accessed through the class itself:
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 class Base:
     base_attr: int = 1
@@ -212,7 +216,8 @@ def _[T: Initialized](x: type[T]):
 ### Generic classes
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
@@ -251,7 +256,8 @@ python-version = "3.13"
 ```
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 class InitializingMeta[T](type):
     def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
@@ -274,7 +280,8 @@ def _[T: Initialized](x: type[T]):
 
 ```py
 from typing import Any
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 def f(x: type[Any]):
     static_assert(has_member(x, "__base__"))
@@ -291,7 +298,8 @@ def f(x: Any):
 ### Other instance-like types
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 from typing_extensions import LiteralString
 
 static_assert(has_member(True, "__xor__"))
@@ -312,7 +320,8 @@ static_assert(has_member("a".startswith, "__doc__"))
 ### Enums
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 from enum import Enum
 
 class Answer(Enum):
@@ -327,7 +336,8 @@ static_assert(has_member(Answer, "__members__"))
 ### TypedDicts
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 from typing import TypedDict
 
 class Person(TypedDict):
@@ -357,7 +367,8 @@ def _(t_person: type[Person]):
 ### NamedTuples
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 from typing import NamedTuple, Generic, TypeVar
 
 class Person(NamedTuple):
@@ -413,7 +424,8 @@ For unions, `ide_support::all_members` only returns members that are available o
 the union.
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 class A:
     on_both: int = 1
@@ -434,7 +446,8 @@ items on the intersection of the non-`Any` elements:
 
 ```py
 from typing import Any
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 class A:
     on_both: int = 1
@@ -459,7 +472,8 @@ unioned with `Any`:
 
 ```py
 from typing import Any
-from ty_extensions import Intersection, has_member, static_assert
+from ty_extensions import Intersection, static_assert
+from ty_extensions.internal import has_member
 
 class A:
     on_both: int = 1
@@ -483,7 +497,8 @@ Conversely, for intersections, `ide_support::all_members` lists members that are
 the elements:
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 class A:
     on_both: int = 1
@@ -506,7 +521,8 @@ def f(intersection: object):
 It also works when negative types are introduced:
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 class A:
     on_all: int = 1
@@ -547,7 +563,8 @@ def f(intersection: object):
 `ide_support::all_members` can also list attributes on modules:
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 import math
 
 static_assert(has_member(math, "pi"))
@@ -578,7 +595,8 @@ static_assert(has_member(math, "__doc__"))
 `foo.py`:
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 import bar
 
@@ -600,7 +618,8 @@ tiger = 1
 `foo.py`:
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 import bar
 
@@ -647,7 +666,8 @@ def evaluate(x: Optional[int] = None) -> int: ...
 `play.py`:
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 import module
 
@@ -668,7 +688,8 @@ python-version = "3.14"
 ```
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 static_assert(not has_member(bytearray(42), "take_bytes"))
 ```
@@ -681,7 +702,8 @@ python-version = "3.15"
 ```
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 static_assert(has_member(bytearray(42), "take_bytes"))
 ```
@@ -693,7 +715,8 @@ static_assert(has_member(bytearray(42), "take_bytes"))
 Dynamically added members cannot be accessed:
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 class C:
     static_attr = 1
@@ -723,7 +746,8 @@ python-version = "3.9"
 ```
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 from dataclasses import dataclass
 
 @dataclass
@@ -788,7 +812,8 @@ def _(person: Person):
 `repr=False` and `eq=False` are set:
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 from dataclasses import dataclass
 
 @dataclass(init=False, repr=False, eq=False)
@@ -810,7 +835,8 @@ static_assert(has_member(C(), "__ne__"))
 When `order=True` is set, comparison dunder methods become available:
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 from dataclasses import dataclass
 
 @dataclass(order=True)
@@ -834,7 +860,8 @@ def _(c: C):
 When `slots=True`, the corresponding dunder attribute becomes available:
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 from dataclasses import dataclass
 
 @dataclass(slots=True)
@@ -855,7 +882,8 @@ python-version = "3.11"
 ```
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 from dataclasses import dataclass
 
 @dataclass(slots=True, weakref_slot=True)
@@ -876,7 +904,8 @@ python-version = "3.13"
 ```
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 from dataclasses import dataclass
 
 @dataclass
@@ -899,7 +928,8 @@ python-version = "3.10"
 ```
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 from dataclasses import dataclass
 
 @dataclass
@@ -921,7 +951,8 @@ python-version = "3.9"
 
 ```py
 from dataclasses import dataclass
-from ty_extensions import static_assert, has_member
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 # These parameters don't exist on Python 3.9.
 @dataclass(slots=True, weakref_slot=True)  # error: [no-matching-overload]
@@ -943,7 +974,8 @@ Dynamic classes created using the three-argument form of `type()` support autoco
 inherited from their base classes on the class object:
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 class Base:
     base_attr: int = 1
@@ -971,7 +1003,8 @@ static_assert(has_member(DynamicMulti, "mixin_attr"))
 Members from `object` and the `type` metaclass are available on the class object:
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 Dynamic = type("Dynamic", (), {})
 
@@ -989,7 +1022,8 @@ static_assert(has_member(Dynamic, "__subclasses__"))
 Attributes from the namespace dict (third argument) are not tracked:
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 DynamicWithDict = type("DynamicWithDict", (), {"custom_attr": 42})
 
@@ -1001,7 +1035,8 @@ static_assert(has_member(DynamicWithDict(), "custom_attr"))  # error: [static-as
 Dynamic classes inheriting from classes with custom metaclasses get metaclass members:
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 class MyMeta(type):
     meta_attr: str = "meta"
@@ -1019,7 +1054,8 @@ static_assert(has_member(Dynamic, "base_attr"))
 However, instances of dynamic classes currently do not expose members for autocomplete:
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 class Base:
     base_attr: int = 1
@@ -1040,7 +1076,8 @@ example, `__annotations__` does not exist on `int` at runtime, but it is availab
 on `object` in typeshed:
 
 ```py
-from ty_extensions import has_member, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 # TODO: this should ideally not be available:
 static_assert(not has_member(3, "__annotations__"))  # error: [static-assert-error]
@@ -1069,7 +1106,8 @@ static_assert(not has_member(3, "__annotations__"))  # error: [static-assert-err
 import namespace_package
 import regular_module
 import regular_package
-from ty_extensions import static_assert, has_member
+from ty_extensions import static_assert
+from ty_extensions.internal import has_member
 
 static_assert(has_member(namespace_package, "__file__"))
 static_assert(has_member(namespace_package, "__name__"))

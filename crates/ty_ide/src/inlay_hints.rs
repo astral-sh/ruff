@@ -2087,7 +2087,7 @@ Source with applied edits:
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | ^^^^^^^
@@ -2659,7 +2659,7 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | ^^^^^^^
@@ -5427,7 +5427,7 @@ Source with applied edits:
         bar([a=]1, [b=]2)
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | ^^^^^^^
@@ -5440,7 +5440,7 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | ^^^^^^^
@@ -6539,7 +6539,7 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | ^^^^^^^
@@ -7137,7 +7137,7 @@ Source with applied edits:
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | Top: _SpecialForm
            | ^^^
@@ -7163,7 +7163,7 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | ^^^^^^^

@@ -1853,7 +1853,7 @@ C.X = "bar"
 ### Multiple inheritance
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions.internal import reveal_mro
 
 class O: ...
 
@@ -2112,7 +2112,7 @@ Similar principles apply if `Any` appears in the middle of an inheritance hierar
 
 ```py
 from typing import ClassVar, Literal
-from ty_extensions import reveal_mro
+from ty_extensions.internal import reveal_mro
 
 class A:
     x: ClassVar[Literal[1]] = 1
@@ -2769,7 +2769,8 @@ Some attributes are special-cased, however:
 
 ```py
 import types
-from ty_extensions import static_assert, TypeOf, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions.internal import TypeOf, is_subtype_of
 
 reveal_type(f.__get__)  # revealed: <method-wrapper '__get__' of function 'f'>
 reveal_type(f.__call__)  # revealed: <method-wrapper '__call__' of function 'f'>

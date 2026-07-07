@@ -50,7 +50,8 @@ type.
 
 ```py
 from typing import final, Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -96,7 +97,8 @@ for every type that satisfies the upper bound.
 
 ```py
 from typing import final, Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -241,7 +243,8 @@ constraint set to be satisfied by all of those constraints.
 
 ```py
 from typing import final, Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...

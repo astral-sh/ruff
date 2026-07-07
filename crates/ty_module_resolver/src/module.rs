@@ -321,6 +321,8 @@ pub enum KnownModule {
     #[strum(serialize = "_typeshed._type_checker_internals")]
     TypeCheckerInternals,
     TyExtensions,
+    #[strum(serialize = "ty_extensions.internal")]
+    TyExtensionsInternal,
     #[strum(serialize = "importlib")]
     ImportLib,
     #[strum(serialize = "unittest.mock")]
@@ -361,6 +363,7 @@ impl KnownModule {
             Self::Inspect => "inspect",
             Self::TypeCheckerInternals => "_typeshed._type_checker_internals",
             Self::TyExtensions => "ty_extensions",
+            Self::TyExtensionsInternal => "ty_extensions.internal",
             Self::ImportLib => "importlib",
             Self::Warnings => "warnings",
             Self::UnittestMock => "unittest.mock",
@@ -415,6 +418,7 @@ impl KnownModule {
             | Self::Templatelib
             | Self::TypeCheckerInternals
             | Self::TyExtensions
+            | Self::TyExtensionsInternal
             | Self::ImportLib
             | Self::UnittestMock
             | Self::Uuid
@@ -438,6 +442,10 @@ impl KnownModule {
 
     pub const fn is_ty_extensions(self) -> bool {
         matches!(self, Self::TyExtensions)
+    }
+
+    pub const fn is_ty_extensions_internal(self) -> bool {
+        matches!(self, Self::TyExtensionsInternal)
     }
 
     pub const fn is_inspect(self) -> bool {

@@ -24,7 +24,8 @@ Since this is an implementation detail of the Python runtime, we model all integ
 non-singleton types:
 
 ```py
-from ty_extensions import static_assert, is_singleton
+from ty_extensions import static_assert
+from ty_extensions.internal import is_singleton
 from typing import Literal
 
 static_assert(not is_singleton(Literal[0]))
@@ -55,7 +56,8 @@ There is a slightly weaker property that integer literals have. They are single-
 means that all objects of the type have the same value, i.e. they compare equal to each other:
 
 ```py
-from ty_extensions import static_assert, is_single_valued
+from ty_extensions import static_assert
+from ty_extensions.internal import is_single_valued
 from typing import Literal
 
 static_assert(is_single_valued(Literal[0]))
@@ -84,7 +86,8 @@ def f(x: int):
 All integer literals are subtypes of `int`:
 
 ```py
-from ty_extensions import static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions.internal import is_subtype_of
 from typing import Literal
 
 static_assert(is_subtype_of(Literal[0], int))
@@ -126,7 +129,8 @@ a `float` or `complex` is expected. We use the types `JustFloat` and `JustComple
 recognizes an annotation of `float` as `int | float` to support that typing system special case.
 
 ```py
-from ty_extensions import static_assert, is_subtype_of, JustFloat, JustComplex
+from ty_extensions import static_assert, JustFloat, JustComplex
+from ty_extensions.internal import is_subtype_of
 from typing import Literal
 
 # Not subtypes of `float` and `complex`
@@ -150,7 +154,8 @@ y: complex = 1
 The only subtypes of an integer literal type _that can be named_ are the type itself and `Never`:
 
 ```py
-from ty_extensions import static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions.internal import is_subtype_of
 from typing_extensions import Never, Literal
 
 static_assert(is_subtype_of(Literal[54165], Literal[54165]))
@@ -162,7 +167,8 @@ static_assert(is_subtype_of(Never, Literal[54165]))
 Two integer literal types `Literal[a]` and `Literal[b]` are disjoint if `a != b`:
 
 ```py
-from ty_extensions import static_assert, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions.internal import is_disjoint_from
 from typing import Literal
 
 static_assert(is_disjoint_from(Literal[0], Literal[1]))

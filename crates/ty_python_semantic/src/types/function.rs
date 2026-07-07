@@ -2031,37 +2031,37 @@ pub enum KnownFunction {
 
     /// `ty_extensions.static_assert`
     StaticAssert,
-    /// `ty_extensions.is_equivalent_to`
+    /// `ty_extensions.internal.is_equivalent_to`
     IsEquivalentTo,
-    /// `ty_extensions.is_subtype_of`
+    /// `ty_extensions.internal.is_subtype_of`
     IsSubtypeOf,
-    /// `ty_extensions.is_assignable_to`
+    /// `ty_extensions.internal.is_assignable_to`
     IsAssignableTo,
-    /// `ty_extensions.is_constraint_set_assignable_to`
+    /// `ty_extensions.internal.is_constraint_set_assignable_to`
     IsConstraintSetAssignableTo,
-    /// `ty_extensions.is_disjoint_from`
+    /// `ty_extensions.internal.is_disjoint_from`
     IsDisjointFrom,
-    /// `ty_extensions.is_singleton`
+    /// `ty_extensions.internal.is_singleton`
     IsSingleton,
-    /// `ty_extensions.is_single_valued`
+    /// `ty_extensions.internal.is_single_valued`
     IsSingleValued,
-    /// `ty_extensions.generic_context`
+    /// `ty_extensions.internal.generic_context`
     GenericContext,
-    /// `ty_extensions.into_callable`
+    /// `ty_extensions.internal.into_callable`
     IntoCallable,
-    /// `ty_extensions.into_regular_callable`
+    /// `ty_extensions.internal.into_regular_callable`
     IntoRegularCallable,
-    /// `ty_extensions.dunder_all_names`
+    /// `ty_extensions.internal.dunder_all_names`
     DunderAllNames,
-    /// `ty_extensions.enum_members`
+    /// `ty_extensions.internal.enum_members`
     EnumMembers,
-    /// `ty_extensions.all_members`
+    /// `ty_extensions.internal.all_members`
     AllMembers,
-    /// `ty_extensions.has_member`
+    /// `ty_extensions.internal.has_member`
     HasMember,
-    /// `ty_extensions.reveal_protocol_interface`
+    /// `ty_extensions.internal.reveal_protocol_interface`
     RevealProtocolInterface,
-    /// `ty_extensions.reveal_mro`
+    /// `ty_extensions.internal.reveal_mro`
     RevealMro,
     /// `struct.unpack`
     Unpack,
@@ -2143,6 +2143,7 @@ impl KnownFunction {
             }
             Self::TotalOrdering => module.is_functools(),
             Self::GetattrStatic => module.is_inspect(),
+            Self::StaticAssert => module.is_ty_extensions(),
             Self::IsAssignableTo
             | Self::IsConstraintSetAssignableTo
             | Self::IsDisjointFrom
@@ -2155,11 +2156,10 @@ impl KnownFunction {
             | Self::IntoRegularCallable
             | Self::DunderAllNames
             | Self::EnumMembers
-            | Self::StaticAssert
             | Self::HasMember
             | Self::RevealProtocolInterface
             | Self::RevealMro
-            | Self::AllMembers => module.is_ty_extensions(),
+            | Self::AllMembers => module.is_ty_extensions_internal(),
             Self::ImportModule => module.is_importlib(),
             Self::Unpack => {
                 matches!(module, KnownModule::Struct)
@@ -2689,6 +2689,8 @@ pub(crate) mod tests {
 
                 KnownFunction::TypeCheckOnly => KnownModule::Typing,
 
+                KnownFunction::StaticAssert => KnownModule::TyExtensions,
+
                 KnownFunction::IsSingleton
                 | KnownFunction::IsSubtypeOf
                 | KnownFunction::GenericContext
@@ -2696,7 +2698,6 @@ pub(crate) mod tests {
                 | KnownFunction::IntoRegularCallable
                 | KnownFunction::DunderAllNames
                 | KnownFunction::EnumMembers
-                | KnownFunction::StaticAssert
                 | KnownFunction::IsDisjointFrom
                 | KnownFunction::IsSingleValued
                 | KnownFunction::IsAssignableTo
@@ -2705,7 +2706,7 @@ pub(crate) mod tests {
                 | KnownFunction::HasMember
                 | KnownFunction::RevealProtocolInterface
                 | KnownFunction::RevealMro
-                | KnownFunction::AllMembers => KnownModule::TyExtensions,
+                | KnownFunction::AllMembers => KnownModule::TyExtensionsInternal,
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,
                 KnownFunction::NamedTuple => KnownModule::Collections,

@@ -1421,7 +1421,8 @@ and their types, rather than the class hierarchy:
 ```py
 from typing import TypedDict
 from typing_extensions import ReadOnly
-from ty_extensions import static_assert, is_assignable_to, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to, is_subtype_of
 
 class Person(TypedDict):
     name: str
@@ -1750,7 +1751,8 @@ def a3_from_b(b: B) -> A3:
 
 ```py
 from typing_extensions import TypedDict, ReadOnly, NotRequired
-from ty_extensions import static_assert, is_assignable_to, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to, is_subtype_of
 
 class Inner1(TypedDict):
     name: str
@@ -1834,7 +1836,8 @@ types:
 
 ```py
 from typing_extensions import Any, TypedDict, ReadOnly, assert_type
-from ty_extensions import is_assignable_to, is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to, is_equivalent_to
 
 class Foo(TypedDict):
     x: int
@@ -1915,7 +1918,8 @@ static_assert(not is_equivalent_to(Foo, DifferentFieldGradualType))
 ## Structural equivalence understands the interaction between `Required`/`NotRequired` and `total`
 
 ```py
-from ty_extensions import static_assert, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_equivalent_to
 from typing_extensions import TypedDict, Required, NotRequired
 
 class Foo1(TypedDict, total=False):
@@ -1945,7 +1949,8 @@ static_assert(is_equivalent_to(Bar1 | int, int | Bar2))
 
 ```py
 from typing_extensions import TypedDict
-from ty_extensions import static_assert, is_assignable_to, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to, is_equivalent_to
 
 class Node1(TypedDict):
     value: int
@@ -3058,7 +3063,8 @@ class Child(P1, P2, P3):
 
 ```py
 from typing import Generic, TypeVar, TypedDict, Any
-from ty_extensions import static_assert, is_assignable_to, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to, is_subtype_of
 
 T = TypeVar("T")
 
@@ -3102,7 +3108,8 @@ python-version = "3.12"
 
 ```py
 from typing import TypedDict, Any
-from ty_extensions import static_assert, is_assignable_to, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to, is_subtype_of
 
 class TaggedData[T](TypedDict):
     data: T
@@ -3244,7 +3251,7 @@ TypedDicts can be created using the functional syntax:
 
 ```py
 from typing_extensions import TypedDict
-from ty_extensions import reveal_mro
+from ty_extensions.internal import reveal_mro
 
 Movie = TypedDict("Movie", {"name": str, "year": int})
 
@@ -4118,7 +4125,8 @@ Functional and class-based `TypedDict`s with the same fields are structurally eq
 ```py
 from typing import TypedDict
 from typing_extensions import assert_type
-from ty_extensions import is_assignable_to, is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to, is_equivalent_to
 
 class ClassBased(TypedDict):
     name: str
@@ -4143,7 +4151,8 @@ A functional `TypedDict` is not a subtype of a class-based one when the field ty
 
 ```py
 from typing import TypedDict
-from ty_extensions import is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 
 class StrFields(TypedDict):
     x: str
@@ -4558,7 +4567,8 @@ fields with the same name but disjoint types:
 ```py
 from typing import TypedDict, final
 from typing_extensions import ReadOnly
-from ty_extensions import static_assert, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions.internal import is_disjoint_from
 
 # Two simple disjoint types, to avoid relying on `@disjoint_base` special cases for built-ins like
 # `int` and `str`.
@@ -4592,7 +4602,7 @@ neither inherits from the other, because we could define a third class that mult
 both. `TypedDict` disjointness takes this into account. For example:
 
 ```py
-from ty_extensions import is_assignable_to
+from ty_extensions.internal import is_assignable_to
 
 class NonFinal1: ...
 class NonFinal2: ...
@@ -4818,7 +4828,8 @@ static_assert(not is_disjoint_from(NotRequiredReadOnlyBoolTD, NotRequiredReadOnl
 
 ```py
 from typing import TypedDict, Mapping
-from ty_extensions import static_assert, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions.internal import is_disjoint_from
 
 class TD(TypedDict):
     x: int
@@ -4962,7 +4973,8 @@ Narrowing is restricted to `Literal` tags, though, because `x == "foo"` doesn't 
 anything about the type of `x`. Here's an example where narrowing would be tempting but unsound:
 
 ```py
-from ty_extensions import is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 
 class NonLiteralTD(TypedDict):
     tag: int
@@ -5128,7 +5140,8 @@ that contain `TypedDict`s, and unions that contain intersections that contain `T
 
 ```py
 from typing_extensions import Literal, Any
-from ty_extensions import Intersection, is_assignable_to, static_assert
+from ty_extensions import Intersection, static_assert
+from ty_extensions.internal import is_assignable_to
 
 def _(t: Bar, u: Foo | Intersection[Bar, Any], v: Intersection[Bar, Any], w: Literal["bar"]):
     reveal_type(u)  # revealed: Foo | (Bar & Any)
@@ -5293,7 +5306,8 @@ def match_single(u: Foo):
 Narrowing is restricted to `Literal` tags:
 
 ```py
-from ty_extensions import is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 
 class NonLiteralTD(TypedDict):
     tag: int
@@ -5766,7 +5780,8 @@ python-version = "3.12"
 
 ```py
 from typing_extensions import TypedDict, Never
-from ty_extensions import static_assert, is_equivalent_to, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions.internal import is_equivalent_to, is_subtype_of
 
 class Extra(TypedDict, extra_items=Never):
     x: int
@@ -5826,7 +5841,8 @@ of as "structurally final" even if they are not nominally final.
 
 ```py
 from typing_extensions import TypedDict
-from ty_extensions import static_assert, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_equivalent_to
 
 class Closed(TypedDict, closed=True):
     name: str
@@ -5919,7 +5935,8 @@ python-version = "3.12"
 
 ```py
 from typing_extensions import ReadOnly, TypedDict
-from ty_extensions import is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_subtype_of
 
 class NativeGenericExtra[T](TypedDict, extra_items=T): ...
 class NativeReadOnlyExtra[T](TypedDict, extra_items=ReadOnly[T]): ...
@@ -6722,7 +6739,8 @@ def _(
 
 ```py
 from typing_extensions import TypedDict, ReadOnly, NotRequired
-from ty_extensions import static_assert, is_assignable_to, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to, is_subtype_of
 
 class ExtraInt(TypedDict, extra_items=int):
     name: str
@@ -6841,7 +6859,8 @@ optional mutable item can also conflict with a closed or explicit extra-items po
 
 ```py
 from typing_extensions import NotRequired, ReadOnly, TypedDict
-from ty_extensions import static_assert, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions.internal import is_disjoint_from
 
 class RequiredInt(TypedDict, closed=True):
     value: int
@@ -6917,7 +6936,8 @@ static_assert(not is_disjoint_from(ReadOnlyStrExtras, ClosedOptionalReadOnlyInt)
 ```py
 from collections.abc import Mapping
 from typing_extensions import TypedDict
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 
 class ExtraStr(TypedDict, extra_items=str):
     name: str
@@ -6950,7 +6970,8 @@ type, as an inhabitant of this type might be an instance of a subclass of `dict`
 ```py
 from typing import Any
 from typing_extensions import TypedDict, NotRequired
-from ty_extensions import static_assert, is_subtype_of, is_assignable_to, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_subtype_of, is_assignable_to, is_equivalent_to
 
 class IntDict(TypedDict, extra_items=int): ...
 

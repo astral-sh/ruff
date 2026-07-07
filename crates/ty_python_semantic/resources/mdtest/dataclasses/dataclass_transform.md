@@ -1950,7 +1950,8 @@ type:
 
 ```py
 from typing import Protocol
-from ty_extensions import is_assignable_to, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to, is_subtype_of
 
 class HasConvertedField(Protocol):
     @property

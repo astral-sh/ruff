@@ -26,7 +26,7 @@ python-version = "3.12"
 
 ```py
 from __future__ import annotations
-from ty_extensions import reveal_mro
+from ty_extensions.internal import reveal_mro
 
 class A:
     def a(self): ...
@@ -495,7 +495,7 @@ super objects are combined into a union.
 
 ```py
 from typing import Literal
-from ty_extensions import reveal_mro
+from ty_extensions.internal import reveal_mro
 
 class A: ...
 
@@ -562,7 +562,8 @@ python-version = "3.12"
 ```
 
 ```py
-from ty_extensions import TypeOf, static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions.internal import TypeOf, is_subtype_of
 
 class A[T]:
     def f(self, a: T) -> T:

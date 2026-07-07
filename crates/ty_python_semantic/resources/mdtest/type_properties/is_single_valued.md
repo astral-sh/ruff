@@ -6,7 +6,8 @@ A type is single-valued iff it is not empty and all inhabitants of it compare eq
 import types
 from types import UnionType
 from typing_extensions import Any, Literal, LiteralString, Never, Callable, TypeAliasType
-from ty_extensions import is_single_valued, static_assert, TypeOf
+from ty_extensions import static_assert
+from ty_extensions.internal import TypeOf, is_single_valued
 
 static_assert(is_single_valued(None))
 static_assert(is_single_valued(Literal[True]))
@@ -63,7 +64,8 @@ these methods always return `True`/`False`, respectively. Otherwise, the single 
 literal type might not compare equal to itself.
 
 ```pyi
-from ty_extensions import is_single_valued, static_assert, TypeOf
+from ty_extensions import static_assert
+from ty_extensions.internal import TypeOf, is_single_valued
 from enum import Enum
 
 class NormalEnum(Enum):

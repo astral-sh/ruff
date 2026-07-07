@@ -25,7 +25,7 @@ A protocol is defined by inheriting from the `Protocol` class, which is annotate
 
 ```py
 from typing import Protocol
-from ty_extensions import reveal_mro
+from ty_extensions.internal import reveal_mro
 
 class MyProtocol(Protocol): ...
 
@@ -225,7 +225,8 @@ of that protocol (more on that below). However, classes that explicitly inherit 
 class are understood as subtypes of that protocol, the same as with nominal types:
 
 ```py
-from ty_extensions import static_assert, is_subtype_of, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_subtype_of, is_assignable_to
 
 static_assert(is_subtype_of(SubclassOfMyProtocol, MyProtocol))
 static_assert(is_assignable_to(SubclassOfMyProtocol, MyProtocol))
@@ -275,7 +276,7 @@ second argument to `issubclass()` at runtime:
 ```py
 import abc
 import typing
-from ty_extensions import TypeOf, reveal_mro
+from ty_extensions.internal import TypeOf, reveal_mro
 
 reveal_type(type(Protocol))  # revealed: <class '_ProtocolMeta'>
 # revealed: (<class '_ProtocolMeta'>, <class 'ABCMeta'>, <class 'type'>, <class 'object'>)
@@ -339,7 +340,8 @@ class Foo[T](Protocol[T]): ...  # error: [invalid-generic-class]
 ```py
 import typing
 import typing_extensions
-from ty_extensions import static_assert, is_equivalent_to, TypeOf
+from ty_extensions import static_assert
+from ty_extensions.internal import TypeOf, is_equivalent_to
 
 static_assert(is_equivalent_to(TypeOf[typing.Protocol], TypeOf[typing_extensions.Protocol]))
 static_assert(is_equivalent_to(int | str | TypeOf[typing.Protocol], TypeOf[typing_extensions.Protocol] | str | int))
@@ -466,10 +468,10 @@ reveal_type(get_protocol_members(Foo))  # revealed: frozenset[Literal["method_me
 ```
 
 To see the kinds and types of the protocol members, you can use the debugging aid
-`ty_extensions.reveal_protocol_interface`, meanwhile:
+`ty_extensions.internal.reveal_protocol_interface`, meanwhile:
 
 ```py
-from ty_extensions import reveal_protocol_interface
+from ty_extensions.internal import reveal_protocol_interface
 from typing import SupportsIndex, SupportsAbs, ClassVar, Iterator
 
 # revealed: {"method_member": MethodMember(`(self, /) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { read: `str` }, "z": PropertyMember { read: `int`, write: `int` }}
@@ -492,7 +494,7 @@ reveal_protocol_interface("foo")
 Similar to the way that `typing.is_protocol` returns `False` at runtime for all generic aliases,
 `typing.get_protocol_members` raises an exception at runtime if you pass it a generic alias, so we
 do not implement any special handling for generic aliases passed to the function.
-`ty_extensions.reveal_protocol_interface` can be used on both, however:
+`ty_extensions.internal.reveal_protocol_interface` can be used on both, however:
 
 ```py
 # TODO: these fail at runtime, but we don't emit `[invalid-argument-type]` diagnostics
@@ -645,7 +647,8 @@ python-version = "3.12"
 ```py
 from typing import Protocol, Any, ClassVar, Final
 from collections.abc import Sequence
-from ty_extensions import static_assert, is_assignable_to, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to, is_subtype_of
 
 class HasX(Protocol):
     x: int
@@ -1059,15 +1062,15 @@ class AssignmentForms(Protocol):
 
 ```snapshot
 warning[ambiguous-protocol-member]: Cannot assign to an undeclared attribute in a protocol method
-   --> src/mdtest_snippet.py:325:9
+   --> src/mdtest_snippet.py:326:9
     |
-325 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
+326 |         self.augmented += 1  # snapshot: ambiguous-protocol-member
     |         ^^^^^^^^^^^^^^ `augmented` is not declared as a protocol member
     |
 info: Assigning to an undeclared attribute in a protocol method leads to an ambiguous interface
-   --> src/mdtest_snippet.py:317:7
+   --> src/mdtest_snippet.py:318:7
     |
-317 | class AssignmentForms(Protocol):
+318 | class AssignmentForms(Protocol):
     |       ^^^^^^^^^^^^^^^^^^^^^^^^^ `AssignmentForms` declared as a protocol here
     |
 info: No declarations found for `augmented` in the body of `AssignmentForms` or any of its superclasses
@@ -1181,7 +1184,7 @@ static_assert(is_subtype_of(object, UniversalSet))
 Which means that `UniversalSet` here is in fact an equivalent type to `object`:
 
 ```py
-from ty_extensions import is_equivalent_to
+from ty_extensions.internal import is_equivalent_to
 
 static_assert(is_equivalent_to(UniversalSet, object))
 ```
@@ -1277,7 +1280,7 @@ those subclasses. For example, `list[str]` is unhashable but is a subtype of `Se
 ```py
 from collections.abc import Hashable as AbcHashable
 from typing import Sequence
-from ty_extensions import is_disjoint_from
+from ty_extensions.internal import is_disjoint_from
 
 def takes_hashable_or_sequence(x: Hashable | list[Hashable]): ...
 def check_hashable_or_sequence(x: Hashable | Sequence[Hashable]):
@@ -1446,7 +1449,8 @@ different names:
 
 ```py
 from typing import Protocol
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_equivalent_to
 
 class HasX(Protocol):
     x: int
@@ -1536,7 +1540,8 @@ from both `X` and `Y`:
 
 ```py
 from typing import Protocol
-from ty_extensions import Intersection, static_assert, is_equivalent_to
+from ty_extensions import Intersection, static_assert
+from ty_extensions.internal import is_equivalent_to
 
 class HasX(Protocol):
     x: int
@@ -1566,7 +1571,7 @@ that would lead to it satisfying `X`'s interface:
 
 ```py
 from typing import final
-from ty_extensions import is_disjoint_from
+from ty_extensions.internal import is_disjoint_from
 
 class NotFinalNominal: ...
 
@@ -1619,7 +1624,8 @@ python-version = "3.12"
 ```py
 from typing import Literal, Protocol
 from typing_extensions import Never
-from ty_extensions import is_assignable_to, is_disjoint_from, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to, is_disjoint_from, is_subtype_of
 
 class HasLengthTwo(Protocol):
     def __len__(self) -> Literal[2]: ...
@@ -1687,7 +1693,8 @@ but will also not be disjoint from the protocol:
 
 ```py
 from typing import final, ClassVar, Protocol
-from ty_extensions import TypeOf, static_assert, is_subtype_of, is_disjoint_from, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import TypeOf, is_subtype_of, is_disjoint_from, is_assignable_to
 
 def who_knows() -> bool:
     return False
@@ -1731,7 +1738,8 @@ if who_knows():
 ```py
 import b
 from a import HasReadOnlyX
-from ty_extensions import TypeOf, static_assert, is_subtype_of, is_disjoint_from, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import TypeOf, is_subtype_of, is_disjoint_from, is_assignable_to
 
 static_assert(not is_subtype_of(TypeOf[b], HasReadOnlyX))
 static_assert(not is_assignable_to(TypeOf[b], HasReadOnlyX))
@@ -1746,7 +1754,8 @@ it is still disjoint from the protocol. This applies to both `@final` types and 
 ```py
 from a import HasReadOnlyX, who_knows
 from typing import final, ClassVar, Protocol
-from ty_extensions import static_assert, is_disjoint_from, TypeOf
+from ty_extensions import static_assert
+from ty_extensions.internal import TypeOf, is_disjoint_from
 
 class Proto(Protocol):
     x: int
@@ -1784,7 +1793,8 @@ x: int = 42
 ```py
 import module
 from typing import Protocol
-from ty_extensions import is_subtype_of, is_assignable_to, static_assert, TypeOf
+from ty_extensions import static_assert
+from ty_extensions.internal import TypeOf, is_subtype_of, is_assignable_to
 
 class HasX(Protocol):
     x: int
@@ -1825,7 +1835,8 @@ the non-callable attribute must be readable with the same type through both an i
 
 ```py
 from typing import ClassVar, Protocol
-from ty_extensions import is_subtype_of, is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_subtype_of, is_assignable_to
 
 class ClassVarXProto(Protocol):
     x: ClassVar[int]
@@ -1895,7 +1906,8 @@ read/write property, a `Final` attribute, or a `ClassVar` attribute:
 
 ```py
 from typing import ClassVar, Final, Protocol, final
-from ty_extensions import is_subtype_of, is_assignable_to, is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_subtype_of, is_assignable_to, is_disjoint_from
 
 class HasXProperty(Protocol):
     @property
@@ -2070,7 +2082,7 @@ A protocol with a read/write property `x` is exactly equivalent to a protocol wi
 attribute `x`. Both are subtypes of a protocol with a read-only property `x`:
 
 ```py
-from ty_extensions import is_equivalent_to
+from ty_extensions.internal import is_equivalent_to
 
 class HasMutableXAttr(Protocol):
     x: int
@@ -2442,7 +2454,8 @@ python-version = "3.12"
 
 ```py
 from typing import Final, Protocol, cast
-from ty_extensions import is_assignable_to, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to, is_subtype_of
 
 class MyInt(int): ...
 
@@ -2462,7 +2475,8 @@ class `T` has a method `m` which is assignable to the `Callable` supertype of th
 
 ```py
 from typing import Protocol
-from ty_extensions import is_subtype_of, is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_subtype_of, is_assignable_to
 
 class P(Protocol):
     def m(self, x: int, /) -> None: ...
@@ -2519,7 +2533,8 @@ be a subtype of `P`:
 
 ```py
 from typing import Callable, Protocol
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 
 class SupportsFooMethod(Protocol):
     def foo(self): ...
@@ -2546,7 +2561,8 @@ class object, not the instance. (Protocols with non-method members cannot be pas
 
 ```py
 from typing import Iterable, Any
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 
 class Foo:
     def __init__(self):
@@ -2561,7 +2577,8 @@ and subtyping, we understand that `IterableClass` here is a subtype of `Iterable
 
 ```py
 from typing import Iterator, Iterable
-from ty_extensions import static_assert, is_subtype_of, TypeOf
+from ty_extensions import static_assert
+from ty_extensions.internal import TypeOf, is_subtype_of
 
 class Meta(type):
     def __iter__(self) -> Iterator[int]:
@@ -2651,7 +2668,8 @@ second time. This matters when checking a covariant protocol that also has non-m
 ```py
 from collections.abc import Iterator
 from typing import Any, Protocol, TypeVar
-from ty_extensions import is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 
 T_co = TypeVar("T_co", covariant=True)
 
@@ -2671,7 +2689,8 @@ instance and class access capabilities must preserve callable-specific cycle nor
 ```py
 from collections.abc import Iterable
 from typing import Protocol
-from ty_extensions import is_assignable_to, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to, is_subtype_of
 
 class RichCast(Protocol):
     def __rich__(self) -> "ConsoleRenderable | RichCast": ...
@@ -2699,7 +2718,8 @@ python-version = "3.12"
 ```py
 from typing import final
 from typing_extensions import TypeVar, Self, Protocol
-from ty_extensions import is_equivalent_to, static_assert, is_assignable_to, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions.internal import is_equivalent_to, is_assignable_to, is_subtype_of
 
 class NewStyleClassScoped[T](Protocol):
     def method(self, input: T) -> None: ...
@@ -2856,7 +2876,8 @@ of `N` or inhabitants of `type[N]`, *and* the signature of `N.x` is equivalent t
 
 ```py
 from typing import Protocol
-from ty_extensions import static_assert, is_subtype_of, is_assignable_to, is_equivalent_to, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions.internal import is_subtype_of, is_assignable_to, is_equivalent_to, is_disjoint_from
 
 class PClassMethod(Protocol):
     @classmethod
@@ -2970,7 +2991,8 @@ protocol methods to implementations, decorators should be applied consistently:
 from typing import Protocol
 from collections.abc import Generator
 from contextlib import contextmanager
-from ty_extensions import static_assert, is_subtype_of, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_subtype_of, is_assignable_to
 
 class ContextManagerProtocol(Protocol):
     @contextmanager
@@ -3004,7 +3026,8 @@ for property members.
 
 ```py
 from typing import Protocol
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_equivalent_to
 
 class P1(Protocol):
     def x(self, y: int) -> None: ...
@@ -3063,7 +3086,8 @@ on `PSuper`:
 
 ```py
 from typing import Protocol
-from ty_extensions import static_assert, is_subtype_of, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_subtype_of, is_assignable_to
 
 class Super: ...
 class Sub(Super): ...
@@ -3092,7 +3116,8 @@ A protocol with a method member can be considered a subtype of a protocol with a
 
 ```py
 from typing import Protocol, Callable
-from ty_extensions import static_assert, is_subtype_of, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_subtype_of, is_assignable_to
 
 class PropertyInt(Protocol):
     @property
@@ -3406,7 +3431,8 @@ right signature:
 
 ```py
 from typing import Callable
-from ty_extensions import is_subtype_of, is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_subtype_of, is_assignable_to
 
 static_assert(is_subtype_of(CallMeMaybe, Callable[[int], str]))
 static_assert(is_assignable_to(CallMeMaybe, Callable[[int], str]))
@@ -3425,7 +3451,7 @@ signature implied by the `Callable` type is assignable to the signature of the `
 specified by the protocol:
 
 ```py
-from ty_extensions import TypeOf
+from ty_extensions.internal import TypeOf
 
 class Foo(Protocol):
     def __call__(self, x: int, /) -> str: ...
@@ -3535,7 +3561,8 @@ Principle in some way.
 
 ```py
 from typing import Protocol, final
-from ty_extensions import static_assert, is_subtype_of, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions.internal import is_subtype_of, is_disjoint_from
 
 class X(Protocol):
     x: int
@@ -3595,7 +3622,7 @@ worth it. Such cases should anyway be exceedingly rare and/or contrived.
 
 ```py
 from typing import Protocol, Callable
-from ty_extensions import is_singleton, is_single_valued
+from ty_extensions.internal import is_singleton, is_single_valued
 
 class WeirdAndWacky(Protocol):
     @property
@@ -3631,7 +3658,8 @@ def two(some_list: list[Any], some_tuple: tuple[int, str], some_sized: Sized):
 from __future__ import annotations
 
 from typing import Protocol, Any, TypeVar
-from ty_extensions import static_assert, is_assignable_to, is_subtype_of, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to, is_subtype_of, is_equivalent_to
 
 class RecursiveFullyStatic(Protocol):
     parent: RecursiveFullyStatic
@@ -3711,7 +3739,8 @@ python-version = "3.12"
 from __future__ import annotations
 
 from typing import Protocol, Callable
-from ty_extensions import Intersection, Not, is_assignable_to, is_equivalent_to, static_assert
+from ty_extensions import Intersection, Not, static_assert
+from ty_extensions.internal import is_assignable_to, is_equivalent_to
 
 class C: ...
 
@@ -3762,7 +3791,8 @@ def _(r: Recursive):
 
 ```py
 from typing import Protocol
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_equivalent_to
 
 class Foo(Protocol):
     x: "Bar"
@@ -3777,7 +3807,8 @@ static_assert(is_equivalent_to(Foo, Bar))
 
 ```py
 from typing import Protocol
-from ty_extensions import is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_disjoint_from
 
 class Proto(Protocol):
     x: "Proto"
@@ -4063,7 +4094,8 @@ without violating the Liskov Substitution Principle, since all protocols are als
 
 ```py
 from typing import Protocol
-from ty_extensions import static_assert, is_subtype_of, is_equivalent_to, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions.internal import is_subtype_of, is_equivalent_to, is_disjoint_from
 
 class HasRepr(Protocol):
     # error: [invalid-method-override]
@@ -4107,7 +4139,8 @@ minimum in the meantime.
 
 ```py
 from typing import Protocol, ClassVar
-from ty_extensions import static_assert, is_assignable_to, TypeOf, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions.internal import TypeOf, is_assignable_to, is_subtype_of
 
 class Foo(Protocol):
     x: int
@@ -4168,7 +4201,7 @@ class Foo(Protocol):
 
 ```py
 from stub import Foo
-from ty_extensions import reveal_protocol_interface
+from ty_extensions.internal import reveal_protocol_interface
 
 # revealed: {"x": AttributeMember(`int`; ClassVar)}
 reveal_protocol_interface(Foo)
@@ -4251,7 +4284,8 @@ python-version = "3.12"
 ```
 
 ```py
-from ty_extensions import is_equivalent_to, is_subtype_of, static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_equivalent_to, is_subtype_of, is_assignable_to
 from typing import Generator, Awaitable, Protocol, TypeVar, Any, Protocol
 
 T_co = TypeVar("T_co", covariant=True)
@@ -4294,7 +4328,8 @@ python-version = "3.13"
 ```
 
 ```py
-from ty_extensions import is_equivalent_to, is_subtype_of, static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_equivalent_to, is_subtype_of, is_assignable_to
 from typing import Generator, Awaitable, TypeVar, Protocol, Any
 
 T_co = TypeVar("T_co", covariant=True)

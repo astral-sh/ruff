@@ -271,7 +271,7 @@ def f(
 ## As a base class
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions.internal import reveal_mro
 
 class Foo(type[int]): ...
 
@@ -316,7 +316,8 @@ python-version = "3.12"
 
 ```py
 from typing import final, Any
-from ty_extensions import is_assignable_to, is_subtype_of, is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to, is_subtype_of, is_disjoint_from
 
 class Biv[T]: ...
 
@@ -484,7 +485,8 @@ def _[T]():
 
 ```py
 from typing import Callable, Protocol
-from ty_extensions import is_assignable_to, is_subtype_of, static_assert, TypeOf, Top
+from ty_extensions import static_assert, Top
+from ty_extensions.internal import TypeOf, is_assignable_to, is_subtype_of
 
 class Foo:
     def __init__(self): ...

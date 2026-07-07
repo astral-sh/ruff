@@ -77,9 +77,9 @@ pub enum SpecialFormType {
     Never,
     /// The symbol `ty_extensions.Unknown`
     Unknown,
-    /// The symbol `ty_extensions.Divergent`
+    /// The symbol `ty_extensions.internal.Divergent`
     Divergent,
-    /// The symbol `ty_extensions.Todo`
+    /// The symbol `ty_extensions.internal.Todo`
     Todo,
     /// The symbol `ty_extensions.AlwaysTruthy`
     AlwaysTruthy,
@@ -89,11 +89,11 @@ pub enum SpecialFormType {
     Not,
     /// The symbol `ty_extensions.Intersection`
     Intersection,
-    /// The symbol `ty_extensions.TypeOf`
+    /// The symbol `ty_extensions.internal.TypeOf`
     TypeOf,
-    /// The symbol `ty_extensions.CallableTypeOf`
+    /// The symbol `ty_extensions.internal.CallableTypeOf`
     CallableTypeOf,
-    /// The symbol `ty_extensions.RegularCallableTypeOf`
+    /// The symbol `ty_extensions.internal.RegularCallableTypeOf`
     RegularCallableTypeOf,
     /// The symbol `ty_extensions.Top`
     Top,
@@ -548,17 +548,18 @@ impl SpecialFormType {
             }
 
             Self::Unknown
-            | Self::Divergent
-            | Self::Todo
             | Self::AlwaysTruthy
             | Self::AlwaysFalsy
             | Self::Not
             | Self::Top
             | Self::Bottom
-            | Self::Intersection
+            | Self::Intersection => module.is_ty_extensions(),
+
+            Self::Divergent
+            | Self::Todo
             | Self::TypeOf
             | Self::CallableTypeOf
-            | Self::RegularCallableTypeOf => module.is_ty_extensions(),
+            | Self::RegularCallableTypeOf => module.is_ty_extensions_internal(),
 
             Self::CollectionsAbcCallable => matches!(
                 module,
@@ -774,17 +775,18 @@ impl SpecialFormType {
             SpecialFormType::CollectionsAbcCallable => &[KnownModule::CollectionsAbc],
 
             SpecialFormType::Unknown
-            | SpecialFormType::Divergent
-            | SpecialFormType::Todo
             | SpecialFormType::AlwaysTruthy
             | SpecialFormType::AlwaysFalsy
             | SpecialFormType::Not
             | SpecialFormType::Intersection
-            | SpecialFormType::TypeOf
-            | SpecialFormType::CallableTypeOf
-            | SpecialFormType::RegularCallableTypeOf
             | SpecialFormType::Top
             | SpecialFormType::Bottom => &[KnownModule::TyExtensions],
+
+            SpecialFormType::Divergent
+            | SpecialFormType::Todo
+            | SpecialFormType::TypeOf
+            | SpecialFormType::CallableTypeOf
+            | SpecialFormType::RegularCallableTypeOf => &[KnownModule::TyExtensionsInternal],
         }
     }
 

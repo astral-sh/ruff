@@ -18,7 +18,8 @@ Fully static types participate in subtyping. If a type `S` is a subtype of `T`, 
 assignable to `T`. Two equivalent types are subtypes of each other:
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 
 class Parent: ...
 class Child1(Parent): ...
@@ -44,7 +45,8 @@ static_assert(not is_assignable_to(Child1, Child2))
 The dynamic type is assignable to or from any type.
 
 ```py
-from ty_extensions import static_assert, is_assignable_to, Unknown
+from ty_extensions import static_assert, Unknown
+from ty_extensions.internal import is_assignable_to
 from typing import Any, Literal
 
 static_assert(is_assignable_to(Unknown, Literal[1]))
@@ -61,7 +63,8 @@ static_assert(is_assignable_to(Literal[1], Any))
 which is in turn a subtype of `int`:
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 from typing import Literal
 
 static_assert(is_assignable_to(Literal[True], Literal[True]))
@@ -75,7 +78,8 @@ static_assert(not is_assignable_to(bool, Literal[True]))
 ### Integer literals
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 from typing import Literal
 
 static_assert(is_assignable_to(Literal[1], Literal[1]))
@@ -92,7 +96,8 @@ All string-literal types are subtypes of (and therefore assignable to) `LiteralS
 turn a subtype of `str`:
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 from typing_extensions import Literal, LiteralString
 from typing import Sequence, Any
 
@@ -120,7 +125,8 @@ their characters.
 
 ```py
 from typing import Literal, Sequence, Iterable, Collection, Reversible
-from ty_extensions import is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 
 static_assert(is_assignable_to(Literal["abba"], Sequence[Literal["a", "b"]]))
 static_assert(is_assignable_to(Literal["abb"], Iterable[Literal["a", "b"]]))
@@ -139,7 +145,8 @@ static_assert(not is_assignable_to(Literal["aa"], Sequence[Literal[""]]))
 ### Byte literals
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 from typing_extensions import Literal, LiteralString
 
 static_assert(is_assignable_to(Literal[b"foo"], bytes))
@@ -155,7 +162,8 @@ static_assert(not is_assignable_to(Literal["foo"], Literal[b"foo"]))
 ### Enum literals
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 from typing_extensions import Literal
 from enum import Enum
 
@@ -182,7 +190,8 @@ static_assert(is_assignable_to(Single, Literal[Single.VALUE]))
 The type of a slice literal is currently inferred as a specialization of `slice`.
 
 ```py
-from ty_extensions import TypeOf, is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import TypeOf, is_assignable_to
 
 static_assert(is_assignable_to(TypeOf[1:2:3], slice))
 static_assert(is_assignable_to(TypeOf[1:2:3], slice[int]))
@@ -199,7 +208,8 @@ Both `TypeOf[str]` and `type[str]` are subtypes of `type` and `type[object]`, wh
 is known to be no larger than the set of possible objects represented by `type`.
 
 ```py
-from ty_extensions import static_assert, is_assignable_to, Unknown, TypeOf
+from ty_extensions import static_assert, Unknown
+from ty_extensions.internal import TypeOf, is_assignable_to
 from typing import Any
 
 static_assert(is_assignable_to(type, type))
@@ -279,7 +289,8 @@ static_assert(not is_assignable_to(TypeOf[Foo[bool]], type[Bar[int]]))
 
 ```py
 from typing import Any
-from ty_extensions import is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 
 static_assert(not is_assignable_to(type[Any], None))
 ```
@@ -293,7 +304,8 @@ assignable to `type`:
 
 ```py
 from typing import Any
-from ty_extensions import is_assignable_to, static_assert, TypeOf
+from ty_extensions import static_assert
+from ty_extensions.internal import TypeOf, is_assignable_to
 
 class A: ...
 
@@ -344,7 +356,8 @@ Instances of classes that inherit directly from `Any` are assignable to arbitrar
 final types.
 
 ```py
-from ty_extensions import is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 from typing_extensions import Any, final
 
 class InheritsAny(Any):
@@ -375,7 +388,8 @@ static_assert(is_assignable_to(type[Any], type[object]))
 ## Heterogeneous tuple types
 
 ```py
-from ty_extensions import static_assert, is_assignable_to, AlwaysTruthy, AlwaysFalsy
+from ty_extensions import static_assert, AlwaysTruthy, AlwaysFalsy
+from ty_extensions.internal import is_assignable_to
 from typing import Literal, Any
 
 static_assert(is_assignable_to(tuple[()], tuple[()]))
@@ -419,7 +433,8 @@ assignable to `Sequence`:
 
 ```pyi
 from typing import Literal, Any, Sequence
-from ty_extensions import static_assert, is_assignable_to, AlwaysFalsy
+from ty_extensions import static_assert, AlwaysFalsy
+from ty_extensions.internal import is_assignable_to
 
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[Literal[1, 2], ...]))
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[Literal[1], *tuple[Literal[2], ...]]))
@@ -454,7 +469,8 @@ python-version = "3.12"
 
 ```py
 from typing import Literal, Any, Sequence
-from ty_extensions import static_assert, is_assignable_to, AlwaysFalsy
+from ty_extensions import static_assert, AlwaysFalsy
+from ty_extensions.internal import is_assignable_to
 
 static_assert(
     is_assignable_to(
@@ -577,7 +593,8 @@ is assignable to every tuple of any length.
 
 ```py
 from typing import Any
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 
 static_assert(is_assignable_to(tuple[Any, ...], tuple[Any, ...]))
 static_assert(is_assignable_to(tuple[Any, ...], tuple[Any]))
@@ -670,7 +687,8 @@ static_assert(not is_assignable_to(tuple[int, *tuple[int, ...], int], tuple[int,
 ## Union types
 
 ```py
-from ty_extensions import AlwaysTruthy, AlwaysFalsy, static_assert, is_assignable_to, Unknown
+from ty_extensions import AlwaysTruthy, AlwaysFalsy, static_assert, Unknown
+from ty_extensions.internal import is_assignable_to
 from typing_extensions import Literal, Any, LiteralString
 
 static_assert(is_assignable_to(int, int | str))
@@ -705,7 +723,8 @@ static_assert(not is_assignable_to(Literal[True] | AlwaysFalsy, Literal[False] |
 ## Intersection types
 
 ```pyi
-from ty_extensions import static_assert, is_assignable_to, AlwaysTruthy, AlwaysFalsy
+from ty_extensions import static_assert, AlwaysTruthy, AlwaysFalsy
+from ty_extensions.internal import is_assignable_to
 from typing_extensions import Any, Literal, final, LiteralString
 
 class Parent: ...
@@ -794,7 +813,8 @@ The root cause was that we failed to properly materialize a `Callable[..., Unkno
 `Unknown` return type originated from a missing annotation.
 
 ```pyi
-from ty_extensions import static_assert, is_assignable_to, Unknown, RegularCallableTypeOf
+from ty_extensions import static_assert, Unknown
+from ty_extensions.internal import RegularCallableTypeOf, is_assignable_to
 from typing import Callable
 
 # `Callable[..., Unknown]` has explicit Unknown return type
@@ -816,7 +836,8 @@ _top_ materialization of the negated elements.
 
 ```pyi
 from typing_extensions import Any, Never, Sequence
-from ty_extensions import is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 
 # The bottom materialization of `tuple[Any]` is `tuple[Never]`,
 # which simplifies to `Never`, so `tuple[int]` and `tuple[()]` are
@@ -885,7 +906,8 @@ See also: our property tests in `property_tests.rs`.
 `object` is Python's top type; the set of all possible objects at runtime:
 
 ```py
-from ty_extensions import static_assert, is_assignable_to, Unknown
+from ty_extensions import static_assert, Unknown
+from ty_extensions.internal import is_assignable_to
 from typing import Literal, Any
 
 static_assert(is_assignable_to(str, object))
@@ -905,7 +927,8 @@ static_assert(is_assignable_to(type[Any], object))
 any type is assignable to them:
 
 ```py
-from ty_extensions import static_assert, is_assignable_to, Unknown
+from ty_extensions import static_assert, Unknown
+from ty_extensions.internal import is_assignable_to
 from typing import Literal, Any
 
 static_assert(is_assignable_to(str, Any))
@@ -935,7 +958,8 @@ static_assert(is_assignable_to(type[Any], Unknown))
 assignable to any arbitrary type.
 
 ```py
-from ty_extensions import static_assert, is_assignable_to, Unknown
+from ty_extensions import static_assert, Unknown
+from ty_extensions.internal import is_assignable_to
 from typing_extensions import Never, Any, Literal
 
 static_assert(is_assignable_to(Never, str))
@@ -955,7 +979,8 @@ static_assert(is_assignable_to(Never, type[Any]))
 including `Never`.
 
 ```pyi
-from ty_extensions import static_assert, is_assignable_to, Unknown
+from ty_extensions import static_assert, Unknown
+from ty_extensions.internal import is_assignable_to
 from typing_extensions import Never, Any
 
 static_assert(is_assignable_to(Any, Never))
@@ -976,7 +1001,8 @@ are covered in the [subtyping tests](./is_subtype_of.md#callable).
 ### Return type
 
 ```py
-from ty_extensions import RegularCallableTypeOf, Unknown, static_assert, is_assignable_to
+from ty_extensions import Unknown, static_assert
+from ty_extensions.internal import RegularCallableTypeOf, is_assignable_to
 from typing import Any, Callable
 
 static_assert(is_assignable_to(Callable[[], Any], Callable[[], int]))
@@ -1006,7 +1032,8 @@ A `Callable` which uses the gradual form (`...`) for the parameter types is cons
 input signature.
 
 ```py
-from ty_extensions import RegularCallableTypeOf, static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import RegularCallableTypeOf, is_assignable_to
 from typing import Any, Callable
 
 static_assert(is_assignable_to(Callable[[], None], Callable[..., None]))
@@ -1123,7 +1150,8 @@ c: Callable[[Any], str] = A().g
 
 ```py
 from typing import Any, Callable
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 
 c: Callable[[object], type] = type
 c: Callable[[str], Any] = str
@@ -1214,7 +1242,8 @@ c: Callable[[int], str] = overloaded
 
 ```py
 from typing import Callable, Any
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 
 class TakesAny:
     def __call__(self, a: Any) -> str:
@@ -1245,7 +1274,8 @@ python-version = "3.12"
 
 ```py
 from typing_extensions import Callable, Any, Generic, TypeVar, ParamSpec
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 
 T = TypeVar("T")
 P = ParamSpec("P")
@@ -1287,7 +1317,8 @@ callable `__call__` attribute.
 from __future__ import annotations
 
 from typing import Callable
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 
 def call_impl(a: A, x: int) -> str:
     return ""
@@ -1306,7 +1337,8 @@ reveal_type(A()(1))  # revealed: str
 
 ```py
 from typing import Callable
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 
 class A:
     def __init__(self, x: int) -> None: ...
@@ -1326,7 +1358,8 @@ static_assert(not is_assignable_to(type[B], Callable[[int], B]))
 
 ```py
 from typing import Callable, Any
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 
 static_assert(is_assignable_to(type, Callable[..., Any]))
 ```
@@ -1340,7 +1373,8 @@ the generic callable.)
 
 ```py
 from typing import Callable, Self
-from ty_extensions import RegularCallableTypeOf, TypeOf, is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import RegularCallableTypeOf, TypeOf, is_assignable_to
 
 def identity[T](t: T) -> T:
     return t
@@ -1464,7 +1498,8 @@ necessary for `X` and `Y` to be mutually assignable.
 
 ```py
 from typing import Any, TypeVar, Generic
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 
 InvariantTypeVar = TypeVar("InvariantTypeVar")
 
@@ -1505,7 +1540,8 @@ def g3(obj: Foo[tuple[A]]):
 
 ```py
 from typing import final
-from ty_extensions import static_assert, is_assignable_to, TypeOf
+from ty_extensions import static_assert
+from ty_extensions.internal import TypeOf, is_assignable_to
 
 class GenericClass[T]:
     x: T  # invariant
@@ -1540,7 +1576,8 @@ static_assert(not is_assignable_to(TypeOf[GenericFinalClass[str]], type[GenericF
 `TypeGuard[...]` and `TypeIs[...]` are always assignable to `bool`.
 
 ```py
-from ty_extensions import Unknown, is_assignable_to, static_assert
+from ty_extensions import Unknown, static_assert
+from ty_extensions.internal import is_assignable_to
 from typing_extensions import Any, TypeGuard, TypeIs
 
 static_assert(is_assignable_to(TypeGuard[Unknown], bool))
@@ -1557,7 +1594,8 @@ so `TypeIs` annotations that differ only by `Any` are still compatible:
 
 ```py
 from collections.abc import Sequence
-from ty_extensions import is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 from typing_extensions import Any, TypeIs
 
 static_assert(is_assignable_to(TypeIs[Sequence[int]], TypeIs[Sequence[Any]]))
@@ -1590,7 +1628,8 @@ takes_plugin_predicate(callable)
 ## `ParamSpec`
 
 ```py
-from ty_extensions import TypeOf, static_assert, is_assignable_to, Unknown
+from ty_extensions import static_assert, Unknown
+from ty_extensions.internal import TypeOf, is_assignable_to
 from typing import ParamSpec, Mapping, Callable, Any
 
 P = ParamSpec("P")
@@ -1626,7 +1665,8 @@ def f(func: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
 A `Callable` with `Concatenate` should be assignable to itself.
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 from typing import Callable, Concatenate
 
 static_assert(is_assignable_to(Callable[Concatenate[int, ...], None], Callable[Concatenate[int, ...], None]))
@@ -1639,7 +1679,8 @@ A callable with `Concatenate` parameters should be assignable to the gradual cal
 the gradual form is consistent with any input signature.
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 from typing import Callable, Concatenate
 
 static_assert(is_assignable_to(Callable[Concatenate[int, ...], None], Callable[..., None]))
@@ -1656,7 +1697,8 @@ static_assert(is_assignable_to(Callable[..., None], Callable[Concatenate[int, st
 ### Assignable from bottom callable
 
 ```py
-from ty_extensions import static_assert, is_assignable_to, RegularCallableTypeOf
+from ty_extensions import static_assert
+from ty_extensions.internal import RegularCallableTypeOf, is_assignable_to
 from typing import Callable, Concatenate, Never
 
 def bottom(*args: object, **kwargs: object) -> Never:
@@ -1675,7 +1717,8 @@ Callable parameters are contravariant: a callable accepting a wider type (`A`) i
 expecting a narrower type (`B`), because any call valid for `B` is also valid for `A`.
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 from typing import Callable, Concatenate
 
 class Parent: ...
@@ -1688,7 +1731,8 @@ static_assert(not is_assignable_to(Callable[Concatenate[Child, ...], None], Call
 ### Different parameter types
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 from typing import Callable, Concatenate, final
 
 class A: ...
@@ -1703,7 +1747,8 @@ static_assert(not is_assignable_to(Callable[Concatenate[B, ...], None], Callable
 Callables with different numbers of prepended parameters should be assignable.
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 from typing import Callable, Concatenate
 
 static_assert(is_assignable_to(Callable[Concatenate[int, ...], None], Callable[Concatenate[int, str, ...], None]))
@@ -1713,7 +1758,8 @@ static_assert(is_assignable_to(Callable[Concatenate[int, str, ...], None], Calla
 ### `Concatenate` with ellipsis vs explicit parameter list
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 from typing import Callable, Concatenate
 
 static_assert(is_assignable_to(Callable[Concatenate[int, ...], None], Callable[[int], None]))
@@ -1726,7 +1772,8 @@ static_assert(is_assignable_to(Callable[[int, str], None], Callable[Concatenate[
 ### `Concatenate` with `ParamSpec`
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import is_assignable_to
 from typing import Callable, Concatenate
 
 class A: ...
@@ -1739,7 +1786,8 @@ def with_paramspec[**P](_: Callable[P, None]):
 ### Gradual `Concatenate` with regular function
 
 ```py
-from ty_extensions import RegularCallableTypeOf, static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions.internal import RegularCallableTypeOf, is_assignable_to
 from typing import Callable, Concatenate
 
 class A: ...

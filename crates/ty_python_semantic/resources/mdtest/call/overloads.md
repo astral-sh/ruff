@@ -1469,7 +1469,8 @@ def _(int_str: tuple[int, str], int_any: tuple[int, Any], any_any: tuple[Any, An
 
 ```pyi
 from typing_extensions import Iterable, overload, LiteralString, Protocol
-from ty_extensions import Unknown, is_assignable_to
+from ty_extensions import Unknown
+from ty_extensions.internal import is_assignable_to
 
 class Foo:
     @overload

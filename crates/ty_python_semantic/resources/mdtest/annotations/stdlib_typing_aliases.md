@@ -114,7 +114,7 @@ The aliases can be inherited from. Some of these are still partially or wholly T
 
 ```py
 import typing
-from ty_extensions import reveal_mro
+from ty_extensions.internal import reveal_mro
 
 ####################
 ### Built-ins

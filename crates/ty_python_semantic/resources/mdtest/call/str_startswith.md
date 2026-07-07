@@ -52,7 +52,8 @@ Unlike bound methods for some other classes implemented in C, `"foo".startswith`
 
 ```py
 import types
-from ty_extensions import TypeOf, static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions.internal import TypeOf, is_subtype_of
 
 static_assert(is_subtype_of(TypeOf["foo".startswith], types.BuiltinFunctionType))
 

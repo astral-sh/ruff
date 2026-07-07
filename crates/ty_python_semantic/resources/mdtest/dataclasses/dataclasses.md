@@ -253,7 +253,7 @@ But if there is a variable annotation with a function or class literal type, the
 `__init__` will include this field:
 
 ```py
-from ty_extensions import TypeOf
+from ty_extensions.internal import TypeOf
 
 class SomeClass: ...
 
@@ -2043,7 +2043,7 @@ and attributes like the MRO are unchanged:
 
 ```py
 from dataclasses import dataclass
-from ty_extensions import reveal_mro
+from ty_extensions.internal import reveal_mro
 
 @dataclass
 class Person:
@@ -2078,7 +2078,8 @@ python-version = "3.12"
 from dataclasses import dataclass
 from typing import Callable
 from types import FunctionType
-from ty_extensions import CallableTypeOf, TypeOf, static_assert, is_subtype_of, is_assignable_to, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions.internal import CallableTypeOf, TypeOf, is_subtype_of, is_assignable_to, is_equivalent_to
 
 @dataclass(order=True)
 class C:

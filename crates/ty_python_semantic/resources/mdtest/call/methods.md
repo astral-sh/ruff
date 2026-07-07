@@ -1018,7 +1018,8 @@ properties are understood correctly for these functions and methods.
 ```py
 import types
 from typing import Any, Callable
-from ty_extensions import static_assert, RegularCallableTypeOf, is_assignable_to, TypeOf
+from ty_extensions import static_assert
+from ty_extensions.internal import RegularCallableTypeOf, TypeOf, is_assignable_to
 
 def f(obj: type) -> None: ...
 

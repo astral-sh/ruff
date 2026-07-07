@@ -37,7 +37,8 @@ classes.
 We use `P`, `Q`, `R`, … to denote types that are non-disjoint:
 
 ```py
-from ty_extensions import static_assert, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions.internal import is_disjoint_from
 
 class P: ...
 class Q: ...
@@ -58,7 +59,8 @@ We use `Literal[1]`, `Literal[2]`, … as examples of pairwise-disjoint types, a
 supertype of these:
 
 ```py
-from ty_extensions import static_assert, is_disjoint_from, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions.internal import is_disjoint_from, is_subtype_of
 from typing import Literal
 
 static_assert(is_disjoint_from(Literal[1], Literal[2]))
@@ -75,7 +77,8 @@ static_assert(is_subtype_of(Literal[3], int))
 Finally, we use `A <: B <: C` and `A <: B1`, `A <: B2` to denote hierarchies of (proper) subtypes:
 
 ```py
-from ty_extensions import static_assert, is_subtype_of, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions.internal import is_subtype_of, is_disjoint_from
 
 class A: ...
 class B(A): ...
@@ -284,7 +287,8 @@ in intersections, and can be eagerly simplified out. `object & P` is equivalent 
 `object & ~P` is equivalent to `~P` for any type `P`.
 
 ```pyi
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_equivalent_to
 
 class P: ...
 

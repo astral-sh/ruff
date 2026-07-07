@@ -484,7 +484,8 @@ At runtime, `attr_property.__get__` and `attr_property.__set__` are both instanc
 
 ```py
 import types
-from ty_extensions import TypeOf, static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions.internal import TypeOf, is_subtype_of
 
 static_assert(is_subtype_of(TypeOf[attr_property.__get__], types.MethodWrapperType))
 static_assert(is_subtype_of(TypeOf[attr_property.__set__], types.MethodWrapperType))
@@ -504,14 +505,14 @@ structural rather than exact function literals:
 
 ```py
 from typing import Callable
-from ty_extensions import (
+from ty_extensions import static_assert
+from ty_extensions.internal import (
     CallableTypeOf,
     TypeOf,
     is_assignable_to,
     is_disjoint_from,
     is_equivalent_to,
     is_subtype_of,
-    static_assert,
 )
 
 def get_int(self) -> int:

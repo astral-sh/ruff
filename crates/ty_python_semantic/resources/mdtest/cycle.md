@@ -273,7 +273,8 @@ as gradual:
 
 ```py
 from typing import Any, Callable, Generic, TypeVar
-from ty_extensions import TypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import TypeOf, is_subtype_of
 
 T = TypeVar("T")
 flag: bool
@@ -406,7 +407,7 @@ reveal_type(Derived.decorate)
 `derived.py`:
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions.internal import reveal_mro
 import bases
 
 class Derived(bases.GenericBase["Foo", "Bar"]): ...
@@ -432,7 +433,7 @@ reveal_mro(Bar)
 
 ```py
 from typing import Generic, TypeVar, Type
-from ty_extensions import reveal_mro
+from ty_extensions.internal import reveal_mro
 
 T = TypeVar("T")
 B1 = TypeVar("B1", bound="Foo")

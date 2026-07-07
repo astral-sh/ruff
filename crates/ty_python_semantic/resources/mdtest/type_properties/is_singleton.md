@@ -7,7 +7,8 @@ A type is a singleton type iff it has exactly one inhabitant.
 ```pyi
 from types import UnionType
 from typing_extensions import Any, Callable, Literal, Never, TypeAliasType
-from ty_extensions import TypeOf, is_singleton, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import TypeOf, is_singleton
 from enum import Enum
 
 class Answer(Enum):
@@ -66,7 +67,8 @@ python-version = "3.12"
 
 ```py
 from typing_extensions import _NoDefaultType
-from ty_extensions import is_singleton, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_singleton
 
 static_assert(is_singleton(_NoDefaultType))
 ```
@@ -80,7 +82,8 @@ python-version = "3.13"
 
 ```py
 from typing import _NoDefaultType
-from ty_extensions import is_singleton, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_singleton
 
 static_assert(is_singleton(_NoDefaultType))
 ```
@@ -99,7 +102,8 @@ python-version = "3.9"
 ```
 
 ```py
-from ty_extensions import is_singleton, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_singleton
 
 static_assert(is_singleton(Ellipsis.__class__))
 ```
@@ -116,7 +120,8 @@ python-version = "3.10"
 
 ```py
 import types
-from ty_extensions import static_assert, is_singleton
+from ty_extensions import static_assert
+from ty_extensions.internal import is_singleton
 
 static_assert(is_singleton(types.EllipsisType))
 ```
@@ -134,7 +139,8 @@ python-version = "3.9"
 ```
 
 ```py
-from ty_extensions import is_singleton, static_assert
+from ty_extensions import static_assert
+from ty_extensions.internal import is_singleton
 
 static_assert(is_singleton(NotImplemented.__class__))
 ```
@@ -152,7 +158,8 @@ python-version = "3.10"
 
 ```py
 import types
-from ty_extensions import static_assert, is_singleton
+from ty_extensions import static_assert
+from ty_extensions.internal import is_singleton
 
 static_assert(is_singleton(types.NotImplementedType))
 ```
@@ -171,7 +178,8 @@ have to hold true; it's more of a unit test for our current implementation.
 ```py
 import types
 from typing import Callable
-from ty_extensions import static_assert, is_singleton, TypeOf
+from ty_extensions import static_assert
+from ty_extensions.internal import TypeOf, is_singleton
 
 class A:
     def method(self): ...

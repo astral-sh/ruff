@@ -11,7 +11,7 @@ In type stubs, classes can reference themselves in their base class definitions.
 `typeshed`, we have `class str(Sequence[str]): ...`.
 
 ```pyi
-from ty_extensions import reveal_mro
+from ty_extensions.internal import reveal_mro
 
 class Foo[T]: ...
 class Bar(Foo[Bar]): ...

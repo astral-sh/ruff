@@ -254,7 +254,8 @@ def _(flag: bool):
 
 ```py
 from typing import Literal
-from ty_extensions import Not, AlwaysFalsy, static_assert, is_subtype_of, is_assignable_to
+from ty_extensions import Not, AlwaysFalsy, static_assert
+from ty_extensions.internal import is_subtype_of, is_assignable_to
 
 static_assert(is_subtype_of(Literal["a", ""], Literal["a", ""] | Not[AlwaysFalsy]))
 static_assert(is_subtype_of(Not[AlwaysFalsy], Literal["", "a"] | Not[AlwaysFalsy]))
@@ -291,7 +292,7 @@ def _(
 ## A `TypeForm` parameter is a value parameter
 
 ```py
-from ty_extensions import is_singleton
+from ty_extensions.internal import is_singleton
 
 def _(flag: bool):
     if flag:
