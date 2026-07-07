@@ -69,7 +69,7 @@ mod tests {
 
     /// Test selection range on a simple expression
     #[test]
-    fn test_selection_range_simple_expression() {
+    fn selection_range_simple_expression() {
         let test = CursorTest::builder()
             .source(
                 "main.py",
@@ -113,7 +113,7 @@ x = 1 + <CURSOR>2
 
     /// Test selection range on a function call
     #[test]
-    fn test_selection_range_function_call() {
+    fn selection_range_function_call() {
         let test = CursorTest::builder()
             .source(
                 "main.py",
@@ -164,7 +164,7 @@ print(\"he<CURSOR>llo\")
 
     /// Test selection range on a function definition
     #[test]
-    fn test_selection_range_function_definition() {
+    fn selection_range_function_definition() {
         let test = CursorTest::builder()
             .source(
                 "main.py",
@@ -204,7 +204,7 @@ def my_<CURSOR>function():
 
     /// Test selection range on a class definition
     #[test]
-    fn test_selection_range_class_definition() {
+    fn selection_range_class_definition() {
         let test = CursorTest::builder()
             .source(
                 "main.py",
@@ -247,7 +247,7 @@ class My<CURSOR>Class:
 
     /// Test selection range on a deeply nested expression with comprehension, lambda, and subscript
     #[test]
-    fn test_selection_range_deeply_nested_expression() {
+    fn selection_range_deeply_nested_expression() {
         let test = CursorTest::builder()
             .source(
                 "main.py",
@@ -319,7 +319,7 @@ result = [(lambda x: x[key.<CURSOR>attr])(item) for item in data if item is not 
 
     /// Test selection range on an empty string literal
     #[test]
-    fn test_selection_range_empty_string_literal() {
+    fn selection_range_empty_string_literal() {
         let test = CursorTest::builder()
             .source(
                 "main.py",
@@ -349,7 +349,7 @@ result = [(lambda x: x[key.<CURSOR>attr])(item) for item in data if item is not 
 
     /// Test selection range on a bytes literal
     #[test]
-    fn test_selection_range_bytes_literal() {
+    fn selection_range_bytes_literal() {
         let test = CursorTest::builder()
             .source(
                 "main.py",
