@@ -38,7 +38,7 @@ use ruff_spo_triplet::{
     CppAccess, CppBase, CppField, CppFriend, CppMethod, CppTemplate, CppTemplateKind,
 };
 
-use crate::{CppClass, Declaration};
+use crate::{CppClass, CppFunction, Declaration};
 
 /// A failure walking a translation unit.
 #[derive(Debug)]
@@ -82,6 +82,86 @@ pub fn walk_tu(path: &Path, args: &[String]) -> Result<Vec<CppClass>, WalkError>
     let mut out = Vec::new();
     collect_classes(&tu.get_entity(), &mut out);
     Ok(out)
+}
+
+/// Walk ONE translation unit and collect free-function DEFINITIONS with their
+/// **general call graph** — the C-library dispatch structure (e.g. leptonica
+/// `pixScale` → `pixScaleGeneral` → `pixScaleGrayLI`/`pixScaleAreaMap`/
+/// `pixUnsharpMasking`). Unlike [`walk_tu`] this parses WITH bodies
+/// (`skip_function_bodies(false)`), because the callee set is the point.
+///
+/// This is the missing arm for C libraries: [`walk_tu`] harvests C++ *classes*;
+/// a C library (leptonica, zlib, …) is free functions on pointer buffers, so
+/// the AR/OO member body-arm ([`method_body_arm`]) captures nothing there — but
+/// the call graph IS the transcode-driving structure (which functions to port,
+/// in what dispatch order). Numeric kernel BODIES remain the essential-15%
+/// hand-port (the doctrine); this mints the 85% structure that classifies + orders
+/// them.
+///
+/// # Errors
+///
+/// [`WalkError::Libclang`] if libclang fails to initialise (non-recoverable);
+/// [`WalkError::Parse`] if the TU fails to parse.
+#[cfg(feature = "libclang")]
+pub fn walk_free_functions(path: &Path, args: &[String]) -> Result<Vec<CppFunction>, WalkError> {
+    let clang = Clang::new().map_err(WalkError::Libclang)?;
+    let index = Index::new(&clang, false, false);
+    let tu = index
+        .parser(path)
+        .arguments(args)
+        .skip_function_bodies(false)
+        .parse()
+        .map_err(|e| WalkError::Parse(e.to_string()))?;
+
+    let mut out = Vec::new();
+    collect_functions(&tu.get_entity(), &mut out);
+    Ok(out)
+}
+
+/// Recurse the AST, emitting a [`CppFunction`] for every free-function
+/// DEFINITION (recursing into namespaces). Prototypes (no body) and
+/// system-header functions are skipped — a transcode wants the library's own
+/// definitions.
+#[cfg(feature = "libclang")]
+fn collect_functions(entity: &Entity, out: &mut Vec<CppFunction>) {
+    for child in entity.get_children() {
+        match child.get_kind() {
+            EntityKind::FunctionDecl => {
+                if child.is_definition()
+                    && !in_system_header(&child)
+                    && let Some(name) = child.get_name()
+                {
+                    let mut calls = Vec::new();
+                    collect_calls(&child, &mut calls);
+                    calls.sort();
+                    calls.dedup();
+                    out.push(CppFunction {
+                        namespace: enclosing_scopes(&child),
+                        name,
+                        calls,
+                    });
+                }
+            }
+            EntityKind::Namespace => collect_functions(&child, out),
+            _ => {}
+        }
+    }
+}
+
+/// Recurse a function body collecting EVERY resolvable callee name (the general
+/// call graph). Distinct from [`walk_body`]'s `calls` (persistence mutators
+/// only): here every `CallExpr` callee is the dispatch structure a C-library
+/// transcode follows.
+#[cfg(feature = "libclang")]
+fn collect_calls(node: &Entity, out: &mut Vec<String>) {
+    for child in node.get_children() {
+        if child.get_kind() == EntityKind::CallExpr
+            && let Some(name) = child.get_name()
+        {
+            out.push(name);
+        }
+        collect_calls(&child, out);
+    }
 }
 
 /// Coverage instrumentation for `CPP-SCHEMA-FIT`: tally the libclang
