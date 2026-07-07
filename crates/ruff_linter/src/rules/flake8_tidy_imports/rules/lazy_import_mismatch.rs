@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{AtomicNodeIndex, PythonVersion, Stmt, StmtImport, StmtImportFrom};
-use ruff_python_trivia::indentation_at_offset;
+use ruff_python_trivia::{has_leading_content, indentation_at_offset, is_python_whitespace};
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -51,7 +52,7 @@ enum LazyImportPolicy {
 }
 
 impl Violation for LazyImportMismatch {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -177,11 +178,15 @@ fn report_lazy_import_policy(
     selector: &crate::rules::flake8_tidy_imports::settings::ImportSelector,
 ) {
     let mut diagnostic = checker.report_diagnostic(LazyImportMismatch { policy, name }, range);
-    if let Stmt::Import(import) = stmt
-        && let Some(fix) = split_import_fix(checker, stmt, import, policy, selector)
-    {
-        diagnostic.set_fix(fix);
-        return;
+    if let Stmt::Import(import) = stmt {
+        match split_import_fix(checker, stmt, import, policy, selector) {
+            SplitImportFix::Fix(fix) => {
+                diagnostic.set_fix(fix);
+                return;
+            }
+            SplitImportFix::Unavailable => return,
+            SplitImportFix::NotMixed => {}
+        }
     }
 
     match policy {
@@ -200,62 +205,96 @@ fn report_lazy_import_policy(
     }
 }
 
+enum SplitImportFix {
+    Fix(Fix),
+    NotMixed,
+    Unavailable,
+}
+
 fn split_import_fix(
     checker: &Checker,
     stmt: &Stmt,
     import: &StmtImport,
     policy: LazyImportPolicy,
     selector: &crate::rules::flake8_tidy_imports::settings::ImportSelector,
-) -> Option<Fix> {
+) -> SplitImportFix {
     if import.names.len() < 2 {
-        return None;
+        return SplitImportFix::NotMixed;
     }
 
-    let mut matching = Vec::new();
-    let mut non_matching = Vec::new();
+    let matching_is_lazy = matches!(policy, LazyImportPolicy::RequireLazy);
+    let mut has_matching = false;
+    let mut has_non_matching = false;
+    let mut runs: Vec<StmtImport> = Vec::new();
+    let mut current_names = Vec::new();
+    let mut current_is_lazy = None;
+
     for alias in &import.names {
         let import_policy = NameMatchPolicy::MatchNameOrParent(MatchNameOrParent {
             module: &alias.name,
         });
-        if selector.find(&import_policy).is_some() {
-            matching.push(alias.clone());
+        let is_match = selector.find(&import_policy).is_some();
+        if is_match {
+            has_matching = true;
         } else {
-            non_matching.push(alias.clone());
+            has_non_matching = true;
+        }
+        let is_lazy = if is_match {
+            matching_is_lazy
+        } else {
+            !matching_is_lazy
+        };
+
+        if current_is_lazy == Some(is_lazy) {
+            current_names.push(alias.clone());
+        } else {
+            if let Some(previous_is_lazy) = current_is_lazy {
+                runs.push(import_stmt(
+                    std::mem::take(&mut current_names),
+                    previous_is_lazy,
+                ));
+            }
+            current_is_lazy = Some(is_lazy);
+            current_names.push(alias.clone());
         }
     }
 
-    if matching.is_empty() || non_matching.is_empty() {
-        return None;
+    if !has_matching || !has_non_matching {
+        return SplitImportFix::NotMixed;
     }
 
-    let matching_is_lazy = matches!(policy, LazyImportPolicy::RequireLazy);
-    let matching_stmt = import_stmt(matching, matching_is_lazy);
-    let non_matching_stmt = import_stmt(non_matching, !matching_is_lazy);
+    if has_leading_content(stmt.start(), checker.source())
+        || has_trailing_comment_or_content(stmt.end(), checker.source())
+    {
+        return SplitImportFix::Unavailable;
+    }
 
-    let first_alias = import.names.first()?;
-    let first_matches = selector
-        .find(&NameMatchPolicy::MatchNameOrParent(MatchNameOrParent {
-            module: &first_alias.name,
-        }))
-        .is_some();
-    let (first, second) = if first_matches {
-        (&matching_stmt, &non_matching_stmt)
-    } else {
-        (&non_matching_stmt, &matching_stmt)
-    };
+    if let Some(is_lazy) = current_is_lazy {
+        runs.push(import_stmt(current_names, is_lazy));
+    }
 
     let indentation = indentation_at_offset(stmt.start(), checker.source()).unwrap_or_default();
     let line_ending = checker.stylist().line_ending().as_str();
-    let replacement = format!(
-        "{}{line_ending}{indentation}{}",
-        checker.generator().stmt(&Stmt::Import(first.clone())),
-        checker.generator().stmt(&Stmt::Import(second.clone()))
-    );
+    let mut replacement = String::new();
+    for (index, run) in runs.into_iter().enumerate() {
+        if index > 0 {
+            replacement.push_str(line_ending);
+            replacement.push_str(indentation);
+        }
+        replacement.push_str(&checker.generator().stmt(&Stmt::Import(run)));
+    }
 
-    Some(Fix::unsafe_edit(Edit::range_replacement(
+    SplitImportFix::Fix(Fix::unsafe_edit(Edit::range_replacement(
         replacement,
         stmt.range(),
     )))
+}
+
+fn has_trailing_comment_or_content(offset: TextSize, source: &str) -> bool {
+    let line_end = source.line_end(offset);
+    source[TextRange::new(offset, line_end)]
+        .chars()
+        .any(|char| !is_python_whitespace(char))
 }
 
 fn import_stmt(names: Vec<ruff_python_ast::Alias>, is_lazy: bool) -> StmtImport {

@@ -270,10 +270,14 @@ mod tests {
             import os
             import this, typing
             lazy import this, typing
+            import a, typing, b
+            import this, typing  # noqa: F401
 
             if True:
                 import email
                 import sitecustomize, typing_extensions
+
+            if True: import this, typing
 
             with manager():
                 from foo import bar
@@ -301,11 +305,17 @@ mod tests {
             lazy import typing
             import this
             lazy import typing
+            import a
+            lazy import typing
+            import b
+            import this, typing  # noqa: F401
 
             if True:
                 lazy import email
                 import sitecustomize
                 lazy import typing_extensions
+
+            if True: import this, typing
 
             with manager():
                 lazy from foo import bar
@@ -354,7 +364,7 @@ mod tests {
             },
         );
 
-        assert_eq!(diagnostics.len(), 6);
+        assert_eq!(diagnostics.len(), 9);
         assert_eq!(fixed.source_code(), expected);
     }
 
