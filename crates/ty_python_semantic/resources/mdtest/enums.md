@@ -559,6 +559,24 @@ reveal_type(AnnotatedConnector.GITHUB.value)  # revealed: str
 reveal_type(AnnotatedConnector.GITHUB._value_)  # revealed: str
 ```
 
+Even when a custom `__new__` means that aliases cannot be determined, we assume that an enum
+member's declaration name is canonical when inferring `.name`:
+
+```py
+from enum import IntEnum
+
+class CustomInteger(IntEnum):
+    def __new__(cls, value: int) -> "CustomInteger":
+        obj = int.__new__(cls, value)
+        obj._value_ = value
+        return obj
+
+    VALUE = 1
+    ALIAS = 1
+
+reveal_type(CustomInteger.ALIAS.name)  # revealed: Literal["ALIAS"]
+```
+
 ### Inherited `_value_` annotation
 
 A `_value_` annotation on a parent enum is inherited by subclasses. Member values are validated
@@ -854,6 +872,7 @@ class ParsedIntegerValues(int, Enum):
     SECOND = "1"
 
 reveal_type(ParsedIntegerValues.FIRST is ParsedIntegerValues.SECOND)  # revealed: bool
+reveal_type(ParsedIntegerValues.SECOND.name)  # revealed: Literal["SECOND"]
 reveal_type(enum_members(ParsedIntegerValues))  # revealed: Unknown
 ```
 
@@ -906,7 +925,7 @@ class CustomValues(CustomInt, Enum):
 
 reveal_type(CustomValues.FALSE.value)  # revealed: Any
 reveal_type(CustomValues.FALSE is CustomValues.ZERO)  # revealed: bool
-reveal_type(CustomValues.ZERO.name)  # revealed: str
+reveal_type(CustomValues.ZERO.name)  # revealed: Literal["ZERO"]
 reveal_type(enum_members(CustomValues))  # revealed: Unknown
 ```
 
@@ -995,6 +1014,7 @@ class MyModelChoices(IntegerChoices):
     GOOD = 1, "I like this"
 
 reveal_type(MyModelChoices.GOOD.value)  # revealed: Any
+reveal_type(MyModelChoices.GOOD.name)  # revealed: Literal["GOOD"]
 ```
 
 An explicit `_value_` annotation on the transformed enum class still takes precedence, even when the
