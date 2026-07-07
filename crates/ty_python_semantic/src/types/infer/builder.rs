@@ -4807,12 +4807,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             else {
                                 continue;
                             };
-                            let field_kind = if matches!(class_kind, CodeGeneratorKind::Pydantic(_))
-                            {
-                                "Pydantic model"
-                            } else {
-                                "dataclass"
-                            };
+                            let field_kind = class_kind.name();
                             builder.into_diagnostic(format_args!(
                                 "`{name}` is not allowed in {field_kind} fields",
                                 name = qualifier.name(),

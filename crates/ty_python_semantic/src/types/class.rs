@@ -241,6 +241,15 @@ impl<'db> CodeGeneratorKind<'db> {
         }
     }
 
+    pub(super) const fn name(self) -> &'static str {
+        match self {
+            Self::DataclassLike(_) => "dataclass",
+            Self::Pydantic(_) => "Pydantic model",
+            Self::NamedTuple => "named tuple",
+            Self::TypedDict => "TypedDict",
+        }
+    }
+
     /// Return `true` if generated fields are treated as instance attributes.
     pub(super) const fn treats_fields_as_instance_attributes(self) -> bool {
         matches!(self, Self::DataclassLike(_) | Self::Pydantic(_))
