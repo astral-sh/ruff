@@ -18,6 +18,7 @@ use ty_python_core::semantic_index;
 
 use super::{known_type_form_parameter_index, visible_reachable_definitions_for_name};
 use crate::dunder_all::dunder_all_names;
+use crate::types::{SpecialFormType, Type};
 use crate::{Db, HasType, SemanticModel};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, GetSize)]
@@ -187,6 +188,12 @@ impl<'model> StringAnnotationDefinitionVisitor<'model, '_> {
         self.in_annotation = previous;
     }
 
+    fn leave_annotation(&mut self, visit: impl FnOnce(&mut Self)) {
+        let previous = std::mem::replace(&mut self.in_annotation, false);
+        visit(self);
+        self.in_annotation = previous;
+    }
+
     fn visit_string_annotation(&mut self, string: &'model ast::ExprStringLiteral) {
         let Some(parsed) = parse_string_annotation(self.source, string) else {
             return;
@@ -234,6 +241,33 @@ impl<'model> SourceOrderVisitor<'model> for StringAnnotationDefinitionVisitor<'m
         match expr {
             ast::Expr::StringLiteral(string) if self.in_annotation => {
                 self.visit_string_annotation(string);
+            }
+            ast::Expr::Subscript(subscript) if self.in_annotation => {
+                self.visit_expr(&subscript.value);
+
+                let special_form = subscript
+                    .value
+                    .inferred_type(self.model)
+                    .and_then(Type::as_special_form);
+
+                if special_form == Some(SpecialFormType::Literal) {
+                    // String arguments to `Literal` are values, not forward references.
+                    self.leave_annotation(|visitor| visitor.visit_expr(&subscript.slice));
+                } else if special_form == Some(SpecialFormType::Annotated)
+                    && let ast::Expr::Tuple(tuple) = subscript.slice.as_ref()
+                    && let Some((first, rest)) = tuple.elts.split_first()
+                {
+                    // Only the first argument to `Annotated` is a type, the rest is
+                    // arbitrary metadata.
+                    self.visit_expr(first);
+                    self.leave_annotation(|visitor| {
+                        for element in rest {
+                            visitor.visit_expr(element);
+                        }
+                    });
+                } else {
+                    self.visit_expr(&subscript.slice);
+                }
             }
             ast::Expr::Call(call) if !call.arguments.args.is_empty() => {
                 let type_form_index = call
@@ -1367,6 +1401,66 @@ mod tests {
         )?;
 
         assert_eq!(names, vec!["Path"]);
+        Ok(())
+    }
+
+    #[test]
+    fn reports_imports_used_only_as_unquoted_literal_string_values() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            from pathlib import Path
+            from typing import Literal
+
+            x: Literal["Path"] = "Path"
+            "#,
+        )?;
+
+        assert_eq!(names, vec!["Path"]);
+        Ok(())
+    }
+
+    #[test]
+    fn reports_imports_used_only_as_aliased_literal_string_values() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            from pathlib import Path
+            from typing import Literal as L
+
+            x: L["Path"] = "Path"
+            "#,
+        )?;
+
+        assert_eq!(names, vec!["Path"]);
+        Ok(())
+    }
+
+    #[test]
+    fn reports_imports_used_only_as_unquoted_annotated_string_metadata() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            from pathlib import Path
+            from typing import Annotated
+
+            value: Annotated[int, "Path"] = 1
+            "#,
+        )?;
+
+        assert_eq!(names, vec!["Path"]);
+        Ok(())
+    }
+
+    #[test]
+    fn skips_import_used_as_unquoted_annotated_string_first_argument() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            from pathlib import Path
+            from typing import Annotated
+
+            value: Annotated["Path", "metadata"]
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
         Ok(())
     }
 
