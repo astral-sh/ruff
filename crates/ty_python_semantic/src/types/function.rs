@@ -1066,6 +1066,23 @@ impl<'db> FunctionType<'db> {
             .and_then(|updated| updated.implementation_signature.as_ref())
     }
 
+    pub(crate) fn visit_updated_signatures(
+        self,
+        db: &'db dyn Db,
+        mut visit: impl FnMut(&Signature<'db>),
+    ) {
+        if let Some(updated) = self.updated_signatures(db) {
+            if let Some(callable_signature) = &updated.signature {
+                for signature in &callable_signature.overloads {
+                    visit(signature);
+                }
+            }
+            if let Some(signature) = &updated.implementation_signature {
+                visit(signature);
+            }
+        }
+    }
+
     pub(crate) fn with_inherited_generic_context(
         self,
         db: &'db dyn Db,
@@ -1102,13 +1119,15 @@ impl<'db> FunctionType<'db> {
         let literal = self.literal(db);
         let (updated_signature, updated_implementation_signature) = if matches!(
             type_mapping,
-            TypeMapping::ApplySpecialization(
-                ApplySpecialization::ReturnCallables(_) | ApplySpecialization::TypeAlias(_)
-            ) | TypeMapping::ApplySpecializationWithMaterialization {
-                specialization: ApplySpecialization::ReturnCallables(_)
-                    | ApplySpecialization::TypeAlias(_),
-                ..
-            }
+            TypeMapping::RescopeReturnCallables(_)
+                | TypeMapping::ApplySpecialization(
+                    ApplySpecialization::ReturnCallables(_) | ApplySpecialization::TypeAlias(_)
+                )
+                | TypeMapping::ApplySpecializationWithMaterialization {
+                    specialization: ApplySpecialization::ReturnCallables(_)
+                        | ApplySpecialization::TypeAlias(_),
+                    ..
+                }
         ) {
             (
                 self.updated_signature(db).map(|signature| {
