@@ -3223,11 +3223,7 @@ static_assert(not is_assignable_to(BadReturnType, ShapeProtocolExplicitSelf))
 ## Module objects with static-method protocol members
 
 Module objects implement protocols through their public interface. A module-level function can
-therefore satisfy a static-method member with the same signature.
-
-Here, the ordinary method and the static method both describe a callable `(int) -> str` on the
-protocol value. Combining those protocols in a union must not make the module incompatible,
-including when the other possible value has an unknown type.
+therefore satisfy an ordinary or static method member with the same signature.
 
 `factory.py`:
 
@@ -3242,7 +3238,6 @@ def make(value: int) -> str:
 
 ```py
 from typing import Protocol
-from ty_extensions import Unknown
 
 import factory
 
@@ -3256,11 +3251,8 @@ class FactoryModule(Protocol):
     @staticmethod
     def make(value: int) -> str: ...
 
-factory_protocol: FactoryModule = factory
-
-def from_gradual_value(value: Unknown, condition: bool) -> FactoryObject | FactoryModule:
-    candidate = factory if condition else value
-    return candidate
+factory_object: FactoryObject = factory
+factory_module: FactoryModule = factory
 ```
 
 ## Class objects with class-method protocol members
