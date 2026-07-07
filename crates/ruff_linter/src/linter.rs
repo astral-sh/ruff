@@ -784,7 +784,7 @@ pub fn parse_unchecked_source(
         Some(notebook) => ruff_python_parser::parse_cells_unchecked(
             source_kind.source_code(),
             notebook.cell_offsets().content_ranges(),
-            options,
+            &options,
         ),
         None => ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
             .try_into_module()

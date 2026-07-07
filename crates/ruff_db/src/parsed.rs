@@ -55,7 +55,7 @@ pub fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
     // surfaced instead of being masked by a later cell's content. Regular files take the existing
     // single-parse path.
     if let Some(notebook) = source.as_notebook() {
-        parse_cells_unchecked(&source, notebook.cell_offsets().content_ranges(), options)
+        parse_cells_unchecked(&source, notebook.cell_offsets().content_ranges(), &options)
     } else {
         parse_unchecked(&source, options)
             .try_into_module()

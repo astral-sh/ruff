@@ -313,7 +313,7 @@ pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed
 pub fn parse_cells_unchecked(
     source: &str,
     ranges: impl IntoIterator<Item = TextRange>,
-    options: ParseOptions,
+    options: &ParseOptions,
 ) -> Parsed<ModModule> {
     let mut ranges = ranges.into_iter().peekable();
     let mut body = Suite::new();
