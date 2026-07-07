@@ -2830,6 +2830,14 @@ from ty_extensions._internal import is_subtype_of, is_assignable_to
 class P(Protocol):
     def m(self, x: int, /) -> None: ...
 
+class PWithClassMethod(Protocol):
+    @classmethod
+    def m(cls, x: int, /) -> None: ...
+
+class PWithStaticMethod(Protocol):
+    @staticmethod
+    def m(x: int, /) -> None: ...
+
 class NominalSubtype:
     def m(self, y: int) -> None: ...
 
@@ -2862,31 +2870,18 @@ static_assert(not is_assignable_to(DefinitelyNotSubtype, P))
 static_assert(not is_assignable_to(NotSubtype, P))
 static_assert(not is_assignable_to(NominalSubtype | NotSubtype, P))
 static_assert(not is_assignable_to(NominalSubtype2 | DefinitelyNotSubtype, P))
-```
 
-A class or static method can satisfy an ordinary method member when it has the right signature on an
-instance. This applies to both nominal classes and other protocols:
-
-```py
-class PWithClassMethod(Protocol):
-    @classmethod
-    def m(cls, x: int, /) -> None: ...
-
-class PWithStaticMethod(Protocol):
-    @staticmethod
-    def m(x: int, /) -> None: ...
-
+# A classmethod or staticmethod can satisfy a regular method member if it has the correct
+# signature when accessed on an instance. The class-side check only establishes that the member
+# is present on the class.
 static_assert(is_assignable_to(NominalWithClassMethod, P))
 static_assert(is_assignable_to(NominalWithStaticMethodGood, P))
 static_assert(is_assignable_to(NominalSubtype | NominalWithClassMethod, P))
 static_assert(is_assignable_to(NominalSubtype | NominalWithStaticMethodGood, P))
 static_assert(is_subtype_of(PWithClassMethod, P))
 static_assert(is_subtype_of(PWithStaticMethod, P))
-```
 
-A static method with an extra parameter does not satisfy the ordinary method member:
-
-```py
+# This staticmethod has an extra parameter when accessed on an instance.
 static_assert(not is_assignable_to(NominalWithStaticMethod, P))
 static_assert(not is_assignable_to(NominalSubtype | NominalWithStaticMethod, P))
 ```
@@ -3290,11 +3285,16 @@ parser: Parser = IntParser
 
 ## Subtyping of protocols with `@classmethod` or `@staticmethod` members
 
-The typing specification permits protocols to declare class and static methods, but it does not
-define exactly when another class satisfies such a protocol. ty requires the member to have a
-compatible callable signature when accessed through either the class or an instance. This agrees
-with the basic cases in the
+The typing spec states that protocols may have `@classmethod` or `@staticmethod` method members.
+However, as of 2025/09/24, the spec does not elaborate on how these members should behave with
+regards to subtyping and assignability (nor are there any tests in the typing conformance suite).
+Ty's behaviour is therefore derived from first principles and the
 [mypy test suite](https://github.com/python/mypy/blob/354bea6352ee7a38b05e2f42c874e7d1f7bf557a/test-data/unit/check-protocols.test#L1231-L1263).
+
+A protocol `P` with a `@classmethod` method member `x` can only be satisfied by a nominal type `N`
+if `N.x` is a callable object that evaluates to the same type whether it is accessed on inhabitants
+of `N` or inhabitants of `type[N]`, *and* the signature of `N.x` is equivalent to the signature of
+`P.x` after the descriptor protocol has been invoked on `P.x`:
 
 ```py
 from collections.abc import Callable
@@ -3310,19 +3310,7 @@ class PClassMethod(Protocol):
 class PStaticMethod(Protocol):
     @staticmethod
     def x(val: int) -> str: ...
-```
 
-These protocols expose the same callable signature through both access paths, so they are
-equivalent:
-
-```py
-static_assert(is_equivalent_to(PClassMethod, PStaticMethod))
-```
-
-A non-callable attribute does not satisfy either protocol. An ordinary instance method also fails
-because accessing it through the class leaves its `self` parameter unbound:
-
-```py
 class NNotCallable:
     x = None
 
@@ -3330,15 +3318,26 @@ class NInstanceMethod:
     def x(self, val: int) -> str:
         return "foo"
 
-static_assert(not is_assignable_to(NNotCallable, PClassMethod))
-static_assert(not is_assignable_to(NInstanceMethod, PStaticMethod))
-```
+class NClassMethodGood:
+    @classmethod
+    def x(cls, val: int) -> str:
+        return "foo"
 
-Failure to satisfy a protocol does not prove that two types are disjoint. A subclass can replace the
-`None` attribute, a union may contain a callable value, and an `object` attribute can hold a
-callable at runtime:
+class NClassMethodBad:
+    @classmethod
+    def x(cls, val: str) -> int:
+        return 42
 
-```py
+class NStaticMethodGood:
+    @staticmethod
+    def x(val: int) -> str:
+        return "foo"
+
+class NStaticMethodBad:
+    @staticmethod
+    def x(cls, val: int) -> str:
+        return "foo"
+
 class NMaybeCallable:
     x: Callable[[int], str] | None
 
@@ -3349,64 +3348,10 @@ class F:
 class NObject:
     x: object = F()
 
-static_assert(not is_disjoint_from(NNotCallable, PClassMethod))
-static_assert(not is_disjoint_from(NMaybeCallable, PStaticMethod))
-static_assert(not is_disjoint_from(NObject, PStaticMethod))
-```
-
-A class method can satisfy a static-method protocol, and a static method can satisfy a class-method
-protocol, as long as the visible signatures are compatible:
-
-```py
-class NClassMethodGood:
-    @classmethod
-    def x(cls, val: int) -> str:
-        return "foo"
-
-class NStaticMethodGood:
-    @staticmethod
-    def x(val: int) -> str:
-        return "foo"
-
-static_assert(is_assignable_to(NClassMethodGood, PStaticMethod))
-static_assert(is_assignable_to(NStaticMethodGood, PClassMethod))
-static_assert(is_subtype_of(NClassMethodGood, PStaticMethod))
-static_assert(is_subtype_of(NStaticMethodGood, PClassMethod))
-```
-
-An incompatible signature fails the protocol check, including when it appears in a union:
-
-```py
-class NClassMethodBad:
-    @classmethod
-    def x(cls, val: str) -> int:
-        return 42
-
-class NStaticMethodBad:
-    @staticmethod
-    def x(cls, val: int) -> str:
-        return "foo"
-
-static_assert(not is_assignable_to(NClassMethodBad, PClassMethod))
-static_assert(not is_assignable_to(NStaticMethodBad, PStaticMethod))
-static_assert(not is_assignable_to(NClassMethodGood | NClassMethodBad, PClassMethod))
-```
-
-An instance attribute can override an inherited static method. The instance then no longer satisfies
-the protocol:
-
-```py
 class NStaticMethodShadowed(NStaticMethodGood):
     def __init__(self) -> None:
         self.x: int = 1
 
-static_assert(not is_subtype_of(NStaticMethodShadowed, PStaticMethod))
-```
-
-`Self` in a class-method return type is bound to the implementation class. A method that always
-returns `int` does not satisfy that requirement:
-
-```py
 class PFactory(Protocol):
     @classmethod
     def create(cls) -> Self: ...
@@ -3421,13 +3366,6 @@ class BadFactory:
     def create(cls) -> int:
         return 42
 
-static_assert(is_subtype_of(Factory, PFactory))
-static_assert(not is_assignable_to(BadFactory, PFactory))
-```
-
-Each overload of a class method keeps its own `Self` binding:
-
-```py
 class POverloadedFactory(Protocol):
     @overload
     @classmethod
@@ -3447,6 +3385,53 @@ class OverloadedFactory:
     def create(cls, value: int | str) -> Self:
         return cls()
 
+# `PClassMethod.x` and `PStaticMethod.x` evaluate to callable types with equivalent signatures
+# whether you access them on the protocol class or instances of the protocol.
+# That means that they are equivalent protocols!
+static_assert(is_equivalent_to(PClassMethod, PStaticMethod))
+
+static_assert(not is_assignable_to(NNotCallable, PClassMethod))
+static_assert(not is_assignable_to(NNotCallable, PStaticMethod))
+static_assert(not is_disjoint_from(NNotCallable, PClassMethod))
+static_assert(not is_disjoint_from(NNotCallable, PStaticMethod))
+static_assert(not is_disjoint_from(NMaybeCallable, PStaticMethod))
+static_assert(not is_disjoint_from(NObject, PStaticMethod))
+
+# `NInstanceMethod.x` has the correct type when accessed on an instance of
+# `NInstanceMethod`, but not when accessed on the class object itself
+#
+static_assert(not is_assignable_to(NInstanceMethod, PClassMethod))
+static_assert(not is_assignable_to(NInstanceMethod, PStaticMethod))
+
+# A nominal type with a `@staticmethod` can satisfy a protocol with a `@classmethod`
+# if the staticmethod duck-types the same as the classmethod member
+# both when accessed on the class and when accessed on an instance of the class
+# The same also applies for a nominal type with a `@classmethod` and a protocol
+# with a `@staticmethod` member
+static_assert(is_assignable_to(NClassMethodGood, PClassMethod))
+static_assert(is_assignable_to(NClassMethodGood, PStaticMethod))
+static_assert(is_subtype_of(NClassMethodGood, PClassMethod))
+static_assert(is_subtype_of(NClassMethodGood, PStaticMethod))
+static_assert(not is_assignable_to(NClassMethodBad, PClassMethod))
+static_assert(not is_assignable_to(NClassMethodBad, PStaticMethod))
+static_assert(not is_assignable_to(NClassMethodGood | NClassMethodBad, PClassMethod))
+
+static_assert(is_assignable_to(NStaticMethodGood, PClassMethod))
+static_assert(is_assignable_to(NStaticMethodGood, PStaticMethod))
+static_assert(is_subtype_of(NStaticMethodGood, PClassMethod))
+static_assert(is_subtype_of(NStaticMethodGood, PStaticMethod))
+static_assert(not is_assignable_to(NStaticMethodBad, PClassMethod))
+static_assert(not is_assignable_to(NStaticMethodBad, PStaticMethod))
+static_assert(not is_assignable_to(NStaticMethodGood | NStaticMethodBad, PStaticMethod))
+
+# An instance attribute can override an inherited static method.
+static_assert(not is_subtype_of(NStaticMethodShadowed, PStaticMethod))
+
+# `Self` in the classmethod signature is bound to the implementation type.
+static_assert(is_subtype_of(Factory, PFactory))
+static_assert(not is_assignable_to(BadFactory, PFactory))
+
+# Each overload keeps its own `Self` binding.
 static_assert(is_subtype_of(OverloadedFactory, POverloadedFactory))
 ```
 
