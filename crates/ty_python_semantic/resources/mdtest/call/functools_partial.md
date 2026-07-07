@@ -1045,6 +1045,10 @@ maybe_placeholder = _ if runtime_bool() else "bound"
 ambiguous = partial(consume, maybe_placeholder, 1)
 reveal_type(ambiguous)  # revealed: partial[None]
 ambiguous()
+partial(consume, maybe_placeholder, "bad")  # error: [invalid-argument-type]
+
+maybe_placeholder_tuple = (maybe_placeholder,)
+partial(consume, *maybe_placeholder_tuple, "bad")  # error: [invalid-argument-type]
 
 P = ParamSpec("P")
 R = TypeVar("R")
