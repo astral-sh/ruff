@@ -245,7 +245,7 @@ fn source_method_names_in_mro<'db>(db: &'db dyn Db, class: ClassType<'db>) -> Fx
                 continue;
             }
             seen.insert(name.clone());
-            if is_function_definition(db, scope, symbol_id) {
+            if source_method_function(db, owner, name).is_some() {
                 methods.insert(name.clone());
             }
         }
@@ -291,14 +291,7 @@ fn effective_source_method_contract<'db>(
         let (owner_literal, _) = owner.static_class_literal(db)?;
         let scope = owner_literal.body_scope(db);
         let symbol = place_table(db, scope).symbol_id(name)?;
-        if !is_function_definition(db, scope, symbol) {
-            return None;
-        }
-
-        let own_ty = member.inner.place.raw_type()?;
-        let Type::FunctionLiteral(function) = own_ty else {
-            return None;
-        };
+        let function = source_method_function(db, owner, name)?;
         let ty = Type::FunctionLiteral(function)
             .try_call_dunder_get(db, Some(receiver), receiver.to_meta_type(db))?
             .0
@@ -313,6 +306,26 @@ fn effective_source_method_contract<'db>(
     }
 
     None
+}
+
+/// Returns the function stored in a source-defined class member.
+///
+/// This includes functions installed by assignment, such as `method = helper`, because Python
+/// binds those function objects as methods in the same way as a class-body function definition.
+fn source_method_function<'db>(
+    db: &'db dyn Db,
+    owner: ClassType<'db>,
+    name: &Name,
+) -> Option<FunctionType<'db>> {
+    let Type::FunctionLiteral(function) = owner
+        .own_class_member(db, None, name)
+        .inner
+        .place
+        .raw_type()?
+    else {
+        return None;
+    };
+    Some(function)
 }
 
 /// Returns the first inherited `NamedTuple` field in the MRO for `field_name`.

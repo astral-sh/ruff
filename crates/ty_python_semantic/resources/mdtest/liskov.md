@@ -681,6 +681,24 @@ info: incompatible return types: `str` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 ```
 
+### Functions assigned in a class body
+
+A function installed through a class-body assignment is bound as a method and contributes the same
+kind of inherited contract as a class-body function definition. Both base orders are checked.
+
+```pyi
+def returns_str(self) -> str: ...
+
+class Assigned:
+    method = returns_str
+
+class Defined:
+    def method(self) -> int: ...
+
+class AssignedFirst(Assigned, Defined): ...  # error: [invalid-method-override]
+class AssignedSecond(Defined, Assigned): ...  # error: [invalid-method-override]
+```
+
 ### Methods inherited by a direct base
 
 A direct base does not need to define the method itself. Its effective method can come from an
