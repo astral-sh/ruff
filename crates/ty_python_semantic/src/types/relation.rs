@@ -1855,9 +1855,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (
                 Type::Callable(source_callable),
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(target_partial)),
-            ) => self.with_recursion_guard(source, target, || {
-                self.check_callable_pair(db, source_callable, target_partial.partial(db))
-            }),
+            ) if self.relation.is_assignability() => {
+                self.with_recursion_guard(source, target, || {
+                    self.check_callable_pair(db, source_callable, target_partial.partial(db))
+                })
+            }
 
             (_, Type::Callable(target_callable)) => {
                 self.with_recursion_guard(source, target, || {
