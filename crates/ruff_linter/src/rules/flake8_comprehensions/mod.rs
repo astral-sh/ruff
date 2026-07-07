@@ -57,6 +57,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryListComprehensionSet, Path::new("C403_py315.py"))]
     #[test_case(Rule::UnnecessaryListCall, Path::new("C411_py315.py"))]
     #[test_case(Rule::UnnecessaryLiteralWithinDictCall, Path::new("C418_py315.py"))]
+    #[test_case(Rule::UnnecessaryLiteralWithinTupleCall, Path::new("C409_py315.py"))]
     #[test_case(Rule::UnnecessaryComprehensionInCall, Path::new("C419_py315.py"))]
     fn rules_py315(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
