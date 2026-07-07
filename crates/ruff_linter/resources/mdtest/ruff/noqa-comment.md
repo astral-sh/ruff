@@ -170,9 +170,18 @@ help: Use `ruff:ignore` instead
 ```toml
 [lint]
 preview = true
-select = ["noqa-comment", "unused-noqa"]
+select = ["noqa-comment", "unused-noqa", "F401"]
 ```
+
+It should be possible to suppress `RUF105` with a `noqa` comment:
 
 ```py
 value = 1  # noqa: RUF105
+```
+
+But a suppression for `RUF100` should not prevent the rule from firing:
+
+```py
+# error: [noqa-comment]
+import math  # noqa: RUF100, F401
 ```

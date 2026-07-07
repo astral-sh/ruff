@@ -165,12 +165,17 @@ pub(crate) fn check_noqa(
                     let mut suppress_noqa_comment = false;
                     for original_code in directive.iter().map(Code::as_str) {
                         let code = get_redirect_target(original_code).unwrap_or(original_code);
-                        if Rule::UnusedNOQA.noqa_code() == code {
-                            self_ignore = true;
-                            break;
-                        }
-
                         if seen_codes.insert(original_code) {
+                            if Rule::UnusedNOQA.noqa_code() == code {
+                                self_ignore = true;
+                                if context.is_rule_enabled(Rule::UnusedNOQA) {
+                                    valid_codes.push(original_code);
+                                } else {
+                                    disabled_codes.push(original_code);
+                                }
+                                continue;
+                            }
+
                             if context.is_rule_enabled(Rule::NoqaComment)
                                 && Rule::NoqaComment.noqa_code() == code
                             {
@@ -206,15 +211,11 @@ pub(crate) fn check_noqa(
                         }
                     }
 
-                    if self_ignore {
-                        continue;
-                    }
-
                     let has_unused_codes = !(disabled_codes.is_empty()
                         && duplicated_codes.is_empty()
                         && unmatched_codes.is_empty());
 
-                    if check_unused_noqa && has_unused_codes {
+                    if check_unused_noqa && !self_ignore && has_unused_codes {
                         let edit = if valid_codes.is_empty() {
                             delete_comment(directive.range(), locator)
                         } else {
