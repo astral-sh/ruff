@@ -1190,8 +1190,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 node_index: _,
             }) if !self.semantic.scope_id.is_global() => {
                 for name in names {
-                    self.semantic.ensure_builtin_binding(name);
-                    let binding_id = self.semantic.global_scope().get(name);
+                    let binding_id = self.semantic.global_binding(name);
 
                     // Mark the binding in the global scope as "rebound" in the current scope.
                     if let Some(binding_id) = binding_id {
@@ -1201,6 +1200,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                     // Add a binding to the current scope.
                     let binding_id = self.semantic.push_binding(
+                        name,
                         name.range(),
                         BindingKind::Global(binding_id),
                         BindingFlags::GLOBAL,
@@ -1231,6 +1231,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                         // Add a binding to the current scope.
                         let binding_id = self.semantic.push_binding(
+                            name,
                             name.range(),
                             BindingKind::Nonlocal(binding_id, scope_id),
                             BindingFlags::NONLOCAL,
@@ -1299,6 +1300,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 let added_dunder_class_scope = if self.semantic.current_scope().kind.is_class() {
                     self.semantic.push_scope(ScopeKind::DunderClassCell);
                     let binding_id = self.semantic.push_binding(
+                        "__class__",
                         TextRange::default(),
                         BindingKind::DunderClassCell,
                         BindingFlags::empty(),
@@ -2291,13 +2293,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 node_index: _,
             }) => {
                 if let Some(name) = name {
-                    // Materialize the builtin before looking up the exception target's previous
-                    // binding. Otherwise, `except Exception as len` records no previous binding
-                    // and later treats `len` as undefined instead of resolving to the builtin.
-                    self.semantic.ensure_builtin_binding(name.as_str());
-
                     // Store the existing binding, if any.
-                    let binding_id = self.semantic.lookup_symbol(name.as_str());
+                    let binding_id = self.semantic.lookup_binding(name.as_str());
 
                     // Add the bound exception name to the scope.
                     self.add_binding(
@@ -2684,8 +2681,6 @@ impl<'a> Checker<'a> {
         kind: BindingKind<'a>,
         mut flags: BindingFlags,
     ) -> BindingId {
-        self.semantic.ensure_builtin_binding(name);
-
         // Determine the scope to which the binding belongs.
         // Per [PEP 572](https://peps.python.org/pep-0572/#scope-of-the-target), named
         // expressions in generators and comprehensions bind to the scope that contains the
@@ -2708,7 +2703,7 @@ impl<'a> Checker<'a> {
         }
 
         // Create the `Binding`.
-        let binding_id = self.semantic.push_binding(range, kind, flags);
+        let binding_id = self.semantic.push_binding(name, range, kind, flags);
 
         // If the name is private, mark is as such.
         if name.starts_with('_') {
@@ -2906,9 +2901,12 @@ impl<'a> Checker<'a> {
         }
 
         // Create a binding to model the deletion.
-        let binding_id =
-            self.semantic
-                .push_binding(expr.range(), BindingKind::Deletion, BindingFlags::empty());
+        let binding_id = self.semantic.push_binding(
+            id,
+            expr.range(),
+            BindingKind::Deletion,
+            BindingFlags::empty(),
+        );
         let scope = self.semantic.current_scope_mut();
         scope.add(id, binding_id);
     }
@@ -3189,6 +3187,7 @@ impl<'a> Checker<'a> {
                 {
                     self.semantic.push_scope(ScopeKind::DunderClassCell);
                     let binding_id = self.semantic.push_binding(
+                        "__class__",
                         TextRange::default(),
                         BindingKind::DunderClassCell,
                         BindingFlags::empty(),
@@ -3246,8 +3245,7 @@ impl<'a> Checker<'a> {
         for definition in definitions {
             for export in definition.names() {
                 let (name, range) = (export.name(), export.range());
-                self.semantic.ensure_builtin_binding(name);
-                if let Some(binding_id) = self.semantic.global_scope().get(name) {
+                if let Some(binding_id) = self.semantic.global_binding(name) {
                     self.semantic.flags |= SemanticModelFlags::DUNDER_ALL_DEFINITION;
                     // Mark anything referenced in `__all__` as used.
                     self.semantic

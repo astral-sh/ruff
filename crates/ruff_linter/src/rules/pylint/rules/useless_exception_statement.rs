@@ -100,7 +100,7 @@ fn is_custom_exception(
     let Some(symbol) = qualified_name.segments().last() else {
         return false;
     };
-    let Some(binding_id) = semantic.lookup_symbol(symbol) else {
+    let Some(binding_id) = semantic.lookup_symbol(symbol).binding_id() else {
         return false;
     };
     let binding = semantic.binding(binding_id);

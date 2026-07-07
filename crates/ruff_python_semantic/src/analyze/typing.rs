@@ -1207,7 +1207,7 @@ pub fn resolve_assignment<'a>(
 /// This function will return a `NumberLiteral` with value `Int(42)` when called with `foo` and a
 /// `StringLiteral` with value `"str"` when called with `bla`.
 pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) -> Option<&'a Expr> {
-    let binding_id = semantic.lookup_symbol(symbol)?;
+    let binding_id = semantic.lookup_symbol(symbol).binding_id()?;
     let binding = semantic.binding(binding_id);
     find_binding_value(binding, semantic)
 }
