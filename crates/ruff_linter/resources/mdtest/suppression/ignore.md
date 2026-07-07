@@ -668,7 +668,7 @@ import foo
 ```toml
 [lint]
 preview = true
-select = ["F401", "RUF10", "FIX002"]
+select = ["F401", "RUF100", "FIX002"]
 ```
 
 Nested suppression comments on a comment-only line are treated as trailing on the comment itself and
