@@ -1,7 +1,7 @@
 # Blanket `ty: ignore` comments
 
 The optional `blanket-ignore-comment` rule requires `ty: ignore` comments to include specific rule
-codes, regardless of whether they suppress a diagnostic.
+codes.
 
 ```toml
 [rules]
@@ -22,7 +22,7 @@ c = unresolved  # type: ignore
 
 ## Unused ignore comments
 
-If `unused-ignore-comment` is also enabled, unused blanket comments emit both diagnostics.
+When `unused-ignore-comment` is also enabled, unused blanket comments trigger both rules.
 
 ```py
 # error: [unused-ignore-comment] "Unused `ty: ignore` without a code"
