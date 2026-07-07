@@ -386,6 +386,19 @@ LaxNone(value=None)
 LaxNone(value=1)  # error: [invalid-argument-type]
 ```
 
+Aliasing a scalar type does not affect lax input conversion:
+
+```py
+from datetime import datetime as AliasedDatetime
+
+from pydantic import BaseModel
+
+class Model(BaseModel):
+    value: AliasedDatetime
+
+reveal_type(Model.__init__)  # revealed: (self: Model, *, value: LaxDatetime, **extra: Any) -> None
+```
+
 For collections, we widen something like `list[int]` to `Iterable[LaxInt]`. Pydantic can coerce a
 set of specific collection types to `list[int]` (`deque`, `frozenset`, ...), but we cannot use a
 union like `list[LaxInt] | deque[LaxInt] | frozenset[LaxInt] | ...` due to invariance of some of
