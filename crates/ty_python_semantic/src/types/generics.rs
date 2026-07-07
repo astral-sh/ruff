@@ -1990,23 +1990,24 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // was not enough: `solutions_with` still performed the expensive path traversal, and the
         // skipped projection changed precision in LiteralString tests. See the
         // `ty_micro[pydantic_core_schema_dict]` benchmark for a minimized reproducer.
-        let pending = self
-            .pending
-            .remove_noninferable(self.db, self.constraints, self.inferable);
-        let solutions =
-            match pending.solutions_with(self.db, self.constraints, |_variance, path_bound| {
+        let solutions = match self.pending.solutions_with(
+            self.db,
+            self.constraints,
+            self.inferable,
+            |_variance, path_bound| {
                 let typevar = path_bound.bound_typevar;
                 if let Some(ty) = choose(typevar, Some(path_bound)) {
                     return Ok(Some(ty));
                 }
 
                 PathBounds::default_solve(self.db, self.constraints, path_bound)
-            }) {
-                Solutions::Unsatisfiable | Solutions::Unconstrained => {
-                    return self.solve_hash_map_with(generic_context, choose);
-                }
-                Solutions::Constrained(solutions) => solutions,
-            };
+            },
+        ) {
+            Solutions::Unsatisfiable | Solutions::Unconstrained => {
+                return self.solve_hash_map_with(generic_context, choose);
+            }
+            Solutions::Constrained(solutions) => solutions,
+        };
 
         let mut types = FxHashMap::default();
         for solution in solutions {
@@ -2319,8 +2320,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         &mut self,
         set: ConstraintSet<'db, 'c>,
     ) -> Result<(), ()> {
-        let set = set.remove_noninferable(self.db, self.constraints, self.inferable);
-        let solutions = match set.solutions(self.db, self.constraints) {
+        let solutions = match set.solutions(self.db, self.constraints, self.inferable) {
             Solutions::Unsatisfiable => return Err(()),
             Solutions::Unconstrained => return Ok(()),
             Solutions::Constrained(solutions) => solutions,
