@@ -9,12 +9,12 @@ use ruff_db::{
     files::FileRange,
     parsed::ParsedModuleRef,
 };
-use ruff_python_ast::name::Name;
+use ruff_python_ast::{PythonVersion, name::Name};
 use ruff_python_stdlib::identifiers::is_mangled_private;
 use rustc_hash::FxHashSet;
 
 use crate::{
-    Db,
+    Db, Program,
     lint::LintId,
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     reachability::ReachabilityConstraintsExtension,
@@ -121,8 +121,7 @@ fn check_inherited_method_conflicts<'db>(
     if matches!(
         CodeGeneratorKind::from_class(db, class.into()),
         Some(CodeGeneratorKind::NamedTuple | CodeGeneratorKind::TypedDict)
-    ) || is_enum_class_by_inheritance(db, class)
-    {
+    ) {
         return;
     }
 
@@ -178,6 +177,15 @@ fn check_inherited_method_conflicts<'db>(
                 continue;
             }
 
+            if enum_class_creation_manages_conflict(
+                db,
+                class,
+                &name,
+                selected.owner,
+                contract.owner,
+            ) {
+                continue;
+            }
             report_incompatible_base_method(
                 context,
                 class,
@@ -326,6 +334,40 @@ fn source_method_function<'db>(
         return None;
     };
     Some(function)
+}
+
+/// Returns `true` when this source-level conflict involves a method replaced by `EnumType` during
+/// class creation.
+///
+/// Restricting this to a known enum implementation still allows two ordinary mixins to contribute
+/// conflicting contracts for the same method name.
+fn enum_class_creation_manages_conflict<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+    name: &Name,
+    selected_owner: ClassType<'db>,
+    contract_owner: ClassType<'db>,
+) -> bool {
+    if !is_enum_class_by_inheritance(db, class) {
+        return false;
+    }
+
+    if matches!(
+        name.as_str(),
+        "__repr__" | "__str__" | "__format__" | "__reduce_ex__"
+    ) {
+        return selected_owner.is_known(db, KnownClass::Enum)
+            || contract_owner.is_known(db, KnownClass::Enum);
+    }
+
+    Program::get(db).python_version(db) >= PythonVersion::PY311
+        && Type::ClassLiteral(class.into()).is_subtype_of(db, KnownClass::Flag.to_subclass_of(db))
+        && matches!(
+            name.as_str(),
+            "__or__" | "__and__" | "__xor__" | "__ror__" | "__rand__" | "__rxor__" | "__invert__"
+        )
+        && (selected_owner.is_known(db, KnownClass::Flag)
+            || contract_owner.is_known(db, KnownClass::Flag))
 }
 
 /// Returns the first inherited `NamedTuple` field in the MRO for `field_name`.
