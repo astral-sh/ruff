@@ -4,7 +4,6 @@ use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_comprehensions::fixes;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::flake8_comprehensions::helpers;
@@ -69,10 +68,7 @@ impl Violation for UnnecessaryLiteralWithinTupleCall {
 }
 
 /// C409
-pub(crate) fn unnecessary_literal_within_tuple_call(
-    checker: &Checker,
-    call: &ast::ExprCall,
-) {
+pub(crate) fn unnecessary_literal_within_tuple_call(checker: &Checker, call: &ast::ExprCall) {
     if !call.arguments.keywords.is_empty() {
         return;
     }

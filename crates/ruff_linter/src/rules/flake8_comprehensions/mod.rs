@@ -16,7 +16,7 @@ mod tests {
     use crate::settings::LinterSettings;
     use crate::settings::types::PreviewMode;
     use crate::test::test_path;
-    use crate::{assert_diagnostics, assert_diagnostics_diff};
+    use crate::assert_diagnostics;
 
     #[test_case(Rule::UnnecessaryCallAroundSorted, Path::new("C413.py"))]
     #[test_case(Rule::UnnecessaryCollectionCall, Path::new("C408.py"))]
