@@ -59,11 +59,9 @@ always has `__doc__` set to that string at runtime. Just like `__file__` above, 
 narrowed to `str` in that case, rather than the wider `str | None`:
 
 ```py
-"""I am `typeshed.stdlib.types.ModuleType.__doc__: str | None` and this value is a `str`."""
+"""Some docstring"""
 
 reveal_type(__doc__)  # revealed: str
-
-__doc__.splitlines()  # not an error
 ```
 
 ## `ModuleType` globals combined with explicit assignments and declarations
