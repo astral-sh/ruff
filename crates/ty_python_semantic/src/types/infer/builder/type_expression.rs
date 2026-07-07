@@ -1518,7 +1518,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
-                            "`ty_extensions.ConstraintSet` is not allowed in {}s",
+                            "`ty_extensions._internal.ConstraintSet` is not allowed in {}s",
                             self.type_expression_context(),
                         ));
                     }
@@ -1530,7 +1530,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
-                            "`ty_extensions.GenericContext` is not allowed in {}s",
+                            "`ty_extensions._internal.GenericContext` is not allowed in {}s",
                             self.type_expression_context(),
                         ));
                     }
@@ -1542,7 +1542,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
-                            "`ty_extensions.Specialization` is not allowed in {}s",
+                            "`ty_extensions._internal.Specialization` is not allowed in {}s",
                             self.type_expression_context(),
                         ));
                     }

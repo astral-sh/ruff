@@ -92,15 +92,15 @@ pub enum KnownInstanceType<'db> {
     Field(FieldInstance<'db>),
 
     /// A constraint set, which is exposed in mdtests as an instance of
-    /// `ty_extensions.ConstraintSet`.
+    /// `ty_extensions._internal.ConstraintSet`.
     ConstraintSet(InternedConstraintSet<'db>),
 
     /// A generic context, which is exposed in mdtests as an instance of
-    /// `ty_extensions.GenericContext`.
+    /// `ty_extensions._internal.GenericContext`.
     GenericContext(GenericContext<'db>),
 
     /// A specialization, which is exposed in mdtests as an instance of
-    /// `ty_extensions.Specialization`.
+    /// `ty_extensions._internal.Specialization`.
     Specialization(Specialization<'db>),
 
     /// A single instance of `types.UnionType`, which stores the elements of

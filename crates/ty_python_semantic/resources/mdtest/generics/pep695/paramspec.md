@@ -1297,7 +1297,7 @@ Regression test for <https://github.com/astral-sh/ty/issues/2336>
 
 ```py
 from typing import Callable
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 def decorator[**P, T](func: Callable[P, T]) -> Callable[P, T]:
     return func
@@ -1310,9 +1310,9 @@ def identity[T](value: T) -> T:
 def pair[T, U](first: T, second: U) -> tuple[T, U]:
     return (first, second)
 
-# revealed: ty_extensions.GenericContext[T@identity]
+# revealed: ty_extensions._internal.GenericContext[T@identity]
 reveal_type(generic_context(identity))
-# revealed: ty_extensions.GenericContext[T@pair, U@pair]
+# revealed: ty_extensions._internal.GenericContext[T@pair, U@pair]
 reveal_type(generic_context(pair))
 
 reveal_type(identity(1))  # revealed: Literal[1]
@@ -1346,7 +1346,7 @@ reveal_type(chained_generic("test"))  # revealed: Literal["test"]
 
 ```py
 from typing import Callable
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 def method_decorator[**P, R](func: Callable[P, R]) -> Callable[P, R]:
     return func
@@ -1358,7 +1358,7 @@ class Container:
 
 c = Container()
 
-# revealed: ty_extensions.GenericContext[T@generic_method]
+# revealed: ty_extensions._internal.GenericContext[T@generic_method]
 reveal_type(generic_context(c.generic_method))
 
 reveal_type(c.generic_method)  # revealed: [T](value: T) -> T

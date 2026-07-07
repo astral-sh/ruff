@@ -1336,14 +1336,14 @@ impl KnownClass {
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field | Self::KwOnly => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
-            Self::NamedTupleLike
-            | Self::ConstraintSet
+            Self::NamedTupleLike => KnownModule::TyExtensions,
+            Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
             | Self::TyExtensionsAsyncIterable
             | Self::TyExtensionsAsyncIterator
             | Self::TyExtensionsIterable
-            | Self::TyExtensionsIterator => KnownModule::TyExtensions,
+            | Self::TyExtensionsIterator => KnownModule::TyExtensionsInternal,
             Self::Template => KnownModule::Templatelib,
             Self::Path => KnownModule::Pathlib,
             Self::FunctoolsPartial => KnownModule::Functools,
