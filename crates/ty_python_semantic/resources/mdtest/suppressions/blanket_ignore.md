@@ -22,7 +22,8 @@ c = unresolved  # type: ignore
 
 ## Unused ignore comments
 
-When `unused-ignore-comment` is also enabled, unused blanket comments trigger both rules.
+When `unused-ignore-comment` is enabled, an unused `ty: ignore` comment without rule codes triggers
+both rules.
 
 ```py
 # error: [unused-ignore-comment] "Unused `ty: ignore` without a code"
