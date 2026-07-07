@@ -1,4 +1,6 @@
-use rustc_hash::FxHashSet;
+use std::hash::Hash;
+
+use rustc_hash::{FxBuildHasher, FxHashSet};
 use smallvec::SmallVec;
 
 use crate::{
@@ -309,45 +311,61 @@ impl<'db> TypeCollector<'db> {
     }
 }
 
+// Most guarded walks are shallow; avoid allocating a hash table until linear search is costly.
+type CollectedTypes<'db> = SmallSet<Type<'db>, 8>;
+
+/// A set optimized for values that usually contain only a few distinct elements.
 #[derive(Debug)]
-struct CollectedTypes<'db> {
-    inline: SmallVec<[Type<'db>; 8]>,
-    spilled: Option<FxHashSet<Type<'db>>>,
+enum SmallSet<T, const INLINE_CAPACITY: usize> {
+    Inline(SmallVec<[T; INLINE_CAPACITY]>),
+    Spilled(FxHashSet<T>),
 }
 
-impl Default for CollectedTypes<'_> {
+impl<T, const INLINE_CAPACITY: usize> Default for SmallSet<T, INLINE_CAPACITY> {
     fn default() -> Self {
-        Self {
-            inline: SmallVec::new(),
-            spilled: None,
-        }
+        Self::Inline(SmallVec::new())
     }
 }
 
-impl<'db> CollectedTypes<'db> {
-    // Most guarded walks are shallow; avoid allocating a hash table until linear search is costly.
-    const INLINE_CAPACITY: usize = 8;
+impl<T, const INLINE_CAPACITY: usize> SmallSet<T, INLINE_CAPACITY> {
+    #[inline]
+    pub(super) fn insert(&mut self, value: T) -> bool
+    where
+        T: Hash + Eq,
+    {
+        match self {
+            Self::Inline(inline) => {
+                if inline.contains(&value) {
+                    return false;
+                }
 
-    fn insert(&mut self, ty: Type<'db>) -> bool {
-        if let Some(types) = &mut self.spilled {
-            return types.insert(ty);
-        }
+                if inline.len() < INLINE_CAPACITY {
+                    inline.push(value);
+                    return true;
+                }
 
-        if self.inline.contains(&ty) {
-            return false;
+                *self = Self::Spilled(Self::spill(inline, value));
+                true
+            }
+            Self::Spilled(set) => set.insert(value),
         }
-        if self.inline.len() < Self::INLINE_CAPACITY {
-            self.inline.push(ty);
-            return true;
-        }
+    }
 
-        let mut set = FxHashSet::default();
-        set.reserve(self.inline.len() + 1);
-        set.extend(self.inline.drain(..));
-        let inserted = set.insert(ty);
+    #[cold]
+    fn spill(inline: &mut SmallVec<[T; INLINE_CAPACITY]>, value: T) -> FxHashSet<T>
+    where
+        T: Hash + Eq,
+    {
+        let mut set = FxHashSet::with_capacity_and_hasher(inline.len() + 1, FxBuildHasher);
+        set.extend(inline.drain(..));
+        let inserted = set.insert(value);
         debug_assert!(inserted);
-        self.spilled = Some(set);
-        true
+        set
+    }
+
+    #[cfg(test)]
+    pub(super) const fn is_spilled(&self) -> bool {
+        matches!(self, Self::Spilled(_))
     }
 }
 
@@ -469,7 +487,7 @@ mod tests {
             assert!(collected.insert(ty));
         }
 
-        assert!(collected.spilled.is_some());
+        assert!(collected.is_spilled());
         assert!(!collected.insert(Type::Never));
         assert!(!collected.insert(Type::Dynamic(DynamicType::TodoUnpack)));
         assert!(collected.insert(Type::Dynamic(DynamicType::TodoStarredExpression)));
