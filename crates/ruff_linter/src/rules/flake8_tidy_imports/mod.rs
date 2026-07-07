@@ -374,6 +374,8 @@ mod tests {
             r#"
             import foo
             import foo.bar
+            import foo, foo.bar
+            import foo.bar, foo
 
             from foo import bar
             from foo import baz
@@ -383,6 +385,8 @@ mod tests {
             r#"
             import foo
             lazy import foo.bar
+            import foo, foo.bar
+            import foo.bar, foo
 
             lazy from foo import bar
             from foo import baz
@@ -410,7 +414,7 @@ mod tests {
             },
         );
 
-        assert_eq!(diagnostics.len(), 2);
+        assert_eq!(diagnostics.len(), 4);
         assert_eq!(fixed.source_code(), expected);
     }
 

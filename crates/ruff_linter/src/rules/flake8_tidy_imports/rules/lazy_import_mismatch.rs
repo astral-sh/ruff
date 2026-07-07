@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{AtomicNodeIndex, PythonVersion, Stmt, StmtImport, StmtImportFrom};
+use ruff_python_ast::{Alias, AtomicNodeIndex, PythonVersion, Stmt, StmtImport, StmtImportFrom};
 use ruff_python_trivia::{has_leading_content, indentation_at_offset, is_python_whitespace};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -228,6 +228,7 @@ fn split_import_fix(
     let mut runs: Vec<StmtImport> = Vec::new();
     let mut current_names = Vec::new();
     let mut current_is_lazy = None;
+    let mut bound_names = Vec::new();
 
     for alias in &import.names {
         let import_policy = NameMatchPolicy::MatchNameOrParent(MatchNameOrParent {
@@ -244,6 +245,14 @@ fn split_import_fix(
         } else {
             !matching_is_lazy
         };
+        let bound_name = import_alias_bound_name(alias);
+        if bound_names
+            .iter()
+            .any(|(name, previous_is_lazy)| *name == bound_name && *previous_is_lazy != is_lazy)
+        {
+            return SplitImportFix::Unavailable;
+        }
+        bound_names.push((bound_name, is_lazy));
 
         if current_is_lazy == Some(is_lazy) {
             current_names.push(alias.clone());
@@ -297,7 +306,17 @@ fn has_trailing_comment_or_content(offset: TextSize, source: &str) -> bool {
         .any(|char| !is_python_whitespace(char))
 }
 
-fn import_stmt(names: Vec<ruff_python_ast::Alias>, is_lazy: bool) -> StmtImport {
+fn import_alias_bound_name(alias: &Alias) -> &str {
+    alias.asname.as_deref().unwrap_or_else(|| {
+        alias
+            .name
+            .as_str()
+            .split_once('.')
+            .map_or(alias.name.as_str(), |(name, _)| name)
+    })
+}
+
+fn import_stmt(names: Vec<Alias>, is_lazy: bool) -> StmtImport {
     StmtImport {
         node_index: AtomicNodeIndex::NONE,
         range: TextRange::default(),
