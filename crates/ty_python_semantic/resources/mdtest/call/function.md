@@ -1826,6 +1826,20 @@ def invalid_headers_with_optional() -> None:
     with_optional_headers(**kwargs)  # error: [invalid-argument-type]
 ```
 
+Diagnostics emitted while inferring a known field with its parameter context are preserved:
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+def takes_callback(*, callback: Callable[[int], int]) -> None: ...
+def invalid_callback() -> None:
+    kwargs: dict[str, Any] = {
+        "callback": lambda value: value.missing,  # error: [unresolved-attribute]
+    }
+    takes_callback(**kwargs)
+```
+
 Contextual inference does not suppress errors for mappings whose keys may not be strings:
 
 ```py

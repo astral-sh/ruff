@@ -5132,6 +5132,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let mut seen = FxHashSet::default();
                     let argument_type = self.expression_type(value);
                     let teardown = self.setup_expression_cache();
+                    let has_unique_context = overloads_with_binding.len() == 1;
 
                     for (overload, binding) in &overloads_with_binding {
                         let adjusted_argument_index = if binding.bound_type.is_some() {
@@ -5160,11 +5161,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             continue;
                         }
 
-                        if let Some(ty) = self.speculate().try_narrow_dict_kwargs(
-                            argument_type,
-                            keyword,
-                            Some(&expected_fields),
-                        ) {
+                        let ty = if has_unique_context {
+                            self.try_narrow_dict_kwargs(
+                                argument_type,
+                                keyword,
+                                Some(&expected_fields),
+                            )
+                        } else {
+                            self.speculate_without_diagnostics().try_narrow_dict_kwargs(
+                                argument_type,
+                                keyword,
+                                Some(&expected_fields),
+                            )
+                        };
+                        if let Some(ty) = ty {
                             arguments_types.insert_type(argument_index, context_ty, ty);
                         }
                     }
@@ -7365,7 +7375,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_lambda_body(&mut self, lambda_expression: &ast::ExprLambda, tcx: TypeContext<'db>) {
-        self.infer_expression(&lambda_expression.body, tcx);
+        let body_tcx = tcx
+            .annotation
+            .and_then(|ty| {
+                ty.filter_union(self.db(), Type::is_callable_type)
+                    .as_callable()
+            })
+            .and_then(|callable| {
+                let [signature] = callable.signatures(self.db()).overloads.as_slice() else {
+                    return None;
+                };
+                Some(match signature.return_ty {
+                    Type::Dynamic(DynamicType::Unknown) => TypeContext::default(),
+                    return_ty => TypeContext::new(Some(return_ty)),
+                })
+            })
+            .unwrap_or(tcx);
+
+        self.infer_expression(&lambda_expression.body, body_tcx);
     }
 
     fn infer_lambda_expression(
@@ -7488,21 +7515,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let scope = scope_id.to_scope_id(self.db(), self.file());
 
-        // If we have a direct `Callable` type context, we can infer the body with the annotated
-        // return type as type context.
-        let return_tcx = if let Some(signature) = callable_tcx {
-            match signature.return_ty {
-                Type::Dynamic(DynamicType::Unknown) => TypeContext::new(None),
-                _ => TypeContext::new(Some(signature.return_ty)),
-            }
+        // The lambda scope needs the full callable context to infer parameter types. The body
+        // extracts and uses only the callable's return type.
+        let scope_tcx = if callable_tcx.is_some() {
+            tcx
         } else {
-            // TODO: Useful inference of a lambda's return type will require a different approach,
-            // which does the inference of the body expression based on arguments at each call site,
-            // rather than eagerly computing a return type without knowing the argument types.
-            TypeContext::new(None)
+            TypeContext::default()
         };
 
-        let inference = infer_scope_types(self.db(), scope, return_tcx);
+        let inference = infer_scope_types(self.db(), scope, scope_tcx);
         self.extend_scope(inference);
 
         let return_ty = inference.expression_type(lambda_expression.body.as_ref());
@@ -8925,15 +8946,50 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let use_id = expr_ref.scoped_use_id(db, self.file());
-            let place = place_from_bindings_with_reachability_cache(
-                db,
-                use_def.bindings_at_use(use_id),
-                self.reachability_cache(),
-            )
-            .place;
+            let bindings = use_def.bindings_at_use(use_id);
+            let contextual_place = bindings.clone().exactly_one().ok().and_then(|binding| {
+                let definition = binding.binding.definition()?;
+                let parameter_ty = self.contextual_lambda_parameter_type(definition)?;
+                Some(
+                    Place::bound(binding.narrowing_constraint.narrow(
+                        db,
+                        parameter_ty,
+                        definition.place(db),
+                    ))
+                    .with_definition(definition),
+                )
+            });
+            let place = contextual_place.unwrap_or_else(|| {
+                place_from_bindings_with_reachability_cache(db, bindings, self.reachability_cache())
+                    .place
+            });
 
             (place, Some(use_id))
         }
+    }
+
+    fn contextual_lambda_parameter_type(&self, definition: Definition<'db>) -> Option<Type<'db>> {
+        let InferenceRegion::Scope(_, tcx) = self.region else {
+            return None;
+        };
+        let DefinitionKind::LambdaParameter(parameter) = definition.kind(self.db()) else {
+            return None;
+        };
+        let callable = tcx
+            .annotation?
+            .filter_union(self.db(), Type::is_callable_type)
+            .as_callable()?;
+        let [signature] = callable.signatures(self.db()).overloads.as_slice() else {
+            return None;
+        };
+        let parameter_ty = signature
+            .parameters()
+            .as_slice()
+            .get(parameter.index as usize)?
+            .annotated_type();
+
+        (!parameter_ty.is_unknown() && !parameter_ty.has_unspecialized_type_var(self.db()))
+            .then_some(parameter_ty)
     }
 
     /// Resolve a load that has fallen through to the module's explicit global scope.
