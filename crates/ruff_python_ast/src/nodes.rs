@@ -1624,6 +1624,11 @@ impl StringLiteralFlags {
         self
     }
 
+    /// Returns `true` if the parser deemed the string literal invalid.
+    pub const fn is_invalid(self) -> bool {
+        self.0.contains(StringLiteralFlagsInner::INVALID)
+    }
+
     pub const fn prefix(self) -> StringLiteralPrefix {
         if self.0.contains(StringLiteralFlagsInner::U_PREFIX) {
             debug_assert!(
@@ -2045,6 +2050,11 @@ impl BytesLiteralFlags {
         self
     }
 
+    /// Returns `true` if the parser deemed the bytes literal invalid.
+    pub const fn is_invalid(self) -> bool {
+        self.0.contains(BytesLiteralFlagsInner::INVALID)
+    }
+
     pub const fn prefix(self) -> ByteStringPrefix {
         if self.0.contains(BytesLiteralFlagsInner::R_PREFIX_LOWER) {
             debug_assert!(!self.0.contains(BytesLiteralFlagsInner::R_PREFIX_UPPER));
@@ -2134,6 +2144,16 @@ impl BytesLiteral {
             node_index: AtomicNodeIndex::NONE,
             flags: BytesLiteralFlags::empty().with_invalid(),
         }
+    }
+
+    /// The range of the byte literal's contents.
+    ///
+    /// This excludes any prefixes, opening quotes or closing quotes.
+    pub fn content_range(&self) -> TextRange {
+        TextRange::new(
+            self.start() + self.flags.opener_len(),
+            self.end() - self.flags.closer_len(),
+        )
     }
 }
 
