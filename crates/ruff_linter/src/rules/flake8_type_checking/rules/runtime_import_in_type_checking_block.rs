@@ -109,7 +109,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
     let ignore_dunder_all_references = checker
         .semantic()
         .lookup_symbol_in_scope("__getattr__", ScopeId::global(), false)
-        .is_some();
+        .is_bound();
 
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
