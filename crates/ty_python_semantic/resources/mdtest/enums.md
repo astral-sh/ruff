@@ -872,6 +872,7 @@ class ParsedIntegerValues(int, Enum):
     SECOND = "1"
 
 reveal_type(ParsedIntegerValues.FIRST is ParsedIntegerValues.SECOND)  # revealed: bool
+# TODO really should be `Literal["FIRST"]` since its a known alias
 reveal_type(ParsedIntegerValues.SECOND.name)  # revealed: Literal["SECOND"]
 reveal_type(enum_members(ParsedIntegerValues))  # revealed: Unknown
 ```
