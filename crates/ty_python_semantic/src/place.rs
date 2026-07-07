@@ -2056,15 +2056,15 @@ pub(crate) mod implicit_globals {
             // None`.
             "__file__" => Place::bound(KnownClass::Str.to_instance(db)).into(),
 
-            // We special-case `__doc__` here because we know its exact value for the current
-            // module: it's `str` if the module has a docstring, and `None` if it doesn't, even
-            // though typeshed says `str | None` unconditionally.
-            "__doc__" => Place::bound(if module_docstring(db, file).is_some() {
-                KnownClass::Str.to_instance(db)
-            } else {
-                Type::none(db)
-            })
-            .into(),
+            // We special-case `__doc__` because a module with a literal docstring has `__doc__`
+            // set to that string at runtime. We only narrow when a docstring is present: `__doc__`
+            // may be set dynamically, so we fall back to the typeshed's `str | None`.
+            "__doc__" if module_docstring(db, file).is_some() => {
+                // Docstrings are stripped in `-OO` optimized mode, but here we assume that the
+                // existence of an actual docstring AND the usage of `__doc__` is reason enough to
+                // believe that it will exist at runtime.
+                Place::bound(KnownClass::Str.to_instance(db)).into()
+            }
 
             "__builtins__" => Place::bound(Type::any()).into(),
 

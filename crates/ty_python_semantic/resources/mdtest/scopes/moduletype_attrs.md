@@ -12,8 +12,8 @@ reveal_type(__name__)  # revealed: str
 reveal_type(__file__)  # revealed: str
 reveal_type(__loader__)  # revealed: LoaderProtocol | None
 reveal_type(__package__)  # revealed: str | None
-# This module has no docstring, so `__doc__` is `None`, not the wider `str | None`
-reveal_type(__doc__)  # revealed: None
+# This module has no docstring, so `__doc__` falls back to the typeshed type `str | None`
+reveal_type(__doc__)  # revealed: str | None
 reveal_type(__spec__)  # revealed: ModuleSpec | None
 reveal_type(__path__)  # revealed: MutableSequence[str]
 reveal_type(__builtins__)  # revealed: Any
@@ -77,7 +77,7 @@ redeclaration:
 ```py
 __file__ = None
 __path__: list[str] = []
-__doc__: int  # error: [invalid-declaration] "Cannot declare type `int` for inferred type `None`"
+__doc__: int  # error: [invalid-declaration] "Cannot declare type `int` for inferred type `str | None`"
 # error: [invalid-declaration] "Cannot shadow implicit global attribute `__package__` with declaration of type `int`"
 __package__: int = 42
 __spec__ = 42  # error: [invalid-assignment] "Object of type `Literal[42]` is not assignable to `ModuleSpec | None`"
