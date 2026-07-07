@@ -116,6 +116,51 @@ static_assert(is_equivalent_to(Top[int | str], int | str))
 static_assert(is_equivalent_to(Bottom[int | str], int | str))
 ```
 
+Non-recursive aliases are materialized through nested specializations. Reusing the same alias
+definition with a different specialization is not itself a recursive cycle.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+from ty_extensions import Bottom, Top
+
+type Alias[T] = tuple[T, ...]
+
+def _(top: Top[Alias[Alias[Any]]], bottom: Bottom[Alias[Alias[Any]]]) -> None:
+    reveal_type(top)  # revealed: tuple[tuple[object, ...], ...]
+    reveal_type(bottom)  # revealed: tuple[tuple[()], ...]
+
+def triple(
+    top: Top[Alias[Alias[Alias[Any]]]],
+    bottom: Bottom[Alias[Alias[Alias[Any]]]],
+) -> None:
+    reveal_type(top)  # revealed: tuple[tuple[tuple[object, ...], ...], ...]
+    reveal_type(bottom)  # revealed: tuple[tuple[tuple[()], ...], ...]
+
+def generic[T](
+    top: Top[Alias[Alias[Any | T]]],
+    bottom: Bottom[Alias[Alias[Any | T]]],
+) -> None:
+    reveal_type(top)  # revealed: tuple[tuple[object, ...], ...]
+    reveal_type(bottom)  # revealed: tuple[tuple[T@generic, ...], ...]
+```
+
+Growing recursive aliases also terminate when materialization sees a fresh concrete specialization
+at each recursive step.
+
+```py
+from ty_extensions import Top
+
+type Grow[T] = T | tuple[Grow[list[T]]]
+
+def _(x: Top[Grow[int]]) -> None:
+    reveal_type(x)  # revealed: int | tuple[Grow[list[int]]]
+```
+
 We currently treat function literals as fully static types, so they remain unchanged even though the
 signature might have `Any` in it. (TODO: this is probably not right.)
 
