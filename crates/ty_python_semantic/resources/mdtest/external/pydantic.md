@@ -534,9 +534,11 @@ PlainDictConfig(name="Alice", something_else=7)
 
 ## Differences from dataclasses
 
-Pydantic models use `dataclass_transform` to describe their fields and constructor to static type
-checkers, but that does not make them dataclasses or grant them all dataclass-generated behavior. In
-particular, Pydantic allows a required field after one with a default:
+Pydantic uses `@dataclass_transform(...)` on its `ModelMetaclass` to help type checkers understand
+that models derived from classes like `BaseModel` (which have `ModelMetaclass` as their metaclass)
+are similar to dataclasses. However, there are some crucial differences.
+
+Pydantic models allow a required field after one with a default:
 
 ```py
 from pydantic import BaseModel
