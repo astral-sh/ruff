@@ -580,26 +580,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, self.node.exists(db, builder, to_remove))
     }
 
-    pub(crate) fn remove_noninferable(
-        self,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
-    ) -> Self {
-        self.verify_builder(builder);
-        if self
-            .node
-            .simple_lower_bound_conjunction(db, builder)
-            .all(|bound| bound.is_ok_and(|(typevar, _, _)| typevar.is_inferable(db, inferable)))
-        {
-            return self;
-        }
-        Self::from_node(
-            builder,
-            self.node.remove_noninferable(db, builder, inferable),
-        )
-    }
-
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
     ///
     /// The `choose` hook is called for each typevar on each BDD path with the typevar's variance
@@ -613,8 +593,9 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'db>,
     ) -> Solutions<'db> {
-        self.solutions_with(db, builder, |_variance, path_bound| {
+        self.solutions_with(db, builder, inferable, |_variance, path_bound| {
             PathBounds::default_solve(db, builder, path_bound)
         })
     }
@@ -623,10 +604,11 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'db>,
         choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
         self.verify_builder(builder);
-        self.node.solutions_with(db, builder, choose)
+        self.node.solutions_with(db, builder, inferable, choose)
     }
 
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
@@ -1849,8 +1831,6 @@ enum Node {
     Interior(InteriorNode),
 }
 
-type SimpleLowerBound<'db> = (BoundTypeVarInstance<'db>, Type<'db>, usize);
-
 impl NodeId {
     /// Creates a new BDD node, applying local TDD reductions.
     fn new(
@@ -2114,44 +2094,6 @@ impl NodeId {
         }
     }
 
-    /// Iterates over the concrete lower bounds in this BDD if it is a single positive conjunction.
-    /// Yields an error and terminates if the BDD does not have that shape.
-    fn simple_lower_bound_conjunction<'db, 'c>(
-        self,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-    ) -> impl Iterator<Item = Result<SimpleLowerBound<'db>, ()>> + use<'db, 'c> {
-        let mut node = Some(self);
-        std::iter::from_fn(move || {
-            let current = node.take()?;
-
-            match current.node() {
-                Node::AlwaysTrue => None,
-                Node::AlwaysFalse => Some(Err(())),
-                Node::Interior(_) => {
-                    let interior = builder.interior_node_data(current);
-                    if interior.if_uncertain != ALWAYS_FALSE || interior.if_false != ALWAYS_FALSE {
-                        return Some(Err(()));
-                    }
-
-                    let constraint = builder.constraint_data(interior.constraint);
-                    let Some(lower) = constraint.bounds.lower else {
-                        return Some(Err(()));
-                    };
-                    if constraint.bounds.upper.is_some()
-                        || lower.has_typevar(db)
-                        || lower.has_unspecialized_type_var(db)
-                    {
-                        return Some(Err(()));
-                    }
-
-                    node = Some(interior.if_true);
-                    Some(Ok((constraint.typevar, lower, interior.source_order)))
-                }
-            }
-        })
-    }
-
     fn for_each_path<'db>(
         self,
         db: &'db dyn Db,
@@ -2369,9 +2311,10 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'db>,
         choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
-        let path_bounds = PathBounds::compute(db, builder, self);
+        let path_bounds = PathBounds::compute(db, builder, self, inferable);
         path_bounds.solve_with(choose)
     }
 
@@ -3452,10 +3395,7 @@ impl<'db> Type<'db> {
             inferable: InferableTypeVars<'db>,
         ) -> PathBounds<'db> {
             let when = source.when_constraint_set_assignable_to_owned(db, target);
-            when.query(|builder, when| {
-                let when = when.remove_noninferable(db, builder, inferable);
-                PathBounds::compute(db, builder, when.node)
-            })
+            when.query(|builder, when| PathBounds::compute(db, builder, when.node, inferable))
         }
 
         assignable_solutions_impl(db, self, target, inferable)
@@ -3489,15 +3429,23 @@ impl<'db> PathBounds<'db> {
     ///
     /// Returns a list of paths, where each path contains the explicit lower/upper bounds for each
     /// typevar that appears in the path's constraints.
-    fn compute(db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>, node: NodeId) -> Self {
+    fn compute(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        node: NodeId,
+        inferable: InferableTypeVars<'db>,
+    ) -> Self {
+        if let Some(path_bounds) =
+            Self::compute_simple_lower_bound_conjunction(db, builder, node, inferable)
+        {
+            return path_bounds;
+        }
+
+        let node = node.remove_noninferable(db, builder, inferable);
         match node.node() {
             Node::AlwaysTrue => return PathBounds::Unconstrained,
             Node::AlwaysFalse => return PathBounds::Unsatisfiable,
             Node::Interior(_) => {}
-        }
-
-        if let Some(path_bounds) = Self::compute_simple_lower_bound_conjunction(db, builder, node) {
-            return path_bounds;
         }
 
         // Sort the constraints in each path by their `source_order`s, to ensure that we construct
@@ -3568,15 +3516,48 @@ impl<'db> PathBounds<'db> {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         node: NodeId,
+        inferable: InferableTypeVars<'db>,
     ) -> Option<Self> {
-        let mut constraints = node
-            .simple_lower_bound_conjunction(db, builder)
-            .collect::<Result<Vec<_>, _>>()
-            .ok()?;
-        constraints.sort_by_key(|(_, _, source_order)| *source_order);
+        match node.node() {
+            Node::AlwaysTrue => return Some(PathBounds::Unconstrained),
+            Node::AlwaysFalse => return Some(PathBounds::Unsatisfiable),
+            Node::Interior(_) => {}
+        }
+
+        let mut constraints = Vec::default();
+        let mut current = node;
+        loop {
+            match current.node() {
+                Node::AlwaysTrue => break,
+                Node::AlwaysFalse => return None,
+                Node::Interior(_) => {
+                    let interior = builder.interior_node_data(current);
+                    if interior.if_uncertain != ALWAYS_FALSE || interior.if_false != ALWAYS_FALSE {
+                        return None;
+                    }
+
+                    let constraint = builder.constraint_data(interior.constraint);
+                    if !constraint.typevar.is_inferable(db, inferable) {
+                        return None;
+                    }
+
+                    let lower = constraint.bounds.lower?;
+                    if constraint.bounds.upper.is_some()
+                        || lower.has_typevar(db)
+                        || lower.has_unspecialized_type_var(db)
+                    {
+                        return None;
+                    }
+
+                    current = interior.if_true;
+                    constraints.push((constraint.typevar, lower, interior.source_order));
+                }
+            }
+        }
 
         let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
             FxHashMap::default();
+        constraints.sort_by_key(|(_, _, source_order)| *source_order);
         for (typevar, lower, _) in constraints {
             mappings.entry(typevar).or_default().add_lower(db, lower);
         }
@@ -7015,8 +6996,7 @@ mod tests {
             )
         };
 
-        let set = set.remove_noninferable(&db, &builder, inferable);
-        let solutions = set.solutions(&db, &builder);
+        let solutions = set.solutions(&db, &builder, inferable);
         assert_eq!(
             solutions,
             Solutions::Constrained(vec![vec![TypeVarSolution {
