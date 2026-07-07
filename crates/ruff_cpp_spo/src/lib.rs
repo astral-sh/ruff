@@ -58,7 +58,9 @@ use ruff_spo_triplet::{
 #[cfg(feature = "libclang")]
 mod clang_walker;
 #[cfg(feature = "libclang")]
-pub use clang_walker::{MAPPED_CURSOR_KINDS, WalkError, class_body_cursor_histogram, walk_tu};
+pub use clang_walker::{
+    MAPPED_CURSOR_KINDS, WalkError, class_body_cursor_histogram, walk_free_functions, walk_tu,
+};
 
 /// The namespace prefix for C++ machine-plane subjects/objects.
 ///
@@ -106,6 +108,31 @@ impl CppClass {
             format!("{}::{}", self.namespace.join("::"), self.name)
         }
     }
+}
+
+/// A free (non-member) function DEFINITION and its **general call graph** — the
+/// harvest arm for **C libraries** (leptonica, zlib, …), whose transcode is
+/// driven by function dispatch, not class inheritance.
+///
+/// [`CppClass`] covers C++ *classes* (the `classid → ClassView` manifest);
+/// this covers C *free functions* on pointer buffers, where the OO body-arm
+/// captures nothing. The `calls` set is the dispatch structure — WHICH functions
+/// to transcode and in what order (e.g. `pixScale → pixScaleGeneral →
+/// {pixScaleGrayLI, pixScaleAreaMap, pixUnsharpMasking}`). The numeric kernel
+/// bodies are the doctrine's essential-15% hand-port; this mints the 85%
+/// structure that classifies + orders them.
+#[cfg(feature = "libclang")]
+#[derive(Debug, Clone, Default)]
+pub struct CppFunction {
+    /// Enclosing namespace components, outermost first (empty at global scope,
+    /// the norm for a C library).
+    pub namespace: Vec<String>,
+    /// The function name as written (`pixScaleGrayLI`).
+    pub name: String,
+    /// Every resolvable callee name in the body, deduped + sorted — the call
+    /// graph. Distinct from the AR/OO `BodyArm.calls` (persistence mutators
+    /// only); this is EVERY `CallExpr` callee.
+    pub calls: Vec<String>,
 }
 
 /// One class-body declaration, discriminated by category.
