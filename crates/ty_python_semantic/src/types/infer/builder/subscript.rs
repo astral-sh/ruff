@@ -79,7 +79,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let keys = typed_dict
                         .items(db)
                         .keys()
-                        .map(|key| Type::string_literal(db, key.as_str()))
+                        .map(|key| Type::string_literal(db, key))
                         .collect_vec();
                     (!keys.is_empty()).then(|| UnionType::from_elements(db, keys))
                 }
@@ -993,7 +993,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // TODO: `Unpack`
                     Parameters::todo()
                 } else {
-                    Parameters::new(
+                    Parameters::from_annotation(
                         db,
                         parameter_types.iter().map(|param_type| {
                             Parameter::positional_only(None).with_annotated_type(*param_type)
@@ -1066,7 +1066,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         return Ok(Type::paramspec_value_callable(
                             db,
-                            Parameters::new(
+                            Parameters::from_annotation(
                                 db,
                                 [
                                     Parameter::positional_only(None)
@@ -1095,7 +1095,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 // type.
                                 Parameters::unknown()
                             } else {
-                                Parameters::new(
+                                Parameters::from_annotation(
                                     db,
                                     [Parameter::positional_only(None)
                                         .with_annotated_type(param_type)],

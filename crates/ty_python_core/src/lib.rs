@@ -339,6 +339,9 @@ pub struct SemanticIndex<'db> {
     /// Set of all generator functions in this file.
     generator_functions: FrozenSet<FileScopeId>,
 
+    /// Set of all asynchronous comprehensions in this file.
+    async_comprehensions: FrozenSet<FileScopeId>,
+
     /// Narrowing alias metadata for predicate leaf names.
     /// When a predicate references an alias variable (e.g., `is_none` from `is_none = x is None`),
     /// the alias Name node is mapped to its aliased expression for constraint-generation time.

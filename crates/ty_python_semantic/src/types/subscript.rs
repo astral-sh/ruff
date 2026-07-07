@@ -2,6 +2,7 @@
 
 use std::fmt::{self, Display};
 
+use compact_str::{CompactString, ToCompactString};
 use itertools::Itertools;
 use ruff_python_ast as ast;
 
@@ -648,7 +649,7 @@ impl<'db> Type<'db> {
                 i32::try_from(i64_int).ok().map(|i32_int| {
                     let literal_value = literal_ty.value(db);
                     match (&mut literal_value.chars()).py_index(db, i32_int) {
-                        Ok(ch) => Ok(Type::string_literal(db, &ch.to_string())),
+                        Ok(ch) => Ok(Type::string_literal(db, ch.to_compact_string())),
                         Err(_) => Err(SubscriptError::new(
                             Type::unknown(),
                             SubscriptErrorKind::IndexOutOfBounds {
@@ -673,8 +674,8 @@ impl<'db> Type<'db> {
 
                     match chars.py_slice(db, start, stop, step) {
                         Ok(new_chars) => {
-                            let literal = new_chars.collect::<String>();
-                            Ok(Type::string_literal(db, &literal))
+                            let literal = new_chars.collect::<CompactString>();
+                            Ok(Type::string_literal(db, literal))
                         }
                         Err(_) => Err(SubscriptError::new(
                             Type::unknown(),

@@ -31,12 +31,13 @@ use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
-use crate::types::typevar::{BoundTypeVarIdentity, max_typevar_freshness_matching_generic_context};
+use crate::types::typevar::max_typevar_freshness_matching_generic_context;
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
-    ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind,
-    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping, TypeVarNonce,
-    TypedDictType, UnionBuilder, VarianceInferable, infer_complete_scope_types, todo_type,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
+    CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
+    MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
+    TypeMapping, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
+    infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -275,31 +276,26 @@ impl<'db> CallableSignature<'db> {
         ) -> Option<CallableSignature<'db>> {
             match paramspec_value {
                 Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
+                    let prefix_parameters = prefix_parameters
+                        .iter()
+                        .map(|param| param.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                        .collect::<Vec<_>>();
+                    let parameters = if prefix_parameters.is_empty() {
+                        Parameters::paramspec(db, typevar)
+                    } else {
+                        Parameters::concatenate(
+                            db,
+                            prefix_parameters,
+                            ConcatenateTail::ParamSpec(typevar),
+                        )
+                    };
+
                     Some(CallableSignature::single(Signature {
                         generic_context: self_signature.generic_context.map(|context| {
                             type_mapping.update_signature_generic_context(db, context)
                         }),
                         definition: self_signature.definition,
-                        parameters: Parameters::new(
-                            db,
-                            prefix_parameters
-                                .iter()
-                                .map(|param| {
-                                    param.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                                })
-                                .chain([
-                                    Parameter::variadic(Name::new_static("args"))
-                                        .with_annotated_type(Type::TypeVar(
-                                            typevar
-                                                .with_paramspec_attr(db, ParamSpecAttrKind::Args),
-                                        )),
-                                    Parameter::keyword_variadic(Name::new_static("kwargs"))
-                                        .with_annotated_type(Type::TypeVar(
-                                            typevar
-                                                .with_paramspec_attr(db, ParamSpecAttrKind::Kwargs),
-                                        )),
-                                ]),
-                        ),
+                        parameters,
                         return_ty: self_signature.return_ty.apply_type_mapping_impl(
                             db,
                             type_mapping,
@@ -321,24 +317,11 @@ impl<'db> CallableSignature<'db> {
                                 }),
                             ),
                             definition: signature.definition,
-                            parameters: if signature.parameters().is_top() {
-                                signature.parameters().clone()
-                            } else {
-                                Parameters::new(
-                                    db,
-                                    prefix_parameters
-                                        .iter()
-                                        .map(|param| {
-                                            param.apply_type_mapping_impl(
-                                                db,
-                                                type_mapping,
-                                                tcx,
-                                                visitor,
-                                            )
-                                        })
-                                        .chain(signature.parameters().iter().cloned()),
-                                )
-                            },
+                            parameters: signature.parameters().with_prefix(
+                                prefix_parameters.iter().map(|param| {
+                                    param.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                                }),
+                            ),
                             return_ty: self_signature.return_ty.apply_type_mapping_impl(
                                 db,
                                 type_mapping,
@@ -478,7 +461,7 @@ impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
 
 impl<'db> VarianceInferable<'db> for &CallableSignature<'db> {
     // TODO: possibly need to replace self
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         self.overloads
             .iter()
             .map(|signature| signature.variance_of(db, typevar))
@@ -762,11 +745,12 @@ impl<'db> Signature<'db> {
 
         let parameters = if self.parameters.len() == previous.parameters.len() {
             Parameters::new(
-                db,
                 self.parameters
                     .iter()
                     .zip(previous.parameters.iter())
-                    .map(|(curr, prev)| curr.cycle_normalized(db, prev, cycle)),
+                    .map(|(curr, prev)| curr.cycle_normalized(db, prev, cycle))
+                    .collect::<Box<[_]>>(),
+                self.parameters.kind(),
             )
         } else {
             debug_assert_eq!(previous.parameters, Parameters::bottom());
@@ -800,7 +784,7 @@ impl<'db> Signature<'db> {
             for param in &self.parameters {
                 parameters.push(param.recursive_type_normalized_impl(db, div, nested)?);
             }
-            Parameters::new(db, parameters)
+            Parameters::new(parameters, self.parameters.kind())
         };
         Some(Self {
             generic_context: self.generic_context,
@@ -953,16 +937,15 @@ impl<'db> Signature<'db> {
     }
 
     pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
-        let mut parameters = self.parameters.iter().cloned().peekable();
-        let removed_receiver = parameters.peek().is_some_and(Parameter::is_positional);
+        let removed_receiver = self.parameters.get(0).is_some_and(Parameter::is_positional);
 
         // TODO: Theoretically, for a signature like `f(*args: *tuple[MyClass, int, *tuple[str, ...]])` with
         // a variadic first parameter, we should also "skip the first parameter" by modifying the tuple type.
-        if removed_receiver {
-            parameters.next();
-        }
-
-        let mut parameters = Parameters::new(db, parameters);
+        let mut parameters = if removed_receiver {
+            self.parameters.without_first()
+        } else {
+            self.parameters.clone()
+        };
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
         if let Some(self_type) = self_type
@@ -1152,7 +1135,10 @@ impl<'db> Signature<'db> {
 
         // Expand `P.args`/`P.kwargs` while the pair is still adjacent. The keyword-only reshuffle
         // below can separate them, which would otherwise prevent expansion.
-        let remaining = Parameters::new(db, remaining).expand_paramspec_variadics(db);
+        let remaining = signature
+            .parameters
+            .with_transformed_parameters(remaining)
+            .expand_paramspec_variadics(db);
 
         let mut reordered = Vec::with_capacity(remaining.len());
         let mut keyword_only = Vec::new();
@@ -1179,8 +1165,10 @@ impl<'db> Signature<'db> {
         reordered.extend(keyword_only);
         reordered.extend(keyword_variadic);
 
+        let reordered = remaining.with_transformed_parameters(reordered);
+
         signature
-            .with_parameters(Parameters::new(db, reordered))
+            .with_parameters(reordered)
             .with_return_type(return_ty)
     }
 
@@ -1418,10 +1406,10 @@ impl<'db> Signature<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for &Signature<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         tracing::trace!(
             "Checking variance of `{tvar}` in `{self:?}`",
-            tvar = typevar.typevar(db).name(db)
+            tvar = typevar.identity.name(db)
         );
 
         let parameter_variance = |parameter: &Parameter<'db>| {
@@ -2357,11 +2345,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }
 
                     let (source_params, _) = parameters.into_remaining();
+                    let source_params = source
+                        .parameters
+                        .with_transformed_parameters(source_params.cloned());
                     let lower = Type::Callable(CallableType::new(
                         db,
                         CallableSignature::single(Signature::new_generic(
                             source.generic_context,
-                            Parameters::new(db, source_params.cloned()),
+                            source_params,
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
@@ -2490,11 +2481,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }
 
                     let (_, target_params) = parameters.into_remaining();
+                    let target_params = target
+                        .parameters
+                        .with_transformed_parameters(target_params.cloned());
                     let upper = Type::Callable(CallableType::new(
                         db,
                         CallableSignature::single(Signature::new_generic(
                             target.generic_context,
-                            Parameters::new(db, target_params.cloned()),
+                            target_params,
                             Type::unknown(),
                         )),
                         CallableTypeKind::ParamSpecValue,
@@ -3108,6 +3102,10 @@ pub(crate) enum ConcatenateTail<'db> {
 }
 
 /// The kind of parameter list represented.
+///
+/// For annotation-derived parameter lists, the kind records the form of the original annotation
+/// and must be preserved when its parameter types are transformed. In particular, specializing a
+/// standard `(*args: T, **kwargs: T)` parameter list with `T = Any` does not make it gradual.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum ParametersKind<'db> {
     /// A standard parameter list.
@@ -3177,7 +3175,13 @@ pub(crate) struct Parameters<'db> {
 }
 
 impl<'db> Parameters<'db> {
-    fn from_parts(value: impl Into<Box<[Parameter<'db>]>>, kind: ParametersKind<'db>) -> Self {
+    /// Create a parameter list with an explicit kind.
+    ///
+    /// This constructor does not infer the kind from the parameter types or normalize an unpacked
+    /// `TypedDict`. Use [`Self::standard`] for a known-standard list and
+    /// [`Self::from_annotation`] when the kind should be inferred from annotations; preserve the
+    /// existing kind when transforming a parameter list.
+    pub(crate) fn new(value: impl Into<Box<[Parameter<'db>]>>, kind: ParametersKind<'db>) -> Self {
         Self {
             data: Arc::new(ParametersData {
                 value: value.into(),
@@ -3186,7 +3190,7 @@ impl<'db> Parameters<'db> {
         }
     }
 
-    /// Create a new parameter list from an iterator of parameters.
+    /// Create a parameter list, normalizing it and inferring its kind from annotations.
     ///
     /// The kind of the parameter list is determined based on the provided parameters. Specifically,
     /// if the parameter list contains `*args` and `**kwargs`, then it checks their annotated types
@@ -3194,7 +3198,7 @@ impl<'db> Parameters<'db> {
     /// `ParamSpec`, or a `Concatenate` form. `**kwargs: Unpack[TypedDict]` is normalized here by
     /// synthesizing keyword-only parameters for the unpacked keys and a possible trailing
     /// `**kwargs` parameter for explicit extra items or an open `TypedDict`.
-    pub(crate) fn new(
+    pub(crate) fn from_annotation(
         db: &'db dyn Db,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
     ) -> Self {
@@ -3323,12 +3327,20 @@ impl<'db> Parameters<'db> {
             }
         }
 
-        Self::from_parts(value, kind)
+        Self::new(value, kind)
     }
 
     /// Create an empty parameter list.
     pub(crate) fn empty() -> Self {
-        Self::from_parts(Box::default(), ParametersKind::Standard)
+        Self::standard([])
+    }
+
+    /// Create a standard parameter list without inferring its kind or normalizing annotations.
+    pub(crate) fn standard(parameters: impl IntoIterator<Item = Parameter<'db>>) -> Self {
+        Self::new(
+            parameters.into_iter().collect::<Box<[_]>>(),
+            ParametersKind::Standard,
+        )
     }
 
     pub(crate) fn as_slice(&self) -> &[Parameter<'db>] {
@@ -3337,6 +3349,115 @@ impl<'db> Parameters<'db> {
 
     pub(crate) fn kind(&self) -> ParametersKind<'db> {
         self.data.kind
+    }
+
+    /// Return a copy of this parameter list with the given prefix parameters.
+    fn with_prefix(&self, prefix_parameters: impl IntoIterator<Item = Parameter<'db>>) -> Self {
+        let mut prefix_parameters = prefix_parameters.into_iter().collect::<Vec<_>>();
+        if prefix_parameters.is_empty() || self.is_top() {
+            return self.clone();
+        }
+
+        let kind = match self.data.kind {
+            ParametersKind::Standard => ParametersKind::Standard,
+            ParametersKind::Gradual
+                if prefix_parameters.iter().all(Parameter::is_positional_only)
+                    && matches!(
+                        self.data.value.as_ref(),
+                        [variadic, keyword_variadic]
+                            if variadic.is_variadic()
+                                && keyword_variadic.is_keyword_variadic()
+                    ) =>
+            {
+                ParametersKind::Concatenate(ConcatenateTail::Gradual)
+            }
+            ParametersKind::Gradual => ParametersKind::Gradual,
+            ParametersKind::ParamSpec(typevar) => {
+                ParametersKind::Concatenate(ConcatenateTail::ParamSpec(typevar))
+            }
+            ParametersKind::Concatenate(tail) => ParametersKind::Concatenate(tail),
+            ParametersKind::Top => return self.clone(),
+        };
+
+        prefix_parameters.extend(self.iter().cloned());
+        Self::new(prefix_parameters, kind)
+    }
+
+    /// Rebuild this parameter list after transforming its existing parameters.
+    ///
+    /// Unlike [`Self::from_annotation`], this preserves the provenance of the original parameter
+    /// list instead of inferring a new kind from the transformed annotation types. Structural
+    /// kinds are normalized when a transformation removes or rearranges their tail parameters.
+    fn with_transformed_parameters(
+        &self,
+        parameters: impl IntoIterator<Item = Parameter<'db>>,
+    ) -> Self {
+        let parameters = parameters.into_iter().collect::<Box<[_]>>();
+        let variadic_index = parameters.iter().position(Parameter::is_variadic);
+        let keyword_variadic_index = parameters.iter().position(Parameter::is_keyword_variadic);
+
+        let kind = match self.data.kind {
+            ParametersKind::Standard => ParametersKind::Standard,
+            ParametersKind::Gradual
+                if variadic_index.is_some() && keyword_variadic_index.is_some() =>
+            {
+                ParametersKind::Gradual
+            }
+            ParametersKind::Gradual => ParametersKind::Standard,
+            ParametersKind::Top => ParametersKind::Top,
+            ParametersKind::ParamSpec(typevar) => {
+                if matches!((variadic_index, keyword_variadic_index), (Some(0), Some(1)))
+                    && parameters.len() == 2
+                {
+                    ParametersKind::ParamSpec(typevar)
+                } else {
+                    ParametersKind::Standard
+                }
+            }
+            ParametersKind::Concatenate(tail) => {
+                let Some(variadic_index) = variadic_index else {
+                    return Self::standard(parameters);
+                };
+                let Some(keyword_variadic_index) = keyword_variadic_index else {
+                    return Self::standard(parameters);
+                };
+                let prefix = &parameters[..variadic_index];
+                let has_adjacent_tail = keyword_variadic_index == variadic_index + 1;
+
+                match tail {
+                    ConcatenateTail::Gradual => {
+                        if has_adjacent_tail
+                            && !prefix.is_empty()
+                            && prefix.iter().all(Parameter::is_positional_only)
+                        {
+                            ParametersKind::Concatenate(tail)
+                        } else {
+                            ParametersKind::Gradual
+                        }
+                    }
+                    ConcatenateTail::ParamSpec(typevar) if has_adjacent_tail => {
+                        if prefix.is_empty() {
+                            ParametersKind::ParamSpec(typevar)
+                        } else if prefix.iter().all(Parameter::is_positional) {
+                            ParametersKind::Concatenate(tail)
+                        } else {
+                            ParametersKind::Standard
+                        }
+                    }
+                    ConcatenateTail::ParamSpec(_) => ParametersKind::Standard,
+                }
+            }
+        };
+
+        Self::new(parameters, kind)
+    }
+
+    /// Return a copy of this parameter list without its first parameter.
+    ///
+    /// Removing the only prefix parameter from a `Concatenate` form leaves the tail as a plain
+    /// gradual or `ParamSpec` parameter list.
+    fn without_first(&self) -> Self {
+        self.with_transformed_parameters(self.iter().skip(1).cloned())
     }
 
     /// Returns `true` if the parameters represent a gradual form using `...` as the only parameter
@@ -3391,7 +3512,7 @@ impl<'db> Parameters<'db> {
 
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)
     pub(crate) fn todo() -> Self {
-        Self::from_parts(
+        Self::new(
             [
                 Parameter::variadic(Name::new_static("args"))
                     .with_annotated_type(todo_type!("todo signature *args")),
@@ -3408,7 +3529,7 @@ impl<'db> Parameters<'db> {
     ///
     /// [`Any`]: DynamicType::Any
     pub(crate) fn gradual_form() -> Self {
-        Self::from_parts(
+        Self::new(
             [
                 Parameter::variadic(Name::new_static("args"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Any)),
@@ -3420,7 +3541,7 @@ impl<'db> Parameters<'db> {
     }
 
     pub(crate) fn paramspec(db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> Self {
-        Self::from_parts(
+        Self::new(
             [
                 Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::TypeVar(
                     typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args),
@@ -3456,7 +3577,7 @@ impl<'db> Parameters<'db> {
             Parameter::keyword_variadic(Name::new_static("kwargs"))
                 .with_annotated_type(kwargs_type),
         ]);
-        Self::from_parts(prefix_params, ParametersKind::Concatenate(concatenate_tail))
+        Self::new(prefix_params, ParametersKind::Concatenate(concatenate_tail))
     }
 
     /// Return parameters that represents an unknown list of parameters.
@@ -3466,7 +3587,7 @@ impl<'db> Parameters<'db> {
     ///
     /// [`Unknown`]: crate::types::DynamicType::Unknown
     pub(crate) fn unknown() -> Self {
-        Self::from_parts(
+        Self::new(
             [
                 Parameter::variadic(Name::new_static("args"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
@@ -3480,7 +3601,7 @@ impl<'db> Parameters<'db> {
     /// Return parameters that represents `(*args: object, **kwargs: object)`, the bottom signature
     /// (accepts any call, so subtype of all other signatures.)
     pub(crate) fn bottom() -> Self {
-        Self::from_parts(
+        Self::new(
             [
                 Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
@@ -3496,7 +3617,7 @@ impl<'db> Parameters<'db> {
     /// and still accepts the empty call `()`; it has to be represented instead as a special
     /// `ParametersKind`.
     pub(crate) fn top() -> Self {
-        Self::from_parts(
+        Self::new(
             // We always emit `called-top-callable` for any call to the top callable (based on the
             // `kind` below), so we otherwise give it the most permissive signature`(*object,
             // **object)`, so that we avoid emitting any other errors about arity mismatches.
@@ -3614,7 +3735,7 @@ impl<'db> Parameters<'db> {
             )
         });
 
-        Self::new(
+        Self::from_annotation(
             db,
             positional_only
                 .into_iter()
@@ -3660,7 +3781,7 @@ impl<'db> Parameters<'db> {
             .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
             .collect();
 
-        Self::from_parts(value, self.data.kind)
+        Self::new(value, self.data.kind)
     }
     pub(crate) fn len(&self) -> usize {
         self.data.value.len()
@@ -3778,11 +3899,18 @@ impl<'db> Parameters<'db> {
             return self.clone();
         };
 
-        let mut expanded = Vec::with_capacity(self.len());
-        expanded.extend_from_slice(&self.data.value[..variadic_index]);
-        expanded.extend_from_slice(mapped_signature.parameters().as_slice());
-        expanded.extend_from_slice(&self.data.value[variadic_index + 2..]);
-        Parameters::new(db, expanded)
+        let expanded = mapped_signature
+            .parameters()
+            .with_prefix(self.data.value[..variadic_index].iter().cloned());
+        if variadic_index + 2 == self.len() {
+            expanded
+        } else {
+            let parameters = expanded
+                .iter()
+                .cloned()
+                .chain(self.data.value[variadic_index + 2..].iter().cloned());
+            expanded.with_transformed_parameters(parameters)
+        }
     }
 }
 

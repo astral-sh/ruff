@@ -110,7 +110,7 @@ combine-as-imports = true
 
 [tool.ruff.per-file-target-version]
 "crates/ty_python_semantic/mdtest.py" = "py310"
-"crates/ty_vendored/ty_extensions/ty_extensions.pyi" = "py312"
+"crates/ty_vendored/ty_extensions/*.pyi" = "py312"
 
 [tool.black]
 force-exclude = '''

@@ -13,9 +13,10 @@ pub(crate) use self::static_literal::{
     ExpandedClassBaseEntry, StaticClassLiteral, expanded_class_base_entries,
 };
 pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
+use super::dedicated::pydantic;
 use super::{
-    BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType, SubclassOfType, Type,
-    TypeQualifiers, class_base::ClassBase, function::FunctionType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType,
+    SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, Provenance, TypeOrigin};
@@ -86,6 +87,8 @@ impl get_size2::GetSize for ClassInstanceFlags {}
 pub(crate) enum CodeGeneratorKind<'db> {
     /// Classes decorated with `@dataclass` or similar dataclass-like decorators
     DataclassLike(Option<DataclassTransformerParams<'db>>),
+    /// Classes inheriting from Pydantic's `BaseModel`.
+    Pydantic(pydantic::ModelMetadata<'db>),
     /// Classes inheriting from `typing.NamedTuple`
     NamedTuple,
     /// Classes inheriting from `typing.TypedDict` or `typing_extensions.TypedDict`
@@ -96,8 +99,8 @@ impl<'db> CodeGeneratorKind<'db> {
     /// Return the code-generation behavior for a class.
     ///
     /// This is invariant across generic specializations. Type arguments affect the types of
-    /// synthesized members, but not whether the class is dataclass-like, a `NamedTuple`, or a
-    /// `TypedDict`.
+    /// synthesized members, but not whether the class is dataclass-like, a Pydantic model, a
+    /// `NamedTuple`, or a `TypedDict`.
     pub(crate) fn from_class(db: &'db dyn Db, class: ClassLiteral<'db>) -> Option<Self> {
         match class {
             ClassLiteral::Static(static_class) => Self::from_static_class(db, static_class),
@@ -134,7 +137,11 @@ impl<'db> CodeGeneratorKind<'db> {
             if class.dataclass_params(db).is_some() {
                 Some(CodeGeneratorKind::DataclassLike(None))
             } else if let Ok((_, Some(info))) = class.try_metaclass(db) {
-                Some(CodeGeneratorKind::DataclassLike(Some(info.params)))
+                Some(CodeGeneratorKind::from_dataclass_transformer(
+                    db,
+                    class,
+                    info.params,
+                ))
             } else if KnownClass::Type
                 .try_to_class_literal(db)
                 .is_none_or(|type_class| {
@@ -153,7 +160,11 @@ impl<'db> CodeGeneratorKind<'db> {
                         })
                     })
             {
-                Some(CodeGeneratorKind::DataclassLike(Some(transformer_params)))
+                Some(CodeGeneratorKind::from_dataclass_transformer(
+                    db,
+                    class,
+                    transformer_params,
+                ))
             } else if class
                 .explicit_bases(db)
                 .contains(&Type::SpecialForm(SpecialFormType::NamedTuple))
@@ -167,6 +178,22 @@ impl<'db> CodeGeneratorKind<'db> {
         }
 
         code_generator_of_static_class(db, class)
+    }
+
+    fn from_dataclass_transformer(
+        db: &'db dyn Db,
+        class: StaticClassLiteral<'db>,
+        transformer_params: DataclassTransformerParams<'db>,
+    ) -> Self {
+        if pydantic::is_model(db, class) {
+            Self::Pydantic(pydantic::ModelMetadata::from_class(
+                db,
+                class,
+                transformer_params,
+            ))
+        } else {
+            Self::DataclassLike(Some(transformer_params))
+        }
     }
 
     fn from_dynamic_class(db: &'db dyn Db, class: DynamicClassLiteral<'db>) -> Option<Self> {
@@ -200,6 +227,7 @@ impl<'db> CodeGeneratorKind<'db> {
         matches!(
             (CodeGeneratorKind::from_class(db, class), self),
             (Some(Self::DataclassLike(_)), Self::DataclassLike(_))
+                | (Some(Self::Pydantic(_)), Self::Pydantic(_))
                 | (Some(Self::NamedTuple), Self::NamedTuple)
                 | (Some(Self::TypedDict), Self::TypedDict)
         )
@@ -208,7 +236,57 @@ impl<'db> CodeGeneratorKind<'db> {
     pub(super) fn dataclass_transformer_params(self) -> Option<DataclassTransformerParams<'db>> {
         match self {
             Self::DataclassLike(params) => params,
+            Self::Pydantic(metadata) => Some(metadata.transformer_params()),
             Self::NamedTuple | Self::TypedDict => None,
+        }
+    }
+
+    pub(super) const fn name(self) -> &'static str {
+        match self {
+            Self::DataclassLike(_) => "dataclass",
+            Self::Pydantic(_) => "Pydantic model",
+            Self::NamedTuple => "named tuple",
+            Self::TypedDict => "TypedDict",
+        }
+    }
+
+    /// Return `true` if field declarations should be treated as instance attributes.
+    ///
+    /// For example, a bare annotation in a dataclass body is seen as evidence for the
+    /// existence of an instance attribute, since the field will be set in the generated
+    /// constructor.
+    ///
+    /// ```python
+    /// @dataclass
+    /// class C:
+    ///     value: int
+    ///
+    /// def f(c: C):
+    ///     c.value  # okay, `value` will be set by `C`'s constructor
+    /// ```
+    pub(super) const fn treats_fields_as_instance_attributes(self) -> bool {
+        matches!(self, Self::DataclassLike(_) | Self::Pydantic(_))
+    }
+
+    /// Return `true` if the class constructor is synthesized from its fields.
+    ///
+    /// For example, a dataclass field becomes a parameter in the generated constructor:
+    ///
+    /// ```python
+    /// @dataclass
+    /// class C:
+    ///     value: int
+    ///
+    /// C(value=42)
+    /// ```
+    pub(super) const fn synthesizes_constructor_signature_from_fields(self) -> bool {
+        matches!(self, Self::DataclassLike(_) | Self::Pydantic(_))
+    }
+
+    pub(super) const fn pydantic_metadata(self) -> Option<pydantic::ModelMetadata<'db>> {
+        match self {
+            Self::Pydantic(metadata) => Some(metadata),
+            Self::DataclassLike(_) | Self::NamedTuple | Self::TypedDict => None,
         }
     }
 }
@@ -319,7 +397,7 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
         cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         let origin = self.origin(db);
 
         let specialization = self.specialization(db);
@@ -348,7 +426,7 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
                     let typevar_variance_in_substituted_type = ty.variance_of(db, typevar);
                     origin
                         .with_polarity(typevar_variance_in_substituted_type)
-                        .variance_of(db, generic_typevar)
+                        .variance_of(db, generic_typevar.identity(db))
                 }
             })
             .collect()
@@ -1552,14 +1630,13 @@ impl<'db> ClassType<'db> {
         name: &str,
     ) -> Member<'db> {
         fn synthesize_getitem_overload_signature<'db>(
-            db: &'db dyn Db,
             index_annotation: Type<'db>,
             return_annotation: Type<'db>,
         ) -> Signature<'db> {
             let self_parameter = Parameter::positional_only(Some(Name::new_static("self")));
             let index_parameter = Parameter::positional_only(Some(Name::new_static("index")))
                 .with_annotated_type(index_annotation);
-            let parameters = Parameters::new(db, [self_parameter, index_parameter]);
+            let parameters = Parameters::standard([self_parameter, index_parameter]);
             Signature::new(parameters, return_annotation)
         }
 
@@ -1595,11 +1672,10 @@ impl<'db> ClassType<'db> {
                     .map(Type::int_literal)
                     .unwrap_or_else(|| KnownClass::Int.to_instance(db));
 
-                let parameters = Parameters::new(
-                    db,
-                    [Parameter::positional_only(Some(Name::new_static("self")))
-                        .with_annotated_type(Type::instance(db, self))],
-                );
+                let parameters = Parameters::standard([Parameter::positional_only(Some(
+                    Name::new_static("self"),
+                ))
+                .with_annotated_type(Type::instance(db, self))]);
 
                 let synthesized_dunder_method =
                     Type::function_like_callable(db, Signature::new(parameters, return_type));
@@ -1732,7 +1808,6 @@ impl<'db> ClassType<'db> {
                                 );
 
                                 Some(synthesize_getitem_overload_signature(
-                                    db,
                                     index_annotation,
                                     return_type,
                                 ))
@@ -1750,7 +1825,6 @@ impl<'db> ClassType<'db> {
                         //    __getitem__(self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[str | float | bytes, ...]
                         //
                         overload_signatures.push(synthesize_getitem_overload_signature(
-                            db,
                             KnownClass::SupportsIndex.to_instance(db),
                             all_elements_unioned,
                         ));
@@ -1760,7 +1834,6 @@ impl<'db> ClassType<'db> {
                             [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
                         );
                         overload_signatures.push(synthesize_getitem_overload_signature(
-                            db,
                             KnownClass::Slice.to_specialized_instance(
                                 db,
                                 &[slice_bound, slice_bound, slice_bound],
@@ -1837,14 +1910,11 @@ impl<'db> ClassType<'db> {
                         iterable_parameter.with_default_type(Type::empty_tuple(db));
                 }
 
-                let parameters = Parameters::new(
-                    db,
-                    [
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(SubclassOfType::from(db, self)),
-                        iterable_parameter,
-                    ],
-                );
+                let parameters = Parameters::standard([
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(SubclassOfType::from(db, self)),
+                    iterable_parameter,
+                ]);
 
                 let synthesized_dunder = Type::function_like_callable(
                     db,
@@ -2195,7 +2265,7 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ClassType<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         match self {
             Self::NonGeneric(ClassLiteral::Static(class)) => class.variance_of(db, typevar),
             Self::NonGeneric(
@@ -2401,7 +2471,7 @@ impl<'db> Field<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         match self {
             Self::Static(class) => class.variance_of(db, typevar),
             Self::Dynamic(_)

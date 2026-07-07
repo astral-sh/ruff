@@ -6,7 +6,8 @@ User-defined type guards are functions of which the return type is either `TypeG
 ## Display
 
 ```py
-from ty_extensions import Intersection, Not, TypeOf
+from ty_extensions import Intersection, Not
+from ty_extensions._internal import TypeOf
 from typing_extensions import TypeGuard, TypeIs
 
 def _(

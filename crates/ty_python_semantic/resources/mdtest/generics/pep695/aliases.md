@@ -12,7 +12,7 @@ At its simplest, to define a type alias using PEP 695 syntax, you add a list of 
 
 ```py
 from typing import Callable
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 type SingleTypevar[T] = list[T]
 type MultipleTypevars[T, S] = tuple[T, S]
@@ -21,20 +21,20 @@ type TypeVarAndParamSpec[T, **P] = Callable[P, T]
 type SingleTypeVarTuple[*Ts] = tuple[*Ts]
 type TypeVarAndTypeVarTuple[T, *Ts] = tuple[T, *Ts]
 
-# revealed: ty_extensions.GenericContext[T@SingleTypevar]
+# revealed: ty_extensions._internal.GenericContext[T@SingleTypevar]
 reveal_type(generic_context(SingleTypevar))
-# revealed: ty_extensions.GenericContext[T@MultipleTypevars, S@MultipleTypevars]
+# revealed: ty_extensions._internal.GenericContext[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
 
 # TODO: support `TypeVarTuple` properly
 # (these should include the `TypeVarTuple`s in their generic contexts)
-# revealed: ty_extensions.GenericContext[P@SingleParamSpec]
+# revealed: ty_extensions._internal.GenericContext[P@SingleParamSpec]
 reveal_type(generic_context(SingleParamSpec))
-# revealed: ty_extensions.GenericContext[T@TypeVarAndParamSpec, P@TypeVarAndParamSpec]
+# revealed: ty_extensions._internal.GenericContext[T@TypeVarAndParamSpec, P@TypeVarAndParamSpec]
 reveal_type(generic_context(TypeVarAndParamSpec))
-# revealed: ty_extensions.GenericContext[]
+# revealed: ty_extensions._internal.GenericContext[]
 reveal_type(generic_context(SingleTypeVarTuple))
-# revealed: ty_extensions.GenericContext[T@TypeVarAndTypeVarTuple]
+# revealed: ty_extensions._internal.GenericContext[T@TypeVarAndTypeVarTuple]
 reveal_type(generic_context(TypeVarAndTypeVarTuple))
 ```
 

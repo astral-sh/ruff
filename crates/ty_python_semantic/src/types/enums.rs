@@ -1,3 +1,4 @@
+use compact_str::ToCompactString;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -72,7 +73,7 @@ impl KnownEnumDataTypeMixin {
                 Type::int_literal(i64::from(value))
             }
             (Self::Str, Some(LiteralValueTypeKind::Int(value))) => {
-                Type::string_literal(db, &value.to_string())
+                Type::string_literal(db, value.to_compact_string())
             }
             (Self::Str, Some(LiteralValueTypeKind::Bool(value))) => {
                 Type::string_literal(db, if value { "True" } else { "False" })
@@ -385,7 +386,7 @@ impl<'db> EnumClassLiteral<'db> {
             return Some(KnownClass::Str.to_instance(db));
         }
         self.resolve_member(db, name)
-            .map(|name| Type::string_literal(db, name.as_str()))
+            .map(|name| Type::string_literal(db, name))
     }
 
     pub(crate) fn value_type(self, db: &'db dyn Db, name: &Name) -> Option<Type<'db>> {
@@ -613,7 +614,7 @@ impl<'db> EnumMetadata<'db> {
         let union = self
             .members
             .keys()
-            .map(|name| Type::string_literal(db, name.as_str()))
+            .map(|name| Type::string_literal(db, name))
             .fold(UnionBuilder::new(db), UnionBuilder::add)
             .build();
         Some(union)
@@ -1093,7 +1094,7 @@ pub(crate) fn enum_metadata<'db>(
                                     if Type::ClassLiteral(ClassLiteral::Static(class))
                                         .is_subtype_of(db, KnownClass::StrEnum.to_subclass_of(db))
                                     {
-                                        Type::string_literal(db, &name.to_lowercase())
+                                        Type::string_literal(db, &*name.to_lowercase())
                                     } else {
                                         let custom_mixins: SmallVec<[Option<KnownClass>; 1]> =
                                             class

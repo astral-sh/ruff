@@ -156,6 +156,54 @@ p = partial(f, 1)
 reveal_type(p)  # revealed: partial[(**kwargs: str) -> bool]
 ```
 
+### Specialized generic variadics remain non-gradual
+
+Specializing variadic parameter types to `Any` does not make them gradual when constructing a
+`partial`:
+
+```py
+from functools import partial
+from typing import Any, Callable, Generic, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+T = TypeVar("T")
+
+class C(Generic[T]):
+    def method(self, *args: T, **kwargs: T) -> None: ...
+
+callback = partial(C[Any]().method)
+reveal_type(callback)  # revealed: partial[(*args: Any, **kwargs: Any) -> None]
+# Unlike a gradual callable, this standard variadic callable is a subtype of a no-argument callable.
+static_assert(is_subtype_of(TypeOf[callback], Callable[[], None]))
+```
+
+### Expanded ParamSpec variadics preserve non-gradual parameters
+
+When a `partial` expands specialized `P.args` and `P.kwargs`, it preserves the kind of the
+parameters inferred for `P`:
+
+```py
+from functools import partial
+from typing import Any, Callable, Generic, ParamSpec, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+class C(Generic[T]):
+    def method(self, *args: T, **kwargs: T) -> None: ...
+
+def invoke(callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None:
+    callback(*args, **kwargs)
+
+callback = partial(invoke, C[Any]().method)
+reveal_type(callback)  # revealed: partial[(*args: Any, **kwargs: Any) -> None]
+# Unlike a gradual callable, this standard variadic callable is a subtype of a no-argument callable.
+static_assert(is_subtype_of(TypeOf[callback], Callable[[], None]))
+```
+
 ### Defaults preserved
 
 ```py

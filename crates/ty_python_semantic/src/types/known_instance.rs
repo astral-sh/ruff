@@ -4,10 +4,10 @@ use ruff_python_ast::name::Name;
 use crate::{
     Db, DisplaySettings,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassType, GenericContext,
-        InferenceFlags, InvalidTypeExpressionError, KnownClass, PromotionKind, PromotionMode,
-        StringLiteralType, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarNonce,
-        TypeVarVariance, UnionBuilder,
+        ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
+        ClassType, GenericContext, InferenceFlags, InvalidTypeExpressionError, KnownClass,
+        PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
+        TypeMapping, TypeVarNonce, TypeVarVariance, UnionBuilder,
         class::NamedTupleSpec,
         constraints::OwnedConstraintSet,
         generics::{Specialization, walk_generic_context},
@@ -92,15 +92,15 @@ pub enum KnownInstanceType<'db> {
     Field(FieldInstance<'db>),
 
     /// A constraint set, which is exposed in mdtests as an instance of
-    /// `ty_extensions.ConstraintSet`.
+    /// `ty_extensions._internal.ConstraintSet`.
     ConstraintSet(InternedConstraintSet<'db>),
 
     /// A generic context, which is exposed in mdtests as an instance of
-    /// `ty_extensions.GenericContext`.
+    /// `ty_extensions._internal.GenericContext`.
     GenericContext(GenericContext<'db>),
 
     /// A specialization, which is exposed in mdtests as an instance of
-    /// `ty_extensions.Specialization`.
+    /// `ty_extensions._internal.Specialization`.
     Specialization(Specialization<'db>),
 
     /// A single instance of `types.UnionType`, which stores the elements of
@@ -204,7 +204,7 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
 }
 
 impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         match self {
             KnownInstanceType::TypeAliasType(type_alias) => {
                 type_alias.raw_value_type(db).variance_of(db, typevar)

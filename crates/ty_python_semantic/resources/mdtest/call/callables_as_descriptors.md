@@ -13,7 +13,7 @@ instance to the first argument. The bound-method object therefore has a differen
 the first argument:
 
 ```py
-from ty_extensions import RegularCallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 from typing import Any, Callable
 
 class C1:
@@ -348,7 +348,7 @@ The callable type of a type object is not function-like.
 
 ```py
 from typing import ClassVar
-from ty_extensions import RegularCallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 
 class WithNew:
     def __new__(self, x: int) -> WithNew:

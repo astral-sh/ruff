@@ -769,9 +769,11 @@ impl ParseSource {
     }
 }
 
-/// Like [`ruff_python_parser::parse_unchecked_source`] but with an additional [`PythonVersion`]
-/// argument.
-fn parse_unchecked_source(
+/// Like [`ruff_python_parser::parse_unchecked_source`], but with an explicit [`PythonVersion`] and
+/// per-cell notebook parsing.
+///
+/// Per-cell modules are merged so definitions remain visible across cells.
+pub fn parse_unchecked_source(
     source_kind: &SourceKind,
     source_type: PySourceType,
     target_version: PythonVersion,
@@ -780,9 +782,16 @@ fn parse_unchecked_source(
     // SAFETY: Safe because `PySourceType` always parses to a `ModModule`. See
     // `ruff_python_parser::parse_unchecked_source`. We use `parse_unchecked` (and thus
     // have to unwrap) in order to pass the `PythonVersion` via `ParseOptions`.
-    ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
-        .try_into_module()
-        .expect("PySourceType always parses into a module")
+    match source_kind.as_ipy_notebook() {
+        Some(notebook) => ruff_python_parser::parse_cells_unchecked(
+            source_kind.source_code(),
+            notebook.cell_offsets().content_ranges(),
+            &options,
+        ),
+        None => ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
+            .try_into_module()
+            .expect("PySourceType always parses into a module"),
+    }
 }
 
 #[cfg(test)]
@@ -793,14 +802,13 @@ mod tests {
     use ruff_python_ast::{PySourceType, PythonVersion};
     use ruff_python_codegen::Stylist;
     use ruff_python_index::Indexer;
-    use ruff_python_parser::ParseOptions;
     use ruff_python_trivia::textwrap::dedent;
     use test_case::test_case;
 
     use ruff_db::diagnostic::Diagnostic;
     use ruff_notebook::{Notebook, NotebookError};
 
-    use crate::linter::check_path;
+    use crate::linter::{check_path, parse_unchecked_source};
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
     use crate::source_kind::SourceKind;
@@ -966,11 +974,9 @@ mod tests {
     ) -> Vec<Diagnostic> {
         let source_type = PySourceType::from(path);
         let target_version = settings.resolve_target_version(path);
-        let options =
-            ParseOptions::from(source_type).with_target_version(target_version.parser_version());
-        let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
-            .try_into_module()
-            .expect("PySourceType always parses into a module");
+        // Mirror the production parse path so notebooks are validated cell by cell.
+        let parsed =
+            parse_unchecked_source(source_kind, source_type, target_version.parser_version());
         let locator = Locator::new(source_kind.source_code());
         let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
         let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());

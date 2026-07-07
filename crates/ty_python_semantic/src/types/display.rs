@@ -3188,12 +3188,14 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 }
             }
             KnownInstanceType::GenericContext(generic_context) => {
-                f.with_type(ty).write_str("ty_extensions.GenericContext")?;
+                f.with_type(ty)
+                    .write_str("ty_extensions._internal.GenericContext")?;
                 write!(f, "{}", generic_context.display_full(self.db))
             }
             KnownInstanceType::Specialization(specialization) => {
                 // Normalize for consistent output across CI platforms
-                f.with_type(ty).write_str("ty_extensions.Specialization")?;
+                f.with_type(ty)
+                    .write_str("ty_extensions._internal.Specialization")?;
                 write!(f, "{}", specialization.display_full(self.db))
             }
             KnownInstanceType::UnionType(union) => {
@@ -3309,7 +3311,7 @@ mod tests {
         return_ty: Option<Type<'db>>,
     ) -> String {
         Signature::new(
-            Parameters::new(db, parameters),
+            Parameters::from_annotation(db, parameters),
             return_ty.unwrap_or(Type::unknown()),
         )
         .display(db)
@@ -3322,7 +3324,7 @@ mod tests {
         return_ty: Option<Type<'db>>,
     ) -> String {
         Signature::new(
-            Parameters::new(db, parameters),
+            Parameters::from_annotation(db, parameters),
             return_ty.unwrap_or(Type::unknown()),
         )
         .display_with(db, super::DisplaySettings::default().multiline())

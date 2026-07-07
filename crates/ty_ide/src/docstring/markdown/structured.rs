@@ -623,13 +623,23 @@ mod tests {
             ),
             SectionItem::new(
                 SectionKind::Parameters,
+                Some("link syntax"),
+                None,
+                "\
+Rendered as code:
+
+    `not a link <https://example.com>`_
+",
+            ),
+            SectionItem::new(
+                SectionKind::Parameters,
                 Some("nested"),
                 None,
                 "- parent\n  - child",
             ),
         ]);
 
-        assert_snapshot!(render_markdown(&section), @"
+        assert_snapshot!(render_markdown(&section), @r"
         ## Parameters
         **paragraphs**<HB>
         First paragraph.
@@ -641,6 +651,11 @@ mod tests {
             code<HB>
         <HB>
         trailing
+
+        **link syntax**<HB>
+        Rendered as code:
+
+            `not a link <https://example.com>`\_
 
         **nested**
 

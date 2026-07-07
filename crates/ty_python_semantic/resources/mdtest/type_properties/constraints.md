@@ -34,7 +34,8 @@ upper bound.
 
 ```py
 from typing import Any, final, Never, Sequence
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -126,7 +127,8 @@ strict subtype of the lower bound, a strict supertype of the upper bound, or inc
 
 ```pyi
 from typing import Any, final, Never, Sequence
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -224,7 +226,7 @@ cases, we can simplify the result of an intersection.
 ### Different typevars
 
 ```py
-from ty_extensions import ConstraintSet
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -247,7 +249,8 @@ The intersection of two ranges is where the ranges "overlap".
 
 ```pyi
 from typing import final
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -322,7 +325,8 @@ the intersection as removing the hole from the range constraint.
 
 ```py
 from typing import final, Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -376,7 +380,8 @@ smaller constraint. For negated ranges, the smaller constraint is the one with t
 
 ```py
 from typing import final
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -434,7 +439,7 @@ can simplify the result of an union.
 ### Different typevars
 
 ```py
-from ty_extensions import ConstraintSet
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -458,7 +463,8 @@ bounds.
 
 ```py
 from typing import final
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -562,7 +568,8 @@ the union as filling part of the hole with the types from the range constraint.
 
 ```py
 from typing import final, Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -615,7 +622,8 @@ The union of two negated ranges has a hole where the ranges "overlap".
 
 ```py
 from typing import final
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -657,7 +665,8 @@ def _[T]() -> None:
 
 ```py
 from typing import Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...
@@ -686,7 +695,8 @@ def _[T]() -> None:
 
 ```py
 from typing import final, Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 class Base: ...
 
@@ -724,7 +734,8 @@ enforce an arbitrary ordering on typevars, and always place the constraint on th
 
 ```py
 from typing import Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 def f[S, T]():
     # (S@f ≤ T@f)
@@ -778,7 +789,8 @@ set.
 
 ```pyi
 from typing import Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 def f[T]():
     c1 = ConstraintSet.range(Never, T, str | int)
@@ -799,7 +811,8 @@ static types.)
 
 ```pyi
 from typing import Never
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
 
 def same_typevar[T]():
     constraints = ConstraintSet.range(Never, T, T)
@@ -857,7 +870,7 @@ out all of the different kinds of constraints described above. Here we just test
 exists, and provides more detail than otherwise.
 
 ```py
-from ty_extensions import ConstraintSet
+from ty_extensions._internal import ConstraintSet
 
 class Super: ...
 class Base(Super): ...

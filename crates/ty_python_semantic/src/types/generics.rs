@@ -2289,14 +2289,21 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         variance: TypeVarVariance,
     ) {
         self.insert_hash_map_type_mapping(bound_typevar, ty);
+        self.insert_pending_type_mapping(bound_typevar, ty, variance);
+    }
 
+    fn insert_pending_type_mapping(
+        &mut self,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+        variance: TypeVarVariance,
+    ) {
         let bounds = match variance {
             TypeVarVariance::Covariant => ConstraintBounds::new(Some(ty), None),
             TypeVarVariance::Contravariant => ConstraintBounds::new(None, Some(ty)),
             TypeVarVariance::Invariant => ConstraintBounds::exact(ty),
             TypeVarVariance::Bivariant => return,
         };
-
         self.intersect_pending_typevar_constraint(bound_typevar, bounds);
     }
 
@@ -2775,7 +2782,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             };
 
                             if is_satisfied {
-                                self.add_type_mapping(bound_typevar, *constraint, polarity);
+                                // For the old solver, we use the constraint itself as the mapped
+                                // type, since the old solver's hash map stores solutions. For the
+                                // new solver's pending constraint set, we store the type that
+                                // matched against the constraint. This is especially important
+                                // when the matched type is gradual, since it might match multiple
+                                // constraints, and we need the constraint set to be able to reason
+                                // about all of them.
+                                self.insert_hash_map_type_mapping(bound_typevar, *constraint);
+                                self.insert_pending_type_mapping(bound_typevar, ty, polarity);
                                 return Ok(());
                             }
                         }

@@ -191,15 +191,17 @@ fn check_class_declaration<'db>(
                 diagnostic.info("This will cause the class creation to fail at runtime");
             }
         }
-        Some(policy @ CodeGeneratorKind::DataclassLike(_)) => check_post_init_signature(
-            context,
-            configuration,
-            class,
-            member,
-            *first_reachable_definition,
-            policy,
-        ),
-        Some(CodeGeneratorKind::TypedDict) | None => {}
+        Some(policy @ CodeGeneratorKind::DataclassLike(_)) => {
+            check_post_init_signature(
+                context,
+                configuration,
+                class,
+                member,
+                *first_reachable_definition,
+                policy,
+            );
+        }
+        Some(CodeGeneratorKind::Pydantic(_) | CodeGeneratorKind::TypedDict) | None => {}
     }
 
     if configuration.check_invalid_named_tuple_field_overrides()
@@ -1442,10 +1444,8 @@ fn check_post_init_signature<'db>(
         Parameter::positional_only(Some(name.clone())).with_annotated_type(field.declared_ty)
     });
 
-    let parameters = Parameters::new(
-        db,
-        std::iter::chain([first_parameter], following_parameters),
-    );
+    let parameters =
+        Parameters::standard(std::iter::chain([first_parameter], following_parameters));
 
     let expected_signature = CallableType::single(db, Signature::new(parameters, Type::object()));
 
