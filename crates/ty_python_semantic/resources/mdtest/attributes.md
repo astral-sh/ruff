@@ -1300,13 +1300,27 @@ reveal_type(InitializedDerived.inherited_attr)  # revealed: int
 
 ## Attributes stored on classes by metaclasses
 
-A metaclass declaration can describe an attribute that the metaclass stores in every class it
-creates. The attribute is then available through instances of those classes. This is useful when a
-generic metaclass method relies on a protocol describing the classes it accepts:
+ty treats an attribute declared in a metaclass with an annotation but no value as an attribute of
+every class created with that metaclass. The attribute is therefore available through instances of
+those classes:
 
 ```py
-from dataclasses import dataclass
-from typing import Any, Callable, ClassVar, Iterator, Literal, Protocol, TypeVar
+class StoringMeta(type):
+    generated: int
+
+    def __new__(mcls, name: str, bases: tuple[type, ...], namespace: dict[str, object]):
+        namespace["generated"] = 1
+        return super().__new__(mcls, name, bases, namespace)
+
+class GeneratedClass(metaclass=StoringMeta): ...
+
+reveal_type(GeneratedClass().generated)  # revealed: int
+```
+
+This also lets a generic metaclass method rely on a protocol describing the classes it accepts:
+
+```py
+from typing import Iterator, Protocol, TypeVar
 
 class EnumProtocol(Protocol):
     _member_map_: dict[str, int]
@@ -1338,13 +1352,6 @@ Because the metaclass stores the declared attribute directly on the new class, i
 over an attribute inherited from a base class:
 
 ```py
-class StoringMeta(type):
-    generated: int
-
-    def __new__(mcls, name: str, bases: tuple[type, ...], namespace: dict[str, object]):
-        namespace["generated"] = 1
-        return super().__new__(mcls, name, bases, namespace)
-
 class GeneratedBase:
     generated = "base"
 
@@ -1376,6 +1383,8 @@ A function is a descriptor when stored on a class, but not when stored directly 
 instance attribute is therefore returned without descriptor binding:
 
 ```py
+from typing import Callable
+
 class CallableStoringMeta(type):
     generated_callable: Callable[[int], str]
 
@@ -1394,6 +1403,8 @@ A dynamic base may provide an instance attribute of any type, so a regular attri
 metaclass does not remove that uncertainty:
 
 ```py
+from typing import Any
+
 DynamicGeneratedBase: Any = object
 
 class InheritsDynamicGenerated(DynamicGeneratedBase, metaclass=StoringMeta): ...
@@ -1426,6 +1437,9 @@ An inherited `ClassVar` does not describe an instance attribute, but an inherite
 does:
 
 ```py
+from dataclasses import dataclass
+from typing import ClassVar
+
 class ClassVarGeneratedBase:
     generated: ClassVar[str]
 
@@ -1446,6 +1460,8 @@ The attribute stored by the metaclass also shadows a descriptor inherited from a
 instance assignment can therefore take precedence over that inherited descriptor:
 
 ```py
+from typing import Literal
+
 class InheritedGeneratedProperty:
     @property
     def generated(self) -> Literal["property"]:
@@ -1589,16 +1605,18 @@ class ConditionalMethodAssignment(metaclass=StoringMeta):
 reveal_type(ConditionalMethodAssignment().generated)  # revealed: int
 ```
 
-Only an annotation without a class-body value describes an attribute stored on each class created by
-the metaclass. A metaclass attribute with a value remains an attribute of the metaclass, and a
-method assignment without a declaration is not enough evidence that the attribute is present on
-every created class:
+ty only applies this rule to an annotation without a class-body value. An attribute assigned in the
+metaclass body is available on classes that use the metaclass, but not on their instances.
+Similarly, assigning through `cls` in a metaclass method does not tell ty that the attribute is
+present on every created class:
 
 ```py
 class MetaclassAttributeOnly(type):
     metaclass_only: int = 1
 
 class DoesNotInheritMetaclassAttribute(metaclass=MetaclassAttributeOnly): ...
+
+reveal_type(DoesNotInheritMetaclassAttribute.metaclass_only)  # revealed: int
 
 # error: [unresolved-attribute]
 reveal_type(DoesNotInheritMetaclassAttribute().metaclass_only)  # revealed: Unknown
