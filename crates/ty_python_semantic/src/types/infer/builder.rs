@@ -5132,7 +5132,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let mut seen = FxHashSet::default();
                     let argument_type = self.expression_type(value);
                     let teardown = self.setup_expression_cache();
-                    let has_unique_context = overloads_with_binding.len() == 1;
+                    let has_unique_context = !self.context.diagnostics_are_suppressed()
+                        && matches!(
+                            overloads_with_binding.as_slice(),
+                            [(_, binding)] if matches!(
+                                binding.matching_overload_index(),
+                                MatchingOverloadIndex::Single(_)
+                            )
+                        );
 
                     for (overload, binding) in &overloads_with_binding {
                         let adjusted_argument_index = if binding.bound_type.is_some() {
@@ -5150,7 +5157,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .keyword_parameter_types(overload.signature.parameters())
                             .collect();
                         let expected_variadic_ty = argument_matches
-                            .keyword_variadic_parameter_type(overload.signature.parameters());
+                            .keyword_variadic_context_type(db, overload.signature.parameters());
                         let Some(context_ty) = argument_matches
                             .keyword_context_type(db, overload.signature.parameters())
                         else {
@@ -5162,30 +5169,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                         let ty = if value.is_dict_expr() {
                             let tcx = TypeContext::new(Some(context_ty));
+                            let mut builder = self.speculate_without_diagnostics();
+                            let ty = infer_argument_ty(&mut builder, (argument_index, value, tcx));
+                            Some(ty)
+                        } else {
                             let mut builder = if has_unique_context {
                                 self.speculate()
                             } else {
                                 self.speculate_without_diagnostics()
                             };
-                            let ty = infer_argument_ty(&mut builder, (argument_index, value, tcx));
+                            let ty = builder.try_narrow_dict_kwargs(
+                                argument_type,
+                                keyword,
+                                Some(&expected_fields),
+                                expected_variadic_ty,
+                            );
                             if has_unique_context {
-                                self.extend(builder);
+                                let diagnostics = builder.context.finish();
+                                self.context.extend(&diagnostics);
                             }
-                            Some(ty)
-                        } else if has_unique_context {
-                            self.try_narrow_dict_kwargs(
-                                argument_type,
-                                keyword,
-                                Some(&expected_fields),
-                                expected_variadic_ty,
-                            )
-                        } else {
-                            self.speculate_without_diagnostics().try_narrow_dict_kwargs(
-                                argument_type,
-                                keyword,
-                                Some(&expected_fields),
-                                expected_variadic_ty,
-                            )
+                            ty
                         };
                         if let Some(ty) = ty {
                             arguments_types.insert_type(argument_index, context_ty, ty);
@@ -8988,7 +8991,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let InferenceRegion::Scope(_, tcx) = self.region else {
             return None;
         };
-        let DefinitionKind::LambdaParameter(parameter) = definition.kind(self.db()) else {
+        let DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
+            index,
+            parameter: ParameterDefinitionNodeKind::Parameter(_),
+            ..
+        }) = definition.kind(self.db())
+        else {
             return None;
         };
         let callable = tcx
@@ -9001,7 +9009,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let parameter_ty = signature
             .parameters()
             .as_slice()
-            .get(parameter.index as usize)?
+            .get(*index as usize)?
             .annotated_type();
 
         (!parameter_ty.is_unknown() && !parameter_ty.has_unspecialized_type_var(self.db()))

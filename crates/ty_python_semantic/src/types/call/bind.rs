@@ -5721,8 +5721,10 @@ impl<'db> MatchedArgument<'db> {
         })
     }
 
-    pub(crate) fn keyword_variadic_parameter_type(
+    /// Returns the concrete per-field context contributed by a keyword-variadic parameter.
+    pub(crate) fn keyword_variadic_context_type(
         &self,
+        db: &'db dyn Db,
         parameters: &Parameters<'db>,
     ) -> Option<Type<'db>> {
         self.parameters.iter().find_map(|matched_parameter| {
@@ -5730,6 +5732,12 @@ impl<'db> MatchedArgument<'db> {
             parameter
                 .is_keyword_variadic()
                 .then(|| parameter.annotated_type())
+                .filter(|ty| {
+                    // A dynamic annotation provides no context, while `P.kwargs` describes an
+                    // entire parameter pack rather than the type of each keyword value.
+                    !ty.is_dynamic()
+                        && !matches!(ty, Type::TypeVar(typevar) if typevar.paramspec_attr(db).is_some())
+                })
         })
     }
 
@@ -5738,7 +5746,7 @@ impl<'db> MatchedArgument<'db> {
         db: &'db dyn Db,
         parameters: &Parameters<'db>,
     ) -> Option<Type<'db>> {
-        let variadic_ty = self.keyword_variadic_parameter_type(parameters);
+        let variadic_ty = self.keyword_variadic_context_type(db, parameters);
         let openness = variadic_ty.map_or(TypedDictOpenness::Closed, |ty| {
             TypedDictOpenness::extra(db, ty, false)
         });

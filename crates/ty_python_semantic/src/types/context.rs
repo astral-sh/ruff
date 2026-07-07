@@ -115,6 +115,10 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.diagnostics_suppressed = true;
     }
 
+    pub(super) fn diagnostics_are_suppressed(&self) -> bool {
+        self.diagnostics_suppressed
+    }
+
     pub(super) fn is_lint_enabled(&self, lint: &'static LintMetadata) -> bool {
         LintDiagnosticGuardBuilder::severity_and_source(self, LintId::of(lint)).is_some()
     }
