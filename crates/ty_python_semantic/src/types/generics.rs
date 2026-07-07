@@ -1073,9 +1073,15 @@ impl<'db> GenericContext<'db> {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
-struct InvariantArgumentBounds<'db> {
+pub(super) struct InvariantArgumentBounds<'db> {
     bottom: Type<'db>,
     top: Type<'db>,
+}
+
+impl<'db> InvariantArgumentBounds<'db> {
+    pub(super) const fn new(bottom: Type<'db>, top: Type<'db>) -> Self {
+        Self { bottom, top }
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -1655,13 +1661,10 @@ impl<'db> Specialization<'db> {
                     vartype.materialize(db, materialization_kind.flip(), visitor)
                 }
                 TypeVarVariance::Invariant => {
-                    let bottom = vartype.materialize(db, MaterializationKind::Bottom, visitor);
-                    let top = vartype.materialize(db, MaterializationKind::Top, visitor);
-                    if !visitor.is_equivalent_to_materialization(db, vartype, top) {
-                        materialized_arguments.push(MaterializedInvariantArgument {
-                            index,
-                            bounds: InvariantArgumentBounds { bottom, top },
-                        });
+                    let bounds = visitor.materialization_bounds(db, vartype);
+                    if !visitor.is_equivalent_to_materialization(db, vartype, bounds.top) {
+                        materialized_arguments
+                            .push(MaterializedInvariantArgument { index, bounds });
                     }
                     vartype
                 }

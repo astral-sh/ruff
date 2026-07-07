@@ -76,8 +76,8 @@ use crate::types::function::{
 };
 pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{
-    ApplySpecialization, InferableTypeVars, Specialization, SpecializationMaterialization,
-    bind_typevar,
+    ApplySpecialization, InferableTypeVars, InvariantArgumentBounds, Specialization,
+    SpecializationMaterialization, bind_typevar,
 };
 use crate::types::infer::InferenceFlags;
 use crate::types::known_instance::{
@@ -294,8 +294,11 @@ fn definition_expression_annotation<'db>(
 struct ApplyDefaultTypeMapping;
 struct ApplyTopMaterialization;
 struct ApplyBottomMaterialization;
+struct ApplyMaterializationBounds;
 struct ApplyMaterializationEquivalence;
 
+type MaterializationBoundsVisitor<'db> =
+    CycleDetector<ApplyMaterializationBounds, Type<'db>, Option<InvariantArgumentBounds<'db>>, 3>;
 type MaterializationEquivalenceVisitor<'db> =
     Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
 
@@ -303,11 +306,13 @@ type MaterializationEquivalenceVisitor<'db> =
 ///
 /// Materialization is the only mapping mode that needs to visit the same type under two different
 /// mappings within a single recursive call chain (`Top` and `Bottom`). Keep separate cycle caches
-/// for those modes so invariant checks can safely reuse one visitor.
+/// for those modes, and memoize the resulting pair, so recursively invariant types do not compute
+/// the same pair exponentially at every nesting level.
 pub(crate) struct ApplyTypeMappingVisitor<'db> {
     default: OnceCell<TypeTransformer<'db, ApplyDefaultTypeMapping>>,
     top_materialization: OnceCell<TypeTransformer<'db, ApplyTopMaterialization>>,
     bottom_materialization: OnceCell<TypeTransformer<'db, ApplyBottomMaterialization>>,
+    materialization_bounds: OnceCell<MaterializationBoundsVisitor<'db>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
 }
 
@@ -315,6 +320,22 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
     fn materialization_equivalence(&self) -> &MaterializationEquivalenceVisitor<'db> {
         self.materialization_equivalence
             .get_or_init(|| Rc::new(CycleDetector::new(true)))
+    }
+
+    fn materialization_bounds(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> InvariantArgumentBounds<'db> {
+        self.materialization_bounds
+            .get_or_init(|| CycleDetector::new(None))
+            .visit(ty, || {
+                Some(InvariantArgumentBounds::new(
+                    ty.materialize(db, MaterializationKind::Bottom, self),
+                    ty.materialize(db, MaterializationKind::Top, self),
+                ))
+            })
+            .unwrap_or_else(|| InvariantArgumentBounds::new(ty, ty))
     }
 
     pub(crate) fn visit(
@@ -361,6 +382,7 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
             default: OnceCell::new(),
             top_materialization: OnceCell::new(),
             bottom_materialization: OnceCell::new(),
+            materialization_bounds: OnceCell::new(),
             materialization_equivalence,
         }
     }
@@ -372,6 +394,7 @@ impl Default for ApplyTypeMappingVisitor<'_> {
             default: OnceCell::new(),
             top_materialization: OnceCell::new(),
             bottom_materialization: OnceCell::new(),
+            materialization_bounds: OnceCell::new(),
             materialization_equivalence: OnceCell::new(),
         }
     }

@@ -977,3 +977,26 @@ def _(top: Top[AliasedCallable[Any]], bottom: Bottom[AliasedCallable[Any]]) -> N
     reveal_type(top)  # revealed: (Never, /) -> object
     reveal_type(bottom)  # revealed: (object, /) -> Never
 ```
+
+## Recursive generic aliases
+
+Computing both materialization bounds for a deeply nested invariant recursive alias should not
+recompute the bounds exponentially at every level.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Generic, TypeAlias, TypeVar
+
+T = TypeVar("T")
+Nested: TypeAlias = "list[Nested[T]]"
+
+class Wrapper(Generic[T]):
+    def __init__(self, value: Nested[T], context: T) -> None: ...
+
+value = [[[[[[[[[[[[[[[[1]], [[]]]]]]]]]]]]]]]]
+Wrapper(value, 1)
+```
