@@ -3442,6 +3442,11 @@ impl<'db> PathBounds<'db> {
         }
 
         let node = node.remove_noninferable(db, builder, inferable);
+        match node.node() {
+            Node::AlwaysTrue => return PathBounds::Unconstrained,
+            Node::AlwaysFalse => return PathBounds::Unsatisfiable,
+            Node::Interior(_) => {}
+        }
 
         // Sort the constraints in each path by their `source_order`s, to ensure that we construct
         // any unions or intersections in our type mappings in a stable order. Constraints might
