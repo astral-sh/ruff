@@ -33,13 +33,13 @@ use crate::types::relation::{
 };
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
 use crate::types::typevar::max_typevar_freshness_matching_generic_context;
+use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
     MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
     TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder,
-    VarianceInferable,
-    infer_complete_scope_types, todo_type,
+    VarianceInferable, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -494,6 +494,31 @@ pub struct Signature<'db> {
 
     /// Return type. If no annotation was provided, this is `Unknown`.
     pub(crate) return_ty: Type<'db>,
+}
+
+fn type_references_protocol_instance<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    any_over_type(db, ty, false, |inner| {
+        matches!(inner, Type::ProtocolInstance(_))
+    })
+}
+
+fn can_quantify_typevar_domain<'db>(db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> bool {
+    if typevar.is_paramspec(db) {
+        return false;
+    }
+    let can_quantify = |ty: Type<'db>| {
+        !any_over_type(db, ty, false, |inner| {
+            inner.is_type_var()
+                || inner.is_dynamic()
+                || matches!(inner, Type::ProtocolInstance(_) | Type::TypeAlias(_))
+        }) && ty.bottom_materialization(db) == ty.top_materialization(db)
+    };
+    match typevar.typevar(db).require_bound_or_constraints(db) {
+        TypeVarBoundOrConstraints::UpperBound(bound) => can_quantify(bound),
+        TypeVarBoundOrConstraints::Constraints(constraints) => {
+            constraints.elements(db).iter().copied().all(can_quantify)
+        }
+    }
 }
 
 /// Whether one callable signature's parameters are compatible with another's.
@@ -1289,6 +1314,12 @@ impl<'db> Signature<'db> {
         )
     }
 
+    fn references_protocol_instance(&self, db: &'db dyn Db) -> bool {
+        std::iter::once(self.return_ty)
+            .chain(self.parameters.iter().map(Parameter::annotated_type))
+            .any(|ty| type_references_protocol_instance(db, ty))
+    }
+
     pub(crate) fn is_non_generic(&self) -> bool {
         self.generic_context.is_none()
     }
@@ -1932,10 +1963,42 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
     }
 
+    /// Adds and existentially abstracts each variable's declared domain without first
+    /// materializing the domains' Cartesian product.
+    fn existentially_quantify_context(
+        &self,
+        db: &'db dyn Db,
+        context: GenericContext<'db>,
+        relation: ConstraintSet<'db, 'c>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        let mut quantified = relation;
+        for typevar in context.variables(db) {
+            let witness = ConstraintSet::valid_specializations(db, self.constraints, typevar).and(
+                db,
+                self.constraints,
+                || quantified,
+            );
+            if !witness.supports_exact_existential_quantification(
+                db,
+                self.constraints,
+                typevar.identity(db),
+            ) {
+                return None;
+            }
+            quantified = witness.reduce_inferable(
+                db,
+                self.constraints,
+                std::iter::once(typevar.identity(db)),
+            );
+        }
+        Some(quantified)
+    }
+
     /// Infers a source specialization when both signatures contribute to an outer inference goal.
     ///
-    /// The source's declared domain is included before its variables are abstracted away, while
-    /// the target's callable-local variables remain rigid.
+    /// Source-local variables are existentially quantified inside the target-local variables'
+    /// universal scope. Variables from enclosing contexts remain available to the outer inference
+    /// goal.
     fn check_signature_pair_with_inferred_source_for_inference(
         &self,
         db: &'db dyn Db,
@@ -1948,21 +2011,74 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             .inferable
             .merge(db, source_inferable.merge(db, target_inferable));
         let checker = self.with_inferable_typevars(inferable);
-        let source_domain = source.generic_context.map_or_else(
-            || checker.always(),
-            |context| {
+        let relation = checker.with_signature_recursion_guard(source, target, || {
+            checker.check_signature_pair_inner(db, source, target)
+        });
+        let domains_can_be_quantified = source.generic_context.is_some_and(|context| {
+            context
+                .variables(db)
+                .all(|typevar| can_quantify_typevar_domain(db, typevar))
+                && target.generic_context.is_none_or(|target_context| {
+                    target_context
+                        .variables(db)
+                        .all(|typevar| can_quantify_typevar_domain(db, typevar))
+                })
+                && !source.references_protocol_instance(db)
+                && !target.references_protocol_instance(db)
+                && relation.supports_exact_quantification(db, self.constraints)
+        });
+        let source_witness = if domains_can_be_quantified {
+            source
+                .generic_context
+                .and_then(|context| self.existentially_quantify_context(db, context, relation))
+        } else {
+            None
+        };
+        let mut when = source_witness.unwrap_or_else(|| {
+            source.generic_context.map_or(relation, |context| {
                 context
                     .variables(db)
                     .when_all(db, self.constraints, |typevar| {
                         ConstraintSet::valid_specializations(db, self.constraints, typevar)
                     })
-            },
-        );
-        let when = checker.with_signature_recursion_guard(source, target, || {
-            source_domain.and(db, self.constraints, || {
-                checker.check_signature_pair_inner(db, source, target)
+                    .and(db, self.constraints, || relation)
             })
         });
+        if source_witness.is_some()
+            && let Some(target_context) = target.generic_context
+        {
+            for typevar in target_context.variables(db) {
+                let implication = ConstraintSet::valid_specializations(
+                    db,
+                    self.constraints,
+                    typevar,
+                )
+                .implies(db, self.constraints, || when);
+                if !implication.supports_exact_universal_quantification(
+                    db,
+                    self.constraints,
+                    typevar.identity(db),
+                ) {
+                    // A target-local relationship with an outer variable cannot be projected
+                    // without negative constraint inference. Preserve rigid validity, but leave
+                    // any outer type to the surrounding inference goal.
+                    return if when.satisfied_by_all_typevars(
+                        db,
+                        self.constraints,
+                        InferableTypeVars::None,
+                    ) {
+                        self.always()
+                    } else {
+                        self.never()
+                    };
+                }
+                when = implication.reduce_universal(
+                    db,
+                    self.constraints,
+                    std::iter::once(typevar.identity(db)),
+                );
+            }
+        }
         when.reduce_inferable(
             db,
             self.constraints,
@@ -2036,7 +2152,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
     }
 
-    /// Infers a source specialization, then verifies it against the rigid generic target.
+    /// Checks that every valid target specialization has a valid source specialization.
     ///
     /// The inferred specialization may depend on a target type variable. For example, the source
     /// below satisfies the target by choosing `S = list[T]` for each target specialization:
@@ -2062,13 +2178,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let Some(source_context) = source.generic_context else {
             return self.never();
         };
+        let Some(target_context) = target.generic_context else {
+            return self.never();
+        };
         let relation = checker.with_signature_recursion_guard(source, target, || {
             checker.check_signature_pair_inner(db, source, target)
         });
-        // Prefer a structural solution such as `S = list[T]`, which preserves how the source
-        // specialization depends on each rigid target specialization. If that is not valid for a
-        // constrained source variable, also try the source's declared alternatives; this models
-        // promotion such as choosing `S = int` for every `T` bounded by `int`.
         let structural_solutions =
             relation.structural_solutions(db, self.constraints, source_inferable);
         self.check_signature_pair_with_source_solutions(
@@ -2079,25 +2194,110 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             structural_solutions,
         )
         .or(db, self.constraints, || {
-            let source_domain = source_context
+            // Recursive protocol bounds can force an interface that is still being inferred, and
+            // gradual target constraints require mixed universal/existential materialization.
+            // Preserve the concrete solver for those cases and for ParamSpecs.
+            let source_domains_can_be_quantified = source_context
                 .variables(db)
-                // An unused variable cannot affect assignability. Including its constrained
-                // alternatives here would needlessly multiply the solver's paths.
-                .filter(|typevar| source.variance_of(db, *typevar) != TypeVarVariance::Bivariant)
-                .when_all(db, self.constraints, |typevar| {
-                    ConstraintSet::valid_specializations(db, self.constraints, typevar)
-                });
-            let domain_solutions = source_domain
-                .and(db, self.constraints, || relation)
-                .solutions(db, self.constraints, source_inferable);
-            self.check_signature_pair_with_source_solutions(
-                db,
-                source,
-                target,
-                source_context,
-                domain_solutions,
-            )
+                .all(|typevar| can_quantify_typevar_domain(db, typevar));
+            let target_domains_can_be_quantified = target_context
+                .variables(db)
+                .all(|typevar| can_quantify_typevar_domain(db, typevar));
+            let can_quantify = source_domains_can_be_quantified
+                && target_domains_can_be_quantified
+                && !source.references_protocol_instance(db)
+                && !target.references_protocol_instance(db)
+                && relation.supports_exact_quantification(db, self.constraints);
+
+            if !can_quantify {
+                return self.check_signature_pair_with_domain_solutions(
+                    db,
+                    source,
+                    target,
+                    source_context,
+                    source_inferable,
+                    relation,
+                );
+            }
+
+            // Quantify each variable as soon as its domain is added. Building every constrained
+            // domain first would materialize their Cartesian product in the TDD before
+            // abstraction. The exactness gate above excludes dependencies between domains, so
+            // variables of the same quantifier kind can be removed in either order.
+            let Some(source_witness) =
+                self.existentially_quantify_context(db, source_context, relation)
+            else {
+                return self.check_signature_pair_with_domain_solutions(
+                    db,
+                    source,
+                    target,
+                    source_context,
+                    source_inferable,
+                    relation,
+                );
+            };
+
+            // The source variables are existential inside the target variables' universal scope:
+            // every target specialization may choose a different source specialization.
+            let mut quantified = source_witness;
+            for typevar in target_context.variables(db) {
+                let implication = ConstraintSet::valid_specializations(
+                    db,
+                    self.constraints,
+                    typevar,
+                )
+                .implies(db, self.constraints, || quantified);
+                if !implication.supports_exact_universal_quantification(
+                    db,
+                    self.constraints,
+                    typevar.identity(db),
+                ) {
+                    return self.check_signature_pair_with_domain_solutions(
+                        db,
+                        source,
+                        target,
+                        source_context,
+                        source_inferable,
+                        relation,
+                    );
+                }
+                quantified = implication.reduce_universal(
+                    db,
+                    self.constraints,
+                    std::iter::once(typevar.identity(db)),
+                );
+            }
+            quantified
         })
+    }
+
+    fn check_signature_pair_with_domain_solutions(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+        source_context: GenericContext<'db>,
+        source_inferable: InferableTypeVars<'db>,
+        relation: ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        let source_domain = source_context
+            .variables(db)
+            .filter(|typevar| {
+                source.variance_of(db, typevar.identity(db)) != TypeVarVariance::Bivariant
+            })
+            .when_all(db, self.constraints, |typevar| {
+                ConstraintSet::valid_specializations(db, self.constraints, typevar)
+            });
+        let domain_solutions = source_domain
+            .and(db, self.constraints, || relation)
+            .solutions(db, self.constraints, source_inferable);
+        self.check_signature_pair_with_source_solutions(
+            db,
+            source,
+            target,
+            source_context,
+            domain_solutions,
+        )
     }
 
     /// Applies candidate source solutions and checks each specialized source against the original

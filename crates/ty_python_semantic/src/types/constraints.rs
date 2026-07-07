@@ -589,6 +589,173 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, self.node.exists(db, builder, to_remove))
     }
 
+    /// Universally quantifies the given typevars out of this constraint set.
+    ///
+    /// The result holds when the original constraint set holds for every specialization of the
+    /// removed typevars. A caller that only requires this for the typevars' declared domains must
+    /// encode those domains as an implication before calling this method. Because universal
+    /// quantification is implemented as negated existential abstraction, callers must also verify
+    /// [`supports_exact_universal_quantification`](Self::supports_exact_universal_quantification)
+    /// first.
+    pub(crate) fn reduce_universal(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        to_remove: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
+    ) -> Self {
+        self.verify_builder(builder);
+        let to_remove = to_remove.into_iter().collect::<Vec<_>>();
+        debug_assert!(to_remove.iter().all(|typevar| {
+            self.supports_exact_universal_quantification(db, builder, *typevar)
+        }));
+        Self::from_node(
+            builder,
+            self.node
+                .negate(builder)
+                .exists(db, builder, to_remove)
+                .negate(builder),
+        )
+    }
+
+    /// Returns whether universal abstraction of `typevar` is exact for this constraint set.
+    ///
+    /// Existential abstraction can preserve a positive relationship between two bare typevars by
+    /// deriving a constraint on the retained variable. Universal abstraction is implemented as a
+    /// negated existential, however, and the corresponding negative relationship would require a
+    /// contrapositive that the constraint set does not currently derive. We therefore only remove
+    /// a universally quantified typevar when every constraint that mentions it compares it with
+    /// fully static types.
+    pub(crate) fn supports_exact_universal_quantification(
+        &self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> bool {
+        if !self.supports_exact_quantification(db, builder) {
+            return false;
+        }
+
+        let mut supported = true;
+        self.node
+            .for_each_unique_constraint(builder, &mut |constraint, _| {
+                let constraint = builder.constraint_data(constraint);
+                let constrains_typevar = constraint.typevar.identity(db) == typevar;
+                let mut bounds = constraint
+                    .bounds
+                    .lower
+                    .into_iter()
+                    .chain(constraint.bounds.upper);
+                let bound_mentions_typevar = bounds.clone().any(|bound| {
+                    any_over_type(db, bound, false, |inner| {
+                        inner
+                            .as_typevar()
+                            .is_some_and(|inner| inner.identity(db) == typevar)
+                    })
+                });
+
+                if constrains_typevar || bound_mentions_typevar {
+                    supported &= constrains_typevar
+                        && bounds.all(|bound| !any_over_type(db, bound, false, Type::is_type_var));
+                }
+            });
+        supported
+    }
+
+    /// Returns whether existential abstraction of `typevar` is exact for this constraint set.
+    ///
+    /// A positive relation between bare typevars can be preserved by deriving a constraint on the
+    /// retained variable. A negated or optional relation would require deriving a negative fact,
+    /// which existential abstraction does not support. Relations between `typevar` and another
+    /// typevar must therefore be mandatory on every satisfying path.
+    pub(crate) fn supports_exact_existential_quantification(
+        &self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> bool {
+        fn walk<'db>(
+            db: &'db dyn Db,
+            builder: &ConstraintSetBuilder<'db>,
+            node: NodeId,
+            typevar: BoundTypeVarIdentity<'db>,
+            seen: &mut FxHashSet<NodeId>,
+        ) -> bool {
+            if node.is_terminal() || !seen.insert(node) {
+                return true;
+            }
+
+            let interior = builder.interior_node_data(node);
+            let constraint = builder.constraint_data(interior.constraint);
+            let constrains_typevar = constraint.typevar.identity(db) == typevar;
+            let mut bound_typevars = constraint
+                .bounds
+                .lower
+                .into_iter()
+                .chain(constraint.bounds.upper)
+                .filter_map(Type::as_typevar);
+            let bound_mentions_typevar = bound_typevars
+                .clone()
+                .any(|inner| inner.identity(db) == typevar);
+            let mentions_retained_typevar = (!constrains_typevar && bound_mentions_typevar)
+                || bound_typevars.any(|inner| inner.identity(db) != typevar);
+
+            if (constrains_typevar || bound_mentions_typevar)
+                && mentions_retained_typevar
+                && (!interior.if_false.is_never_satisfied(db, builder)
+                    || !interior.if_uncertain.is_never_satisfied(db, builder))
+            {
+                return false;
+            }
+
+            walk(db, builder, interior.if_true, typevar, seen)
+                && walk(db, builder, interior.if_uncertain, typevar, seen)
+                && walk(db, builder, interior.if_false, typevar, seen)
+        }
+
+        if !self.supports_exact_quantification(db, builder) {
+            return false;
+        }
+
+        walk(db, builder, self.node, typevar, &mut FxHashSet::default())
+    }
+
+    /// Returns whether this constraint set is in the fragment supported by exact quantification.
+    ///
+    /// Existential abstraction preserves relations between bare typevars through derived
+    /// constraints. It cannot, in general, preserve a relationship such as `list[T] ≤ list[U]`
+    /// after one variable is removed. Non-typevar bounds must also be fully static and cannot hide
+    /// a recursive protocol or lazy alias.
+    pub(crate) fn supports_exact_quantification(
+        &self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+    ) -> bool {
+        self.verify_builder(builder);
+        let mut supported = true;
+        self.node
+            .for_each_unique_constraint(builder, &mut |constraint, _| {
+                let constraint = builder.constraint_data(constraint);
+                supported &= constraint
+                    .bounds
+                    .lower
+                    .into_iter()
+                    .chain(constraint.bounds.upper)
+                    .all(|bound| {
+                        bound.is_type_var()
+                            || (!any_over_type(db, bound, false, |inner| {
+                                inner.is_type_var()
+                                    || inner.is_dynamic()
+                                    || matches!(
+                                        inner,
+                                        Type::ProtocolInstance(_) | Type::TypeAlias(_)
+                                    )
+                            }) && bound.bottom_materialization(db)
+                                == bound.top_materialization(db))
+                    });
+            });
+        supported
+    }
+
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
     ///
     /// The `choose` hook is called for each typevar on each BDD path with the typevar's variance
@@ -7395,6 +7562,83 @@ mod tests {
         // iff(T, ¬T) == false
         let negated = tdd.negate(&db, &builder);
         assert!(tdd.iff(&db, &builder, negated).is_never_satisfied(&db));
+    }
+
+    #[test]
+    fn universal_reduction_rejects_relations_with_retained_typevars() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let o = create_typevar(&db, "O");
+        let builder = ConstraintSetBuilder::new();
+        let int = KnownClass::Int.to_instance(&db);
+
+        // For every `T` bounded by `int`, `T` must also be bounded by `O`. Projecting the
+        // counterexample requires deriving the contrapositive `¬(int ≤ O)`, which existential
+        // abstraction does not currently support.
+        let domain = ConstraintSet::constrain_typevar_upper_bound(&db, &builder, t, int);
+        let witness =
+            ConstraintSet::constrain_typevar_upper_bound(&db, &builder, t, Type::TypeVar(o));
+        let implication = domain.implies(&db, &builder, || witness);
+
+        assert!(!implication.supports_exact_universal_quantification(
+            &db,
+            &builder,
+            t.identity(&db)
+        ));
+    }
+
+    #[test]
+    fn universal_reduction_of_static_bounds() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let int = KnownClass::Int.to_instance(&db);
+        let object = Type::object();
+
+        let domain = ConstraintSet::constrain_typevar_upper_bound(&db, &builder, t, int);
+        let witness = ConstraintSet::constrain_typevar_upper_bound(&db, &builder, t, object);
+        let implication = domain.implies(&db, &builder, || witness);
+
+        assert!(implication.supports_exact_universal_quantification(
+            &db,
+            &builder,
+            t.identity(&db)
+        ));
+        assert!(
+            implication
+                .reduce_universal(&db, &builder, std::iter::once(t.identity(&db)))
+                .is_always_satisfied(&db)
+        );
+    }
+
+    #[test]
+    fn existential_reduction_rejects_negative_typevar_relations() {
+        let db = setup_db();
+        let s = create_typevar(&db, "S");
+        let o = create_typevar(&db, "O");
+        let builder = ConstraintSetBuilder::new();
+        let relation =
+            ConstraintSet::constrain_typevar_upper_bound(&db, &builder, s, Type::TypeVar(o));
+
+        assert!(relation.supports_exact_existential_quantification(&db, &builder, s.identity(&db)));
+        assert!(
+            !relation
+                .negate(&db, &builder)
+                .supports_exact_existential_quantification(&db, &builder, s.identity(&db))
+        );
+    }
+
+    #[test]
+    fn rigid_validity_rejects_free_typevars_in_bounds() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let o = create_typevar(&db, "O");
+        let builder = ConstraintSetBuilder::new();
+        let relation =
+            ConstraintSet::constrain_typevar_upper_bound(&db, &builder, o, Type::TypeVar(t));
+        // `T` appears only in the bound, but the rigid check must not treat `O ≤ T` as universally
+        // valid.
+        assert!(!relation.satisfied_by_all_typevars(&db, &builder, InferableTypeVars::None));
     }
 
     fn create_compacted_owned_set(db: &dyn Db) -> OwnedConstraintSet<'_> {

@@ -2876,7 +2876,8 @@ independently on every call like an ordinary method type variable:
 
 ```py
 from typing import Protocol, TypeVar
-from ty_extensions import is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 SelfT = TypeVar("SelfT", bound="Copyable")
 
@@ -3010,7 +3011,9 @@ static_assert(is_assignable_to(IntOrStrIdentity, IntBoundReturnsObjectProtocol))
 ### Constraints that depend on protocol type variables
 
 The implementation's choice may depend on the protocol method's type variable. For `T = int`, the
-implementation below uses `S = list[int]`; for `T = str`, it uses `S = list[str]`:
+first implementation below uses `S = list[int]`; for `T = str`, it uses `S = list[str]`. The second
+implementation uses `S = int` for `T = bool`, following constrained-type-variable promotion, and
+`S = str` for `T = str`:
 
 ```py
 from typing import Protocol
@@ -3024,7 +3027,15 @@ class ConstrainedList:
     def f[S: (list[int], list[str])](self, value: S) -> object:
         return value
 
+class PromotedConstraintsProtocol(Protocol):
+    def f[T: (bool, str)](self, value: T) -> object: ...
+
+class PromotedConstraints:
+    def f[S: (int, str)](self, value: S) -> object:
+        return value
+
 static_assert(is_assignable_to(ConstrainedList, ConstrainedListProtocol))
+static_assert(is_assignable_to(PromotedConstraints, PromotedConstraintsProtocol))
 ```
 
 ### Unused method type variables
@@ -3064,6 +3075,132 @@ class ManyUnusedTypeVariables:
         return value
 
 static_assert(is_assignable_to(ManyUnusedTypeVariables, ReturnsObject))
+```
+
+### Scaling with constrained method type variables
+
+Matching constrained implementation variables should preserve the compact constraint-set
+representation instead of enumerating the Cartesian product of their alternatives:
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+class IntBoundParameters(Protocol):
+    def f[T01: int, T02: int, T03: int, T04: int, T05: int, T06: int](
+        self,
+        value01: T01,
+        value02: T02,
+        value03: T03,
+        value04: T04,
+        value05: T05,
+        value06: T06,
+    ) -> object: ...
+
+class ConstrainedParameters:
+    def f[
+        S01: (int, str),
+        S02: (int, str),
+        S03: (int, str),
+        S04: (int, str),
+        S05: (int, str),
+        S06: (int, str),
+    ](
+        self,
+        value01: S01,
+        value02: S02,
+        value03: S03,
+        value04: S04,
+        value05: S05,
+        value06: S06,
+    ) -> object:
+        return value01
+
+class IntBoundParametersWithResult[ResultT](Protocol):
+    def f[T01: int, T02: int, T03: int, T04: int, T05: int, T06: int](
+        self,
+        value01: T01,
+        value02: T02,
+        value03: T03,
+        value04: T04,
+        value05: T05,
+        value06: T06,
+    ) -> ResultT: ...
+
+def infer_result[ResultT](value: IntBoundParametersWithResult[ResultT]) -> ResultT:
+    raise NotImplementedError
+
+static_assert(is_assignable_to(ConstrainedParameters, IntBoundParameters))
+reveal_type(infer_result(ConstrainedParameters()))  # revealed: object
+```
+
+### Target-dependent outer inference
+
+Universal projection cannot yet preserve a relationship between a method-local target variable and
+an inferred variable from an enclosing context. In that case, use a rigid validity check and leave
+the outer type uninferred. The fallback should not leak the method-local variable, reject a valid
+call when another argument supplies the outer type, or make a broader fallback overload appear more
+precise:
+
+```py
+from typing import Protocol, overload
+
+class BoundIdentity[ResultT](Protocol):
+    def f[T: int, U: str](self, value: T) -> ResultT: ...
+
+class SwappedIdentity:
+    def f[S: str, R: int](self, value: R) -> R:
+        return value
+
+class TwoDomainIdentity[ResultT](Protocol):
+    def f[T: (int, str), U: (bytes, float)](self, first: T, second: U) -> ResultT: ...
+
+class BadIdentity:
+    def f[R: (int, str), S: bytes](self, first: R, second: S) -> R:
+        return first
+
+class Callback[ResultT](Protocol):
+    def __call__[T: int, U: str](self, value: T) -> ResultT: ...
+
+def swapped[S: str, R: int](value: R) -> R:
+    return value
+
+def infer_result[ResultT](value: BoundIdentity[ResultT]) -> ResultT:
+    raise NotImplementedError
+
+def infer_result_with_hint[ResultT](value: BoundIdentity[ResultT], hint: ResultT) -> ResultT:
+    raise NotImplementedError
+
+def infer_bad_result[ResultT](value: TwoDomainIdentity[ResultT]) -> ResultT:
+    raise NotImplementedError
+
+def infer_callback_result[ResultT](value: Callback[ResultT]) -> ResultT:
+    raise NotImplementedError
+
+@overload
+def overloaded[ResultT](value: BoundIdentity[ResultT]) -> ResultT: ...
+@overload
+def overloaded(value: object) -> str: ...
+def overloaded(value: object) -> object:
+    raise NotImplementedError
+
+@overload
+def selected[ResultT](value: BoundIdentity[ResultT]) -> int: ...
+@overload
+def selected(value: object) -> str: ...
+def selected(value: object) -> int | str:
+    raise NotImplementedError
+
+def make_int() -> int:
+    return 1
+
+reveal_type(infer_result(SwappedIdentity()))  # revealed: Unknown
+reveal_type(infer_result_with_hint(SwappedIdentity(), make_int()))  # revealed: int
+reveal_type(overloaded(SwappedIdentity()))  # revealed: Unknown
+reveal_type(selected(SwappedIdentity()))  # revealed: int
+reveal_type(infer_callback_result(swapped))  # revealed: Unknown
+infer_bad_result(BadIdentity())  # error: [invalid-argument-type]
 ```
 
 ### Overloaded implementations
