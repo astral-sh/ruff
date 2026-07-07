@@ -885,6 +885,19 @@ def capybara(top: Top[Invariant[Any]], bottom: Bottom[Invariant[Any]]) -> None:
 
     reveal_type(top.attr)  # revealed: object
     reveal_type(bottom.attr)  # revealed: Never
+
+def slice_list(top: Top[list[Any]], bottom: Bottom[list[Any]]) -> None:
+    reveal_type(top[:])  # revealed: Top[list[Any]]
+    reveal_type(bottom[:])  # revealed: Bottom[list[Any]]
+
+class Mixed[T, U]:
+    first: T
+    second: U
+    nested: list[tuple[Any, U]]
+
+def preserve_unrelated_any(top: Top[Mixed[Any, int]], bottom: Bottom[Mixed[Any, int]]) -> None:
+    reveal_type(top.nested)  # revealed: list[tuple[Any, int]]
+    reveal_type(bottom.nested)  # revealed: list[tuple[Any, int]]
 ```
 
 Alias specializations also preserve the materialization polarity in contravariant positions.

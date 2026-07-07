@@ -1322,7 +1322,7 @@ def test_match_generic_container_member_keeps_loop_reachable(
     match value:
         case GenericListOverlapB(values=items):
             for item in items:
-                reveal_type(item)  # revealed: Unknown
+                reveal_type(item)  # revealed: object
 ```
 
 ## Class pattern captures from `Any` and `Unknown`
