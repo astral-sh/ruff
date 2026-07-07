@@ -211,6 +211,15 @@ fn collect_functions(entity: &Entity, out: &mut Vec<CppFunction>) {
                     && !in_system_header(&child)
                     && let Some(name) = child.get_name()
                 {
+                    // Methods are keyed CLASS-QUALIFIED (`A::reset`) so two
+                    // classes' same-named methods stay distinct in the call
+                    // graph (codex P2 on ruff #57); free functions keep their
+                    // bare name — the banked manifests' zero-loss bar.
+                    let name = if child.get_kind() == EntityKind::Method {
+                        qualify_with_class(&child, name)
+                    } else {
+                        name
+                    };
                     let mut calls = Vec::new();
                     collect_calls(&child, &mut calls);
                     calls.sort();
@@ -268,7 +277,31 @@ fn collect_calls(node: &Entity, out: &mut Vec<String>) {
 /// INNER call's callee is never mistaken for the OUTER one.
 #[cfg(feature = "libclang")]
 fn call_callee_name(call: &Entity) -> Option<String> {
+    // A resolved call to a METHOD is emitted class-qualified (`A::reset`) so
+    // it joins against the class-qualified definition entry and same-named
+    // methods of different classes never collapse (codex P2 on ruff #57).
+    // Free-function callees stay bare (zero-loss vs the banked manifests);
+    // the OverloadedDeclRef fallback stays bare too — an unresolved lookup
+    // set has no single owning class to name.
+    if let Some(referenced) = call.get_reference() {
+        if referenced.get_kind() == EntityKind::Method
+            && let Some(name) = referenced.get_name()
+        {
+            return Some(qualify_with_class(&referenced, name));
+        }
+    }
     call.get_name().or_else(|| find_overloaded_decl_ref(call))
+}
+
+/// `Class::name` for a method entity, from its SEMANTIC parent (the class),
+/// which is correct for out-of-line definitions whose lexical parent is the
+/// namespace/TU. Falls back to the bare name when the parent is unnamed.
+#[cfg(feature = "libclang")]
+fn qualify_with_class(method: &Entity, name: String) -> String {
+    match method.get_semantic_parent().and_then(|p| p.get_name()) {
+        Some(class) => format!("{class}::{name}"),
+        None => name,
+    }
 }
 
 #[cfg(feature = "libclang")]
@@ -1168,18 +1201,20 @@ void Widget::dispatch() {
         // (`enclosing_scopes` resolves the class as the scope component).
         let compute = funcs
             .iter()
-            .find(|f| f.name == "compute")
+            .find(|f| f.name == "Widget::compute")
             .unwrap_or_else(|| panic!("Widget::compute missing; got {funcs:?}"));
         assert_eq!(compute.namespace, vec!["Widget".to_string()]);
         let dispatch = funcs
             .iter()
-            .find(|f| f.name == "dispatch")
+            .find(|f| f.name == "Widget::dispatch")
             .unwrap_or_else(|| panic!("Widget::dispatch missing; got {funcs:?}"));
         assert_eq!(dispatch.namespace, vec!["Widget".to_string()]);
 
-        // Fix 1: in-TU dispatch between two out-of-line methods resolves.
+        // Fix 1 + codex P2 (#57): in-TU dispatch between two out-of-line
+        // methods resolves CLASS-QUALIFIED, so same-named methods of
+        // different classes can never collapse in the call graph.
         assert!(
-            dispatch.calls.contains(&"compute".to_string()),
+            dispatch.calls.contains(&"Widget::compute".to_string()),
             "dispatch must call compute: {:?}",
             dispatch.calls
         );
@@ -1198,12 +1233,56 @@ void Widget::dispatch() {
         // neither fix changes that scoping (only out-of-line definitions,
         // lexically at namespace/TU level, ever reach the `Method` arm).
         assert!(
-            !funcs.iter().any(|f| f.name == "inline_only"),
+            !funcs.iter().any(|f| f.name.ends_with("inline_only")),
             "inline_only is a class-body definition, not out-of-line: {funcs:?}"
         );
 
         // Exactly the 2 out-of-line methods — no phantom extra captures.
         assert_eq!(funcs.len(), 2, "unexpected extra captures: {funcs:?}");
+    }
+
+    /// codex P2 on ruff #57, proven: two classes with the SAME method name
+    /// stay distinct — definitions are keyed `A::reset` / `B::reset`, and a
+    /// resolved call site to each is emitted class-qualified, so the call
+    /// graph can never report a call to one as dispatching to the other.
+    const SAME_NAME_TWO_CLASSES_SRC: &str = r"
+class A {
+ public:
+  void reset();
+};
+class B {
+ public:
+  void reset();
+};
+void A::reset() {}
+void B::reset() {}
+void drive(A &a, B &b) {
+  a.reset();
+  b.reset();
+}
+";
+
+    #[test]
+    fn same_named_methods_of_different_classes_stay_distinct() {
+        let _guard = CLANG_TEST_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let path = write_fixture("same_name_two_classes", SAME_NAME_TWO_CLASSES_SRC);
+        let funcs = walk_free_functions(&path, &cxx_args()).expect("libclang walk");
+        let _ = std::fs::remove_file(&path);
+
+        assert!(funcs.iter().any(|f| f.name == "A::reset"), "{funcs:?}");
+        assert!(funcs.iter().any(|f| f.name == "B::reset"), "{funcs:?}");
+        let drive = funcs
+            .iter()
+            .find(|f| f.name == "drive")
+            .unwrap_or_else(|| panic!("drive missing; got {funcs:?}"));
+        assert!(
+            drive.calls.contains(&"A::reset".to_string())
+                && drive.calls.contains(&"B::reset".to_string()),
+            "drive must reference BOTH class-qualified callees: {:?}",
+            drive.calls
+        );
     }
 
     /// A PLAIN free function (no class involved) keeps its existing
