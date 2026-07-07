@@ -801,3 +801,280 @@ pub struct CppStaticAssert {
     /// The asserted condition, verbatim.
     pub condition: String,
 }
+
+#[cfg(test)]
+mod dto_surface_tests {
+    use super::*;
+
+    // ── The codebook-DTO lock (operator, 2026-07-07) ─────────────────────
+    // ~49 `skip_serializing_if` attributes make the serde surface of the IR
+    // invisible on default values, so a consumer (ogar-from-ruff's
+    // `lift_actions`, the woa/odoo mapping bridges) discovers field drift
+    // only at its own lift site. These pins make the DTO surface a
+    // conscious, reviewed act on THIS side of the repo boundary: adding,
+    // removing or renaming a serde-visible field bangs here first — the
+    // struct-surface sibling of `predicate_count_locked_at_64`.
+
+    /// Sorted serde key set of a value. The fixtures below populate EVERY
+    /// field (each `Vec` non-empty, each `Option` `Some`) so that
+    /// `skip_serializing_if` hides nothing; a forgotten fixture field shows
+    /// up as a missing key and fails the pin — the check is self-guarding.
+    fn keys<T: serde::Serialize>(v: &T) -> Vec<String> {
+        let serde_json::Value::Object(map) = serde_json::to_value(v).expect("serializes") else {
+            panic!("expected a JSON object");
+        };
+        let mut k: Vec<String> = map.into_iter().map(|(k, _)| k).collect();
+        k.sort_unstable();
+        k
+    }
+
+    fn opts() -> Vec<(String, String)> {
+        vec![("k".into(), "v".into())]
+    }
+
+    /// The full `Function` DTO surface, pinned.
+    const FUNCTION_DTO: &[&str] = &[
+        "calls",
+        "constrains",
+        "guarded_writes",
+        "name",
+        "onchange",
+        "raises",
+        "reads",
+        "traverses",
+        "writes",
+    ];
+
+    /// The subset of [`FUNCTION_DTO`] that `ogar-from-ruff::lift_actions`
+    /// consumes to build `ActionDef` (effect slots `reads`/`writes`/`calls`/
+    /// `raises`, guard source `guarded_writes`) and `KausalSpec`
+    /// (`constrains`/`onchange`). Renaming or removing one of these is a
+    /// cross-repo consumer break — extend consciously, never silently.
+    /// (`traverses` is deliberately NOT in the feed today.)
+    const ACTIONDEF_FEED_FUNCTION: &[&str] = &[
+        "calls",
+        "constrains",
+        "guarded_writes",
+        "name",
+        "onchange",
+        "raises",
+        "reads",
+        "writes",
+    ];
+
+    /// The full `Field` DTO surface, pinned.
+    const FIELD_DTO: &[&str] = &[
+        "depends_on",
+        "emitted_by",
+        "field_type",
+        "inverse_name",
+        "name",
+        "not_null",
+        "relation_kind",
+        "stored",
+        "target",
+    ];
+
+    /// The subset of [`FIELD_DTO`] the `ComputedField` lift consumes
+    /// (`depends_on`/`emitted_by` build the kausal index, `stored` carries
+    /// the `store=` kwarg). Same conscious-extension rule as the
+    /// [`ACTIONDEF_FEED_FUNCTION`] pin.
+    const COMPUTED_FEED_FIELD: &[&str] = &["depends_on", "emitted_by", "name", "stored"];
+
+    /// The full `Model` DTO surface, pinned (Ruby/Python AR block + the
+    /// C++ block share the one struct).
+    const MODEL_DTO: &[&str] = &[
+        "acts_as",
+        "associations",
+        "attributes",
+        "bases",
+        "callbacks",
+        "concerns",
+        "delegations",
+        "dsl_calls",
+        "dynamic_methods",
+        "fields",
+        "friends",
+        "functions",
+        "gem_dsl",
+        "helpers",
+        "inherits",
+        "macro_uses",
+        "member_fields",
+        "methods",
+        "name",
+        "refinements",
+        "scopes",
+        "static_asserts",
+        "sti",
+        "templates",
+        "validations",
+    ];
+
+    fn full_function() -> Function {
+        Function {
+            name: "f".into(),
+            reads: vec!["a".into()],
+            raises: vec!["E".into()],
+            traverses: vec!["rel".into()],
+            writes: vec!["b".into()],
+            guarded_writes: vec!["c".into()],
+            calls: vec!["m.n".into()],
+            constrains: vec!["d".into()],
+            onchange: vec!["e".into()],
+        }
+    }
+
+    fn full_field() -> Field {
+        Field {
+            name: "f".into(),
+            depends_on: vec!["x.y".into()],
+            emitted_by: Some("compute_f".into()),
+            target: Some("Other".into()),
+            inverse_name: Some("back".into()),
+            relation_kind: Some("Many2one".into()),
+            field_type: Some("string".into()),
+            not_null: Some(true),
+            stored: Some(true),
+        }
+    }
+
+    fn full_model() -> Model {
+        Model {
+            name: "M".into(),
+            fields: vec![full_field()],
+            functions: vec![full_function()],
+            helpers: vec![full_function()],
+            inherits: vec!["Base".into()],
+            associations: vec![AssocDecl {
+                kind: AssocKind::BelongsTo,
+                name: "owner".into(),
+                options: opts(),
+            }],
+            validations: vec![Validation {
+                kind: ValidationKind::Validates,
+                target: "name".into(),
+                options: opts(),
+            }],
+            callbacks: vec![Callback {
+                phase: "before_save".into(),
+                target: "touch".into(),
+                options: opts(),
+            }],
+            concerns: vec![ConcernRef {
+                kind: ConcernKind::Include,
+                module: "Mix".into(),
+                body_ref: Some("ref".into()),
+            }],
+            attributes: vec![AttrDecl {
+                kind: AttrKind::Attribute,
+                name: "a".into(),
+                options: opts(),
+            }],
+            delegations: vec![Delegation {
+                methods: vec!["m".into()],
+                to: "t".into(),
+                options: opts(),
+            }],
+            scopes: vec![ScopeDecl {
+                kind: ScopeKind::Scope,
+                name: "s".into(),
+                body_ref: "ref".into(),
+            }],
+            acts_as: vec![ActsAs {
+                variant: "list".into(),
+                options: opts(),
+            }],
+            dsl_calls: vec![DslCall {
+                name: "d".into(),
+                args: "args".into(),
+            }],
+            gem_dsl: vec![GemDsl {
+                gem: GemKind::MountUploader,
+                args: "args".into(),
+            }],
+            dynamic_methods: vec![DynMethod {
+                name_expr: "expr".into(),
+                body_ref: "ref".into(),
+            }],
+            refinements: vec![UsingRef {
+                refinement_module: "R".into(),
+            }],
+            sti: Some(StiInfo {
+                inherits_from: Some("Base".into()),
+                abstract_class: true,
+                inheritance_column: Some("type".into()),
+            }),
+            bases: vec![CppBase {
+                name: "B".into(),
+                access: CppAccess::Public,
+                virtual_base: true,
+            }],
+            member_fields: vec![CppField {
+                name: "m".into(),
+                type_name: "int".into(),
+            }],
+            methods: vec![CppMethod {
+                name: "m".into(),
+                is_pure_virtual: true,
+                constexpr_kind: Some(ConstexprKind::Constexpr),
+                is_noexcept: true,
+                overrides: Some("Base::m".into()),
+                operator_kind: Some("==".into()),
+                requires_clause: Some("C<T>".into()),
+                return_type: Some("int".into()),
+                param_types: vec!["int".into()],
+                is_const: true,
+                is_static: true,
+                access: CppAccess::Public,
+            }],
+            templates: vec![CppTemplate {
+                kind: CppTemplateKind::Specialisation,
+                name: "T".into(),
+            }],
+            friends: vec![CppFriend { name: "F".into() }],
+            macro_uses: vec![CppMacroUse {
+                identifier: "ID".into(),
+                macro_name: "MAC".into(),
+            }],
+            static_asserts: vec![CppStaticAssert {
+                condition: "true".into(),
+            }],
+        }
+    }
+
+    #[test]
+    fn function_dto_surface_locked() {
+        assert_eq!(keys(&full_function()), FUNCTION_DTO);
+    }
+
+    #[test]
+    fn field_dto_surface_locked() {
+        assert_eq!(keys(&full_field()), FIELD_DTO);
+    }
+
+    #[test]
+    fn model_dto_surface_locked() {
+        assert_eq!(keys(&full_model()), MODEL_DTO);
+    }
+
+    #[test]
+    fn actiondef_feed_is_subset_of_function_dto() {
+        for k in ACTIONDEF_FEED_FUNCTION {
+            assert!(
+                FUNCTION_DTO.contains(k),
+                "ActionDef feed names `{k}` which is not on the Function DTO surface"
+            );
+        }
+    }
+
+    #[test]
+    fn computed_field_feed_is_subset_of_field_dto() {
+        for k in COMPUTED_FEED_FIELD {
+            assert!(
+                FIELD_DTO.contains(k),
+                "ComputedField feed names `{k}` which is not on the Field DTO surface"
+            );
+        }
+    }
+}
