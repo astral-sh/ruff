@@ -2106,6 +2106,7 @@ def unused(x):
         .check_command()
         .args(["--config", "ruff.toml"])
         .arg("noqa.py")
+        .arg("--preview")
         .args(["--add-noqa"])
         .arg("-")
         .pass_stdin(r#"
@@ -2204,6 +2205,7 @@ def unused(x):  # noqa: ANN001, ARG001, D103
         .check_command()
         .args(["--config", "ruff.toml"])
         .arg("noqa.py")
+        .arg("--preview")
         .args(["--add-noqa"])
         .arg("-")
         .pass_stdin(r#"
@@ -2252,6 +2254,7 @@ import os
         .check_command()
         .args(["--config", "ruff.toml"])
         .arg("noqa.py")
+        .arg("--preview")
         .args(["--add-noqa"])
         .arg("-")
         .pass_stdin(r#"
@@ -2352,6 +2355,7 @@ print(
         .check_command()
         .args(["--config", "ruff.toml"])
         .arg("noqa.py")
+        .arg("--preview")
         .args(["--add-noqa"])
         .arg("-")
         .pass_stdin(r#"
@@ -2402,6 +2406,7 @@ select = ["D100"]
         .check_command()
         .args(["--config", "ruff.toml"])
         .arg("noqa.py")
+        .arg("--preview")
         .args(["--add-noqa"])
         , @"
     success: true
@@ -2441,6 +2446,7 @@ select = ["D100"]
         .check_command()
         .args(["--config", "ruff.toml"])
         .arg("noqa.py")
+        .arg("--preview")
         .args(["--add-noqa"])
         , @"
     success: true
