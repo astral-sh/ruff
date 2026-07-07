@@ -55,6 +55,18 @@ exclude = [
     "crates/ruff_linter/src/rules/*/snapshots/**/*"
 ]
 
+[dependency-groups]
+dev = [
+    "prek==0.4.5",
+]
+release = [
+    "rooster==0.1.1",
+]
+
+[tool.uv.dependency-groups]
+dev = { requires-python = ">=3.12" }
+release = { requires-python = ">=3.12" }
+
 [tool.ruff]
 target-version = "py38"
 extend-exclude = [

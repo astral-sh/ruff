@@ -539,7 +539,7 @@ fn is_kwarg_parameter(semantic: &SemanticModel, name: &ExprName) -> bool {
 /// from airflow.datasets.manager import DatasetManager
 ///
 /// manager = DatasetManager()
-/// manager.register_datsaet_change()
+/// manager.register_dataset_change()
 /// ```
 fn check_method(checker: &Checker, call_expr: &ExprCall) {
     let Expr::Attribute(ExprAttribute { attr, value, .. }) = &*call_expr.func else {

@@ -1164,6 +1164,7 @@ fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
 }
 
 const NUM_LITERAL_FALLTHROUGH_ARMS: usize = 40;
+const NUM_LITERAL_OR_PATTERN_ALTERNATIVES: usize = 23;
 
 fn is_literal_fallthrough_arm(index: usize) -> bool {
     index.is_multiple_of(8) || index == NUM_LITERAL_FALLTHROUGH_ARMS - 4
@@ -1258,6 +1259,20 @@ fn literal_equality_fallthrough_code() -> String {
     code
 }
 
+fn literal_or_pattern_reachability_code() -> String {
+    let mut code = "from typing import Any\n\ndef check(item: Any) -> None:\n    x: int\n    match item:\n        case ".to_string();
+
+    for index in 0..NUM_LITERAL_OR_PATTERN_ALTERNATIVES {
+        if index > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "{index}").ok();
+    }
+
+    code.push_str(":\n            x = 1\n");
+    code
+}
+
 /// Benchmarks `match` fallthrough over a finite `Literal` subject.
 ///
 /// This generates a large version of this Python shape:
@@ -1338,6 +1353,29 @@ fn benchmark_literal_equality_fallthrough_guarded_any(criterion: &mut Criterion)
         "ty_micro[literal_equality_fallthrough_guarded_any]",
         &literal_equality_fallthrough_code(),
     );
+}
+
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/3880>.
+///
+/// Reachability analysis for a large literal OR pattern on `Any` used to rebuild the remaining
+/// subject from all preceding alternatives. Assigning to an annotation-only local forces the case
+/// predicate to be evaluated while resolving the live declaration, exposing the exponential
+/// growth.
+fn benchmark_literal_or_pattern_reachability(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = literal_or_pattern_reachability_code();
+    criterion.bench_function("ty_micro[literal_or_pattern_reachability]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
 }
 
 fn benchmark_literal_fallthrough(criterion: &mut Criterion, name: &str, code: &str) {
@@ -1678,7 +1716,7 @@ fn hydra(criterion: &mut Criterion) {
             max_dep_date: TY_ECOSYSTEM_PIN,
             python_version: SupportedPythonVersion::Py311,
         },
-        510,
+        520,
     );
 
     bench_project(&benchmark, criterion);
@@ -1767,6 +1805,7 @@ criterion_group!(
     benchmark_literal_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,
+    benchmark_literal_or_pattern_reachability,
     benchmark_typeis_narrowing,
     benchmark_factored_upper_bounds,
     benchmark_pandas_tdd,

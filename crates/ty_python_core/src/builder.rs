@@ -285,6 +285,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
     generator_functions: FxHashSet<FileScopeId>,
+    /// Hashset of all [`FileScopeId`]s that correspond to asynchronous comprehensions.
+    async_comprehensions: FxHashSet<FileScopeId>,
     /// Snapshots of enclosing-scope place states visible from nested scopes.
     enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
     /// Errors collected by the `semantic_checker`.
@@ -335,6 +337,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             seen_submodule_imports: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
+            async_comprehensions: FxHashSet::default(),
 
             enclosing_snapshots: FxHashMap::default(),
 
@@ -369,6 +372,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn current_scope_id(&self) -> ScopeId<'db> {
         self.scope_ids_by_scope[self.current_scope()]
+    }
+
+    fn mark_current_comprehension_async(&mut self) {
+        let scope = self.current_scope();
+        if self.scopes[scope].kind() == ScopeKind::Comprehension {
+            self.async_comprehensions.insert(scope);
+        }
     }
 
     pub(crate) fn expect_single_definition(
@@ -1518,8 +1528,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // Note `definition_node` is guaranteed to be a child of `self.module`
         let kind = definition_node.into_owned(self.module);
         let is_loop_header = kind.is_loop_header();
-
-        let category = kind.category(self.source_type.is_stub(), self.module);
         let is_reexported = kind.is_reexported();
 
         let definition: Definition<'db> =
@@ -1534,6 +1542,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             definitions.push(definition);
             definitions.len()
         };
+
+        self.record_definition(place, definition);
+
+        (definition, num_definitions)
+    }
+
+    /// Records an already-created definition in the current scope.
+    fn record_definition(&mut self, place: ScopedPlaceId, definition: Definition<'db>) {
+        let kind = definition.kind(self.db);
+        let is_loop_header = kind.is_loop_header();
+        let category = kind.category(self.source_type.is_stub(), self.module);
 
         // We need to avoid marking places as bound as soon as we encounter a loop header
         // definition for them, because that would lead to false-positive semantic syntax errors in
@@ -1588,8 +1607,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
         try_node_stack_manager.record_definition(self);
         self.try_node_context_stack_manager = try_node_stack_manager;
-
-        (definition, num_definitions)
     }
 
     // Creates a definition for each key-value assignment in the dictionary.
@@ -2372,7 +2389,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         scope: NodeWithScopeRef,
         generators: &'ast [ast::Comprehension],
         visit_outer_elt: impl FnOnce(&mut Self),
-    ) {
+    ) -> FileScopeId {
         let mut generators_iter = generators.iter();
 
         let Some(generator) = generators_iter.next() else {
@@ -2391,6 +2408,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let saved_assignments = std::mem::take(&mut self.current_assignments);
 
         self.push_scope(scope);
+        let comprehension_scope = self.current_scope();
+
+        if generators.iter().any(|generator| generator.is_async) {
+            self.async_comprehensions.insert(comprehension_scope);
+        }
 
         self.add_unpackable_assignment(
             &Unpackable::Comprehension {
@@ -2427,6 +2449,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.pop_scope();
 
         self.current_assignments = saved_assignments;
+
+        comprehension_scope
     }
 
     fn visit_comprehension_filter(&mut self, if_expr: &'ast ast::Expr) {
@@ -2660,6 +2684,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             enclosing_snapshots: FrozenMap::from(self.enclosing_snapshots),
             semantic_syntax_errors,
             generator_functions: FrozenSet::from(self.generator_functions),
+            async_comprehensions: FrozenSet::from(self.async_comprehensions),
             narrowing_alias_predicates: FrozenMap::from(self.alias_predicates),
         }
     }
@@ -4481,22 +4506,28 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     elt, generators, ..
                 },
             ) => {
-                self.with_generators_scope(
+                let scope = self.with_generators_scope(
                     NodeWithScopeRef::ListComprehension(list_comprehension),
                     generators,
                     |builder| builder.visit_expr(elt),
                 );
+                if self.async_comprehensions.contains(&scope) {
+                    self.mark_current_comprehension_async();
+                }
             }
             ast::Expr::SetComp(
                 set_comprehension @ ast::ExprSetComp {
                     elt, generators, ..
                 },
             ) => {
-                self.with_generators_scope(
+                let scope = self.with_generators_scope(
                     NodeWithScopeRef::SetComprehension(set_comprehension),
                     generators,
                     |builder| builder.visit_expr(elt),
                 );
+                if self.async_comprehensions.contains(&scope) {
+                    self.mark_current_comprehension_async();
+                }
             }
             ast::Expr::Generator(
                 generator @ ast::ExprGenerator {
@@ -4517,7 +4548,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     ..
                 },
             ) => {
-                self.with_generators_scope(
+                let scope = self.with_generators_scope(
                     NodeWithScopeRef::DictComprehension(dict_comprehension),
                     generators,
                     |builder| {
@@ -4527,6 +4558,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         builder.visit_expr(value);
                     },
                 );
+                if self.async_comprehensions.contains(&scope) {
+                    self.mark_current_comprehension_async();
+                }
             }
             ast::Expr::BoolOp(ast::ExprBoolOp {
                 values,
@@ -4609,6 +4643,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 if self.scopes[scope].kind() == ScopeKind::Function {
                     self.generator_functions.insert(scope);
                 }
+                walk_expr(self, expr);
+            }
+            ast::Expr::Await(_) => {
+                self.mark_current_comprehension_async();
                 walk_expr(self, expr);
             }
             _ => {

@@ -12,6 +12,7 @@ use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::equality::{evaluate_type_equality, is_same_enum_domain};
 use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
+use crate::types::visitor::any_over_type;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass,
     Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext,
@@ -106,27 +107,21 @@ fn sequence_pattern_getitem_method<'db>(
         .into_iter()
         .map(|(index, element_type)| {
             Signature::new(
-                Parameters::new(
-                    db,
-                    [
-                        self_parameter(),
-                        Parameter::positional_only(Some(Name::new_static("index")))
-                            .with_annotated_type(Type::int_literal(index)),
-                    ],
-                ),
+                Parameters::standard([
+                    self_parameter(),
+                    Parameter::positional_only(Some(Name::new_static("index")))
+                        .with_annotated_type(Type::int_literal(index)),
+                ]),
                 element_type,
             )
         });
     let fallback_overload = fallback_return_type.map(|fallback_return_type| {
         Signature::new(
-            Parameters::new(
-                db,
-                [
-                    self_parameter(),
-                    Parameter::positional_only(Some(Name::new_static("index")))
-                        .with_annotated_type(KnownClass::Int.to_instance(db)),
-                ],
-            ),
+            Parameters::standard([
+                self_parameter(),
+                Parameter::positional_only(Some(Name::new_static("index")))
+                    .with_annotated_type(KnownClass::Int.to_instance(db)),
+            ]),
             fallback_return_type,
         )
     });
@@ -169,7 +164,7 @@ pub(crate) fn exact_sequence_pattern_type<'db>(
 
     let self_parameter = || Parameter::positional_only(Some(Name::new_static("self")));
 
-    let len_signature = Signature::new(Parameters::new(db, [self_parameter()]), length_type);
+    let len_signature = Signature::new(Parameters::standard([self_parameter()]), length_type);
     let len_method = CallableType::function_like(db, len_signature);
 
     let getitem_method = (element_types.len() > 0).then(|| {
@@ -277,8 +272,13 @@ fn class_pattern_is_exhaustive(
 enum ClassMatchArgs<'db> {
     /// The class and its metaclass hierarchy do not define `__match_args__`.
     Undefined,
-    /// `__match_args__` is definitely bound with this type.
-    Defined(Type<'db>),
+    /// `__match_args__` is definitely bound.
+    Defined {
+        /// The semantic member type used to validate positional subpatterns.
+        member_type: Type<'db>,
+        /// The type used to resolve positional attribute names.
+        positional_source_type: Type<'db>,
+    },
     /// `__match_args__` is defined along some control-flow paths but not others.
     PossiblyUndefined,
 }
@@ -296,9 +296,10 @@ pub(crate) enum ClassPatternPositionalSource {
 
 /// Resolve `__match_args__` through the pattern class, including its metaclass.
 ///
-/// Inferred assignments retain their literal binding type, while an explicit annotation remains
-/// authoritative. `PossiblyUndefined` is distinct from `Undefined` because only a truly absent
-/// `__match_args__` enables match-self behavior.
+/// The semantic member type is used for validation. When mapping positional subpatterns to
+/// attributes, inferred assignments retain their literal binding type while an explicit annotation
+/// remains authoritative. `PossiblyUndefined` is distinct from `Undefined` because only a truly
+/// absent `__match_args__` enables match-self behavior.
 fn class_match_args_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> ClassMatchArgs<'db> {
     match Type::ClassLiteral(class).member(db, "__match_args__").place {
         Place::Defined(
@@ -308,13 +309,16 @@ fn class_match_args_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> Clas
                 provenance,
                 ..
             },
-        ) if place.is_definitely_defined() => ClassMatchArgs::Defined(if origin.is_declared() {
-            ty
-        } else {
-            provenance
-                .definition()
-                .map_or(ty, |definition| binding_type(db, definition))
-        }),
+        ) if place.is_definitely_defined() => ClassMatchArgs::Defined {
+            member_type: ty,
+            positional_source_type: if origin.is_declared() {
+                ty
+            } else {
+                provenance
+                    .definition()
+                    .map_or(ty, |definition| binding_type(db, definition))
+            },
+        },
         Place::Defined(_) => ClassMatchArgs::PossiblyUndefined,
         Place::Undefined => ClassMatchArgs::Undefined,
     }
@@ -347,6 +351,49 @@ fn class_has_match_self_flag(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
                 )
             )
         })
+}
+
+/// The statically known result of validating positional subpatterns for a class pattern.
+pub(crate) enum ClassPatternPositionalResult<'db> {
+    /// The maximum number of positional subpatterns accepted by the class.
+    Limit(usize),
+    /// A statically known non-tuple value used for `__match_args__`.
+    InvalidType(Type<'db>),
+}
+
+/// Validate positional subpatterns against a statically known `__match_args__` type.
+pub(crate) fn class_pattern_positional_result<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+) -> Option<ClassPatternPositionalResult<'db>> {
+    match class_match_args_type(db, class) {
+        ClassMatchArgs::Undefined if class_has_match_self_flag(db, class) => {
+            Some(ClassPatternPositionalResult::Limit(1))
+        }
+        ClassMatchArgs::Undefined
+            if class.known(db).is_some()
+                || class
+                    .as_static()
+                    .is_some_and(|class| !class.body_scope(db).file(db).is_stub(db)) =>
+        {
+            Some(ClassPatternPositionalResult::Limit(0))
+        }
+        ClassMatchArgs::Defined { member_type, .. } => {
+            let match_args = member_type.resolve_type_alias(db);
+            if let Some(limit) = match_args.exact_tuple_instance_spec(db).and_then(|tuple| {
+                tuple
+                    .as_fixed_length()
+                    .map(super::tuple::FixedLengthTuple::len)
+            }) {
+                Some(ClassPatternPositionalResult::Limit(limit))
+            } else {
+                match_args
+                    .is_disjoint_from(db, Type::homogeneous_tuple(db, Type::unknown()))
+                    .then_some(ClassPatternPositionalResult::InvalidType(match_args))
+            }
+        }
+        ClassMatchArgs::Undefined | ClassMatchArgs::PossiblyUndefined => None,
+    }
 }
 
 /// Resolve the value supplied to each positional subpattern, preserving source order and length.
@@ -386,7 +433,10 @@ pub(crate) fn class_pattern_positional_sources(
                 })
                 .collect();
         }
-        ClassMatchArgs::Defined(match_args) => match_args
+        ClassMatchArgs::Defined {
+            positional_source_type,
+            ..
+        } => positional_source_type
             .exact_tuple_instance_spec(db)
             .and_then(|tuple| tuple.as_fixed_length().cloned()),
         ClassMatchArgs::Undefined | ClassMatchArgs::PossiblyUndefined => None,
@@ -516,6 +566,10 @@ fn sequence_pattern_is_exhaustive_for_subject(
 /// could raise at runtime. The same rule is propagated through nested sequence, `or`, and `as`
 /// patterns.
 ///
+/// When a pattern exhausts a gradual subject, the definite-match type is the subject's top
+/// materialization. Negative narrowing can then eliminate every materialization of the subject,
+/// including when exhaustiveness depends on a nested pattern.
+///
 /// ```python
 /// class Base:
 ///     x: int
@@ -559,7 +613,11 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
             match class_ty {
                 Type::ClassLiteral(class) => {
                     if class_pattern_is_exhaustive(db, class, resolved_subject_ty, kind) {
-                        return subject_ty;
+                        let top_subject_ty = resolved_subject_ty.top_materialization(db);
+                        if !class_pattern_is_exhaustive(db, class, top_subject_ty, kind) {
+                            return subject_ty;
+                        }
+                        return top_subject_ty;
                     }
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
@@ -572,20 +630,28 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
             }
         }
         PatternPredicateKind::Sequence(kind) => {
-            return if sequence_pattern_is_exhaustive_for_subject(db, kind, resolved_subject_ty) {
-                subject_ty
-            } else {
+            if !sequence_pattern_is_exhaustive_for_subject(db, kind, resolved_subject_ty) {
                 // A nested subject-dependent pattern rejected the context-free approximation.
                 // Reusing that approximation for the surrounding sequence would reintroduce the
                 // values that the recursive analysis deliberately excluded.
-                Type::Never
+                return Type::Never;
+            }
+            let top_subject_ty = resolved_subject_ty.top_materialization(db);
+            return if sequence_pattern_is_exhaustive_for_subject(db, kind, top_subject_ty) {
+                top_subject_ty
+            } else {
+                subject_ty
             };
         }
         PatternPredicateKind::Mapping(kind) => {
-            return if mapping_pattern_is_exhaustive(db, kind, resolved_subject_ty) {
-                subject_ty
+            if !mapping_pattern_is_exhaustive(db, kind, resolved_subject_ty) {
+                return Type::Never;
+            }
+            let top_subject_ty = resolved_subject_ty.top_materialization(db);
+            return if mapping_pattern_is_exhaustive(db, kind, top_subject_ty) {
+                top_subject_ty
             } else {
-                Type::Never
+                subject_ty
             };
         }
         PatternPredicateKind::Or(patterns) => {
@@ -664,40 +730,109 @@ pub(crate) fn pattern_fallthrough_type<'db>(
 /// Failure of a sequence pattern establishes length and indexed-element facts at the instant of
 /// matching, but those facts can become stale for mutable or stateful sequences. Exact tuples are
 /// immutable, so they retain normal sequence-pattern fallthrough narrowing.
+///
+/// In the example below, `subject_ty` is `tuple[int | str, int | str]`, `kind` represents the
+/// `[int(), str()]` sequence pattern, and the returned fallthrough type is
+/// `tuple[str, int | str] | tuple[int | str, int]`.
+///
+/// ```python
+/// def f(value: tuple[int | str, int | str]) -> None:
+///     match value:
+///         case [int(), str()]:
+///             pass
+///         case _:
+///             # tuple[str, int | str] | tuple[int | str, int]
+///             reveal_type(value)
+/// ```
 pub(crate) fn pattern_binding_fallthrough_type<'db>(
     db: &'db dyn Db,
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
+    let mut budget = ExactTuplePatternExpansionBudget::default();
+    try_pattern_binding_fallthrough_type(db, kind, subject_ty, &mut budget)
+        .unwrap_or_else(|()| conservative_pattern_binding_fallthrough_type(db, kind, subject_ty))
+}
+
+/// Compute binding fallthrough while charging every nested exact-tuple expansion to `budget`.
+///
+/// An error means that the caller must discard the partially expanded type and recompute the
+/// complete pattern conservatively.
+fn try_pattern_binding_fallthrough_type<'db>(
+    db: &'db dyn Db,
+    kind: &PatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+    budget: &mut ExactTuplePatternExpansionBudget,
+) -> Result<Type<'db>, ()> {
     match kind {
         PatternPredicateKind::Sequence(sequence) => {
-            sequence_pattern_binding_fallthrough_type(db, sequence, subject_ty)
+            try_sequence_pattern_binding_fallthrough_type(db, sequence, subject_ty, budget)
         }
         PatternPredicateKind::Or(patterns) => {
-            patterns.iter().fold(subject_ty, |remaining, pattern| {
-                pattern_binding_fallthrough_type(db, pattern, remaining)
+            patterns.iter().try_fold(subject_ty, |remaining, pattern| {
+                try_pattern_binding_fallthrough_type(db, pattern, remaining, budget)
             })
         }
         PatternPredicateKind::As(Some(pattern), _) => {
-            pattern_binding_fallthrough_type(db, pattern, subject_ty)
+            try_pattern_binding_fallthrough_type(db, pattern, subject_ty, budget)
+        }
+        _ => Ok(pattern_fallthrough_type(db, kind, subject_ty)),
+    }
+}
+
+/// Compute binding fallthrough without expanding exact tuples.
+///
+/// This preserves the recursive handling of `Or` and `As` patterns while providing the fallback
+/// used when the precise traversal exceeds its expansion budget.
+fn conservative_pattern_binding_fallthrough_type<'db>(
+    db: &'db dyn Db,
+    kind: &PatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+) -> Type<'db> {
+    match kind {
+        PatternPredicateKind::Or(patterns) => {
+            patterns.iter().fold(subject_ty, |remaining, pattern| {
+                conservative_pattern_binding_fallthrough_type(db, pattern, remaining)
+            })
+        }
+        PatternPredicateKind::As(Some(pattern), _) => {
+            conservative_pattern_binding_fallthrough_type(db, pattern, subject_ty)
         }
         _ => pattern_fallthrough_type(db, kind, subject_ty),
     }
 }
 
-fn sequence_pattern_binding_fallthrough_type<'db>(
+/// Apply sequence-pattern binding fallthrough, expanding immutable exact tuples within `budget`.
+///
+/// The budget is shared by unions, intersections, and nested patterns so that their cumulative
+/// expansion cannot exceed the configured limits.
+fn try_sequence_pattern_binding_fallthrough_type<'db>(
     db: &'db dyn Db,
     kind: &SequencePatternPredicateKind<'db>,
     subject_ty: Type<'db>,
-) -> Type<'db> {
+    budget: &mut ExactTuplePatternExpansionBudget,
+) -> Result<Type<'db>, ()> {
     let resolved = subject_ty.resolve_type_alias(db);
     let narrowed = match resolved {
-        Type::Union(union) => union.map(db, |element| {
-            sequence_pattern_binding_fallthrough_type(db, kind, *element)
-        }),
-        Type::Intersection(intersection) => intersection.map_positive(db, |element| {
-            sequence_pattern_binding_fallthrough_type(db, kind, *element)
-        }),
+        Type::Union(union) => union
+            .try_map(db, |element| {
+                try_sequence_pattern_binding_fallthrough_type(db, kind, *element, budget).ok()
+            })
+            .ok_or(())?,
+        Type::Intersection(intersection) => {
+            let mut failed = false;
+            let narrowed = intersection.map_positive(db, |element| {
+                try_sequence_pattern_binding_fallthrough_type(db, kind, *element, budget)
+                    .unwrap_or_else(|()| {
+                        failed = true;
+                        *element
+                    })
+            });
+            if failed {
+                return Err(());
+            }
+            narrowed
+        }
         Type::TypeVar(typevar)
             if typevar.typevar(db).upper_bound(db).is_some_and(|bound| {
                 pattern_fallthrough_type(db, &PatternPredicateKind::Sequence(kind.clone()), bound)
@@ -707,7 +842,14 @@ fn sequence_pattern_binding_fallthrough_type<'db>(
             Type::Never
         }
         _ if resolved.exact_tuple_instance_spec(db).is_some() => {
-            pattern_fallthrough_type(db, &PatternPredicateKind::Sequence(kind.clone()), resolved)
+            exact_tuple_sequence_pattern_fallthrough_type(db, kind, resolved, budget)?
+                .unwrap_or_else(|| {
+                    pattern_fallthrough_type(
+                        db,
+                        &PatternPredicateKind::Sequence(kind.clone()),
+                        resolved,
+                    )
+                })
         }
         // An irrefutable sequence pattern can only fail if the subject is not eligible for sequence
         // matching. Unlike length and indexed-element facts, eligibility is unaffected by mutation.
@@ -719,10 +861,88 @@ fn sequence_pattern_binding_fallthrough_type<'db>(
     };
 
     if narrowed == resolved {
-        subject_ty
+        Ok(subject_ty)
     } else {
-        narrowed
+        Ok(narrowed)
     }
+}
+
+const MAX_EXACT_TUPLE_PATTERN_ALTERNATIVES: usize = 64;
+const MAX_EXACT_TUPLE_PATTERN_ELEMENTS: usize = 4_096;
+
+/// Limits the cumulative alternatives and element slots created by one pattern traversal.
+#[derive(Default)]
+struct ExactTuplePatternExpansionBudget {
+    alternatives: usize,
+    elements: usize,
+}
+
+impl ExactTuplePatternExpansionBudget {
+    fn add_alternative(&mut self, elements: usize) -> Result<(), ()> {
+        self.alternatives += 1;
+        self.elements = self.elements.saturating_add(elements);
+        if self.alternatives > MAX_EXACT_TUPLE_PATTERN_ALTERNATIVES
+            || self.elements > MAX_EXACT_TUPLE_PATTERN_ELEMENTS
+        {
+            Err(())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+/// Return the part of an exact fixed-length tuple that can remain after a sequence pattern fails.
+///
+/// A pattern fails if any aligned element pattern fails. Represent that as a union with one tuple
+/// alternative per element. Large expansions and gradual tuples keep the synthesized-protocol
+/// representation used by the general fallthrough path.
+fn exact_tuple_sequence_pattern_fallthrough_type<'db>(
+    db: &'db dyn Db,
+    kind: &SequencePatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+    budget: &mut ExactTuplePatternExpansionBudget,
+) -> Result<Option<Type<'db>>, ()> {
+    if kind.split_around_star().is_some() {
+        return Ok(None);
+    }
+
+    let Some(tuple) = subject_ty.exact_tuple_instance_spec(db) else {
+        return Ok(None);
+    };
+    let Some(tuple) = tuple.as_fixed_length() else {
+        return Ok(None);
+    };
+    if tuple
+        .all_elements()
+        .iter()
+        .any(|element| any_over_type(db, *element, true, |ty| ty.is_dynamic()))
+    {
+        return Ok(None);
+    }
+    if tuple.len() != kind.patterns.len() {
+        return Ok(Some(subject_ty));
+    }
+    let mut alternatives = Vec::new();
+    for (index, (element, pattern)) in tuple
+        .iter_all_elements()
+        .zip(kind.patterns.iter())
+        .enumerate()
+    {
+        let remaining = try_pattern_binding_fallthrough_type(db, pattern, element, budget)?;
+        if remaining == element {
+            return Ok(Some(subject_ty));
+        }
+        if remaining.is_never() {
+            continue;
+        }
+
+        budget.add_alternative(tuple.len())?;
+        let mut elements = tuple.all_elements().to_vec();
+        elements[index] = remaining;
+        alternatives.push(Type::heterogeneous_tuple(db, elements));
+    }
+
+    Ok(Some(UnionType::from_elements(db, alternatives)))
 }
 
 /// Return whether every possible value of `ty` belongs to the same enum as `right`, including

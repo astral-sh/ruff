@@ -541,7 +541,7 @@ PTH104 [*] `os.rename()` should be replaced by `Path.rename()`
 54 |
 55 | rename(
    | ^^^^^^
-56 |     # commment 1
+56 |     # comment 1
 57 |     file, # comment 2
    |
 help: Replace with `Path(...).rename(...)`
@@ -552,7 +552,7 @@ help: Replace with `Path(...).rename(...)`
 --------------------------------------------------------------------------------
 55 |
    - rename(
-   -     # commment 1
+   -     # comment 1
    -     file, # comment 2
    -     "file_2.py"
    -     ,

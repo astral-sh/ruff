@@ -524,7 +524,7 @@ def f():
 The example above (hopefully) feels natural, but if we look at it closely, the reveals there are
 making some beefy assumptions. For one, we assume `g` might be called before the final reveal, even
 though in this case we can actually see that it's never called. A "sufficiently smart compiler"
-could've narrowed that to `Literal[1]`, but we don't/can't track what functions are caled when, so
+could've narrowed that to `Literal[1]`, but we don't/can't track what functions are called when, so
 we're being conservative. On the other hand, the reveal of `Literal[2]` after the binding in `g` is
 the opposite, an aggressive assumption that's not generally sound. Consider this counterexample
 where `g` and `h` are siblings that both assign to `x`:
@@ -659,7 +659,7 @@ def foo():
 We don't need to think about this ordering in normal execution, since the body of a function doesn't
 get to cause any side effects until the function is called. But we do need to think about it in
 inference, because of the (generally unsound) rule mentioned above about considering nested bindings
-visible after we encounter them. That can matter in unusual sitautions like this one:
+visible after we encounter them. That can matter in unusual situations like this one:
 
 ```py
 def f():

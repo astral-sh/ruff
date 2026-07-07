@@ -459,6 +459,45 @@ OTHER = "OTHER"
     Ok(())
 }
 
+/// Regression test for <https://github.com/astral-sh/ruff/issues/18980>
+#[test]
+fn extend_exclude_cli() -> Result<()> {
+    let test = CliTest::with_files([
+        (
+            "ruff.toml",
+            r#"
+extend-exclude = ["out"]
+
+[format]
+exclude = ["format_excluded.py"]
+"#,
+        ),
+        ("main.py", "x    = 1"),
+        ("format_excluded.py", "x    = 1"),
+        ("cli_excluded.py", "x    = 1"),
+        ("out/a.py", "x    = 1"),
+    ])?;
+
+    assert_cmd_snapshot!(test.format_command()
+        .args([
+            "--check",
+            "--config",
+            "ruff.toml",
+            "--extend-exclude",
+            "cli_excluded.py",
+        ])
+        .arg("."), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Would reformat: main.py
+    1 file would be reformatted
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
 /// Regression test for <https://github.com/astral-sh/ruff/issues/20035>
 #[test]
 fn deduplicate_directory_and_explicit_file() -> Result<()> {

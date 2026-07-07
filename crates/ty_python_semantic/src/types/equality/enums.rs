@@ -848,6 +848,9 @@ fn same_enum_comparison_profile<'db>(
     let profile = enum_class_key_profile(db, enum_class, operator);
     let (comparison_keys, members_compare_by_identity) = match profile.semantics {
         None => (None, false),
+        Some(KnownComparisonSemantics::Object) if !enum_class.aliases_are_known(db) => {
+            (Some(SameEnumComparisonKeys::UnknownOrRepeated), true)
+        }
         Some(KnownComparisonSemantics::Object) => (Some(SameEnumComparisonKeys::Distinct), true),
         Some(
             KnownComparisonSemantics::Int

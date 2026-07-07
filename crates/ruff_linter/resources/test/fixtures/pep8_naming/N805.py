@@ -104,7 +104,7 @@ class SelfInArgsClass:
     def self_as_kw_only_argument(this, *, self):
         pass
 
-    def self_as_varags(this, *self):
+    def self_as_varargs(this, *self):
         pass
 
     def self_as_kwargs(this, **self):

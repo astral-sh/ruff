@@ -232,7 +232,7 @@ enum DescriptorReceiverKind {
     Instance,
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
 pub struct ResolvedSuperOwner<'db> {
     /// The resolved second `super()` argument, used when binding descriptors after
     /// attribute lookup. If `receiver` is [`DescriptorReceiverKind::Instance`], this
@@ -286,7 +286,7 @@ impl<'db> ResolvedSuperOwner<'db> {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
 pub enum SuperOwnerKind<'db> {
     Dynamic(DynamicType<'db>),
     Divergent(DivergentType),
@@ -304,7 +304,7 @@ impl<'db> SuperOwnerKind<'db> {
             SuperOwnerKind::Dynamic(dynamic) => {
                 Some(SuperOwnerKind::Dynamic(dynamic.recursive_type_normalized()))
             }
-            SuperOwnerKind::Divergent(_) => Some(self.clone()),
+            SuperOwnerKind::Divergent(_) => Some(*self),
             SuperOwnerKind::Resolved(resolved_owner) => Some(SuperOwnerKind::Resolved(
                 resolved_owner.recursive_type_normalized_impl(db, div, nested)?,
             )),
@@ -934,7 +934,7 @@ impl<'db> BoundSuperType<'db> {
         {
             let item_parameter = Parameter::positional_only(Some(Name::new_static("item")))
                 .with_annotated_type(Type::unknown());
-            let parameters = Parameters::new(db, [item_parameter]);
+            let parameters = Parameters::standard([item_parameter]);
             let return_type = self.owner(db).owner_type();
             let class_getitem = Type::single_callable(db, Signature::new(parameters, return_type));
             return Place::bound(class_getitem).into();

@@ -1105,6 +1105,29 @@ Section::
     }
 
     #[test]
+    fn parser_recovers_after_dedented_doctest() {
+        let docstring = r#"
+        >>> identity(1)
+        1
+    :param value: Parameter documentation.
+"#;
+
+        let parsed = field_lists(docstring);
+
+        assert_eq!(parsed.len(), 1);
+        assert_debug_snapshot!(&parsed[0].fields, @r#"
+        [
+            Parameter {
+                display_name: "value",
+                lookup_name: "value",
+                ty: None,
+                description: "Parameter documentation.",
+            },
+        ]
+        "#);
+    }
+
+    #[test]
     fn doctests_take_precedence_over_markdown_fences_in_preformatted_blocks() {
         let docstring = "\
 >>> print(\"field list\")

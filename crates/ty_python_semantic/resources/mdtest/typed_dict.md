@@ -5726,7 +5726,7 @@ def _(closed: Closed) -> None:
 
 ### Iterating keys, values and items of an extra-items TypedDict
 
-For an extra-items `TypedDict`, iteraitng over the keys only gives you a `str`, because there may be
+For an extra-items `TypedDict`, iterating over the keys only gives you a `str`, because there may be
 arbitrary additional keys in the mapping. Iterating over the values gives you a union of all known
 value types and the `extra_items` type.
 

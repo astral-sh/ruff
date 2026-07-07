@@ -538,6 +538,14 @@ pub struct FormatCommand {
         help_heading = "File selection"
     )]
     pub exclude: Option<Vec<FilePattern>>,
+    /// Like --exclude, but adds additional files and directories on top of those already excluded.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "FILE_PATTERN",
+        help_heading = "File selection"
+    )]
+    pub extend_exclude: Option<Vec<FilePattern>>,
 
     /// Enforce exclusions, even for paths passed to Ruff directly on the command-line.
     /// Use `--no-force-exclude` to disable.
@@ -837,6 +845,7 @@ impl FormatCommand {
             line_length: self.line_length,
             respect_gitignore: resolve_bool_arg(self.respect_gitignore, self.no_respect_gitignore),
             exclude: self.exclude,
+            extend_exclude: self.extend_exclude,
             preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
             force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
             target_version: self.target_version.map(ast::PythonVersion::from),

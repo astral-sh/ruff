@@ -17,6 +17,7 @@ ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 
 itertools = { workspace = true }
+rustc-hash = { workspace = true }
 unicode-ident = { workspace = true }
 
 [lints]

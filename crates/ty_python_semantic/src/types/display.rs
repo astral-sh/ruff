@@ -1312,9 +1312,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     )
                 }
                 // We used to return `str` as the type here because that feels generally more useful.
-                // However, the inoncistency between the type shown in the inlay hint and its hover, and the
+                // However, the inconsistency between the type shown in the inlay hint and its hover, and the
                 // inconsistency to what's shown when hovering the backed inlay hint of a `LiteralString`
-                // convinvced us that we should change the type to `LiteralString`.
+                // convinced us that we should change the type to `LiteralString`.
                 LiteralValueTypeKind::LiteralString => f
                     .with_type(Type::SpecialForm(SpecialFormType::LiteralString))
                     .write_str("LiteralString"),
@@ -3309,7 +3309,7 @@ mod tests {
         return_ty: Option<Type<'db>>,
     ) -> String {
         Signature::new(
-            Parameters::new(db, parameters),
+            Parameters::from_annotation(db, parameters),
             return_ty.unwrap_or(Type::unknown()),
         )
         .display(db)
@@ -3322,7 +3322,7 @@ mod tests {
         return_ty: Option<Type<'db>>,
     ) -> String {
         Signature::new(
-            Parameters::new(db, parameters),
+            Parameters::from_annotation(db, parameters),
             return_ty.unwrap_or(Type::unknown()),
         )
         .display_with(db, super::DisplaySettings::default().multiline())

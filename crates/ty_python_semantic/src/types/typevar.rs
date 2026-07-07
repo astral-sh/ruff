@@ -572,8 +572,7 @@ impl<'db> TypeVarInstance<'db> {
                 Type::NominalInstance(nominal_instance) => nominal_instance
                     .own_tuple_spec(db)
                     .map_or_else(Parameters::unknown, |tuple_spec| {
-                        Parameters::new(
-                            db,
+                        Parameters::standard(
                             tuple_spec
                                 .iter_all_elements()
                                 .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
@@ -844,21 +843,51 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
 
 /// A type variable that has been bound to a generic context, and which can be specialized to a
 /// concrete type.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(
+    debug,
+    constructor = new_internal,
+    heap_size = ruff_memory_usage::heap_size
+)]
 pub struct BoundTypeVarInstance<'db> {
     pub typevar: TypeVarInstance<'db>,
-    pub(super) binding_context: BindingContext<'db>,
-    /// If [`Some`], this indicates that this type variable is the `args` or `kwargs` component
-    /// of a `ParamSpec` i.e., `P.args` or `P.kwargs`.
-    pub(super) paramspec_attr: Option<ParamSpecAttrKind>,
-    /// The freshness nonce for this bound typevar occurrence; `0` is the source-level occurrence.
-    pub(super) freshness: TypeVarNonce,
+    // This duplicates the source-level identity accessible through `typevar`, but keeps
+    // `identity()` to a single interned-field read. Storing only the occurrence-specific fields
+    // and reconstructing the full identity regresses hot-path project benchmarks.
+    identity_inner: BoundTypeVarIdentity<'db>,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for BoundTypeVarInstance<'_> {}
 
 impl<'db> BoundTypeVarInstance<'db> {
+    pub(crate) fn new(
+        db: &'db dyn Db,
+        typevar: TypeVarInstance<'db>,
+        binding_context: BindingContext<'db>,
+        paramspec_attr: Option<ParamSpecAttrKind>,
+        freshness: TypeVarNonce,
+    ) -> Self {
+        let identity = BoundTypeVarIdentity {
+            identity: typevar.identity(db),
+            binding_context,
+            paramspec_attr,
+            freshness,
+        };
+        Self::new_internal(db, typevar, identity)
+    }
+
+    pub(super) fn binding_context(self, db: &'db dyn Db) -> BindingContext<'db> {
+        self.identity(db).binding_context
+    }
+
+    pub(super) fn paramspec_attr(self, db: &'db dyn Db) -> Option<ParamSpecAttrKind> {
+        self.identity(db).paramspec_attr
+    }
+
+    pub(super) fn freshness(self, db: &'db dyn Db) -> TypeVarNonce {
+        self.identity(db).freshness
+    }
+
     pub(crate) fn with_name_suffix(self, db: &'db dyn Db, suffix: &str) -> Self {
         Self::new(
             db,
@@ -876,12 +905,7 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// occurrence, regardless of e.g. differences in their bounds or constraints due to
     /// materialization.
     pub(crate) fn identity(self, db: &'db dyn Db) -> BoundTypeVarIdentity<'db> {
-        BoundTypeVarIdentity {
-            identity: self.typevar(db).identity(db),
-            binding_context: self.binding_context(db),
-            paramspec_attr: self.paramspec_attr(db),
-            freshness: self.freshness(db),
-        }
+        self.identity_inner(db)
     }
 
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db Name {

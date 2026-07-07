@@ -78,8 +78,7 @@ You can optionally install hooks to automatically run the validation checks
 when making a commit:
 
 ```shell
-uv tool install prek
-prek install
+uv run --only-group dev --locked prek install
 ```
 
 We recommend [nextest](https://nexte.st/) to run Ruff's test suite (via `cargo nextest run`),
@@ -106,7 +105,7 @@ and that it passes both the lint and test validation checks:
 ```shell
 cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
 RUFF_UPDATE_SCHEMA=1 cargo test  # Rust testing and updating ruff.schema.json
-uvx prek run -a  # Rust and Python formatting, Markdown and Python linting, etc.
+uv run --only-group dev --locked prek run --all-files  # Rust and Python formatting, Markdown and Python linting, etc.
 ```
 
 These checks will run on GitHub Actions when you open your pull request, but running them locally

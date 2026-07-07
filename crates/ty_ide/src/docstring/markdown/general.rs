@@ -196,6 +196,10 @@ fn render_with_indentation_mode(
                     | "versionchanged" | "version-changed" | "version-deprecated" | "deprecated"
                     | "version-removed" | "versionremoved",
                 ) => {
+                    // A directive starts a new block and cannot continue a
+                    // pending hyperlink from the previous line.
+                    renderer.flush_pending_link();
+
                     // Map version directives to human-readable phrases (matching Sphinx output)
                     let pretty_directive = match directive.unwrap() {
                         "versionadded" | "version-added" => Cow::Borrowed("Added in version"),
@@ -245,7 +249,16 @@ fn render_with_indentation_mode(
             continue;
         }
 
-        renderer.render_line(rendered_line);
+        let is_indented_markdown_code =
+            matches!(leading_indentation, LeadingIndentation::MarkdownSyntax)
+                && line_indent >= TextSize::from(4)
+                && !renderer.inline.has_pending_link();
+
+        renderer.render_line(
+            rendered_line,
+            line_indent.to_usize(),
+            !is_indented_markdown_code,
+        );
     }
     renderer.finish_document();
 }
@@ -263,6 +276,7 @@ enum LeadingIndentation {
 struct Renderer<'source, 'output> {
     line_prefix: LinePrefix,
     block_state: BlockState<'source>,
+    inline: inline::Renderer,
     output: &'output mut String,
 }
 
@@ -271,6 +285,7 @@ impl<'source, 'output> Renderer<'source, 'output> {
         Self {
             line_prefix: LinePrefix::default(),
             block_state: BlockState::default(),
+            inline: inline::Renderer::default(),
             output,
         }
     }
@@ -289,7 +304,13 @@ impl<'source, 'output> Renderer<'source, 'output> {
 
     /// Flushes content buffered for the current line.
     fn flush_pending_line(&mut self) {
+        self.inline.flush_pending_link(self.output);
         self.line_prefix.emit(self.output);
+    }
+
+    /// Flushes a wrapped hyperlink candidate.
+    fn flush_pending_link(&mut self) {
+        self.inline.flush_pending_link(self.output);
     }
 
     fn finish_rest_literal(&mut self) {
@@ -341,12 +362,12 @@ impl<'source, 'output> Renderer<'source, 'output> {
         self.output.push_str(line);
     }
 
-    fn render_line(&mut self, line: &str) {
-        self.flush_pending_line();
+    fn render_line(&mut self, line: &str, source_indentation: usize, render_rst_links: bool) {
         if self.block_state.is_code() {
+            self.flush_pending_line();
             self.output.push_str(line);
         } else {
-            inline::render_line(self.output, line);
+            self.render_inline(line, source_indentation, render_rst_links);
         }
     }
 
@@ -363,6 +384,21 @@ impl<'source, 'output> Renderer<'source, 'output> {
                 self.output.push_str(fence.marker());
             }
         }
+    }
+
+    fn render_inline(&mut self, text: &str, source_indentation: usize, render_rst_links: bool) {
+        let line = inline::Line {
+            rendered_prefix: &self.line_prefix.rendered,
+            source_indentation,
+            text,
+        };
+        if render_rst_links {
+            self.inline.render_line(self.output, line);
+        } else {
+            self.inline
+                .render_line_without_link_conversion(self.output, line);
+        }
+        self.line_prefix.rendered.clear();
     }
 }
 

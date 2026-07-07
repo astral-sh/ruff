@@ -159,8 +159,7 @@ fn synthesize_typed_dict_init<'db>(
     });
 
     let map_overload = Signature::new(
-        Parameters::new(
-            db,
+        Parameters::standard(
             [self_param.clone(), map_param]
                 .into_iter()
                 .chain(params_with_default)
@@ -181,8 +180,7 @@ fn synthesize_typed_dict_init<'db>(
     });
 
     let keyword_overload = Signature::new(
-        Parameters::new(
-            db,
+        Parameters::standard(
             std::iter::once(self_param)
                 .chain(keyword_field_params)
                 .chain(keyword_rest_param),
@@ -215,18 +213,15 @@ fn synthesize_typed_dict_getitem<'db>(
                 Parameter::positional_only(Some(Name::new_static("key")))
                     .with_annotated_type(key_type),
             ];
-            Signature::new(Parameters::new(db, parameters), field.declared_ty)
+            Signature::new(Parameters::standard(parameters), field.declared_ty)
         })
         .chain(std::iter::once(Signature::new(
-            Parameters::new(
-                db,
-                [
-                    Parameter::positional_only(Some(Name::new_static("self")))
-                        .with_annotated_type(instance_ty),
-                    Parameter::positional_only(Some(Name::new_static("key")))
-                        .with_annotated_type(KnownClass::Str.to_instance(db)),
-                ],
-            ),
+            Parameters::standard([
+                Parameter::positional_only(Some(Name::new_static("self")))
+                    .with_annotated_type(instance_ty),
+                Parameter::positional_only(Some(Name::new_static("key")))
+                    .with_annotated_type(KnownClass::Str.to_instance(db)),
+            ]),
             if typed_dict.explicit_extra_items(db).is_some() {
                 typed_dict.value_type(db)
             } else {
@@ -264,7 +259,7 @@ fn synthesize_typed_dict_setitem<'db>(
             Parameter::positional_only(Some(Name::new_static("value")))
                 .with_annotated_type(Type::any()),
         ];
-        let signature = Signature::new(Parameters::new(db, parameters), Type::none(db));
+        let signature = Signature::new(Parameters::standard(parameters), Type::none(db));
         return Type::function_like_callable(db, signature);
     }
 
@@ -279,7 +274,7 @@ fn synthesize_typed_dict_setitem<'db>(
                 Parameter::positional_only(Some(Name::new_static("value")))
                     .with_annotated_type(field.declared_ty),
             ];
-            Signature::new(Parameters::new(db, parameters), Type::none(db))
+            Signature::new(Parameters::standard(parameters), Type::none(db))
         })
         .chain(arbitrary_key_mutation_type.map(|value_ty| {
             let parameters = [
@@ -290,7 +285,7 @@ fn synthesize_typed_dict_setitem<'db>(
                 Parameter::positional_only(Some(Name::new_static("value")))
                     .with_annotated_type(value_ty),
             ];
-            Signature::new(Parameters::new(db, parameters), Type::none(db))
+            Signature::new(Parameters::standard(parameters), Type::none(db))
         }));
 
     Type::Callable(CallableType::new(
@@ -321,7 +316,7 @@ fn synthesize_typed_dict_delitem<'db>(
             Parameter::positional_only(Some(Name::new_static("key")))
                 .with_annotated_type(Type::Never),
         ];
-        let signature = Signature::new(Parameters::new(db, parameters), Type::none(db));
+        let signature = Signature::new(Parameters::standard(parameters), Type::none(db));
         return Type::function_like_callable(db, signature);
     }
 
@@ -334,7 +329,7 @@ fn synthesize_typed_dict_delitem<'db>(
                 Parameter::positional_only(Some(Name::new_static("key")))
                     .with_annotated_type(key_type),
             ];
-            Signature::new(Parameters::new(db, parameters), Type::none(db))
+            Signature::new(Parameters::standard(parameters), Type::none(db))
         })
         .chain(supports_arbitrary_key_deletion.then(|| {
             let parameters = [
@@ -343,7 +338,7 @@ fn synthesize_typed_dict_delitem<'db>(
                 Parameter::positional_only(Some(Name::new_static("key")))
                     .with_annotated_type(KnownClass::Str.to_instance(db)),
             ];
-            Signature::new(Parameters::new(db, parameters), Type::none(db))
+            Signature::new(Parameters::standard(parameters), Type::none(db))
         }));
 
     Type::Callable(CallableType::new(
@@ -378,7 +373,7 @@ fn synthesize_typed_dict_get<'db>(
                     .with_annotated_type(key_type),
             ];
             let get_sig = Signature::new(
-                Parameters::new(db, get_sig_params),
+                Parameters::standard(get_sig_params),
                 if field.is_required() {
                     field.declared_ty
                 } else {
@@ -402,7 +397,7 @@ fn synthesize_typed_dict_get<'db>(
             ];
             let get_with_default_sig = Signature::new_generic(
                 Some(GenericContext::from_typevar_instances(db, [t_default])),
-                Parameters::new(db, get_with_default_sig_params),
+                Parameters::standard(get_with_default_sig_params),
                 if field.is_required() {
                     field.declared_ty
                 } else {
@@ -418,17 +413,14 @@ fn synthesize_typed_dict_get<'db>(
                 Either::Left([get_sig, get_with_default_sig].into_iter())
             } else {
                 let get_with_typed_default_sig = Signature::new(
-                    Parameters::new(
-                        db,
-                        [
-                            Parameter::positional_only(Some(Name::new_static("self")))
-                                .with_annotated_type(instance_ty),
-                            Parameter::positional_only(Some(Name::new_static("key")))
-                                .with_annotated_type(key_type),
-                            Parameter::positional_only(Some(Name::new_static("default")))
-                                .with_annotated_type(field.declared_ty),
-                        ],
-                    ),
+                    Parameters::standard([
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_only(Some(Name::new_static("key")))
+                            .with_annotated_type(key_type),
+                        Parameter::positional_only(Some(Name::new_static("default")))
+                            .with_annotated_type(field.declared_ty),
+                    ]),
                     field.declared_ty,
                 );
                 Either::Right(
@@ -438,15 +430,12 @@ fn synthesize_typed_dict_get<'db>(
         })
         // Fallback overloads for unknown keys
         .chain(std::iter::once(Signature::new(
-            Parameters::new(
-                db,
-                [
-                    Parameter::positional_only(Some(Name::new_static("self")))
-                        .with_annotated_type(instance_ty),
-                    Parameter::positional_only(Some(Name::new_static("key")))
-                        .with_annotated_type(KnownClass::Str.to_instance(db)),
-                ],
-            ),
+            Parameters::standard([
+                Parameter::positional_only(Some(Name::new_static("self")))
+                    .with_annotated_type(instance_ty),
+                Parameter::positional_only(Some(Name::new_static("key")))
+                    .with_annotated_type(KnownClass::Str.to_instance(db)),
+            ]),
             UnionType::from_two_elements(db, fallback_value_ty, Type::none(db)),
         )))
         .chain(std::iter::once({
@@ -456,7 +445,7 @@ fn synthesize_typed_dict_get<'db>(
                 TypeVarVariance::Covariant,
             );
 
-            let parameterss = [
+            let parameters = [
                 Parameter::positional_only(Some(Name::new_static("self")))
                     .with_annotated_type(instance_ty),
                 Parameter::positional_only(Some(Name::new_static("key")))
@@ -467,7 +456,7 @@ fn synthesize_typed_dict_get<'db>(
 
             Signature::new_generic(
                 Some(GenericContext::from_typevar_instances(db, [t_default])),
-                Parameters::new(db, parameterss),
+                Parameters::standard(parameters),
                 UnionType::from_two_elements(db, fallback_value_ty, Type::TypeVar(t_default)),
             )
         }));
@@ -536,7 +525,7 @@ fn synthesize_typed_dict_update<'db>(
     .into_iter()
     .chain(keyword_parameters);
 
-    let update_signature = Signature::new(Parameters::new(db, parameters), Type::none(db));
+    let update_signature = Signature::new(Parameters::standard(parameters), Type::none(db));
     Type::function_like_callable(db, update_signature)
 }
 
@@ -553,7 +542,7 @@ fn synthesize_typed_dict_pop<'db>(
                 .with_annotated_type(instance_ty),
             Parameter::positional_only(Some(Name::new_static("key"))).with_annotated_type(key_ty),
         ];
-        let pop_sig = Signature::new(Parameters::new(db, pop_parameters), value_ty);
+        let pop_sig = Signature::new(Parameters::standard(pop_parameters), value_ty);
 
         // Non-generic overload that accepts the value type as the default,
         // providing bidirectional inference context for the default argument.
@@ -565,7 +554,7 @@ fn synthesize_typed_dict_pop<'db>(
                 .with_annotated_type(value_ty),
         ];
         let pop_with_typed_default_sig = Signature::new(
-            Parameters::new(db, pop_with_typed_default_parameters),
+            Parameters::standard(pop_with_typed_default_parameters),
             value_ty,
         );
 
@@ -580,7 +569,7 @@ fn synthesize_typed_dict_pop<'db>(
         ];
         let pop_with_default_sig = Signature::new_generic(
             Some(GenericContext::from_typevar_instances(db, [t_default])),
-            Parameters::new(db, pop_with_default_parameters),
+            Parameters::standard(pop_with_default_parameters),
             UnionType::from_two_elements(db, value_ty, Type::TypeVar(t_default)),
         );
 
@@ -630,7 +619,7 @@ fn synthesize_typed_dict_setdefault<'db>(
                     .with_annotated_type(field.declared_ty),
             ];
 
-            Signature::new(Parameters::new(db, parameters), field.declared_ty)
+            Signature::new(Parameters::standard(parameters), field.declared_ty)
         })
         .chain(
             typed_dict
@@ -644,7 +633,7 @@ fn synthesize_typed_dict_setdefault<'db>(
                         Parameter::positional_only(Some(Name::new_static("default")))
                             .with_annotated_type(default_ty),
                     ];
-                    Signature::new(Parameters::new(db, parameters), typed_dict.value_type(db))
+                    Signature::new(Parameters::standard(parameters), typed_dict.value_type(db))
                 }),
         );
 
@@ -664,11 +653,8 @@ fn synthesize_typed_dict_no_argument_method<'db>(
     Type::function_like_callable(
         db,
         Signature::new(
-            Parameters::new(
-                db,
-                [Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(Type::TypedDict(typed_dict))],
-            ),
+            Parameters::standard([Parameter::positional_only(Some(Name::new_static("self")))
+                .with_annotated_type(Type::TypedDict(typed_dict))]),
             return_ty,
         ),
     )
@@ -719,7 +705,7 @@ fn synthesize_typed_dict_merge<'db>(
     ];
 
     overloads = smallvec::smallvec![Signature::new(
-        Parameters::new(db, first_overload_parameters,),
+        Parameters::standard(first_overload_parameters),
         instance_ty,
     )];
 
@@ -748,7 +734,7 @@ fn synthesize_typed_dict_merge<'db>(
                 .with_annotated_type(partial_ty),
         ];
         overloads.push(Signature::new(
-            Parameters::new(db, overload_two_parameters),
+            Parameters::standard(overload_two_parameters),
             instance_ty,
         ));
 
@@ -759,7 +745,7 @@ fn synthesize_typed_dict_merge<'db>(
                 .with_annotated_type(dict_param_ty),
         ];
         overloads.push(Signature::new(
-            Parameters::new(db, overload_three_parameters),
+            Parameters::standard(overload_three_parameters),
             dict_return_ty,
         ));
     }
@@ -1006,29 +992,15 @@ pub(super) fn typed_dict_fallback_class_member<'db>(
     lookup_policy: MemberLookupPolicy,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
-    let fallback_member = KnownClass::TypedDictFallback
+    let fallback = match module {
+        TypedDictModule::Typing => KnownClass::TypedDictFallback,
+        TypedDictModule::TypingExtensions => KnownClass::ExtensionTypedDictFallback,
+    };
+
+    fallback
         .to_class_literal(db)
         .find_name_in_mro_with_policy(db, name, lookup_policy)
-        .expect("Will return Some() when called on class literal");
-    if !fallback_member.is_undefined() || module != TypedDictModule::TypingExtensions {
-        return fallback_member;
-    }
-
-    let Some(fallback) = known_module_symbol(db, KnownModule::TypingExtensions, "_TypedDict")
-        .place
-        .ignore_possibly_undefined()
-        .filter(|ty| ty.as_class_literal().is_some())
-    else {
-        return fallback_member;
-    };
-    let member = fallback
-        .find_name_in_mro_with_policy(db, name, lookup_policy)
-        .expect("Will return Some() when called on class literal");
-    if member.is_undefined() {
-        fallback_member
-    } else {
-        member
-    }
+        .expect("Will return Some() when called on class literal")
 }
 
 pub(super) fn typed_dict_class_member<'db>(

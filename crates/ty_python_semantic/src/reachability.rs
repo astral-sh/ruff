@@ -200,12 +200,12 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        ActiveRecursionDetector, CallableTypes, EnumClassLiteral, IntersectionBuilder,
-        KnownInstanceType, NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
-        callable_pattern_type, definite_match_pattern_type,
-        definite_match_pattern_type_for_subject, equality_truthiness, expand_type,
-        infer_narrowing_constraints, infer_same_file_expression_type, mapping_pattern_type,
-        pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
+        ActiveRecursionDetector, CallableTypes, EnumClassLiteral, KnownInstanceType,
+        NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType, callable_pattern_type,
+        definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
+        expand_type, infer_narrowing_constraints, infer_same_file_expression_type,
+        mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
+        singleton_pattern_type,
     },
 };
 use ruff_index::{Idx, IndexSlice};
@@ -1137,20 +1137,16 @@ fn analyze_single_pattern_predicate_kind<'db>(
         PatternPredicateKind::Or(predicates) => {
             use std::ops::ControlFlow;
 
-            let mut excluded_types = vec![];
+            let mut remaining_subject_ty = subject_ty;
             let (ControlFlow::Break(truthiness) | ControlFlow::Continue(truthiness)) = predicates
                 .iter()
                 .map(|p| {
-                    let narrowed_subject_ty = IntersectionBuilder::new(db)
-                        .add_positive(subject_ty)
-                        .add_negative(UnionType::from_elements(db, excluded_types.iter()))
-                        .build();
+                    let narrowed_subject_ty = remaining_subject_ty;
 
                     let definitely_matched =
                         definite_match_pattern_type_for_subject(db, p, narrowed_subject_ty);
-                    excluded_types.push(definitely_matched);
 
-                    if narrowed_subject_ty.is_subtype_of(db, definitely_matched) {
+                    let truthiness = if narrowed_subject_ty.is_subtype_of(db, definitely_matched) {
                         Truthiness::AlwaysTrue
                     } else {
                         analyze_single_pattern_predicate_kind(
@@ -1159,7 +1155,11 @@ fn analyze_single_pattern_predicate_kind<'db>(
                             narrowed_subject_ty,
                             Some(definitely_matched),
                         )
-                    }
+                    };
+
+                    remaining_subject_ty =
+                        pattern_binding_fallthrough_type(db, p, narrowed_subject_ty);
+                    truthiness
                 })
                 // this is just a "max", but with a slight optimization:
                 // `AlwaysTrue` is the "greatest" possible element, so we short-circuit if we get there

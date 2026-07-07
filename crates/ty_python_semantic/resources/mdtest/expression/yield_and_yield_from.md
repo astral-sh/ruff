@@ -90,7 +90,7 @@ def outer_generator():
     reveal_type(result)  # revealed: str
 ```
 
-## Infering with type context
+## Inferring with type context
 
 A dict literal that is structurally compatible with a `TypedDict` should be accepted.
 

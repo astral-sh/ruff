@@ -1,4 +1,4 @@
-use compact_str::ToCompactString;
+use compact_str::{CompactString, ToCompactString};
 use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
@@ -38,8 +38,8 @@ pub(crate) use self::match_pattern::{
     ClassPatternPositionalSource, callable_pattern_type, class_pattern_positional_sources,
     definite_match_pattern_type, definite_match_pattern_type_for_subject,
     exact_sequence_pattern_type, mapping_pattern_type, pattern_binding_fallthrough_type,
-    pattern_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
-    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
+    sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
+    typed_dict_matches_class_pattern,
 };
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
@@ -86,7 +86,7 @@ pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDes
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
 use crate::types::newtype::NewType;
-use crate::types::signatures::walk_signature;
+use crate::types::signatures::{ConcatenateTail, walk_signature};
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::TupleSpec;
@@ -116,6 +116,7 @@ use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{Truthiness, place_table, semantic_index};
 
+mod attribute_write;
 mod bool;
 mod bound_super;
 mod call;
@@ -126,6 +127,7 @@ mod constraints;
 mod context;
 mod context_manager;
 mod cyclic;
+mod dedicated;
 mod diagnostic;
 mod display;
 mod enums;
@@ -1786,7 +1788,11 @@ impl<'db> Type<'db> {
     }
 
     /// Create a promotable string literal.
-    pub(crate) fn string_literal(db: &'db dyn Db, string: &str) -> Self {
+    pub(crate) fn string_literal<T>(db: &'db dyn Db, string: T) -> Self
+    where
+        T: salsa::Lookup<CompactString> + std::hash::Hash,
+        CompactString: salsa::HashEqLike<T>,
+    {
         Self::LiteralValue(LiteralValueType::promotable(StringLiteralType::new(
             db, string,
         )))
@@ -2749,11 +2755,10 @@ impl<'db> Type<'db> {
                     _ => None,
                 } && let Ok(length) = i64::try_from(length)
                 {
-                    let parameters = Parameters::new(
-                        db,
-                        [Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(self)],
-                    );
+                    let parameters = Parameters::standard([Parameter::positional_only(Some(
+                        Name::new_static("self"),
+                    ))
+                    .with_annotated_type(self)]);
                     Place::bound(Type::function_like_callable(
                         db,
                         Signature::new(parameters, Type::int_literal(length)),
@@ -4318,11 +4323,10 @@ impl<'db> Type<'db> {
             Type::DataclassTransformer(_) => Binding::single(
                 self,
                 Signature::new(
-                    Parameters::new(
-                        db,
-                        [Parameter::positional_only(Some(Name::new_static("func")))
-                            .with_annotated_type(Type::object())],
-                    ),
+                    Parameters::standard([Parameter::positional_only(Some(Name::new_static(
+                        "func",
+                    )))
+                    .with_annotated_type(Type::object())]),
                     Type::unknown(),
                 ),
             )
@@ -4340,15 +4344,12 @@ impl<'db> Type<'db> {
                         self,
                         Signature::new_generic(
                             Some(GenericContext::from_typevar_instances(db, [val_ty])),
-                            Parameters::new(
-                                db,
-                                [
-                                    Parameter::positional_only(Some(Name::new_static("value")))
-                                        .with_annotated_type(Type::TypeVar(val_ty)),
-                                    Parameter::positional_only(Some(Name::new_static("type")))
-                                        .with_annotated_type(object_type_form(db)),
-                                ],
-                            ),
+                            Parameters::standard([
+                                Parameter::positional_only(Some(Name::new_static("value")))
+                                    .with_annotated_type(Type::TypeVar(val_ty)),
+                                Parameter::positional_only(Some(Name::new_static("type")))
+                                    .with_annotated_type(object_type_form(db)),
+                            ]),
                             Type::TypeVar(val_ty),
                         ),
                     )
@@ -4359,15 +4360,14 @@ impl<'db> Type<'db> {
                     Binding::single(
                         self,
                         Signature::new(
-                            Parameters::new(
-                                db,
-                                [Parameter::positional_only(Some(Name::new_static("arg")))
-                                    // We need to set the type to `Any` here (instead of `Never`),
-                                    // in order for every `assert_never` call to pass the argument
-                                    // check. If we set it to `Never`, we'll get invalid-argument-type
-                                    // errors instead of `type-assertion-failure` errors.
-                                    .with_annotated_type(Type::any())],
-                            ),
+                            Parameters::standard([Parameter::positional_only(Some(
+                                Name::new_static("arg"),
+                            ))
+                            // We need to set the type to `Any` here (instead of `Never`),
+                            // in order for every `assert_never` call to pass the argument
+                            // check. If we set it to `Never`, we'll get invalid-argument-type
+                            // errors instead of `type-assertion-failure` errors.
+                            .with_annotated_type(Type::any())]),
                             Type::Never,
                         ),
                     )
@@ -4377,15 +4377,12 @@ impl<'db> Type<'db> {
                 Some(KnownFunction::Cast) => Binding::single(
                     self,
                     Signature::new(
-                        Parameters::new(
-                            db,
-                            [
-                                Parameter::positional_or_keyword(Name::new_static("typ"))
-                                    .with_annotated_type(object_type_form(db)),
-                                Parameter::positional_or_keyword(Name::new_static("val"))
-                                    .with_annotated_type(Type::any()),
-                            ],
-                        ),
+                        Parameters::standard([
+                            Parameter::positional_or_keyword(Name::new_static("typ"))
+                                .with_annotated_type(object_type_form(db)),
+                            Parameter::positional_or_keyword(Name::new_static("val"))
+                                .with_annotated_type(Type::any()),
+                        ]),
                         Type::any(),
                     ),
                 )
@@ -4435,15 +4432,14 @@ impl<'db> Type<'db> {
                         [
                             // def dataclass(cls: None, /, *, ...) -> Callable[[type[_T]], type[_T]]: ...
                             Signature::new(
-                                Parameters::new(db, parameters_with_cls(Type::none(db))),
+                                Parameters::standard(parameters_with_cls(Type::none(db))),
                                 Type::unknown(),
                             ),
                             // def dataclass(cls: type[_T], /, *, ...) -> type[_T]: ...
                             Signature::new(
-                                Parameters::new(
-                                    db,
-                                    parameters_with_cls(KnownClass::Type.to_instance(db)),
-                                ),
+                                Parameters::standard(parameters_with_cls(
+                                    KnownClass::Type.to_instance(db),
+                                )),
                                 Type::unknown(),
                             ),
                             // def dataclass(
@@ -4460,7 +4456,7 @@ impl<'db> Type<'db> {
                             //     weakref_slot: bool = False,
                             // ) -> Callable[[type[_T]], type[_T]]: ...
                             Signature::new(
-                                Parameters::new(db, decorator_factory_parameters),
+                                Parameters::standard(decorator_factory_parameters),
                                 Type::unknown(),
                             ),
                         ],
@@ -4526,7 +4522,7 @@ impl<'db> Type<'db> {
             Type::SpecialForm(SpecialFormType::TypeQualifier(TypeQualifier::InitVar)) => {
                 let parameter = Parameter::positional_or_keyword(Name::new_static("type"))
                     .with_annotated_type(Type::any());
-                let signature = Signature::new(Parameters::new(db, [parameter]), Type::any());
+                let signature = Signature::new(Parameters::standard([parameter]), Type::any());
                 Binding::single(self, signature).into()
             }
 
@@ -4597,8 +4593,11 @@ impl<'db> Type<'db> {
                 // Intersect with `Any` for the return type to reflect the fact that the `dataclass()`
                 // decorator adds methods to the class
                 let returns = IntersectionType::from_two_elements(db, typevar_meta, Type::any());
-                let signature =
-                    Signature::new_generic(Some(context), Parameters::new(db, parameters), returns);
+                let signature = Signature::new_generic(
+                    Some(context),
+                    Parameters::standard(parameters),
+                    returns,
+                );
                 Binding::single(self, signature).into()
             }
 
@@ -4615,11 +4614,8 @@ impl<'db> Type<'db> {
             Type::KnownInstance(KnownInstanceType::NewType(newtype)) => Binding::single(
                 self,
                 Signature::new(
-                    Parameters::new(
-                        db,
-                        [Parameter::positional_only(None)
-                            .with_annotated_type(newtype.base(db).instance_type(db))],
-                    ),
+                    Parameters::standard([Parameter::positional_only(None)
+                        .with_annotated_type(newtype.base(db).instance_type(db))]),
                     Type::NewTypeInstance(newtype),
                 ),
             )
@@ -4664,12 +4660,11 @@ impl<'db> Type<'db> {
                     Binding::single(
                         self,
                         Signature::new(
-                            Parameters::new(
-                                db,
-                                [Parameter::positional_only(Some(Name::new_static("o")))
-                                    .with_annotated_type(Type::any())
-                                    .with_default_type(Type::bool_literal(false))],
-                            ),
+                            Parameters::standard([Parameter::positional_only(Some(
+                                Name::new_static("o"),
+                            ))
+                            .with_annotated_type(Type::any())
+                            .with_default_type(Type::bool_literal(false))]),
                             KnownClass::Bool.to_instance(db),
                         ),
                     )
@@ -4704,23 +4699,19 @@ impl<'db> Type<'db> {
                         self,
                         [
                             Signature::new(
-                                Parameters::new(
-                                    db,
-                                    [
-                                        Parameter::positional_only(Some(Name::new_static("t")))
-                                            .with_annotated_type(Type::any()),
-                                        Parameter::positional_only(Some(Name::new_static("obj")))
-                                            .with_annotated_type(Type::any()),
-                                    ],
-                                ),
+                                Parameters::standard([
+                                    Parameter::positional_only(Some(Name::new_static("t")))
+                                        .with_annotated_type(Type::any()),
+                                    Parameter::positional_only(Some(Name::new_static("obj")))
+                                        .with_annotated_type(Type::any()),
+                                ]),
                                 KnownClass::Super.to_instance(db),
                             ),
                             Signature::new(
-                                Parameters::new(
-                                    db,
-                                    [Parameter::positional_only(Some(Name::new_static("t")))
-                                        .with_annotated_type(Type::any())],
-                                ),
+                                Parameters::standard([Parameter::positional_only(Some(
+                                    Name::new_static("t"),
+                                ))
+                                .with_annotated_type(Type::any())]),
                                 KnownClass::Super.to_instance(db),
                             ),
                             Signature::new(Parameters::empty(), KnownClass::Super.to_instance(db)),
@@ -4748,23 +4739,20 @@ impl<'db> Type<'db> {
                     Binding::single(
                         self,
                         Signature::new(
-                            Parameters::new(
-                                db,
-                                [
-                                    Parameter::positional_only(Some(Name::new_static("message")))
-                                        .with_annotated_type(Type::literal_string()),
-                                    Parameter::keyword_only(Name::new_static("category"))
-                                        .with_annotated_type(UnionType::from_two_elements(
-                                            db,
-                                            warning_class_type,
-                                            Type::none(db),
-                                        ))
-                                        .with_default_type(warning_class_type),
-                                    Parameter::keyword_only(Name::new_static("stacklevel"))
-                                        .with_annotated_type(KnownClass::Int.to_instance(db))
-                                        .with_default_type(Type::int_literal(1)),
-                                ],
-                            ),
+                            Parameters::standard([
+                                Parameter::positional_only(Some(Name::new_static("message")))
+                                    .with_annotated_type(Type::literal_string()),
+                                Parameter::keyword_only(Name::new_static("category"))
+                                    .with_annotated_type(UnionType::from_two_elements(
+                                        db,
+                                        warning_class_type,
+                                        Type::none(db),
+                                    ))
+                                    .with_default_type(warning_class_type),
+                                Parameter::keyword_only(Name::new_static("stacklevel"))
+                                    .with_annotated_type(KnownClass::Int.to_instance(db))
+                                    .with_default_type(Type::int_literal(1)),
+                            ]),
                             KnownClass::Deprecated.to_instance(db),
                         ),
                     )
@@ -4786,28 +4774,25 @@ impl<'db> Type<'db> {
                     Binding::single(
                         self,
                         Signature::new(
-                            Parameters::new(
-                                db,
-                                [
-                                    Parameter::positional_or_keyword(Name::new_static("name"))
-                                        .with_annotated_type(KnownClass::Str.to_instance(db)),
-                                    Parameter::positional_or_keyword(Name::new_static("value"))
-                                        .with_annotated_type(object_type_form(db)),
-                                    Parameter::keyword_only(Name::new_static("type_params"))
-                                        .with_annotated_type(Type::homogeneous_tuple(
+                            Parameters::standard([
+                                Parameter::positional_or_keyword(Name::new_static("name"))
+                                    .with_annotated_type(KnownClass::Str.to_instance(db)),
+                                Parameter::positional_or_keyword(Name::new_static("value"))
+                                    .with_annotated_type(object_type_form(db)),
+                                Parameter::keyword_only(Name::new_static("type_params"))
+                                    .with_annotated_type(Type::homogeneous_tuple(
+                                        db,
+                                        UnionType::from_elements(
                                             db,
-                                            UnionType::from_elements(
-                                                db,
-                                                [
-                                                    KnownClass::TypeVar.to_instance(db),
-                                                    KnownClass::ParamSpec.to_instance(db),
-                                                    KnownClass::TypeVarTuple.to_instance(db),
-                                                ],
-                                            ),
-                                        ))
-                                        .with_default_type(Type::empty_tuple(db)),
-                                ],
-                            ),
+                                            [
+                                                KnownClass::TypeVar.to_instance(db),
+                                                KnownClass::ParamSpec.to_instance(db),
+                                                KnownClass::TypeVarTuple.to_instance(db),
+                                            ],
+                                        ),
+                                    ))
+                                    .with_default_type(Type::empty_tuple(db)),
+                            ]),
                             Type::unknown(),
                         ),
                     )
@@ -4817,27 +4802,22 @@ impl<'db> Type<'db> {
 
             KnownClass::Property => {
                 let getter_signature = Signature::new(
-                    Parameters::new(
-                        db,
-                        [Parameter::positional_only(None).with_annotated_type(Type::any())],
-                    ),
+                    Parameters::standard([
+                        Parameter::positional_only(None).with_annotated_type(Type::any())
+                    ]),
                     Type::any(),
                 );
                 let setter_signature = Signature::new(
-                    Parameters::new(
-                        db,
-                        [
-                            Parameter::positional_only(None).with_annotated_type(Type::any()),
-                            Parameter::positional_only(None).with_annotated_type(Type::any()),
-                        ],
-                    ),
+                    Parameters::standard([
+                        Parameter::positional_only(None).with_annotated_type(Type::any()),
+                        Parameter::positional_only(None).with_annotated_type(Type::any()),
+                    ]),
                     Type::none(db),
                 );
                 let deleter_signature = Signature::new(
-                    Parameters::new(
-                        db,
-                        [Parameter::positional_only(None).with_annotated_type(Type::any())],
-                    ),
+                    Parameters::standard([
+                        Parameter::positional_only(None).with_annotated_type(Type::any())
+                    ]),
                     Type::any(),
                 );
 
@@ -4845,39 +4825,36 @@ impl<'db> Type<'db> {
                     Binding::single(
                         self,
                         Signature::new(
-                            Parameters::new(
-                                db,
-                                [
-                                    Parameter::positional_or_keyword(Name::new_static("fget"))
-                                        .with_annotated_type(UnionType::from_two_elements(
-                                            db,
-                                            Type::single_callable(db, getter_signature),
-                                            Type::none(db),
-                                        ))
-                                        .with_default_type(Type::none(db)),
-                                    Parameter::positional_or_keyword(Name::new_static("fset"))
-                                        .with_annotated_type(UnionType::from_two_elements(
-                                            db,
-                                            Type::single_callable(db, setter_signature),
-                                            Type::none(db),
-                                        ))
-                                        .with_default_type(Type::none(db)),
-                                    Parameter::positional_or_keyword(Name::new_static("fdel"))
-                                        .with_annotated_type(UnionType::from_two_elements(
-                                            db,
-                                            Type::single_callable(db, deleter_signature),
-                                            Type::none(db),
-                                        ))
-                                        .with_default_type(Type::none(db)),
-                                    Parameter::positional_or_keyword(Name::new_static("doc"))
-                                        .with_annotated_type(UnionType::from_two_elements(
-                                            db,
-                                            KnownClass::Str.to_instance(db),
-                                            Type::none(db),
-                                        ))
-                                        .with_default_type(Type::none(db)),
-                                ],
-                            ),
+                            Parameters::standard([
+                                Parameter::positional_or_keyword(Name::new_static("fget"))
+                                    .with_annotated_type(UnionType::from_two_elements(
+                                        db,
+                                        Type::single_callable(db, getter_signature),
+                                        Type::none(db),
+                                    ))
+                                    .with_default_type(Type::none(db)),
+                                Parameter::positional_or_keyword(Name::new_static("fset"))
+                                    .with_annotated_type(UnionType::from_two_elements(
+                                        db,
+                                        Type::single_callable(db, setter_signature),
+                                        Type::none(db),
+                                    ))
+                                    .with_default_type(Type::none(db)),
+                                Parameter::positional_or_keyword(Name::new_static("fdel"))
+                                    .with_annotated_type(UnionType::from_two_elements(
+                                        db,
+                                        Type::single_callable(db, deleter_signature),
+                                        Type::none(db),
+                                    ))
+                                    .with_default_type(Type::none(db)),
+                                Parameter::positional_or_keyword(Name::new_static("doc"))
+                                    .with_annotated_type(UnionType::from_two_elements(
+                                        db,
+                                        KnownClass::Str.to_instance(db),
+                                        Type::none(db),
+                                    ))
+                                    .with_default_type(Type::none(db)),
+                            ]),
                             Type::unknown(),
                         ),
                     )
@@ -4901,9 +4878,9 @@ impl<'db> Type<'db> {
                         self,
                         Signature::new_generic(
                             Some(GenericContext::from_typevar_instances(db, [return_ty])),
-                            Parameters::new(
+                            Parameters::concatenate(
                                 db,
-                                [
+                                vec![
                                     Parameter::positional_only(Some(Name::new_static("func")))
                                         .with_annotated_type(Type::single_callable(
                                             db,
@@ -4912,11 +4889,8 @@ impl<'db> Type<'db> {
                                                 Type::TypeVar(return_ty),
                                             ),
                                         )),
-                                    Parameter::variadic(Name::new_static("args"))
-                                        .with_annotated_type(Type::any()),
-                                    Parameter::keyword_variadic(Name::new_static("kwargs"))
-                                        .with_annotated_type(Type::any()),
                                 ],
+                                ConcatenateTail::Gradual,
                             ),
                             KnownClass::FunctoolsPartial
                                 .to_specialized_instance(db, &[Type::TypeVar(return_ty)]),
@@ -4947,18 +4921,13 @@ impl<'db> Type<'db> {
                             Signature::new(Parameters::empty(), Type::empty_tuple(db)),
                             Signature::new_generic(
                                 Some(GenericContext::from_typevar_instances(db, [element_ty])),
-                                Parameters::new(
-                                    db,
-                                    [Parameter::positional_only(Some(Name::new_static(
-                                        "iterable",
-                                    )))
-                                    .with_annotated_type(
-                                        KnownClass::Iterable.to_specialized_instance(
-                                            db,
-                                            &[Type::TypeVar(element_ty)],
-                                        ),
-                                    )],
-                                ),
+                                Parameters::standard([Parameter::positional_only(Some(
+                                    Name::new_static("iterable"),
+                                ))
+                                .with_annotated_type(
+                                    KnownClass::Iterable
+                                        .to_specialized_instance(db, &[Type::TypeVar(element_ty)]),
+                                )]),
                                 Type::homogeneous_tuple(db, Type::TypeVar(element_ty)),
                             ),
                         ],
@@ -6823,7 +6792,7 @@ impl<'db> Type<'db> {
                 LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => *self,
                 LiteralValueTypeKind::Enum(enum_literal) => Type::string_literal(
                     db,
-                    &format!(
+                    compact_str::format_compact!(
                         "{enum_class}.{name}",
                         enum_class = enum_literal.enum_class(db).name(db),
                         name = enum_literal.name(db)
@@ -6831,9 +6800,11 @@ impl<'db> Type<'db> {
                 ),
                 LiteralValueTypeKind::Bytes(_) => KnownClass::Str.to_instance(db),
             },
-            Type::SpecialForm(special_form) => Type::string_literal(db, &special_form.to_string()),
+            Type::SpecialForm(special_form) => {
+                Type::string_literal(db, special_form.to_compact_string())
+            }
             Type::KnownInstance(known_instance) => {
-                Type::string_literal(db, &known_instance.repr(db).to_string())
+                Type::string_literal(db, known_instance.repr(db).to_compact_string())
             }
             ty if ty.is_subtype_of(db, Type::literal_string()) => Type::literal_string(),
             Type::Intersection(intersection) => {
@@ -6855,18 +6826,21 @@ impl<'db> Type<'db> {
     pub(crate) fn repr(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::LiteralValue(literal) => match literal.kind() {
-                LiteralValueTypeKind::Int(number) => Type::string_literal(db, &number.to_string()),
+                LiteralValueTypeKind::Int(number) => {
+                    Type::string_literal(db, number.to_compact_string())
+                }
                 LiteralValueTypeKind::Bool(true) => Type::string_literal(db, "True"),
                 LiteralValueTypeKind::Bool(false) => Type::string_literal(db, "False"),
-                LiteralValueTypeKind::String(literal) => {
-                    Type::string_literal(db, &format!("'{}'", literal.value(db).escape_default()))
-                }
+                LiteralValueTypeKind::String(literal) => Type::string_literal(
+                    db,
+                    compact_str::format_compact!("'{}'", literal.value(db).escape_default()),
+                ),
                 LiteralValueTypeKind::LiteralString => Type::literal_string(),
                 _ => KnownClass::Str.to_instance(db),
             },
-            Type::SpecialForm(special_form) => Type::string_literal(db, &special_form.to_string()),
+            Type::SpecialForm(special_form) => Type::string_literal(db, &*special_form.to_string()),
             Type::KnownInstance(known_instance) => {
-                Type::string_literal(db, &known_instance.repr(db).to_string())
+                Type::string_literal(db, known_instance.repr(db).to_compact_string())
             }
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
@@ -7626,7 +7600,7 @@ impl<'db> TypeMapping<'_, 'db> {
 
 /// A type that is determined to be divergent during recursive type inference.
 /// This type must never be eliminated by dynamic type reduction
-/// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reducted to `@Todo`).
+/// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reduced to `@Todo`).
 /// Otherwise, type inference cannot converge properly.
 /// For detailed properties of this type, see the unit test at the end of the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]

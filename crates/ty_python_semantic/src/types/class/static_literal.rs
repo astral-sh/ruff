@@ -34,6 +34,7 @@ use crate::{
             typed_dict::{TypedDictFields, synthesize_typed_dict_method, typed_dict_class_member},
         },
         context::InferContext,
+        dedicated::pydantic,
         definition_expression_type, determine_upper_bound,
         diagnostic::INVALID_DATACLASS_OVERRIDE,
         enums::{enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value},
@@ -1193,10 +1194,9 @@ impl<'db> StaticClassLiteral<'db> {
                 .get(name)
             {
                 let property_getter_signature = Signature::new(
-                    Parameters::new(
-                        db,
-                        [Parameter::positional_only(Some(Name::new_static("self")))],
-                    ),
+                    Parameters::standard([Parameter::positional_only(Some(Name::new_static(
+                        "self",
+                    )))]),
                     field.declared_ty,
                 );
                 let property_getter = Type::single_callable(db, property_getter_signature);
@@ -1464,13 +1464,18 @@ impl<'db> StaticClassLiteral<'db> {
             // so that the keyword-only parameters appear after positional parameters.
             parameters.sort_by_key(Parameter::is_keyword_only);
 
+            if name == "__init__" && pydantic::uses_base_model_init(db, self) {
+                let extra = pydantic::extra_parameter(&parameters);
+                parameters.push(extra);
+            }
+
             let signature = match name {
                 "__new__" | "__init__" => Signature::new_generic(
                     inherited_generic_context.or_else(|| self.inherited_generic_context(db)),
-                    Parameters::new(db, parameters),
+                    Parameters::standard(parameters),
                     return_ty,
                 ),
-                _ => Signature::new(Parameters::new(db, parameters), return_ty),
+                _ => Signature::new(Parameters::standard(parameters), return_ty),
             };
             Some(Type::function_like_callable(db, signature))
         };
@@ -1539,17 +1544,14 @@ impl<'db> StaticClassLiteral<'db> {
                 }
 
                 let signature = Signature::new(
-                    Parameters::new(
-                        db,
-                        [
-                            Parameter::positional_or_keyword(Name::new_static("self"))
-                                // TODO: could be `Self`.
-                                .with_annotated_type(instance_ty),
-                            Parameter::positional_or_keyword(Name::new_static("other"))
-                                // TODO: could be `Self`.
-                                .with_annotated_type(instance_ty),
-                        ],
-                    ),
+                    Parameters::standard([
+                        Parameter::positional_or_keyword(Name::new_static("self"))
+                            // TODO: could be `Self`.
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_or_keyword(Name::new_static("other"))
+                            // TODO: could be `Self`.
+                            .with_annotated_type(instance_ty),
+                    ]),
                     KnownClass::Bool.to_instance(db),
                 );
 
@@ -1563,11 +1565,10 @@ impl<'db> StaticClassLiteral<'db> {
 
                 if unsafe_hash || (frozen && eq) {
                     let signature = Signature::new(
-                        Parameters::new(
-                            db,
-                            [Parameter::positional_or_keyword(Name::new_static("self"))
-                                .with_annotated_type(instance_ty)],
-                        ),
+                        Parameters::standard([Parameter::positional_or_keyword(Name::new_static(
+                            "self",
+                        ))
+                        .with_annotated_type(instance_ty)]),
                         KnownClass::Int.to_instance(db),
                     );
 
@@ -1654,15 +1655,12 @@ impl<'db> StaticClassLiteral<'db> {
             (CodeGeneratorKind::DataclassLike(_), "__setattr__") => {
                 if self.is_frozen_dataclass(db) == Some(true) {
                     let signature = Signature::new(
-                        Parameters::new(
-                            db,
-                            [
-                                Parameter::positional_or_keyword(Name::new_static("self"))
-                                    .with_annotated_type(instance_ty),
-                                Parameter::positional_or_keyword(Name::new_static("name")),
-                                Parameter::positional_or_keyword(Name::new_static("value")),
-                            ],
-                        ),
+                        Parameters::standard([
+                            Parameter::positional_or_keyword(Name::new_static("self"))
+                                .with_annotated_type(instance_ty),
+                            Parameter::positional_or_keyword(Name::new_static("name")),
+                            Parameter::positional_or_keyword(Name::new_static("value")),
+                        ]),
                         Type::Never,
                     );
 
@@ -1713,16 +1711,13 @@ impl<'db> StaticClassLiteral<'db> {
             Type::instance(db, self.apply_optional_specialization(db, specialization));
         let setattr_signature = |name_ty, return_ty| {
             Signature::new(
-                Parameters::new(
-                    db,
-                    [
-                        Parameter::positional_or_keyword(Name::new_static("self"))
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_or_keyword(Name::new_static("name"))
-                            .with_annotated_type(name_ty),
-                        Parameter::positional_or_keyword(Name::new_static("value")),
-                    ],
-                ),
+                Parameters::standard([
+                    Parameter::positional_or_keyword(Name::new_static("self"))
+                        .with_annotated_type(instance_ty),
+                    Parameter::positional_or_keyword(Name::new_static("name"))
+                        .with_annotated_type(name_ty),
+                    Parameter::positional_or_keyword(Name::new_static("value")),
+                ]),
                 return_ty,
             )
         };
@@ -2006,7 +2001,17 @@ impl<'db> StaticClassLiteral<'db> {
 
         let use_def = use_def_map(db, class_body_scope);
 
-        let typed_dict_params = self.typed_dict_params(db);
+        // `own_fields(..., NamedTuple)` is called while constructing the class's MRO because the
+        // field types determine the synthesized tuple base. `typed_dict_params` also queries the
+        // class's MRO, so only read the `total` default when collecting `TypedDict` fields.
+        let typed_dict_fields_are_required_by_default =
+            if field_policy == CodeGeneratorKind::TypedDict {
+                self.typed_dict_params(db)
+                    .expect("TypedDictParams should be available for CodeGeneratorKind::TypedDict")
+                    .contains(TypedDictParams::TOTAL)
+            } else {
+                false
+            };
         let dataclass_kw_only_default = matches!(field_policy, CodeGeneratorKind::DataclassLike(_))
             .then(|| self.has_dataclass_param(db, field_policy, DataclassFlags::KW_ONLY));
         let mut kw_only_sentinel_field_seen = false;
@@ -2064,10 +2069,14 @@ impl<'db> StaticClassLiteral<'db> {
             }
 
             if let Some(attr_ty) = attr.place.ignore_possibly_undefined() {
-                let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                let mut default_ty = place_from_bindings(db, bindings)
-                    .place
-                    .ignore_possibly_undefined();
+                let mut default_ty = if field_policy == CodeGeneratorKind::TypedDict {
+                    None
+                } else {
+                    let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
+                    place_from_bindings(db, bindings)
+                        .place
+                        .ignore_possibly_undefined()
+                };
 
                 default_ty =
                     default_ty.map(|ty| ty.apply_optional_specialization(db, specialization));
@@ -2103,9 +2112,7 @@ impl<'db> StaticClassLiteral<'db> {
                             false
                         } else {
                             // No explicit qualifier - use class default (`total` parameter)
-                            typed_dict_params
-                                .expect("TypedDictParams should be available for CodeGeneratorKind::TypedDict")
-                                .contains(TypedDictParams::TOTAL)
+                            typed_dict_fields_are_required_by_default
                         };
 
                         FieldKind::TypedDict {
@@ -2122,7 +2129,9 @@ impl<'db> StaticClassLiteral<'db> {
                 };
 
                 // Check if this is a KW_ONLY sentinel and mark subsequent fields as keyword-only
-                if field.is_kw_only_sentinel(db) {
+                if matches!(field_policy, CodeGeneratorKind::DataclassLike(_))
+                    && field.is_kw_only_sentinel(db)
+                {
                     kw_only_sentinel_field_seen = true;
                 }
 
