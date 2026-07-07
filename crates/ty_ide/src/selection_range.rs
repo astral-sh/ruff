@@ -52,7 +52,7 @@ fn literal_content_range(node: ruff_python_ast::AnyNodeRef) -> Option<TextRange>
     use ruff_python_ast::AnyNodeRef;
     let range = match node {
         AnyNodeRef::StringLiteral(s) => Some(s.content_range()),
-        AnyNodeRef::BytesLiteral(b) => Some(b.range),
+        AnyNodeRef::BytesLiteral(b) => Some(b.content_range()),
         _ => None,
     };
     range.filter(|&range| range.len() > 0.into())
@@ -343,6 +343,43 @@ result = [(lambda x: x[key.<CURSOR>attr])(item) for item in data if item is not 
           |
         2 | ""
           | ^^
+          |
+        "#);
+    }
+
+    /// Test selection range on a bytes literal
+    #[test]
+    fn test_selection_range_bytes_literal() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+b"he<CURSOR>llo"
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.selection_range(), @r#"
+        info[selection-range]: Selection Range 0
+         --> main.py:1:1
+          |
+        1 | /
+        2 | | b"hello"
+          | |_________^
+          |
+
+        info[selection-range]: Selection Range 1
+         --> main.py:2:1
+          |
+        2 | b"hello"
+          | ^^^^^^^^
+          |
+
+        info[selection-range]: Selection Range 2
+         --> main.py:2:3
+          |
+        2 | b"hello"
+          |   ^^^^^
           |
         "#);
     }

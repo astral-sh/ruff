@@ -2135,6 +2135,16 @@ impl BytesLiteral {
             flags: BytesLiteralFlags::empty().with_invalid(),
         }
     }
+
+    /// The range of the byte literal's contents.
+    ///
+    /// This excludes any prefixes, opening quotes or closing quotes.
+    pub fn content_range(&self) -> TextRange {
+        TextRange::new(
+            self.start() + self.flags.opener_len(),
+            self.end() - self.flags.closer_len(),
+        )
+    }
 }
 
 impl From<BytesLiteral> for Expr {
