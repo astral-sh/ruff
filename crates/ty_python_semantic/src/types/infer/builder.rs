@@ -7559,7 +7559,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         arguments: &'a ast::Arguments,
     ) -> CallArguments<'a, 'db> {
-        let call_arguments =
+        let mut call_arguments =
             CallArguments::from_arguments(arguments, |arg_or_keyword, splatted_value| {
                 let ty = self.get_or_infer_expression(splatted_value, TypeContext::default());
                 if let ast::ArgOrKeyword::Arg(argument) = arg_or_keyword
@@ -7572,6 +7572,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 ty
             });
+
+        for (argument_index, arg_or_keyword) in arguments.iter_source_order().enumerate() {
+            if let ast::ArgOrKeyword::Keyword(ast::Keyword {
+                arg: None,
+                value: ast::Expr::Dict(ast::ExprDict { items, .. }),
+                ..
+            }) = arg_or_keyword
+            {
+                let value_types: Vec<_> = items
+                    .iter()
+                    .filter(|item| item.key.is_some())
+                    .map(|item| self.get_or_infer_expression(&item.value, TypeContext::default()))
+                    .collect();
+                call_arguments.set_explicit_keyword_value_types(argument_index, value_types);
+            }
+        }
 
         for arg in &arguments.args {
             if let ast::Expr::Starred(ast::ExprStarred { value, .. }) = arg {

@@ -268,6 +268,17 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
                 },
                 Argument::Keywords => {
                     can_synthesize_signature = false;
+                    for value_ty in arguments.explicit_keyword_value_types(argument_index) {
+                        match classify(value_ty) {
+                            PlaceholderPossibility::No => {}
+                            PlaceholderPossibility::Possible => {
+                                suppressed_argument_errors[argument_index] = true;
+                            }
+                            PlaceholderPossibility::Exactly => {
+                                invalid_keyword.get_or_insert(argument_index);
+                            }
+                        }
+                    }
                     if let Some(unpacked) =
                         extract_unpacked_typed_dict_from_value_type(db, argument_ty)
                     {

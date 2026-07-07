@@ -1079,6 +1079,11 @@ def no_args() -> str:
 mixed_paramspec(no_args)
 
 partial(accepts_object, **{"value": _})  # error: [invalid-argument-type]
+
+def accepts_keywords(*, value: object, count: int) -> None:
+    pass
+
+partial(accepts_keywords, **{"value": _, "count": 1})  # error: [invalid-argument-type]
 ```
 
 ## Constructors and advanced signatures

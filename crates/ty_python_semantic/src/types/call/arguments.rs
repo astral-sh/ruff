@@ -42,16 +42,20 @@ pub(crate) struct CallArguments<'a, 'db> {
 struct CallArgument<'a, 'db> {
     argument: Argument<'a>,
     types: CallArgumentTypes<'db>,
-    /// Whether a variadic keyword argument is statically known to contribute at least one item.
-    is_definitely_nonempty: bool,
+    /// Types of explicit values in a `**{...}` argument.
+    explicit_keyword_value_types: Box<[Type<'db>]>,
 }
 
 impl<'a, 'db> CallArgument<'a, 'db> {
-    fn new(argument: Argument<'a>, ty: Option<Type<'db>>, is_definitely_nonempty: bool) -> Self {
+    fn new(
+        argument: Argument<'a>,
+        ty: Option<Type<'db>>,
+        explicit_keyword_value_types: Vec<Type<'db>>,
+    ) -> Self {
         Self {
             argument,
             types: CallArgumentTypes::new(ty),
-            is_definitely_nonempty,
+            explicit_keyword_value_types: explicit_keyword_value_types.into_boxed_slice(),
         }
     }
 }
@@ -130,31 +134,28 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         };
 
         for arg_or_keyword in arguments.iter_source_order() {
-            let (argument, ty, is_definitely_nonempty) = match arg_or_keyword {
+            let (argument, ty, explicit_keyword_value_types) = match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
                         let ty = infer_argument_type(&arg_or_keyword, value);
-                        (Argument::Variadic, Some(ty), false)
+                        (Argument::Variadic, Some(ty), vec![])
                     }
-                    _ => (Argument::Positional, None, false),
+                    _ => (Argument::Positional, None, vec![]),
                 },
                 ast::ArgOrKeyword::Keyword(ast::Keyword { arg, value, .. }) => {
                     if let Some(arg) = arg {
-                        (Argument::Keyword(&arg.id), None, false)
+                        (Argument::Keyword(&arg.id), None, vec![])
                     } else {
                         let ty = infer_argument_type(&arg_or_keyword, value);
-                        let is_definitely_nonempty = matches!(
-                            value,
-                            ast::Expr::Dict(ast::ExprDict { items, .. })
-                                if items.iter().any(|item| item.key.is_some())
-                        );
-                        (Argument::Keywords, Some(ty), is_definitely_nonempty)
+                        (Argument::Keywords, Some(ty), vec![])
                     }
                 }
             };
-            call_arguments
-                .items
-                .push(CallArgument::new(argument, ty, is_definitely_nonempty));
+            call_arguments.items.push(CallArgument::new(
+                argument,
+                ty,
+                explicit_keyword_value_types,
+            ));
         }
 
         call_arguments
@@ -237,7 +238,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     pub(crate) fn with_self(&self, bound_self: Option<Type<'db>>) -> Cow<'_, Self> {
         if bound_self.is_some() {
             let mut items = Vec::with_capacity(self.items.len() + 1);
-            items.push(CallArgument::new(Argument::Synthetic, bound_self, false));
+            items.push(CallArgument::new(Argument::Synthetic, bound_self, vec![]));
             items.extend(self.items.iter().cloned());
             Cow::Owned(CallArguments { items })
         } else {
@@ -282,7 +283,25 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     }
 
     pub(super) fn is_definitely_nonempty(&self, index: usize) -> bool {
-        self.items[index].is_definitely_nonempty
+        !self.items[index].explicit_keyword_value_types.is_empty()
+    }
+
+    pub(super) fn explicit_keyword_value_types(
+        &self,
+        index: usize,
+    ) -> impl Iterator<Item = Type<'db>> + '_ {
+        self.items[index]
+            .explicit_keyword_value_types
+            .iter()
+            .copied()
+    }
+
+    pub(crate) fn set_explicit_keyword_value_types(
+        &mut self,
+        index: usize,
+        types: impl IntoIterator<Item = Type<'db>>,
+    ) {
+        self.items[index].explicit_keyword_value_types = types.into_iter().collect();
     }
 
     /// Returns an iterator on performing [argument type expansion].
@@ -485,7 +504,7 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
         let mut items = Vec::with_capacity(upper.unwrap_or(lower));
 
         for (argument, ty) in iter {
-            items.push(CallArgument::new(argument, ty, false));
+            items.push(CallArgument::new(argument, ty, vec![]));
         }
 
         Self { items }
