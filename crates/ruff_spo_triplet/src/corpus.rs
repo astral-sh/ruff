@@ -66,6 +66,19 @@ pub fn group_functions(triples: &[Triple]) -> Vec<Function> {
             Predicate::Raises => {
                 push_unique(&mut method_entry(&mut methods, &t.s).raises, &t.o);
             }
+            Predicate::EmittedBy => {
+                // Odoo's declarative write signal, INVERTED: the triple is
+                // `(field, emitted_by, method)` — field as subject, method as
+                // object — because the fact comes from the field declaration
+                // (`compute='_compute_x'`), not from a body walk. Fold it
+                // into `writes` exactly like a body-observed store: without
+                // this arm, an Odoo corpus (whose harvest predates the
+                // ruff #51 body-write DTO arm, e.g. odoo-rs slice_2 with 388
+                // `emitted_by` rows and ZERO `writes_field`) regroups with
+                // `Function.writes == []` and `recipe::classify` misreads
+                // every compute as Guard/Observe/Empty.
+                push_unique(&mut method_entry(&mut methods, &t.o).writes, &t.s);
+            }
             _ => {}
         }
     }
@@ -227,6 +240,41 @@ mod tests {
 
     fn t(s: &str, p: Predicate, o: &str) -> Triple {
         Triple::new(s, p, o, p.default_provenance())
+    }
+
+    /// The Odoo declarative-write arm: `(field, emitted_by, method)` is
+    /// INVERTED (field subject, method object) and must fold into the
+    /// method's `writes` — without it, an emitted_by-style corpus (e.g.
+    /// odoo-rs slice_2: 388 emitted_by rows, zero writes_field) regroups
+    /// write-blind and `recipe::classify` misreads every compute as
+    /// Guard/Observe/Empty.
+    #[test]
+    fn emitted_by_folds_inverted_into_writes_and_classifies_compute() {
+        let triples = vec![
+            t(
+                "odoo:account_move",
+                Predicate::HasFunction,
+                "odoo:account_move._compute_amount",
+            ),
+            t(
+                "odoo:account_move.amount_total",
+                Predicate::EmittedBy,
+                "odoo:account_move._compute_amount",
+            ),
+            t(
+                "odoo:account_move._compute_amount",
+                Predicate::ReadsField,
+                "odoo:account_move.line_ids",
+            ),
+        ];
+        let fns = group_functions(&triples);
+        assert_eq!(fns.len(), 1);
+        let f = &fns[0];
+        assert_eq!(f.name, "odoo:account_move._compute_amount");
+        assert_eq!(f.writes, vec!["odoo:account_move.amount_total"]);
+        assert!(f.guarded_writes.is_empty(), "declarative write is not a J1 guard");
+        // The whole point: the fresh write (W ⊄ R) classifies as Compute.
+        assert_eq!(crate::recipe::classify(f), crate::recipe::RecipeCentroid::Compute);
     }
 
     #[test]
