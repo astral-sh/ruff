@@ -682,6 +682,97 @@ mod tests {
     }
 
     #[test]
+    fn skips_multipart_import_used_from_function_defined_before_import() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            def f():
+                return os.path.join("a", "b")
+
+            import os.path
+
+            f()
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_multipart_import_used_from_nested_nested_scope() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            def outer():
+                def inner():
+                    return os.path.join("a", "b")
+
+                return inner
+
+            import os.path
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn late_multipart_sibling_imports_are_credited_together() -> anyhow::Result<()> {
+        // Accepted false negative: a dotted use recorded before the import can't
+        // defer its path, so a later import list is credited without submodule
+        // matching.
+        let names = UnusedImportTest::new().names(
+            r#"
+            def f():
+                return json.decoder.JSONDecoder
+
+            import json.decoder, json.encoder
+
+            f()
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn reports_multipart_import_used_before_function_local_binding() -> anyhow::Result<()> {
+        // `os` is local for the whole body of `f`, so the dotted use is unbound at
+        // runtime and the module import is never used.
+        let names = UnusedImportTest::new().names(
+            r#"
+            import os.path
+
+            def f():
+                print(os.path)
+                os = 1
+            "#,
+        )?;
+
+        assert_eq!(names, vec!["os.path"]);
+        Ok(())
+    }
+
+    #[test]
+    fn reports_unused_multipart_sibling_import_used_from_function_scope() -> anyhow::Result<()> {
+        let entries = UnusedImportTest::new().entries(
+            r#"
+            import json.decoder, json.encoder
+
+            def f():
+                return json.decoder.JSONDecoder
+            "#,
+        )?;
+
+        assert_eq!(
+            entries,
+            vec![("json.encoder".to_string(), "json.encoder".to_string())]
+        );
+        Ok(())
+    }
+
+    #[test]
     fn reports_partially_used_multipart_import_lists() -> anyhow::Result<()> {
         let entries = UnusedImportTest::new().entries(
             r#"
