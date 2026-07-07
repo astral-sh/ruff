@@ -3300,22 +3300,26 @@ impl<'db> CallableBinding<'db> {
             }
         };
 
+        if application.has_placeholders()
+            && selected_overload_indexes.iter().any(|index| {
+                self.overloads()
+                    .get(*index)
+                    .and_then(|overload| overload.signature.generic_context)
+                    .is_some_and(|generic_context| {
+                        generic_context_has_paramspec(db, generic_context)
+                    })
+            })
+        {
+            // Dropping only the unsupported overloads would incorrectly narrow the callable.
+            return None;
+        }
+
         let signature_arguments = application.arguments.with_self(self.bound_type);
         let bound_argument_offset = usize::from(self.bound_type.is_some());
         let applications: SmallVec<_> = selected_overload_indexes
             .into_iter()
             .filter_map(|index| {
                 let overload = self.overloads().get(index)?;
-                if application.has_placeholders()
-                    && overload
-                        .signature
-                        .generic_context
-                        .is_some_and(|generic_context| {
-                            generic_context_has_paramspec(db, generic_context)
-                        })
-                {
-                    return None;
-                }
                 Some(overload.partial_signature_application(
                     signature_arguments.as_ref(),
                     application,

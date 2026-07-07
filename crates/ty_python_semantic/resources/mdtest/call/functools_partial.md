@@ -1052,6 +1052,21 @@ via_paramspec = partial(invoke, _, 1)
 reveal_type(via_paramspec)  # revealed: partial[Unknown]
 via_paramspec(takes_int)
 
+@overload
+def mixed(callback: Callable[P, R], sentinel: int) -> R: ...
+@overload
+def mixed(callback: Callable[[int], int], sentinel: int) -> int: ...
+def mixed(callback: Callable[..., object], sentinel: int) -> object:
+    return callback()
+
+mixed_paramspec = partial(mixed, _, 1)
+reveal_type(mixed_paramspec)  # revealed: partial[Unknown]
+
+def no_args() -> str:
+    return "value"
+
+mixed_paramspec(no_args)
+
 partial(accepts_object, **{"value": _})  # error: [invalid-argument-type]
 ```
 
