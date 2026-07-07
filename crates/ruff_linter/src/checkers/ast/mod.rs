@@ -1127,7 +1127,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.importer.visit_import(stmt);
                 }
 
-                let module = module.as_deref();
+                let module_identifier = module.as_ref();
+                let module = module_identifier.map(ruff_python_ast::Identifier::as_str);
                 let level = *level;
                 let is_lazy = *is_lazy;
 
@@ -1135,6 +1136,40 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 if level == 0 {
                     if let Some(module) = module.and_then(|module| module.split('.').next()) {
                         self.semantic.add_module(module);
+                    }
+                }
+
+                if self.in_init_module() && level == 1 {
+                    if let Some(module_identifier) = module_identifier {
+                        let submodule = module_identifier.as_str().split('.').next().unwrap();
+                        let qualified_name = collect_import_from_member(level, None, submodule);
+                        let already_bound =
+                            self.semantic.current_scope().get(submodule).is_some_and(
+                                |binding_id| {
+                                    matches!(
+                                        &self.semantic.binding(binding_id).kind,
+                                        BindingKind::FromImport(FromImport {
+                                            qualified_name: existing,
+                                        }) if existing.as_ref() == &qualified_name
+                                    )
+                                },
+                            );
+
+                        if !already_bound {
+                            let binding_id = self.add_binding(
+                                submodule,
+                                TextRange::at(
+                                    module_identifier.start(),
+                                    TextSize::try_from(submodule.len()).unwrap(),
+                                ),
+                                BindingKind::FromImport(FromImport {
+                                    qualified_name: Box::new(qualified_name),
+                                }),
+                                BindingFlags::EXTERNAL,
+                            );
+                            // This binding is implicit, so don't report it as an unused import.
+                            self.semantic.bindings[binding_id].source = None;
+                        }
                     }
                 }
 
