@@ -3435,7 +3435,9 @@ impl<'db> PathBounds<'db> {
         node: NodeId,
         inferable: InferableTypeVars<'db>,
     ) -> Self {
-        if let Some(path_bounds) = Self::compute_simple_lower_bound_conjunction(db, builder, node) {
+        if let Some(path_bounds) =
+            Self::compute_simple_lower_bound_conjunction(db, builder, node, inferable)
+        {
             return path_bounds;
         }
 
@@ -3509,6 +3511,7 @@ impl<'db> PathBounds<'db> {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         node: NodeId,
+        inferable: InferableTypeVars<'db>,
     ) -> Option<Self> {
         match node.node() {
             Node::AlwaysTrue => return Some(PathBounds::Unconstrained),
@@ -3529,6 +3532,10 @@ impl<'db> PathBounds<'db> {
                     }
 
                     let constraint = builder.constraint_data(interior.constraint);
+                    if !constraint.typevar.is_inferable(db, inferable) {
+                        return None;
+                    }
+
                     let lower = constraint.bounds.lower?;
                     if constraint.bounds.upper.is_some()
                         || lower.has_typevar(db)
