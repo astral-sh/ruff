@@ -1053,6 +1053,37 @@ impl<'db> Bindings<'db> {
         Some(partial_bindings)
     }
 
+    /// Prevents placeholder arguments from contributing to generic inference while still letting
+    /// ordinary call checking consume the parameters they reserve.
+    fn add_functools_partial_placeholder_contexts(
+        &self,
+        arguments: &mut CallArguments<'_, 'db>,
+        placeholder_arguments: &[bool],
+    ) {
+        for binding in self.iter_flat() {
+            let bound_argument_offset = usize::from(binding.bound_type.is_some());
+            for overload in binding.overloads() {
+                let parameters = overload.signature.parameters().as_slice();
+                for (argument_index, argument_matches) in
+                    overload.argument_matches.iter().enumerate()
+                {
+                    let Some(bound_argument_index) =
+                        argument_index.checked_sub(bound_argument_offset)
+                    else {
+                        continue;
+                    };
+                    if !placeholder_arguments[bound_argument_index] {
+                        continue;
+                    }
+                    for matched_parameter in argument_matches.iter() {
+                        let declared_type = parameters[matched_parameter.index].annotated_type();
+                        arguments.insert_type(bound_argument_index, declared_type, declared_type);
+                    }
+                }
+            }
+        }
+    }
+
     /// Synthesizes the precise `functools.partial(...)` type for the already-matched bindings.
     ///
     /// Wrapped unions and intersections keep their original callable structure by partially
@@ -6515,7 +6546,7 @@ impl<'db> Binding<'db> {
         let failed_synthesis_return_type =
             KnownClass::FunctoolsPartial.to_specialized_instance(db, &[Type::unknown()]);
 
-        let application =
+        let mut application =
             match FunctoolsPartialApplicationPlan::from_call_arguments(db, call_arguments) {
                 Ok(Some(application)) => application,
                 Ok(None) => return Some(imprecise_return_type),
@@ -6531,6 +6562,10 @@ impl<'db> Binding<'db> {
             };
         let partial_bindings =
             Bindings::functools_partial_matched_bindings(db, func_ty, &application.arguments)?;
+        partial_bindings.add_functools_partial_placeholder_contexts(
+            &mut application.arguments,
+            &application.placeholder_arguments,
+        );
 
         // Reuse call-binding machinery to resolve which wrapped overloads are compatible with
         // bound arguments and to surface binding diagnostics.

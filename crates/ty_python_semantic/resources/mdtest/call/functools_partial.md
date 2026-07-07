@@ -993,6 +993,13 @@ def pair(left: T, right: T) -> tuple[T, T]:
 generic = partial(pair, _, 1)
 reveal_type(generic)  # revealed: partial[(left: int, /) -> tuple[int, int]]
 
+def first(value: T, sentinel: int) -> T:
+    return value
+
+generic_hole = partial(first, _, 1)
+reveal_type(generic_hole)  # revealed: partial[[T](value: T, /) -> T]
+reveal_type(generic_hole("x"))  # revealed: Literal["x"]
+
 def generic_collect(*values: T) -> tuple[T, ...]:
     return values
 
