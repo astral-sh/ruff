@@ -1228,6 +1228,7 @@ fn protocol_member_read_type<'db>(
         return Some(ty);
     }
 
+    // PEP 544 matches module-level functions directly, without descriptor binding on `ModuleType`.
     let place = if access == ProtocolMemberAccessMode::Instance
         && member.is_instance_method()
         && !matches!(ty, Type::ModuleLiteral(_))
