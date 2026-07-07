@@ -379,12 +379,10 @@ impl<'db> EnumClassLiteral<'db> {
 
     /// Returns the type of `.name`/`._name_` for a given enum member.
     ///
-    /// This is the canonical member name when alias detection is precise, or `str` when the
-    /// declaration may be an alias of another member.
+    /// This is the canonical member name when alias detection is precise. When alias detection is
+    /// inconclusive, we intentionally favor useful literal inference and assume the declaration is
+    /// canonical, even though custom enum construction could make it an alias of another member.
     pub(crate) fn name_type(self, db: &'db dyn Db, name: &Name) -> Option<Type<'db>> {
-        if !self.aliases_are_known(db) {
-            return Some(KnownClass::Str.to_instance(db));
-        }
         self.resolve_member(db, name)
             .map(|name| Type::string_literal(db, name))
     }
