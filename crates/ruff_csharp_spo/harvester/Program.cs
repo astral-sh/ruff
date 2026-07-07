@@ -6,7 +6,25 @@
 // rejects anything outside it.
 //
 // Usage:
-//   dotnet run --project CSharpSpoHarvester.csproj -- <source-root> [out.ndjson]
+//   dotnet run --project CSharpSpoHarvester.csproj -- <source-root> [out.ndjson] [flags]
+//
+// Flags (all optional; defaults reproduce the original EF-Core-flavoured
+// behaviour so existing invocations are unaffected):
+//   --ns <name>                      IRI namespace prefix (default "csharp")
+//   --mutator-names a,b,c            exact persistence-mutator method names
+//                                    that make a `calls` fact fire (default:
+//                                    the EF Core set below)
+//   --mutator-prefixes add_,del_     method-name PREFIXES that also count as
+//                                    mutators (default: none) — for bespoke
+//                                    ADO.NET DALs with a naming convention
+//                                    instead of a fixed method set (e.g.
+//                                    a hand-rolled DAL's `add_*`/`del_*`/`set_*`)
+//   --mutator-receivers mysql        restrict the `calls` fact to invocations
+//                                    whose receiver's last identifier segment
+//                                    is in this list (default: none = any
+//                                    receiver). `main.mysql.add_x(...)`
+//                                    matches receiver `mysql`; a form's own
+//                                    `set_Foo(...)` does not.
 //
 // Scaffold scope: syntax layer only (declarations + names as written). Symbol
 // resolution (fully-qualified bases, overrides, attribute binding) is the
@@ -18,25 +36,69 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-const string ns = "medcare";
-
 // Structural facts harvested from declarations are certain by construction;
 // mirror ruff_spo_triplet's "declared/structural" provenance tier.
 const double f = 1.0;
 const double c = 0.9;
 
-if (args.Length < 1)
+// Original scaffold's closed EF-Core persistence-mutator set — kept as the
+// default `--mutator-names` so invocations with no flags are unchanged.
+var defaultMutatorNames = new[]
 {
-    Console.Error.WriteLine("usage: csharp-spo-harvest <source-root> [out.ndjson]");
+    "SaveChanges", "SaveChangesAsync", "Update", "UpdateRange",
+    "Add", "AddRange", "Remove", "RemoveRange", "Delete",
+    "ExecuteDelete", "ExecuteUpdate",
+};
+
+var ns = "csharp";
+var mutatorNames = new HashSet<string>(defaultMutatorNames, StringComparer.Ordinal);
+var mutatorPrefixes = new List<string>();
+var mutatorReceivers = new List<string>();
+var positional = new List<string>();
+
+for (var i = 0; i < args.Length; i++)
+{
+    switch (args[i])
+    {
+        case "--ns" when i + 1 < args.Length:
+            ns = args[++i];
+            break;
+        case "--mutator-names" when i + 1 < args.Length:
+            mutatorNames = new HashSet<string>(SplitCsv(args[++i]), StringComparer.Ordinal);
+            break;
+        case "--mutator-prefixes" when i + 1 < args.Length:
+            mutatorPrefixes = SplitCsv(args[++i]);
+            break;
+        case "--mutator-receivers" when i + 1 < args.Length:
+            mutatorReceivers = SplitCsv(args[++i]);
+            break;
+        default:
+            positional.Add(args[i]);
+            break;
+    }
+}
+
+if (positional.Count < 1)
+{
+    Console.Error.WriteLine(
+        "usage: csharp-spo-harvest <source-root> [out.ndjson] " +
+        "[--ns <name>] [--mutator-names a,b,c] [--mutator-prefixes add_,del_] " +
+        "[--mutator-receivers mysql]");
     return 2;
 }
 
-var root = args[0];
+var root = positional[0];
 if (!Directory.Exists(root))
 {
     Console.Error.WriteLine($"error: source root not found: {root}");
     return 2;
 }
+
+// The one `calls`-fact predicate for this run, closed over the configured
+// name set / prefixes / receivers — built once, passed down explicitly
+// (EmitBodyArm is a `static` local function and cannot capture top-level
+// variables).
+var isMutatorCall = BuildMutatorPredicate(mutatorNames, mutatorPrefixes, mutatorReceivers);
 
 var triples = new List<Triple>();
 
@@ -87,23 +149,60 @@ foreach (var file in Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDire
                     break;
 
                 case MethodDeclarationSyntax m:
-                    var msubj = $"{ns}:{name}.{m.Identifier.Text}";
-                    triples.Add(new Triple(subj, "has_function", msubj, f, c));
-                    triples.Add(new Triple(msubj, "rdf:type", "ogit:Function", f, c));
-                    if (m.Modifiers.Any(t => t.IsKind(SyntaxKind.StaticKeyword)))
                     {
-                        triples.Add(new Triple(msubj, "is_static", "true", f, c));
+                        var msubj = $"{ns}:{name}.{m.Identifier.Text}";
+                        triples.Add(new Triple(subj, "has_function", msubj, f, c));
+                        triples.Add(new Triple(msubj, "rdf:type", "ogit:Function", f, c));
+                        if (m.Modifiers.Any(t => t.IsKind(SyntaxKind.StaticKeyword)))
+                        {
+                            triples.Add(new Triple(msubj, "is_static", "true", f, c));
+                        }
+
+                        // AST-DLL signature plane (returns_type / has_param_type /
+                        // has_visibility) — mirrors the C++ frontend's cpp_method
+                        // (ruff_spo_triplet::expand.rs cpp_method) so the codegen's
+                        // "helpers/private split" (fuzzy-recipe-codebook.md §2) and
+                        // the AST-DLL signature shape work identically for C#.
+                        if (m.ReturnType.ToString() != "void")
+                        {
+                            triples.Add(new Triple(msubj, "returns_type", m.ReturnType.ToString(), f, c));
+                        }
+                        var parameters = m.ParameterList.Parameters;
+                        for (var pi = 0; pi < parameters.Count; pi++)
+                        {
+                            if (parameters[pi].Type is { } pType)
+                            {
+                                triples.Add(new Triple(msubj, "has_param_type", $"{pi}:{pType}", f, c));
+                            }
+                        }
+                        // Always present — every method has a visibility, matching
+                        // the C++ frontend's "always present" access specifier.
+                        triples.Add(new Triple(
+                            msubj,
+                            "has_visibility",
+                            VisibilityOf(m.Modifiers, type is InterfaceDeclarationSyntax),
+                            f,
+                            c));
+
+                        // DTO ARM (syntax-only) — the body-fact fingerprint
+                        // the fuzzy recipe-codebook needs (ruff/.claude/
+                        // knowledge/fuzzy-recipe-codebook.md §2). Populates
+                        // writes_field / reads_field / raises / calls /
+                        // writes_if_blank for a C# method body, so the same
+                        // recipe centroids that classify Rails hooks classify
+                        // C# `OnSaving`/`SaveChanges` overrides + property
+                        // setters, and bespoke ADO.NET DALs (`add_*`/`del_*`
+                        // naming, no ORM) via
+                        // --mutator-prefixes/--mutator-receivers. TESTED:
+                        // built + run with dotnet-sdk-8 against
+                        // `fixtures/recipe_shapes.cs` (all 7 recipe centroids
+                        // classify correctly, `ruff_csharp_spo` unit tests
+                        // round-trip the emitted predicates) AND end-to-end
+                        // against a real production C# corpus (~97k triples,
+                        // `ruff_csharp_spo::load` validates all of them).
+                        EmitBodyArm(triples, ns, name, msubj, m.Body, m.ExpressionBody, f, c, isMutatorCall);
+                        break;
                     }
-                    // DTO ARM (DRAFT) — the body-fact fingerprint the fuzzy
-                    // recipe-codebook needs (ruff/.claude/knowledge/
-                    // fuzzy-recipe-codebook.md §2). Populates writes_field /
-                    // reads_field / raises / calls / writes_if_blank for a C#
-                    // method body, so the same recipe centroids that classify
-                    // Rails hooks classify C# `OnSaving`/`SaveChanges`
-                    // overrides + property setters. Untested against a corpus
-                    // in this checkout (no dotnet) — review + run on MedCare.
-                    EmitBodyArm(triples, ns, name, msubj, m.Body, m.ExpressionBody, f, c);
-                    break;
 
                 default:
                     break;
@@ -113,8 +212,8 @@ foreach (var file in Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDire
 }
 
 var json = new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.Never };
-using (var w = args.Length > 1
-           ? new StreamWriter(args[1])
+using (var w = positional.Count > 1
+           ? new StreamWriter(positional[1])
            : new StreamWriter(Console.OpenStandardOutput()))
 {
     foreach (var t in triples)
@@ -144,7 +243,7 @@ static void EmitField(
     triples.Add(new Triple(fsubj, "field_type", type.ToString(), f, c));
 }
 
-// DTO ARM (DRAFT, syntax-only) — the body-fact fingerprint for the fuzzy
+// DTO ARM (syntax-only) — the body-fact fingerprint for the fuzzy
 // recipe-codebook (ruff/.claude/knowledge/fuzzy-recipe-codebook.md §2). Emits,
 // for one C# method body, the SAME predicates the Ruby frontend emits so the
 // recipe centroids are language-agnostic:
@@ -155,7 +254,10 @@ static void EmitField(
 //   writes_if_blank `X ??= v` / `if (X==null) X = v`   J1 default-vs-normalize
 // Syntax-only, no SemanticModel: a bare `X` is heuristically a member read
 // (Inferred, matching Ruby's convention) — a SemanticModel upgrade would prune
-// locals/params. The persistence-mutator set mirrors Ruby's closed AR_MUTATORS.
+// locals/params. `isMutatorCall` is the configured persistence-mutator
+// predicate (`--mutator-names`/`--mutator-prefixes`/`--mutator-receivers`,
+// see `BuildMutatorPredicate`) — the C# analogue of Ruby's closed
+// AR_MUTATORS, made agnostic to ORM vs bespoke ADO.NET DAL naming.
 static void EmitBodyArm(
     List<Triple> triples,
     string ns,
@@ -164,7 +266,8 @@ static void EmitBodyArm(
     BlockSyntax? body,
     ArrowExpressionClauseSyntax? expressionBody,
     double f,
-    double c)
+    double c,
+    Func<MemberAccessExpressionSyntax, bool> isMutatorCall)
 {
     // Unify block-bodied (`{ … }`) and expression-bodied (`=> …`) methods:
     // walk whichever node holds the body.
@@ -173,14 +276,6 @@ static void EmitBodyArm(
     {
         return;
     }
-
-    // Closed persistence-mutator set — the C# analogue of Ruby's AR_MUTATORS.
-    // A `calls` fact fires only for these (the triage needs "does it call a
-    // writer", not every invocation). Extend per ORM (EF Core shown).
-    static bool IsMutator(string method) => method is
-        "SaveChanges" or "SaveChangesAsync" or "Update" or "UpdateRange" or
-        "Add" or "AddRange" or "Remove" or "RemoveRange" or "Delete" or
-        "ExecuteDelete" or "ExecuteUpdate";
 
     // LHS of an assignment -> the member name it writes, or null if the LHS is
     // not a plain member (`this.X` / `X`). Indexers, tuples, locals -> null.
@@ -238,7 +333,7 @@ static void EmitBodyArm(
 
             // ── calls (persistence mutators only) ──
             case InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax mac }
-                when IsMutator(mac.Name.Identifier.Text):
+                when isMutatorCall(mac):
                 // "receiver.method" verbatim, like Ruby's calls object.
                 triples.Add(new Triple(msubj, "calls", $"{mac.Expression}.{mac.Name.Identifier.Text}", f, c));
                 break;
@@ -284,6 +379,83 @@ static string? NullGuardedField(ExpressionSyntax cond)
             => MemberName(inv.ArgumentList.Arguments[0].Expression),
         _ => null,
     };
+}
+
+// Split a `--flag a,b,c` CLI value into a trimmed, empty-entry-free list.
+static List<string> SplitCsv(string s) =>
+    s.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+
+// The receiver of an invocation, reduced to its last identifier segment, so
+// `main.mysql.add_x(...)` matches `--mutator-receivers mysql` (the `.mysql`
+// leg), not the whole `main.mysql` chain. `ctx.SaveChanges()` -> "ctx";
+// `this.mysql.add_x(...)` -> "mysql" (the `this.mysql` receiver is itself a
+// MemberAccess whose Name is "mysql").
+static string ReceiverLastSegment(ExpressionSyntax receiver) => receiver switch
+{
+    MemberAccessExpressionSyntax ma => ma.Name.Identifier.Text,
+    IdentifierNameSyntax id => id.Identifier.Text,
+    ThisExpressionSyntax => "this",
+    _ => receiver.ToString(),
+};
+
+// Builds the one `calls`-fact predicate for a harvest run from the
+// `--mutator-names`/`--mutator-prefixes`/`--mutator-receivers` configuration.
+// A name match is `mutatorNames.Contains(name)` (exact, the original EF-Core
+// behaviour) OR a `mutatorPrefixes` prefix match (for naming-convention DALs
+// with `add_*`/`del_*`-style names) — either is sufficient. When
+// `mutatorReceivers` is non-empty, the match is further restricted to
+// invocations whose receiver's last segment (see `ReceiverLastSegment`) is in
+// that list; an empty `mutatorReceivers` matches any receiver (the original
+// behaviour, e.g. `ctx.SaveChanges()` with no receiver filter at all).
+static Func<MemberAccessExpressionSyntax, bool> BuildMutatorPredicate(
+    HashSet<string> mutatorNames,
+    List<string> mutatorPrefixes,
+    List<string> mutatorReceivers) => mac =>
+{
+    var name = mac.Name.Identifier.Text;
+    var nameMatches = mutatorNames.Contains(name)
+        || mutatorPrefixes.Any(p => name.StartsWith(p, StringComparison.Ordinal));
+    if (!nameMatches)
+    {
+        return false;
+    }
+    return mutatorReceivers.Count == 0
+        || mutatorReceivers.Contains(ReceiverLastSegment(mac.Expression));
+};
+
+// Method access specifier -> "public"|"protected"|"private", the closed
+// `has_visibility` vocabulary (`ruff_spo_triplet::Predicate::HasVisibility`,
+// mirroring the C++ frontend's `CppAccess`). C# has no explicit keyword for
+// the common "no modifier" case, so the two language defaults are applied:
+// `private` for class/struct/record members, *implicitly* `public` for
+// interface members. `internal`-only members (package-visible, no C#
+// equivalent in the closed three-value vocabulary) collapse to "private":
+// per the codebook's API-surface signal (fuzzy-recipe-codebook.md §2 —
+// "public methods are the adapter surface; private/protected are likely
+// internal"), an internal-only member is not on the public adapter surface
+// either, so folding it into "private" preserves that signal even though C#
+// `internal` and `private` are technically distinct accessibilities.
+// `protected internal` / `private protected` collapse to "protected" (the
+// first matching, more-restrictive keyword below wins).
+static string VisibilityOf(SyntaxTokenList modifiers, bool isInterfaceMember)
+{
+    if (modifiers.Any(t => t.IsKind(SyntaxKind.PublicKeyword)))
+    {
+        return "public";
+    }
+    if (modifiers.Any(t => t.IsKind(SyntaxKind.ProtectedKeyword)))
+    {
+        return "protected";
+    }
+    if (modifiers.Any(t => t.IsKind(SyntaxKind.PrivateKeyword)))
+    {
+        return "private";
+    }
+    if (modifiers.Any(t => t.IsKind(SyntaxKind.InternalKeyword)))
+    {
+        return "private";
+    }
+    return isInterfaceMember ? "public" : "private";
 }
 
 // Base/type name as written, generics stripped (`List<Foo>` -> `List`) so the

@@ -53,12 +53,17 @@
 //! `serde` + `serde_json` only — the same zero-dep ethos as
 //! `lance_graph_contract`.
 
+mod codebook;
+mod corpus;
 mod expand;
 mod ir;
 mod ndjson;
 mod reassemble;
+mod recipe;
 mod triple;
 
+pub use codebook::{CodebookBinding, CodebookCheck, check_model_graph, concept_key};
+pub use corpus::{group_functions, reassemble_model_graph};
 pub use expand::expand;
 pub use ir::{
     ActsAs, AssocDecl, AssocKind, AttrDecl, AttrKind, Callback, ConcernKind, ConcernRef,
@@ -69,6 +74,7 @@ pub use ir::{
 };
 pub use ndjson::{ParseError, from_ndjson, to_ndjson};
 pub use reassemble::{cpp_projection, reassemble};
+pub use recipe::{RecipeCentroid, classify, is_recoverable};
 pub use triple::{EntityKind, Predicate, Provenance, Triple};
 
 #[cfg(test)]
