@@ -16,7 +16,8 @@ use crate::types::constraints::{
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
+    TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
@@ -1624,11 +1625,36 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // `Foo[list[Any]]` even if `Foo` is invariant, and even though `Any` is not equivalent to
             // `list[Any]`, because `Any` is assignable to `list[Any]` and `list[Any]` is assignable to
             // `Any`.
+            //
+            // For lazy type-variable evaluation, those two directions describe a single
+            // constraint. Constructing it directly avoids combinatorial path expansion when many
+            // invariant specializations are combined in a union. Subtyping uses the gradual
+            // type's materialization range, while assignability uses the type itself for both
+            // bounds.
             (None, None, _) => {
-                self.check_type_pair(db, target_type, source_type)
-                    .and(db, self.constraints, || {
-                        self.check_type_pair(db, source_type, target_type)
-                    })
+                if self.typevar_evaluation == TypeVarEvaluation::Lazy
+                    && let (Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar)) =
+                        (source_type, target_type)
+                    && !ty.is_type_var()
+                    // Preserve union distribution before constructing constraints. Storing the
+                    // entire union as an exact bound makes solving common generic calls involving
+                    // large unions significantly more expensive.
+                    && !ty.is_union()
+                {
+                    let ty = ty.materialized_divergent_fallback().unwrap_or(ty);
+                    let (lower, upper) = if self.relation.is_subtyping() {
+                        (ty.top_materialization(db), ty.bottom_materialization(db))
+                    } else {
+                        (ty, ty)
+                    };
+                    ConstraintSet::constrain_typevar(db, self.constraints, typevar, lower, upper)
+                } else {
+                    self.check_type_pair(db, target_type, source_type).and(
+                        db,
+                        self.constraints,
+                        || self.check_type_pair(db, source_type, target_type),
+                    )
+                }
             }
             // For gradual types, A <: B (subtyping) is defined as Top[A] <: Bottom[B]
             (
