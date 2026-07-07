@@ -6,7 +6,7 @@ Checks for `ty: ignore` comments that don't specify which rules to ignore.
 
 A blanket `ty: ignore` comment suppresses every type-checking diagnostic on the
 applicable line or file. Specifying rule codes documents which diagnostics are
-expected and prevents the comment from hiding unrelated errors.
+expected and prevents the comment from silencing unrelated errors.
 
 ## Examples
 
