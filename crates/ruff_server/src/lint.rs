@@ -19,7 +19,7 @@ use ruff_linter::{
     Locator,
     directives::{Flags, extract_directives},
     generate_noqa_edits,
-    linter::check_path,
+    linter::{check_path, parse_unchecked_source},
     package::PackageRoot,
     packaging::detect_package_root,
     preview::is_human_readable_names_enabled,
@@ -30,7 +30,6 @@ use ruff_linter::{
 use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::ParseOptions;
 use ruff_source_file::LineIndex;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -109,13 +108,8 @@ pub(crate) fn check(
 
     let target_version = settings.linter.resolve_target_version(&document_path);
 
-    let parse_options =
-        ParseOptions::from(source_type).with_target_version(target_version.parser_version());
-
     // Parse once.
-    let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), parse_options)
-        .try_into_module()
-        .expect("PySourceType always parses to a ModModule");
+    let parsed = parse_unchecked_source(&source_kind, source_type, target_version.parser_version());
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
