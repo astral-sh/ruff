@@ -31,12 +31,29 @@ use ruff_cpp_spo::walk_free_functions;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let src = std::env::var("SCALE_SRC").unwrap_or_else(|_| "/tmp/leptonica-src/scale1.c".to_string());
     let inc = std::env::var("LEPT_INCLUDE").unwrap_or_else(|_| "/usr/include/leptonica".to_string());
-    let args = [
-        "-x".to_string(),
-        "c".to_string(),
-        "-std=c11".to_string(),
-        format!("-I{inc}"),
-    ];
+    // LANG=c++ switches to C++ mode (namespaced free functions, e.g. tesseract's
+    // otsuthr.cpp); EXTRA_INC=colon,separated adds include dirs beyond LEPT_INCLUDE.
+    let lang = std::env::var("LANG_MODE").unwrap_or_else(|_| "c".to_string());
+    let mut args = if lang == "c++" {
+        vec![
+            "-x".to_string(),
+            "c++".to_string(),
+            "-std=c++17".to_string(),
+            format!("-I{inc}"),
+        ]
+    } else {
+        vec![
+            "-x".to_string(),
+            "c".to_string(),
+            "-std=c11".to_string(),
+            format!("-I{inc}"),
+        ]
+    };
+    if let Ok(extra) = std::env::var("EXTRA_INC") {
+        for d in extra.split(':').filter(|d| !d.is_empty()) {
+            args.push(format!("-I{d}"));
+        }
+    }
 
     let funcs = walk_free_functions(Path::new(&src), &args).map_err(|e| e.to_string())?;
     eprintln!("[harvest] {} free-function definitions in {src}", funcs.len());
