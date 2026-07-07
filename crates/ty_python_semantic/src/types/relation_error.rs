@@ -478,11 +478,10 @@ impl<'db> ErrorContextTree<'db> {
     }
 
     /// Push a new error context node, making the existing tree a child of the new context.
-    pub(crate) fn push(&self, get_context: impl FnOnce() -> ErrorContext<'db>) {
+    pub(crate) fn push(&self, context: ErrorContext<'db>) {
         if !self.is_enabled() {
             return;
         }
-        let context = get_context();
         let root = self.root.take();
         let children = if root.is_empty() { vec![] } else { vec![root] };
         *self.root.borrow_mut() = ErrorContextNode { context, children };

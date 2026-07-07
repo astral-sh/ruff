@@ -1890,14 +1890,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 target_positional > source_positional || target.parameters.variadic().is_some();
 
             if target_accepts_extra_positionals {
-                if target_positional > source_positional
+                if let Some(context) = self.report_context()
+                    && target_positional > source_positional
                     && let Some(ParameterKind::KeywordOnly { name, .. }) = source
                         .parameters
                         .iter()
                         .nth(source_positional)
                         .map(Parameter::kind)
                 {
-                    self.provide_context(|| ErrorContext::ParameterMustAcceptPositionalArguments {
+                    context.push(ErrorContext::ParameterMustAcceptPositionalArguments {
                         name: name.clone(),
                     });
                 }
@@ -1915,8 +1916,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let return_type_checks = !result
             .intersect(db, self.constraints, return_type_constraints)
             .is_never_satisfied(db);
-        if !return_type_checks {
-            self.provide_context(|| ErrorContext::IncompatibleReturnTypes {
+        if let Some(context) = self.report_context()
+            && !return_type_checks
+        {
+            context.push(ErrorContext::IncompatibleReturnTypes {
                 source: source.return_ty,
                 target: target.return_ty,
             });
@@ -1949,9 +1952,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
 
             let constraint_set = self.check_type_pair(db, target_ty, source_ty);
-            if constraint_set.is_never_satisfied(db) {
+            if let Some(context) = self.report_context()
+                && constraint_set.is_never_satisfied(db)
+            {
                 let parameter = ParameterDescription::new(target_index, target_name);
-                self.provide_context(|| ErrorContext::IncompatibleParameterTypes {
+                context.push(ErrorContext::IncompatibleParameterTypes {
                     source: source_ty,
                     target: target_ty,
                     parameter,
@@ -2111,10 +2116,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 },
                             ) => {
                                 if self_name != other_name {
-                                    self.provide_context(|| ErrorContext::ParameterNameMismatch {
-                                        source_name: self_name.clone(),
-                                        target_name: other_name.clone(),
-                                    });
+                                    if let Some(context) = self.report_context() {
+                                        context.push(ErrorContext::ParameterNameMismatch {
+                                            source_name: self_name.clone(),
+                                            target_name: other_name.clone(),
+                                        });
+                                    }
                                     return self.never();
                                 }
                                 // The following checks are the same as positional-only parameters.
@@ -2772,11 +2779,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         // `target`, then the non-variadic parameters in `source` must have a default
                         // value.
                         if default_type.is_none() {
-                            let parameter =
-                                ParameterDescription::new(target_index, source_parameter.name());
-                            self.provide_context(|| ErrorContext::ExtraRequiredParameter {
-                                parameter,
-                            });
+                            if let Some(context) = self.report_context() {
+                                let parameter = ParameterDescription::new(
+                                    target_index,
+                                    source_parameter.name(),
+                                );
+                                context.push(ErrorContext::ExtraRequiredParameter { parameter });
+                            }
                             return self.never();
                         }
                     }
@@ -2832,10 +2841,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             },
                         ) => {
                             if source_name != target_name {
-                                self.provide_context(|| ErrorContext::ParameterNameMismatch {
-                                    source_name: source_name.clone(),
-                                    target_name: target_name.clone(),
-                                });
+                                if let Some(context) = self.report_context() {
+                                    context.push(ErrorContext::ParameterNameMismatch {
+                                        source_name: source_name.clone(),
+                                        target_name: target_name.clone(),
+                                    });
+                                }
                                 return self.never();
                             }
                             // The following checks are the same as positional-only parameters.
@@ -2926,12 +2937,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 name: target_name, ..
                             },
                         ) => {
-                            self.provide_context(|| {
-                                ErrorContext::ParameterMustAcceptKeywordArguments {
+                            if let Some(context) = self.report_context() {
+                                context.push(ErrorContext::ParameterMustAcceptKeywordArguments {
                                     source_name: name.clone(),
                                     target_name: target_name.clone(),
-                                }
-                            });
+                                });
+                            }
                             return self.never();
                         }
 
@@ -2940,11 +2951,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             ParameterKind::PositionalOnly { .. }
                             | ParameterKind::PositionalOrKeyword { .. },
                         ) => {
-                            self.provide_context(|| {
-                                ErrorContext::ParameterMustAcceptPositionalArguments {
-                                    name: name.clone(),
-                                }
-                            });
+                            if let Some(context) = self.report_context() {
+                                context.push(
+                                    ErrorContext::ParameterMustAcceptPositionalArguments {
+                                        name: name.clone(),
+                                    },
+                                );
+                            }
                             return self.never();
                         }
 

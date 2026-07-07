@@ -1513,7 +1513,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         member: &ProtocolMember<'_, 'db>,
     ) -> ConstraintSet<'db, 'c> {
         let capabilities = member.capabilities(db);
-        if self.is_context_collection_enabled() {
+        if let Some(context) = self.report_context() {
             let instance_read_missing = capabilities.instance.read.is_some()
                 && protocol_member_read_type(
                     db,
@@ -1534,7 +1534,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 )
                 .is_none();
             if instance_read_missing || class_read_missing {
-                self.provide_context(|| ErrorContext::ProtocolMemberNotDefined {
+                context.push(ErrorContext::ProtocolMemberNotDefined {
                     member_name: member.name.into(),
                     ty,
                 });
@@ -1561,8 +1561,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ProtocolMemberAccessMode::Class,
                 )
             });
-        if self.is_context_collection_enabled() && result.is_never_satisfied(db) {
-            self.provide_context(|| ErrorContext::ProtocolMemberIncompatible {
+        if let Some(context) = self.report_context()
+            && result.is_never_satisfied(db)
+        {
+            context.push(ErrorContext::ProtocolMemberIncompatible {
                 member_name: member.name.into(),
             });
         }
@@ -1660,8 +1662,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             .when_all(db, self.constraints, |target_member| {
                 let source_member = source.member_by_name(db, target_member.name);
 
-                if self.is_context_collection_enabled() && source_member.is_none() {
-                    self.provide_context(|| ErrorContext::ProtocolMemberNotDefined {
+                if let Some(context) = self.report_context()
+                    && source_member.is_none()
+                {
+                    context.push(ErrorContext::ProtocolMemberNotDefined {
                         member_name: target_member.name.into(),
                         ty: source_type,
                     });
@@ -1686,8 +1690,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )
                     })
                 });
-                if self.is_context_collection_enabled() && result.is_never_satisfied(db) {
-                    self.provide_context(|| ErrorContext::ProtocolMemberIncompatible {
+                if let Some(context) = self.report_context()
+                    && result.is_never_satisfied(db)
+                {
+                    context.push(ErrorContext::ProtocolMemberIncompatible {
                         member_name: target_member.name.into(),
                     });
                 }

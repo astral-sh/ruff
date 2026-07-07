@@ -867,13 +867,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         ConstraintSet::from_bool(self.constraints, false)
     }
 
-    /// Provide context about a failing (assignability) relation between two types.
-    pub(super) fn provide_context(&self, get_context: impl FnOnce() -> ErrorContext<'db>) {
-        if let Some(context_tree) = &self.context_tree {
-            context_tree.push(get_context);
-        }
-    }
-
     /// Overwrite the error context tree with a new root context and child nodes.
     pub(super) fn set_context(
         &self,
@@ -887,9 +880,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     /// Return true if error context collection is currently enabled.
     pub(super) fn is_context_collection_enabled(&self) -> bool {
+        self.report_context().is_some()
+    }
+
+    /// If error context collection is enabled, returns the current error context tree. You will
+    /// typically use [`push`][ErrorContextTree::push] to add additional information to the error
+    /// context. Returns `None` if error context collection is disabled, allowing you to skip
+    /// expensive checks.
+    pub(super) fn report_context(&self) -> Option<&ErrorContextTree<'db>> {
         self.context_tree
             .as_ref()
-            .is_some_and(ErrorContextTree::is_enabled)
+            .filter(|context| context.is_enabled())
     }
 
     /// Temporarily suppress error context collection for the duration of `f`.
@@ -1519,8 +1520,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .iter()
                     .when_all(db, self.constraints, |&elem_ty| {
                         let constraint_set = self.check_type_pair(db, elem_ty, target);
-                        if constraint_set.is_never_satisfied(db) {
-                            self.provide_context(|| ErrorContext::NotAllUnionElementsAssignable {
+                        if let Some(context) = self.report_context()
+                            && constraint_set.is_never_satisfied(db)
+                        {
+                            context.push(ErrorContext::NotAllUnionElementsAssignable {
                                 element: elem_ty,
                                 union: source,
                                 target,
@@ -1616,8 +1619,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .iter()
                 .when_all(db, self.constraints, |&pos_ty| {
                     let constraint_set = self.check_type_pair(db, source, pos_ty);
-                    if constraint_set.is_never_satisfied(db) {
-                        self.provide_context(|| ErrorContext::NotAssignableToIntersectionElement {
+                    if let Some(context) = self.report_context()
+                        && constraint_set.is_never_satisfied(db)
+                    {
+                        context.push(ErrorContext::NotAssignableToIntersectionElement {
                             source,
                             element: pos_ty,
                             intersection: target,
@@ -1850,10 +1855,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
                     let result = self.check_callables_vs_callable(db, &callables, target_callable);
 
-                    if self.should_provide_callable_upcast_context(source)
+                    if let Some(context) = self.report_context()
+                        && self.should_provide_callable_upcast_context(source)
                         && result.is_never_satisfied(db)
                     {
-                        self.provide_context(|| ErrorContext::InferredCallableType {
+                        context.push(ErrorContext::InferredCallableType {
                             source,
                             callable: callables.into_type(db),
                         });
@@ -1907,14 +1913,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     )
                 };
                 let result = self.check_type_pair(db, fallback, target);
-                if result.is_never_satisfied(db) {
-                    if let Type::NominalInstance(instance) = target
-                        && instance.class(db).is_known(db, KnownClass::Dict)
-                    {
-                        self.provide_context(|| {
-                            ErrorContext::TypedDictNotAssignableToDict(typed_dict)
-                        });
-                    }
+                if let Some(context) = self.report_context()
+                    && result.is_never_satisfied(db)
+                    && let Type::NominalInstance(instance) = target
+                    && instance.class(db).is_known(db, KnownClass::Dict)
+                {
+                    context.push(ErrorContext::TypedDictNotAssignableToDict(typed_dict));
                 }
                 result
             }),
