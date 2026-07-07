@@ -108,8 +108,7 @@ pub(crate) fn check(
 
     let target_version = settings.linter.resolve_target_version(&document_path);
 
-    // Parse once. Notebooks are parsed cell by cell so a syntax error confined to one cell isn't
-    // masked by a following cell; definitions still resolve across cells.
+    // Parse once.
     let parsed = parse_unchecked_source(&source_kind, source_type, target_version.parser_version());
 
     // Map row and column locations to byte slices (lazily).

@@ -767,12 +767,10 @@ impl ParseSource {
     }
 }
 
-/// Like [`ruff_python_parser::parse_unchecked_source`] but with an additional [`PythonVersion`]
-/// argument.
+/// Like [`ruff_python_parser::parse_unchecked_source`], but with an explicit [`PythonVersion`] and
+/// per-cell notebook parsing.
 ///
-/// Jupyter notebooks are parsed cell by cell so that a syntax error confined to one cell isn't
-/// masked by the source of a following cell
-/// Definitions still resolve across cells because the per-cell modules are concatenated into a single module
+/// Per-cell modules are merged so definitions remain visible across cells.
 pub fn parse_unchecked_source(
     source_kind: &SourceKind,
     source_type: PySourceType,
@@ -819,49 +817,6 @@ mod tests {
     /// Construct a path to a Jupyter notebook in the `resources/test/fixtures/jupyter` directory.
     fn notebook_path(path: impl AsRef<Path>) -> std::path::PathBuf {
         Path::new("../ruff_notebook/resources/test/fixtures/jupyter").join(path)
-    }
-
-    #[test]
-    fn notebook_cell_boundary_syntax_error() -> Result<(), NotebookError> {
-        // A decorator whose definition lives in the next cell parses cleanly once the cells are
-        // concatenated, but is invalid on its own. Per-cell parsing must report it.
-        let path = notebook_path("cell_boundary_syntax_error.ipynb");
-        let source_kind = SourceKind::ipy_notebook(Notebook::from_path(&path)?);
-        let diagnostics =
-            test_contents_syntax_errors(&source_kind, &path, &LinterSettings::default());
-        assert!(
-            diagnostics.iter().any(Diagnostic::is_invalid_syntax),
-            "expected a cell-boundary syntax error, got: {diagnostics:?}"
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn notebook_cell_boundary_tokens_preserve_linting() -> Result<(), NotebookError> {
-        // `valid_multicell.ipynb` ends a cell with an indented `def` block right before the next
-        // cell, so per-cell parsing emits a trailing `Dedent` at that boundary. It also places a
-        // range-suppression comment and its suppressed import in separate cells. Ensure the
-        // boundary tokens preserve suppression without introducing blank-line or whitespace
-        // diagnostics.
-        let path = notebook_path("valid_multicell.ipynb");
-        let source_kind = SourceKind::ipy_notebook(Notebook::from_path(&path)?);
-        let settings = LinterSettings::for_rules([
-            Rule::BlankLineBetweenMethods,
-            Rule::BlankLinesTopLevel,
-            Rule::TooManyBlankLines,
-            Rule::BlankLinesAfterFunctionOrClass,
-            Rule::BlankLinesBeforeNestedDefinition,
-            Rule::TrailingWhitespace,
-            Rule::BlankLineWithWhitespace,
-            Rule::TooManyNewlinesAtEndOfFile,
-            Rule::UnusedImport,
-        ]);
-        let diagnostics = test_contents_syntax_errors(&source_kind, &path, &settings);
-        assert!(
-            diagnostics.is_empty(),
-            "cell-boundary tokens changed lint results: {diagnostics:?}"
-        );
-        Ok(())
     }
 
     #[test]

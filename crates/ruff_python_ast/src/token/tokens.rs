@@ -225,6 +225,15 @@ impl Tokens {
     }
 }
 
+impl IntoIterator for Tokens {
+    type Item = Token;
+    type IntoIter = std::vec::IntoIter<Token>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.raw.into_iter()
+    }
+}
+
 impl<'a> IntoIterator for &'a Tokens {
     type Item = &'a Token;
     type IntoIter = std::slice::Iter<'a, Token>;

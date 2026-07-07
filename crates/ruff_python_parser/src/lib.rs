@@ -304,7 +304,7 @@ pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed
 ///
 /// This validates sources such as Jupyter notebooks, where each cell must be syntactically valid on
 /// its own while later cells can still reference earlier definitions.
-/// The `ranges` must be ordered and non-overlapping. An empty `ranges` falls back to [`parse_unchecked`].
+/// The `ranges` must be ordered and non-overlapping.
 ///
 /// Consecutive ranges must be separated by a single-byte `\n`: each range ends just before the
 /// separator and the next range starts just after it, as Ruff's notebook cells are. A syntax error
@@ -316,12 +316,6 @@ pub fn parse_cells_unchecked(
     options: ParseOptions,
 ) -> Parsed<ModModule> {
     let mut ranges = ranges.into_iter().peekable();
-    if ranges.peek().is_none() {
-        return parse_unchecked(source, options)
-            .try_into_module()
-            .expect("module options should parse into a module");
-    }
-
     let mut body = Suite::new();
     let mut tokens = Vec::new();
     let mut errors = Vec::new();
@@ -330,12 +324,12 @@ pub fn parse_cells_unchecked(
 
     while let Some(range) = ranges.next() {
         if let Some(previous) = module_range {
-            debug_assert!(previous.end() <= range.start());
+            assert!(previous.end() <= range.start());
         }
 
         // The cell is lexed from `range.start()`, so the slice must keep the leading text to
         // preserve absolute offsets into the concatenated source.
-        let cell_source = &source[..range.end().to_usize()];
+        let cell_source = &source[TextRange::up_to(range.end())];
         let Parsed {
             syntax,
             tokens: cell_tokens,
@@ -347,18 +341,17 @@ pub fn parse_cells_unchecked(
             .expect("module options should parse into a module");
 
         body.extend(syntax.body);
-        tokens.extend(cell_tokens.iter().copied());
+        tokens.extend(cell_tokens);
         errors.extend(cell_errors);
         unsupported_syntax_errors.extend(cell_unsupported_syntax_errors);
 
-        // Each range excludes its trailing `\n` separator (see the doc comment above), so the
-        // per-cell parse never lexes it, leaving a one-byte gap in the token stream between cells.
-        // Bridge it with the `NonLogicalNewline` the lexer would have emitted for the separator, so
-        // token-based checks such as the blank-line rules don't misread the boundary. The final
-        // cell's separator is the file-final newline and is deliberately left uncovered.
+        // Each range excludes its trailing `\n` separator (see the doc comment above), leaving a
+        // one-byte gap in the token stream. Cover it with a `NonLogicalNewline` so token-based
+        // checks don't treat the separator as another logical line terminator. The final cell's
+        // separator is the file-final newline and is deliberately left uncovered.
         if let Some(next) = ranges.peek() {
             let separator = TextRange::new(range.end(), next.start());
-            debug_assert_eq!(separator.len().to_usize(), 1);
+            assert_eq!(&source[separator], "\n");
             tokens.push(Token::new(
                 TokenKind::NonLogicalNewline,
                 separator,
@@ -380,7 +373,7 @@ pub fn parse_cells_unchecked(
     Parsed {
         syntax: ModModule {
             node_index: AtomicNodeIndex::NONE,
-            range: module_range.expect("at least one range must be present"),
+            range: module_range.unwrap_or_default(),
             body,
         },
         tokens: Tokens::new(tokens),

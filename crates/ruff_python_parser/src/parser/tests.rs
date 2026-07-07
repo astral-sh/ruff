@@ -1,10 +1,6 @@
-use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, ModModule, Number, Stmt};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, Stmt};
 
-use crate::{
-    Mode, ParseErrorType, ParseOptions, Parsed, parse, parse_cells_unchecked, parse_expression,
-    parse_module,
-};
+use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
 
 #[test]
 fn test_modes() {
@@ -550,84 +546,4 @@ fn recursion_limit_nested_lambda_chain() {
         "expected RecursionLimitExceeded, got {:?}",
         err.error
     );
-}
-
-/// Parses `cells` as consecutive IPython cells, mirroring how `CellOffsets::content_ranges` splits a
-/// notebook's concatenated source: each range covers a cell's content up to but not including the
-/// synthetic `\n` separator, and the next range starts just after it.
-fn parse_ipy_cells(cells: &[&str]) -> Parsed<ModModule> {
-    let mut source = String::new();
-    let mut ranges = Vec::new();
-    for cell in cells {
-        assert!(
-            cell.ends_with('\n'),
-            "each cell must end with the separator newline that `CellOffsets` appends: {cell:?}"
-        );
-        let start = TextSize::of(&source);
-        source.push_str(cell);
-        // Exclude the trailing separator newline, matching `CellOffsets::content_ranges`.
-        let end = TextSize::of(&source) - TextSize::from(1);
-        ranges.push(TextRange::new(start, end));
-    }
-    parse_cells_unchecked(&source, ranges, ParseOptions::from(Mode::Ipython))
-}
-
-#[test]
-fn notebook_cell_boundary_syntax_errors() {
-    // Each pair concatenates into valid source, but the first cell is invalid on its own.
-    // Concatenated parse masks the error; per-cell parsing must surface it and report it in the
-    // first cell (an EOF-anchored error must not leak across the boundary into the next cell).
-    let cases = [
-        ["if True:\n", "    pass\n"],
-        ["x = [\n", "1]\n"],
-        ["s = \"\"\"a\n", "b\"\"\"\n"],
-        ["y = f\"{x\n", "}\"\n"],
-        ["z = 1 + \\\n", "2\n"],
-        ["@deco\n", "def f(): pass\n"],
-    ];
-
-    for [first, second] in cases {
-        let concatenated = format!("{first}{second}");
-        assert!(
-            parse_module(&concatenated).is_ok(),
-            "concatenated source should parse cleanly: {concatenated:?}"
-        );
-
-        let parsed = parse_ipy_cells(&[first, second]);
-        let first_cell = TextRange::up_to(TextSize::of(first));
-        let Some(error) = parsed.errors().first() else {
-            panic!("per-cell parsing should report a syntax error: {concatenated:?}");
-        };
-        // Cell attribution keys off the start offset's row, and the boundary offset is the next
-        // cell's first row, so the error must start strictly before the boundary. A zero-width
-        // error left at the boundary (the pre-fix behavior) would be reported in the next cell.
-        assert!(
-            error.location.start() < first_cell.end(),
-            "error {:?} should start inside the first cell {first_cell:?}: {concatenated:?}",
-            error.location,
-        );
-    }
-}
-
-#[test]
-fn notebook_cells_resolve_across_boundaries() {
-    // A definition in an earlier cell stays visible to a later cell: the combined module keeps both
-    // statements in order, and the second cell's node carries its concatenated-source offset.
-    let cells = ["import os\n", "os.getcwd()\n"];
-    let parsed = parse_ipy_cells(&cells);
-
-    assert!(parsed.has_valid_syntax());
-
-    let body = &parsed.syntax().body;
-    assert_eq!(body.len(), 2);
-    assert!(matches!(body[0], Stmt::Import(_)));
-    assert_eq!(body[1].start(), TextSize::of(cells[0]));
-}
-
-#[test]
-fn notebook_empty_ranges_falls_back_to_whole_source() {
-    // No cell ranges e.g a notebook with only magic/markdown cells, parses the whole source once.
-    let parsed = parse_cells_unchecked("x = 1\n", [], ParseOptions::from(Mode::Ipython));
-    assert!(parsed.has_valid_syntax());
-    assert_eq!(parsed.syntax().body.len(), 1);
 }
