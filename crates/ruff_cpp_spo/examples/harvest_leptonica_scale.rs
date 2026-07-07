@@ -29,8 +29,10 @@ use std::path::Path;
 use ruff_cpp_spo::walk_free_functions;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let src = std::env::var("SCALE_SRC").unwrap_or_else(|_| "/tmp/leptonica-src/scale1.c".to_string());
-    let inc = std::env::var("LEPT_INCLUDE").unwrap_or_else(|_| "/usr/include/leptonica".to_string());
+    let src =
+        std::env::var("SCALE_SRC").unwrap_or_else(|_| "/tmp/leptonica-src/scale1.c".to_string());
+    let inc =
+        std::env::var("LEPT_INCLUDE").unwrap_or_else(|_| "/usr/include/leptonica".to_string());
     // LANG=c++ switches to C++ mode (namespaced free functions, e.g. tesseract's
     // otsuthr.cpp); EXTRA_INC=colon,separated adds include dirs beyond LEPT_INCLUDE.
     let lang = std::env::var("LANG_MODE").unwrap_or_else(|_| "c".to_string());
@@ -56,7 +58,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let funcs = walk_free_functions(Path::new(&src), &args).map_err(|e| e.to_string())?;
-    eprintln!("[harvest] {} free-function definitions in {src}", funcs.len());
+    eprintln!(
+        "[harvest] {} free-function definitions in {src}",
+        funcs.len()
+    );
 
     // The intra-TU dispatch graph: for every harvested function, the callees
     // that are ALSO defined in this TU. This is the transcode-driving structure
@@ -64,8 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // its own is a LEAF — the essential numeric kernel to hand-port. Filtering
     // to the in-TU set drops the libc/leptonica-helper noise so the graph is the
     // dispatch skeleton. General over any C file (scale1.c, enhance.c, …).
-    let defined: std::collections::BTreeSet<&str> =
-        funcs.iter().map(|f| f.name.as_str()).collect();
+    let defined: std::collections::BTreeSet<&str> = funcs.iter().map(|f| f.name.as_str()).collect();
 
     // Optional focus: FAMILY=comma,sep restricts the printed roots (still shows
     // their full in-TU dispatch). Default: every function.
@@ -81,8 +85,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for name in roots {
         match funcs.iter().find(|f| f.name == name) {
             Some(f) => {
-                let dispatch: Vec<&String> =
-                    f.calls.iter().filter(|c| defined.contains(c.as_str())).collect();
+                let dispatch: Vec<&String> = f
+                    .calls
+                    .iter()
+                    .filter(|c| defined.contains(c.as_str()))
+                    .collect();
                 println!(
                     "{}\tdispatches_to\t{:?}\t(+{} non-TU callees)",
                     f.name,

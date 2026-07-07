@@ -84,7 +84,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Err(e) => eprintln!("[harvest] walk {h} failed: {e}"),
         }
     }
-    eprintln!("[harvest] {} unique classes across {} headers", all.len(), headers.len());
+    eprintln!(
+        "[harvest] {} unique classes across {} headers",
+        all.len(),
+        headers.len()
+    );
 
     // The network class hierarchy — the classid → ClassView method-resolution
     // manifest (what the C++ vtable resolved by type; what invoke_network

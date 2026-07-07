@@ -33,6 +33,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;
 
+use clang::diagnostic::Severity;
 use clang::{Accessibility, Clang, Entity, EntityKind, ExceptionSpecification, Index};
 use ruff_spo_triplet::{
     CppAccess, CppBase, CppField, CppFriend, CppMethod, CppTemplate, CppTemplateKind,
@@ -69,7 +70,54 @@ impl std::error::Error for WalkError {}
 /// declarations are needed for SPO extraction. Parsing tolerates errors
 /// (missing includes still yield a partial AST), matching how libclang is
 /// used on large real corpora.
+///
+/// A **partial** AST is silently possible even when this returns `Ok`: see
+/// [`walk_tu_with_diagnostics`] for the visibility this function alone does
+/// not give a caller doing a multi-header sweep.
 pub fn walk_tu(path: &Path, args: &[String]) -> Result<Vec<CppClass>, WalkError> {
+    walk_tu_with_diagnostics(path, args).map(|(classes, _)| classes)
+}
+
+/// One libclang parse diagnostic at severity [`Severity::Error`] or higher —
+/// the tier that can silently drop AST content (as opposed to `Warning`/
+/// `Note`, which never do).
+#[derive(Debug, Clone)]
+pub struct ParseDiagnostic {
+    /// The formatted diagnostic, including the `file:line:col:` location
+    /// prefix libclang's default formatter attaches (e.g.
+    /// `"scrollview.h:23:10: fatal error: 'X.h' file not found"`).
+    pub message: String,
+}
+
+impl fmt::Display for ParseDiagnostic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+/// Like [`walk_tu`], but also returns every libclang parse diagnostic at
+/// [`Severity::Error`] or higher (one parse, not two — [`walk_tu`] is a thin
+/// wrapper over this).
+///
+/// `walk_tu`'s `Ok` alone can mislead a caller into treating "the parse
+/// returned `Ok`, 0 failed" as "the whole TU was captured". libclang
+/// recovers from an unresolved `#include` by treating the file as
+/// successfully parsed while simply DROPPING the incomplete declaration that
+/// needed the missing header — no `Err`, no partial-class marker, nothing on
+/// [`CppClass`] hints at the gap. This is the exact `STATS`/`scrollview.h`
+/// gap found harvesting Tesseract (`statistc.h` includes `scrollview.h` for
+/// GRAPHICS_DISABLED-gated declarations; without `src/viewer` on the include
+/// path, `STATS`'s `CXXRecordDecl` silently never completes and the class is
+/// simply ABSENT from `walk_tu`'s output —
+/// `tesseract-rs/.claude/harvest/statistc-manifest.txt`). A caller doing a
+/// multi-header sweep (see `examples/harvest_textord.rs`) should call this
+/// instead of `walk_tu` and warn loudly when the returned diagnostic list is
+/// non-empty — "0 failed" from `walk_tu` alone does NOT mean the sweep is
+/// complete.
+pub fn walk_tu_with_diagnostics(
+    path: &Path,
+    args: &[String],
+) -> Result<(Vec<CppClass>, Vec<ParseDiagnostic>), WalkError> {
     let clang = Clang::new().map_err(WalkError::Libclang)?;
     let index = Index::new(&clang, false, false);
     let tu = index
@@ -79,9 +127,18 @@ pub fn walk_tu(path: &Path, args: &[String]) -> Result<Vec<CppClass>, WalkError>
         .parse()
         .map_err(|e| WalkError::Parse(e.to_string()))?;
 
+    let diagnostics = tu
+        .get_diagnostics()
+        .into_iter()
+        .filter(|d| d.get_severity() >= Severity::Error)
+        .map(|d| ParseDiagnostic {
+            message: d.formatter().format(),
+        })
+        .collect();
+
     let mut out = Vec::new();
     collect_classes(&tu.get_entity(), &mut out);
-    Ok(out)
+    Ok((out, diagnostics))
 }
 
 /// Walk ONE translation unit and collect free-function DEFINITIONS with their
@@ -122,15 +179,47 @@ pub fn walk_free_functions(path: &Path, args: &[String]) -> Result<Vec<CppFuncti
 /// DEFINITION (recursing into namespaces). Prototypes (no body) and
 /// system-header functions are skipped — a transcode wants the library's own
 /// definitions.
+///
+/// Also captures out-of-line class-METHOD definitions (`Ret Class::method(...)
+/// { ... }`) — the C++ analogue of a free function for the C-library harvest
+/// arm's purpose (transcode dispatch structure). libclang's cursor tree nests
+/// members by LEXICAL position, not semantic ownership: an out-of-line method
+/// definition's lexical parent is the enclosing namespace/TU (where the text
+/// sits), while its semantic parent is the class — so it shows up as a direct
+/// child here, at the SAME recursion level as a free `FunctionDecl`, even
+/// though this walker never recurses into a `ClassDecl`/`StructDecl` body. That
+/// non-recursion is exactly what keeps this arm's capture correctly scoped:
+/// an IN-CLASS (inline) method definition is lexically a child of the
+/// `ClassDecl` cursor, which this walker never visits, so only genuinely
+/// out-of-line definitions ever reach the `Method` arm below.
+/// [`enclosing_scopes`] resolves the owning class as a namespace-like scope
+/// component, so the harvested [`CppFunction::namespace`] is `["Widget"]` for
+/// `Widget::helper`, matching how a namespaced free function is captured
+/// (found via Tesseract's `Textord::compute_block_xheight` /
+/// `compute_row_xheight` / `make_spline_rows`, makerow.cpp — previously
+/// invisible to this harvest; `tesseract-rs/.claude/harvest/makerow-callgraph.txt`).
+/// Constructors/destructors/conversion operators are deliberately NOT
+/// included here (unlike [`build_class`]'s member-function set) — kept
+/// scoped to the reported gap rather than expanding to every function-like
+/// cursor kind.
 #[cfg(feature = "libclang")]
 fn collect_functions(entity: &Entity, out: &mut Vec<CppFunction>) {
     for child in entity.get_children() {
         match child.get_kind() {
-            EntityKind::FunctionDecl => {
+            EntityKind::FunctionDecl | EntityKind::Method => {
                 if child.is_definition()
                     && !in_system_header(&child)
                     && let Some(name) = child.get_name()
                 {
+                    // Methods are keyed CLASS-QUALIFIED (`A::reset`) so two
+                    // classes' same-named methods stay distinct in the call
+                    // graph (codex P2 on ruff #57); free functions keep their
+                    // bare name — the banked manifests' zero-loss bar.
+                    let name = if child.get_kind() == EntityKind::Method {
+                        qualify_with_class(&child, name)
+                    } else {
+                        name
+                    };
                     let mut calls = Vec::new();
                     collect_calls(&child, &mut calls);
                     calls.sort();
@@ -156,12 +245,80 @@ fn collect_functions(entity: &Entity, out: &mut Vec<CppFunction>) {
 fn collect_calls(node: &Entity, out: &mut Vec<String>) {
     for child in node.get_children() {
         if child.get_kind() == EntityKind::CallExpr
-            && let Some(name) = child.get_name()
+            && let Some(name) = call_callee_name(&child)
         {
             out.push(name);
         }
         collect_calls(&child, out);
     }
+}
+
+/// The callee name of a `CallExpr` cursor, with a fallback for the case
+/// `child.get_name()` alone misses.
+///
+/// Ordinarily `CallExpr::get_name()` (`clang_getCursorSpelling`) already
+/// resolves the callee — but when ANYTHING in the surrounding expression has
+/// an error/dependent type (a genuinely unresolved template-dependent call,
+/// OR — the concrete case found harvesting real Tesseract, makerow.cpp's
+/// `make_baseline_spline`, `tesseract-rs/.claude/harvest/makerow-callgraph.txt`
+/// — a call downstream of an UNRELATED parse error elsewhere in the same
+/// statement: an `auto`-typed variable whose initializer references an
+/// undeclared symbol becomes `<dependent type>`, and passing THAT variable as
+/// an argument to an otherwise perfectly ordinary, non-overloaded function
+/// forces Clang to represent the call's callee as an `UnresolvedLookupExpr`
+/// instead of a resolved `DeclRefExpr`), `clang_getCursorSpelling` on the
+/// `CallExpr` itself returns empty (`get_name()` → `None`) even though the
+/// callee's own name is perfectly well-formed one level down: nested inside
+/// an `OverloadedDeclRef` cursor (libclang's cursor-kind for the unresolved
+/// lookup set), reachable via the `CallExpr`'s callee sub-expression
+/// (`DeclRefExpr`/`UnexposedExpr` wrapping). Falls back to the first
+/// `OverloadedDeclRef` found among the `CallExpr`'s descendants, stopping at
+/// any nested `CallExpr` (an argument that is itself a call) so a broken
+/// INNER call's callee is never mistaken for the OUTER one.
+#[cfg(feature = "libclang")]
+fn call_callee_name(call: &Entity) -> Option<String> {
+    // A resolved call to a METHOD is emitted class-qualified (`A::reset`) so
+    // it joins against the class-qualified definition entry and same-named
+    // methods of different classes never collapse (codex P2 on ruff #57).
+    // Free-function callees stay bare (zero-loss vs the banked manifests);
+    // the OverloadedDeclRef fallback stays bare too — an unresolved lookup
+    // set has no single owning class to name.
+    if let Some(referenced) = call.get_reference() {
+        if referenced.get_kind() == EntityKind::Method
+            && let Some(name) = referenced.get_name()
+        {
+            return Some(qualify_with_class(&referenced, name));
+        }
+    }
+    call.get_name().or_else(|| find_overloaded_decl_ref(call))
+}
+
+/// `Class::name` for a method entity, from its SEMANTIC parent (the class),
+/// which is correct for out-of-line definitions whose lexical parent is the
+/// namespace/TU. Falls back to the bare name when the parent is unnamed.
+#[cfg(feature = "libclang")]
+fn qualify_with_class(method: &Entity, name: String) -> String {
+    match method.get_semantic_parent().and_then(|p| p.get_name()) {
+        Some(class) => format!("{class}::{name}"),
+        None => name,
+    }
+}
+
+#[cfg(feature = "libclang")]
+fn find_overloaded_decl_ref(node: &Entity) -> Option<String> {
+    for child in node.get_children() {
+        if child.get_kind() == EntityKind::OverloadedDeclRef
+            && let Some(name) = child.get_name()
+        {
+            return Some(name);
+        }
+        if child.get_kind() != EntityKind::CallExpr
+            && let Some(name) = find_overloaded_decl_ref(&child)
+        {
+            return Some(name);
+        }
+    }
+    None
 }
 
 /// Walk ONE translation unit and collect free-standing ENUM DECLARATIONS at
@@ -862,6 +1019,16 @@ fn bare_type_name(display: &str) -> String {
     s.rsplit("::").next().unwrap_or(s).trim().to_string()
 }
 
+/// `clang::Clang` is a process-singleton (`Clang::new()` returns `Err` rather
+/// than panicking if one is already alive, but that `Err` would surface as a
+/// test failure) — serialize every test in this file that constructs one, so
+/// cargo's parallel test threads never race two at once. Shared CRATE-WIDE:
+/// [`arm_tests`] + [`walker_tests`] here AND `lib.rs`'s `libclang_tests`
+/// (which aliases this lock) — two separate locks raced each other once
+/// ("an instance of `Clang` already exists" in motherlode).
+#[cfg(all(test, feature = "libclang"))]
+pub(crate) static CLANG_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[cfg(all(test, feature = "libclang"))]
 mod arm_tests {
     use super::*;
@@ -888,6 +1055,9 @@ mod arm_tests {
         let mut fh = std::fs::File::create(&path).unwrap();
         fh.write_all(src.as_bytes()).unwrap();
         drop(fh);
+        let _guard = CLANG_TEST_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let clang = Clang::new().unwrap();
         let index = Index::new(&clang, false, false);
         let tu = index
@@ -952,5 +1122,279 @@ struct Patient {
             "calls {:?}",
             persist.calls
         );
+    }
+}
+
+/// Hermetic fixtures for the three `ruff_cpp_spo` harvest gaps found on real
+/// Tesseract corpora (`tesseract-rs/.claude/harvest/makerow-callgraph.txt` +
+/// `statistc-manifest.txt`): out-of-line class methods invisible to
+/// [`walk_free_functions`], an unresolved-lookup callee reference silently
+/// dropped from the call graph, and an unresolved `#include` silently
+/// dropping AST content with no visible signal. No real corpus needed — each
+/// fixture reproduces the exact libclang cursor shape found on the real
+/// files (confirmed via `-Xclang -ast-dump` + a cursor-kind probe against
+/// `/tmp/tesseract/src/textord/makerow.cpp` and `.../ccstruct/statistc.h`).
+#[cfg(all(test, feature = "libclang"))]
+mod walker_tests {
+    use super::*;
+    use std::io::Write;
+
+    /// Write `src` to a fresh temp file under a name-scoped dir (mirrors
+    /// `arm_tests::arm_of`'s fixture-writing pattern), returning its path.
+    fn write_fixture(name: &str, src: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("cpp_walker_{name}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("f.cpp");
+        let mut fh = std::fs::File::create(&path).unwrap();
+        fh.write_all(src.as_bytes()).unwrap();
+        path
+    }
+
+    fn cxx_args() -> Vec<String> {
+        ["-std=c++17", "-x", "c++"].map(String::from).to_vec()
+    }
+
+    /// Fix 1 + Fix 2 combined: `Widget::dispatch` is an out-of-line method
+    /// that calls ANOTHER out-of-line method of the same class,
+    /// `Widget::compute` — previously invisible to `walk_free_functions`,
+    /// which only recursed `FunctionDecl` + `Namespace` cursors (the real gap:
+    /// `Textord::compute_block_xheight` / `compute_row_xheight` /
+    /// `make_spline_rows` in makerow.cpp). `compute()`'s own body exercises
+    /// Fix 2: `free_helper(v)`'s callee reference becomes an unresolved
+    /// `OverloadedDeclRef` (not a clean, directly-named `DeclRefExpr`) because
+    /// `v`'s `auto`-deduced type is poisoned by the undeclared-identifier
+    /// error on the line above — the exact shape found (via cursor-kind probe)
+    /// in `make_baseline_spline`'s calls to `segment_baseline` /
+    /// `linear_spline_baseline`, both of which are perfectly ordinary,
+    /// non-overloaded functions.
+    const OUT_OF_LINE_SRC: &str = r"
+int free_helper(int x);
+
+class Widget {
+ public:
+  void inline_only() {}
+  void compute();
+  void dispatch();
+};
+
+void Widget::compute() {
+  auto v = totally_undefined_symbol_xyz();
+  free_helper(v);
+}
+
+void Widget::dispatch() {
+  compute();
+}
+";
+
+    #[test]
+    fn out_of_line_methods_are_captured_with_qualified_scope_and_dispatch() {
+        let _guard = CLANG_TEST_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let path = write_fixture("out_of_line", OUT_OF_LINE_SRC);
+        let funcs = walk_free_functions(&path, &cxx_args()).expect("libclang walk");
+        let _ = std::fs::remove_file(&path);
+
+        // Fix 1: both out-of-line methods are captured, scoped under the
+        // owning class exactly like a namespaced free function
+        // (`enclosing_scopes` resolves the class as the scope component).
+        let compute = funcs
+            .iter()
+            .find(|f| f.name == "Widget::compute")
+            .unwrap_or_else(|| panic!("Widget::compute missing; got {funcs:?}"));
+        assert_eq!(compute.namespace, vec!["Widget".to_string()]);
+        let dispatch = funcs
+            .iter()
+            .find(|f| f.name == "Widget::dispatch")
+            .unwrap_or_else(|| panic!("Widget::dispatch missing; got {funcs:?}"));
+        assert_eq!(dispatch.namespace, vec!["Widget".to_string()]);
+
+        // Fix 1 + codex P2 (#57): in-TU dispatch between two out-of-line
+        // methods resolves CLASS-QUALIFIED, so same-named methods of
+        // different classes can never collapse in the call graph.
+        assert!(
+            dispatch.calls.contains(&"Widget::compute".to_string()),
+            "dispatch must call compute: {:?}",
+            dispatch.calls
+        );
+
+        // Fix 2: the unresolved (`OverloadedDeclRef`-shaped) callee reference
+        // to `free_helper` is still recovered, despite `get_name()` on the
+        // `CallExpr` itself returning empty.
+        assert!(
+            compute.calls.contains(&"free_helper".to_string()),
+            "compute must call free_helper despite the unresolved-lookup shape: {:?}",
+            compute.calls
+        );
+
+        // Regression: an IN-CLASS (inline) method definition must NOT be
+        // captured — this walker never recurses into a ClassDecl body, and
+        // neither fix changes that scoping (only out-of-line definitions,
+        // lexically at namespace/TU level, ever reach the `Method` arm).
+        assert!(
+            !funcs.iter().any(|f| f.name.ends_with("inline_only")),
+            "inline_only is a class-body definition, not out-of-line: {funcs:?}"
+        );
+
+        // Exactly the 2 out-of-line methods — no phantom extra captures.
+        assert_eq!(funcs.len(), 2, "unexpected extra captures: {funcs:?}");
+    }
+
+    /// codex P2 on ruff #57, proven: two classes with the SAME method name
+    /// stay distinct — definitions are keyed `A::reset` / `B::reset`, and a
+    /// resolved call site to each is emitted class-qualified, so the call
+    /// graph can never report a call to one as dispatching to the other.
+    const SAME_NAME_TWO_CLASSES_SRC: &str = r"
+class A {
+ public:
+  void reset();
+};
+class B {
+ public:
+  void reset();
+};
+void A::reset() {}
+void B::reset() {}
+void drive(A &a, B &b) {
+  a.reset();
+  b.reset();
+}
+";
+
+    #[test]
+    fn same_named_methods_of_different_classes_stay_distinct() {
+        let _guard = CLANG_TEST_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let path = write_fixture("same_name_two_classes", SAME_NAME_TWO_CLASSES_SRC);
+        let funcs = walk_free_functions(&path, &cxx_args()).expect("libclang walk");
+        let _ = std::fs::remove_file(&path);
+
+        assert!(funcs.iter().any(|f| f.name == "A::reset"), "{funcs:?}");
+        assert!(funcs.iter().any(|f| f.name == "B::reset"), "{funcs:?}");
+        let drive = funcs
+            .iter()
+            .find(|f| f.name == "drive")
+            .unwrap_or_else(|| panic!("drive missing; got {funcs:?}"));
+        assert!(
+            drive.calls.contains(&"A::reset".to_string())
+                && drive.calls.contains(&"B::reset".to_string()),
+            "drive must reference BOTH class-qualified callees: {:?}",
+            drive.calls
+        );
+    }
+
+    /// A PLAIN free function (no class involved) keeps its existing
+    /// zero-fallback behavior: `call_callee_name` only engages when
+    /// `get_name()` is empty, so a healthy, already-resolved call is
+    /// untouched by Fix 2. This is the regression bar for "existing manifests
+    /// must not change for pure-C TUs" — asserted directly here as an
+    /// in-crate fixture rather than only via the real leptonica corpus.
+    const PLAIN_FREE_FUNCTION_SRC: &str = r"
+int leaf(int x) { return x; }
+int root(int x) { return leaf(x); }
+";
+
+    #[test]
+    fn plain_free_function_calls_are_unaffected() {
+        let _guard = CLANG_TEST_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let path = write_fixture("plain_free_fn", PLAIN_FREE_FUNCTION_SRC);
+        let funcs = walk_free_functions(&path, &cxx_args()).expect("libclang walk");
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(funcs.len(), 2, "got {funcs:?}");
+        let root = funcs
+            .iter()
+            .find(|f| f.name == "root")
+            .unwrap_or_else(|| panic!("root missing; got {funcs:?}"));
+        assert!(root.namespace.is_empty(), "namespace {:?}", root.namespace);
+        assert_eq!(root.calls, vec!["leaf".to_string()]);
+    }
+
+    /// Fix 3 (walker half): a TU with an unresolved `#include` still parses
+    /// (`walk_tu` alone returns `Ok`, "0 failed") but
+    /// [`walk_tu_with_diagnostics`] surfaces the severity>=Error diagnostic a
+    /// caller would otherwise never see. Mirrors the real `STATS` /
+    /// `scrollview.h` gap (`tesseract-rs/.claude/harvest/statistc-manifest.txt`):
+    /// a class defined independently of the missing header still parses fine
+    /// here (this fixture does not reproduce the FULL real-corpus cascade that
+    /// drops `STATS` itself — see `lib.rs`'s `statistc_missing_viewer_include_is_now_diagnosed_and_fixed`
+    /// for that end-to-end confirmation against the real file), but the
+    /// diagnostic is exactly the signal that makes the caller aware the parse
+    /// was imperfect, which `walk_tu` alone hides.
+    const MISSING_INCLUDE_SRC: &str = r#"
+#include "definitely_missing_header_xyz.h"
+
+class Healthy {
+ public:
+  void method();
+};
+"#;
+
+    #[test]
+    fn unresolved_include_is_surfaced_as_a_diagnostic_not_silently_dropped() {
+        let _guard = CLANG_TEST_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let path = write_fixture("missing_include", MISSING_INCLUDE_SRC);
+        let (classes, diagnostics) =
+            walk_tu_with_diagnostics(&path, &cxx_args()).expect("libclang walk");
+
+        assert!(
+            !diagnostics.is_empty(),
+            "a missing #include must surface at least one severity>=Error diagnostic"
+        );
+        assert!(
+            diagnostics[0]
+                .message
+                .contains("definitely_missing_header_xyz.h"),
+            "diagnostic message must name the missing file: {}",
+            diagnostics[0].message
+        );
+        // The class itself, defined independently of the missing header, still
+        // parses ("0 failed" is not a lie here) — the diagnostic is what makes
+        // the caller aware the parse was imperfect, which `walk_tu` alone hides.
+        assert!(
+            classes.iter().any(|c| c.name == "Healthy"),
+            "Healthy must still be captured: {:?}",
+            classes.iter().map(|c| &c.name).collect::<Vec<_>>()
+        );
+
+        // walk_tu (the pre-existing API, now a thin wrapper) is unaffected:
+        // same class list, from the same parse-shaped TU.
+        let via_walk_tu = walk_tu(&path, &cxx_args()).expect("libclang walk");
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(
+            via_walk_tu
+                .iter()
+                .map(CppClass::qualified_name)
+                .collect::<Vec<_>>(),
+            classes
+                .iter()
+                .map(CppClass::qualified_name)
+                .collect::<Vec<_>>(),
+            "walk_tu and walk_tu_with_diagnostics must return the same class list"
+        );
+    }
+
+    /// Regression: a clean TU (no missing includes, no errors) reports zero
+    /// diagnostics — the happy path is unaffected by the new diagnostics arm.
+    #[test]
+    fn clean_tu_reports_no_diagnostics() {
+        let _guard = CLANG_TEST_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let path = write_fixture("clean_tu", "class Healthy { public: void method(); };");
+        let (classes, diagnostics) =
+            walk_tu_with_diagnostics(&path, &cxx_args()).expect("libclang walk");
+        let _ = std::fs::remove_file(&path);
+        assert!(
+            diagnostics.is_empty(),
+            "clean TU must report 0 diagnostics: {diagnostics:?}"
+        );
+        assert_eq!(classes.len(), 1);
     }
 }

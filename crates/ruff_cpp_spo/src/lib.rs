@@ -59,8 +59,8 @@ use ruff_spo_triplet::{
 mod clang_walker;
 #[cfg(feature = "libclang")]
 pub use clang_walker::{
-    MAPPED_CURSOR_KINDS, WalkError, class_body_cursor_histogram, walk_enums, walk_free_functions,
-    walk_tu,
+    MAPPED_CURSOR_KINDS, ParseDiagnostic, WalkError, class_body_cursor_histogram, walk_enums,
+    walk_free_functions, walk_tu, walk_tu_with_diagnostics,
 };
 
 /// The namespace prefix for C++ machine-plane subjects/objects.
@@ -620,18 +620,21 @@ mod tests {
 #[cfg(all(test, feature = "libclang"))]
 mod libclang_tests {
     use std::io::Write;
-    use std::sync::Mutex;
 
     use ruff_spo_triplet::{Triple, cpp_projection, expand, from_ndjson, reassemble, to_ndjson};
 
     use super::{
-        MAPPED_CURSOR_KINDS, ModelGraph, NAMESPACE, class_body_cursor_histogram, extract_dir,
-        extract_tree, model_from_class, walk_tu,
+        Declaration, MAPPED_CURSOR_KINDS, ModelGraph, NAMESPACE, class_body_cursor_histogram,
+        extract_dir, extract_tree, model_from_class, walk_tu, walk_tu_with_diagnostics,
     };
 
     /// `clang::Clang` is a process-singleton — serialize the libclang tests so
-    /// cargo's parallel test threads never construct two at once.
-    static CLANG_LOCK: Mutex<()> = Mutex::new(());
+    /// cargo's parallel test threads never construct two at once. ONE lock for
+    /// the whole crate: the hermetic `walker_tests` in `clang_walker.rs` hold a
+    /// live `Clang` too, so a module-local lock here raced them (motherlode
+    /// panicked with "an instance of `Clang` already exists" whenever the two
+    /// modules interleaved).
+    use crate::clang_walker::CLANG_TEST_LOCK as CLANG_LOCK;
 
     /// Hermetic libclang walk: write a small self-contained C++ TU (no
     /// includes), walk it via real libclang, and assert the extracted shape +
@@ -1576,6 +1579,122 @@ class Recognizer : public Classify {
             g.models.len() >= 100,
             "expected many ccstruct classes, got {}",
             g.models.len()
+        );
+    }
+
+    /// `STATS`/`scrollview.h` — the real-corpus confirmation of the
+    /// `walk_tu_with_diagnostics` fix
+    /// (`tesseract-rs/.claude/harvest/statistc-manifest.txt`). WITHOUT
+    /// `src/viewer` on the include path, `ccstruct/statistc.h`'s `STATS`
+    /// class silently vanishes from `walk_tu`'s output (its body declares
+    /// `plot`/`plotline` methods taking `ScrollView`/`ScrollView::Color`,
+    /// types declared in the missing `src/viewer/scrollview.h`) while
+    /// `walk_tu` itself still returns `Ok` — exactly the "0 failed" blind
+    /// spot `walk_tu_with_diagnostics` exists to close. WITH `src/viewer`
+    /// (now `harvest_textord.rs`'s default include list), `STATS` reappears
+    /// with its full 23-method/4-field surface (matching the banked
+    /// manifest's own confirmation run byte-for-byte) and the diagnostic
+    /// count drops to 0. Gated on `TESSERACT_SRC`.
+    #[test]
+    #[expect(clippy::print_stderr, reason = "diagnostic emission gated on env var")]
+    fn statistc_missing_viewer_include_is_now_diagnosed_and_fixed() {
+        let _guard = CLANG_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Ok(src_root) = std::env::var("TESSERACT_SRC") else {
+            eprintln!("TESSERACT_SRC unset; skipping STATS/scrollview.h real-corpus confirmation");
+            return;
+        };
+        let root = std::path::Path::new(&src_root);
+        let header = root.join("src/ccstruct/statistc.h");
+        if !header.exists() {
+            eprintln!("{} missing; skipping", header.display());
+            return;
+        }
+
+        let args_for = |with_viewer: bool| -> Vec<String> {
+            let mut a = vec![
+                "-std=c++17".to_string(),
+                "-x".to_string(),
+                "c++".to_string(),
+                format!("-I{}", root.join("src/textord").display()),
+                format!("-I{}", root.join("src/ccstruct").display()),
+                format!("-I{}", root.join("src/ccutil").display()),
+                format!("-I{}", root.join("src/arch").display()),
+                format!("-I{}", root.join("src/ccmain").display()),
+                format!("-I{}", root.join("src/api").display()),
+                format!("-I{}", root.join("src/dict").display()),
+                format!("-I{}", root.join("src/classify").display()),
+                format!("-I{}", root.join("src/wordrec").display()),
+                format!("-I{}", root.join("src/lstm").display()),
+            ];
+            if with_viewer {
+                a.push(format!("-I{}", root.join("src/viewer").display()));
+            }
+            a.push(format!("-I{}", root.join("include").display()));
+            a.push("-I/usr/include/leptonica".to_string());
+            a
+        };
+
+        // Without src/viewer (the pre-fix default): STATS silently absent,
+        // diagnostics non-empty (the fatal "scrollview.h file not found").
+        let (classes_before, diags_before) =
+            walk_tu_with_diagnostics(&header, &args_for(false)).expect("libclang init");
+        assert!(
+            !classes_before.iter().any(|c| c.name == "STATS"),
+            "STATS must be silently absent without src/viewer (pre-fix reproduction): {:?}",
+            classes_before.iter().map(|c| &c.name).collect::<Vec<_>>()
+        );
+        assert!(
+            !diags_before.is_empty(),
+            "the missing include must surface as a severity>=Error diagnostic"
+        );
+        eprintln!(
+            "[STATS-FIX3] without src/viewer: {} classes, STATS absent, {} diagnostic(s): {}",
+            classes_before.len(),
+            diags_before.len(),
+            diags_before[0]
+        );
+
+        // With src/viewer (the fix, now harvest_textord.rs's default): STATS
+        // reappears with its full surface, and the parse is clean.
+        let (classes_after, diags_after) =
+            walk_tu_with_diagnostics(&header, &args_for(true)).expect("libclang init");
+        let stats = classes_after
+            .iter()
+            .find(|c| c.name == "STATS")
+            .unwrap_or_else(|| {
+                panic!(
+                    "STATS must reappear with src/viewer: {:?}",
+                    classes_after.iter().map(|c| &c.name).collect::<Vec<_>>()
+                )
+            });
+        let methods = stats
+            .declarations
+            .iter()
+            .filter(|d| matches!(d, Declaration::Method(_)))
+            .count();
+        let fields = stats
+            .declarations
+            .iter()
+            .filter(|d| matches!(d, Declaration::Field(_)))
+            .count();
+        eprintln!(
+            "[STATS-FIX3] with src/viewer: STATS {methods} methods, {fields} fields, \
+             {} diagnostic(s)",
+            diags_after.len()
+        );
+        assert_eq!(
+            methods, 23,
+            "STATS method count must match the banked manifest"
+        );
+        assert_eq!(
+            fields, 4,
+            "STATS field count must match the banked manifest"
+        );
+        assert!(
+            diags_after.is_empty(),
+            "with src/viewer the parse must be clean: {diags_after:?}"
         );
     }
 }
