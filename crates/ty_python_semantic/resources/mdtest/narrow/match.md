@@ -687,6 +687,8 @@ def failed_sequence_pattern_does_not_narrow_mutable_subject(
         case []:
             pass
         case _:
+            # Reaching this arm means the preceding `[]` pattern failed, but clearing the list
+            # invalidates the resulting non-empty constraint.
             value.clear()
             match value:
                 case []:
@@ -1663,6 +1665,7 @@ def list_class_pattern_does_not_keep_index_types_after_mutation(
 ) -> None:
     match value:
         case list([int(), str()]):
+            # Reversing the list invalidates the indexed-element facts established by the pattern.
             value.reverse()
             reveal_type(value[0])  # revealed: int | str
 
@@ -1671,6 +1674,8 @@ def nested_list_pattern_does_not_keep_index_types_after_mutation(
 ) -> None:
     match value:
         case [[int(), str()]]:
+            # The inner list is mutable, so the indexed-element facts established by the pattern
+            # cannot be retained through the outer tuple after this mutation.
             value[0].reverse()
             reveal_type(value[0][0])  # revealed: int | str
 
