@@ -2822,10 +2822,11 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         name: &str,
     ) -> Option<Type<'db>> {
-        let field_policy = CodeGeneratorKind::from_static_class(db, self)?;
-        if !field_policy.uses_converter_input_type_for_assignments() {
+        let field_policy @ CodeGeneratorKind::DataclassLike(_) =
+            CodeGeneratorKind::from_static_class(db, self)?
+        else {
             return None;
-        }
+        };
         let fields = self.fields(db, None, field_policy);
         let field = fields.get(name)?;
         if let FieldKind::Dataclass { converter, .. } = field.kind {

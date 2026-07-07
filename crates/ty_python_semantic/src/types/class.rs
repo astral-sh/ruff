@@ -250,17 +250,35 @@ impl<'db> CodeGeneratorKind<'db> {
         }
     }
 
-    /// Return `true` if generated fields are treated as instance attributes.
+    /// Return `true` if field declarations should be treated as instance attributes.
+    ///
+    /// For example, a bare annotation in a dataclass body is seen as evidence for the
+    /// existence of an instance attribute, since the field will be set in the generated
+    /// constructor.
+    ///
+    /// ```python
+    /// @dataclass
+    /// class C:
+    ///     value: int
+    ///
+    /// def f(c: C):
+    ///     c.value  # okay, `value` will be set by `C`'s constructor
+    /// ```
     pub(super) const fn treats_fields_as_instance_attributes(self) -> bool {
         matches!(self, Self::DataclassLike(_) | Self::Pydantic(_))
     }
 
-    /// Return `true` if field assignments use the converter's input type.
-    pub(super) const fn uses_converter_input_type_for_assignments(self) -> bool {
-        matches!(self, Self::DataclassLike(_))
-    }
-
     /// Return `true` if the class constructor is synthesized from its fields.
+    ///
+    /// For example, a dataclass field becomes a parameter in the generated constructor:
+    ///
+    /// ```python
+    /// @dataclass
+    /// class C:
+    ///     value: int
+    ///
+    /// C(value=42)
+    /// ```
     pub(super) const fn synthesizes_constructor_signature_from_fields(self) -> bool {
         matches!(self, Self::DataclassLike(_) | Self::Pydantic(_))
     }
