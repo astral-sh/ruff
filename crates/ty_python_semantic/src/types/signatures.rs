@@ -3861,6 +3861,13 @@ impl<'db> Parameters<'db> {
         })
     }
 
+    /// Return a synthesized positional-only parameter whose original keyword name is reserved.
+    pub(crate) fn reserved_keyword_by_name(&self, name: &str) -> Option<(usize, &Parameter<'db>)> {
+        self.iter()
+            .enumerate()
+            .find(|(_, parameter)| parameter.reserves_keyword_name(name))
+    }
+
     /// Return the variadic parameter (`*args`), if any, and its index, or `None`.
     pub(crate) fn variadic(&self) -> Option<(usize, &Parameter<'db>)> {
         self.iter()
@@ -3991,6 +3998,13 @@ pub(crate) struct Parameter<'db> {
     /// Syntax-level annotation kind for cases where the annotation has special parameter semantics.
     annotation_kind: ParameterAnnotationKind,
 
+    /// Whether this positional-only parameter's name must not be captured by `**kwargs`.
+    ///
+    /// This is used for positional-or-keyword parameters converted to positional-only placeholder
+    /// slots in synthesized `functools.partial` signatures. Passing the original name by keyword
+    /// would otherwise reach `**kwargs`, but fail at runtime as a duplicate argument.
+    keyword_name_is_reserved: bool,
+
     kind: ParameterKind<'db>,
 }
 
@@ -4018,6 +4032,7 @@ impl<'db> Parameter<'db> {
             definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
+            keyword_name_is_reserved: false,
             kind: ParameterKind::PositionalOnly {
                 name,
                 default_type: None,
@@ -4031,6 +4046,7 @@ impl<'db> Parameter<'db> {
             definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
+            keyword_name_is_reserved: false,
             kind: ParameterKind::PositionalOrKeyword {
                 name,
                 default_type: None,
@@ -4044,6 +4060,7 @@ impl<'db> Parameter<'db> {
             definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
+            keyword_name_is_reserved: false,
             kind: ParameterKind::Variadic { name },
         }
     }
@@ -4054,6 +4071,7 @@ impl<'db> Parameter<'db> {
             definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
+            keyword_name_is_reserved: false,
             kind: ParameterKind::KeywordOnly {
                 name,
                 default_type: None,
@@ -4067,6 +4085,7 @@ impl<'db> Parameter<'db> {
             definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
+            keyword_name_is_reserved: false,
             kind: ParameterKind::KeywordVariadic { name },
         }
     }
@@ -4105,10 +4124,13 @@ impl<'db> Parameter<'db> {
                 name,
                 default_type: None,
             },
-            ParameterKind::PositionalOrKeyword { name, .. } => ParameterKind::PositionalOnly {
-                name: Some(name),
-                default_type: None,
-            },
+            ParameterKind::PositionalOrKeyword { name, .. } => {
+                self.keyword_name_is_reserved = true;
+                ParameterKind::PositionalOnly {
+                    name: Some(name),
+                    default_type: None,
+                }
+            }
             kind => kind,
         };
         self
@@ -4140,6 +4162,7 @@ impl<'db> Parameter<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             inferred_annotation: self.inferred_annotation,
             annotation_kind: self.annotation_kind,
+            keyword_name_is_reserved: self.keyword_name_is_reserved,
         }
     }
 
@@ -4155,6 +4178,7 @@ impl<'db> Parameter<'db> {
             definition: self.definition,
             inferred_annotation: self.inferred_annotation,
             annotation_kind: self.annotation_kind,
+            keyword_name_is_reserved: self.keyword_name_is_reserved,
             kind,
         }
     }
@@ -4170,6 +4194,7 @@ impl<'db> Parameter<'db> {
             definition,
             annotation_kind,
             inferred_annotation,
+            keyword_name_is_reserved,
             kind,
         } = self;
 
@@ -4230,6 +4255,7 @@ impl<'db> Parameter<'db> {
             definition: *definition,
             inferred_annotation: *inferred_annotation,
             annotation_kind: *annotation_kind,
+            keyword_name_is_reserved: *keyword_name_is_reserved,
             kind,
         })
     }
@@ -4274,6 +4300,7 @@ impl<'db> Parameter<'db> {
             definition,
             inferred_annotation,
             annotation_kind,
+            keyword_name_is_reserved: false,
             kind,
         }
     }
@@ -4286,6 +4313,11 @@ impl<'db> Parameter<'db> {
     /// Returns `true` if this is a positional-only parameter.
     pub(crate) fn is_positional_only(&self) -> bool {
         matches!(self.kind, ParameterKind::PositionalOnly { .. })
+    }
+
+    /// Returns whether `name` is reserved by a synthesized positional-only parameter.
+    pub(crate) fn reserves_keyword_name(&self, name: &str) -> bool {
+        self.keyword_name_is_reserved && self.name().is_some_and(|param_name| param_name == name)
     }
 
     /// Returns `true` if this is a variadic parameter.
@@ -4573,6 +4605,7 @@ mod tests {
         annotation_kind: ParameterAnnotationKind,
         inferred_annotation: bool,
         kind: &'a ParameterKind<'db>,
+        keyword_name_is_reserved: bool,
     }
 
     impl<'a, 'db> From<&'a Parameter<'db>> for ParameterWithoutDefinition<'a, 'db> {
@@ -4582,6 +4615,7 @@ mod tests {
                 definition: _,
                 annotation_kind,
                 inferred_annotation,
+                keyword_name_is_reserved,
                 kind,
             } = parameter;
 
@@ -4589,6 +4623,7 @@ mod tests {
                 annotated_type,
                 annotation_kind: *annotation_kind,
                 inferred_annotation: *inferred_annotation,
+                keyword_name_is_reserved: *keyword_name_is_reserved,
                 kind,
             }
         }

@@ -4478,11 +4478,21 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument_type: Option<Type<'db>>,
         name: &str,
     ) -> Result<(), ()> {
-        let Some((parameter_index, parameter)) = self
-            .parameters
-            .keyword_by_name(name)
-            .or_else(|| self.parameters.keyword_variadic())
-        else {
+        let parameter = if let Some(parameter) = self.parameters.keyword_by_name(name) {
+            parameter
+        } else if let Some((parameter_index, parameter)) =
+            self.parameters.reserved_keyword_by_name(name)
+        {
+            self.errors
+                .push(BindingError::PositionalOnlyParameterAsKwarg {
+                    argument_index: self.get_argument_index(argument_index),
+                    parameter: ParameterContext::new(parameter, parameter_index, true),
+                });
+            self.parameter_info[parameter_index].suppress_missing_error = true;
+            return Err(());
+        } else if let Some(parameter) = self.parameters.keyword_variadic() {
+            parameter
+        } else {
             if let Some((parameter_index, parameter)) =
                 self.parameters.positional_only_by_name(name)
             {
@@ -4500,6 +4510,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             }
             return Err(());
         };
+        let (parameter_index, parameter) = parameter;
         self.assign_argument(
             argument_index,
             argument,

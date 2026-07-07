@@ -955,6 +955,18 @@ pending(1)  # error: [missing-argument]
 pending(left=1, right=2.0)  # error: [positional-only-parameter-as-kwarg]
 combine(_, "value", 2.0)  # error: [invalid-argument-type]
 
+def accepts_extra(value: int, bound: str, **kwargs: object) -> None:
+    pass
+
+with_extra = partial(accepts_extra, _, "bound")
+with_extra(1, other=2)
+with_extra(1, value=2)  # error: [positional-only-parameter-as-kwarg]
+
+def source_positional_only(value: int, /, **kwargs: object) -> None:
+    pass
+
+source_positional_only(1, value=2)
+
 retained = partial(pending, _, 3.0)
 reveal_type(retained)  # revealed: partial[(left: int, /) -> tuple[int, str, int | float]]
 filled = partial(pending, 1, 3.0)
