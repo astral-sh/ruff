@@ -20,7 +20,7 @@ class B: ...
 
 ```py
 import exporter
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: None
 reveal_type(dunder_all_names(exporter))
@@ -53,7 +53,7 @@ foo()
 
 ```py
 import exporter
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: tuple[Literal["A"]]
 reveal_type(dunder_all_names(exporter))
@@ -88,7 +88,7 @@ class D: ...
 ```py
 import exporter
 import exporter_annotated
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: tuple[Literal["A"], Literal["B"]]
 reveal_type(dunder_all_names(exporter))
@@ -131,7 +131,7 @@ class Z: ...
 ```py
 import exporter
 import exporter_annotated
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: tuple[Literal["C"], Literal["D"]]
 reveal_type(dunder_all_names(exporter))
@@ -165,7 +165,7 @@ class D: ...
 ```py
 import exporter
 import exporter_annotated
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: tuple[Literal["A"], Literal["B"]]
 reveal_type(dunder_all_names(exporter))
@@ -208,7 +208,7 @@ class Z: ...
 ```py
 import exporter
 import exporter_annotated
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: tuple[Literal["C"], Literal["D"]]
 reveal_type(dunder_all_names(exporter))
@@ -245,7 +245,7 @@ class D: ...
 
 ```py
 import exporter
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: tuple[Literal["A"], Literal["B"], Literal["C"], Literal["D"]]
 reveal_type(dunder_all_names(exporter))
@@ -293,7 +293,7 @@ if True:
 
 ```py
 import module
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 reveal_type(dunder_all_names(module))  # revealed: tuple[Literal["bar"], Literal["foo"]]
 ```
@@ -328,7 +328,7 @@ class D: ...
 
 ```py
 import exporter
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: tuple[Literal["A"], Literal["B"], Literal["C"], Literal["D"], Literal["E"], Literal["F"], Literal["G"], Literal["H"]]
 reveal_type(dunder_all_names(exporter))
@@ -350,7 +350,7 @@ class B: ...
 
 ```py
 import exporter
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: tuple[Literal["A"], Literal["B"]]
 reveal_type(dunder_all_names(exporter))
@@ -376,7 +376,7 @@ class B: ...
 
 ```py
 import exporter
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: tuple[Literal["B"]]
 reveal_type(dunder_all_names(exporter))
@@ -415,7 +415,7 @@ class D: ...
 
 ```py
 import exporter
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: tuple[Literal["A"], Literal["C"], Literal["D"]]
 reveal_type(dunder_all_names(exporter))
@@ -447,7 +447,7 @@ import bar as bar
 
 ```py
 import foo
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 __all__ = []
 
@@ -487,7 +487,7 @@ class D: ...
 
 ```py
 import exporter
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: None
 reveal_type(dunder_all_names(exporter))
@@ -511,7 +511,7 @@ class B: ...
 
 ```py
 import subexporter
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: tuple[Literal["A"], Literal["B"]]
 reveal_type(dunder_all_names(subexporter))
@@ -526,7 +526,7 @@ class C: ...
 
 ```py
 import exporter1
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: None
 reveal_type(dunder_all_names(exporter1))
@@ -571,7 +571,7 @@ else:
 
 ```py
 import exporter
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: tuple[Literal["AllVersion"], Literal["Python310"]]
 reveal_type(dunder_all_names(exporter))
@@ -614,7 +614,7 @@ else:
 
 ```py
 import exporter
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: tuple[Literal["AllVersion"], Literal["Python311"]]
 reveal_type(dunder_all_names(exporter))
@@ -657,7 +657,7 @@ else:
 
 ```py
 import exporter
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: tuple[Literal["AllVersion"], Literal["Python312"]]
 reveal_type(dunder_all_names(exporter))
@@ -702,7 +702,7 @@ if sys.version_info >= (3, 10):
 
 ```py
 import exporter
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: tuple[Literal["AllVersion"], Literal["Python310"], Literal["Python311"]]
 reveal_type(dunder_all_names(exporter))
@@ -726,7 +726,7 @@ class A: ...
 
 ```py
 import exporter
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: tuple[Literal["A"]]
 reveal_type(dunder_all_names(exporter))
@@ -757,7 +757,7 @@ class B: ...
 ```py
 import exporter
 import subexporter
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: tuple[Literal["A"]]
 reveal_type(dunder_all_names(subexporter))
@@ -796,7 +796,7 @@ class B: ...
 ```py
 import exporter
 import subexporter
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: tuple[Literal["A"], Literal["__all__"]]
 reveal_type(dunder_all_names(subexporter))
@@ -833,7 +833,7 @@ class B: ...
 ```py
 import exporter
 import subexporter
-from ty_extensions.internal import dunder_all_names
+from ty_extensions._internal import dunder_all_names
 
 # revealed: tuple[Literal["A"]]
 reveal_type(dunder_all_names(subexporter))

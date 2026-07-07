@@ -268,7 +268,7 @@ type X = C | D
 type Y = W | X
 
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(Y, A | B | C | D))
 ```
@@ -336,7 +336,7 @@ Two `TypeAliasType`s are distinct and disjoint, even if they refer to the same t
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_equivalent_to, is_disjoint_from
+from ty_extensions._internal import TypeOf, is_equivalent_to, is_disjoint_from
 
 type Alias1 = int
 type Alias2 = int
@@ -589,7 +589,7 @@ def _(x: C):
 
 ```py
 from ty_extensions import static_assert, Bottom, Top
-from ty_extensions.internal import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 
 type JsonValue = None | JsonDict
 type JsonDict = dict[str, JsonValue]
@@ -605,7 +605,7 @@ static_assert(is_subtype_of(Bottom[JsonDict], Top[JsonDict]))
 ```py
 from typing import Callable
 from ty_extensions import static_assert, Top
-from ty_extensions.internal import is_equivalent_to, is_subtype_of
+from ty_extensions._internal import is_equivalent_to, is_subtype_of
 
 class Box[T]:
     pass

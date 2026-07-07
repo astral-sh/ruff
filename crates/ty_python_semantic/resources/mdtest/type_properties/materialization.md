@@ -90,7 +90,7 @@ The top / bottom (and only) materialization of any fully static type is just its
 ```py
 from typing import Any, Literal
 from ty_extensions import Bottom, Top, static_assert
-from ty_extensions.internal import TypeOf, is_equivalent_to
+from ty_extensions._internal import TypeOf, is_equivalent_to
 from enum import Enum
 
 class Answer(Enum):
@@ -151,7 +151,7 @@ python-version = "3.12"
 ```py
 from typing import Any, Callable
 from ty_extensions import Unknown, Bottom, Top
-from ty_extensions.internal import TypeOf
+from ty_extensions._internal import TypeOf
 
 type C1 = Callable[[Any, Unknown], Any]
 
@@ -200,7 +200,7 @@ python-version = "3.12"
 ```py
 from typing import Any, Callable, Never, Protocol
 from ty_extensions import Bottom, Top, static_assert
-from ty_extensions.internal import is_equivalent_to, is_subtype_of
+from ty_extensions._internal import is_equivalent_to, is_subtype_of
 
 type GradualCallable = Callable[..., Any]
 
@@ -240,7 +240,7 @@ Materializing an overloaded callable materializes each overload separately.
 
 ```py
 from typing import overload
-from ty_extensions.internal import RegularCallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 
 @overload
 def f(x: int) -> Any: ...
@@ -289,7 +289,7 @@ python-version = "3.12"
 ```py
 from typing import Any, Never
 from ty_extensions import Unknown, Bottom, Top, static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(Top[tuple[Any, int]], tuple[object, int]))
 static_assert(is_equivalent_to(Bottom[tuple[Any, int]], Never))
@@ -306,7 +306,7 @@ inherit the contravariant position.
 
 ```py
 from typing import Callable
-from ty_extensions.internal import TypeOf
+from ty_extensions._internal import TypeOf
 
 type C = Callable[[tuple[Any, int], tuple[str, Unknown]], None]
 
@@ -352,7 +352,7 @@ python-version = "3.12"
 ```py
 from typing import Any
 from ty_extensions import Unknown, Bottom, Top, static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(Top[Any | int], object))
 static_assert(is_equivalent_to(Bottom[Any | int], int))
@@ -369,7 +369,7 @@ inherit the contravariant position.
 
 ```py
 from typing import Callable
-from ty_extensions.internal import TypeOf
+from ty_extensions._internal import TypeOf
 
 def _(callable: Callable[[Any | int, str | Unknown], None]) -> None:
     static_assert(is_equivalent_to(Top[TypeOf[callable]], Callable[[int, str], None]))
@@ -405,7 +405,7 @@ All positions in an intersection are covariant.
 from typing import Any
 from typing_extensions import Never
 from ty_extensions import Unknown, Bottom, Top, static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(Top[Any & int], int))
 static_assert(is_equivalent_to(Bottom[Any & int], Never))
@@ -461,7 +461,7 @@ All positions in a negation are contravariant.
 from typing import Any
 from typing_extensions import Never
 from ty_extensions import Unknown, Bottom, Top, static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 # ~Any is still Any, so the top materialization is object
 static_assert(is_equivalent_to(Top[~Any], object))
@@ -484,7 +484,7 @@ python-version = "3.12"
 from typing import Any
 from typing_extensions import Never
 from ty_extensions import Unknown, Bottom, Top, static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(Top[type[Any]], type))
 static_assert(is_equivalent_to(Bottom[type[Any]], Never))
@@ -511,7 +511,7 @@ python-version = "3.12"
 ```py
 from typing import Any, Never, TypeVar
 from ty_extensions import Unknown, Bottom, Top, static_assert
-from ty_extensions.internal import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 
 def bounded_by_gradual[T: Any](t: T) -> None:
     # Top materialization of `T: Any` is `T: object`
@@ -544,7 +544,7 @@ python-version = "3.12"
 ```py
 from typing import Any, Generic, TypeVar, Never
 from ty_extensions import Bottom, Top, static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 T = TypeVar("T")
 T_co = TypeVar("T_co", covariant=True)
@@ -597,7 +597,7 @@ Parameters in callable are contravariant, so the variance should be flipped:
 
 ```py
 from typing import Callable
-from ty_extensions.internal import TypeOf
+from ty_extensions._internal import TypeOf
 
 type InvariantCallable = Callable[[GenericInvariant[Any]], None]
 type CovariantCallable = Callable[[GenericCovariant[Any]], None]
@@ -657,7 +657,7 @@ materialization (themselves) and applying `Top` or `Bottom` again does nothing.
 ```py
 from typing import Any
 from ty_extensions import Top, Bottom, static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(Top[Top[list[Any]]], Top[list[Any]]))
 static_assert(is_equivalent_to(Bottom[Top[list[Any]]], Top[list[Any]]))
@@ -674,7 +674,7 @@ other specializations are subtypes.
 ```pyi
 from typing import Any, Literal
 from ty_extensions import static_assert, Top, Bottom
-from ty_extensions.internal import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 
 # None and Top
 static_assert(is_subtype_of(list[int], Top[list[Any]]))
@@ -750,7 +750,7 @@ static types, but some gradual types are assignable even if they are not subtype
 ```pyi
 from typing import Any, Literal
 from ty_extensions import static_assert, Top, Bottom
-from ty_extensions.internal import is_assignable_to
+from ty_extensions._internal import is_assignable_to
 
 # None and Top
 static_assert(is_assignable_to(list[Any], Top[list[Any]]))
@@ -827,7 +827,7 @@ number of other covariant ABCs, but we'll use a synthetic example.
 ```py
 from typing import Generic, TypeVar, Any
 from ty_extensions import static_assert, Top
-from ty_extensions.internal import is_assignable_to, is_equivalent_to
+from ty_extensions._internal import is_assignable_to, is_equivalent_to
 
 class A:
     pass

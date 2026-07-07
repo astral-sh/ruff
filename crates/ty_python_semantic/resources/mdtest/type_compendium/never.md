@@ -14,7 +14,7 @@ type is a subtype of `Never`, except for `Never` itself or type variables with u
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 from typing_extensions import Never, TypeVar
 
 class C: ...
@@ -40,7 +40,7 @@ context that requires a value of a specific type. For example, changing the `Nev
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_assignable_to
+from ty_extensions._internal import is_assignable_to
 from typing_extensions import Never, Any
 
 static_assert(is_assignable_to(Never, int))
@@ -95,7 +95,7 @@ it is disjoint from every other type:
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 from typing_extensions import Never
 
 class C: ...
@@ -112,7 +112,7 @@ static_assert(is_disjoint_from(Never, Never))
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 from typing_extensions import Never
 
 class P: ...
@@ -127,7 +127,7 @@ Intersecting with `Never` results in `Never`:
 
 ```pyi
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 from typing_extensions import Never
 
 class P: ...
@@ -143,7 +143,7 @@ types are complements of each other:
 
 ```pyi
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 from typing_extensions import Never
 
 static_assert(is_equivalent_to(~object, Never))
@@ -175,7 +175,7 @@ A type like `tuple[int, Never]` has no inhabitants, and so it is equivalent to `
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 from typing_extensions import Never
 
 static_assert(is_equivalent_to(tuple[int, Never], Never))
@@ -196,7 +196,7 @@ The `NoReturn` type is a different name for `Never`:
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 from typing_extensions import NoReturn, Never
 
 static_assert(is_equivalent_to(NoReturn, Never))

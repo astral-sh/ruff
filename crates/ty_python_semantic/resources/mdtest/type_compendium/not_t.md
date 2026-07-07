@@ -14,7 +14,7 @@ in `T`.
 
 ```pyi
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 class T: ...
 class S(T): ...
@@ -30,7 +30,7 @@ Together, `T` and `~T` describe the set of all values. So the union of both type
 
 ```pyi
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 class T: ...
 
@@ -43,7 +43,7 @@ If `S <: T`, then `~T <: ~S`:, similar to how negation in logic reverses the ord
 
 ```pyi
 from ty_extensions import static_assert
-from ty_extensions.internal import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 
 class T: ...
 class S(T): ...
@@ -58,7 +58,7 @@ Assignability relationships are similarly reversed:
 
 ```pyi
 from ty_extensions import static_assert
-from ty_extensions.internal import is_assignable_to
+from ty_extensions._internal import is_assignable_to
 from typing import Any
 
 class T: ...
@@ -78,7 +78,7 @@ If two types `P` and `Q` are disjoint, then `P` must be a subtype of `~Q`, and v
 
 ```pyi
 from ty_extensions import static_assert
-from ty_extensions.internal import is_subtype_of, is_disjoint_from
+from ty_extensions._internal import is_subtype_of, is_disjoint_from
 from typing import final
 
 @final
@@ -100,7 +100,7 @@ set-theoretic types:
 
 ```pyi
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 class P: ...
 class Q: ...
@@ -125,7 +125,7 @@ two gradual types are equivalent:
 
 ```pyi
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 from typing import Any
 
 static_assert(is_equivalent_to(~Any, Any))

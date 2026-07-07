@@ -1302,7 +1302,7 @@ len([], 1)
 ### Type property predicates
 
 ```py
-from ty_extensions.internal import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 
 # error: [missing-argument]
 is_subtype_of()

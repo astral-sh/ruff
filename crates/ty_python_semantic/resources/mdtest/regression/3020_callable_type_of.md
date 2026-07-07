@@ -5,7 +5,7 @@ Regression test for [this issue](https://github.com/astral-sh/ty/issues/3020).
 ```python
 from typing import Callable
 from ty_extensions import static_assert
-from ty_extensions.internal import (
+from ty_extensions._internal import (
     RegularCallableTypeOf,
     TypeOf,
     is_assignable_to,

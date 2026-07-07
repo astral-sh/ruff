@@ -321,7 +321,7 @@ pub enum KnownModule {
     #[strum(serialize = "_typeshed._type_checker_internals")]
     TypeCheckerInternals,
     TyExtensions,
-    #[strum(serialize = "ty_extensions.internal")]
+    #[strum(serialize = "ty_extensions._internal")]
     TyExtensionsInternal,
     #[strum(serialize = "importlib")]
     ImportLib,
@@ -363,7 +363,7 @@ impl KnownModule {
             Self::Inspect => "inspect",
             Self::TypeCheckerInternals => "_typeshed._type_checker_internals",
             Self::TyExtensions => "ty_extensions",
-            Self::TyExtensionsInternal => "ty_extensions.internal",
+            Self::TyExtensionsInternal => "ty_extensions._internal",
             Self::ImportLib => "importlib",
             Self::Warnings => "warnings",
             Self::UnittestMock => "unittest.mock",

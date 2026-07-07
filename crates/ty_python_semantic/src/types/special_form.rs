@@ -77,9 +77,9 @@ pub enum SpecialFormType {
     Never,
     /// The symbol `ty_extensions.Unknown`
     Unknown,
-    /// The symbol `ty_extensions.internal.Divergent`
+    /// The symbol `ty_extensions._internal.Divergent`
     Divergent,
-    /// The symbol `ty_extensions.internal.Todo`
+    /// The symbol `ty_extensions._internal.Todo`
     Todo,
     /// The symbol `ty_extensions.AlwaysTruthy`
     AlwaysTruthy,
@@ -89,11 +89,11 @@ pub enum SpecialFormType {
     Not,
     /// The symbol `ty_extensions.Intersection`
     Intersection,
-    /// The symbol `ty_extensions.internal.TypeOf`
+    /// The symbol `ty_extensions._internal.TypeOf`
     TypeOf,
-    /// The symbol `ty_extensions.internal.CallableTypeOf`
+    /// The symbol `ty_extensions._internal.CallableTypeOf`
     CallableTypeOf,
-    /// The symbol `ty_extensions.internal.RegularCallableTypeOf`
+    /// The symbol `ty_extensions._internal.RegularCallableTypeOf`
     RegularCallableTypeOf,
     /// The symbol `ty_extensions.Top`
     Top,

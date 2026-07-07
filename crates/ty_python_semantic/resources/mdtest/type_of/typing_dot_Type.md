@@ -23,7 +23,7 @@ not a class.
 
 ```py
 from typing import Type
-from ty_extensions.internal import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class C(Type): ...
 

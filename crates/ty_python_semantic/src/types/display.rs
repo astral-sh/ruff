@@ -3189,13 +3189,13 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             }
             KnownInstanceType::GenericContext(generic_context) => {
                 f.with_type(ty)
-                    .write_str("ty_extensions.internal.GenericContext")?;
+                    .write_str("ty_extensions._internal.GenericContext")?;
                 write!(f, "{}", generic_context.display_full(self.db))
             }
             KnownInstanceType::Specialization(specialization) => {
                 // Normalize for consistent output across CI platforms
                 f.with_type(ty)
-                    .write_str("ty_extensions.internal.Specialization")?;
+                    .write_str("ty_extensions._internal.Specialization")?;
                 write!(f, "{}", specialization.display_full(self.db))
             }
             KnownInstanceType::UnionType(union) => {

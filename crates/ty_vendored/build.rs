@@ -21,8 +21,8 @@ const TY_EXTENSIONS_STUBS: &[(&str, &str)] = &[
         "stdlib/ty_extensions/__init__.pyi",
     ),
     (
-        "ty_extensions/internal.pyi",
-        "stdlib/ty_extensions/internal.pyi",
+        "ty_extensions/_internal.pyi",
+        "stdlib/ty_extensions/_internal.pyi",
     ),
 ];
 const TYPESHED_ZIP_LOCATION: &str = "/zipped_typeshed.zip";

@@ -14,7 +14,7 @@ type, which means that it represents an *unknown* set of runtime values.
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_assignable_to
+from ty_extensions._internal import is_assignable_to
 from typing_extensions import Never, Any
 
 class C: ...
@@ -49,7 +49,7 @@ type with *lower bound* `T`. Again, this can be demonstrated using the assignabl
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_assignable_to, is_equivalent_to
+from ty_extensions._internal import is_assignable_to, is_equivalent_to
 from typing_extensions import Any
 
 # A class hierarchy Small <: Medium <: Big
@@ -81,7 +81,7 @@ type with *upper bound* `T`:
 
 ```pyi
 from ty_extensions import static_assert
-from ty_extensions.internal import is_assignable_to, is_equivalent_to
+from ty_extensions._internal import is_assignable_to, is_equivalent_to
 from typing import Any
 
 class Big: ...
@@ -129,7 +129,7 @@ gradual types:
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_assignable_to
+from ty_extensions._internal import is_assignable_to
 from typing import Any
 
 static_assert(is_assignable_to(tuple[int, Any], tuple[int, int]))

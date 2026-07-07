@@ -13,7 +13,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 ## mdtest_snippet.py
 
 ```
- 1 | from ty_extensions.internal import reveal_mro
+ 1 | from ty_extensions._internal import reveal_mro
  2 | 
  3 | def returns_bool() -> bool:
  4 |     return True

@@ -13,7 +13,7 @@ It is the top type in Python's type system, i.e., it is a supertype of all other
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 
 static_assert(is_subtype_of(int, object))
 static_assert(is_subtype_of(str, object))
@@ -28,7 +28,7 @@ collections of objects (but also erases more specific type information):
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_assignable_to
+from ty_extensions._internal import is_assignable_to
 from typing_extensions import Any, Never
 
 static_assert(is_assignable_to(int, object))
@@ -47,7 +47,7 @@ There is no type that is disjoint from `object` except for `Never`:
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 from typing_extensions import Any, Never
 
 static_assert(not is_disjoint_from(int, object))
@@ -64,7 +64,7 @@ Unions with `object` are equivalent to `object`:
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(int | object | None, object))
 ```
@@ -75,7 +75,7 @@ Intersecting with `object` is equivalent to the original type:
 
 ```pyi
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 class P: ...
 class Q: ...

@@ -613,7 +613,7 @@ def _(
 
 ```py
 from typing_extensions import Generic
-from ty_extensions.internal import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class GenericBase(Generic[T]):
     pass
@@ -826,7 +826,7 @@ def _(
 Trying to specialize a non-name node results in an error:
 
 ```py
-from ty_extensions.internal import TypeOf
+from ty_extensions._internal import TypeOf
 
 IntOrStr = int | str
 
@@ -1786,7 +1786,7 @@ def _(
 ```py
 from typing import TypeVar, Union
 from ty_extensions import Bottom, Top, static_assert
-from ty_extensions.internal import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 
 T = TypeVar("T")
 K = TypeVar("K")

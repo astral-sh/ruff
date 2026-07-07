@@ -15,7 +15,7 @@ materializations of `B`, and all materializations of `B` are also materializatio
 ```py
 from typing_extensions import Literal, LiteralString, Protocol, Never
 from ty_extensions import Unknown, static_assert, AlwaysTruthy, AlwaysFalsy
-from ty_extensions.internal import TypeOf, is_equivalent_to
+from ty_extensions._internal import TypeOf, is_equivalent_to
 from enum import Enum
 
 class Answer(Enum):
@@ -73,7 +73,7 @@ static_assert(is_equivalent_to(type, type[object]))
 from typing import Any
 from typing_extensions import Literal, LiteralString, Never
 from ty_extensions import Unknown, static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(Any, Any))
 static_assert(is_equivalent_to(Unknown, Unknown))
@@ -89,7 +89,7 @@ static_assert(not is_equivalent_to(type[object], type[Any]))
 ```pyi
 from typing import Any, Literal, TypeAlias
 from ty_extensions import Unknown, static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 from enum import Enum
 
 static_assert(is_equivalent_to(str | int, str | int))
@@ -153,7 +153,7 @@ static_assert(is_equivalent_to(Any, ~None & Unknown | Unknown))
 
 ```py
 from ty_extensions import Unknown, static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 from typing import Any
 
 static_assert(is_equivalent_to(tuple[str, Any], tuple[str, Unknown]))
@@ -166,7 +166,7 @@ static_assert(not is_equivalent_to(tuple[str, int], tuple[int, str]))
 
 ```pyi
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_equivalent_to
+from ty_extensions._internal import TypeOf, is_equivalent_to
 from typing import Literal
 
 class P: ...
@@ -183,7 +183,7 @@ static_assert(is_equivalent_to(tuple[P & Q | R & ~S], tuple[~S & R | Q & P]))
 
 ```pyi
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 class P: ...
 class Q: ...
@@ -206,7 +206,7 @@ static_assert(
 
 ```pyi
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 class P: ...
 class Q: ...
@@ -224,7 +224,7 @@ python-version = "3.12"
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 class A: ...
 class B: ...
@@ -243,7 +243,7 @@ other callable should also have a default value.
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import RegularCallableTypeOf, is_equivalent_to
+from ty_extensions._internal import RegularCallableTypeOf, is_equivalent_to
 from typing import Callable
 
 def f1(a: int = 1) -> None: ...
@@ -292,7 +292,7 @@ There are multiple cases when two callable types are not equivalent which are en
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import RegularCallableTypeOf, is_equivalent_to
+from ty_extensions._internal import RegularCallableTypeOf, is_equivalent_to
 from typing import Callable
 ```
 
@@ -372,7 +372,7 @@ ordered:
 
 ```py
 from ty_extensions import Unknown, static_assert
-from ty_extensions.internal import RegularCallableTypeOf, is_equivalent_to
+from ty_extensions._internal import RegularCallableTypeOf, is_equivalent_to
 
 def f(x): ...
 def g(x: Unknown): ...
@@ -387,7 +387,7 @@ Differently ordered unions inside `Callable`s inside unions can still be equival
 ```py
 from typing import Callable
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(int | Callable[[int | str], None], Callable[[str | int], None] | int))
 ```
@@ -415,7 +415,7 @@ def overloaded(a: Grandparent) -> None: ...
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import RegularCallableTypeOf, is_equivalent_to
+from ty_extensions._internal import RegularCallableTypeOf, is_equivalent_to
 from overloaded import Grandparent, Parent, Child, overloaded
 
 def grandparent(a: Grandparent) -> None: ...
@@ -449,7 +449,7 @@ def cpg(a: Grandparent) -> None: ...
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import RegularCallableTypeOf, is_equivalent_to
+from ty_extensions._internal import RegularCallableTypeOf, is_equivalent_to
 from overloaded import pg, cpg
 
 static_assert(is_equivalent_to(RegularCallableTypeOf[pg], RegularCallableTypeOf[cpg]))
@@ -467,7 +467,7 @@ python-version = "3.12"
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_equivalent_to
+from ty_extensions._internal import TypeOf, is_equivalent_to
 
 def f(): ...
 
@@ -490,7 +490,7 @@ are covered above.
 
 ```py
 from ty_extensions import Unknown, static_assert
-from ty_extensions.internal import CallableTypeOf, RegularCallableTypeOf, TypeOf, is_equivalent_to
+from ty_extensions._internal import CallableTypeOf, RegularCallableTypeOf, TypeOf, is_equivalent_to
 from typing import Any, Callable
 
 static_assert(is_equivalent_to(Callable[..., int], Callable[..., int]))
@@ -623,7 +623,7 @@ import typing
 import typing
 from module import typing as other_typing
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_equivalent_to
+from ty_extensions._internal import TypeOf, is_equivalent_to
 
 static_assert(is_equivalent_to(TypeOf[typing], TypeOf[other_typing]))
 static_assert(is_equivalent_to(TypeOf[typing] | int | str, str | int | TypeOf[other_typing]))
@@ -658,7 +658,7 @@ import imported.abc
 import imported
 from module2 import imported as other_imported
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_equivalent_to
+from ty_extensions._internal import TypeOf, is_equivalent_to
 
 # error: [possibly-missing-submodule]
 reveal_type(imported.abc)  # revealed: Unknown
@@ -679,7 +679,7 @@ python-version = "3.12"
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_equivalent_to
+from ty_extensions._internal import TypeOf, is_equivalent_to
 
 class Foo[T]:
     x: T

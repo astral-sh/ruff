@@ -7,7 +7,7 @@ object `None`.
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_singleton, is_equivalent_to
+from ty_extensions._internal import is_singleton, is_equivalent_to
 
 n: None = None
 
@@ -18,7 +18,7 @@ Just like for other singleton types, the only subtypes of `None` are `None` itse
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 from typing_extensions import Never
 
 static_assert(is_subtype_of(None, None))
@@ -31,7 +31,7 @@ The type `Optional[T]` is an alias for `T | None` (or `Union[T, None]`):
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 from typing import Optional, Union
 
 class T: ...
@@ -77,7 +77,7 @@ python-version = "3.10"
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 from types import NoneType
 
 static_assert(is_equivalent_to(NoneType, None))

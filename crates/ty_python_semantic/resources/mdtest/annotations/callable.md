@@ -22,7 +22,7 @@ A bare `Callable` without any type arguments:
 ```py
 from typing import Callable, Any
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 def _(c: Callable):  # error: [missing-type-argument]
     reveal_type(c)  # revealed: (...) -> Unknown
@@ -517,7 +517,7 @@ def f_okay(c: Callable[[], None]):
 ### Subclasses should return themselves, not superclass
 
 ```py
-from ty_extensions.internal import into_regular_callable
+from ty_extensions._internal import into_regular_callable
 
 class Base:
     def __init__(self) -> None:
@@ -536,7 +536,7 @@ reveal_type(into_regular_callable(A))
 from typing import Callable
 
 from ty_extensions import static_assert
-from ty_extensions.internal import is_assignable_to
+from ty_extensions._internal import is_assignable_to
 
 static_assert(
     not is_assignable_to(
@@ -583,7 +583,7 @@ def _(c1: typing.Callable[[int], str], c2: collections.abc.Callable[[int], str])
 import typing
 import collections.abc
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(typing.Callable[[int], str], collections.abc.Callable[[int], str]))
 # error: [missing-type-argument]

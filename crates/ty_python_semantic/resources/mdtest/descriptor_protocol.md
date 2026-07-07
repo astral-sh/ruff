@@ -847,7 +847,7 @@ Here, we only demonstrate how `__get__` works on functions:
 import types
 from inspect import getattr_static
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_subtype_of
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 def f(x: object) -> str:
     return "a"

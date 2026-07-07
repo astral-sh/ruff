@@ -74,7 +74,7 @@ Inheriting from `Annotated[T, ...]` is equivalent to inheriting from `T` itself.
 
 ```py
 from typing_extensions import Annotated, Any
-from ty_extensions.internal import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class C(Annotated[int, "foo"]): ...
 
@@ -101,7 +101,7 @@ reveal_mro(F)
 
 ```py
 from typing_extensions import Annotated
-from ty_extensions.internal import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 # At runtime, this is an error.
 # error: [invalid-base]

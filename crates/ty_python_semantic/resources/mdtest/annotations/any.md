@@ -56,7 +56,7 @@ is not assignable to either subclass.
 
 ```py
 from typing import Any
-from ty_extensions.internal import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class SubclassOfAny(Any): ...
 class IndirectSubclass(SubclassOfAny): ...
@@ -92,7 +92,7 @@ This behavior is preserved through dynamically created subclasses:
 
 ```py
 from typing import Any, final
-from ty_extensions.internal import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class A(Any): ...
 
@@ -114,7 +114,7 @@ c: FinalClass = C()
 
 ```py
 from typing import Annotated, Any, Literal, final
-from ty_extensions.internal import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class A(Any): ...
 class B(Annotated[A, "metadata"]): ...
@@ -287,7 +287,7 @@ on all versions of Python:
 ```py
 from typing import Any
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_assignable_to
+from ty_extensions._internal import TypeOf, is_assignable_to
 
 reveal_type(Any.__base__)  # revealed: type | None
 reveal_type(Any.__bases__)  # revealed: tuple[type, ...]

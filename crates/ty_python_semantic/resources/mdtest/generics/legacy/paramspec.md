@@ -756,14 +756,14 @@ its own generic context:
 
 ```py
 from typing import Callable, Generic, ParamSpec
-from ty_extensions.internal import generic_context
+from ty_extensions._internal import generic_context
 
 P = ParamSpec("P")
 
 class C(Generic[P]):
     def method(self, *args: P.args, **kwargs: P.kwargs): ...
 
-# revealed: ty_extensions.internal.GenericContext[Self@method]
+# revealed: ty_extensions._internal.GenericContext[Self@method]
 reveal_type(generic_context(C.method))
 
 def outer(_: Callable[P, None]):

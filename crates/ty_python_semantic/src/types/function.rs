@@ -2031,37 +2031,37 @@ pub enum KnownFunction {
 
     /// `ty_extensions.static_assert`
     StaticAssert,
-    /// `ty_extensions.internal.is_equivalent_to`
+    /// `ty_extensions._internal.is_equivalent_to`
     IsEquivalentTo,
-    /// `ty_extensions.internal.is_subtype_of`
+    /// `ty_extensions._internal.is_subtype_of`
     IsSubtypeOf,
-    /// `ty_extensions.internal.is_assignable_to`
+    /// `ty_extensions._internal.is_assignable_to`
     IsAssignableTo,
-    /// `ty_extensions.internal.is_constraint_set_assignable_to`
+    /// `ty_extensions._internal.is_constraint_set_assignable_to`
     IsConstraintSetAssignableTo,
-    /// `ty_extensions.internal.is_disjoint_from`
+    /// `ty_extensions._internal.is_disjoint_from`
     IsDisjointFrom,
-    /// `ty_extensions.internal.is_singleton`
+    /// `ty_extensions._internal.is_singleton`
     IsSingleton,
-    /// `ty_extensions.internal.is_single_valued`
+    /// `ty_extensions._internal.is_single_valued`
     IsSingleValued,
-    /// `ty_extensions.internal.generic_context`
+    /// `ty_extensions._internal.generic_context`
     GenericContext,
-    /// `ty_extensions.internal.into_callable`
+    /// `ty_extensions._internal.into_callable`
     IntoCallable,
-    /// `ty_extensions.internal.into_regular_callable`
+    /// `ty_extensions._internal.into_regular_callable`
     IntoRegularCallable,
-    /// `ty_extensions.internal.dunder_all_names`
+    /// `ty_extensions._internal.dunder_all_names`
     DunderAllNames,
-    /// `ty_extensions.internal.enum_members`
+    /// `ty_extensions._internal.enum_members`
     EnumMembers,
-    /// `ty_extensions.internal.all_members`
+    /// `ty_extensions._internal.all_members`
     AllMembers,
-    /// `ty_extensions.internal.has_member`
+    /// `ty_extensions._internal.has_member`
     HasMember,
-    /// `ty_extensions.internal.reveal_protocol_interface`
+    /// `ty_extensions._internal.reveal_protocol_interface`
     RevealProtocolInterface,
-    /// `ty_extensions.internal.reveal_mro`
+    /// `ty_extensions._internal.reveal_mro`
     RevealMro,
     /// `struct.unpack`
     Unpack,

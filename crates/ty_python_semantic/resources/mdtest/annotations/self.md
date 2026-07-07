@@ -1129,7 +1129,7 @@ bound at `C.f`.
 
 ```py
 from typing import Self
-from ty_extensions.internal import generic_context
+from ty_extensions._internal import generic_context
 
 class C[T]():  # fmt:skip
     def f(self: Self):
@@ -1138,7 +1138,7 @@ class C[T]():  # fmt:skip
         # revealed: None
         reveal_type(generic_context(b))
 
-# revealed: ty_extensions.internal.GenericContext[Self@f]
+# revealed: ty_extensions._internal.GenericContext[Self@f]
 reveal_type(generic_context(C.f))
 ```
 
@@ -1147,7 +1147,7 @@ Even if the `Self` annotation appears first in the nested function, it is the me
 
 ```py
 from typing import Self
-from ty_extensions.internal import generic_context
+from ty_extensions._internal import generic_context
 
 class C:
     def f(self: "C"):
@@ -1165,7 +1165,7 @@ reveal_type(generic_context(C.f))
 This makes sure that we don't bind `self` if it's not a positional parameter:
 
 ```py
-from ty_extensions.internal import RegularCallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 
 class C:
     def method(*args, **kwargs) -> None: ...

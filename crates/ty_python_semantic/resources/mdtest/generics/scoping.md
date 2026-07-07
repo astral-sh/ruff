@@ -149,13 +149,13 @@ The class typevar in the method signature does not bind a _new_ instance of the 
 already solved and specialized when the class was specialized:
 
 ```py
-from ty_extensions.internal import generic_context
+from ty_extensions._internal import generic_context
 
 legacy.m("string", None)  # error: [invalid-argument-type]
 reveal_type(legacy.m)  # revealed: bound method Legacy[int].m[S](x: int, y: S) -> S
-# revealed: ty_extensions.internal.GenericContext[T@Legacy]
+# revealed: ty_extensions._internal.GenericContext[T@Legacy]
 reveal_type(generic_context(Legacy))
-# revealed: ty_extensions.internal.GenericContext[Self@m, S@m]
+# revealed: ty_extensions._internal.GenericContext[Self@m, S@m]
 reveal_type(generic_context(legacy.m))
 ```
 
@@ -230,7 +230,7 @@ error on the following snippet, but we may change this in the future.
 
 ```py
 from typing import TypeVar, Callable
-from ty_extensions.internal import generic_context
+from ty_extensions._internal import generic_context
 
 T = TypeVar("T")
 
@@ -546,7 +546,7 @@ parameters from the enclosing class.
 ```py
 from typing import Generic, TypeVar
 
-from ty_extensions.internal import into_regular_callable
+from ty_extensions._internal import into_regular_callable
 
 T = TypeVar("T")
 S = TypeVar("S")

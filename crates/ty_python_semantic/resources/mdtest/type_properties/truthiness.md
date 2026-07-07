@@ -107,7 +107,7 @@ import types
 import typing
 import sys
 from ty_extensions import AlwaysTruthy, static_assert
-from ty_extensions.internal import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 from typing_extensions import _NoDefaultType
 
 static_assert(is_subtype_of(sys.version_info.__class__, AlwaysTruthy))

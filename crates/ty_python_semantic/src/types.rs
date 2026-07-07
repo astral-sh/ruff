@@ -7899,11 +7899,11 @@ enum InvalidTypeExpression<'db> {
     Deprecated,
     /// Same for `dataclasses.Field`
     Field,
-    /// Same for `ty_extensions.internal.ConstraintSet`
+    /// Same for `ty_extensions._internal.ConstraintSet`
     ConstraintSet,
-    /// Same for `ty_extensions.internal.GenericContext`
+    /// Same for `ty_extensions._internal.GenericContext`
     GenericContext,
-    /// Same for `ty_extensions.internal.Specialization`
+    /// Same for `ty_extensions._internal.Specialization`
     Specialization,
     /// Same for `NamedTupleSpec`
     NamedTupleSpec,
@@ -7967,17 +7967,17 @@ impl<'db> InvalidTypeExpression<'db> {
                     }
                     InvalidTypeExpression::ConstraintSet => write!(
                         f,
-                        "`ty_extensions.internal.ConstraintSet` is not allowed in {location}s",
+                        "`ty_extensions._internal.ConstraintSet` is not allowed in {location}s",
                     ),
                     InvalidTypeExpression::GenericContext => {
                         write!(
                             f,
-                            "`ty_extensions.internal.GenericContext` is not allowed in {location}s"
+                            "`ty_extensions._internal.GenericContext` is not allowed in {location}s"
                         )
                     }
                     InvalidTypeExpression::Specialization => write!(
                         f,
-                        "`ty_extensions.internal.Specialization` is not allowed in {location}s",
+                        "`ty_extensions._internal.Specialization` is not allowed in {location}s",
                     ),
                     InvalidTypeExpression::NamedTupleSpec => {
                         write!(f, "`NamedTupleSpec` is not allowed in {location}s")

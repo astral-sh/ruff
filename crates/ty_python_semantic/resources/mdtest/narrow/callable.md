@@ -113,7 +113,7 @@ functions expecting gradual callables.
 ```py
 from typing import Any, Callable, TypeVar
 from ty_extensions import static_assert, Top
-from ty_extensions.internal import is_assignable_to
+from ty_extensions._internal import is_assignable_to
 
 static_assert(is_assignable_to(Top[Callable[..., bool]], Callable[..., int]))
 

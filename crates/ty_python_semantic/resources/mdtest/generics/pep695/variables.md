@@ -305,7 +305,7 @@ specialization. Thus, the typevar is a subtype of itself and of `object`, but no
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_assignable_to, is_subtype_of
+from ty_extensions._internal import is_assignable_to, is_subtype_of
 
 class Super: ...
 class Base(Super): ...
@@ -534,7 +534,7 @@ And an intersection of a typevar with another type is always a subtype of the Ty
 
 ```py
 from ty_extensions import Intersection, Not
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 class A: ...
 
@@ -560,7 +560,7 @@ that final class.)
 ```py
 from typing import final
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 @final
 class FinalClass: ...
@@ -586,7 +586,7 @@ TypeVars which have non-fully-static bounds or constraints are also self-equival
 ```py
 from typing import final, Any
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 # fmt: off
 
@@ -614,7 +614,7 @@ non-singleton type.
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_singleton, is_single_valued
+from ty_extensions._internal import is_singleton, is_single_valued
 
 def unbounded_unconstrained[T](t: T) -> None:
     static_assert(not is_singleton(T))
@@ -843,7 +843,7 @@ of) itself.
 
 ```py
 from ty_extensions import Not, static_assert
-from ty_extensions.internal import is_assignable_to, is_subtype_of
+from ty_extensions._internal import is_assignable_to, is_subtype_of
 
 def intersection_is_assignable[T](t: T) -> None:
     static_assert(is_assignable_to(Intersection[T, None], T))

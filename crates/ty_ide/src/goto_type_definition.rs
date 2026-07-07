@@ -185,7 +185,7 @@ mod tests {
            |     ^ Clicking here
            |
         info: Found 1 type definition
-          --> stdlib/ty_extensions/internal.pyi:LL:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
         LL | Divergent: _SpecialForm
            | ---------
@@ -762,7 +762,7 @@ mod tests {
            |                               ^^ Clicking here
            |
         info: Found 1 type definition
-          --> stdlib/ty_extensions/internal.pyi:LL:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
         LL | Todo: _SpecialForm
            | ----
@@ -1589,7 +1589,7 @@ mod tests {
            |                                      ^^ Clicking here
            |
         info: Found 1 type definition
-          --> stdlib/ty_extensions/internal.pyi:LL:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
         LL | Todo: _SpecialForm
            | ----

@@ -706,7 +706,7 @@ Protocol types can be used as TypeVar bounds, just like nominal types.
 ```py
 from typing import Any, Protocol
 from ty_extensions import static_assert
-from ty_extensions.internal import is_assignable_to
+from ty_extensions._internal import is_assignable_to
 
 class SupportsClose(Protocol):
     def close(self) -> None: ...
@@ -1006,7 +1006,7 @@ specializations of a generic function.
 
 ```py
 from typing import Any, Callable, NoReturn, overload, Self
-from ty_extensions.internal import generic_context, into_regular_callable
+from ty_extensions._internal import generic_context, into_regular_callable
 
 def accepts_callable[**P, R](callable: Callable[P, R]) -> Callable[P, R]:
     return callable
@@ -1135,12 +1135,12 @@ class GenericClass[T]:
 def _(x: list[str]):
     # revealed: [T](x: list[T], y: list[T]) -> GenericClass[T]
     reveal_type(into_regular_callable(GenericClass))
-    # revealed: ty_extensions.internal.GenericContext[T@GenericClass]
+    # revealed: ty_extensions._internal.GenericContext[T@GenericClass]
     reveal_type(generic_context(into_regular_callable(GenericClass)))
 
     # revealed: [T](x: list[T], y: list[T]) -> GenericClass[T]
     reveal_type(accepts_callable(GenericClass))
-    # revealed: ty_extensions.internal.GenericContext[T@GenericClass]
+    # revealed: ty_extensions._internal.GenericContext[T@GenericClass]
     reveal_type(generic_context(accepts_callable(GenericClass)))
 
     # revealed: GenericClass[str]

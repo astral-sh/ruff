@@ -51,7 +51,7 @@ It follows directly from the definition that `AlwaysTruthy` and `AlwaysFalsy` ar
 
 ```py
 from ty_extensions import static_assert, AlwaysTruthy, AlwaysFalsy
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 static_assert(is_disjoint_from(AlwaysTruthy, AlwaysFalsy))
 ```
@@ -68,7 +68,7 @@ examples for values that belong to these three types:
 
 ```pyi
 from ty_extensions import static_assert, AlwaysTruthy, AlwaysFalsy
-from ty_extensions.internal import is_equivalent_to, is_disjoint_from
+from ty_extensions._internal import is_equivalent_to, is_disjoint_from
 from typing_extensions import Never
 from random import choice
 
@@ -118,7 +118,7 @@ f = CustomAmbiguousTruthinessType()  # error: [invalid-assignment]
 
 ```py
 from ty_extensions import static_assert, AlwaysTruthy, AlwaysFalsy
-from ty_extensions.internal import is_subtype_of, is_disjoint_from
+from ty_extensions._internal import is_subtype_of, is_disjoint_from
 from typing_extensions import Literal
 ```
 
@@ -167,7 +167,7 @@ Is `tuple[()]` always falsy? We currently model it this way, but this is
 
 ```py
 from ty_extensions import static_assert, AlwaysFalsy
-from ty_extensions.internal import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 
 static_assert(is_subtype_of(tuple[()], AlwaysFalsy))
 ```

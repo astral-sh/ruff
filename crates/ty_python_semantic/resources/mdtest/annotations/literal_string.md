@@ -131,7 +131,7 @@ not vice versa.
 ```py
 from typing_extensions import Literal, LiteralString
 from ty_extensions import static_assert
-from ty_extensions.internal import is_assignable_to
+from ty_extensions._internal import is_assignable_to
 
 static_assert(is_assignable_to(Literal[""], LiteralString))
 static_assert(is_assignable_to(Literal["abc"], LiteralString))

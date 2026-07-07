@@ -21,7 +21,7 @@ type (i.e. not an alias).
 ```py
 from typing_extensions import NewType
 from ty_extensions import static_assert, Not, Intersection, AlwaysFalsy
-from ty_extensions.internal import is_subtype_of, is_equivalent_to, is_assignable_to
+from ty_extensions._internal import is_subtype_of, is_equivalent_to, is_assignable_to
 
 Foo = NewType("Foo", int)
 Bar = NewType("Bar", Foo)
@@ -110,7 +110,7 @@ reveal_type(Baz.__supertype__)  # revealed: type | NewType
 ```py
 from collections.abc import Callable
 from typing_extensions import NewType
-from ty_extensions.internal import RegularCallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 
 Foo = NewType("Foo", int)
 
@@ -142,14 +142,14 @@ reveal_type(str | Foo)  # revealed: <types.UnionType special-form 'str | Foo'>
 
 ```py
 from typing import NewType, Callable, Any
-from ty_extensions.internal import RegularCallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 
 N = NewType("N", int)
 i = N(42)
 
 y: Callable[..., Any] = i  # error: [invalid-assignment] "Object of type `N` is not assignable to `(...) -> Any`"
 
-# error: [invalid-type-form] "Expected the first argument to `ty_extensions.internal.RegularCallableTypeOf` to be a callable object, but got an object of type `N`"
+# error: [invalid-type-form] "Expected the first argument to `ty_extensions._internal.RegularCallableTypeOf` to be a callable object, but got an object of type `N`"
 def f(x: RegularCallableTypeOf[i]):
     reveal_type(x)  # revealed: Unknown
 
@@ -187,7 +187,7 @@ reveal_type(Foo)  # revealed: <NewType pseudo-class 'Foo'>
 
 ```py
 from typing_extensions import NewType
-from ty_extensions.internal import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 
 # snapshot: mismatched-type-name
 UserId = NewType("Id", int)
@@ -303,7 +303,7 @@ and we accept the unions they expand into.
 ```py
 from typing import NewType
 from ty_extensions import static_assert
-from ty_extensions.internal import is_assignable_to
+from ty_extensions._internal import is_assignable_to
 
 Foo = NewType("Foo", float)
 Foo(3.14)
@@ -571,7 +571,7 @@ E(E(E(["foo"])))  # error: [invalid-argument-type]
 ```py
 from typing_extensions import NewType
 from ty_extensions import static_assert
-from ty_extensions.internal import is_singleton, is_single_valued
+from ty_extensions._internal import is_singleton, is_single_valued
 from types import EllipsisType
 
 A = NewType("A", EllipsisType)

@@ -7,7 +7,7 @@ import types
 from types import UnionType
 from typing_extensions import Any, Literal, LiteralString, Never, Callable, TypeAliasType
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_single_valued
+from ty_extensions._internal import TypeOf, is_single_valued
 
 static_assert(is_single_valued(None))
 static_assert(is_single_valued(Literal[True]))
@@ -65,7 +65,7 @@ literal type might not compare equal to itself.
 
 ```pyi
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_single_valued
+from ty_extensions._internal import TypeOf, is_single_valued
 from enum import Enum
 
 class NormalEnum(Enum):

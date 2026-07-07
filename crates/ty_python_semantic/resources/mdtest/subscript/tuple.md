@@ -125,7 +125,7 @@ The stdlib API `os.stat` is a commonly used API that returns an instance of a tu
 ```py
 import os
 import stat
-from ty_extensions.internal import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 reveal_type(os.stat("my_file.txt"))  # revealed: stat_result
 reveal_type(os.stat("my_file.txt")[stat.ST_MODE])  # revealed: int
@@ -159,7 +159,7 @@ tuples are naturally understood as being subtypes of protocols that have precise
 ```py
 from typing import Protocol, Literal
 from ty_extensions import static_assert
-from ty_extensions.internal import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 
 class IntFromZeroSubscript(Protocol):
     def __getitem__(self, index: Literal[0], /) -> int: ...
@@ -434,7 +434,7 @@ python-version = "3.9"
 ```
 
 ```py
-from ty_extensions.internal import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class A(tuple[int, str]): ...
 
@@ -476,7 +476,7 @@ python-version = "3.9"
 
 ```py
 from typing import Tuple
-from ty_extensions.internal import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class A(Tuple[int, str]): ...
 

@@ -10,7 +10,7 @@ python-version = "3.14"
 ```pyi
 from typing import Any
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to, is_subtype_of
+from ty_extensions._internal import is_equivalent_to, is_subtype_of
 ```
 
 Throughout the document, we use the following classes as canonical examples for covariant,

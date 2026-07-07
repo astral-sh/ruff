@@ -8,7 +8,7 @@ This means that it is known that no possible runtime object inhabits both types 
 ```pyi
 from typing_extensions import Literal, LiteralString, Any
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_disjoint_from
+from ty_extensions._internal import TypeOf, is_disjoint_from
 
 static_assert(is_disjoint_from(bool, str))
 static_assert(not is_disjoint_from(bool, bool))
@@ -27,7 +27,7 @@ static_assert(not is_disjoint_from(str, LiteralString))
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_disjoint_from
+from ty_extensions._internal import TypeOf, is_disjoint_from
 
 static_assert(is_disjoint_from(TypeOf[range(0)], TypeOf[range(1)]))
 static_assert(is_disjoint_from(TypeOf[range(1)], TypeOf[range(0)]))
@@ -41,7 +41,7 @@ static_assert(not is_disjoint_from(TypeOf[range(1)], range))
 from enum import Enum
 from typing import Literal
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 class Color(Enum):
     RED = 1
@@ -66,7 +66,7 @@ static_assert(
 
 ```pyi
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from, is_subtype_of
+from ty_extensions._internal import is_disjoint_from, is_subtype_of
 from typing import final
 
 class A: ...
@@ -116,7 +116,7 @@ Some builtins types are declared as `@final`:
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 class Foo: ...
 
@@ -139,7 +139,7 @@ python-version = "3.12"
 ```py
 from typing import Any, final
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 @final
 class Foo[T]:
@@ -167,7 +167,7 @@ not: a covariant container can be inhabited by an empty value.
 from collections.abc import Sequence
 from typing import Any, Generic, TypeVar
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -219,7 +219,7 @@ python-version = "3.12"
 ```py
 from typing import Generic, Never, TypeVar
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 T = TypeVar("T")
 
@@ -265,7 +265,7 @@ import asyncio
 from typing import Any
 from typing_extensions import disjoint_base
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 class Foo: ...
 
@@ -306,7 +306,7 @@ ty:
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 class A:
     __slots__ = ("a",)
@@ -340,7 +340,7 @@ static_assert(not is_disjoint_from(D, A))
 ```py
 from dataclasses import dataclass
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 @dataclass(slots=True)
 class F: ...
@@ -372,7 +372,7 @@ static_assert(is_disjoint_from(I, J))
 ```py
 from typing_extensions import Literal, Never
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_disjoint_from
+from ty_extensions._internal import TypeOf, is_disjoint_from
 
 static_assert(is_disjoint_from(tuple[()], TypeOf[object]))
 static_assert(is_disjoint_from(tuple[()], TypeOf[Literal]))
@@ -399,7 +399,7 @@ static_assert(is_disjoint_from(tuple[int, int], tuple[None, ...]))  # error: [st
 ```py
 from typing_extensions import Literal
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 static_assert(is_disjoint_from(Literal[1, 2], Literal[3]))
 static_assert(is_disjoint_from(Literal[1, 2], Literal[3, 4]))
@@ -413,7 +413,7 @@ static_assert(not is_disjoint_from(Literal[1, 2], Literal[2, 3]))
 ```pyi
 from typing_extensions import Literal, final, Any, LiteralString
 from ty_extensions import static_assert, AlwaysFalsy
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 @final
 class P: ...
@@ -482,7 +482,7 @@ static_assert(is_disjoint_from(AlwaysFalsy, LiteralString & ~Literal[""]))  # er
 ```py
 from typing_extensions import Never
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 static_assert(is_disjoint_from(Never, Never))
 static_assert(is_disjoint_from(Never, None))
@@ -495,7 +495,7 @@ static_assert(is_disjoint_from(Never, object))
 ```pyi
 from typing_extensions import Literal, LiteralString
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 static_assert(is_disjoint_from(None, Literal[True]))
 static_assert(is_disjoint_from(None, Literal[1]))
@@ -518,7 +518,7 @@ static_assert(is_disjoint_from(None, int & ~str))
 ```pyi
 from typing_extensions import Literal, LiteralString
 from ty_extensions import static_assert, AlwaysFalsy, AlwaysTruthy
-from ty_extensions.internal import TypeOf, is_disjoint_from
+from ty_extensions._internal import TypeOf, is_disjoint_from
 from enum import Enum
 
 class Answer(Enum):
@@ -585,7 +585,7 @@ python-version = "3.12"
 ```py
 from types import ModuleType, FunctionType
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_disjoint_from
+from ty_extensions._internal import TypeOf, is_disjoint_from
 
 class A: ...
 class B: ...
@@ -627,7 +627,7 @@ static_assert(not is_disjoint_from(TypeOf[f], object))
 ```py
 from typing import final
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_disjoint_from
+from ty_extensions._internal import TypeOf, is_disjoint_from
 
 class A:
     def foo(self) -> None: ...
@@ -665,7 +665,7 @@ Two different `@final` methods are disjoint, even if they share the same name an
 ```py
 from typing import final
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_disjoint_from
+from ty_extensions._internal import TypeOf, is_disjoint_from
 
 class C:
     @final
@@ -710,7 +710,7 @@ static_assert(not is_disjoint_from(TypeOf[F().foo], TypeOf[G().foo]))
 
 ```py
 from ty_extensions import AlwaysFalsy, AlwaysTruthy, static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 from typing import Literal
 
 static_assert(is_disjoint_from(None, AlwaysTruthy))
@@ -732,7 +732,7 @@ the instance type is not a subclass of `T`'s metaclass.
 ```py
 from typing import final
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 @final
 class Foo: ...
@@ -766,7 +766,7 @@ metaclass of `T` is disjoint from the metaclass of `S`.
 ```py
 from typing import final
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 @final
 class Meta1(type): ...
@@ -785,7 +785,7 @@ static_assert(is_disjoint_from(type[UsesMeta1], type[UsesMeta2]))
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_disjoint_from
+from ty_extensions._internal import TypeOf, is_disjoint_from
 from typing import final, Protocol, Literal
 
 class C:
@@ -834,7 +834,7 @@ static_assert(is_disjoint_from(HasReadWriteIntProp, E))
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 from typing_extensions import TypeGuard, TypeIs
 
 static_assert(not is_disjoint_from(bool, TypeGuard[str]))
@@ -853,7 +853,7 @@ type of the protocol's member.
 ```py
 from typing_extensions import Protocol, Literal, final, ClassVar
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 class HasAttrA(Protocol):
     attr: Literal["a"]
@@ -913,7 +913,7 @@ from __future__ import annotations
 
 from typing import NamedTuple, final
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 @final
 class Path(NamedTuple):
@@ -942,7 +942,7 @@ python-version = "3.12"
 ```py
 from typing import final
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_disjoint_from
+from ty_extensions._internal import TypeOf, is_disjoint_from
 
 class GenericClass[T]:
     x: T  # invariant
@@ -984,7 +984,7 @@ would inhabit both types simultaneously.
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import RegularCallableTypeOf, is_disjoint_from
+from ty_extensions._internal import RegularCallableTypeOf, is_disjoint_from
 from typing_extensions import Callable, Literal, Never
 
 def mixed(a: int, /, b: str, *args: int, c: int = 2, **kwargs: int) -> None: ...
@@ -1006,7 +1006,7 @@ A callable type is disjoint from all literal types.
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import RegularCallableTypeOf, is_disjoint_from
+from ty_extensions._internal import RegularCallableTypeOf, is_disjoint_from
 from typing_extensions import Callable, Literal, Never
 
 static_assert(is_disjoint_from(Callable[[], None], Literal[""]))
@@ -1020,7 +1020,7 @@ A callable type is disjoint from nominal instance types where the classes are fi
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import RegularCallableTypeOf, is_disjoint_from
+from ty_extensions._internal import RegularCallableTypeOf, is_disjoint_from
 from typing_extensions import Any, Callable, final
 
 @final
@@ -1079,7 +1079,7 @@ A callable type is disjoint from special form types, except for callable special
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_disjoint_from
+from ty_extensions._internal import TypeOf, is_disjoint_from
 from typing_extensions import Any, Callable, TypedDict
 from typing import Literal, Union, Optional, Final, Type, ChainMap, Counter, OrderedDict, DefaultDict, Deque
 from collections.abc import Callable as CollectionsAbcCallable
@@ -1132,7 +1132,7 @@ static_assert(not is_disjoint_from(TypeOf[OrderedDict], Callable[..., Any]))
 ```py
 from enum import Enum
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 from typing_extensions import Literal
 
 class MyEnum(Enum):

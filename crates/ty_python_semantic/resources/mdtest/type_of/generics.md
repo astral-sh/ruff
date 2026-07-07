@@ -182,7 +182,7 @@ A class `A` is a subtype of `type[T]` if any instance of `A` is a subtype of `T`
 ```py
 from typing import Any, Callable, Protocol
 from ty_extensions import static_assert
-from ty_extensions.internal import is_assignable_to, is_subtype_of, is_disjoint_from
+from ty_extensions._internal import is_assignable_to, is_subtype_of, is_disjoint_from
 
 class Callback[T](Protocol):
     def __call__(self, *args, **kwargs) -> T: ...
@@ -296,7 +296,7 @@ python-version = "3.12"
 
 ```py
 from typing import final
-from ty_extensions.internal import TypeOf
+from ty_extensions._internal import TypeOf
 
 @final
 class FinalClass: ...
@@ -595,7 +595,7 @@ expects_type_c_default_of_int_str(C[str, int])
 the class that the instance-type refers to.
 
 ```py
-from ty_extensions.internal import RegularCallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 
 class TakesStrInConstructor:
     def __init__(self, x: int, y: str | None = None): ...

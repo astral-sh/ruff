@@ -5,7 +5,7 @@ from typing import Any, ClassVar, Protocol, _SpecialForm
 
 from typing_extensions import LiteralString, Self  # noqa: UP035
 
-from .internal import TypeOf as _TypeOf
+from ._internal import TypeOf as _TypeOf
 
 # ------------------
 # Special operations

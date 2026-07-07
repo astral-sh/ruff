@@ -20,7 +20,7 @@ We don't parenthesize display of an overloaded callable, since it is already wra
 
 ```py
 from typing import Callable, Literal, overload
-from ty_extensions.internal import RegularCallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 
 @overload
 def f(x: int) -> bool: ...

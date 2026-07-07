@@ -23,7 +23,7 @@ get from the sequence is a valid `int`.
 
 ```py
 from ty_extensions import static_assert, Unknown
-from ty_extensions.internal import is_assignable_to, is_equivalent_to, is_subtype_of
+from ty_extensions._internal import is_assignable_to, is_equivalent_to, is_subtype_of
 from typing import Any, Generic, TypeVar
 
 class A: ...
@@ -105,7 +105,7 @@ that you pass into the consumer is a valid `int`.
 
 ```py
 from ty_extensions import static_assert, Unknown
-from ty_extensions.internal import is_assignable_to, is_equivalent_to, is_subtype_of
+from ty_extensions._internal import is_assignable_to, is_equivalent_to, is_subtype_of
 from typing import Any, Generic, TypeVar
 
 class A: ...
@@ -218,7 +218,7 @@ since we can't know in advance which of the allowed methods you'll want to use.
 
 ```py
 from ty_extensions import static_assert, Unknown
-from ty_extensions.internal import is_assignable_to, is_equivalent_to, is_subtype_of
+from ty_extensions._internal import is_assignable_to, is_equivalent_to, is_subtype_of
 from typing import Any, Generic, TypeVar
 
 class A: ...
@@ -408,7 +408,7 @@ python-version = "3.12"
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_assignable_to
+from ty_extensions._internal import is_assignable_to
 from typing import Generic, TypeVar
 
 class A: ...

@@ -10,7 +10,7 @@ python-version = "3.11"
 ```py
 from types import FunctionType
 from ty_extensions import Not, AlwaysTruthy, static_assert
-from ty_extensions.internal import is_subtype_of, is_disjoint_from
+from ty_extensions._internal import is_subtype_of, is_disjoint_from
 
 class Meta(type): ...
 class F(metaclass=Meta): ...

@@ -229,7 +229,7 @@ emitted:
 
 ```py
 import types
-from ty_extensions.internal import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class Base:
     base_attr: int = 1

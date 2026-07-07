@@ -165,7 +165,7 @@ Specializing variadic parameter types to `Any` does not make them gradual when c
 from functools import partial
 from typing import Any, Callable, Generic, TypeVar
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_subtype_of
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 T = TypeVar("T")
 
@@ -187,7 +187,7 @@ parameters inferred for `P`:
 from functools import partial
 from typing import Any, Callable, Generic, ParamSpec, TypeVar
 from ty_extensions import static_assert
-from ty_extensions.internal import TypeOf, is_subtype_of
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 P = ParamSpec("P")
 T = TypeVar("T")

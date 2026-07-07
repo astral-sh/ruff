@@ -81,7 +81,7 @@ def _(a: MyGenericAlias1, b: MyGenericAlias2, c: MyGenericAlias3) -> None:
 ```py
 from typing import TypeAlias
 from ty_extensions import static_assert
-from ty_extensions.internal import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 
 MyList: TypeAlias = list["int"]
 
@@ -360,7 +360,7 @@ my_isinstance(1, (int, (str, 1)))
 ```py
 from typing import TypeAlias, TypeVar, Union
 from ty_extensions import Bottom, Top, static_assert
-from ty_extensions.internal import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 
 K = TypeVar("K")
 V = TypeVar("V")

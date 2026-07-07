@@ -163,7 +163,7 @@ and `S2` is a subtype of `T2`, and similar for other lengths of tuples:
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_subtype_of
+from ty_extensions._internal import is_subtype_of
 
 class T1: ...
 class S1(T1): ...
@@ -194,7 +194,7 @@ The empty tuple can also be subclassed (further clarifying that it is not a sing
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_singleton, is_subtype_of, is_equivalent_to, is_assignable_to
+from ty_extensions._internal import is_singleton, is_subtype_of, is_equivalent_to, is_assignable_to
 
 static_assert(not is_singleton(tuple[()]))
 
@@ -213,7 +213,7 @@ object), non-empty tuples are also not singleton types — even if all their ele
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_singleton
+from ty_extensions._internal import is_singleton
 
 static_assert(is_singleton(None))
 
@@ -233,7 +233,7 @@ element also contains no inhabitants.
 ```py
 from typing import Never
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(tuple[Never], Never))
 static_assert(is_equivalent_to(tuple[int, Never], Never))
@@ -246,7 +246,7 @@ empty. This means that the tuple is not actually variable-length!
 ```py
 from typing import Never
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(tuple[Never, ...], tuple[()]))
 static_assert(is_equivalent_to(tuple[int, *tuple[Never, ...]], tuple[int]))
@@ -308,7 +308,7 @@ suffix.
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_subtype_of, is_equivalent_to
+from ty_extensions._internal import is_subtype_of, is_equivalent_to
 
 static_assert(is_equivalent_to(tuple[int, *tuple[int, ...]], tuple[*tuple[int, ...], int]))
 
@@ -320,7 +320,7 @@ This is true when the prefix/suffix and variable-length types are equivalent, no
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_subtype_of, is_equivalent_to
+from ty_extensions._internal import is_subtype_of, is_equivalent_to
 
 static_assert(is_equivalent_to(tuple[int | str, *tuple[str | int, ...]], tuple[*tuple[str | int, ...], int | str]))
 
@@ -345,7 +345,7 @@ of the other.)
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 static_assert(is_disjoint_from(tuple[()], tuple[int]))
 static_assert(not is_disjoint_from(tuple[()], tuple[int, ...]))
@@ -429,7 +429,7 @@ The truthiness of the empty tuple is `False`.
 ```py
 from typing_extensions import assert_type, Literal
 from ty_extensions import static_assert, AlwaysFalsy
-from ty_extensions.internal import is_assignable_to
+from ty_extensions._internal import is_assignable_to
 
 assert_type(bool(()), Literal[False])
 
@@ -443,7 +443,7 @@ its content.
 ```py
 from typing_extensions import assert_type, Any, Literal
 from ty_extensions import static_assert, AlwaysTruthy
-from ty_extensions.internal import is_assignable_to
+from ty_extensions._internal import is_assignable_to
 
 assert_type(bool((False,)), Literal[True])
 assert_type(bool((False, False)), Literal[True])
@@ -462,7 +462,7 @@ non-empty tuples.
 ```py
 from typing_extensions import Any, Literal
 from ty_extensions import static_assert, AlwaysFalsy, AlwaysTruthy
-from ty_extensions.internal import is_assignable_to
+from ty_extensions._internal import is_assignable_to
 
 static_assert(not is_assignable_to(tuple[Any, ...], AlwaysFalsy))
 static_assert(not is_assignable_to(tuple[Any, ...], AlwaysTruthy))
@@ -507,7 +507,7 @@ An unspecialized tuple is equivalent to `tuple[Any, ...]` and `tuple[Unknown, ..
 ```py
 from typing_extensions import Any, assert_type
 from ty_extensions import Unknown, static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(tuple[Any, ...], tuple[Unknown, ...]))
 

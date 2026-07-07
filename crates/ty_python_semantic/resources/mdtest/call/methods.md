@@ -1019,7 +1019,7 @@ properties are understood correctly for these functions and methods.
 import types
 from typing import Any, Callable
 from ty_extensions import static_assert
-from ty_extensions.internal import RegularCallableTypeOf, TypeOf, is_assignable_to
+from ty_extensions._internal import RegularCallableTypeOf, TypeOf, is_assignable_to
 
 def f(obj: type) -> None: ...
 

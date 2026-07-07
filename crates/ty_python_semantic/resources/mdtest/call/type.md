@@ -55,7 +55,7 @@ Each `type()` call produces a distinct class type, even if they have the same na
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
 class Base: ...
 
@@ -299,7 +299,7 @@ Disjointness also works for `type[]` of dynamic classes:
 
 ```py
 from ty_extensions import static_assert
-from ty_extensions.internal import is_disjoint_from
+from ty_extensions._internal import is_disjoint_from
 
 # Dynamic classes with disjoint bases have disjoint type[] types.
 IntClass = type("IntClass", (int,), {})
@@ -591,7 +591,7 @@ cannot be resolved. `Unknown` is inserted into the MRO and `unsupported-dynamic-
 This gives exactly one diagnostic rather than cascading errors:
 
 ```py
-from ty_extensions.internal import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class Base:
     base_attr: int = 1
@@ -1080,7 +1080,7 @@ literal type but with `Unknown` in the MRO. This means instances are treated hig
 any attribute access returns `Unknown`:
 
 ```py
-from ty_extensions.internal import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class Base1: ...
 class Base2: ...
@@ -1120,7 +1120,7 @@ reveal_type(instance.attr)  # revealed: int
 Unpacking arguments with `*args` or `**kwargs`:
 
 ```py
-from ty_extensions.internal import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class Base: ...
 
@@ -1294,7 +1294,7 @@ Inheriting from a class that is itself a protocol is valid:
 
 ```py
 from typing import Protocol
-from ty_extensions.internal import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class MyProtocol(Protocol):
     def method(self) -> int: ...
@@ -1313,7 +1313,7 @@ Inheriting from a class that is itself a TypedDict is valid:
 
 ```py
 from typing_extensions import TypedDict
-from ty_extensions.internal import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class MyDict(TypedDict):
     name: str
@@ -1329,7 +1329,7 @@ reveal_mro(DictSubclass)  # revealed: (<class 'DictSubclass'>, <class 'MyDict'>,
 ```py
 # NamedTuple bases work but the dynamic subclass isn't recognized as a NamedTuple
 from typing import NamedTuple
-from ty_extensions.internal import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class Point(NamedTuple):
     x: int
@@ -1392,7 +1392,7 @@ DynamicChild = type("DynamicChild", (Base,), {}, required_arg="value")
 When the bases tuple is empty, the class implicitly inherits from `object`:
 
 ```py
-from ty_extensions.internal import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 EmptyBases = type("EmptyBases", (), {})
 reveal_type(EmptyBases)  # revealed: <class 'EmptyBases'>
