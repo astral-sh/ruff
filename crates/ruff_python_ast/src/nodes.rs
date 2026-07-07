@@ -3916,16 +3916,16 @@ mod tests {
     #[test]
     #[cfg(target_pointer_width = "64")]
     fn size() {
-        assert_eq!(std::mem::size_of::<Stmt>(), 96);
-        assert_eq!(std::mem::size_of::<StmtFunctionDef>(), 96);
-        assert_eq!(std::mem::size_of::<StmtClassDef>(), 88);
+        assert_eq!(std::mem::size_of::<Stmt>(), 88);
+        assert_eq!(std::mem::size_of::<StmtFunctionDef>(), 88);
+        assert_eq!(std::mem::size_of::<StmtClassDef>(), 80);
         assert_eq!(std::mem::size_of::<StmtTry>(), 64);
         assert_eq!(std::mem::size_of::<Mod>(), 32);
-        assert_eq!(std::mem::size_of::<Pattern>(), 80);
+        assert_eq!(std::mem::size_of::<Pattern>(), 72);
         assert_eq!(std::mem::size_of::<Parameters>(), 56);
         assert_eq!(std::mem::size_of::<Arguments>(), 40);
         assert_eq!(std::mem::size_of::<Expr>(), 72);
-        assert_eq!(std::mem::size_of::<ExprAttribute>(), 64);
+        assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
         assert_eq!(std::mem::size_of::<ExprAwait>(), 24);
         assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
         assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
@@ -3943,7 +3943,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprLambda>(), 32);
         assert_eq!(std::mem::size_of::<ExprList>(), 40);
         assert_eq!(std::mem::size_of::<ExprListComp>(), 48);
-        assert_eq!(std::mem::size_of::<ExprName>(), 40);
+        assert_eq!(std::mem::size_of::<ExprName>(), 32);
         assert_eq!(std::mem::size_of::<ExprNamed>(), 32);
         assert_eq!(std::mem::size_of::<ExprNoneLiteral>(), 12);
         assert_eq!(std::mem::size_of::<ExprNumberLiteral>(), 40);
