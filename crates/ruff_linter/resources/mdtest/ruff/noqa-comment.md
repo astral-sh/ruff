@@ -142,6 +142,8 @@ import math
 
 ## Inline comments
 
+### Basic
+
 ```py
 # snapshot: noqa-comment
 import math  # noqa: F401
@@ -162,6 +164,28 @@ help: Use `ruff:ignore` instead
   - import math  # noqa: F401
 2 + import math  # ruff:ignore[F401]
 3 |
+  |
+```
+
+### Nested pragma comment before the directive
+
+```py
+# snapshot: noqa-comment
+import math  # fmt:skip # noqa: F401
+```
+
+```snapshot
+error[RUF105]: `noqa` comment used instead of `ruff:ignore`
+ --> src/mdtest_snippet.py:2:25
+  |
+2 | import math  # fmt:skip # noqa: F401
+  |                         ^^^^^^^^^^^^
+  |
+help: Use `ruff:ignore` instead
+  |
+1 | # snapshot: noqa-comment
+  - import math  # fmt:skip # noqa: F401
+2 + import math  # fmt:skip # ruff:ignore[F401]
   |
 ```
 
