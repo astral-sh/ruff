@@ -469,6 +469,66 @@ def final_iterable(x: Payload | Literal["missing"], values: FinalIterable):
         reveal_type(x)  # revealed: Literal["missing"]
 ```
 
+### Inherited built-in containment
+
+A subclass that does not define `__contains__` uses the method inherited from its built-in base.
+Membership still checks the built-in container's stored items if the subclass changes `__iter__`. If
+the subclass, or an intermediate base, defines `__contains__`, its iterator annotation no longer
+describes membership and cannot be used to narrow:
+
+```py
+from collections.abc import Iterator
+from typing import Literal, TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+class MissingList(list[Literal["missing"]]): ...
+class MissingSet(set[Literal["missing"]]): ...
+class MissingFrozenSet(frozenset[Literal["missing"]]): ...
+class MissingDict(dict[Literal["missing"], object]): ...
+class MissingTuple(tuple[Literal["missing"], ...]): ...
+
+def inherited_builtin_contains(
+    x: Payload | Literal["missing"],
+    values: MissingList | MissingSet | MissingFrozenSet | MissingDict | MissingTuple,
+):
+    if x in values:
+        reveal_type(x)  # revealed: Literal["missing"]
+
+class OverridesBuiltinIteration(list[object]):
+    def __iter__(self) -> Iterator[Literal["missing"]]:
+        yield "missing"
+
+def overridden_iteration(
+    x: Payload | Literal["missing"],
+    values: OverridesBuiltinIteration,
+):
+    if x in values:
+        reveal_type(x)  # revealed: Payload | Literal["missing"]
+
+class ContainsEverythingList(list[Literal["missing"]]):
+    def __contains__(self, value: object) -> bool:
+        return True
+
+class InheritsCustomContains(ContainsEverythingList): ...
+
+def inherited_custom_contains(
+    x: Payload | Literal["missing"],
+    values: InheritsCustomContains,
+):
+    if x in values:
+        reveal_type(x)  # revealed: Payload | Literal["missing"]
+
+class ContainsNothingTuple(tuple[Literal[1]]):
+    def __contains__(self, value: object) -> bool:
+        return False
+
+def custom_tuple_not_in(x: Literal[1] | None, values: ContainsNothingTuple):
+    if x not in values:
+        reveal_type(x)  # revealed: Literal[1] | None
+```
+
 ## Assignment expression on the right-hand side
 
 A named expression around a tuple literal is still known to use tuple membership:
@@ -653,66 +713,6 @@ from typing import Literal
 def range_membership(value: Literal["x", 1], values: range) -> None:
     if value in values:
         reveal_type(value)  # revealed: Literal[1]
-```
-
-## Inherited built-in containment
-
-A subclass that does not define `__contains__` uses the method inherited from its built-in base.
-Membership still checks the built-in container's stored items if the subclass changes `__iter__`. If
-the subclass, or an intermediate base, defines `__contains__`, its iterator annotation no longer
-describes membership and cannot be used to narrow:
-
-```py
-from collections.abc import Iterator
-from typing import Literal, TypedDict
-
-class Payload(TypedDict):
-    value: int
-
-class MissingList(list[Literal["missing"]]): ...
-class MissingSet(set[Literal["missing"]]): ...
-class MissingFrozenSet(frozenset[Literal["missing"]]): ...
-class MissingDict(dict[Literal["missing"], object]): ...
-class MissingTuple(tuple[Literal["missing"], ...]): ...
-
-def inherited_builtin_contains(
-    x: Payload | Literal["missing"],
-    values: MissingList | MissingSet | MissingFrozenSet | MissingDict | MissingTuple,
-):
-    if x in values:
-        reveal_type(x)  # revealed: Literal["missing"]
-
-class OverridesBuiltinIteration(list[object]):
-    def __iter__(self) -> Iterator[Literal["missing"]]:
-        yield "missing"
-
-def overridden_iteration(
-    x: Payload | Literal["missing"],
-    values: OverridesBuiltinIteration,
-):
-    if x in values:
-        reveal_type(x)  # revealed: Payload | Literal["missing"]
-
-class ContainsEverythingList(list[Literal["missing"]]):
-    def __contains__(self, value: object) -> bool:
-        return True
-
-class InheritsCustomContains(ContainsEverythingList): ...
-
-def inherited_custom_contains(
-    x: Payload | Literal["missing"],
-    values: InheritsCustomContains,
-):
-    if x in values:
-        reveal_type(x)  # revealed: Payload | Literal["missing"]
-
-class ContainsNothingTuple(tuple[Literal[1]]):
-    def __contains__(self, value: object) -> bool:
-        return False
-
-def custom_tuple_not_in(x: Literal[1] | None, values: ContainsNothingTuple):
-    if x not in values:
-        reveal_type(x)  # revealed: Literal[1] | None
 ```
 
 ## `TypedDict` key membership
