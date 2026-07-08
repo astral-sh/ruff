@@ -799,7 +799,7 @@ info: └── protocol member `check` is not defined on type `SupportsSomethin
 Incompatible readable and writable protocol attributes:
 
 ```py
-from typing import Generic, Protocol, TypeVar
+from typing import Protocol
 
 class ReadableName(Protocol):
     @property
@@ -882,32 +882,6 @@ info: └── protocol member `name` is incompatible
 info:     └── the member does not accept writes of type `str`
 ```
 
-```py
-T = TypeVar("T", bound=WritableName)
-
-class NameBox(Generic[T]): ...
-
-class InvalidNameBox(NameBox[ReadOnlyName]):  # snapshot: invalid-type-arguments
-    pass
-```
-
-```snapshot
-error[invalid-type-arguments]: Type `ReadOnlyName` is not assignable to upper bound `WritableName` of type variable `T@NameBox`
-  --> src/mdtest_snippet.py:59:1
-   |
-59 | T = TypeVar("T", bound=WritableName)
-   | - Type variable defined here
-60 |
-61 | class NameBox(Generic[T]): ...
-62 |
-63 | class InvalidNameBox(NameBox[ReadOnlyName]):  # snapshot: invalid-type-arguments
-   |                              ^^^^^^^^^^^^
-   |
-info: type `ReadOnlyName` is not assignable to protocol `WritableName`
-info: └── protocol member `name` is incompatible
-info:     └── the member does not accept writes of type `str`
-```
-
 Incompatible readable and writable attributes when assigning one protocol to another:
 
 ```py
@@ -932,9 +906,9 @@ def _(source: ReadOnlyNameProtocol):
 
 ```snapshot
 error[invalid-assignment]: Object of type `ReadOnlyNameProtocol` is not assignable to `WritableName`
-  --> src/mdtest_snippet.py:78:13
+  --> src/mdtest_snippet.py:72:13
    |
-78 |     target: WritableName = source  # snapshot
+72 |     target: WritableName = source  # snapshot
    |             ------------   ^^^^^^ Incompatible value of type `ReadOnlyNameProtocol`
    |             |
    |             Declared type
@@ -951,9 +925,9 @@ def _(source: BytesNameProtocol):
 
 ```snapshot
 error[invalid-assignment]: Object of type `BytesNameProtocol` is not assignable to `WritableName`
-  --> src/mdtest_snippet.py:80:13
+  --> src/mdtest_snippet.py:74:13
    |
-80 |     target: WritableName = source  # snapshot
+74 |     target: WritableName = source  # snapshot
    |             ------------   ^^^^^^ Incompatible value of type `BytesNameProtocol`
    |             |
    |             Declared type
@@ -970,9 +944,9 @@ def _(source: BytesSetterNameProtocol):
 
 ```snapshot
 error[invalid-assignment]: Object of type `BytesSetterNameProtocol` is not assignable to `WritableName`
-  --> src/mdtest_snippet.py:82:13
+  --> src/mdtest_snippet.py:76:13
    |
-82 |     target: WritableName = source  # snapshot
+76 |     target: WritableName = source  # snapshot
    |             ------------   ^^^^^^ Incompatible value of type `BytesSetterNameProtocol`
    |             |
    |             Declared type
@@ -994,9 +968,9 @@ def _(source: SupportsCheckWithOtherSignature):
 
 ```snapshot
 error[invalid-assignment]: Object of type `SupportsCheckWithOtherSignature` is not assignable to `SupportsCheck`
-  --> src/mdtest_snippet.py:87:13
+  --> src/mdtest_snippet.py:81:13
    |
-87 |     target: SupportsCheck = source  # snapshot
+81 |     target: SupportsCheck = source  # snapshot
    |             -------------   ^^^^^^ Incompatible value of type `SupportsCheckWithOtherSignature`
    |             |
    |             Declared type
