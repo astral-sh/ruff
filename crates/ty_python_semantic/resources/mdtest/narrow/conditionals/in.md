@@ -191,6 +191,13 @@ def union_literal_haystack(x: Literal["a", "ab", "z"], flag: bool):
         reveal_type(x)  # revealed: Literal["a", "ab"]
     else:
         reveal_type(x)  # revealed: Literal["a", "ab", "z"]
+
+def mixed_literal_union_haystack(
+    x: Literal["a", "z", "missing"],
+    values: Literal["abc"] | tuple[Literal["z"]],
+):
+    if x in values:
+        reveal_type(x)  # revealed: Literal["a", "z"]
 ```
 
 ```py

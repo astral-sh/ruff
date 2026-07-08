@@ -72,6 +72,10 @@ impl<'db> Type<'db> {
 
         match ty {
             Type::Union(union) => {
+                // Combine elementwise containment for `not in`, ordinary `in` unions, and unions
+                // reached through wrappers such as type variables. Positive unions that contain
+                // string literals are distributed in `evaluate_expr_in` instead because substring
+                // semantics depend on the value of each literal haystack.
                 let mut builder = UnionBuilder::new(db);
                 let mut has_unknown_behavior = false;
                 for element in union.elements(db) {
@@ -2979,10 +2983,21 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
     fn evaluate_expr_in(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         let rhs_ty = rhs_ty.resolve_type_alias(self.db);
+
+        // The supported containers compare against their iterated elements, so union arms can be
+        // combined. String membership also accepts multi-character substrings, so evaluate literal
+        // haystacks separately, including when they occur in a union.
         if let Some(haystack) = rhs_ty.as_string_literal() {
             return narrow_string_membership(self.db, lhs_ty, haystack.value(self.db), true);
         }
-        if let Type::Union(union) = rhs_ty {
+        if let Type::Union(union) = rhs_ty
+            && union.elements(self.db).iter().any(|element| {
+                element
+                    .resolve_type_alias(self.db)
+                    .as_string_literal()
+                    .is_some()
+            })
+        {
             let mut builder = UnionBuilder::new(self.db);
             for element in union.elements(self.db) {
                 builder = builder.add(self.evaluate_expr_in(lhs_ty, *element)?);
