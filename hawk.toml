@@ -161,14 +161,6 @@ reason = "public formatter settings fields direct callers to this resolver"
 [[override]]
 lint = "hawk::unnecessary_public"
 crate = "ty_python_semantic"
-item = "semantic_model::SemanticModel::<'db>::scope"
-kind = "inherent_method"
-level = "expect"
-reason = "preserves the documented semantic-model scope navigation API"
-
-[[override]]
-lint = "hawk::unnecessary_public"
-crate = "ty_python_semantic"
 item = "types::set_theoretic::UnionType::<'db>::from_two_elements"
 kind = "inherent_method"
 level = "expect"
