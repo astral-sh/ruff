@@ -739,6 +739,10 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvalu
             self.3,
         )
     }
+
+    fn needs_recursive_identity(&self) -> bool {
+        self.0.needs_recursive_identity() || self.1.needs_recursive_identity()
+    }
 }
 
 impl<'db, 'c> HasRelationToVisitor<'db, 'c> {

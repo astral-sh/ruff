@@ -310,17 +310,35 @@ impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
+        let Some(generic_context) = self.generic_context(db) else {
+            return self.value_type(db).variance_of(db, typevar);
+        };
+
         // Infers the variance of the recursive alias's own type parameters from the raw RHS.
         // Applying alias specialization here would result in requesting the same `variance_of` query recursively.
-        if self.generic_context(db).is_some_and(|generic_context| {
-            generic_context
-                .variables(db)
-                .any(|alias_typevar| alias_typevar.identity(db) == typevar)
-        }) {
+        if generic_context
+            .variables(db)
+            .any(|alias_typevar| alias_typevar.identity(db) == typevar)
+        {
             return self.raw_value_type(db).variance_of(db, typevar);
         }
 
-        self.value_type(db).variance_of(db, typevar)
+        let raw_value_type = self.raw_value_type(db);
+        let specialization = self
+            .specialization(db)
+            .unwrap_or_else(|| generic_context.default_specialization(db, None));
+
+        // For external typevars, variance flows through the specialization arguments. Expanding
+        // the specialized alias body here can create ever-larger recursive alias applications.
+        generic_context
+            .variables(db)
+            .zip(specialization.types(db))
+            .map(|(alias_typevar, argument_ty)| {
+                raw_value_type
+                    .variance_of(db, alias_typevar.identity(db))
+                    .compose_thunk(|| argument_ty.variance_of(db, typevar))
+            })
+            .collect()
     }
 }
 
