@@ -505,6 +505,14 @@ enum SearchPathInner {
 pub struct SearchPath(Arc<SearchPathInner>);
 
 impl SearchPath {
+    /// Derives the module name a system path would have on this search path.
+    ///
+    /// The path need not exist. Returns `None` if the path is outside this search path, has an
+    /// unsupported extension, or cannot be represented as a Python module name.
+    pub fn module_name_for_system_path(&self, path: &SystemPath) -> Option<ModuleName> {
+        self.relativize_system_path(path)?.to_module_name()
+    }
+
     fn directory_path(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<SystemPathBuf> {
         if system.is_directory(&root) {
             Ok(root)
