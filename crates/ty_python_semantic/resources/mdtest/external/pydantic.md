@@ -1042,7 +1042,7 @@ Annotated attributes on mixin-classes that do not inherit from `BaseModel` also 
 model:
 
 ```py
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 class Mixin:
     mixin_field: bool
@@ -1050,9 +1050,9 @@ class Mixin:
 class MyModel(BaseModel, Mixin):
     model_field: bool
 
-# TODO: this should also include the field from the mixin
-# revealed: (self: MyModel, *, model_field: LaxBool, **extra: Any) -> None
+# revealed: (self: MyModel, *, mixin_field: LaxBool, model_field: LaxBool, **extra: Any) -> None
 reveal_type(MyModel.__init__)
+MyModel(model_field=True, mixin_field=False)
 ```
 
 ## Differences from dataclasses
