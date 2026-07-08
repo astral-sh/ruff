@@ -1736,13 +1736,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         // A legacy TypeVar's owner is inferred from its uses. When an enclosing generic context
         // is unavailable, a class variable can therefore look method-local. Restrict higher-rank
-        // comparison to PEP 695 variables lexically declared by this function.
+        // comparison to PEP 695 variables lexically declared by this function. A type variable
+        // used only inside a returned `Callable` is moved onto that callable's synthetic
+        // signature, but retains the enclosing function as its binding context.
         let has_higher_rank_target = target.generic_context.is_some_and(|context| {
             let mut typevars = context.variables(db);
             typevars.len() > 0
                 && typevars.all(|typevar| {
                     typevar.kind(db) == TypeVarKind::Pep695TypeVar
-                        && typevar.binding_context(db).definition() == target.definition
+                        && match target.definition {
+                            Some(definition) => {
+                                typevar.binding_context(db).definition() == Some(definition)
+                            }
+                            None => typevar
+                                .binding_context(db)
+                                .definition()
+                                .is_some_and(|definition| definition.kind(db).is_function_def()),
+                        }
                 })
         });
 

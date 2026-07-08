@@ -2905,6 +2905,7 @@ python-version = "3.12"
 ```
 
 ```py
+from collections.abc import Callable
 from typing import Any, Protocol
 from ty_extensions import static_assert
 from ty_extensions._internal import is_assignable_to, is_subtype_of
@@ -2927,6 +2928,23 @@ class GenericIdentity:
 # The source and target variables are distinct, but the two methods are alpha-equivalent.
 static_assert(is_assignable_to(GenericIdentity, IdentityProtocol))
 static_assert(is_subtype_of(GenericIdentity, IdentityProtocol))
+
+class CallableIdentityProtocol(Protocol):
+    def f[T](self) -> Callable[[T], T]: ...
+
+class IntCallableIdentity:
+    def f(self) -> Callable[[int], int]:
+        return lambda value: value
+
+class GenericCallableIdentity:
+    def f[S](self) -> Callable[[S], S]:
+        return lambda value: value
+
+# A target variable remains universally quantified when it appears in a nested callable.
+static_assert(not is_assignable_to(IntCallableIdentity, CallableIdentityProtocol))
+static_assert(not is_subtype_of(IntCallableIdentity, CallableIdentityProtocol))
+static_assert(is_assignable_to(GenericCallableIdentity, CallableIdentityProtocol))
+static_assert(is_subtype_of(GenericCallableIdentity, CallableIdentityProtocol))
 
 class AnyIdentity:
     def f(self, value: Any) -> Any:
