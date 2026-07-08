@@ -506,8 +506,8 @@ def wrapped_tuple(
 ## Type-variable containers
 
 A bound or constrained type variable can use its item type only if membership checks those items for
-every possible container. Both possible values of `ConstrainedTuple` use tuple containment, while
-`MixedContainers` also permits an open iterable that could define arbitrary containment behavior.
+every possible container. `BoundTuple` and both possible values of `ConstrainedTuple` use tuple
+containment.
 
 ```py
 from collections.abc import Iterator
@@ -537,6 +537,19 @@ def constrained_tuple(
 ) -> None:
     if value in values:
         reveal_type(value)  # revealed: Literal[1]
+```
+
+A constrained type variable remains conservative if any constraint has unknown containment behavior.
+`OpenIterable` is not final, so a subclass could define `__contains__` that accepts a `Token` even
+though iteration only yields `Literal[1]`. Because `MixedContainers` permits such an instance,
+membership does not narrow the tested value.
+
+```py
+from collections.abc import Iterator
+from typing import Literal, TypeVar, final
+
+@final
+class Token: ...
 
 class OpenIterable:
     def __iter__(self) -> Iterator[Literal[1]]:
