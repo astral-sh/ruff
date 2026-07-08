@@ -2975,18 +2975,19 @@ impl NodeId {
         }
     }
 
-    fn abstract_one_inner<'db>(
+    fn abstract_one_inner_with<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         should_remove: &mut dyn FnMut(ConstraintId) -> bool,
         path: &mut PathAssignments,
+        derived_node: impl Copy + Fn(ConstraintAssignment, usize) -> NodeId,
     ) -> Self {
         match self.node() {
             Node::AlwaysTrue => ALWAYS_TRUE,
             Node::AlwaysFalse => ALWAYS_FALSE,
             Node::Interior(interior) => {
-                interior.abstract_one_inner(db, builder, should_remove, path)
+                interior.abstract_one_inner_with(db, builder, should_remove, path, derived_node)
             }
         }
     }
@@ -4220,7 +4221,7 @@ impl InteriorNode {
             ty.as_typevar()
                 .is_some_and(|bound_typevar| bound_typevar.is_inferable(db, inferable))
         };
-        self.abstract_one_inner(
+        self.abstract_one_inner_raw(
             db,
             builder,
             // We only want to keep constraints on inferable typevars. If the constraint's typevar
@@ -4255,6 +4256,44 @@ impl InteriorNode {
         should_remove: &mut dyn FnMut(ConstraintId) -> bool,
         path: &mut PathAssignments,
     ) -> NodeId {
+        self.abstract_one_inner_with(
+            db,
+            builder,
+            should_remove,
+            path,
+            |assignment, source_order| assignment.to_derived_node(db, builder, source_order),
+        )
+    }
+
+    fn abstract_one_inner_raw<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        should_remove: &mut dyn FnMut(ConstraintId) -> bool,
+        path: &mut PathAssignments,
+    ) -> NodeId {
+        // Pruning non-inferable variables only needs to retain facts already derived by the
+        // sequent machinery. Rebuilding those facts would recursively re-run assignability checks
+        // without changing which variables remain in the solution.
+        self.abstract_one_inner_with(
+            db,
+            builder,
+            should_remove,
+            path,
+            |assignment, source_order| {
+                Node::new_satisfied_constraint(builder, assignment, source_order)
+            },
+        )
+    }
+
+    fn abstract_one_inner_with<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        should_remove: &mut dyn FnMut(ConstraintId) -> bool,
+        path: &mut PathAssignments,
+        derived_node: impl Copy + Fn(ConstraintAssignment, usize) -> NodeId,
+    ) -> NodeId {
         let self_interior = builder.interior_node_data(self.node());
         if should_remove(self_interior.constraint) {
             // If we should remove constraints involving this typevar, then we replace this node
@@ -4276,11 +4315,12 @@ impl InteriorNode {
                     self_interior.constraint.when_true(),
                     self_interior.source_order,
                     |path, new_range| {
-                        let branch = self_interior.if_true.abstract_one_inner(
+                        let branch = self_interior.if_true.abstract_one_inner_with(
                             db,
                             builder,
                             should_remove,
                             path,
+                            derived_node,
                         );
                         path.assignments[new_range]
                             .iter()
@@ -4290,10 +4330,7 @@ impl InteriorNode {
                                 !should_remove(assignment.constraint())
                             })
                             .fold(branch, |branch, (assignment, (source_order, _))| {
-                                branch.and(
-                                    builder,
-                                    assignment.to_derived_node(db, builder, *source_order),
-                                )
+                                branch.and(builder, derived_node(*assignment, *source_order))
                             })
                     },
                 )
@@ -4305,11 +4342,12 @@ impl InteriorNode {
                     self_interior.constraint.when_false(),
                     self_interior.source_order,
                     |path, new_range| {
-                        let branch = self_interior.if_false.abstract_one_inner(
+                        let branch = self_interior.if_false.abstract_one_inner_with(
                             db,
                             builder,
                             should_remove,
                             path,
+                            derived_node,
                         );
                         path.assignments[new_range]
                             .iter()
@@ -4319,10 +4357,7 @@ impl InteriorNode {
                                 !should_remove(assignment.constraint())
                             })
                             .fold(branch, |branch, (assignment, (source_order, _))| {
-                                branch.and(
-                                    builder,
-                                    assignment.to_derived_node(db, builder, *source_order),
-                                )
+                                branch.and(builder, derived_node(*assignment, *source_order))
                             })
                     },
                 )
@@ -4334,20 +4369,18 @@ impl InteriorNode {
                     self_interior.constraint.when_unconstrained(),
                     self_interior.source_order,
                     |path, new_range| {
-                        let branch = self_interior.if_uncertain.abstract_one_inner(
+                        let branch = self_interior.if_uncertain.abstract_one_inner_with(
                             db,
                             builder,
                             should_remove,
                             path,
+                            derived_node,
                         );
                         path.assignments[new_range]
                             .iter()
                             .filter(|(assignment, _)| !should_remove(assignment.constraint()))
                             .fold(branch, |branch, (assignment, (source_order, _))| {
-                                branch.and(
-                                    builder,
-                                    assignment.to_derived_node(db, builder, *source_order),
-                                )
+                                branch.and(builder, derived_node(*assignment, *source_order))
                             })
                     },
                 )
@@ -4362,9 +4395,13 @@ impl InteriorNode {
                     self_interior.constraint.when_true(),
                     self_interior.source_order,
                     |path, _| {
-                        self_interior
-                            .if_true
-                            .abstract_one_inner(db, builder, should_remove, path)
+                        self_interior.if_true.abstract_one_inner_with(
+                            db,
+                            builder,
+                            should_remove,
+                            path,
+                            derived_node,
+                        )
                     },
                 )
                 .unwrap_or(ALWAYS_FALSE);
@@ -4375,11 +4412,12 @@ impl InteriorNode {
                     self_interior.constraint.when_unconstrained(),
                     self_interior.source_order,
                     |path, _| {
-                        self_interior.if_uncertain.abstract_one_inner(
+                        self_interior.if_uncertain.abstract_one_inner_with(
                             db,
                             builder,
                             should_remove,
                             path,
+                            derived_node,
                         )
                     },
                 )
@@ -4391,9 +4429,13 @@ impl InteriorNode {
                     self_interior.constraint.when_false(),
                     self_interior.source_order,
                     |path, _| {
-                        self_interior
-                            .if_false
-                            .abstract_one_inner(db, builder, should_remove, path)
+                        self_interior.if_false.abstract_one_inner_with(
+                            db,
+                            builder,
+                            should_remove,
+                            path,
+                            derived_node,
+                        )
                     },
                 )
                 .unwrap_or(ALWAYS_FALSE);

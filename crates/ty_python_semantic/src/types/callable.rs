@@ -723,7 +723,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: CallableType<'db>,
         target: CallableType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if target.is_function_like(db) && !source.is_function_like(db) {
+        let source_kind = source.kind(db);
+        let target_kind = target.kind(db);
+        if target_kind == CallableTypeKind::FunctionLike
+            && source_kind != CallableTypeKind::FunctionLike
+        {
             return self.never();
         }
         // A `ParamSpecValue` is an inferred parameter-list witness, not a callable contract. Its
@@ -731,8 +735,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // spliced into a regular callable, ordinary higher-rank target comparison applies again.
         // Either operand can be a bound on the same inferred witness, so both directions use this
         // mode.
-        if source.kind(db) == CallableTypeKind::ParamSpecValue
-            || target.kind(db) == CallableTypeKind::ParamSpecValue
+        if source_kind == CallableTypeKind::ParamSpecValue
+            || target_kind == CallableTypeKind::ParamSpecValue
         {
             let source_signatures = source.signatures(db);
             let target_signatures = target.signatures(db);

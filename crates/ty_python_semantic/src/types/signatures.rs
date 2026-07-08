@@ -1732,15 +1732,26 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        // Most generic signatures use legacy TypeVars and retain the existing comparison. Check
+        // one variable before freshening so that path does not need to collect the entire context.
+        // The full context is validated below before entering higher-rank comparison.
+        let may_have_higher_rank_target = target.generic_context.is_some_and(|context| {
+            context.variables(db).next().is_some_and(|typevar| {
+                typevar.kind(db) == TypeVarKind::Pep695TypeVar
+                    && typevar.binding_context(db).definition() == target.definition
+            })
+        });
+
         // A generic signature can also carry inference variables from the call site. Those remain
         // existential; they are not callable-local binders introduced by the target signature.
-        // Classify them before freshening changes their identities.
-        let caller_inferable_count = target
-            .generic_context
-            .into_iter()
-            .flat_map(|context| context.variables(db))
-            .filter(|typevar| typevar.is_inferable(db, self.inferable))
-            .count();
+        // Classify them before freshening changes their identities, but only for a possible
+        // higher-rank target.
+        let caller_has_inferable = may_have_higher_rank_target
+            && target.generic_context.is_some_and(|context| {
+                context
+                    .variables(db)
+                    .any(|typevar| typevar.is_inferable(db, self.inferable))
+            });
 
         // Freshen callable-local typevars so variables from distinct signatures do not collide.
         // The relation below decides which fresh variables are inferable.
@@ -1769,15 +1780,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target
         };
 
+        if !may_have_higher_rank_target {
+            return self.check_signature_pair_infer_both(db, source, target);
+        }
+
         let target_typevars = target
             .generic_context
             .into_iter()
             .flat_map(|context| context.variables(db))
             .collect::<Vec<_>>();
-        if target_typevars.is_empty() || caller_inferable_count == target_typevars.len() {
-            return self.check_signature_pair_infer_both(db, source, target);
-        }
-        if caller_inferable_count > 0 {
+        if caller_has_inferable {
             // TODO: Partition caller-owned variables from callable-local variables, leaving the
             // former free while universally quantifying the latter.
             return self.check_signature_pair_infer_both(db, source, target);
