@@ -1715,6 +1715,7 @@ impl<'db> Bindings<'db> {
                         let init = get_argument_type("init", true);
                         let kw_only = get_argument_type("kw_only", true);
                         let alias = get_argument_type("alias", true);
+                        let validation_alias = get_argument_type("validation_alias", true);
                         let converter = get_argument_type("converter", true);
                         // `Field(strict=None)` inherits the model-global strictness configuration,
                         // so treat it like an unspecified field-level value.
@@ -1760,8 +1761,12 @@ impl<'db> Bindings<'db> {
                             None
                         };
 
-                        let alias = alias
+                        // A Pydantic validation alias takes precedence over the ordinary alias for
+                        // constructor input. `FieldInstance::alias` only models the constructor
+                        // parameter name, so the ordinary alias does not need to be retained here.
+                        let alias = validation_alias
                             .and_then(Type::as_string_literal)
+                            .or_else(|| alias.and_then(Type::as_string_literal))
                             .map(|literal| Box::from(literal.value(db)));
 
                         // Extract the first positional parameter type and the return type from the
