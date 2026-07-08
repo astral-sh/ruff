@@ -876,6 +876,29 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         self
     }
 
+    /// Returns whether gradual assignability makes this pair valid for every specialization of a
+    /// universally quantified type variable.
+    pub(super) fn is_gradual_assignability_with_universal_typevar(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> bool {
+        self.relation.is_assignability()
+            && match (source, target) {
+                (Type::Dynamic(_), Type::TypeVar(typevar))
+                | (Type::TypeVar(typevar), Type::Dynamic(_)) => {
+                    typevar.is_inferable(db, self.universally_quantified)
+                }
+                _ => false,
+            }
+    }
+
+    /// Returns whether this relation will be universally quantified over any type variables.
+    pub(super) const fn has_universally_quantified_typevars(&self) -> bool {
+        matches!(self.universally_quantified, InferableTypeVars::Some(_))
+    }
+
     pub(super) const fn is_eager_assignability(&self) -> bool {
         self.relation.is_assignability()
             && matches!(self.typevar_evaluation, TypeVarEvaluation::Eager)
@@ -1084,6 +1107,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .implies_subtype_of(db, self.constraints, source, target);
         }
 
+        if self.is_gradual_assignability_with_universal_typevar(db, source, target) {
+            return self.always();
+        }
+
         // With lazy evaluation, comparisons with a type variable are translated directly into a
         // constraint set.
         if self.typevar_evaluation == TypeVarEvaluation::Lazy {
@@ -1093,15 +1120,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // only has to hold when the typevar has a valid specialization (i.e., one that
             // satisfies the upper bound/constraints).
             if let Type::TypeVar(bound_typevar) = source {
-                // Dynamic types are assignable to every specialization of a universally
-                // quantified type variable. Existential type variables still need a constraint
-                // so that they can infer `Any` or `Unknown` from the comparison.
-                if self.relation.is_assignability()
-                    && target.is_dynamic()
-                    && bound_typevar.is_inferable(db, self.universally_quantified)
-                {
-                    return self.always();
-                }
                 let upper = if self.relation.is_subtyping() {
                     target.bottom_materialization(db)
                 } else {
@@ -1114,12 +1132,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     upper,
                 );
             } else if let Type::TypeVar(bound_typevar) = target {
-                if self.relation.is_assignability()
-                    && source.is_dynamic()
-                    && bound_typevar.is_inferable(db, self.universally_quantified)
-                {
-                    return self.always();
-                }
                 let lower = if self.relation.is_subtyping() {
                     source.top_materialization(db)
                 } else {

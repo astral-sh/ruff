@@ -2942,6 +2942,17 @@ static_assert(not is_subtype_of(AnyIdentity, IdentityProtocol))
 static_assert(is_assignable_to(UnknownIdentity, IdentityProtocol))
 static_assert(not is_subtype_of(UnknownIdentity, IdentityProtocol))
 
+class ListIdentityProtocol(Protocol):
+    def f[T](self, value: list[T]) -> list[T]: ...
+
+class AnyListIdentity:
+    def f(self, value: list[Any]) -> list[Any]:
+        return value
+
+# Gradual assignability also applies when the universal variable is nested in an invariant type.
+static_assert(is_assignable_to(AnyListIdentity, ListIdentityProtocol))
+static_assert(not is_subtype_of(AnyListIdentity, ListIdentityProtocol))
+
 class NestedListProtocol(Protocol):
     def f[T](self, value: list[T]) -> list[list[T]]: ...
 

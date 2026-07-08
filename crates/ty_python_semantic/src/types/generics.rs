@@ -1630,9 +1630,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // constraint. Constructing it directly avoids combinatorial path expansion when many
             // invariant specializations are combined in a union. Subtyping uses the gradual
             // type's materialization range, while assignability uses the type itself for both
-            // bounds.
+            // bounds. Higher-rank comparisons use the ordinary relation in both directions so
+            // that universal variables retain the full assignability semantics.
             (None, None, _) => {
                 if self.typevar_evaluation == TypeVarEvaluation::Lazy
+                    && !self.has_universally_quantified_typevars()
                     && let (Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar)) =
                         (source_type, target_type)
                     && !ty.is_type_var()
