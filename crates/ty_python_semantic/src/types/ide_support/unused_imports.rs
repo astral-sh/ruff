@@ -98,7 +98,7 @@ pub fn unused_imports(db: &dyn Db, file: File) -> Box<[UnusedImport]> {
                                 index
                                     .place_table(scope_id.file_scope_id(db))
                                     .members()
-                                    .filter_map(|member| member.first_attribute_name())
+                                    .filter_map(|member| member.leading_attribute_segments().next())
                             })
                             .collect()
                     })
@@ -588,10 +588,24 @@ mod tests {
     }
 
     #[test]
-    fn late_multipart_sibling_imports_are_credited_together() -> anyhow::Result<()> {
-        // Accepted false negative: a dotted use recorded before the import can't
-        // defer its path, so a later import list is credited without submodule
-        // matching.
+    fn reports_late_multipart_import_used_only_by_root() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            def f():
+                print(json)
+
+            import json.decoder
+
+            f()
+            "#,
+        )?;
+
+        assert_eq!(names, vec!["json.decoder"]);
+        Ok(())
+    }
+
+    #[test]
+    fn reports_unused_late_multipart_sibling_imports() -> anyhow::Result<()> {
         let names = UnusedImportTest::new().names(
             r#"
             def f():
@@ -603,7 +617,7 @@ mod tests {
             "#,
         )?;
 
-        assert_eq!(names, Vec::<String>::new());
+        assert_eq!(names, vec!["json.encoder"]);
         Ok(())
     }
 
@@ -1105,6 +1119,58 @@ mod tests {
 
             def f(x):
                 return x.os
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_class_scope_import_used_via_instance_variable() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            class C:
+                import os
+
+            c = C()
+            c.os.getcwd()
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_class_scope_import_used_via_subclass_instance() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            class C:
+                import os
+
+            class D(C):
+                pass
+
+            def f(d: D):
+                return d.os.getcwd()
+            "#,
+        )?;
+
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_class_scope_import_used_via_classmethod_cls() -> anyhow::Result<()> {
+        let names = UnusedImportTest::new().names(
+            r#"
+            class C:
+                import os
+
+                @classmethod
+                def m(cls):
+                    return cls.os.getcwd()
             "#,
         )?;
 
