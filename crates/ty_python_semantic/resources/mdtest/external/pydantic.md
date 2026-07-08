@@ -931,9 +931,9 @@ class Model(BaseModel):
 
 Model(int_list=IntList([1, 2, 3]))
 Model(int_list=[1, 2, 3])
+Model(int_list=["1", "2", "3"])
 
-# TODO: This should be an error
-Model(int_list=1)
+Model(int_list=1)  # error: [invalid-argument-type]
 ```
 
 ## Model configuration
