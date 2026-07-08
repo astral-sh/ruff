@@ -30,7 +30,7 @@ impl HintKind {
     pub fn message(&self) -> String {
         match self {
             Self::UnusedBinding(name) => format!("`{name}` is unused"),
-            Self::UnusedImport(name) => format!("Import `{name}` is not used"),
+            Self::UnusedImport(name) => format!("Import `{name}` is unused"),
             Self::UnreachableCode(UnreachableKind::Unconditional) => {
                 "Code is always unreachable".to_owned()
             }

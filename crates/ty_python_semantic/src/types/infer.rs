@@ -851,6 +851,16 @@ impl<'db> ScopeInference<'db> {
         self.extra.as_deref().map(|extra| &extra.diagnostics)
     }
 
+    /// The string annotations found in this region.
+    pub(crate) fn string_annotations(
+        &self,
+    ) -> impl Iterator<Item = ExpressionNodeKey> + use<'_, 'db> {
+        self.extra
+            .as_deref()
+            .into_iter()
+            .flat_map(|extra| extra.string_annotations.iter().copied())
+    }
+
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
         self.try_expression_type(expression)
             .unwrap_or_else(Type::unknown)
@@ -1268,6 +1278,14 @@ impl<'db> DefinitionInferenceExtra<'db> {
             _ => None,
         }
     }
+
+    fn string_annotations(&self) -> Option<&FrozenSet<ExpressionNodeKey>> {
+        match self {
+            Self::StringAnnotations(string_annotations) => Some(string_annotations),
+            Self::Other(extra) => Some(&extra.string_annotations),
+            _ => None,
+        }
+    }
 }
 
 impl<'db> DefinitionInference<'db> {
@@ -1467,6 +1485,27 @@ impl<'db> DefinitionInference<'db> {
         match self.extra.as_deref() {
             Some(DefinitionInferenceExtra::Other(extra)) => extra.cycle_recovery,
             Some(_) | None => None,
+        }
+    }
+
+    /// The string annotations found in this region.
+    pub(crate) fn string_annotations(
+        &self,
+    ) -> impl Iterator<Item = ExpressionNodeKey> + use<'_, 'db> {
+        self.extra
+            .as_deref()
+            .and_then(DefinitionInferenceExtra::string_annotations)
+            .into_iter()
+            .flat_map(|string_annotations| string_annotations.iter().copied())
+    }
+
+    /// The definitions in this region that have deferred parts.
+    pub(crate) fn deferred_definitions(&self) -> &[Definition<'db>] {
+        match self.extra.as_deref() {
+            Some(DefinitionInferenceExtra::Deferred(deferred)) => deferred,
+            Some(DefinitionInferenceExtra::DeferredAndUndecorated(extra)) => &extra.deferred,
+            Some(DefinitionInferenceExtra::Other(extra)) => &extra.deferred,
+            Some(_) | None => &[],
         }
     }
 
