@@ -1855,46 +1855,49 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
                 let qualified_name_opt = self.semantic.resolve_qualified_name(func);
 
-                if let Some(qualified_name) = &qualified_name_opt {
-                    let name_str = qualified_name.to_string();
-                    if let Some(args) = self.settings().extend_type_form_callables.get(&name_str) {
-                        for (i, arg) in arguments.iter_source_order().enumerate() {
-                            let mut is_type_form = false;
-                            for target in args {
-                                if let Some(pos) = target.position {
-                                    if i == pos && matches!(arg, ArgOrKeyword::Arg(_)) {
-                                        is_type_form = true;
+                if !self.settings().extend_type_form_callables.is_empty() {
+                    if let Some(qualified_name) = &qualified_name_opt {
+                        for (name_str, args) in &self.settings().extend_type_form_callables {
+                            if qualified_name.segments().iter().copied().eq(name_str.split('.')) {
+                                for (i, arg) in arguments.iter_source_order().enumerate() {
+                                    let mut is_type_form = false;
+                                    for target in args {
+                                        if let Some(pos) = target.position {
+                                            if i == pos && matches!(arg, ArgOrKeyword::Arg(_)) {
+                                                is_type_form = true;
+                                            }
+                                        }
+                                        if let Some(kw) = &target.name {
+                                            if let ArgOrKeyword::Keyword(Keyword {
+                                                arg: Some(id), ..
+                                            }) = arg
+                                            {
+                                                if id.as_str() == kw.as_str() {
+                                                    is_type_form = true;
+                                                }
+                                            }
+                                        }
                                     }
-                                }
-                                if let Some(kw) = &target.name {
-                                    if let ArgOrKeyword::Keyword(Keyword {
-                                        arg: Some(id), ..
-                                    }) = arg
-                                    {
-                                        if id.as_str() == kw.as_str() {
-                                            is_type_form = true;
+                                    match arg {
+                                        ArgOrKeyword::Arg(arg) => {
+                                            if is_type_form {
+                                                self.visit_type_definition(arg);
+                                            } else {
+                                                self.visit_non_type_definition(arg);
+                                            }
+                                        }
+                                        ArgOrKeyword::Keyword(Keyword { value, .. }) => {
+                                            if is_type_form {
+                                                self.visit_type_definition(value);
+                                            } else {
+                                                self.visit_non_type_definition(value);
+                                            }
                                         }
                                     }
                                 }
-                            }
-                            match arg {
-                                ArgOrKeyword::Arg(arg) => {
-                                    if is_type_form {
-                                        self.visit_type_definition(arg);
-                                    } else {
-                                        self.visit_non_type_definition(arg);
-                                    }
-                                }
-                                ArgOrKeyword::Keyword(Keyword { value, .. }) => {
-                                    if is_type_form {
-                                        self.visit_type_definition(value);
-                                    } else {
-                                        self.visit_non_type_definition(value);
-                                    }
-                                }
+                                return;
                             }
                         }
-                        return;
                     }
                 }
 
