@@ -6541,16 +6541,20 @@ impl PathAssignments {
                 entry.insert((source_order, history));
             }
             Entry::Occupied(mut entry) => {
+                let index = entry.index();
+                let (existing_source_order, existing_history) = entry.get_mut();
+
                 // If a constraint appears both as an "origin" constraint (it actually appears in
                 // the BDD structure) and as a "derived" constraint (we infer it from other
                 // constraints), we should prefer the origin source_order, regardless of which
                 // order we encounter the various constraints in the BDD.
                 if !derived {
-                    entry.get_mut().0 = source_order;
+                    *existing_source_order = source_order;
                 }
 
-                let index = entry.index();
-                if entry.get().1 == history
+                // If we've already seen this assignment with this same substitution history, we
+                // don't need to process it again.
+                if *existing_history == history
                     || !self
                         .additional_substitution_histories
                         .insert((index, history))
