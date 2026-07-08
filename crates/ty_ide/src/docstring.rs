@@ -1815,71 +1815,35 @@ mod tests {
         let param_docs_mac = docstring_mac.parameter_documentation();
         let param_docs_unix = docstring_unix.parameter_documentation();
 
-        // All should produce the same results
+        assert_eq!(param_docs_mac, param_docs_windows);
+        assert_eq!(param_docs_unix, param_docs_windows);
         assert_eq!(param_docs_windows.len(), 2);
-        assert_eq!(param_docs_mac.len(), 2);
-        assert_eq!(param_docs_unix.len(), 2);
-
         assert_eq!(
             param_docs_windows.get("param1"),
             Some(&"The first parameter".to_string())
         );
-        assert_eq!(
-            param_docs_mac.get("param1"),
-            Some(&"The first parameter".to_string())
-        );
-        assert_eq!(
-            param_docs_unix.get("param1"),
-            Some(&"The first parameter".to_string())
-        );
 
-        assert_snapshot!(docstring_windows.render_plaintext(), @"
+        let plaintext = docstring_windows.render_plaintext();
+        assert_snapshot!(plaintext.as_str(), @"
         This is a function description.
 
         Args:
             param1 (str): The first parameter
             param2 (int): The second parameter
         ");
+        assert_eq!(docstring_mac.render_plaintext(), plaintext);
+        assert_eq!(docstring_unix.render_plaintext(), plaintext);
 
-        assert_snapshot!(docstring_windows.render_markdown(), @"
+        let markdown = docstring_windows.render_markdown();
+        assert_snapshot!(markdown.as_str(), @"
         This is a function description.<HB>
         <HB>
         Args:<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
         ");
-
-        assert_snapshot!(docstring_mac.render_plaintext(), @"
-        This is a function description.
-
-        Args:
-            param1 (str): The first parameter
-            param2 (int): The second parameter
-        ");
-
-        assert_snapshot!(docstring_mac.render_markdown(), @"
-        This is a function description.<HB>
-        <HB>
-        Args:<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
-        ");
-
-        assert_snapshot!(docstring_unix.render_plaintext(), @"
-        This is a function description.
-
-        Args:
-            param1 (str): The first parameter
-            param2 (int): The second parameter
-        ");
-
-        assert_snapshot!(docstring_unix.render_markdown(), @"
-        This is a function description.<HB>
-        <HB>
-        Args:<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
-        ");
+        assert_eq!(docstring_mac.render_markdown(), markdown);
+        assert_eq!(docstring_unix.render_markdown(), markdown);
     }
 
     // Regression test: a doctest followed by a literal block with blank lines inside.
