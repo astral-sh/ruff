@@ -244,6 +244,22 @@ Ts_Inferred = TypeVarTuple("Ts_Inferred", infer_variance=True)
 
 ## Generic Classes
 
+### Multiple `TypeVarTuple`s
+
+```py
+from typing import Generic, TypeVarTuple
+
+Xs = TypeVarTuple("Xs")
+Ys = TypeVarTuple("Ys")
+Zs = TypeVarTuple("Zs")
+
+# error: [invalid-generic-class] "Only one `TypeVarTuple` parameter is allowed in a `Generic` subscription"
+class Ambiguous(Generic[*Xs, *Ys]): ...
+
+# error: [invalid-generic-class] "Only one `TypeVarTuple` parameter is allowed in a `Generic` subscription"
+class VeryAmbiguous(Generic[*Xs, *Ys, *Zs]): ...
+```
+
 ### Explicit specialization
 
 ```py

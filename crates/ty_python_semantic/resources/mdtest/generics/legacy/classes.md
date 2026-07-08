@@ -1168,7 +1168,8 @@ class Quux(Generic[Unpack[Ts], T]): ...
 # TODO: should emit [invalid-type-variable-default]
 class Corge(Generic[Unpack[Us], P]): ...
 
-# TODO: should emit [invalid-type-variable-default]
+# TODO: should also emit [invalid-type-variable-default]
+# error: [invalid-generic-class] "Only one `TypeVarTuple` parameter is allowed in a `Generic` subscription"
 class Grault(Generic[Unpack[Us], Unpack[Ts2]]): ...
 
 # These are fine:

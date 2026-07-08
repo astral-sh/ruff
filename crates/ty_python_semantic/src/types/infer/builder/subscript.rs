@@ -1355,15 +1355,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::SpecialForm(SpecialFormType::Protocol) => Some(LegacyGenericOrigin::Protocol),
             _ => None,
         } {
-            let has_invalid_unpack_argument = match subscript.slice.as_ref() {
-                ast::Expr::Tuple(tuple) => tuple.elts.iter().any(|argument| {
-                    self.type_expression_flags(argument)
-                        .contains(TypeExpressionFlags::INVALID_UNPACK)
-                }),
-                argument => self
-                    .type_expression_flags(argument)
-                    .contains(TypeExpressionFlags::INVALID_UNPACK),
+            let arguments = if let ast::Expr::Tuple(tuple) = subscript.slice.as_ref() {
+                &*tuple.elts
+            } else {
+                std::slice::from_ref(subscript.slice.as_ref())
             };
+            let has_invalid_unpack_argument = arguments.iter().any(|argument| {
+                self.type_expression_flags(argument)
+                    .contains(TypeExpressionFlags::INVALID_UNPACK)
+            });
+            let is_unpacked_typevartuple = |argument: &ast::Expr| {
+                let is_unpack = argument.is_starred_expr()
+                    || matches!(
+                        argument,
+                        ast::Expr::Subscript(subscript)
+                            if self.expression_type(&subscript.value)
+                                == Type::SpecialForm(SpecialFormType::Unpack)
+                    );
+                let argument_ty = self.expression_type(argument);
+                is_unpack
+                    && (matches!(
+                        argument_ty,
+                        Type::TypeVar(typevar) if typevar.is_typevartuple(db)
+                    ) || matches!(
+                        argument_ty.exact_tuple_instance_spec(db).as_deref(),
+                        Some(Tuple::Variable(variable))
+                            if variable.variable().typevartuple().is_some()
+                    ))
+            };
+            // A tuple type can preserve only one variable segment, so count unpacked
+            // `TypeVarTuple`s before the argument tuple is lowered to its type.
+            let has_multiple_typevartuple_arguments = arguments
+                .iter()
+                .filter(|argument| is_unpacked_typevartuple(argument))
+                .nth(1)
+                .is_some();
             if has_invalid_unpack_argument {
                 let error = SubscriptError::new(
                     Type::unknown(),
@@ -1371,6 +1397,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         origin,
                         argument_ty: Type::SpecialForm(SpecialFormType::Unpack),
                     },
+                );
+                error.report_diagnostics(&self.context, subscript);
+                return error.result_type();
+            }
+            if has_multiple_typevartuple_arguments {
+                let error = SubscriptError::new(
+                    Type::unknown(),
+                    SubscriptErrorKind::MultipleTypeVarTuples { origin },
                 );
                 error.report_diagnostics(&self.context, subscript);
                 return error.result_type();
