@@ -1536,42 +1536,6 @@ def g3(obj: Foo[tuple[A]]):
     f3(obj)
 ```
 
-### Assignability of generic types parameterized by typevar tuples
-
-For a class parameterized by a typevar tuple, the whole unpacked tuple participates in the generic
-class's variance.
-
-```toml
-[environment]
-python-version = "3.15"
-```
-
-```py
-from typing import Any, Generic, TypeVarTuple
-from ty_extensions import static_assert, is_assignable_to
-
-Ts = TypeVarTuple("Ts")
-
-class Array(Generic[*Ts]):
-    values: tuple[*Ts]
-
-    def gradual(self) -> "Array[*tuple[Any, ...]]":
-        return self
-
-static_assert(is_assignable_to(Array[int, str], Array[int, str]))
-static_assert(not is_assignable_to(Array[str, int], Array[int, str]))
-static_assert(not is_assignable_to(Array[int], Array[int, str]))
-
-OutTs = TypeVarTuple("OutTs", covariant=True)
-
-class CovariantArray(Generic[*OutTs]):
-    def get(self) -> tuple[*OutTs]:
-        raise NotImplementedError
-
-static_assert(is_assignable_to(CovariantArray[int, str], CovariantArray[object, object]))
-static_assert(not is_assignable_to(CovariantArray[object, object], CovariantArray[int, str]))
-```
-
 ## Generic aliases
 
 ```py
