@@ -56,7 +56,7 @@ use crate::types::signatures::{
     CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
     PartialApplication, PartialSignatureApplication,
 };
-use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
+use crate::types::tuple::{TupleLength, TupleSpec, TupleType, VariableSegment};
 use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
 use crate::types::visitor::{
@@ -4546,7 +4546,11 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 length: TupleLength,
                 variable_element: Option<Type<'db>>,
             },
-            Other(Cow<'db, TupleSpec<'db>>),
+            Other {
+                argument_types: Vec<Type<'db>>,
+                length: TupleLength,
+                variable_element: Option<Type<'db>>,
+            },
             None,
         }
 
@@ -4589,14 +4593,14 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                         let any_variable = tuple_specs.iter().any(|s| s.len().is_variable());
                         let max_elements = tuple_specs
                             .iter()
-                            .map(|s| s.all_elements().len())
+                            .map(|s| s.iter_element_types(db).count())
                             .max()
                             .unwrap_or(0);
 
                         let variable_element = {
                             let var_types: Vec<_> = tuple_specs
                                 .iter()
-                                .filter_map(|s| s.variable_element().copied())
+                                .filter_map(|s| s.variable_element_type(db))
                                 .collect();
                             if var_types.is_empty() {
                                 None
@@ -4631,7 +4635,14 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                             variable_element,
                         }
                     }
-                    _ => VariadicArgumentType::Other(argument_type.iterate(db)),
+                    _ => {
+                        let tuple = argument_type.iterate(db);
+                        VariadicArgumentType::Other {
+                            argument_types: tuple.iter_element_types(db).collect(),
+                            length: tuple.len(),
+                            variable_element: tuple.variable_element_type(db),
+                        }
+                    }
                 },
             },
             None => VariadicArgumentType::None,
@@ -4646,11 +4657,11 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 length,
                 variable_element,
             } => (argument_types.as_slice(), *length, *variable_element),
-            VariadicArgumentType::Other(tuple) => (
-                tuple.all_elements(),
-                tuple.len(),
-                tuple.variable_element().copied(),
-            ),
+            VariadicArgumentType::Other {
+                argument_types,
+                length,
+                variable_element,
+            } => (argument_types.as_slice(), *length, *variable_element),
             VariadicArgumentType::None => ([].as_slice(), TupleLength::unknown(), None),
         };
 
@@ -5333,7 +5344,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         Some(TupleSpec::Variable(variable))
                             if matches!(
                                 variable.variable(),
-                                Type::TypeVar(typevar) if typevar.is_typevartuple(self.db)
+                                VariableSegment::TypeVarTuple(_)
                             )
                     ))
                 {

@@ -32,7 +32,7 @@ use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
 };
-use crate::types::tuple::{Tuple, TupleType};
+use crate::types::tuple::{Tuple, TupleType, VariableSegment};
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
 use crate::types::typevar::max_typevar_freshness_matching_generic_context;
 use crate::types::{
@@ -3152,9 +3152,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                         target_index,
                                         source_parameter.name(),
                                     );
-                                    context.push(ErrorContext::ExtraRequiredParameter {
-                                        parameter,
-                                    });
+                                    context
+                                        .push(ErrorContext::ExtraRequiredParameter { parameter });
                                 }
                                 return self.never();
                             }
@@ -4362,9 +4361,14 @@ impl<'db> Parameters<'db> {
                             .name()
                             .cloned()
                             .unwrap_or_else(|| Name::new_static("args"));
-                        parameters.push(
-                            Parameter::variadic(name).with_annotated_type(variable.variable()),
-                        );
+                        parameters.push(Parameter::variadic(name).with_annotated_type(
+                            match variable.variable() {
+                                VariableSegment::Homogeneous(element) => element,
+                                VariableSegment::TypeVarTuple(typevartuple) => {
+                                    Type::TypeVar(typevartuple)
+                                }
+                            },
+                        ));
                         parameters.extend(
                             variable
                                 .iter_suffix_elements()

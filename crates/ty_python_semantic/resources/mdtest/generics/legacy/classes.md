@@ -38,13 +38,13 @@ reveal_type(generic_context(SingleParamSpec))
 # revealed: ty_extensions._internal.GenericContext[P@TypeVarAndParamSpec, T@TypeVarAndParamSpec]
 reveal_type(generic_context(TypeVarAndParamSpec))
 
-# revealed: ty_extensions.GenericContext[Ts@SingleTypeVarTuple]
+# revealed: ty_extensions._internal.GenericContext[Ts@SingleTypeVarTuple]
 reveal_type(generic_context(SingleTypeVarTuple))
-# revealed: ty_extensions.GenericContext[T@TypeVarAndTypeVarTuple, Ts@TypeVarAndTypeVarTuple]
+# revealed: ty_extensions._internal.GenericContext[T@TypeVarAndTypeVarTuple, Ts@TypeVarAndTypeVarTuple]
 reveal_type(generic_context(TypeVarAndTypeVarTuple))
-# revealed: ty_extensions.GenericContext[Ts@StarredSingleTypeVarTuple]
+# revealed: ty_extensions._internal.GenericContext[Ts@StarredSingleTypeVarTuple]
 reveal_type(generic_context(StarredSingleTypeVarTuple))
-# revealed: ty_extensions.GenericContext[T@StarredTypeVarAndTypeVarTuple, Ts@StarredTypeVarAndTypeVarTuple]
+# revealed: ty_extensions._internal.GenericContext[T@StarredTypeVarAndTypeVarTuple, Ts@StarredTypeVarAndTypeVarTuple]
 reveal_type(generic_context(StarredTypeVarAndTypeVarTuple))
 ```
 

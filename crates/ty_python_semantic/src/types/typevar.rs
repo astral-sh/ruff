@@ -582,11 +582,16 @@ impl<'db> TypeVarInstance<'db> {
                 Type::NominalInstance(nominal_instance) => nominal_instance
                     .own_tuple_spec(db)
                     .map_or_else(Parameters::unknown, |tuple_spec| {
-                        Parameters::standard(
-                            tuple_spec
-                                .iter_all_elements()
-                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
-                        )
+                        match tuple_spec.as_ref() {
+                            Tuple::Fixed(tuple) => {
+                                Parameters::standard(tuple.iter_all_elements().map(|ty| {
+                                    Parameter::positional_only(None).with_annotated_type(ty)
+                                }))
+                            }
+                            // A `ParamSpec` default cannot contain a variable-length tuple, so this
+                            // branch only recovers from an invalid type expression.
+                            Tuple::Variable(_) => Parameters::unknown(),
+                        }
                     }),
                 Type::Dynamic(dynamic) => match dynamic {
                     DynamicType::Todo(_) => Parameters::todo(),

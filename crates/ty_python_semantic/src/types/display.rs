@@ -27,7 +27,7 @@ use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, ParametersKind, Signature,
 };
-use crate::types::tuple::TupleSpec;
+use crate::types::tuple::{TupleSpec, VariableSegment};
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
@@ -1528,30 +1528,6 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
             // S is included if there is either a prefix or a suffix. The initial `tuple[` and
             // trailing `]` are printed elsewhere. The `yyy, ...` is printed no matter what.)
             TupleSpec::Variable(tuple) => {
-                if let Type::TypeVar(typevar) = tuple.variable()
-                    && typevar.is_typevartuple(self.db)
-                {
-                    if !tuple.prefix_elements().is_empty() {
-                        tuple
-                            .prefix_elements()
-                            .display_with(self.db, self.settings.singleline())
-                            .fmt_detailed(f)?;
-                        f.write_str(", ")?;
-                    }
-                    f.write_char('*')?;
-                    Type::TypeVar(typevar)
-                        .display_with(self.db, self.settings.singleline())
-                        .fmt_detailed(f)?;
-                    if !tuple.suffix_elements().is_empty() {
-                        f.write_str(", ")?;
-                        tuple
-                            .suffix_elements()
-                            .display_with(self.db, self.settings.singleline())
-                            .fmt_detailed(f)?;
-                    }
-                    f.write_str("]")?;
-                    return Ok(());
-                }
                 if !tuple.prefix_elements().is_empty() {
                     tuple
                         .prefix_elements()
@@ -1559,20 +1535,33 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                         .fmt_detailed(f)?;
                     f.write_str(", ")?;
                 }
-                if !tuple.prefix_elements().is_empty() || !tuple.suffix_elements().is_empty() {
-                    f.write_char('*')?;
-                    // Might as well link the type again here too
-                    f.with_type(KnownClass::Tuple.to_class_literal(self.db))
-                        .write_str("tuple")?;
-                    f.write_char('[')?;
-                }
-                tuple
-                    .variable()
-                    .display_with(self.db, self.settings.singleline())
-                    .fmt_detailed(f)?;
-                f.write_str(", ...")?;
-                if !tuple.prefix_elements().is_empty() || !tuple.suffix_elements().is_empty() {
-                    f.write_str("]")?;
+                match tuple.variable() {
+                    VariableSegment::TypeVarTuple(typevar) => {
+                        f.write_char('*')?;
+                        Type::TypeVar(typevar)
+                            .display_with(self.db, self.settings.singleline())
+                            .fmt_detailed(f)?;
+                    }
+                    VariableSegment::Homogeneous(variable) => {
+                        if !tuple.prefix_elements().is_empty()
+                            || !tuple.suffix_elements().is_empty()
+                        {
+                            f.write_char('*')?;
+                            // Might as well link the type again here too
+                            f.with_type(KnownClass::Tuple.to_class_literal(self.db))
+                                .write_str("tuple")?;
+                            f.write_char('[')?;
+                        }
+                        variable
+                            .display_with(self.db, self.settings.singleline())
+                            .fmt_detailed(f)?;
+                        f.write_str(", ...")?;
+                        if !tuple.prefix_elements().is_empty()
+                            || !tuple.suffix_elements().is_empty()
+                        {
+                            f.write_str("]")?;
+                        }
+                    }
                 }
                 if !tuple.suffix_elements().is_empty() {
                     f.write_str(", ")?;

@@ -22,7 +22,7 @@ use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
 use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
-use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType};
+use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::{
     BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
@@ -717,14 +717,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     && let Tuple::Variable(variable) = tuple.as_ref()
                     && variable.prefix_elements().is_empty()
                     && variable.suffix_elements().is_empty()
-                    && !matches!(
-                        variable.variable(),
-                        Type::TypeVar(typevar) if typevar.is_typevartuple(db)
-                    )
+                    && let Some(variable_type) = variable.variable().homogeneous_type()
                 {
                     tuple_builder = tuple_builder.concat(db, &tuple);
                     packed.push(TypeArgument {
-                        ty: Some(variable.variable()),
+                        ty: Some(variable_type),
                         ..*type_argument
                     });
                 } else if is_unpack
@@ -734,10 +731,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ) || matches!(
                         provided_type.exact_tuple_instance_spec(db).as_deref(),
                         Some(Tuple::Variable(variable))
-                            if matches!(
-                                variable.variable(),
-                                Type::TypeVar(typevar) if typevar.is_typevartuple(db)
-                            )
+                            if variable.variable().typevartuple().is_some()
                     ))
                 {
                     if let Some(builder) = self
@@ -803,14 +797,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         && let Tuple::Variable(variable) = tuple.as_ref()
                         && variable.prefix_elements().is_empty()
                         && variable.suffix_elements().is_empty()
-                        && !matches!(
-                            variable.variable(),
-                            Type::TypeVar(typevar) if typevar.is_typevartuple(db)
-                        )
+                        && let Some(variable_type) = variable.variable().homogeneous_type()
                     {
                         tuple_builder = tuple_builder.concat(db, &tuple);
                         packed_suffix.push(TypeArgument {
-                            ty: Some(variable.variable()),
+                            ty: Some(variable_type),
                             ..*type_argument
                         });
                     } else if is_unpack
@@ -820,10 +811,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ) || matches!(
                             provided_type.exact_tuple_instance_spec(db).as_deref(),
                             Some(Tuple::Variable(variable))
-                                if matches!(
-                                    variable.variable(),
-                                    Type::TypeVar(typevar) if typevar.is_typevartuple(db)
-                                )
+                                if variable.variable().typevartuple().is_some()
                         ))
                     {
                         if let Some(builder) = self
@@ -2340,9 +2328,7 @@ fn legacy_generic_class_context<'db>(
         match tuple_spec {
             Tuple::Fixed(typevars) => typevars.elements_slice(),
             Tuple::Variable(variable) => {
-                if let Type::TypeVar(typevartuple) = variable.variable()
-                    && typevartuple.is_typevartuple(db)
-                {
+                if let VariableSegment::TypeVarTuple(typevartuple) = variable.variable() {
                     unpacked_typevars = variable
                         .iter_prefix_elements()
                         .chain(std::iter::once(Type::TypeVar(typevartuple)))

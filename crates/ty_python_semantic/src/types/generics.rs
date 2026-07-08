@@ -20,7 +20,9 @@ use crate::types::relation::{
     TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
-use crate::types::tuple::{TupleSpec, TupleSpecBuilder, TupleType, walk_tuple_type};
+use crate::types::tuple::{
+    TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
+};
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
@@ -3151,8 +3153,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     actual_nominal.tuple_spec(self.db),
                 ) {
                     if let TupleSpec::Variable(formal_variable) = formal_tuple.as_ref()
-                        && let Type::TypeVar(typevartuple) = formal_variable.variable()
-                        && typevartuple.is_typevartuple(self.db)
+                        && let VariableSegment::TypeVarTuple(typevartuple) =
+                            formal_variable.variable()
                     {
                         let formal_prefix_len = formal_variable.prefix_elements().len();
                         let formal_suffix_len = formal_variable.suffix_elements().len();
@@ -3188,7 +3190,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 let suffix_start = actual_suffix_elements.len() - formal_suffix_len;
                                 (
                                     &actual_prefix_elements[..formal_prefix_len],
-                                    Type::tuple(TupleType::mixed(
+                                    Type::tuple(TupleType::mixed_with_segment(
                                         self.db,
                                         actual_prefix_elements[formal_prefix_len..].iter().copied(),
                                         actual.variable(),
@@ -3225,12 +3227,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         return Ok(());
                     };
                     for (formal_element, actual_element) in formal_tuple
-                        .all_elements()
-                        .iter()
-                        .zip(actual_tuple.all_elements())
+                        .iter_element_types(self.db)
+                        .zip(actual_tuple.iter_element_types(self.db))
                     {
                         let variance = TypeVarVariance::Covariant.compose(polarity);
-                        self.infer_map_impl(*formal_element, *actual_element, variance, seen)?;
+                        self.infer_map_impl(formal_element, actual_element, variance, seen)?;
                     }
                     return Ok(());
                 }

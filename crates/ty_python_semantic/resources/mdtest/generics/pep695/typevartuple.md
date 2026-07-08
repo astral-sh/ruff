@@ -233,6 +233,19 @@ def f(i: int, s: str, b: bool, t: tuple[int, str], vt: tuple[int, ...]) -> None:
     reveal_type(simple(*t))  # revealed: tuple[Unknown, ...]
 ```
 
+### Assignability to fixed-length tuples
+
+An unspecialized type variable tuple can contain any number of elements, so a tuple containing one
+cannot be assigned to a fixed-length tuple, even when its fixed prefix and suffix match.
+
+```py
+def arbitrary_pack[*Ts](value: tuple[*Ts]) -> tuple[int, str]:
+    return value  # error: [invalid-return-type]
+
+def middle_pack[*Ts](value: tuple[int, *Ts, str]) -> tuple[int, str]:
+    return value  # error: [invalid-return-type]
+```
+
 ### Starred variadic parameters
 
 An unpacked `TypeVarTuple` can annotate `*args`. Inferring the `TypeVarTuple` from arguments matched
@@ -819,6 +832,24 @@ reveal_type(test(fn1))  # revealed: tuple[Unknown, ...]
 # TODO: Should reveal `tuple[str, bytes]` without an error.
 # error: [invalid-argument-type] "Argument to function `test` is incorrect: Expected `Alias[*tuple[int, *tuple[Unknown, ...]]]`, found `def fn2(a: int, b: str, c: bytes) -> None`"
 reveal_type(test(fn2))  # revealed: tuple[Unknown, ...]
+```
+
+### Indexing and iteration
+
+An unpacked type variable tuple represents the variable-length segment collectively. It is not the
+type of each individual element in that segment.
+
+```py
+def element_types[*Ts](values: tuple[*Ts]) -> None:
+    reveal_type(values[0])  # revealed: @Todo(TypeVarTuple element union)
+
+    for value in values:
+        reveal_type(value)  # revealed: @Todo(TypeVarTuple element union)
+
+def boundaries[*Ts](values: tuple[int, *Ts, str]) -> None:
+    reveal_type(values[0])  # revealed: int
+    reveal_type(values[-1])  # revealed: str
+    reveal_type(values[:])  # revealed: tuple[int, *Ts@boundaries, str]
 ```
 
 ## Accessing Individual Types

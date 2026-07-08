@@ -2531,12 +2531,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                     let arguments_as_tuple = arguments.exact_tuple_instance_spec(db);
 
-                    let mut argument_elements = arguments_as_tuple
-                        .as_ref()
-                        .map(|tup| tup.all_elements())
-                        .unwrap_or(std::slice::from_ref(&arguments))
-                        .iter()
-                        .copied();
+                    let argument_elements = arguments_as_tuple.as_ref().map_or_else(
+                        || vec![arguments],
+                        |tuple| tuple.iter_element_types(db).collect(),
+                    );
+                    let mut argument_elements = argument_elements.into_iter();
 
                     let probably_meant_literal = argument_elements.all(|ty| match ty {
                         Type::LiteralValue(literal)

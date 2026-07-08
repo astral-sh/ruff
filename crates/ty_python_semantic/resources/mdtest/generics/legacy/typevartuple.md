@@ -9,6 +9,17 @@ The tests in this file focus on how `TypeVarTuple`s are defined and specialized 
 notation. Shared uses of `TypeVarTuple`s are tested with PEP 695 syntax in
 `../pep695/typevartuple.md`; alternate `Unpack` spelling is tested in `unpack.md`.
 
+## Tuple representation
+
+```py
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def preserve(values: tuple[int, *Ts, str]) -> None:
+    reveal_type(values)  # revealed: tuple[int, *Ts@preserve, str]
+```
+
 ## Definition
 
 ### Valid

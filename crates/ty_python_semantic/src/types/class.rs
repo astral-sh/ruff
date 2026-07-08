@@ -1760,13 +1760,15 @@ impl<'db> ClassType<'db> {
                                     ) {
                                         let overload_return = UnionType::from_elements(
                                             db,
-                                            std::iter::once(variable_length_tuple.variable())
-                                                .chain(
-                                                    variable_length_tuple
-                                                        .iter_prefix_elements()
-                                                        .rev()
-                                                        .take(one_based_index),
-                                                ),
+                                            std::iter::once(
+                                                variable_length_tuple.variable().element_type(db),
+                                            )
+                                            .chain(
+                                                variable_length_tuple
+                                                    .iter_prefix_elements()
+                                                    .rev()
+                                                    .take(one_based_index),
+                                            ),
                                         );
                                         element_type_to_indices
                                             .entry(overload_return)
@@ -1794,12 +1796,14 @@ impl<'db> ClassType<'db> {
                                     ) {
                                         let overload_return = UnionType::from_elements(
                                             db,
-                                            std::iter::once(variable_length_tuple.variable())
-                                                .chain(
-                                                    variable_length_tuple
-                                                        .iter_suffix_elements()
-                                                        .take(index + 1),
-                                                ),
+                                            std::iter::once(
+                                                variable_length_tuple.variable().element_type(db),
+                                            )
+                                            .chain(
+                                                variable_length_tuple
+                                                    .iter_suffix_elements()
+                                                    .take(index + 1),
+                                            ),
                                         );
                                         element_type_to_indices
                                             .entry(overload_return)
@@ -1810,8 +1814,7 @@ impl<'db> ClassType<'db> {
                             }
                         }
 
-                        let all_elements_unioned =
-                            UnionType::from_elements(db, tuple.all_elements());
+                        let all_elements_unioned = tuple.homogeneous_element_type(db);
 
                         let mut overload_signatures =
                             Vec::with_capacity(element_type_to_indices.len().saturating_add(2));
@@ -1899,15 +1902,16 @@ impl<'db> ClassType<'db> {
                         if tuple_len.minimum() == 0 && tuple_len.maximum().is_none() {
                             // If the tuple has no length restrictions,
                             // any iterable is allowed as long as the iterable has the correct element type.
-                            let mut tuple_elements = tuple.iter_all_elements();
-                            iterable_parameter = iterable_parameter.with_annotated_type(
-                                KnownClass::Iterable
-                                    .to_specialized_instance(db, &[tuple_elements.next().unwrap()]),
-                            );
                             assert_eq!(
-                                tuple_elements.next(),
-                                None,
-                                "Tuple specialization should not have more than one element when it has no length restriction"
+                                tuple.iter_element_types(db).count(),
+                                1,
+                                "Tuple specialization should have exactly one element when it has no length restriction"
+                            );
+                            iterable_parameter = iterable_parameter.with_annotated_type(
+                                KnownClass::Iterable.to_specialized_instance(
+                                    db,
+                                    &[tuple.homogeneous_element_type(db)],
+                                ),
                             );
                         } else {
                             // But if the tuple is of a fixed length, or has a minimum length, we require a tuple rather

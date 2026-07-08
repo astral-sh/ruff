@@ -1632,7 +1632,7 @@ fn check_classinfo_in_isinstance<'db>(
                     Some(ast::Expr::Tuple(tuple_expr)) => Some(&tuple_expr.elts),
                     _ => None,
                 };
-                for (index, element) in tuple_spec.iter_all_elements().enumerate() {
+                for (index, element) in tuple_spec.iter_element_types(db).enumerate() {
                     let element_expr = element_exprs.and_then(|elts| elts.get(index));
                     check_classinfo_in_isinstance(
                         db,

@@ -7,9 +7,7 @@ use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::special_form::TypeQualifier;
-use crate::types::tuple::{
-    Tuple, TupleLength, TupleSpec, TupleSpecBuilder, TupleType, TupleUnpacker,
-};
+use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, TupleUnpacker};
 use crate::types::typed_dict::{
     TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
@@ -533,7 +531,7 @@ impl ClassInfoConstraintFunction {
                 UnionType::try_from_elements(
                     db,
                     tuple
-                        .iter_all_elements()
+                        .iter_element_types(db)
                         .map(|element| self.generate_constraint(db, element, is_positive)),
                 )
             }),
@@ -2429,11 +2427,13 @@ impl<'db> PatternSuccessAnalyzer<'db> {
 
         let tuple = subject_ty.try_iterate(self.db).unwrap_or_else(|error| {
             let fallback_element_ty = error.fallback_element_type(self.db);
-            Cow::Owned(Tuple::homogeneous(if fallback_element_ty.is_unknown() {
-                Type::object()
-            } else {
-                fallback_element_ty
-            }))
+            Cow::Owned(TupleSpec::homogeneous(
+                if fallback_element_ty.is_unknown() {
+                    Type::object()
+                } else {
+                    fallback_element_ty
+                },
+            ))
         });
         let mut unpacker = TupleUnpacker::new(self.db, target_len);
         unpacker.unpack_tuple(tuple.as_ref()).ok()?;
