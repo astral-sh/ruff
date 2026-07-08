@@ -206,6 +206,11 @@ pub(crate) enum CycleDetectorVisit<T, R> {
     Pending(T),
 }
 
+/// Guards recursive type transformations.
+///
+/// Unlike [`CycleDetector`], type transformation has only one recursive fallback: preserve the
+/// current type. It also cannot stop at every same-identity alias application, because some nested
+/// alias applications stabilize after another transform step.
 pub(crate) struct TypeTransformer<'db, Tag> {
     /// A type already present in `seen` forms a recursive cycle and is returned unchanged.
     /// Completed visits are removed from the end of the stack.
@@ -236,36 +241,30 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         compute: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
         match self.begin_visit(db, ty) {
-            CycleDetectorVisit::Ready(result) | CycleDetectorVisit::Cycle(result) => result,
-            CycleDetectorVisit::Pending(ty) => {
+            TypeTransformerVisit::Return(result) => result,
+            TypeTransformerVisit::Pending(ty) => {
                 let result = compute();
                 self.finish_visit(ty, result)
             }
         }
     }
 
-    fn begin_visit(
-        &self,
-        db: &'db dyn Db,
-        ty: Type<'db>,
-    ) -> CycleDetectorVisit<Type<'db>, Type<'db>> {
+    fn begin_visit(&self, db: &'db dyn Db, ty: Type<'db>) -> TypeTransformerVisit<'db> {
         if let Some(result) = self.cache.borrow().get(&ty) {
-            return CycleDetectorVisit::Ready(*result);
+            return TypeTransformerVisit::Return(*result);
         }
 
         let seen = self.seen.borrow();
-        if seen.contains(&ty) || Self::is_growing_recursive_alias(db, ty, &seen) {
-            // When a cycle is encountered, the type being visited is returned as a fallback
-            // (typically a recursive type alias).
-            return CycleDetectorVisit::Cycle(ty);
+        if seen.contains(&ty) || Self::needs_recursive_fallback(db, ty, &seen) {
+            return TypeTransformerVisit::Return(ty);
         }
         drop(seen);
 
         self.seen.borrow_mut().push(ty);
-        CycleDetectorVisit::Pending(ty)
+        TypeTransformerVisit::Pending(ty)
     }
 
-    fn is_growing_recursive_alias(db: &'db dyn Db, ty: Type<'db>, seen: &[Type<'db>]) -> bool {
+    fn needs_recursive_fallback(db: &'db dyn Db, ty: Type<'db>, seen: &[Type<'db>]) -> bool {
         let Type::TypeAlias(alias) = ty else {
             let Some(identity) = ty.recursive_identity(db) else {
                 return false;
@@ -355,6 +354,11 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         self.cache.borrow_mut().insert_completed(ty, result);
         result
     }
+}
+
+enum TypeTransformerVisit<'db> {
+    Return(Type<'db>),
+    Pending(Type<'db>),
 }
 
 impl<'db, Tag, T, R: Default, const INLINE_CAPACITY: usize> Default
