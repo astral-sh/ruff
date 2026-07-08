@@ -2,24 +2,25 @@ use get_size2::GetSize;
 use ruff_db::files::File;
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::{SourceText, source_text};
-use ruff_python_ast::ModExpression;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_python_ast::{
     self as ast, AnyNodeRef,
     helpers::is_dunder,
     name::{Name, UnqualifiedName},
 };
-use ruff_python_parser::Parsed;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
+use ty_python_core::ExpressionNodeKey;
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState, dotted_starts_with};
 use ty_python_core::scope::ScopeKind;
 use ty_python_core::semantic_index;
 
-use super::{known_type_form_parameter_index, visible_reachable_definitions_for_name};
+use super::visible_reachable_definitions_for_name;
+use crate::Db;
 use crate::dunder_all::dunder_all_names;
-use crate::types::{SpecialFormType, Type};
-use crate::{Db, HasType, SemanticModel};
+use crate::semantic_model::SemanticModel;
+use crate::types::TypeContext;
+use crate::types::infer::{infer_deferred_types, infer_definition_types, infer_scope_types};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, GetSize)]
 pub struct UnusedImport {
@@ -152,268 +153,138 @@ struct StringAnnotationUses<'db> {
     dotted_names: FxHashSet<Box<str>>,
 }
 
+/// Resolves the strings that inference classified as type expressions.
+///
+/// Inference retains the node keys of every string it parsed as an annotation, so
+/// classification is inherited from the checker. Only name resolution and dotted
+/// paths are re-derived here.
 fn string_annotation_used_definitions(db: &dyn Db, file: File) -> StringAnnotationUses<'_> {
+    let index = semantic_index(db, file);
+
+    let mut annotation_keys: FxHashSet<ExpressionNodeKey> = FxHashSet::default();
+    for scope_id in index.scope_ids() {
+        annotation_keys
+            .extend(infer_scope_types(db, scope_id, TypeContext::default()).string_annotations());
+
+        let file_scope_id = scope_id.file_scope_id(db);
+        let use_def = index.use_def_map(file_scope_id);
+        for (_, state, _) in use_def.all_definitions_with_usage() {
+            let DefinitionState::Defined(definition) = state else {
+                continue;
+            };
+            let inference = infer_definition_types(db, definition);
+            annotation_keys.extend(inference.string_annotations());
+            for deferred in inference.deferred_definitions() {
+                annotation_keys.extend(infer_deferred_types(db, *deferred).string_annotations());
+            }
+        }
+    }
+
+    let mut uses = StringAnnotationUses {
+        definitions: FxHashSet::default(),
+        dotted_names: FxHashSet::default(),
+    };
+
+    if annotation_keys.is_empty() {
+        return uses;
+    }
+
     let parsed = parsed_module(db, file).load(db);
     let source = source_text(db, file);
     let model = SemanticModel::new(db, file);
-    let mut definitions = FxHashSet::default();
-    let mut dotted_names = FxHashSet::default();
-    let mut visitor = StringAnnotationDefinitionVisitor {
-        model: &model,
-        source: &source,
-        definitions: &mut definitions,
-        dotted_names: &mut dotted_names,
-        in_annotation: false,
-        scope_node: None,
+
+    let mut collector = StringLiteralCollector {
+        annotation_keys: &annotation_keys,
+        strings: Vec::new(),
     };
-
     for stmt in parsed.suite() {
-        visitor.visit_stmt(stmt);
+        collector.visit_stmt(stmt);
     }
 
-    StringAnnotationUses {
-        definitions,
-        dotted_names,
-    }
-}
-
-fn parse_string_annotation(
-    source: &SourceText,
-    string: &ast::ExprStringLiteral,
-) -> Option<Parsed<ModExpression>> {
-    let string_literal = string.as_single_part_string()?;
-
-    if string_literal.flags.prefix().is_raw()
-        || &source[string_literal.content_range()] != string_literal.as_str()
-    {
-        return None;
-    }
-
-    parsed_string_annotation(source.as_str(), string_literal).ok()
-}
-
-struct StringAnnotationDefinitionVisitor<'model, 'db> {
-    model: &'model SemanticModel<'db>,
-    source: &'model SourceText,
-    definitions: &'model mut FxHashSet<Definition<'db>>,
-    dotted_names: &'model mut FxHashSet<Box<str>>,
-    in_annotation: bool,
-    scope_node: Option<AnyNodeRef<'model>>,
-}
-
-impl<'model> StringAnnotationDefinitionVisitor<'model, '_> {
-    fn enter_annotation(&mut self, expr: &'model ast::Expr, visit: impl FnOnce(&mut Self)) {
-        let previous = std::mem::replace(&mut self.in_annotation, true);
-        let previous_scope_node = self.scope_node.replace(expr.into());
-        visit(self);
-        self.scope_node = previous_scope_node;
-        self.in_annotation = previous;
-    }
-
-    fn leave_annotation(&mut self, visit: impl FnOnce(&mut Self)) {
-        let previous = std::mem::replace(&mut self.in_annotation, false);
-        visit(self);
-        self.in_annotation = previous;
-    }
-
-    fn visit_string_annotation(&mut self, string: &'model ast::ExprStringLiteral) {
-        let Some(parsed) = parse_string_annotation(self.source, string) else {
-            return;
+    for string in collector.strings {
+        let mut visitor = StringAnnotationResolver {
+            model: &model,
+            source: &source,
+            annotation_keys: &annotation_keys,
+            scope_node: string.into(),
+            uses: &mut uses,
         };
-
-        let Some(scope_node) = self.scope_node else {
-            return;
-        };
-        let mut visitor = ParsedStringAnnotationDefinitionVisitor {
-            model: self.model,
-            source: self.source,
-            definitions: self.definitions,
-            dotted_names: self.dotted_names,
-            scope_node,
-            parse_nested_string_annotations: true,
-        };
-        visitor.visit_expr(parsed.expr());
+        visitor.visit_string(string);
     }
+
+    uses
 }
 
-impl<'model> SourceOrderVisitor<'model> for StringAnnotationDefinitionVisitor<'model, '_> {
-    fn visit_annotation(&mut self, expr: &'model ast::Expr) {
-        self.enter_annotation(expr, |visitor| {
-            source_order::walk_annotation(visitor, expr);
-        });
-    }
+/// Collects the file-level string literals that inference classified as annotations.
+struct StringLiteralCollector<'a, 'ast> {
+    annotation_keys: &'a FxHashSet<ExpressionNodeKey>,
+    strings: Vec<&'ast ast::ExprStringLiteral>,
+}
 
-    fn visit_stmt(&mut self, stmt: &'model ast::Stmt) {
-        // The value assigned to a type alias is a type expression, so its strings
-        // are forward references.
-        if let ast::Stmt::AnnAssign(assignment) = stmt
-            && let Some(value) = assignment.value.as_deref()
-            && self.model.is_type_alias_annotation(&assignment.annotation)
-        {
-            self.visit_expr(&assignment.target);
-            self.visit_annotation(&assignment.annotation);
-            self.enter_annotation(value, |visitor| visitor.visit_expr(value));
-            return;
-        }
-
-        source_order::walk_stmt(self, stmt);
-    }
-
-    fn visit_expr(&mut self, expr: &'model ast::Expr) {
-        match expr {
-            ast::Expr::StringLiteral(string) if self.in_annotation => {
-                self.visit_string_annotation(string);
+impl<'ast> SourceOrderVisitor<'ast> for StringLiteralCollector<'_, 'ast> {
+    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+        if let ast::Expr::StringLiteral(string) = expr {
+            if self.annotation_keys.contains(&expr.into()) {
+                self.strings.push(string);
             }
-            ast::Expr::Subscript(subscript) if self.in_annotation => {
-                self.visit_expr(&subscript.value);
-
-                let special_form = subscript
-                    .value
-                    .inferred_type(self.model)
-                    .and_then(Type::as_special_form);
-
-                if special_form == Some(SpecialFormType::Literal) {
-                    // String arguments to `Literal` are values, not forward references.
-                    self.leave_annotation(|visitor| visitor.visit_expr(&subscript.slice));
-                } else if special_form == Some(SpecialFormType::Annotated)
-                    && let ast::Expr::Tuple(tuple) = subscript.slice.as_ref()
-                    && let Some((first, rest)) = tuple.elts.split_first()
-                {
-                    // Only the first argument to `Annotated` is a type, the rest is
-                    // arbitrary metadata.
-                    self.visit_expr(first);
-                    self.leave_annotation(|visitor| {
-                        for element in rest {
-                            visitor.visit_expr(element);
-                        }
-                    });
-                } else {
-                    self.visit_expr(&subscript.slice);
-                }
-            }
-            ast::Expr::Call(call) if !call.arguments.args.is_empty() => {
-                let type_form_index = call
-                    .func
-                    .inferred_type(self.model)
-                    .and_then(|ty| known_type_form_parameter_index(self.model.db(), ty));
-
-                let Some(type_form_index) = type_form_index else {
-                    source_order::walk_expr(self, expr);
-                    return;
-                };
-
-                self.visit_expr(&call.func);
-                for (index, argument) in call.arguments.args.iter().enumerate() {
-                    if index == type_form_index {
-                        self.enter_annotation(argument, |visitor| visitor.visit_expr(argument));
-                    } else {
-                        self.visit_expr(argument);
-                    }
-                }
-                // Keyword arguments are not mapped to parameters, so their strings
-                // remain values.
-                for keyword in &call.arguments.keywords {
-                    self.visit_expr(&keyword.value);
-                }
-            }
-            _ => source_order::walk_expr(self, expr),
+        } else {
+            source_order::walk_expr(self, expr);
         }
     }
 }
 
-struct ParsedStringAnnotationDefinitionVisitor<'model, 'db> {
-    model: &'model SemanticModel<'db>,
-    source: &'model SourceText,
-    definitions: &'model mut FxHashSet<Definition<'db>>,
-    dotted_names: &'model mut FxHashSet<Box<str>>,
-    scope_node: AnyNodeRef<'model>,
-    parse_nested_string_annotations: bool,
+struct StringAnnotationResolver<'a, 'db> {
+    model: &'a SemanticModel<'db>,
+    source: &'a SourceText,
+    annotation_keys: &'a FxHashSet<ExpressionNodeKey>,
+    /// The file-level string literal, used to resolve names in its enclosing scope.
+    scope_node: AnyNodeRef<'a>,
+    uses: &'a mut StringAnnotationUses<'db>,
 }
 
-impl ParsedStringAnnotationDefinitionVisitor<'_, '_> {
-    fn collect_name(&mut self, name: &ast::ExprName) {
-        self.definitions
-            .extend(visible_reachable_definitions_for_name(
-                self.model,
-                name.id.as_str(),
-                self.scope_node,
-            ));
-    }
-
-    fn visit_string_annotation(&mut self, string: &ast::ExprStringLiteral) {
-        if !self.parse_nested_string_annotations {
-            return;
-        }
-
-        let Some(parsed) = parse_string_annotation(self.source, string) else {
+impl StringAnnotationResolver<'_, '_> {
+    fn visit_string(&mut self, string: &ast::ExprStringLiteral) {
+        let Some(string_literal) = string.as_single_part_string() else {
             return;
         };
-
+        let Ok(parsed) = parsed_string_annotation(self.source.as_str(), string_literal) else {
+            return;
+        };
         self.visit_expr(parsed.expr());
     }
-
-    fn visit_subscript(&mut self, subscript: &ast::ExprSubscript) {
-        self.visit_expr(&subscript.value);
-        let subscript_name = annotation_subscript_name(&subscript.value);
-
-        if subscript_name == Some("Literal") {
-            // String arguments to `Literal` are values, not forward annotations.
-            self.with_parse_nested_string_annotations(false, |visitor| {
-                visitor.visit_expr(&subscript.slice);
-            });
-            return;
-        }
-
-        if subscript_name == Some("Annotated") {
-            if let ast::Expr::Tuple(tuple) = subscript.slice.as_ref()
-                && let Some((first, rest)) = tuple.elts.split_first()
-            {
-                self.visit_expr(first);
-                self.with_parse_nested_string_annotations(false, |visitor| {
-                    for elt in rest {
-                        visitor.visit_expr(elt);
-                    }
-                });
-                return;
-            }
-        }
-
-        self.visit_expr(&subscript.slice);
-    }
-
-    fn with_parse_nested_string_annotations(&mut self, parse: bool, visit: impl FnOnce(&mut Self)) {
-        let previous = std::mem::replace(&mut self.parse_nested_string_annotations, parse);
-        visit(self);
-        self.parse_nested_string_annotations = previous;
-    }
 }
 
-impl<'ast> SourceOrderVisitor<'ast> for ParsedStringAnnotationDefinitionVisitor<'_, '_> {
+impl<'ast> SourceOrderVisitor<'ast> for StringAnnotationResolver<'_, '_> {
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
         match expr {
-            ast::Expr::Name(name) => self.collect_name(name),
-            ast::Expr::StringLiteral(string) => self.visit_string_annotation(string),
-            ast::Expr::Subscript(subscript) => self.visit_subscript(subscript),
+            ast::Expr::Name(name) => {
+                self.uses
+                    .definitions
+                    .extend(visible_reachable_definitions_for_name(
+                        self.model,
+                        name.id.as_str(),
+                        self.scope_node,
+                    ));
+            }
+            // Sub-ASTs keep file-relative node keys, so inference's classification
+            // applies at any nesting depth.
+            ast::Expr::StringLiteral(string) => {
+                if self.annotation_keys.contains(&expr.into()) {
+                    self.visit_string(string);
+                }
+            }
             ast::Expr::Attribute(_) => {
                 // Retain the dotted path for multipart matching, the walk must continue
-                // so the root name records its definitions. Re-recorded sub-chain
-                // prefixes are harmless.
+                // so the root name records its definitions.
                 if let Some(dotted) = UnqualifiedName::from_expr(expr) {
-                    self.dotted_names
+                    self.uses
+                        .dotted_names
                         .insert(dotted.to_string().into_boxed_str());
                 }
                 source_order::walk_expr(self, expr);
             }
             _ => source_order::walk_expr(self, expr),
         }
-    }
-}
-
-fn annotation_subscript_name(expr: &ast::Expr) -> Option<&str> {
-    match expr {
-        ast::Expr::Name(name) => Some(name.id.as_str()),
-        ast::Expr::Attribute(attribute) => Some(attribute.attr.id.as_str()),
-        _ => None,
     }
 }
 
