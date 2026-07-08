@@ -289,3 +289,33 @@ But a suppression for `RUF100` should not prevent the rule from firing:
 # error: [noqa-comment]
 import math  # noqa: RUF100, F401
 ```
+
+## Suppression with `ruff:ignore`
+
+```toml
+[lint]
+preview = true
+select = ["noqa-comment", "unused-noqa", "F401"]
+```
+
+### Inline suppression
+
+```py
+import math  # noqa: F401  # ruff:ignore[RUF105]
+```
+
+### Standalone suppression
+
+```py
+# ruff:ignore[RUF105]
+# ruff: noqa: F401
+import math
+```
+
+### File-level suppression
+
+```py
+# ruff:file-ignore[RUF105]
+# ruff: noqa: F401
+import math
+```

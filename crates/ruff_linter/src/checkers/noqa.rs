@@ -117,9 +117,6 @@ pub(crate) fn check_noqa(
         }
     }
 
-    // Diagnostics for unused/invalid range suppressions
-    suppressions.check_suppressions(context, locator);
-
     // Only migrate directives that don't require RUF100 cleanup first.
     let check_unused_noqa = context.is_rule_enabled(Rule::UnusedNOQA)
         && analyze_directives
@@ -153,13 +150,18 @@ pub(crate) fn check_noqa(
                         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
                         diagnostic.set_fix(Fix::safe_edit(edit));
                     } else if check_noqa_comment {
-                        ruff::rules::noqa_comment(context, locator, is_file_level, directive);
+                        ruff::rules::noqa_comment(
+                            context,
+                            locator,
+                            is_file_level,
+                            directive,
+                            suppressions,
+                        );
                     }
                 }
                 Directive::Codes(codes) => {
                     let mut disabled_codes = vec![];
                     let mut duplicated_codes = vec![];
-                    let mut unknown_codes = vec![];
                     let mut unmatched_codes = vec![];
                     let mut valid_codes = vec![];
                     let mut seen_codes = FxHashSet::default();
@@ -205,8 +207,6 @@ pub(crate) fn check_noqa(
                                 } else {
                                     disabled_codes.push(original_code);
                                 }
-                            } else {
-                                unknown_codes.push(original_code);
                             }
                         } else {
                             duplicated_codes.push(original_code);
@@ -250,12 +250,21 @@ pub(crate) fn check_noqa(
                         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
                         diagnostic.set_fix(Fix::safe_edit(edit));
                     } else if check_noqa_comment && !suppress_noqa_comment && !has_unused_codes {
-                        ruff::rules::noqa_comment(context, locator, is_file_level, directive);
+                        ruff::rules::noqa_comment(
+                            context,
+                            locator,
+                            is_file_level,
+                            directive,
+                            suppressions,
+                        );
                     }
                 }
             }
         }
     }
+
+    // Diagnostics for unused/invalid range suppressions
+    suppressions.check_suppressions(context, locator);
 
     if context.is_rule_enabled(Rule::RedirectedNOQA) && !exemption.includes(Rule::RedirectedNOQA) {
         ruff::rules::redirected_noqa(context, &noqa_directives);

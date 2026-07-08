@@ -4,7 +4,10 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
-use crate::{FixAvailability, Locator, Violation, checkers::ast::LintContext, noqa::Directive};
+use crate::{
+    FixAvailability, Locator, Violation, checkers::ast::LintContext, codes::Rule, noqa::Directive,
+    suppression::Suppressions,
+};
 
 /// ## What it does
 ///
@@ -82,8 +85,11 @@ pub(crate) fn noqa_comment(
     locator: &Locator,
     file_level: bool,
     directive: &Directive,
+    suppressions: &Suppressions,
 ) {
-    if file_level && locator.slice(directive.range()).contains("flake8") {
+    let range = directive.range();
+
+    if file_level && locator.slice(range).contains("flake8") {
         return;
     }
 
@@ -100,13 +106,17 @@ pub(crate) fn noqa_comment(
         return;
     }
 
+    if suppressions.check_rule(Rule::NoqaComment, range, None) {
+        return;
+    }
+
     let has_codes = matches!(directive, Directive::Codes(_));
     let mut diagnostic = context.report_diagnostic(
         NoqaComment {
             file_level,
             has_codes,
         },
-        directive.range(),
+        range,
     );
 
     let Directive::Codes(codes) = directive else {

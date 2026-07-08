@@ -3181,20 +3181,6 @@ mod tests {
         import math  # noqa: F401  # ruff:ignore[noqa-comment]
 
         ```
-
-        ## New diagnostics after re-checking file
-
-        RUF105 [*] `noqa` comment used instead of `ruff:ignore`
-         --> <filename>:1:14
-          |
-        1 | import math  # noqa: F401  # ruff:ignore[noqa-comment]
-          |              ^^^^^^^^^^^^
-          |
-        help: Use `ruff:ignore` instead
-          |
-          - import math  # noqa: F401  # ruff:ignore[noqa-comment]
-        1 + import math  # ruff:ignore[F401]  # ruff:ignore[noqa-comment]
-          |
         "
         );
         Ok(())
