@@ -586,16 +586,12 @@ impl<'db> OverloadLiteral<'db> {
             file_scope_id,
             index,
         );
-        let has_bound_receiver = index.class_definition_of_method(file_scope_id).is_some()
-            && (!self.is_staticmethod(db) || self.name(db) == "__new__");
-
         let mut raw_signature = Signature::from_function(
             db,
             pep695_ctx,
             definition,
             function_stmt_node,
             has_implicitly_positional_first_parameter,
-            has_bound_receiver,
             return_callable_typevar_scope,
         );
 

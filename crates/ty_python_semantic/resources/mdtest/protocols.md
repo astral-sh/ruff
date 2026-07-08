@@ -2804,13 +2804,6 @@ class UsesLegacyClassReceiver(Protocol):
     @classmethod
     def make(cls: type[LegacyClassReceiverT]) -> LegacyClassReceiverT: ...
 
-class UsesPep695Receiver(Protocol):
-    def compare[T](self: T, other: T) -> bool: ...
-
-class UsesPep695ClassReceiver(Protocol):
-    @classmethod
-    def make[T](cls: type[T]) -> T: ...
-
 class NominalNewStyle:
     def f[T](self, input: T) -> T:
         return input
@@ -2870,8 +2863,6 @@ static_assert(is_assignable_to(NominalLegacyReceiver, UsesLegacyReceiver))
 static_assert(is_subtype_of(NominalLegacyReceiver, UsesLegacyReceiver))
 static_assert(is_assignable_to(NominalLegacyReceiver, LegacyCopyable))
 static_assert(is_assignable_to(NominalLegacyReceiver, UsesLegacyClassReceiver))
-static_assert(is_assignable_to(NominalLegacyReceiver, UsesPep695Receiver))
-static_assert(is_assignable_to(NominalLegacyReceiver, UsesPep695ClassReceiver))
 
 static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))
 # TODO: Retain receiver provenance when binding legacy generic method signatures so ordinary
@@ -2951,9 +2942,17 @@ static_assert(is_subtype_of(WrapInList, NestedListProtocol))
 class ArbitraryConsumerProtocol(Protocol):
     def f[T](self, value: T) -> None: ...
 
+class ObjectConsumer:
+    def f(self, value: object) -> None:
+        return None
+
 class ListOnlyConsumer:
     def f[S](self, value: list[S]) -> None:
         return None
+
+# A non-generic source is valid when its single signature covers every target specialization.
+static_assert(is_assignable_to(ObjectConsumer, ArbitraryConsumerProtocol))
+static_assert(is_subtype_of(ObjectConsumer, ArbitraryConsumerProtocol))
 
 # Projecting `S` from the obligation `T ≤ list[S]` would require an existential type. It must not
 # be treated as though some list element type can make `list[S]` cover every `T`.

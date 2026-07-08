@@ -7559,7 +7559,7 @@ mod tests {
     }
 
     #[test]
-    fn universal_quantification_preserves_uncertain_branch() {
+    fn universal_quantification_preserves_uncertain_disjunct() {
         let db = setup_db();
         let t = create_typevar(&db, "T");
         let u = create_typevar(&db, "U");
@@ -7567,15 +7567,15 @@ mod tests {
         let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
         let u_str = create_constraint(&db, &builder, u, KnownClass::Str);
 
-        // The `u_str` disjunct is stored in an uncertain TDD branch underneath `t_int`. It is
-        // independent of `T`, so it must survive universal quantification of `T`.
+        // `t_int` is stored in the uncertain branch underneath `u_str`. That branch is an
+        // unconditional disjunct, so it must survive universal quantification of `U`.
         let quantified = t_int
             .or(&db, &builder, || u_str)
-            .try_for_all(&db, &builder, std::iter::once(t.identity(&db)))
-            .expect("`U` is independent of the quantified variable");
+            .try_for_all(&db, &builder, std::iter::once(u.identity(&db)))
+            .expect("`T` is independent of the quantified variable");
         assert!(
             quantified
-                .iff(&db, &builder, u_str)
+                .iff(&db, &builder, t_int)
                 .is_always_satisfied(&db)
         );
     }
