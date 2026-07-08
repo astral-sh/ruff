@@ -349,6 +349,7 @@ fn section_item_indent(header: SectionHeader, line: ParsedLine<'_>) -> Option<Te
         HeaderKind::Structured(
             SectionKind::Parameters | SectionKind::KeywordArguments | SectionKind::OtherParameters,
         ) => parse_parameter(trimmed).is_some(),
+        HeaderKind::Structured(_) => false,
         HeaderKind::Container => false,
     };
     is_item.then_some(line.raw_indent)
