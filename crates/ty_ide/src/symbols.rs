@@ -13,9 +13,10 @@ use ruff_python_ast as ast;
 use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 use ty_module_resolver::{ModuleName, resolve_module};
 use ty_project::Db;
+use ty_python_core::syntactic_dunder_all_names;
 
 use crate::completion::CompletionKind;
 
@@ -411,7 +412,8 @@ pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: File) -> FlatSymbo
     let parsed = parsed_module(db, file);
     let module = parsed.load(db);
 
-    let mut visitor = SymbolVisitor::globals(db, file);
+    let mut visitor =
+        SymbolVisitor::globals(db, file, syntactic_dunder_all_names(db, file).possible());
     visitor.visit_body(&module.syntax().body);
 
     if file
@@ -480,189 +482,6 @@ impl From<&ast::Alias> for ImportKind {
     }
 }
 
-/// An abstraction for managing module scope imports.
-///
-/// This is meant to recognize the following idioms for updating
-/// `__all__` in module scope:
-///
-/// ```ignore
-/// __all__ += submodule.__all__
-/// __all__.extend(submodule.__all__)
-/// ```
-///
-/// # Correctness
-///
-/// The approach used here is not correct 100% of the time.
-/// For example, it is somewhat easy to defeat it:
-///
-/// ```ignore
-/// from numpy import *
-/// from importlib import resources
-/// import numpy as np
-/// np = resources
-/// __all__ = []
-/// __all__ += np.__all__
-/// ```
-///
-/// In this example, `np` will still be resolved to the `numpy`
-/// module instead of the `importlib.resources` module. Namely, this
-/// abstraction doesn't track all definitions. This would result in a
-/// silently incorrect `__all__`.
-///
-/// This abstraction does handle the case when submodules are imported.
-/// Namely, we do get this case correct:
-///
-/// ```ignore
-/// from importlib.resources import *
-/// from importlib import resources
-/// __all__ = []
-/// __all__ += resources.__all__
-/// ```
-///
-/// We do this by treating all imports in a `from ... import ...`
-/// statement as *possible* modules. Then when we lookup `resources`,
-/// we attempt to resolve it to an actual module. If that fails, then
-/// we consider `__all__` invalid.
-///
-/// There are likely many many other cases that we don't handle as
-/// well, which ty does (it has its own `__all__` parsing using types
-/// to deal with this case). We can add handling for those as they
-/// come up in real world examples.
-///
-/// # Performance
-///
-/// This abstraction recognizes that, compared to all possible imports,
-/// it is very rare to use one of them to update `__all__`. Therefore,
-/// we are careful not to do too much work up-front (like eagerly
-/// manifesting `ModuleName` values).
-#[derive(Clone, Debug, Default, get_size2::GetSize)]
-struct Imports<'db> {
-    /// A map from the name that a module is available
-    /// under to its actual module name (and our level
-    /// of certainty that it ought to be treated as a module).
-    module_names: FxHashMap<&'db str, ImportModuleKind<'db>>,
-}
-
-impl<'db> Imports<'db> {
-    /// Track the imports from the given `import ...` statement.
-    fn add_import(&mut self, import: &'db ast::StmtImport) {
-        for alias in &import.names {
-            let asname = alias
-                .asname
-                .as_ref()
-                .map(|ident| &ident.id)
-                .unwrap_or(&alias.name.id);
-            let module_name = ImportModuleName::Import(&alias.name.id);
-            self.module_names
-                .insert(asname, ImportModuleKind::Definitive(module_name));
-        }
-    }
-
-    /// Track the imports from the given `from ... import ...` statement.
-    fn add_import_from(&mut self, import_from: &'db ast::StmtImportFrom) {
-        for alias in &import_from.names {
-            if &alias.name == "*" {
-                // FIXME: We'd ideally include the names
-                // imported from the module, but we don't
-                // want to do this eagerly. So supporting
-                // this requires more infrastructure in
-                // `Imports`.
-                continue;
-            }
-
-            let asname = alias
-                .asname
-                .as_ref()
-                .map(|ident| &ident.id)
-                .unwrap_or(&alias.name.id);
-            let module_name = ImportModuleName::ImportFrom {
-                parent: import_from,
-                child: &alias.name.id,
-            };
-            self.module_names
-                .insert(asname, ImportModuleKind::Possible(module_name));
-        }
-    }
-
-    /// Return the symbols exported by the module referred to by `name`.
-    ///
-    /// e.g., This can be used to resolve `__all__ += submodule.__all__`,
-    /// where `name` is `submodule`.
-    fn get_module_symbols(
-        &self,
-        db: &'db dyn Db,
-        importing_file: File,
-        name: &Name,
-    ) -> Option<&'db FlatSymbols> {
-        let module_name = match self.module_names.get(name.as_str())? {
-            ImportModuleKind::Definitive(name) | ImportModuleKind::Possible(name) => {
-                name.to_module_name(db, importing_file)?
-            }
-        };
-        let module = resolve_module(db, importing_file, &module_name)?;
-        Some(symbols_for_file_global_only(db, module.file(db)?))
-    }
-}
-
-/// Describes the level of certainty that an import is a module.
-///
-/// For example, `import foo`, then `foo` is definitively a module.
-/// But `from quux import foo`, then `quux.foo` is possibly a module.
-#[derive(Debug, Clone, Copy, get_size2::GetSize)]
-enum ImportModuleKind<'db> {
-    Definitive(ImportModuleName<'db>),
-    Possible(ImportModuleName<'db>),
-}
-
-/// A representation of something that can be turned into a
-/// `ModuleName`.
-///
-/// We don't do this eagerly, and instead represent the constituent
-/// pieces, in order to avoid the work needed to build a `ModuleName`.
-/// In particular, it is somewhat rare for the visitor to need
-/// to access the imports found in a module. At time of writing
-/// (2025-12-10), this only happens when referencing a submodule
-/// to augment an `__all__` definition. For example, as found in
-/// `matplotlib`:
-///
-/// ```python
-/// import numpy as np
-/// __all__ = ['rand', 'randn', 'repmat']
-/// __all__ += np.__all__
-/// ```
-///
-/// This construct is somewhat rare and it would be sad to allocate a
-/// `ModuleName` for every imported item unnecessarily.
-#[derive(Debug, Clone, Copy, get_size2::GetSize)]
-enum ImportModuleName<'db> {
-    /// The `foo` in `import quux, foo as blah, baz`.
-    Import(&'db Name),
-    /// A possible module in a `from ... import ...` statement.
-    ImportFrom {
-        /// The `..foo` in `from ..foo import quux`.
-        parent: &'db ast::StmtImportFrom,
-        /// The `foo` in `from quux import foo`.
-        child: &'db Name,
-    },
-}
-
-impl<'db> ImportModuleName<'db> {
-    /// Converts the lazy representation of a module name into an
-    /// actual `ModuleName` that can be used for module resolution.
-    fn to_module_name(self, db: &'db dyn Db, importing_file: File) -> Option<ModuleName> {
-        match self {
-            ImportModuleName::Import(name) => ModuleName::new(name),
-            ImportModuleName::ImportFrom { parent, child } => {
-                let mut module_name =
-                    ModuleName::from_import_statement(db, importing_file, parent).ok()?;
-                let child_module_name = ModuleName::new(child)?;
-                module_name.extend(&child_module_name);
-                Some(module_name)
-            }
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
 enum AstImport<'a> {
     Import(&'a ast::StmtImport),
@@ -682,7 +501,6 @@ impl Ranged for AstImport<'_> {
 ///
 /// This guarantees that child symbols have a symbol ID greater
 /// than all of its parents.
-#[expect(clippy::struct_excessive_bools)]
 struct SymbolVisitor<'db> {
     db: &'db dyn Db,
     file: File,
@@ -703,19 +521,8 @@ struct SymbolVisitor<'db> {
     /// interface for that module. i.e., `__all__` is only respected
     /// when this is enabled. It's otherwise ignored.
     exports_only: bool,
-    /// The origin of an `__all__` variable, if found.
-    all_origin: Option<DunderAllOrigin>,
-    /// A set of names extracted from `__all__`.
-    all_names: FxHashSet<Name>,
-    /// A flag indicating whether the module uses unrecognized
-    /// `__all__` idioms or there are any invalid elements in
-    /// `__all__`.
-    all_invalid: bool,
-    /// A collection of imports found while visiting the AST.
-    ///
-    /// These are used to help resolve references to modules
-    /// in some limited cases.
-    imports: Imports<'db>,
+    /// The possible names extracted from `__all__` by the shared syntax-only analysis.
+    all_names: Option<&'db FxHashSet<Name>>,
 }
 
 impl<'db> SymbolVisitor<'db> {
@@ -728,26 +535,19 @@ impl<'db> SymbolVisitor<'db> {
             in_function: false,
             in_class: false,
             exports_only: false,
-            all_origin: None,
-            all_names: FxHashSet::default(),
-            all_invalid: false,
-            imports: Imports::default(),
+            all_names: None,
         }
     }
 
-    fn globals(db: &'db dyn Db, file: File) -> Self {
+    fn globals(db: &'db dyn Db, file: File, all_names: Option<&'db FxHashSet<Name>>) -> Self {
         Self {
             exports_only: true,
+            all_names,
             ..Self::tree(db, file)
         }
     }
 
     fn into_flat_symbols(mut self) -> FlatSymbols {
-        // If `__all__` was found but wasn't recognized,
-        // then we emit a diagnostic message indicating as such.
-        if self.all_invalid {
-            tracing::debug!("Invalid `__all__` in `{}`", self.file.path(self.db));
-        }
         // We want to filter out some of the symbols we collected.
         // Specifically, to respect conventions around library
         // interface.
@@ -807,10 +607,7 @@ impl<'db> SymbolVisitor<'db> {
 
         FlatSymbols {
             symbols: new,
-            all_names: self.all_origin.map(|_| {
-                self.all_names.shrink_to_fit();
-                self.all_names
-            }),
+            all_names: self.all_names.cloned(),
         }
     }
 
@@ -902,143 +699,11 @@ impl<'db> SymbolVisitor<'db> {
         }))
     }
 
-    /// Extracts `__all__` names from the given assignment.
-    ///
-    /// If the assignment isn't for `__all__`, then this is a no-op.
-    fn add_all_assignment(&mut self, targets: &[ast::Expr], value: Option<&ast::Expr>) {
-        // We don't care about `__all__` unless we're
-        // specifically looking for exported symbols.
-        if !self.exports_only {
-            return;
-        }
-        if self.in_function || self.in_class {
-            return;
-        }
-        let Some(target) = targets.first() else {
-            return;
-        };
-        if !is_dunder_all(target) {
-            return;
-        }
-
-        let Some(value) = value else { return };
-        match *value {
-            // `__all__ = [...]`
-            // `__all__ = (...)`
-            ast::Expr::List(ast::ExprList { ref elts, .. })
-            | ast::Expr::Tuple(ast::ExprTuple { ref elts, .. }) => {
-                self.update_all_origin(DunderAllOrigin::CurrentModule);
-                if !self.add_all_names(elts) {
-                    self.all_invalid = true;
-                }
-            }
-            _ => {
-                self.all_invalid = true;
-            }
-        }
-    }
-
-    /// Extends the current set of names with the names from the
-    /// given expression which currently must be a list/tuple/set of
-    /// string-literal names. This currently does not support using a
-    /// submodule's `__all__` variable.
-    ///
-    /// Returns `true` if the expression is a valid list/tuple/set or
-    /// module `__all__`, `false` otherwise.
-    ///
-    /// N.B. Supporting all instances of `__all__ += submodule.__all__`
-    /// and `__all__.extend(submodule.__all__)` is likely difficult
-    /// in this context. Namely, `submodule` needs to be resolved
-    /// to a particular module. ty proper can do this (by virtue
-    /// of inferring the type of `submodule`). With that said, we
-    /// could likely support a subset of cases here without too much
-    /// ceremony. ---AG
-    fn extend_all(&mut self, expr: &ast::Expr) -> bool {
-        match expr {
-            // `__all__ += [...]`
-            // `__all__ += (...)`
-            // `__all__ += {...}`
-            ast::Expr::List(ast::ExprList { elts, .. })
-            | ast::Expr::Tuple(ast::ExprTuple { elts, .. })
-            | ast::Expr::Set(ast::ExprSet { elts, .. }) => self.add_all_names(elts),
-            // `__all__ += module.__all__`
-            // `__all__.extend(module.__all__)`
-            ast::Expr::Attribute(ast::ExprAttribute { .. }) => {
-                let Some(unqualified) = UnqualifiedName::from_expr(expr) else {
-                    return false;
-                };
-                let Some((&attr, rest)) = unqualified.segments().split_last() else {
-                    return false;
-                };
-                if attr != "__all__" {
-                    return false;
-                }
-                let possible_module_name = Name::new(rest.join("."));
-                let Some(symbols) =
-                    self.imports
-                        .get_module_symbols(self.db, self.file, &possible_module_name)
-                else {
-                    return false;
-                };
-                let Some(ref all) = symbols.all_names else {
-                    return false;
-                };
-                self.all_names.extend(all.iter().cloned());
-                true
-            }
-            _ => false,
-        }
-    }
-
-    /// Processes a call idiom for `__all__` and updates the set of
-    /// names accordingly.
-    ///
-    /// Returns `true` if the call idiom is recognized and valid,
-    /// `false` otherwise.
-    fn update_all_by_call_idiom(
-        &mut self,
-        function_name: &ast::Identifier,
-        arguments: &ast::Arguments,
-    ) -> bool {
-        if arguments.len() != 1 {
-            return false;
-        }
-        let Some(argument) = arguments.find_positional(0) else {
-            return false;
-        };
-        match function_name.as_str() {
-            // `__all__.extend([...])`
-            // `__all__.extend(module.__all__)`
-            "extend" => {
-                if !self.extend_all(argument) {
-                    return false;
-                }
-            }
-            // `__all__.append(...)`
-            "append" => {
-                let Some(name) = create_all_name(argument) else {
-                    return false;
-                };
-                self.all_names.insert(name);
-            }
-            // `__all__.remove(...)`
-            "remove" => {
-                let Some(name) = create_all_name(argument) else {
-                    return false;
-                };
-                self.all_names.remove(&name);
-            }
-            _ => return false,
-        }
-        true
-    }
-
     /// Adds all of the names exported from the module
     /// imported by `import_from`. i.e., This implements
     /// `from module import *` semantics.
     fn add_exported_from_wildcard(&mut self, import_from: &ast::StmtImportFrom) {
         let Some(symbols) = self.get_names_from_wildcard(import_from) else {
-            self.all_invalid = true;
             return;
         };
         let star_range = import_from
@@ -1075,29 +740,6 @@ impl<'db> SymbolVisitor<'db> {
                 symbol.imported_from = Some(imported_from);
                 Some(symbol)
             }));
-        // If the imported module defines an `__all__` AND `__all__` is
-        // in `__all__`, then the importer gets it too.
-        if let Some(ref all) = symbols.all_names
-            && all.contains("__all__")
-        {
-            self.update_all_origin(DunderAllOrigin::StarImport);
-            self.all_names.extend(all.iter().cloned());
-        }
-    }
-
-    /// Adds `__all__` from the module imported by `import_from`. i.e.,
-    /// This implements `from module import __all__` semantics.
-    fn add_all_from_import(&mut self, import_from: &ast::StmtImportFrom) {
-        let Some(symbols) = self.get_names_from_wildcard(import_from) else {
-            self.all_invalid = true;
-            return;
-        };
-        // If the imported module defines an `__all__`,
-        // then the importer gets it too.
-        if let Some(ref all) = symbols.all_names {
-            self.update_all_origin(DunderAllOrigin::ExternalModule);
-            self.all_names.extend(all.iter().cloned());
-        }
     }
 
     /// Returns the exported symbols (along with `__all__`) from the
@@ -1110,50 +752,6 @@ impl<'db> SymbolVisitor<'db> {
             ModuleName::from_import_statement(self.db, self.file, import_from).ok()?;
         let module = resolve_module(self.db, self.file, &module_name)?;
         Some(symbols_for_file_global_only(self.db, module.file(self.db)?))
-    }
-
-    /// Add valid names from `__all__` to the set of existing `__all__`
-    /// names.
-    ///
-    /// Returns `false` if any of the names are invalid.
-    fn add_all_names(&mut self, exprs: &[ast::Expr]) -> bool {
-        for expr in exprs {
-            let Some(name) = create_all_name(expr) else {
-                return false;
-            };
-            self.all_names.insert(name);
-        }
-        true
-    }
-
-    /// Updates the origin of `__all__` in the current module.
-    fn update_all_origin(&mut self, origin: DunderAllOrigin) {
-        // N.B. This used to clear `all_names` whenever there
-        // was *any* previous origin set. Now we skip clearing
-        // it if the previous origin and the new origin are
-        // both "current module." This tends to arise in situation
-        // like this:
-        //
-        //     if sys.version > ...:
-        //         __all__ = ['SomeFancyNewSymbol']
-        //     else:
-        //         __all__ = []
-        //
-        // Clearing is arguably correct here, but auto-import
-        // (unlike ty's own __all__ handling) doesn't yet know
-        // how to evaluate conditionals. So instead of over-writing
-        // __all__, we union it. This will produce incorrect
-        // results in some cases, but the failure mode will be
-        // "suggests symbol that doesn't exist" instead of
-        // "doesn't suggest symbol that does exist." The former
-        // seems preferable (until we know how to evaluate at
-        // least some rudimentary conditionals).
-        if !(matches!(self.all_origin, Some(DunderAllOrigin::CurrentModule))
-            && matches!(origin, DunderAllOrigin::CurrentModule))
-        {
-            self.all_names.clear();
-        }
-        self.all_origin = Some(origin);
     }
 
     fn push_symbol(&mut self, symbol: SymbolTree) {
@@ -1204,10 +802,10 @@ impl<'db> SymbolVisitor<'db> {
         // or not. When there is `__all__`, we currently follow it
         // strictly.
         //
-        // If `__all__` is somehow invalid, ignore it and fall
-        // through as-if `__all__` didn't exist.
-        if self.all_origin.is_some() && !self.all_invalid {
-            return self.all_names.contains(&*symbol.name);
+        // The shared syntax-only analysis returns `None` for an invalid `__all__`, in which case
+        // we fall through as if it did not exist.
+        if let Some(all_names) = self.all_names {
+            return all_names.contains(&*symbol.name);
         }
 
         // "Imported symbols are considered private by default. A fixed
@@ -1317,8 +915,6 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                 self.add_name_symbol(stmt, name, SymbolKind::Variable);
             }
             ast::Stmt::Assign(assign) => {
-                self.add_all_assignment(&assign.targets, Some(&assign.value));
-
                 for target in &assign.targets {
                     let ast::Expr::Name(name) = target else {
                         continue;
@@ -1327,76 +923,10 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                 }
             }
             ast::Stmt::AnnAssign(ann_assign) => {
-                self.add_all_assignment(
-                    std::slice::from_ref(&ann_assign.target),
-                    ann_assign.value.as_deref(),
-                );
-
                 let ast::Expr::Name(name) = &*ann_assign.target else {
                     return;
                 };
                 self.add_assignment(stmt, name);
-            }
-            ast::Stmt::AugAssign(ast::StmtAugAssign {
-                target, op, value, ..
-            }) => {
-                // We don't care about `__all__` unless we're
-                // specifically looking for exported symbols.
-                if !self.exports_only {
-                    return;
-                }
-
-                if self.all_origin.is_none() {
-                    // We can't update `__all__` if it doesn't already
-                    // exist.
-                    return;
-                }
-                if !is_dunder_all(target) {
-                    return;
-                }
-                // Anything other than `+=` is not valid.
-                if !matches!(op, ast::Operator::Add) {
-                    self.all_invalid = true;
-                    return;
-                }
-                if !self.extend_all(value) {
-                    self.all_invalid = true;
-                }
-            }
-            ast::Stmt::Expr(expr) => {
-                // We don't care about `__all__` unless we're
-                // specifically looking for exported symbols.
-                if !self.exports_only {
-                    return;
-                }
-
-                if self.all_origin.is_none() {
-                    // We can't update `__all__` if it doesn't already exist.
-                    return;
-                }
-                let Some(ast::ExprCall {
-                    func, arguments, ..
-                }) = expr.value.as_call_expr()
-                else {
-                    return;
-                };
-                let Some(ast::ExprAttribute {
-                    value,
-                    attr,
-                    ctx: ast::ExprContext::Load,
-                    ..
-                }) = func.as_attribute_expr()
-                else {
-                    return;
-                };
-                if !is_dunder_all(value) {
-                    return;
-                }
-                if !self.update_all_by_call_idiom(attr, arguments) {
-                    self.all_invalid = true;
-                }
-
-                source_order::walk_stmt(self, stmt);
             }
             ast::Stmt::Import(import) => {
                 // We ignore any names introduced by imports
@@ -1409,7 +939,6 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                 if self.in_function {
                     return;
                 }
-                self.imports.add_import(import);
                 for alias in &import.names {
                     self.add_import_alias(AstImport::Import(import), alias);
                 }
@@ -1425,27 +954,17 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                 if self.in_function {
                     return;
                 }
-                self.imports.add_import_from(import_from);
                 for alias in &import_from.names {
                     if &alias.name == "*" {
                         self.add_exported_from_wildcard(import_from);
                     } else {
-                        if &alias.name == "__all__"
-                            && alias
-                                .asname
-                                .as_ref()
-                                .is_none_or(|asname| asname == "__all__")
-                        {
-                            self.add_all_from_import(import_from);
-                        }
                         self.add_import_alias(AstImport::ImportFrom(import_from), alias);
                     }
                 }
             }
             // FIXME: We don't currently try to evaluate `if`
             // statements. We just assume that all `if` statements are
-            // always `True`. This applies to symbols in general but
-            // also `__all__`.
+            // always `True`. The shared syntax-only `__all__` analysis uses the same policy.
             _ => {
                 source_order::walk_stmt(self, stmt);
             }
@@ -1455,29 +974,6 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
     // TODO: We might consider handling walrus expressions
     // here, since they can be used to introduce new names.
     fn visit_expr(&mut self, _expr: &ast::Expr) {}
-}
-
-/// Represents where an `__all__` has been defined.
-#[derive(Debug, Clone)]
-enum DunderAllOrigin {
-    /// The `__all__` variable is defined in the current module.
-    CurrentModule,
-    /// The `__all__` variable is imported from another module.
-    ExternalModule,
-    /// The `__all__` variable is imported from a module via a `*`-import.
-    StarImport,
-}
-
-/// Checks if the given expression is a name expression for `__all__`.
-fn is_dunder_all(expr: &ast::Expr) -> bool {
-    matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "__all__")
-}
-
-/// Create and return a string representing a name from the given
-/// expression, or `None` if it is an invalid expression for a
-/// `__all__` element.
-fn create_all_name(expr: &ast::Expr) -> Option<Name> {
-    Some(expr.as_string_literal_expr()?.value.to_str().into())
 }
 
 #[cfg(test)]

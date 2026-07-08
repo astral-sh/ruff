@@ -49,7 +49,7 @@ use crate::predicate::{
     SequencePatternPredicateKind, StarImportPlaceholderPredicate, SubjectElementPatternPredicate,
 };
 use crate::program::Program;
-use crate::re_exports::exported_names;
+use crate::re_exports::{exported_names, syntactic_dunder_all_names};
 use crate::reachability_constraints::{
     ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
@@ -2944,7 +2944,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                         let is_immediately_shadowed = node.names.iter().any(|alias| {
                             if &alias.name == "*" {
-                                return false;
+                                return resolve_module(self.db, self.file, &module_name)
+                                    .and_then(|module| module.file(self.db))
+                                    .is_some_and(|file| {
+                                        syntactic_dunder_all_names(self.db, file)
+                                            .is_definitely_exported(direct_submodule)
+                                    });
                             }
 
                             let bound_name = alias.asname.as_ref().unwrap_or(&alias.name);
