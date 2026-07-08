@@ -730,10 +730,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         {
             return self.never();
         }
-        // A `ParamSpecValue` is an inferred parameter-list witness, not a callable contract. Its
-        // retained generic context is therefore unified existentially. Once the parameter list is
-        // spliced into a regular callable, ordinary higher-rank target comparison applies again.
-        // Either operand can be a bound on the same inferred witness, so both directions use this
+        // A `ParamSpecValue` is an inferred parameter list, not a callable contract. Its retained
+        // generic context is therefore unified existentially. Once the parameter list is spliced
+        // into a regular callable, ordinary higher-rank target comparison applies again. Either
+        // operand can be a bound on the same inferred parameter list, so both directions use this
         // mode.
         if source_kind == CallableTypeKind::ParamSpecValue
             || target_kind == CallableTypeKind::ParamSpecValue

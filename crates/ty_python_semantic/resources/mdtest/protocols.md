@@ -2975,6 +2975,25 @@ class ListOnlyConsumer:
     def f[S](self, value: list[S]) -> None:
         return None
 
+class OptionalConsumer:
+    def f[S](self, value: S | None) -> None:
+        return None
+
+class OptionalListConsumer:
+    def f[S](self, value: list[S] | None) -> None:
+        return None
+
+class ConstrainedOptionalConsumer:
+    def f[S: (int, str)](self, value: S | None) -> None:
+        return None
+
+class IntReturningConsumerProtocol(Protocol):
+    def f[T](self, value: T) -> int: ...
+
+class OptionalIdentity:
+    def f[S](self, value: S | None) -> S:
+        raise NotImplementedError
+
 # A non-generic source is valid when its single signature covers every target specialization.
 static_assert(is_assignable_to(ObjectConsumer, ArbitraryConsumerProtocol))
 static_assert(is_subtype_of(ObjectConsumer, ArbitraryConsumerProtocol))
@@ -2984,6 +3003,25 @@ static_assert(is_subtype_of(ObjectConsumer, ArbitraryConsumerProtocol))
 static_assert(not is_assignable_to(ListOnlyConsumer, ArbitraryConsumerProtocol))
 static_assert(not is_subtype_of(ListOnlyConsumer, ArbitraryConsumerProtocol))
 
+# An unbounded source variable that appears directly in the union can be specialized to the target
+# variable: choosing `S = T` makes `S | None` accept every value accepted by the target.
+static_assert(is_assignable_to(OptionalConsumer, ArbitraryConsumerProtocol))
+static_assert(is_subtype_of(OptionalConsumer, ArbitraryConsumerProtocol))
+
+# A source variable nested inside another type cannot be specialized this way merely because the
+# enclosing type is a union.
+static_assert(not is_assignable_to(OptionalListConsumer, ArbitraryConsumerProtocol))
+static_assert(not is_subtype_of(OptionalListConsumer, ArbitraryConsumerProtocol))
+
+# The source variable must permit every target specialization.
+static_assert(not is_assignable_to(ConstrainedOptionalConsumer, ArbitraryConsumerProtocol))
+static_assert(not is_subtype_of(ConstrainedOptionalConsumer, ArbitraryConsumerProtocol))
+
+# Choosing `S = T` for the parameter must also satisfy the return type. No choice of `S` makes the
+# implementation accept every `T` while returning `int`.
+static_assert(not is_assignable_to(OptionalIdentity, IntReturningConsumerProtocol))
+static_assert(not is_subtype_of(OptionalIdentity, IntReturningConsumerProtocol))
+
 class ConstrainedListConsumerProtocol(Protocol):
     def f[T: (list[int], list[str])](self, value: T) -> None: ...
 
@@ -2991,8 +3029,8 @@ class GenericListConsumer:
     def f[S](self, value: list[S]) -> None:
         return None
 
-# The target domain supplies a concrete source witness for each specialization: `S = int` when
-# `T = list[int]`, and `S = str` when `T = list[str]`.
+# The target domain makes a concrete source specialization possible in each case: choose `S = int`
+# when `T = list[int]`, and `S = str` when `T = list[str]`.
 static_assert(is_assignable_to(GenericListConsumer, ConstrainedListConsumerProtocol))
 static_assert(is_subtype_of(GenericListConsumer, ConstrainedListConsumerProtocol))
 
@@ -3000,7 +3038,7 @@ class ConstrainedScalarConsumerProtocol(Protocol):
     def f[T: (int, str)](self, value: T) -> None: ...
 
 # A concrete target domain only makes projection representable; every target specialization must
-# still have a valid source witness.
+# still be accepted by some valid source specialization.
 static_assert(not is_assignable_to(GenericListConsumer, ConstrainedScalarConsumerProtocol))
 static_assert(not is_subtype_of(GenericListConsumer, ConstrainedScalarConsumerProtocol))
 

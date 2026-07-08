@@ -1848,7 +1848,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
     /// Compares generic signatures as `for all target locals, there exist source locals`.
     ///
-    /// Source variables are projected first, so their witnesses may depend on a target variable:
+    /// Source variables are projected first, so a source specialization may depend on a target
+    /// specialization:
     ///
     /// ```python
     /// def source[S](value: S) -> list[S]: ...
@@ -1875,24 +1876,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         };
         let source_locals = quantified_locals(source_typevars);
         let target_locals = quantified_locals(target_typevars);
-        let target_locals_fixed_by_domain = quantified_locals(
-            &target_typevars
-                .iter()
-                .copied()
-                .filter(|typevar| {
-                    typevar
-                        .typevar(db)
-                        .constraints(db)
-                        .is_some_and(|constraints| {
-                            constraints.iter().all(|constraint| {
-                                !constraint.has_typevar(db)
-                                    && constraint.bottom_materialization(db)
-                                        == constraint.top_materialization(db)
-                            })
-                        })
-                })
-                .collect::<Vec<_>>(),
-        );
         let checker = self
             .with_inferable_typevars(self.inferable.merge(db, source_locals))
             .with_universally_quantified_typevars(db, target_locals)
@@ -1930,15 +1913,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // A generic source is an intersection of its specializations. For each target
         // specialization, it is enough for some valid source specialization to satisfy the
         // relation. Quantify the entire source block in a single BDD traversal.
-        if with_domains.has_unprojectable_nested_typevar(
-            db,
-            self.constraints,
-            source_locals,
-            target_locals_fixed_by_domain,
-        ) {
+        let Some(quantified) = with_domains.try_exists(db, self.constraints, source_locals) else {
             return self.never();
-        }
-        let quantified = with_domains.exists(db, self.constraints, source_locals);
+        };
 
         // A generic target is the intersection of all of its specializations. The source must
         // therefore satisfy every valid target specialization. Source variables have already

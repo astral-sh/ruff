@@ -105,7 +105,7 @@ use crate::types::generics::InferableTypeVars;
 use crate::types::typevar::{BoundTypeVarIdentity, walk_bound_type_var_type};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
-    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+    TypeCollector, TypeVisitor, any_over_type, find_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
     BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, TypeVarVariance,
@@ -580,7 +580,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// true whenever there was _any_ specialization of those typevars that returned true before.
     ///
     /// This cached path retains the existing encoding of facts derived during projection.
-    /// Higher-rank comparison uses [`Self::exists`] to normalize those residual facts instead.
+    /// Higher-rank comparison uses [`Self::try_exists`] to normalize those residual facts instead.
     pub(crate) fn reduce_inferable(
         self,
         db: &'db dyn Db,
@@ -591,67 +591,27 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, self.node.exists(db, builder, to_remove))
     }
 
-    /// Existentially quantifies the given type variables out of this constraint set.
+    /// Tries to existentially quantify the given type variables out of this constraint set.
     ///
     /// The result holds whenever the original constraint set holds for any assignment of the
     /// removed variables. A caller that wants to restrict assignments to a type variable's
     /// declared domain must conjoin that domain before calling this method.
     ///
+    /// Returns [`None`] if this representation cannot express the exact result. This does not mean
+    /// that no specialization exists, only that projection would otherwise discard information.
     /// Positive facts derived during projection are rebuilt through the canonical constraint
     /// constructor. This makes the result independent of type-variable interning order, at the
     /// cost of using a separate, uncached path from [`Self::reduce_inferable`].
-    pub(crate) fn exists(
+    pub(crate) fn try_exists(
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         to_remove: InferableTypeVars<'db>,
-    ) -> Self {
+    ) -> Option<Self> {
         self.verify_builder(builder);
-        Self::from_node(builder, self.node.exists_normalized(db, builder, to_remove))
-    }
-
-    /// Returns whether existential abstraction would require a residual constraint that
-    /// `ConstraintSet` cannot represent.
-    ///
-    /// Relationships between bare type variables can be projected through the sequent machinery.
-    /// A removed variable nested in a bound can instead require an existential type, such as
-    /// projecting `S` from `T ≤ list[S]`; `ConstraintSet` cannot represent that residual today.
-    /// If `T` is fixed by a concrete domain, however, the domain constraints let the sequent
-    /// machinery substitute each concrete specialization before projection.
-    pub(crate) fn has_unprojectable_nested_typevar(
-        self,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-        to_remove: InferableTypeVars<'db>,
-        fixed_by_domain: InferableTypeVars<'db>,
-    ) -> bool {
-        self.verify_builder(builder);
-        if to_remove == InferableTypeVars::None {
-            return false;
-        }
-        let mut unprojectable = false;
         self.node
-            .for_each_unique_constraint(builder, &mut |constraint, _| {
-                let constraint = builder.constraint_data(constraint);
-                for bound in constraint
-                    .bounds
-                    .lower
-                    .into_iter()
-                    .chain(constraint.bounds.upper)
-                {
-                    if !bound.is_type_var()
-                        && any_over_type(db, bound, false, |inner| {
-                            inner
-                                .as_typevar()
-                                .is_some_and(|typevar| typevar.is_inferable(db, to_remove))
-                        })
-                        && !constraint.typevar.is_inferable(db, fixed_by_domain)
-                    {
-                        unprojectable = true;
-                    }
-                }
-            });
-        unprojectable
+            .try_exists_normalized(db, builder, to_remove)
+            .map(|node| Self::from_node(builder, node))
     }
 
     /// Returns whether a constraint relates one of the given type variables to a type variable
@@ -2983,6 +2943,151 @@ impl NodeId {
         let mut storage = builder.storage.borrow_mut();
         storage.exists_cache.insert(key, result);
         result
+    }
+
+    /// Tries to existentially abstract all `bound_typevars`, returning `None` if the exact result
+    /// would require a residual constraint that this representation cannot encode.
+    fn try_exists_normalized<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        bound_typevars: InferableTypeVars<'db>,
+    ) -> Option<Self> {
+        if bound_typevars == InferableTypeVars::None {
+            return Some(self);
+        }
+
+        // Bare relationships such as `T ≤ S` can be projected by the sequent machinery. First
+        // identify the subjects whose bounds contain a variable being removed at a deeper level.
+        let mentions_nested_bound_typevar = |bound: Type<'db>| {
+            !bound.is_type_var()
+                && any_over_type(db, bound, false, |inner| {
+                    inner
+                        .as_typevar()
+                        .is_some_and(|typevar| typevar.is_inferable(db, bound_typevars))
+                })
+        };
+        let mut nested_subjects = FxHashSet::default();
+        self.for_each_unique_constraint(builder, &mut |constraint, _| {
+            let constraint = builder.constraint_data(constraint);
+            if constraint
+                .bounds
+                .lower
+                .into_iter()
+                .chain(constraint.bounds.upper)
+                .any(mentions_nested_bound_typevar)
+            {
+                nested_subjects.insert(constraint.typevar);
+            }
+        });
+        if nested_subjects.is_empty() {
+            return Some(self.exists_normalized(db, builder, bound_typevars));
+        }
+
+        // A nested relationship can still be projected when the formula itself restricts its
+        // subject to concrete alternatives. Collect those alternatives here; below, we verify
+        // that the complete formula implies their disjunction before relying on them.
+        let mut concrete_domains = FxHashMap::default();
+        self.for_each_unique_constraint(builder, &mut |constraint, source_order| {
+            let data = builder.constraint_data(constraint);
+            if !nested_subjects.contains(&data.typevar) {
+                return;
+            }
+            let (Some(lower), Some(upper)) = (data.bounds.lower, data.bounds.upper) else {
+                return;
+            };
+            if lower != upper
+                || lower.has_typevar(db)
+                || lower.bottom_materialization(db) != lower.top_materialization(db)
+            {
+                return;
+            }
+
+            let specialization =
+                Node::new_satisfied_constraint(builder, constraint.when_true(), source_order);
+            concrete_domains
+                .entry(data.typevar)
+                .and_modify(|domain: &mut NodeId| {
+                    *domain = domain.or(builder, specialization);
+                })
+                .or_insert(specialization);
+        });
+
+        let mut subjects_with_concrete_domains = FxHashMap::default();
+        let mut requires_unrepresentable_residual = false;
+        self.for_each_unique_constraint(builder, &mut |constraint, _| {
+            if requires_unrepresentable_residual {
+                return;
+            }
+            let constraint = builder.constraint_data(constraint);
+            let nested_lower = constraint
+                .bounds
+                .lower
+                .filter(|bound| mentions_nested_bound_typevar(*bound));
+            let nested_upper = constraint
+                .bounds
+                .upper
+                .filter(|bound| mentions_nested_bound_typevar(*bound));
+            if nested_lower.is_none() && nested_upper.is_none() {
+                return;
+            }
+
+            let subject_has_concrete_domain = *subjects_with_concrete_domains
+                .entry(constraint.typevar)
+                .or_insert_with(|| {
+                    concrete_domains
+                        .get(&constraint.typevar)
+                        .is_some_and(|domain| {
+                            self.implies(builder, *domain)
+                                .is_always_satisfied(db, builder)
+                        })
+                });
+            if subject_has_concrete_domain {
+                return;
+            }
+
+            // For an upper bound `T ≤ F[S]`, specializing an unbounded `S` to `T` is sufficient
+            // when the ordinary relation checker proves `T ≤ F[T]` for every `T`. This handles
+            // `T ≤ S | None` without making projection depend on any particular type shape.
+            let upper_bound_allows_subject_specialization = |bound: Type<'db>| {
+                let Some(typevar) = find_over_type(db, bound, false, |inner| {
+                    inner
+                        .as_typevar()
+                        .filter(|typevar| typevar.is_inferable(db, bound_typevars))
+                }) else {
+                    return false;
+                };
+                if typevar.typevar(db).bound_or_constraints(db).is_some() {
+                    return false;
+                }
+
+                let subject = Type::TypeVar(constraint.typevar);
+                let specialized = bound.substitute_one_typevar(db, typevar, subject);
+                if any_over_type(db, specialized, false, |inner| {
+                    inner
+                        .as_typevar()
+                        .is_some_and(|typevar| typevar.is_inferable(db, bound_typevars))
+                }) {
+                    return false;
+                }
+
+                subject
+                    .when_constraint_set_assignable_to(db, specialized, builder)
+                    .is_always_satisfied(db)
+            };
+
+            if nested_lower.is_some()
+                || nested_upper
+                    .is_some_and(|upper| !upper_bound_allows_subject_specialization(upper))
+            {
+                requires_unrepresentable_residual = true;
+            }
+        });
+        if requires_unrepresentable_residual {
+            return None;
+        }
+
+        Some(self.exists_normalized(db, builder, bound_typevars))
     }
 
     /// Existentially abstracts all `bound_typevars` in one traversal, normalizing facts derived
@@ -7703,7 +7808,8 @@ mod tests {
 
         // Every target specialization has some equal source specialization.
         let forall_target_exists_source = equal
-            .exists(&db, &builder, source_locals)
+            .try_exists(&db, &builder, source_locals)
+            .expect("equality can be projected exactly")
             .try_for_all(&db, &builder, target_locals)
             .expect("existential abstraction removes the free source variable");
         assert!(forall_target_exists_source.is_always_satisfied(&db));
@@ -7712,7 +7818,8 @@ mod tests {
         let exists_source_forall_target = equal
             .try_for_all(&db, &builder, target_locals)
             .unwrap_or_else(|| ConstraintSet::never(&builder))
-            .exists(&db, &builder, source_locals);
+            .try_exists(&db, &builder, source_locals)
+            .expect("the terminal constraint set can be projected exactly");
         assert!(exists_source_forall_target.is_never_satisfied(&db));
     }
 
@@ -7744,7 +7851,7 @@ mod tests {
     }
 
     #[test]
-    fn existential_quantification_preserves_optional_equality_witness() {
+    fn existential_quantification_preserves_optional_equality() {
         let db = setup_db();
         let source = create_typevar(&db, "S");
         let target = create_typevar(&db, "T");
@@ -7775,12 +7882,14 @@ mod tests {
             let relation = target_below_source.and(&db, &builder, || source_below_value_or_target);
 
             // For every `T`, choosing `S = T` satisfies the union upper bound. The unrelated
-            // `S ≤ V` alternative must not cause abstraction to lose that equality witness.
-            let quantified = relation.exists(
-                &db,
-                &builder,
-                quantified_typevars(&db, [source.identity(&db)]),
-            );
+            // `S ≤ V` alternative must not cause abstraction to discard the `S = T` solution.
+            let quantified = relation
+                .try_exists(
+                    &db,
+                    &builder,
+                    quantified_typevars(&db, [source.identity(&db)]),
+                )
+                .expect("bare type-variable bounds can be projected exactly");
             assert!(quantified.is_always_satisfied(&db));
         }
     }
@@ -7805,11 +7914,13 @@ mod tests {
             Type::TypeVar(value),
         );
         let relation = target_below_source.and(&db, &builder, || source_below_value);
-        let quantified = relation.exists(
-            &db,
-            &builder,
-            quantified_typevars(&db, [source.identity(&db)]),
-        );
+        let quantified = relation
+            .try_exists(
+                &db,
+                &builder,
+                quantified_typevars(&db, [source.identity(&db)]),
+            )
+            .expect("bare type-variable bounds can be projected exactly");
         let expected = ConstraintSet::constrain_typevar_upper_bound(
             &db,
             &builder,
@@ -7819,6 +7930,70 @@ mod tests {
         assert!(
             quantified
                 .iff(&db, &builder, expected)
+                .is_always_satisfied(&db)
+        );
+    }
+
+    #[test]
+    fn existential_quantification_rejects_unrepresentable_residual() {
+        let db = setup_db();
+        let source = create_typevar(&db, "S");
+        let target = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let relation = ConstraintSet::constrain_typevar_upper_bound(
+            &db,
+            &builder,
+            target,
+            KnownClass::List.to_specialized_instance(&db, &[Type::TypeVar(source)]),
+        );
+
+        assert!(
+            relation
+                .try_exists(
+                    &db,
+                    &builder,
+                    quantified_typevars(&db, [source.identity(&db)]),
+                )
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn existential_quantification_uses_concrete_subject_domain() {
+        let db = setup_db();
+        let source = create_typevar(&db, "S");
+        let target = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let list_of_source =
+            KnownClass::List.to_specialized_instance(&db, &[Type::TypeVar(source)]);
+        let relation =
+            ConstraintSet::constrain_typevar_upper_bound(&db, &builder, target, list_of_source);
+        let list_of_int =
+            KnownClass::List.to_specialized_instance(&db, &[KnownClass::Int.to_instance(&db)]);
+        let list_of_str =
+            KnownClass::List.to_specialized_instance(&db, &[KnownClass::Str.to_instance(&db)]);
+        let target_domain = ConstraintSet::constrain_typevar(
+            &db,
+            &builder,
+            target,
+            list_of_int,
+            list_of_int,
+        )
+        .or(&db, &builder, || {
+            ConstraintSet::constrain_typevar(&db, &builder, target, list_of_str, list_of_str)
+        });
+        let relation_in_domain = target_domain.and(&db, &builder, || relation);
+
+        let quantified = relation_in_domain
+            .try_exists(
+                &db,
+                &builder,
+                quantified_typevars(&db, [source.identity(&db)]),
+            )
+            .expect("the concrete subject domain makes projection representable");
+        assert!(
+            quantified
+                .iff(&db, &builder, target_domain)
                 .is_always_satisfied(&db)
         );
     }
