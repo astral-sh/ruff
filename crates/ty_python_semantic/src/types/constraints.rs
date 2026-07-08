@@ -94,7 +94,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use indexmap::map::Entry;
-use itertools::Itertools;
+use itertools::{EitherOrBoth, Itertools};
 use ruff_index::{Idx, IndexVec, newtype_index};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -565,16 +565,15 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, self.node.iff_with_offset(builder, other.node))
     }
 
-    /// Reduces the set of inferable typevars for this constraint set. You provide an iterator of
-    /// the typevars that were inferable when this constraint set was created, and which should be
-    /// abstracted away. Those typevars will be removed from the constraint set, and the constraint
-    /// set will return true whenever there was _any_ specialization of those typevars that
-    /// returned true before.
+    /// Reduces the set of inferable typevars for this constraint set. You provide the typevars that
+    /// were inferable when this constraint set was created, and which should be abstracted away.
+    /// Those typevars will be removed from the constraint set, and the constraint set will return
+    /// true whenever there was _any_ specialization of those typevars that returned true before.
     pub(crate) fn reduce_inferable(
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        to_remove: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
+        to_remove: InferableTypeVars<'db>,
     ) -> Self {
         self.verify_builder(builder);
         Self::from_node(builder, self.node.exists(db, builder, to_remove))
@@ -704,7 +703,7 @@ struct ConstraintSetStorage<'db> {
     negate_cache: FxHashMap<NodeId, NodeId>,
     or_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
     and_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
-    exists_one_cache: FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), NodeId>,
+    exists_cache: FxHashMap<(NodeId, InferableTypeVars<'db>), NodeId>,
     retain_one_cache: FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), NodeId>,
     restrict_one_cache: FxHashMap<(NodeId, ConstraintAssignment), (NodeId, bool)>,
     simplify_cache: FxHashMap<NodeId, NodeId>,
@@ -1126,7 +1125,7 @@ impl IntersectionResult<'_> {
 
 /// The index of a bound typevar within a [`ConstraintSetStorage`].
 #[newtype_index]
-#[derive(salsa::Update, get_size2::GetSize)]
+#[derive(Ord, PartialOrd, salsa::Update, get_size2::GetSize)]
 pub struct TypeVarId;
 
 /// The index of an individual constraint (i.e. a BDD variable) within a [`ConstraintSetStorage`].
@@ -1134,33 +1133,74 @@ pub struct TypeVarId;
 #[derive(salsa::Update, get_size2::GetSize)]
 pub struct ConstraintId;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(
+    Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, salsa::Update, get_size2::GetSize,
+)]
 enum NestedSubstitutionSide {
     Lower,
     Upper,
 }
 
-/// Identifies one nested-typevar substitution that has been applied while saturating a single
-/// BDD path.
+/// Identifies one nested-typevar substitution shape.
 ///
 /// We key this by the typevar of the constrained constraint (which stays the same across an
 /// entire chain of derivations against a single root constraint), the typevar that we substitute
-/// _for_, and the side. We deliberately do _not_ key by the constraint id we substitute into,
-/// because each nested substitution produces a new derived constraint, and if we keyed by that
-/// id the next derivation step would have a different id and the repeat-guard would never fire.
-/// The pathological cases that matter for performance involve repeated wrapping (e.g.
-/// `Iterable[...]` layers) that keeps producing ever-deeper replacement types while targeting
-/// the same constrained typevar; keying by the constrained typevar plus the substituted typevar
-/// lets [`PathAssignments`] apply each substitution shape at most once per path.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+/// _for_, and the side. Each derived path assignment records the substitution shapes in its own
+/// derivation history. This lets independent derivations apply the same substitution while
+/// preventing one derivation chain from repeatedly unfolding the same recursive pattern.
+#[derive(
+    Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, salsa::Update, get_size2::GetSize,
+)]
 struct NestedSubstitution {
-    /// NOTE: Keying `NestedSubstitution` by `constrained_typevar` instead of the specific constrained `ConstraintId` makes
-    /// deduplication apply across all constraints on that typevar.
-    /// This provides a performance benefit, but may weaken sequent saturation and can miss contradictions (or other implications) that depend on keeping both substitutions.
-    /// However, at present, there don't seem to be any cases where this is a problem (see ruff#24803 for details).
     constrained_typevar: TypeVarId,
     substituted_typevar: TypeVarId,
     side: NestedSubstitutionSide,
+}
+
+/// The nested substitution shapes used to derive one path assignment.
+///
+/// The substitutions are kept sorted so that histories with the same substitutions compare and
+/// hash equally regardless of the order in which the antecedents were combined.
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+struct NestedSubstitutionHistory(SmallVec<[NestedSubstitution; 4]>);
+
+impl NestedSubstitutionHistory {
+    /// Merges two derivation histories and records `nested_substitution`. Returns `None` if either
+    /// history has already applied that substitution.
+    fn merged(
+        &self,
+        other: &Self,
+        nested_substitution: Option<NestedSubstitution>,
+    ) -> Option<Self> {
+        if let Some(substitution) = nested_substitution
+            && (self.contains(substitution) || other.contains(substitution))
+        {
+            return None;
+        }
+
+        Some(Self(
+            self.0
+                .iter()
+                .merge(other.0.iter())
+                .merge(nested_substitution.iter())
+                .dedup()
+                .copied()
+                .collect(),
+        ))
+    }
+
+    fn contains(&self, substitution: NestedSubstitution) -> bool {
+        self.0.binary_search(&substitution).is_ok()
+    }
+
+    fn is_subset_of(&self, other: &Self) -> bool {
+        self.0.len() <= other.0.len()
+            && self
+                .0
+                .iter()
+                .merge_join_by(other.0.iter(), Ord::cmp)
+                .all(|item| !matches!(item, EitherOrBoth::Left(_)))
+    }
 }
 
 /// A constraint derived from the sequent map, optionally annotated with the nested substitution
@@ -2765,25 +2805,42 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        bound_typevars: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
+        bound_typevars: InferableTypeVars<'db>,
     ) -> Self {
-        bound_typevars
-            .into_iter()
-            .fold(self, |abstracted, bound_typevar| {
-                abstracted.exists_one(db, builder, bound_typevar)
-            })
+        if bound_typevars == InferableTypeVars::None {
+            return self;
+        }
+
+        let Node::Interior(interior) = self.node() else {
+            return self;
+        };
+
+        let key = (self, bound_typevars);
+        let storage = builder.storage.borrow();
+        if let Some(result) = storage.exists_cache.get(&key) {
+            return *result;
+        }
+        drop(storage);
+
+        let mut path = interior.path_assignments(builder);
+        let result = self.exists_inner(db, builder, bound_typevars, &mut path);
+
+        let mut storage = builder.storage.borrow_mut();
+        storage.exists_cache.insert(key, result);
+        result
     }
 
-    fn exists_one<'db>(
+    fn exists_inner<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        bound_typevar: BoundTypeVarIdentity<'db>,
+        bound_typevars: InferableTypeVars<'db>,
+        path: &mut PathAssignments,
     ) -> Self {
         match self.node() {
             Node::AlwaysTrue => ALWAYS_TRUE,
             Node::AlwaysFalse => ALWAYS_FALSE,
-            Node::Interior(interior) => interior.exists_one(db, builder, bound_typevar),
+            Node::Interior(interior) => interior.exists_inner(db, builder, bound_typevars, path),
         }
     }
 
@@ -4000,58 +4057,38 @@ impl InteriorNode {
         result
     }
 
-    fn exists_one<'db>(
+    fn exists_inner<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        bound_typevar: BoundTypeVarIdentity<'db>,
+        bound_typevars: InferableTypeVars<'db>,
+        path: &mut PathAssignments,
     ) -> NodeId {
-        let key = (self.node(), bound_typevar);
-        let storage = builder.storage.borrow();
-        if let Some(result) = storage.exists_one_cache.get(&key) {
-            return *result;
-        }
-        drop(storage);
-
-        let mut path = self.path_assignments(builder);
         let mentions_typevar = |ty: Type<'db>| match ty {
-            Type::TypeVar(haystack) => haystack.identity(db) == bound_typevar,
+            Type::TypeVar(typevar) => typevar.is_inferable(db, bound_typevars),
             _ => false,
         };
-        let result = self.abstract_one_inner(
+        self.abstract_one_inner(
             db,
             builder,
-            // Remove any node that constrains `bound_typevar`, or that has a lower/upper bound
-            // that mentions `bound_typevar`. The sequent map ensures that derived facts are
-            // propagated for nested typevar references, using the variance of the typevar's
-            // position to determine the correct substitution.
+            // Remove any node that constrains one of `bound_typevars`, or that has a lower/upper
+            // bound that mentions one of them. Removed constraints are still added to `path`, so
+            // the sequent map can propagate any derived constraints that do not mention the
+            // quantified typevars.
             &mut |constraint| {
                 let constraint = builder.constraint_data(constraint);
-                if constraint.typevar.identity(db) == bound_typevar {
-                    return true;
-                }
-                if constraint
-                    .bounds
-                    .lower
-                    .is_some_and(|lower| any_over_type(db, lower, false, mentions_typevar))
-                {
-                    return true;
-                }
-                if constraint
-                    .bounds
-                    .upper
-                    .is_some_and(|upper| any_over_type(db, upper, false, mentions_typevar))
-                {
-                    return true;
-                }
-                false
+                constraint.typevar.is_inferable(db, bound_typevars)
+                    || constraint
+                        .bounds
+                        .lower
+                        .is_some_and(|lower| any_over_type(db, lower, false, mentions_typevar))
+                    || constraint
+                        .bounds
+                        .upper
+                        .is_some_and(|upper| any_over_type(db, upper, false, mentions_typevar))
             },
-            &mut path,
-        );
-
-        let mut storage = builder.storage.borrow_mut();
-        storage.exists_one_cache.insert(key, result);
-        result
+            path,
+        )
     }
 
     fn remove_noninferable<'db>(
@@ -4134,7 +4171,7 @@ impl InteriorNode {
                                 // removed!
                                 !should_remove(assignment.constraint())
                             })
-                            .fold(branch, |branch, (assignment, source_order)| {
+                            .fold(branch, |branch, (assignment, (source_order, _))| {
                                 branch.and(
                                     builder,
                                     Node::new_satisfied_constraint(
@@ -4167,7 +4204,7 @@ impl InteriorNode {
                                 // removed!
                                 !should_remove(assignment.constraint())
                             })
-                            .fold(branch, |branch, (assignment, source_order)| {
+                            .fold(branch, |branch, (assignment, (source_order, _))| {
                                 branch.and(
                                     builder,
                                     Node::new_satisfied_constraint(
@@ -4196,7 +4233,7 @@ impl InteriorNode {
                         path.assignments[new_range]
                             .iter()
                             .filter(|(assignment, _)| !should_remove(assignment.constraint()))
-                            .fold(branch, |branch, (assignment, source_order)| {
+                            .fold(branch, |branch, (assignment, (source_order, _))| {
                                 branch.and(
                                     builder,
                                     Node::new_satisfied_constraint(
@@ -6287,9 +6324,14 @@ impl SequentMap {
 #[derive(Debug)]
 pub(crate) struct PathAssignments {
     map: SequentMap,
-    assignments: FxIndexMap<ConstraintAssignment, usize>,
-    /// Nested substitutions that we have already applied on the current root→terminal path.
-    nested_substitutions: FxIndexSet<NestedSubstitution>,
+    /// Each assignment's source order and the first nested-substitution history that produced it.
+    /// (Most assignments have exactly one history, and so we save space and iteration overhead by
+    /// storing the first history here.)
+    assignments: FxIndexMap<ConstraintAssignment, (usize, NestedSubstitutionHistory)>,
+    /// Additional histories that can produce an assignment, keyed by its index in `assignments`.
+    /// These are stored separately so that branch-local additions can be rolled back by truncating
+    /// the set.
+    additional_substitution_histories: FxIndexSet<(usize, NestedSubstitutionHistory)>,
     /// Constraints that we have discovered, mapped to whether we have processed them yet. (This
     /// ensures a stable order for all of the derived constraints that we create, while still
     /// letting us create them lazily.)
@@ -6305,7 +6347,7 @@ impl PathAssignments {
         Self {
             map: SequentMap::default(),
             assignments: FxIndexMap::default(),
-            nested_substitutions: FxIndexSet::default(),
+            additional_substitution_histories: FxIndexSet::default(),
             discovered,
         }
     }
@@ -6344,7 +6386,7 @@ impl PathAssignments {
         // pass along the range of which assignments are new, and so that we can reset back to this
         // point before returning.
         let start = self.assignments.len();
-        let nested_substitutions_start = self.nested_substitutions.len();
+        let additional_histories_start = self.additional_substitution_histories.len();
 
         // Add the new assignment and anything we can derive from it.
         tracing::trace!(
@@ -6358,7 +6400,14 @@ impl PathAssignments {
             edge = %assignment.display(db, builder),
             "walk edge",
         );
-        let found_conflict = self.add_assignment(db, builder, assignment, source_order, false);
+        let found_conflict = self.add_assignment(
+            db,
+            builder,
+            assignment,
+            source_order,
+            false,
+            NestedSubstitutionHistory::default(),
+        );
         let result = if found_conflict.is_err() {
             // If that results in the path now being impossible due to a contradiction, return
             // without invoking the callback.
@@ -6386,15 +6435,15 @@ impl PathAssignments {
         // Reset back to where we were before following this edge, so that the caller can reuse a
         // single instance for the entire BDD traversal.
         self.assignments.truncate(start);
-        self.nested_substitutions
-            .truncate(nested_substitutions_start);
+        self.additional_substitution_histories
+            .truncate(additional_histories_start);
         result
     }
 
     pub(crate) fn positive_constraints(&self) -> impl Iterator<Item = (ConstraintId, usize)> + '_ {
         self.assignments
             .iter()
-            .filter_map(|(assignment, source_order)| match assignment {
+            .filter_map(|(assignment, (source_order, _))| match assignment {
                 ConstraintAssignment::Positive(constraint) => Some((*constraint, *source_order)),
                 ConstraintAssignment::Negative(_) | ConstraintAssignment::Unconstrained(_) => None,
             })
@@ -6408,6 +6457,27 @@ impl PathAssignments {
         self.assignment_holds(constraint.when_true())
             || self.assignment_holds(constraint.when_false())
             || self.assignment_holds(constraint.when_unconstrained())
+    }
+
+    /// If `assignment` holds on this path, returns an iterator of its substitution histories.
+    /// Otherwise returns `None`.
+    fn histories_for(
+        &self,
+        assignment: ConstraintAssignment,
+    ) -> Option<impl Iterator<Item = &NestedSubstitutionHistory> + Clone> {
+        // This is complicated by the fact that we store each assignment's first history inline in
+        // the `assignments` field, and the others in `additional_substitution_histories`; and
+        // moreover that `additional_substitution_histories` interleaves histories from all
+        // assignments on this path. Assignments will typically have a single history, so it
+        // should™ be fine that we're scanning and filtering that entire list.
+        let (index, _, (_, history)) = self.assignments.get_full(&assignment)?;
+        let first = std::iter::once(history);
+        let rest = self
+            .additional_substitution_histories
+            .iter()
+            .filter(move |(history_index, _)| *history_index == index)
+            .map(|(_, history)| history);
+        Some(std::iter::chain(first, rest))
     }
 
     /// Update our sequent map to ensure that it holds all of the sequents that involve the given
@@ -6448,6 +6518,7 @@ impl PathAssignments {
         assignment: ConstraintAssignment,
         source_order: usize,
         derived: bool,
+        history: NestedSubstitutionHistory,
     ) -> Result<(), PathAssignmentConflict> {
         if matches!(assignment, ConstraintAssignment::Unconstrained(_)) {
             // An `Unconstrained` assignment means "this constraint can go either way". If there is
@@ -6461,12 +6532,11 @@ impl PathAssignments {
             // derive any additional information from the sequent map. We still want to record the
             // assignment, but as an optimization we can return early without actually querying the
             // sequent map.
-            self.assignments.insert(assignment, source_order);
+            self.assignments.insert(assignment, (source_order, history));
             return Ok(());
         }
 
-        // First add this assignment. If it causes a conflict, return that as an error. If we've
-        // already know this assignment holds, just return.
+        // First add this assignment. If it causes a conflict, return that as an error.
         if self.assignments.contains_key(&assignment.negated()) {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::PathAssignment",
@@ -6483,18 +6553,38 @@ impl PathAssignments {
         }
 
         match self.assignments.entry(assignment) {
-            Entry::Vacant(entry) => entry.insert(source_order),
+            Entry::Vacant(entry) => {
+                entry.insert((source_order, history));
+            }
             Entry::Occupied(mut entry) => {
+                let index = entry.index();
+                let (existing_source_order, existing_history) = entry.get_mut();
+
                 // If a constraint appears both as an "origin" constraint (it actually appears in
                 // the BDD structure) and as a "derived" constraint (we infer it from other
                 // constraints), we should prefer the origin source_order, regardless of which
                 // order we encounter the various constraints in the BDD.
                 if !derived {
-                    *entry.get_mut() = source_order;
+                    *existing_source_order = source_order;
                 }
-                return Ok(());
+
+                // A smaller history blocks fewer future substitutions, so it preserves every
+                // derivation available from a larger history. If an existing history is a subset
+                // of this one, this one is redundant and does not need to be processed.
+                if existing_history.is_subset_of(&history)
+                    || self.additional_substitution_histories.iter().any(
+                        |(history_index, existing_history)| {
+                            *history_index == index && existing_history.is_subset_of(&history)
+                        },
+                    )
+                    || !self
+                        .additional_substitution_histories
+                        .insert((index, history))
+                {
+                    return Ok(());
+                }
             }
-        };
+        }
 
         // Then use our sequents to add additional facts that we know to be true. We currently
         // reuse the `source_order` of the "real" constraint passed into `walk_edge` when we add
@@ -6558,40 +6648,55 @@ impl PathAssignments {
             }
         }
 
-        let mut new_constraints = Vec::new();
+        let mut new_constraints = FxIndexSet::default();
         for ((ante1, ante2), posts) in &self.map.pair_implications {
-            if !self.assignment_holds(ante1.when_true())
-                || !self.assignment_holds(ante2.when_true())
-            {
+            let Some(histories1) = self.histories_for(ante1.when_true()) else {
                 continue;
-            }
+            };
+            let Some(histories2) = self.histories_for(ante2.when_true()) else {
+                continue;
+            };
 
             for post in posts {
-                // Nested-typevar sequents are the mechanism that preserves cross-typevar facts when
-                // we later existentially quantify away one of the typevars. However, once we've
-                // applied a particular substitution site on the current path, reapplying it with a
-                // newly derived replacement type does not add fundamentally new information — it
-                // just keeps unfolding the same pattern one layer deeper. Skipping repeated
-                // applications here prevents those infinite-looking expansion chains while still
-                // keeping the first derived relationship.
-                if let Some(nested_substitution) = post.nested_substitution
-                    && !self.nested_substitutions.insert(nested_substitution)
-                {
-                    continue;
+                // The number of histories can grow combinatorially because we consider every pair
+                // of antecedent histories. `add_assignment` partially prunes this growth by
+                // discarding a new history if an existing history for the same assignment is its
+                // subset. We do not yet remove existing histories that are supersets of a new
+                // history, because those removals would have to be restored when we backtrack out
+                // of the current BDD branch.
+                //
+                // TODO: Retain only subset-minimal histories for each assignment by adding support
+                // for rolling back histories removed by dominance pruning.
+                for history1 in histories1.clone() {
+                    for history2 in histories2.clone() {
+                        if let Some(history) = history1.merged(history2, post.nested_substitution) {
+                            new_constraints.insert((post.constraint, history));
+                        }
+                    }
                 }
-
-                new_constraints.push(post.constraint);
             }
         }
 
         for (ante, posts) in &self.map.single_implications {
-            if self.assignment_holds(ante.when_true()) {
-                new_constraints.extend(posts.iter().copied());
+            let Some(histories) = self.histories_for(ante.when_true()) else {
+                continue;
+            };
+            for post in posts {
+                for history in histories.clone() {
+                    new_constraints.insert((*post, history.clone()));
+                }
             }
         }
 
-        for new_constraint in new_constraints {
-            self.add_assignment(db, builder, new_constraint.when_true(), source_order, true)?;
+        for (new_constraint, history) in new_constraints {
+            self.add_assignment(
+                db,
+                builder,
+                new_constraint.when_true(),
+                source_order,
+                true,
+                history,
+            )?;
         }
 
         Ok(())

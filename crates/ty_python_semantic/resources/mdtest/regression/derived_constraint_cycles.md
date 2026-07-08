@@ -27,6 +27,22 @@ def reduce[T](function: Callable[[T, T], T]) -> T:
 reduce(add)
 ```
 
+## Independent nested substitutions can compose
+
+The repeat guard tracks substitution history separately for each derived constraint. This allows two
+independent substitutions to be composed while still preventing either substitution from occurring
+twice in the ancestry of one derived constraint.
+
+```py
+import operator
+from collections.abc import Callable
+
+def consume[T1, T2, S](function: Callable[[T1, T2], S], left: T1, right: T2) -> S:
+    return function(left, right)
+
+reveal_type(consume(operator.mul, 1, 1))  # revealed: int
+```
+
 ## Repeated substitutions across derived constraints
 
 The repeat-guard introduced in [ty#24660] only suppressed a follow-up substitution when the second

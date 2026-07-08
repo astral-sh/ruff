@@ -1755,8 +1755,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let source_inferable = source.inferable_typevars(db);
         let target_inferable = target.inferable_typevars(db);
-        let inferable = source_inferable.merge(db, target_inferable);
-        let inferable = self.inferable.merge(db, inferable);
+        let signature_inferable = source_inferable.merge(db, target_inferable);
+        let inferable = self.inferable.merge(db, signature_inferable);
 
         // `inner` will create a constraint set that references these newly inferable typevars.
         let checker = self.with_inferable_typevars(inferable);
@@ -1768,11 +1768,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // we produce, we reduce it back down to the inferable set that the caller asked about.
         // If we introduced new inferable typevars, those will be existentially quantified away
         // before returning.
-        when.reduce_inferable(
-            db,
-            self.constraints,
-            source_inferable.iter(db).chain(target_inferable.iter(db)),
-        )
+        when.reduce_inferable(db, self.constraints, signature_inferable)
     }
 
     fn with_signature_recursion_guard(
