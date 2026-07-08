@@ -6205,12 +6205,16 @@ impl<'db> Type<'db> {
 
             Type::NominalInstance(instance) => match instance.known_class(db) {
                 Some(KnownClass::NoneType) => Ok(Type::none(db)),
+                // TODO: Emit an invalid-type-form diagnostic and recover to `Unknown` for
+                // unrecognized `TypeVar` and `TypeVarTuple` instances.
                 Some(KnownClass::TypeVar) => Ok(todo_type!(
-                    "Support for `typing.TypeVar` instances in type expressions"
+                    "unrecognized `typing.TypeVar` instances should be invalid type expressions"
                 )),
-                Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple) => Ok(
-                    todo_type!("Support for `typing.TypeVarTuple` instances in type expressions"),
-                ),
+                Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple) => {
+                    Ok(todo_type!(
+                        "unrecognized `typing.TypeVarTuple` instances should be invalid type expressions"
+                    ))
+                }
                 _ => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
                         *self, scope_id

@@ -790,6 +790,7 @@ impl<'db> Type<'db> {
             }
 
             (Type::SpecialForm(SpecialFormType::Unpack), _) => {
+                // TODO: Emit an invalid-type-form diagnostic for runtime subscripting of `Unpack`.
                 Some(Ok(Type::unknown()))
             }
 
