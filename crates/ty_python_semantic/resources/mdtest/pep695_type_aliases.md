@@ -686,6 +686,29 @@ def stable_wrapped(x: StableWrapped[int], y: StableWrapped[str]):
     y = x
 ```
 
+### Non-recursive nested generic aliases
+
+A repeated use of the same generic alias can be a finite alias application instead of recursion.
+
+```py
+from typing import Literal
+
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+type NonRecursiveId[T] = T
+
+static_assert(is_subtype_of(NonRecursiveId[NonRecursiveId[int]], int))
+static_assert(not is_subtype_of(NonRecursiveId[NonRecursiveId[int]], str))
+
+truth: NonRecursiveId[NonRecursiveId[Literal[True]]] = True
+static_assert(truth)
+
+one: NonRecursiveId[NonRecursiveId[Literal[1]]] = 1
+reveal_type(one + 1)  # revealed: Literal[2]
+reveal_type(one == 1)  # revealed: Literal[True]
+```
+
 ### Subtyping of materializations of cyclic aliases
 
 ```py

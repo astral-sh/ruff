@@ -6,7 +6,9 @@ use crate::Db;
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
-use crate::types::cyclic::{CycleDetector, HasIdentity, TypeIdentity};
+use crate::types::cyclic::{
+    CycleDetector, HasIdentity, TypeIdentity, type_pair_has_recursive_identity_cycle,
+};
 use crate::types::equality::{equality_truthiness, inequality_truthiness};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
@@ -37,6 +39,21 @@ impl<'db> HasIdentity<'db> for (Type<'db>, ast::CmpOp, Type<'db>) {
 
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
         (self.0.to_identity(db), self.1, self.2.to_identity(db))
+    }
+
+    fn has_recursive_identity_cycle(&self, db: &'db dyn Db, seen: &[Self]) -> bool {
+        let identity = self.to_identity(db);
+        let active_matches = |active: &Self| active.to_identity(db) == identity;
+
+        type_pair_has_recursive_identity_cycle(
+            db,
+            self.0,
+            self.2,
+            seen,
+            |active| active.0,
+            |active| active.2,
+            active_matches,
+        )
     }
 }
 

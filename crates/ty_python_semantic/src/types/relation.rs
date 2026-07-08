@@ -9,7 +9,10 @@ use crate::types::constraints::{
     ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
     OwnedConstraintSet,
 };
-use crate::types::cyclic::{CycleDetectorVisit, HasIdentity, PairVisitor, TypeIdentity};
+use crate::types::cyclic::{
+    CycleDetectorVisit, HasIdentity, PairVisitor, TypeIdentity,
+    type_pair_has_recursive_identity_cycle,
+};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
@@ -740,6 +743,21 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvalu
 
     fn needs_recursive_identity(&self) -> bool {
         self.0.needs_recursive_identity() || self.1.needs_recursive_identity()
+    }
+
+    fn has_recursive_identity_cycle(&self, db: &'db dyn Db, seen: &[Self]) -> bool {
+        let identity = self.to_identity(db);
+        let active_matches = |active: &Self| active.to_identity(db) == identity;
+
+        type_pair_has_recursive_identity_cycle(
+            db,
+            self.0,
+            self.1,
+            seen,
+            |active| active.0,
+            |active| active.1,
+            active_matches,
+        )
     }
 }
 
