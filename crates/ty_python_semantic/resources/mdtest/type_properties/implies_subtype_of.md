@@ -554,6 +554,27 @@ def identity2[T](t: T) -> T:
     return t
 ```
 
+When comparing two generic callables, all callable-local typevars must be quantified together. The
+parameter and return types below produce the constraint set `(int ≤ T ≤ U) ∧ (U ≤ V)`. Quantifying
+the callable-local `T` and `U` preserves the resulting `int ≤ V` constraint on the enclosing
+typevar.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, RegularCallableTypeOf
+
+def quantifies_callable_typevars_together[V]():
+    def source[T](first: T, second: V) -> T:
+        raise NotImplementedError
+
+    def target[U](first: int, second: U) -> U:
+        raise NotImplementedError
+
+    actual = ConstraintSet.always().implies_subtype_of(RegularCallableTypeOf[source], RegularCallableTypeOf[target])
+    expected = ConstraintSet.range(int, V, object)
+    static_assert(actual == expected)
+```
+
 Invariant generic classes in a generic callable's return type should preserve cross-typevar
 constraints that remain after the callable's own typevars are quantified away. Here, `listify` can
 be used as a `Callable[[U], list[V]]` when the surrounding constraints imply `U ≤ V`.

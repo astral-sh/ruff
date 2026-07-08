@@ -7096,50 +7096,6 @@ mod tests {
     }
 
     #[test]
-    fn existentially_quantifies_multiple_typevars_in_one_pass() {
-        let db = setup_db();
-        let t = create_typevar(&db, "T");
-        let u = create_typevar(&db, "U");
-        let v = create_typevar(&db, "V");
-        let builder = ConstraintSetBuilder::new();
-        let int = known_instance(&db, KnownClass::Int);
-
-        // Quantifying T and U from `(int ≤ T ≤ U) ∧ (U ≤ V)` must preserve the derived
-        // constraint `int ≤ V`. In particular, the removed constraints must still be added to the
-        // path assignments so that the sequent map can derive the retained constraint.
-        let int_to_u = ConstraintSet::constrain_typevar(&db, &builder, t, int, Type::TypeVar(u));
-        let u_to_v =
-            ConstraintSet::constrain_typevar_upper_bound(&db, &builder, u, Type::TypeVar(v));
-        let set = int_to_u.and(&db, &builder, || u_to_v);
-        let inferable = InferableTypeVars::from_typevars(
-            &db,
-            [t.identity(&db), u.identity(&db)].into_iter().collect(),
-        );
-
-        let reduced = set.reduce_inferable(&db, &builder, inferable);
-
-        assert_eq!(reduced.display(&db).to_string(), "(int ≤ V)");
-        reduced
-            .node
-            .for_each_unique_constraint(&builder, &mut |constraint, _| {
-                let constraint = builder.constraint_data(constraint);
-                assert!(!constraint.typevar.is_inferable(&db, inferable));
-                assert!(!constraint.bounds.lower.is_some_and(|lower| {
-                    any_over_type(&db, lower, false, |ty| {
-                        ty.as_typevar()
-                            .is_some_and(|typevar| typevar.is_inferable(&db, inferable))
-                    })
-                }));
-                assert!(!constraint.bounds.upper.is_some_and(|upper| {
-                    any_over_type(&db, upper, false, |ty| {
-                        ty.as_typevar()
-                            .is_some_and(|typevar| typevar.is_inferable(&db, inferable))
-                    })
-                }));
-            });
-    }
-
-    #[test]
     fn default_solve_leaves_unbounded_typevar_unsolved_without_bounds() {
         let db = setup_db();
         let t = create_typevar(&db, "T");
