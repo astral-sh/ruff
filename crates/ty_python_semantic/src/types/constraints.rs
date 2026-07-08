@@ -574,6 +574,18 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, self.node.iff_with_offset(builder, other.node))
     }
 
+    /// Reduces the set of inferable typevars for this constraint set using the ordinary raw
+    /// existential abstraction path.
+    pub(crate) fn reduce_inferable(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        to_remove: InferableTypeVars<'db>,
+    ) -> Self {
+        self.verify_builder(builder);
+        Self::from_node(builder, self.node.exists(db, builder, to_remove))
+    }
+
     /// Existentially quantifies the given type variables out of this constraint set.
     ///
     /// The result holds whenever the original constraint set holds for any assignment of the
@@ -586,7 +598,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         to_remove: InferableTypeVars<'db>,
     ) -> Self {
         self.verify_builder(builder);
-        Self::from_node(builder, self.node.exists(db, builder, to_remove))
+        Self::from_node(builder, self.node.exists_normalized(db, builder, to_remove))
     }
 
     /// Returns whether existential abstraction would require a residual constraint that
@@ -599,10 +611,12 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        to_remove: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
+        to_remove: InferableTypeVars<'db>,
     ) -> bool {
         self.verify_builder(builder);
-        let to_remove = to_remove.into_iter().collect::<FxHashSet<_>>();
+        if to_remove == InferableTypeVars::None {
+            return false;
+        }
         let mut unprojectable = false;
         self.node
             .for_each_unique_constraint(builder, &mut |constraint, _| {
@@ -617,7 +631,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                         && any_over_type(db, bound, false, |inner| {
                             inner
                                 .as_typevar()
-                                .is_some_and(|typevar| to_remove.contains(&typevar.identity(db)))
+                                .is_some_and(|typevar| typevar.is_inferable(db, to_remove))
                         })
                     {
                         unprojectable = true;
@@ -637,15 +651,17 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        to_remove: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
+        to_remove: InferableTypeVars<'db>,
     ) -> bool {
         self.verify_builder(builder);
-        let to_remove = to_remove.into_iter().collect::<FxHashSet<_>>();
+        if to_remove == InferableTypeVars::None {
+            return false;
+        }
         let mut crosses_quantifier = false;
         self.node
             .for_each_unique_constraint(builder, &mut |constraint, _| {
                 let constraint = builder.constraint_data(constraint);
-                let subject_is_removed = to_remove.contains(&constraint.typevar.identity(db));
+                let subject_is_removed = constraint.typevar.is_inferable(db, to_remove);
                 let bounds_mention = |removed| {
                     constraint
                         .bounds
@@ -655,7 +671,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                         .any(|bound| {
                             any_over_type(db, bound, false, |inner| {
                                 inner.as_typevar().is_some_and(|typevar| {
-                                    to_remove.contains(&typevar.identity(db)) == removed
+                                    typevar.is_inferable(db, to_remove) == removed
                                 })
                             })
                         })
@@ -681,7 +697,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         to_remove: InferableTypeVars<'db>,
     ) -> Option<Self> {
         self.verify_builder(builder);
-        if self.has_cross_quantifier_typevar(db, builder, to_remove.iter(db)) {
+        if self.has_cross_quantifier_typevar(db, builder, to_remove) {
             return None;
         }
         // Use the duality `∀x. F = ¬∃x. ¬F` so universal abstraction shares existential
@@ -692,7 +708,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             builder,
             self.node
                 .negate(builder)
-                .exists(db, builder, to_remove)
+                .exists_normalized(db, builder, to_remove)
                 .negate(builder),
         ))
     }
@@ -2941,24 +2957,61 @@ impl NodeId {
         drop(storage);
 
         let mut path = interior.path_assignments(builder);
-        let result = self.exists_inner(db, builder, bound_typevars, &mut path);
+        let result = self.exists_inner_with(
+            db,
+            builder,
+            bound_typevars,
+            &mut path,
+            |assignment, source_order| {
+                Node::new_satisfied_constraint(builder, assignment, source_order)
+            },
+        );
 
         let mut storage = builder.storage.borrow_mut();
         storage.exists_cache.insert(key, result);
         result
     }
 
-    fn exists_inner<'db>(
+    /// Existentially abstracts all `bound_typevars` in one traversal, normalizing facts derived
+    /// while projecting the removed variables. Unlike [`Self::exists`], this result is not cached.
+    fn exists_normalized<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        bound_typevars: InferableTypeVars<'db>,
+    ) -> Self {
+        if bound_typevars == InferableTypeVars::None {
+            return self;
+        }
+
+        let Node::Interior(interior) = self.node() else {
+            return self;
+        };
+
+        let mut path = interior.path_assignments(builder);
+        self.exists_inner_with(
+            db,
+            builder,
+            bound_typevars,
+            &mut path,
+            |assignment, source_order| assignment.to_derived_node(db, builder, source_order),
+        )
+    }
+
+    fn exists_inner_with<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         bound_typevars: InferableTypeVars<'db>,
         path: &mut PathAssignments,
+        derived_node: impl Copy + Fn(ConstraintAssignment, usize) -> NodeId,
     ) -> Self {
         match self.node() {
             Node::AlwaysTrue => ALWAYS_TRUE,
             Node::AlwaysFalse => ALWAYS_FALSE,
-            Node::Interior(interior) => interior.exists_inner(db, builder, bound_typevars, path),
+            Node::Interior(interior) => {
+                interior.exists_inner_with(db, builder, bound_typevars, path, derived_node)
+            }
         }
     }
 
@@ -4176,18 +4229,19 @@ impl InteriorNode {
         result
     }
 
-    fn exists_inner<'db>(
+    fn exists_inner_with<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         bound_typevars: InferableTypeVars<'db>,
         path: &mut PathAssignments,
+        derived_node: impl Copy + Fn(ConstraintAssignment, usize) -> NodeId,
     ) -> NodeId {
         let mentions_typevar = |ty: Type<'db>| match ty {
             Type::TypeVar(typevar) => typevar.is_inferable(db, bound_typevars),
             _ => false,
         };
-        self.abstract_one_inner(
+        self.abstract_one_inner_with(
             db,
             builder,
             // Remove any node that constrains one of `bound_typevars`, or that has a lower/upper
@@ -4207,6 +4261,7 @@ impl InteriorNode {
                         .is_some_and(|upper| any_over_type(db, upper, false, mentions_typevar))
             },
             path,
+            derived_node,
         )
     }
 
@@ -4221,7 +4276,7 @@ impl InteriorNode {
             ty.as_typevar()
                 .is_some_and(|bound_typevar| bound_typevar.is_inferable(db, inferable))
         };
-        self.abstract_one_inner_raw(
+        self.abstract_one_inner_with(
             db,
             builder,
             // We only want to keep constraints on inferable typevars. If the constraint's typevar
@@ -4246,40 +4301,6 @@ impl InteriorNode {
                         .is_some_and(is_bare_inferable_typevar)
             },
             &mut path,
-        )
-    }
-
-    fn abstract_one_inner<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        should_remove: &mut dyn FnMut(ConstraintId) -> bool,
-        path: &mut PathAssignments,
-    ) -> NodeId {
-        self.abstract_one_inner_with(
-            db,
-            builder,
-            should_remove,
-            path,
-            |assignment, source_order| assignment.to_derived_node(db, builder, source_order),
-        )
-    }
-
-    fn abstract_one_inner_raw<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        should_remove: &mut dyn FnMut(ConstraintId) -> bool,
-        path: &mut PathAssignments,
-    ) -> NodeId {
-        // Pruning non-inferable variables only needs to retain facts already derived by the
-        // sequent machinery. Rebuilding those facts would recursively re-run assignability checks
-        // without changing which variables remain in the solution.
-        self.abstract_one_inner_with(
-            db,
-            builder,
-            should_remove,
-            path,
             |assignment, source_order| {
                 Node::new_satisfied_constraint(builder, assignment, source_order)
             },
@@ -5037,11 +5058,7 @@ impl ConstraintAssignment {
         }
     }
 
-    /// Creates a node for a fact derived while walking a constraint path.
-    ///
-    /// Derived constraints are interned directly, so they do not pass through the normalization
-    /// in [`Constraint::new_node_with_bounds`]. Rebuild positive derived facts through that
-    /// constructor before retaining them in an abstracted constraint set.
+    /// Creates a normalized node for a fact derived while walking a constraint path.
     fn to_derived_node<'db>(
         self,
         db: &'db dyn Db,
@@ -7205,6 +7222,13 @@ mod tests {
         BoundTypeVarInstance::synthetic(db, Name::new_static(name), TypeVarVariance::Invariant)
     }
 
+    fn quantified_typevars<'db>(
+        db: &'db dyn Db,
+        typevars: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
+    ) -> InferableTypeVars<'db> {
+        InferableTypeVars::from_typevars(db, typevars.into_iter().collect())
+    }
+
     fn create_constraint<'db, 'c>(
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
@@ -7613,7 +7637,7 @@ mod tests {
         // unconditional disjunct, so it must survive universal quantification of `U`.
         let quantified = t_int
             .or(&db, &builder, || u_str)
-            .try_for_all(&db, &builder, std::iter::once(u.identity(&db)))
+            .try_for_all(&db, &builder, quantified_typevars(&db, [u.identity(&db)]))
             .expect("`T` is independent of the quantified variable");
         assert!(
             quantified
@@ -7638,16 +7662,32 @@ mod tests {
 
         // Every target specialization has some equal source specialization.
         let forall_target_exists_source = equal
-            .exists(&db, &builder, std::iter::once(source.identity(&db)))
-            .try_for_all(&db, &builder, std::iter::once(target.identity(&db)))
+            .exists(
+                &db,
+                &builder,
+                quantified_typevars(&db, [source.identity(&db)]),
+            )
+            .try_for_all(
+                &db,
+                &builder,
+                quantified_typevars(&db, [target.identity(&db)]),
+            )
             .expect("existential abstraction removes the free source variable");
         assert!(forall_target_exists_source.is_always_satisfied(&db));
 
         // No single source specialization is equal to every target specialization.
         let exists_source_forall_target = equal
-            .try_for_all(&db, &builder, std::iter::once(target.identity(&db)))
+            .try_for_all(
+                &db,
+                &builder,
+                quantified_typevars(&db, [target.identity(&db)]),
+            )
             .unwrap_or_else(|| ConstraintSet::never(&builder))
-            .exists(&db, &builder, std::iter::once(source.identity(&db)));
+            .exists(
+                &db,
+                &builder,
+                quantified_typevars(&db, [source.identity(&db)]),
+            );
         assert!(exists_source_forall_target.is_never_satisfied(&db));
     }
 
@@ -7669,7 +7709,11 @@ mod tests {
         let implication = target_domain.implies(&db, &builder, || target_below_outer);
         assert!(
             implication
-                .try_for_all(&db, &builder, std::iter::once(target.identity(&db)))
+                .try_for_all(
+                    &db,
+                    &builder,
+                    quantified_typevars(&db, [target.identity(&db)]),
+                )
                 .is_none()
         );
     }
@@ -7707,7 +7751,11 @@ mod tests {
 
             // For every `T`, choosing `S = T` satisfies the union upper bound. The unrelated
             // `S ≤ V` alternative must not cause abstraction to lose that equality witness.
-            let quantified = relation.exists(&db, &builder, std::iter::once(source.identity(&db)));
+            let quantified = relation.exists(
+                &db,
+                &builder,
+                quantified_typevars(&db, [source.identity(&db)]),
+            );
             assert!(quantified.is_always_satisfied(&db));
         }
     }
@@ -7732,7 +7780,11 @@ mod tests {
             Type::TypeVar(value),
         );
         let relation = target_below_source.and(&db, &builder, || source_below_value);
-        let quantified = relation.exists(&db, &builder, std::iter::once(source.identity(&db)));
+        let quantified = relation.exists(
+            &db,
+            &builder,
+            quantified_typevars(&db, [source.identity(&db)]),
+        );
         let expected = ConstraintSet::constrain_typevar_upper_bound(
             &db,
             &builder,

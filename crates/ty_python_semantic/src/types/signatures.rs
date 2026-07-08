@@ -1857,7 +1857,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // we produce, we reduce it back down to the inferable set that the caller asked about.
         // If we introduced new inferable typevars, those will be existentially quantified away
         // before returning.
-        when.exists(db, self.constraints, signature_inferable)
+        when.reduce_inferable(db, self.constraints, signature_inferable)
     }
 
     /// Compare signatures by existentially quantifying source-local variables inside the
@@ -1884,6 +1884,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .when_all(db, self.constraints, |typevar| {
                     ConstraintSet::valid_specializations(db, self.constraints, typevar)
                 });
+        let source_domain =
+            source_typevars
+                .iter()
+                .copied()
+                .when_all(db, self.constraints, |typevar| {
+                    ConstraintSet::valid_specializations(db, self.constraints, typevar)
+                });
 
         // TODO: A gradual target constraint requires `for all constraint choices, there exists a
         // materialization`. Treating its top-materialized range as one universal domain is
@@ -1893,28 +1900,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // adding the domain only as the implication below because target variables are not
         // existentially quantified, but retaining it here preserves correlations while source
         // variables are abstracted.
-        let mut quantified = target_domain.and(db, self.constraints, || relation);
+        let with_domains = target_domain.and(db, self.constraints, || {
+            source_domain.and(db, self.constraints, || relation)
+        });
 
         // A generic source is an intersection of its specializations. For each target
         // specialization, it is enough for some valid source specialization to satisfy the
-        // relation. Quantify each source variable when adding its domain so independent
-        // constrained variables do not materialize a Cartesian product.
-        for typevar in source_typevars {
-            let source_local = InferableTypeVars::from_typevars(
-                db,
-                std::iter::once(typevar.identity(db)).collect(),
-            );
-            let with_domain = ConstraintSet::valid_specializations(db, self.constraints, *typevar)
-                .and(db, self.constraints, || quantified);
-            if with_domain.has_unprojectable_nested_typevar(
-                db,
-                self.constraints,
-                std::iter::once(typevar.identity(db)),
-            ) {
-                return self.never();
-            }
-            quantified = with_domain.exists(db, self.constraints, source_local);
+        // relation. Quantify the entire source block in a single BDD traversal.
+        if with_domains.has_unprojectable_nested_typevar(db, self.constraints, source_locals) {
+            return self.never();
         }
+        let quantified = with_domains.exists(db, self.constraints, source_locals);
 
         // A generic target is the intersection of all of its specializations. The source must
         // therefore satisfy every valid target specialization. Source variables have already
@@ -1927,8 +1923,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .collect(),
         );
         let universally_quantified = target_domain.implies(db, self.constraints, || quantified);
-        let Some(result) =
-            universally_quantified.try_for_all(db, self.constraints, target_locals)
+        let Some(result) = universally_quantified.try_for_all(db, self.constraints, target_locals)
         else {
             return self.never();
         };

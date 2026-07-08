@@ -554,20 +554,21 @@ def identity2[T](t: T) -> T:
     return t
 ```
 
-When comparing two generic callables, all callable-local typevars must be quantified together. The
-parameter and return types below produce the constraint set `(int ≤ T ≤ U) ∧ (U ≤ V)`. Quantifying
-the callable-local `T` and `U` preserves the resulting `int ≤ V` constraint on the enclosing
-typevar.
+When comparing two generic callables, all source-local typevars must be quantified together inside
+the universal quantification of the target-local typevars. The parameter and return types below
+produce the constraint set `(int ≤ T ≤ V) ∧ (U ≤ S ≤ U)`. For every target specialization of `U`,
+the source can choose `S = U`; quantifying `T` and `S` preserves the resulting `int ≤ V` constraint
+on the enclosing typevar.
 
 ```py
 from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet, RegularCallableTypeOf
 
 def quantifies_callable_typevars_together[V]():
-    def source[T](first: T, second: V) -> T:
+    def source[T, S](first: T, second: S) -> tuple[T, S]:
         raise NotImplementedError
 
-    def target[U](first: int, second: U) -> U:
+    def target[U](first: int, second: U) -> tuple[V, U]:
         raise NotImplementedError
 
     actual = ConstraintSet.always().implies_subtype_of(RegularCallableTypeOf[source], RegularCallableTypeOf[target])
