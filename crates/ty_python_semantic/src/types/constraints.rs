@@ -94,7 +94,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use indexmap::map::Entry;
-use itertools::Itertools;
+use itertools::{EitherOrBoth, Itertools};
 use ruff_index::{Idx, IndexVec, newtype_index};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -1191,6 +1191,15 @@ impl NestedSubstitutionHistory {
 
     fn contains(&self, substitution: NestedSubstitution) -> bool {
         self.0.binary_search(&substitution).is_ok()
+    }
+
+    fn is_subset_of(&self, other: &Self) -> bool {
+        self.0.len() <= other.0.len()
+            && self
+                .0
+                .iter()
+                .merge_join_by(other.0.iter(), Ord::cmp)
+                .all(|item| !matches!(item, EitherOrBoth::Left(_)))
     }
 }
 
@@ -6559,9 +6568,15 @@ impl PathAssignments {
                     *existing_source_order = source_order;
                 }
 
-                // If we've already seen this assignment with this same substitution history, we
-                // don't need to process it again.
-                if *existing_history == history
+                // A smaller history blocks fewer future substitutions, so it preserves every
+                // derivation available from a larger history. If an existing history is a subset
+                // of this one, this one is redundant and does not need to be processed.
+                if existing_history.is_subset_of(&history)
+                    || self.additional_substitution_histories.iter().any(
+                        |(history_index, existing_history)| {
+                            *history_index == index && existing_history.is_subset_of(&history)
+                        },
+                    )
                     || !self
                         .additional_substitution_histories
                         .insert((index, history))
@@ -6643,10 +6658,15 @@ impl PathAssignments {
             };
 
             for post in posts {
-                // TODO: The number of histories can grow combinatorially because we consider every
-                // pair of antecedent histories. If this becomes pathological in practice, retain
-                // only subset-minimal histories for each assignment and prune dominated merged
-                // histories here before recursively adding them.
+                // The number of histories can grow combinatorially because we consider every pair
+                // of antecedent histories. `add_assignment` partially prunes this growth by
+                // discarding a new history if an existing history for the same assignment is its
+                // subset. We do not yet remove existing histories that are supersets of a new
+                // history, because those removals would have to be restored when we backtrack out
+                // of the current BDD branch.
+                //
+                // TODO: Retain only subset-minimal histories for each assignment by adding support
+                // for rolling back histories removed by dominance pruning.
                 for history1 in histories1.clone() {
                     for history2 in histories2.clone() {
                         if let Some(history) = history1.merged(history2, post.nested_substitution) {
