@@ -2023,6 +2023,10 @@ pub enum KnownFunction {
     /// `dataclasses.field`
     Field,
 
+    /// `pydantic.fields.Field`
+    #[strum(serialize = "Field")]
+    PydanticField,
+
     /// `functools.total_ordering`
     TotalOrdering,
 
@@ -2141,6 +2145,7 @@ impl KnownFunction {
             Self::Dataclass | Self::Field => {
                 matches!(module, KnownModule::Dataclasses)
             }
+            Self::PydanticField => matches!(module, KnownModule::PydanticFields),
             Self::TotalOrdering => module.is_functools(),
             Self::GetattrStatic => module.is_inspect(),
             Self::StaticAssert => module.is_ty_extensions(),
@@ -2671,6 +2676,8 @@ pub(crate) mod tests {
 
                 KnownFunction::Dataclass | KnownFunction::Field => KnownModule::Dataclasses,
 
+                KnownFunction::PydanticField => KnownModule::PydanticFields,
+
                 KnownFunction::GetattrStatic => KnownModule::Inspect,
 
                 KnownFunction::Cast
@@ -2714,6 +2721,10 @@ pub(crate) mod tests {
                 KnownFunction::Unpack => KnownModule::Struct,
                 KnownFunction::NewClass => KnownModule::Types,
             };
+
+            if module.is_third_party() {
+                continue;
+            }
 
             let function_definition = known_module_symbol(&db, module, function_name)
                 .place

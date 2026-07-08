@@ -9,8 +9,9 @@ use crate::place::{DefinedPlace, Definedness, Place, Provenance, known_module_sy
 use crate::types::class::CodeGeneratorKind;
 use crate::types::member::class_member;
 use crate::types::{
-    ClassBase, DataclassTransformerParams, KnownClass, KnownInstanceType, KnownUnion, Parameter,
-    StaticClassLiteral, Type, UnionType, definition_expression_type,
+    ClassBase, DataclassTransformerParams, FunctionType, KnownClass, KnownFunction,
+    KnownInstanceType, KnownUnion, Parameter, StaticClassLiteral, Type, UnionType,
+    definition_expression_type,
 };
 
 /// Metadata that controls Pydantic-specific model synthesis.
@@ -174,6 +175,19 @@ pub(in crate::types) fn is_model(db: &dyn Db, class: StaticClassLiteral<'_>) -> 
         .iter_mro(db, None)
         .filter_map(ClassBase::into_class)
         .any(|base| base.is_known(db, KnownClass::PydanticBaseModel))
+}
+
+/// Return whether a field specifier's `default` argument provides a default value.
+///
+/// Pydantic's `Field(...)` uses the ellipsis as a required-field sentinel, so it does not provide
+/// a default value.
+pub(in crate::types) fn field_provides_default(
+    db: &dyn Db,
+    function: FunctionType<'_>,
+    default: Type<'_>,
+) -> bool {
+    !default.is_instance_of(db, KnownClass::EllipsisType)
+        || !function.is_known(db, KnownFunction::PydanticField)
 }
 
 /// Return `true` if fields in `class` are keyword-only constructor parameters.
