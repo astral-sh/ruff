@@ -25,8 +25,8 @@ pub(crate) enum Argument<'a> {
     Synthetic,
     /// A positional argument.
     Positional,
-    /// A starred positional argument (e.g. `*args`) containing the specified number of elements.
-    Variadic,
+    /// A starred positional argument (e.g. `*args`).
+    Variadic { is_definitely_empty: bool },
     /// A keyword argument (e.g. `a=1`).
     Keyword(&'a str),
     /// The double-starred keywords argument (e.g. `**kwargs`).
@@ -123,7 +123,17 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
                         let ty = infer_argument_type(&arg_or_keyword, value);
-                        (Argument::Variadic, Some(ty))
+                        (
+                            Argument::Variadic {
+                                is_definitely_empty: matches!(
+                                    value.as_ref(),
+                                    ast::Expr::List(ast::ExprList { elts, .. })
+                                        | ast::Expr::Tuple(ast::ExprTuple { elts, .. })
+                                        if elts.is_empty()
+                                ),
+                            },
+                            Some(ty),
+                        )
                     }
                     _ => (Argument::Positional, None),
                 },
@@ -159,7 +169,17 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
                         let ty = infer_argument_type(value);
-                        (Argument::Variadic, Some(ty))
+                        (
+                            Argument::Variadic {
+                                is_definitely_empty: matches!(
+                                    value.as_ref(),
+                                    ast::Expr::List(ast::ExprList { elts, .. })
+                                        | ast::Expr::Tuple(ast::ExprTuple { elts, .. })
+                                        if elts.is_empty()
+                                ),
+                            },
+                            Some(ty),
+                        )
                     }
                     _ => {
                         let ty = infer_argument_type(arg);
@@ -281,7 +301,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         for (argument, argument_ty) in bound_call_arguments.iter() {
             let argument_ty = argument_ty.get_default().unwrap_or_else(Type::unknown);
             match argument {
-                Argument::Variadic => {
+                Argument::Variadic { .. } => {
                     if !matches!(
                         argument_ty
                             .as_nominal_instance()
@@ -454,7 +474,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                         Argument::Positional => {
                             write!(f, "{}", DisplayCallArgumentTypes { types, db: self.db })?;
                         }
-                        Argument::Variadic => {
+                        Argument::Variadic { .. } => {
                             write!(f, "*{}", DisplayCallArgumentTypes { types, db: self.db })?;
                         }
                         Argument::Keyword(name) => write!(

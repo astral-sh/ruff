@@ -933,7 +933,8 @@ reveal_type(p2)  # revealed: partial[(c: int | float) -> bool]
 `functools.Placeholder` reserves positional arguments in Python 3.14 and later. Placeholder slots
 must be filled positionally, and a partial cannot end in a placeholder. ty only interprets exact,
 direct positional arguments as placeholders. Uncertain values, unpacked arguments, `ParamSpec`s,
-unpacked variadics, and callable unions retain the existing gradual `partial` behavior.
+unpacked variadics, callable unions, and signatures with `**kwargs` retain the existing gradual
+`partial` behavior.
 
 ```toml
 [environment]
@@ -942,7 +943,7 @@ python-version = "3.14"
 
 ```py
 from functools import Placeholder as _, partial
-from typing import Callable, ParamSpec, Protocol, TypeVar, overload
+from typing import Callable, ParamSpec, TypeVar, overload
 
 def combine(left: int, middle: str, right: float) -> tuple[int, str, float]:
     return left, middle, right
@@ -959,30 +960,8 @@ def accepts_extra(value: int, bound: str, **kwargs: object) -> None:
     pass
 
 with_extra = partial(accepts_extra, _, "bound")
+reveal_type(with_extra)  # revealed: partial[None]
 with_extra(1, other=2)
-with_extra(1, value=2)  # error: [positional-only-parameter-as-kwarg]
-with_extra(1, bound="duplicate")  # error: [positional-only-parameter-as-kwarg]
-
-class AcceptsExtra(Protocol):
-    def __call__(self, value: int, /, **kwargs: object) -> None: ...
-
-callback: AcceptsExtra = with_extra  # error: [invalid-assignment]
-gradual_callback: Callable[..., None] = with_extra
-
-class AcceptsBound(Protocol):
-    def __call__(self, value: int, /, *, bound: object) -> None: ...
-
-bound_callback: AcceptsBound = with_extra  # error: [invalid-assignment]
-
-filled_extra = partial(with_extra, 1)
-filled_extra(other=2)
-filled_extra(value=2)  # error: [positional-only-parameter-as-kwarg]
-filled_extra(bound="duplicate")  # error: [positional-only-parameter-as-kwarg]
-
-def source_positional_only(value: int, /, **kwargs: object) -> None:
-    pass
-
-source_positional_only(1, value=2)
 
 retained = partial(pending, _, 3.0)
 reveal_type(retained)  # revealed: partial[(left: int, /) -> tuple[int, str, int | float]]
@@ -994,6 +973,7 @@ partial(combine, 1, _)  # error: [invalid-argument-type]
 partial(combine, _, "value", _)  # error: [invalid-argument-type]
 partial(combine, *(1, _))  # error: [invalid-argument-type]
 partial(combine, _, *())  # error: [invalid-argument-type]
+partial(combine, _, *[])  # error: [invalid-argument-type]
 
 empty: tuple[()] = ()
 partial(combine, _, *empty)  # error: [invalid-argument-type]
@@ -1124,6 +1104,16 @@ def unpacked(*args: *tuple[int, str]) -> str:
 wrapped = fixed if runtime_bool() else unpacked
 union_partial = partial(wrapped, _, "bound")
 reveal_type(union_partial)  # revealed: partial[int | str]
+
+type Wrapped = Callable[[int, str], int] | Callable[[str, str], str]
+
+def string_fixed(value: str, suffix: str) -> str:
+    return value
+
+aliased_wrapped: Wrapped = fixed if runtime_bool() else string_fixed
+aliased_union_partial = partial(aliased_wrapped, _, "bound")
+reveal_type(aliased_union_partial)  # revealed: partial[int | str]
+aliased_callback: Callable[[int], int] = aliased_union_partial  # error: [invalid-assignment]
 
 def accepts_string(*, value: str) -> None:
     pass

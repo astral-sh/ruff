@@ -208,7 +208,9 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
                         has_unsupported_placeholder = true;
                     }
                 }
-                Argument::Variadic => {
+                Argument::Variadic {
+                    is_definitely_empty,
+                } => {
                     has_variadic_argument = true;
                     let tuple_spec = argument_ty
                         .as_nominal_instance()
@@ -216,7 +218,7 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
                     let fixed_tuple = tuple_spec
                         .as_deref()
                         .and_then(|spec| spec.as_fixed_length());
-                    if fixed_tuple.is_none_or(|tuple| tuple.len() != 0) {
+                    if !is_definitely_empty && fixed_tuple.is_none_or(|tuple| tuple.len() != 0) {
                         last_direct_positional_placeholder = None;
                     }
                     has_unsupported_placeholder |= fixed_tuple.is_some_and(|tuple| {
@@ -3386,7 +3388,7 @@ impl<'db> CallableBinding<'db> {
             if self.overloads.len() > 1
                 && self.matching_overload_index().len() < self.overloads.len()
                 && call_arguments.iter().any(|(argument, argument_types)| {
-                    matches!(argument, Argument::Variadic)
+                    matches!(argument, Argument::Variadic { .. })
                         && argument_types
                             .get_default()
                             .is_some_and(|argument_type| is_expandable_type(db, argument_type))
@@ -4384,7 +4386,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             .any(|(argument, _)| {
                 matches!(
                     argument,
-                    Argument::Synthetic | Argument::Positional | Argument::Variadic
+                    Argument::Synthetic | Argument::Positional | Argument::Variadic { .. }
                 )
             })
     }
@@ -4424,7 +4426,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         if variable_argument_length
             && matches!(
                 (argument, parameter.kind()),
-                (Argument::Variadic, ParameterKind::Variadic { .. })
+                (Argument::Variadic { .. }, ParameterKind::Variadic { .. })
                     | (Argument::Keywords, ParameterKind::KeywordVariadic { .. })
             )
         {
@@ -4481,23 +4483,11 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         argument_type: Option<Type<'db>>,
         name: &str,
     ) -> Result<(), ()> {
-        let parameter = if let Some(parameter) = self.parameters.keyword_by_name(name) {
-            parameter
-        } else if let Some((parameter_index, parameter, reserved_name)) =
-            self.parameters.reserved_keyword_by_name(name)
-        {
-            self.errors
-                .push(BindingError::PositionalOnlyParameterAsKwarg {
-                    argument_index: self.get_argument_index(argument_index),
-                    parameter: ParameterContext::reserved_keyword(reserved_name.clone()),
-                });
-            if parameter.is_positional_only() {
-                self.parameter_info[parameter_index].suppress_missing_error = true;
-            }
-            return Err(());
-        } else if let Some(parameter) = self.parameters.keyword_variadic() {
-            parameter
-        } else {
+        let Some((parameter_index, parameter)) = self
+            .parameters
+            .keyword_by_name(name)
+            .or_else(|| self.parameters.keyword_variadic())
+        else {
             if let Some((parameter_index, parameter)) =
                 self.parameters.positional_only_by_name(name)
             {
@@ -4515,7 +4505,6 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             }
             return Err(());
         };
-        let (parameter_index, parameter) = parameter;
         self.assign_argument(
             argument_index,
             argument,
@@ -5502,7 +5491,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
 
             match argument {
-                Argument::Variadic => self.check_variadic_argument_type(
+                Argument::Variadic { .. } => self.check_variadic_argument_type(
                     constraints,
                     argument_index,
                     adjusted_argument_index,
@@ -6398,7 +6387,7 @@ impl<'db> Binding<'db> {
                 Argument::Keyword(name) => {
                     let _ = matcher.match_keyword(argument_index, argument, None, name);
                 }
-                Argument::Variadic => {
+                Argument::Variadic { .. } => {
                     let _ = matcher.match_variadic(
                         db,
                         argument_index,
@@ -6552,11 +6541,24 @@ impl<'db> Binding<'db> {
                     return Some(imprecise_return_type);
                 }
             };
-        if application.has_placeholders() && (func_ty.is_union() || func_ty.is_intersection()) {
+        let resolved_func_ty = func_ty.resolve_type_alias(db);
+        if application.has_placeholders()
+            && (resolved_func_ty.is_union() || resolved_func_ty.is_intersection())
+        {
             application.can_synthesize_signature = false;
         }
         let partial_bindings =
             Bindings::functools_partial_matched_bindings(db, func_ty, &application.arguments)?;
+        if application.has_placeholders()
+            && partial_bindings.iter_flat().any(|binding| {
+                binding
+                    .overloads()
+                    .iter()
+                    .any(|overload| overload.signature.parameters().keyword_variadic().is_some())
+            })
+        {
+            application.can_synthesize_signature = false;
+        }
         partial_bindings.add_functools_partial_placeholder_contexts(
             &mut application.arguments,
             &application.placeholder_arguments,
@@ -6621,7 +6623,7 @@ impl<'db> Binding<'db> {
             arguments.iter().zip(&self.argument_matches).enumerate()
         {
             match argument {
-                Argument::Positional | Argument::Synthetic | Argument::Variadic => {
+                Argument::Positional | Argument::Synthetic | Argument::Variadic { .. } => {
                     for matched_parameter in argument_matches.iter() {
                         let parameter_index = matched_parameter.index;
                         let parameter = &parameters[parameter_index];
@@ -6641,13 +6643,6 @@ impl<'db> Binding<'db> {
                             && !parameter.is_variadic()
                             && !parameter.is_keyword_variadic()
                         {
-                            partial_application.reserve_keyword_names(
-                                parameter
-                                    .keyword_name()
-                                    .into_iter()
-                                    .chain(parameter.reserved_keyword_names())
-                                    .cloned(),
-                            );
                             partial_application.bind_positionally(parameter_index);
                         }
                     }
@@ -7055,14 +7050,6 @@ impl ParameterContext {
             name: parameter.display_name(),
             index,
             positional,
-        }
-    }
-
-    fn reserved_keyword(name: Name) -> Self {
-        Self {
-            name: Some(name),
-            index: 0,
-            positional: false,
         }
     }
 }

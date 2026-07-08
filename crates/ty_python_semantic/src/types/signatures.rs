@@ -567,7 +567,6 @@ pub(crate) struct PartialApplication<'db> {
     keyword_defaults: Box<[Option<Type<'db>>]>,
     keyword_bound: Box<[bool]>,
     variadic_placeholders: usize,
-    reserved_keyword_names: Vec<Name>,
 }
 
 impl<'db> PartialApplication<'db> {
@@ -580,22 +579,12 @@ impl<'db> PartialApplication<'db> {
             keyword_defaults: vec![None; parameter_count].into_boxed_slice(),
             keyword_bound: vec![false; parameter_count].into_boxed_slice(),
             variadic_placeholders: 0,
-            reserved_keyword_names: Vec::new(),
         }
     }
 
     /// Marks the parameter at `parameter_index` as consumed by a positional binding.
     pub(crate) fn bind_positionally(&mut self, parameter_index: usize) {
         self.positionally_bound[parameter_index] = true;
-    }
-
-    /// Preserves keyword names reserved by a positionally consumed placeholder parameter.
-    pub(crate) fn reserve_keyword_names(&mut self, names: impl IntoIterator<Item = Name>) {
-        for name in names {
-            if !self.reserved_keyword_names.contains(&name) {
-                self.reserved_keyword_names.push(name);
-            }
-        }
     }
 
     /// Marks a fixed parameter as a required placeholder in the reduced signature.
@@ -639,10 +628,6 @@ impl<'db> PartialApplication<'db> {
 
     fn variadic_placeholders(&self) -> usize {
         self.variadic_placeholders
-    }
-
-    fn reserved_keyword_names(&self) -> &[Name] {
-        &self.reserved_keyword_names
     }
 }
 
@@ -1178,16 +1163,6 @@ impl<'db> Signature<'db> {
             }
 
             remaining.push(parameter);
-        }
-
-        if !partial_application.reserved_keyword_names().is_empty()
-            && let Some(keyword_variadic) = remaining
-                .iter_mut()
-                .find(|parameter| parameter.is_keyword_variadic())
-        {
-            *keyword_variadic = keyword_variadic.clone().with_reserved_keyword_names(
-                partial_application.reserved_keyword_names().iter().cloned(),
-            );
         }
 
         // Expand `P.args`/`P.kwargs` while the pair is still adjacent. The keyword-only reshuffle
@@ -1924,21 +1899,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.current_target.into_iter().chain(self.target_iter),
                 )
             }
-        }
-
-        if !(self.relation.is_assignability() && target.parameters.is_gradual())
-            && let Some(reserved_name) = source
-                .parameters
-                .reserved_keyword_names()
-                .find(|name| target.parameters.accepts_keyword_name(name))
-        {
-            if let Some(context) = self.report_context() {
-                context.push(ErrorContext::ParameterMustAcceptKeywordArguments {
-                    source_name: Some(reserved_name.clone()),
-                    target_name: reserved_name.clone(),
-                });
-            }
-            return self.never();
         }
 
         // Fast path: if the target accepts positional calls that the source cannot accept, reject
@@ -3901,34 +3861,6 @@ impl<'db> Parameters<'db> {
         })
     }
 
-    /// Return a parameter carrying a reserved keyword name.
-    pub(crate) fn reserved_keyword_by_name(
-        &self,
-        name: &str,
-    ) -> Option<(usize, &Parameter<'db>, &Name)> {
-        self.iter().enumerate().find_map(|(index, parameter)| {
-            parameter
-                .reserved_keyword_name(name)
-                .map(|reserved_name| (index, parameter, reserved_name))
-        })
-    }
-
-    /// Iterate all keyword names rejected by this parameter list.
-    fn reserved_keyword_names(&self) -> impl Iterator<Item = &Name> {
-        self.iter().flat_map(Parameter::reserved_keyword_names)
-    }
-
-    /// Returns whether callers can provide `name` as a keyword argument.
-    fn accepts_keyword_name(&self, name: &str) -> bool {
-        if self.is_top() || self.reserved_keyword_by_name(name).is_some() {
-            return false;
-        }
-
-        self.keyword_by_name(name)
-            .or_else(|| self.keyword_variadic())
-            .is_some_and(|(_, parameter)| parameter.annotated_type() != Type::Never)
-    }
-
     /// Return the variadic parameter (`*args`), if any, and its index, or `None`.
     pub(crate) fn variadic(&self) -> Option<(usize, &Parameter<'db>)> {
         self.iter()
@@ -4059,13 +3991,6 @@ pub(crate) struct Parameter<'db> {
     /// Syntax-level annotation kind for cases where the annotation has special parameter semantics.
     annotation_kind: ParameterAnnotationKind,
 
-    /// Names that must not be captured by `**kwargs`.
-    ///
-    /// This is used for positional-or-keyword parameters converted to positional-only placeholder
-    /// slots in synthesized `functools.partial` signatures. Passing the original name by keyword
-    /// would otherwise reach `**kwargs`, but fail at runtime as a duplicate argument.
-    reserved_keyword_names: Box<[Name]>,
-
     kind: ParameterKind<'db>,
 }
 
@@ -4093,7 +4018,6 @@ impl<'db> Parameter<'db> {
             definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
-            reserved_keyword_names: Box::default(),
             kind: ParameterKind::PositionalOnly {
                 name,
                 default_type: None,
@@ -4107,7 +4031,6 @@ impl<'db> Parameter<'db> {
             definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
-            reserved_keyword_names: Box::default(),
             kind: ParameterKind::PositionalOrKeyword {
                 name,
                 default_type: None,
@@ -4121,7 +4044,6 @@ impl<'db> Parameter<'db> {
             definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
-            reserved_keyword_names: Box::default(),
             kind: ParameterKind::Variadic { name },
         }
     }
@@ -4132,7 +4054,6 @@ impl<'db> Parameter<'db> {
             definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
-            reserved_keyword_names: Box::default(),
             kind: ParameterKind::KeywordOnly {
                 name,
                 default_type: None,
@@ -4146,7 +4067,6 @@ impl<'db> Parameter<'db> {
             definition: None,
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
-            reserved_keyword_names: Box::default(),
             kind: ParameterKind::KeywordVariadic { name },
         }
     }
@@ -4185,13 +4105,10 @@ impl<'db> Parameter<'db> {
                 name,
                 default_type: None,
             },
-            ParameterKind::PositionalOrKeyword { name, .. } => {
-                self.reserved_keyword_names = Box::new([name.clone()]);
-                ParameterKind::PositionalOnly {
-                    name: Some(name),
-                    default_type: None,
-                }
-            }
+            ParameterKind::PositionalOrKeyword { name, .. } => ParameterKind::PositionalOnly {
+                name: Some(name),
+                default_type: None,
+            },
             kind => kind,
         };
         self
@@ -4223,7 +4140,6 @@ impl<'db> Parameter<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             inferred_annotation: self.inferred_annotation,
             annotation_kind: self.annotation_kind,
-            reserved_keyword_names: self.reserved_keyword_names.clone(),
         }
     }
 
@@ -4239,7 +4155,6 @@ impl<'db> Parameter<'db> {
             definition: self.definition,
             inferred_annotation: self.inferred_annotation,
             annotation_kind: self.annotation_kind,
-            reserved_keyword_names: self.reserved_keyword_names.clone(),
             kind,
         }
     }
@@ -4255,7 +4170,6 @@ impl<'db> Parameter<'db> {
             definition,
             annotation_kind,
             inferred_annotation,
-            reserved_keyword_names,
             kind,
         } = self;
 
@@ -4316,7 +4230,6 @@ impl<'db> Parameter<'db> {
             definition: *definition,
             inferred_annotation: *inferred_annotation,
             annotation_kind: *annotation_kind,
-            reserved_keyword_names: reserved_keyword_names.clone(),
             kind,
         })
     }
@@ -4361,7 +4274,6 @@ impl<'db> Parameter<'db> {
             definition,
             inferred_annotation,
             annotation_kind,
-            reserved_keyword_names: Box::default(),
             kind,
         }
     }
@@ -4374,30 +4286,6 @@ impl<'db> Parameter<'db> {
     /// Returns `true` if this is a positional-only parameter.
     pub(crate) fn is_positional_only(&self) -> bool {
         matches!(self.kind, ParameterKind::PositionalOnly { .. })
-    }
-
-    /// Returns this parameter's reserved keyword names.
-    pub(crate) fn reserved_keyword_names(&self) -> &[Name] {
-        &self.reserved_keyword_names
-    }
-
-    /// Returns the reserved keyword equal to `name`, if present.
-    fn reserved_keyword_name(&self, name: &str) -> Option<&Name> {
-        self.reserved_keyword_names
-            .iter()
-            .find(|reserved_name| reserved_name.as_str() == name)
-    }
-
-    /// Adds keyword names that must not be captured by this parameter.
-    fn with_reserved_keyword_names(mut self, names: impl IntoIterator<Item = Name>) -> Self {
-        let mut reserved_names = self.reserved_keyword_names.into_vec();
-        for name in names {
-            if !reserved_names.contains(&name) {
-                reserved_names.push(name);
-            }
-        }
-        self.reserved_keyword_names = reserved_names.into_boxed_slice();
-        self
     }
 
     /// Returns `true` if this is a variadic parameter.
@@ -4685,7 +4573,6 @@ mod tests {
         annotation_kind: ParameterAnnotationKind,
         inferred_annotation: bool,
         kind: &'a ParameterKind<'db>,
-        reserved_keyword_names: &'a [Name],
     }
 
     impl<'a, 'db> From<&'a Parameter<'db>> for ParameterWithoutDefinition<'a, 'db> {
@@ -4695,7 +4582,6 @@ mod tests {
                 definition: _,
                 annotation_kind,
                 inferred_annotation,
-                reserved_keyword_names,
                 kind,
             } = parameter;
 
@@ -4703,7 +4589,6 @@ mod tests {
                 annotated_type,
                 annotation_kind: *annotation_kind,
                 inferred_annotation: *inferred_annotation,
-                reserved_keyword_names,
                 kind,
             }
         }
