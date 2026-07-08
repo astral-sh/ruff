@@ -2984,6 +2984,38 @@ static_assert(is_subtype_of(ObjectConsumer, ArbitraryConsumerProtocol))
 static_assert(not is_assignable_to(ListOnlyConsumer, ArbitraryConsumerProtocol))
 static_assert(not is_subtype_of(ListOnlyConsumer, ArbitraryConsumerProtocol))
 
+class ConstrainedListConsumerProtocol(Protocol):
+    def f[T: (list[int], list[str])](self, value: T) -> None: ...
+
+class GenericListConsumer:
+    def f[S](self, value: list[S]) -> None:
+        return None
+
+# The target domain supplies a concrete source witness for each specialization: `S = int` when
+# `T = list[int]`, and `S = str` when `T = list[str]`.
+static_assert(is_assignable_to(GenericListConsumer, ConstrainedListConsumerProtocol))
+static_assert(is_subtype_of(GenericListConsumer, ConstrainedListConsumerProtocol))
+
+class ConstrainedScalarConsumerProtocol(Protocol):
+    def f[T: (int, str)](self, value: T) -> None: ...
+
+# A concrete target domain only makes projection representable; every target specialization must
+# still have a valid source witness.
+static_assert(not is_assignable_to(GenericListConsumer, ConstrainedScalarConsumerProtocol))
+static_assert(not is_subtype_of(GenericListConsumer, ConstrainedScalarConsumerProtocol))
+
+class JointConstrainedListProtocol(Protocol):
+    def f[T: (list[int], list[str]), U: (list[int], list[str])](self, left: T, right: U) -> None: ...
+
+class DiagonalListConsumer:
+    def f[S](self, left: list[S], right: list[S]) -> None:
+        return None
+
+# Dependent projection must retain correlations across multiple target variables: no single `S`
+# covers the mixed target specialization `(list[int], list[str])`.
+static_assert(not is_assignable_to(DiagonalListConsumer, JointConstrainedListProtocol))
+static_assert(not is_subtype_of(DiagonalListConsumer, JointConstrainedListProtocol))
+
 class IntBoundIdentityProtocol(Protocol):
     def f[T: int](self, value: T) -> T: ...
 

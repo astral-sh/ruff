@@ -616,11 +616,14 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// Relationships between bare type variables can be projected through the sequent machinery.
     /// A removed variable nested in a bound can instead require an existential type, such as
     /// projecting `S` from `T ≤ list[S]`; `ConstraintSet` cannot represent that residual today.
+    /// If `T` is fixed by a concrete domain, however, the domain constraints let the sequent
+    /// machinery substitute each concrete specialization before projection.
     pub(crate) fn has_unprojectable_nested_typevar(
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         to_remove: InferableTypeVars<'db>,
+        fixed_by_domain: InferableTypeVars<'db>,
     ) -> bool {
         self.verify_builder(builder);
         if to_remove == InferableTypeVars::None {
@@ -642,6 +645,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                                 .as_typevar()
                                 .is_some_and(|typevar| typevar.is_inferable(db, to_remove))
                         })
+                        && !constraint.typevar.is_inferable(db, fixed_by_domain)
                     {
                         unprojectable = true;
                     }

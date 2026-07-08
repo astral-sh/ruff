@@ -1875,6 +1875,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         };
         let source_locals = quantified_locals(source_typevars);
         let target_locals = quantified_locals(target_typevars);
+        let target_locals_fixed_by_domain = quantified_locals(
+            &target_typevars
+                .iter()
+                .copied()
+                .filter(|typevar| {
+                    typevar
+                        .typevar(db)
+                        .constraints(db)
+                        .is_some_and(|constraints| {
+                            constraints.iter().all(|constraint| {
+                                !constraint.has_typevar(db)
+                                    && constraint.bottom_materialization(db)
+                                        == constraint.top_materialization(db)
+                            })
+                        })
+                })
+                .collect::<Vec<_>>(),
+        );
         let checker = self
             .with_inferable_typevars(self.inferable.merge(db, source_locals))
             .with_universally_quantified_typevars(db, target_locals)
@@ -1912,7 +1930,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // A generic source is an intersection of its specializations. For each target
         // specialization, it is enough for some valid source specialization to satisfy the
         // relation. Quantify the entire source block in a single BDD traversal.
-        if with_domains.has_unprojectable_nested_typevar(db, self.constraints, source_locals) {
+        if with_domains.has_unprojectable_nested_typevar(
+            db,
+            self.constraints,
+            source_locals,
+            target_locals_fixed_by_domain,
+        ) {
             return self.never();
         }
         let quantified = with_domains.exists(db, self.constraints, source_locals);
