@@ -14,10 +14,6 @@ enum ContainmentBehavior<'db> {
 }
 
 /// Return the containment behavior known for this type.
-///
-/// For subclasses that inherit a known built-in `__contains__`, the stored type is the specialized
-/// built-in base rather than `ty`. This preserves the built-in element type even if the subclass
-/// overrides `__iter__`.
 fn containment_behavior<'db>(db: &'db dyn Db, ty: Type<'db>) -> ContainmentBehavior<'db> {
     let ty = ty.resolve_type_alias(db);
 
@@ -54,8 +50,7 @@ fn containment_behavior<'db>(db: &'db dyn Db, ty: Type<'db>) -> ContainmentBehav
         Type::TypedDict(_) => ContainmentBehavior::ElementsOf(ty),
         Type::NominalInstance(instance) => {
             // Walk the MRO until we find either a visible override or a supported built-in
-            // implementation. Returning the built-in base preserves its specialization; normal
-            // member lookup specializes inherited signatures for the subclass instead.
+            // implementation.
             for base in instance.class(db).iter_mro(db) {
                 let class = match base {
                     ClassBase::Class(class) => class,
@@ -76,6 +71,16 @@ fn containment_behavior<'db>(db: &'db dyn Db, ty: Type<'db>) -> ContainmentBehav
                             | KnownClass::Range
                     )
                 ) {
+                    // For built-ins with a known containment behavior, we always store the
+                    // built-in base (not `self`), even if `self` is a subclass of the built-in. At
+                    // runtime, a custom `__iter__` on a subclass of a built-in container does not
+                    // change the `__contains__` behavior of the built-in; storing the built-in
+                    // instead of the subclass ensures we model that correctly. We end up calling
+                    // `try_iterate` on the stored type, so otherwise we would wrongly prefer the
+                    // `__iter__` annotation. (It is always true for all types that `__contains__`
+                    // takes precedence over `__iter__` for containment checks, but this is only
+                    // relevant to us for built-ins, since user types with `__contains__` have
+                    // containment behavior that we can't understand and don't try to model.)
                     return ContainmentBehavior::ElementsOf(Type::instance(db, class));
                 }
                 if !class
