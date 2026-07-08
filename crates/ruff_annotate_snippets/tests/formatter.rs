@@ -208,6 +208,54 @@ fn test_format_skip_title() {
 }
 
 #[test]
+fn test_format_no_severity() {
+    let input = &[Group::with_title(
+        Level::ERROR
+            .no_name()
+            .primary_title("This is a title")
+            .id("E0001"),
+    )];
+
+    let expected_ascii = str!["This is a title"];
+    let renderer = Renderer::plain();
+    assert_data_eq!(renderer.render(input), expected_ascii);
+
+    let expected_unicode = str!["This is a title"];
+    let renderer = renderer.decor_style(DecorStyle::Unicode);
+    assert_data_eq!(renderer.render(input), expected_unicode);
+}
+
+#[test]
+fn test_format_no_id() {
+    let input = &[Group::with_title(
+        Level::ERROR.primary_title("This is a title"),
+    )];
+
+    let expected_ascii = str!["error: This is a title"];
+    let renderer = Renderer::plain();
+    assert_data_eq!(renderer.render(input), expected_ascii);
+
+    let expected_unicode = str!["error: This is a title"];
+    let renderer = renderer.decor_style(DecorStyle::Unicode);
+    assert_data_eq!(renderer.render(input), expected_unicode);
+}
+
+#[test]
+fn test_format_no_severity_or_id() {
+    let input = &[Group::with_title(
+        Level::ERROR.no_name().primary_title("This is a title"),
+    )];
+
+    let expected_ascii = str!["This is a title"];
+    let renderer = Renderer::plain();
+    assert_data_eq!(renderer.render(input), expected_ascii);
+
+    let expected_unicode = str!["This is a title"];
+    let renderer = renderer.decor_style(DecorStyle::Unicode);
+    assert_data_eq!(renderer.render(input), expected_unicode);
+}
+
+#[test]
 fn test_format_snippet_only() {
     let source = "This is line 1\nThis is line 2";
     let input = &[Level::ERROR.primary_title("").element(
