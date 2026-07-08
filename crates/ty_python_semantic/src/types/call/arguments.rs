@@ -26,11 +26,29 @@ pub(crate) enum Argument<'a> {
     /// A positional argument.
     Positional,
     /// A starred positional argument (e.g. `*args`).
-    Variadic { is_definitely_empty: bool },
+    Variadic {
+        /// Whether the expression is a syntactically empty list or tuple literal.
+        ///
+        /// This source-level fact cannot be recovered from the inferred container type.
+        is_definitely_empty: bool,
+    },
     /// A keyword argument (e.g. `a=1`).
     Keyword(&'a str),
     /// The double-starred keywords argument (e.g. `**kwargs`).
     Keywords,
+}
+
+impl Argument<'_> {
+    fn variadic(expression: &ast::Expr) -> Self {
+        Self::Variadic {
+            is_definitely_empty: matches!(
+                expression,
+                ast::Expr::List(ast::ExprList { elts, .. })
+                    | ast::Expr::Tuple(ast::ExprTuple { elts, .. })
+                    if elts.is_empty()
+            ),
+        }
+    }
 }
 
 /// Arguments for a single call, in source order, along with inferred types for each argument.
@@ -123,17 +141,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
                         let ty = infer_argument_type(&arg_or_keyword, value);
-                        (
-                            Argument::Variadic {
-                                is_definitely_empty: matches!(
-                                    value.as_ref(),
-                                    ast::Expr::List(ast::ExprList { elts, .. })
-                                        | ast::Expr::Tuple(ast::ExprTuple { elts, .. })
-                                        if elts.is_empty()
-                                ),
-                            },
-                            Some(ty),
-                        )
+                        (Argument::variadic(value), Some(ty))
                     }
                     _ => (Argument::Positional, None),
                 },
@@ -169,17 +177,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
                         let ty = infer_argument_type(value);
-                        (
-                            Argument::Variadic {
-                                is_definitely_empty: matches!(
-                                    value.as_ref(),
-                                    ast::Expr::List(ast::ExprList { elts, .. })
-                                        | ast::Expr::Tuple(ast::ExprTuple { elts, .. })
-                                        if elts.is_empty()
-                                ),
-                            },
-                            Some(ty),
-                        )
+                        (Argument::variadic(value), Some(ty))
                     }
                     _ => {
                         let ty = infer_argument_type(arg);

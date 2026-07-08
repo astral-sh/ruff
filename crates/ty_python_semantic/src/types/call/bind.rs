@@ -180,6 +180,16 @@ struct FunctoolsPartialApplicationPlan<'a, 'db> {
 }
 
 impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
+    /// Classifies bound arguments for Placeholder-aware partial application.
+    ///
+    /// Exact, direct `Placeholder` arguments are replaced with `Never` so ordinary call binding
+    /// consumes their parameters without contributing to inference. Uncertain or unpacked
+    /// placeholders retain the gradual `partial` signature, while definitely invalid keyword and
+    /// trailing placeholders are returned as errors.
+    ///
+    /// ```python
+    /// partial(f, Placeholder, 1)  # reserves the first parameter
+    /// ```
     fn from_call_arguments(
         db: &'db dyn Db,
         call_arguments: &CallArguments<'a, 'db>,
@@ -187,24 +197,24 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
         let placeholder_ty = known_module_symbol(db, KnownModule::Functools, "Placeholder")
             .place
             .ignore_possibly_undefined();
-        let source_arguments = call_arguments.start_from(1);
-        let mut placeholder_arguments = vec![false; source_arguments.len()];
+        let overlaps_placeholder = |ty: Type<'db>| {
+            placeholder_ty.is_some_and(|placeholder| !ty.is_disjoint_from(db, placeholder))
+        };
+        let mut placeholder_arguments = vec![false; call_arguments.len().saturating_sub(1)];
         let mut has_variadic_argument = false;
         let mut has_unsupported_placeholder = false;
-        let mut last_direct_positional_placeholder = None;
+        let mut trailing_placeholder = None;
 
-        for (argument_index, (argument, argument_types)) in source_arguments.iter().enumerate() {
+        for (argument_index, (argument, argument_types)) in
+            call_arguments.iter().skip(1).enumerate()
+        {
             let argument_ty = argument_types.get_default().unwrap_or_else(Type::unknown);
             match argument {
                 Argument::Positional => {
                     let is_placeholder = placeholder_ty == Some(argument_ty);
-                    last_direct_positional_placeholder = Some((argument_index, is_placeholder));
+                    trailing_placeholder = is_placeholder.then_some(argument_index);
                     placeholder_arguments[argument_index] = is_placeholder;
-                    if !is_placeholder
-                        && placeholder_ty.is_some_and(|placeholder| {
-                            !argument_ty.is_disjoint_from(db, placeholder)
-                        })
-                    {
+                    if !is_placeholder && overlaps_placeholder(argument_ty) {
                         has_unsupported_placeholder = true;
                     }
                 }
@@ -219,15 +229,10 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
                         .as_deref()
                         .and_then(|spec| spec.as_fixed_length());
                     if !is_definitely_empty && fixed_tuple.is_none_or(|tuple| tuple.len() != 0) {
-                        last_direct_positional_placeholder = None;
+                        trailing_placeholder = None;
                     }
-                    has_unsupported_placeholder |= fixed_tuple.is_some_and(|tuple| {
-                        placeholder_ty.is_some_and(|placeholder| {
-                            tuple
-                                .iter_all_elements()
-                                .any(|element| !element.is_disjoint_from(db, placeholder))
-                        })
-                    });
+                    has_unsupported_placeholder |= fixed_tuple
+                        .is_some_and(|tuple| tuple.iter_all_elements().any(&overlaps_placeholder));
                 }
                 Argument::Keyword(_) => {
                     if placeholder_ty == Some(argument_ty) {
@@ -236,9 +241,7 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
                             reason: InvalidPartialPlaceholderReason::Keyword,
                         });
                     }
-                    if placeholder_ty
-                        .is_some_and(|placeholder| !argument_ty.is_disjoint_from(db, placeholder))
-                    {
+                    if overlaps_placeholder(argument_ty) {
                         has_unsupported_placeholder = true;
                     }
                 }
@@ -247,7 +250,7 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
             }
         }
 
-        if let Some((argument_index, true)) = last_direct_positional_placeholder {
+        if let Some(argument_index) = trailing_placeholder {
             return Err(InvalidPartialPlaceholder {
                 argument_index,
                 reason: InvalidPartialPlaceholderReason::Trailing,
@@ -259,9 +262,7 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
         else {
             return Ok(None);
         };
-        let has_placeholders = placeholder_arguments
-            .iter()
-            .any(|is_placeholder| *is_placeholder);
+        let has_placeholders = placeholder_arguments.contains(&true);
         can_synthesize_signature &=
             !(has_unsupported_placeholder || has_variadic_argument && has_placeholders);
 
@@ -281,11 +282,10 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
     }
 
     fn has_placeholders(&self) -> bool {
-        self.placeholder_arguments
-            .iter()
-            .any(|is_placeholder| *is_placeholder)
+        self.placeholder_arguments.contains(&true)
     }
 
+    /// Returns whether a matched argument is a placeholder after removing a synthetic receiver.
     fn is_placeholder_argument(&self, argument_index: usize, bound_argument_offset: usize) -> bool {
         argument_index
             .checked_sub(bound_argument_offset)
@@ -293,15 +293,17 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct InvalidPartialPlaceholder {
     argument_index: usize,
     reason: InvalidPartialPlaceholderReason,
 }
 
+/// A definitely invalid use of `functools.Placeholder` while constructing a partial.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum InvalidPartialPlaceholderReason {
+    /// A placeholder was supplied as a named keyword argument.
     Keyword,
+    /// No later positional argument fills the final placeholder.
     Trailing,
 }
 

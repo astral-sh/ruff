@@ -614,20 +614,12 @@ impl<'db> PartialApplication<'db> {
         self.positionally_bound[parameter_index]
     }
 
-    fn is_positional_placeholder(&self, parameter_index: usize) -> bool {
-        self.positional_placeholders[parameter_index]
-    }
-
     fn keyword_default(&self, parameter_index: usize) -> Option<Type<'db>> {
         self.keyword_defaults[parameter_index]
     }
 
     fn is_keyword_bound(&self, parameter_index: usize) -> bool {
         self.keyword_bound[parameter_index]
-    }
-
-    fn variadic_placeholders(&self) -> usize {
-        self.variadic_placeholders
     }
 }
 
@@ -1132,7 +1124,7 @@ impl<'db> Signature<'db> {
         );
 
         let mut remaining =
-            Vec::with_capacity(parameters.len() + partial_application.variadic_placeholders());
+            Vec::with_capacity(parameters.len() + partial_application.variadic_placeholders);
         let mut first_keyword_bound_positional_or_keyword = None;
         for (index, parameter) in parameters.iter().enumerate() {
             if partial_application.is_positionally_bound(index) {
@@ -1140,7 +1132,7 @@ impl<'db> Signature<'db> {
             }
 
             if parameter.is_variadic() {
-                remaining.extend((0..partial_application.variadic_placeholders()).map(|_| {
+                remaining.extend((0..partial_application.variadic_placeholders).map(|_| {
                     Parameter::positional_only(None).with_annotated_type(parameter.annotated_type())
                 }));
             }
@@ -1149,7 +1141,7 @@ impl<'db> Signature<'db> {
                 || parameter.clone(),
                 |default_ty| parameter.clone().with_default_type(default_ty),
             );
-            let parameter = if partial_application.is_positional_placeholder(index) {
+            let parameter = if partial_application.positional_placeholders[index] {
                 parameter.into_required_positional_only()
             } else {
                 parameter
@@ -4099,6 +4091,14 @@ impl<'db> Parameter<'db> {
         }
     }
 
+    /// Converts a retained placeholder parameter into a required positional-only parameter.
+    ///
+    /// A `Placeholder` must be filled positionally even when the original parameter accepted a
+    /// keyword, and it must remain required even when that parameter originally had a default.
+    ///
+    /// ```python
+    /// partial(f, Placeholder, "bound")  # the first parameter remains required and positional
+    /// ```
     fn into_required_positional_only(mut self) -> Self {
         self.kind = match self.kind {
             ParameterKind::PositionalOnly { name, .. } => ParameterKind::PositionalOnly {
