@@ -10,7 +10,7 @@ use crate::{
         TypeMapping, TypeVarNonce, TypeVarVariance, UnionBuilder,
         class::NamedTupleSpec,
         constraints::OwnedConstraintSet,
-        dedicated::pydantic::StrictMode,
+        dedicated::pydantic::ConfigBoolean,
         generics::{Specialization, walk_generic_context},
         newtype::NewType,
         typevar::TypeVarInstance,
@@ -509,7 +509,7 @@ pub struct FieldInstance<'db> {
     pub converter: Option<(Type<'db>, Type<'db>)>,
 
     /// The mode selected by Pydantic's `strict` argument.
-    pub strict: StrictMode,
+    pub strict: ConfigBoolean,
 }
 
 // The Salsa heap is tracked separately.

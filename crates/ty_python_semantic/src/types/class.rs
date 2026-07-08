@@ -2429,7 +2429,7 @@ pub(crate) enum FieldKind<'db> {
         /// The name for this field in the synthesized constructor signature, if specified.
         alias: Option<Box<str>>,
         /// The mode selected by Pydantic's `strict` argument.
-        strict: pydantic::StrictMode,
+        strict: pydantic::ConfigBoolean,
     },
     /// `TypedDict` field metadata
     TypedDict {

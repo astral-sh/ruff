@@ -623,16 +623,14 @@ class AliasAndName(BaseModel):
     name: int = Field(alias="alias")
 
 AliasAndName(alias=1)
-# TODO: no errors here
-# error: [missing-argument]
 AliasAndName(name=1)
+AliasAndName(name=None)  # error: [invalid-argument-type]
 ```
 
 Passing none of these should be an error:
 
 ```py
-# Note: this might be hard to support once we implement the feature above?
-# error: [missing-argument]
+# This is a known limitation, it should ideally be an error.
 AliasAndName()
 ```
 
@@ -644,11 +642,21 @@ class OnlyName(BaseModel):
 
     name: int = Field(alias="alias")
 
-# TODO: this should be an error
-OnlyName(alias=1)
-# TODO: no errors here
-# error: [missing-argument]
+OnlyName(alias=1)  # error: [missing-argument]
 OnlyName(name=1)
+```
+
+If `validate_by_alias=False` is set without specifying `validate_by_name`, Pydantic implicitly
+enables validation by name:
+
+```py
+class ImplicitlyOnlyName(BaseModel):
+    model_config = ConfigDict(validate_by_alias=False)
+
+    name: int = Field(alias="alias")
+
+ImplicitlyOnlyName(alias=1)  # error: [missing-argument]
+ImplicitlyOnlyName(name=1)
 ```
 
 ## Extra fields

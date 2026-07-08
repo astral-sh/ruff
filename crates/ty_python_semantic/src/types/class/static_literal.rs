@@ -1370,7 +1370,7 @@ impl<'db> StaticClassLiteral<'db> {
                         None,
                         None,
                         None,
-                        pydantic::StrictMode::Unspecified,
+                        pydantic::ConfigBoolean::Unspecified,
                     ),
                     FieldKind::Dataclass {
                         init,
@@ -1385,7 +1385,7 @@ impl<'db> StaticClassLiteral<'db> {
                         *kw_only,
                         alias.as_ref(),
                         *converter,
-                        pydantic::StrictMode::Unspecified,
+                        pydantic::ConfigBoolean::Unspecified,
                     ),
                     FieldKind::Pydantic {
                         init,
@@ -1476,28 +1476,63 @@ impl<'db> StaticClassLiteral<'db> {
                     || pydantic_constructor_fields_are_keyword_only
                     || kw_only.unwrap_or(false);
 
-                // Use the alias name if provided, otherwise use the field name
-                let parameter_name =
-                    Name::new(alias.map(|alias| &**alias).unwrap_or(&**field_name));
+                let mut add_parameter_with_name = |parameter_name, default_ty| {
+                    let mut parameter = if is_kw_only {
+                        Parameter::keyword_only(parameter_name)
+                    } else {
+                        Parameter::positional_or_keyword(parameter_name)
+                    }
+                    .with_annotated_type(field_ty)
+                    .with_definition(field.first_declaration);
 
-                let mut parameter = if is_kw_only {
-                    Parameter::keyword_only(parameter_name)
-                } else {
-                    Parameter::positional_or_keyword(parameter_name)
-                }
-                .with_annotated_type(field_ty)
-                .with_definition(field.first_declaration);
+                    parameter = if matches!(name, "__replace__" | "_replace") {
+                        // When replacing, we know there is a default value for the field
+                        // (the value that is currently assigned to the field)
+                        // assume this to be the declared type of the field
+                        parameter.with_default_type(field_ty)
+                    } else {
+                        parameter.with_optional_default_type(default_ty)
+                    };
 
-                parameter = if matches!(name, "__replace__" | "_replace") {
-                    // When replacing, we know there is a default value for the field
-                    // (the value that is currently assigned to the field)
-                    // assume this to be the declared type of the field
-                    parameter.with_default_type(field_ty)
-                } else {
-                    parameter.with_optional_default_type(default_ty)
+                    parameters.push(parameter);
                 };
 
-                parameters.push(parameter);
+                if name == "__init__"
+                    && let Some(metadata) = field_policy.pydantic_metadata()
+                    && let Some(alias) = alias
+                {
+                    match (metadata.validates_by_alias(), metadata.validates_by_name()) {
+                        (true, true) => {
+                            let alias = Name::new(&**alias);
+                            if alias == *field_name {
+                                add_parameter_with_name(field_name.clone(), default_ty);
+                            } else {
+                                // A normal signature cannot express that at least one of two
+                                // differently named parameters is required. We could solve
+                                // this with overloads, but the number of overloads would grow
+                                // exponentially in the number of parameters. So for now, we
+                                // treat both the alias and the field name as optional
+                                // parameters, which leads to false negatives if none of them
+                                // is provided.
+                                let default_ty = Some(default_ty.unwrap_or_else(Type::unknown));
+                                add_parameter_with_name(alias, default_ty);
+                                add_parameter_with_name(field_name.clone(), default_ty);
+                            }
+                        }
+                        (true, false) => {
+                            add_parameter_with_name(Name::new(&**alias), default_ty);
+                        }
+                        (false, true) => {
+                            add_parameter_with_name(field_name.clone(), default_ty);
+                        }
+                        (false, false) => {}
+                    }
+                } else {
+                    // Use the alias name if provided, otherwise use the field name.
+                    let parameter_name =
+                        Name::new(alias.map(|alias| &**alias).unwrap_or(&**field_name));
+                    add_parameter_with_name(parameter_name, default_ty);
+                }
             }
 
             // In the event that we have a mix of keyword-only and positional parameters, we need to sort them
@@ -2140,7 +2175,7 @@ impl<'db> StaticClassLiteral<'db> {
                 let mut kw_only = None;
                 let mut alias = None;
                 let mut converter = None;
-                let mut strict = pydantic::StrictMode::Unspecified;
+                let mut strict = pydantic::ConfigBoolean::Unspecified;
                 if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
                     default_ty = field.default_type(db);
                     init = field.init(db);
