@@ -50,6 +50,19 @@ fn list_alias<'db>(db: &'db dyn Db, argument: Type<'db>) -> GenericAlias<'db> {
         .expect("a specialized `list` should be a generic alias")
 }
 
+fn iterable_alias<'db>(db: &'db dyn Db, argument: Type<'db>) -> GenericAlias<'db> {
+    KnownClass::Iterable
+        .to_specialized_class_type(db, &[argument])
+        .expect("`Iterable` should accept one type argument")
+        .into_generic_alias()
+        .expect("a specialized `Iterable` should be a generic alias")
+}
+
+fn nested_iterable_alias<'db>(db: &'db dyn Db, argument: Type<'db>) -> GenericAlias<'db> {
+    let inner = Type::instance(db, ClassType::Generic(iterable_alias(db, argument)));
+    iterable_alias(db, inner)
+}
+
 fn oscillating_generic_alias_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle: &salsa::Cycle,
@@ -76,6 +89,21 @@ fn oscillating_generic_alias(db: &dyn Db) -> Type<'_> {
     list_alias(db, argument).into()
 }
 
+#[salsa::tracked(
+    cycle_initial=|_, id| Type::divergent(id),
+    cycle_fn=oscillating_generic_alias_cycle_recover,
+)]
+fn oscillating_protocol_alias(db: &dyn Db) -> Type<'_> {
+    let previous = oscillating_protocol_alias(db);
+    let int: Type = nested_iterable_alias(db, KnownClass::Int.to_instance(db)).into();
+
+    if previous == int {
+        nested_iterable_alias(db, KnownClass::Str.to_instance(db)).into()
+    } else {
+        int
+    }
+}
+
 #[test]
 fn generic_alias_cycle_recovery_normalizes_same_origin_unknown_oscillation() {
     let db = setup_db();
@@ -99,6 +127,38 @@ fn generic_alias_cycle_recovery_rejects_unsafe_merges() {
         int.merge_cycle_recovery(&db, list_alias(&db, unknown_generic))
             .is_none()
     );
+}
+
+#[test]
+fn protocol_alias_cycle_recovery_recursively_widens_covariant_arguments() {
+    let db = setup_db();
+    let int = KnownClass::Int.to_instance(&db);
+    let str = KnownClass::Str.to_instance(&db);
+    let previous: Type = nested_iterable_alias(&db, int).into();
+    let current: Type = nested_iterable_alias(&db, str).into();
+
+    assert!(ClassBase::try_from_type(&db, previous, None).is_some());
+    assert!(ClassBase::try_from_type(&db, current, None).is_some());
+
+    let recovered = oscillating_protocol_alias(&db);
+    let Type::GenericAlias(outer) = recovered else {
+        panic!("cycle recovery should preserve the outer protocol alias");
+    };
+    let [inner] = outer.specialization(&db).types(&db) else {
+        panic!("`Iterable` should have one type argument");
+    };
+    let Some((inner_origin, inner_specialization)) = inner.class_specialization(&db) else {
+        panic!("cycle recovery should preserve the inner protocol instance");
+    };
+    assert_eq!(inner_origin, outer.origin(&db));
+
+    let [Type::Union(argument)] = inner_specialization.types(&db) else {
+        panic!("the innermost covariant arguments should be widened to a union");
+    };
+    assert_eq!(argument.elements(&db).len(), 2);
+    assert!(argument.elements(&db).contains(&int));
+    assert!(argument.elements(&db).contains(&str));
+    assert!(ClassBase::try_from_type(&db, recovered, None).is_some());
 }
 
 /// All other tests also make sure that `Type::Todo` works as expected. This particular

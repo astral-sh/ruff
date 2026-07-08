@@ -1215,6 +1215,44 @@ impl<'db> Type<'db> {
         .recursive_type_normalized(db, cycle)
     }
 
+    /// Widen two types in a covariant generic position during cycle recovery.
+    ///
+    /// When both types are instances of the same generic class, preserve that class identity and
+    /// recursively widen its covariant arguments. Otherwise, retain both types in a union.
+    pub(super) fn merge_covariant_cycle_recovery(self, db: &'db dyn Db, previous: Self) -> Self {
+        let merged = match (self, previous) {
+            (Type::GenericAlias(current), Type::GenericAlias(previous)) => current
+                .merge_cycle_recovery(db, previous)
+                .map(Type::GenericAlias),
+            (
+                current @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
+                previous @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
+            ) => Self::merge_generic_instance_cycle_recovery(db, current, previous),
+            _ => None,
+        };
+
+        merged.unwrap_or_else(|| UnionType::from_elements_cycle_recovery(db, [previous, self]))
+    }
+
+    fn merge_generic_instance_cycle_recovery(
+        db: &'db dyn Db,
+        current: Self,
+        previous: Self,
+    ) -> Option<Self> {
+        let (current_origin, current_specialization) = current.class_specialization(db)?;
+        let (previous_origin, previous_specialization) = previous.class_specialization(db)?;
+        if current_origin != previous_origin {
+            return None;
+        }
+
+        let specialization =
+            current_specialization.merge_cycle_recovery(db, previous_specialization)?;
+        Some(Type::instance(
+            db,
+            ClassType::Generic(GenericAlias::new(db, current_origin, specialization)),
+        ))
+    }
+
     pub fn is_none(&self, db: &'db dyn Db) -> bool {
         self.is_instance_of(db, KnownClass::NoneType)
     }

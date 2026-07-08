@@ -1114,10 +1114,10 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> Specialization<'db> {
-    /// Merge cycle iterations that differ only by gradual `Unknown` type arguments.
+    /// Merge two cycle iterations without losing their shared generic class identity.
     ///
-    /// Known argument mismatches are not merged because doing so would be unsound for invariant
-    /// type variables; the caller must retain the outer semantic union in that case.
+    /// Covariant type arguments can be widened in place. Mismatched invariant or contravariant
+    /// arguments cannot, so the caller must retain the outer semantic union in those cases.
     pub(super) fn merge_cycle_recovery(self, db: &'db dyn Db, previous: Self) -> Option<Self> {
         if self.generic_context(db) != previous.generic_context(db)
             || self.materialization_kind(db) != previous.materialization_kind(db)
@@ -1126,20 +1126,24 @@ impl<'db> Specialization<'db> {
             return None;
         }
 
-        let types: Box<[_]> = previous
-            .types(db)
-            .iter()
-            .zip(self.types(db))
-            .map(|(previous, current)| match (*previous, *current) {
-                (previous, current) if previous == current => Some(current),
-                (previous, current)
-                    if previous == Type::unknown() || current == Type::unknown() =>
-                {
-                    Some(Type::unknown())
+        let types: Box<[_]> = itertools::izip!(
+            self.generic_context(db).variables(db),
+            previous.types(db),
+            self.types(db)
+        )
+        .map(|(typevar, previous, current)| match (*previous, *current) {
+            (previous, current) if previous == current => Some(current),
+            (previous, current) if previous == Type::unknown() || current == Type::unknown() => {
+                Some(Type::unknown())
+            }
+            (previous, current) => match specialization_variance(db, typevar) {
+                TypeVarVariance::Bivariant | TypeVarVariance::Covariant => {
+                    Some(current.merge_covariant_cycle_recovery(db, previous))
                 }
-                _ => None,
-            })
-            .collect::<Option<Box<[_]>>>()?;
+                TypeVarVariance::Contravariant | TypeVarVariance::Invariant => None,
+            },
+        })
+        .collect::<Option<Box<[_]>>>()?;
 
         Some(Self::new(
             db,
