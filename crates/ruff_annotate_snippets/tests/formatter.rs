@@ -1,5 +1,5 @@
 use annotate_snippets::{
-    Annotation, AnnotationKind, Group, Level, Padding, Patch, Renderer, Snippet,
+    Annotation, AnnotationKind, Group, Level, Origin, Padding, Patch, Renderer, Snippet,
 };
 
 use annotate_snippets::renderer::DecorStyle;
@@ -5355,4 +5355,81 @@ fn leading_nbsp_no_overflow() {
     // Should not panic.
     let renderer = Renderer::plain();
     let _ = renderer.render(&[input]).clone();
+}
+
+#[test]
+fn hide_snippet() {
+    // tests/ui/traits/alias/object-fail.rs
+    let source = r#"#![feature(trait_alias)]
+
+trait EqAlias = Eq;
+trait IteratorAlias = Iterator;
+
+fn main() {
+    let _: &dyn EqAlias = &123;
+    //~^ ERROR the trait alias `EqAlias` is not dyn compatible [E0038]
+    let _: &dyn IteratorAlias = &vec![123].into_iter();
+    //~^ ERROR must be specified
+}
+"#;
+    let input = &[Level::ERROR
+        .primary_title("the trait alias `EqAlias` is not dyn compatible")
+        .id("E0038")
+        .element(
+            Snippet::source(source)
+                .line_start(1)
+                .path("$DIR/object-fail.rs")
+                .annotation(
+                    AnnotationKind::Primary
+                        .span(107..114)
+                        .label("`EqAlias` is not dyn compatible")
+                        .hide_snippet(true),
+                ),
+        )];
+    let expected_ascii = str![[r#"
+error[E0038]: the trait alias `EqAlias` is not dyn compatible
+ --> $DIR/object-fail.rs:7:17
+  |
+7 |     let _: &dyn EqAlias = &123;
+  |                 ^^^^^^^ `EqAlias` is not dyn compatible
+"#]];
+
+    let renderer = Renderer::plain();
+    assert_data_eq!(renderer.render(input), expected_ascii);
+
+    let expected_unicode = str![[r#"
+error[E0038]: the trait alias `EqAlias` is not dyn compatible
+  ╭▸ $DIR/object-fail.rs:7:17
+  │
+7 │     let _: &dyn EqAlias = &123;
+  ╰╴                ━━━━━━━ `EqAlias` is not dyn compatible
+"#]];
+    let renderer = renderer.decor_style(DecorStyle::Unicode);
+    assert_data_eq!(renderer.render(input), expected_unicode);
+}
+
+#[test]
+fn only_origin() {
+    let input = &[Level::ERROR
+        .primary_title("the trait alias `EqAlias` is not dyn compatible")
+        .id("E0038")
+        .element(
+            Origin::path("$SRC_DIR/core/src/cmp.rs")
+                .line(334)
+                .char_column(14),
+        )];
+    let expected_ascii = str![[r#"
+error[E0038]: the trait alias `EqAlias` is not dyn compatible
+ --> $SRC_DIR/core/src/cmp.rs:334:14
+"#]];
+
+    let renderer = Renderer::plain();
+    assert_data_eq!(renderer.render(input), expected_ascii);
+
+    let expected_unicode = str![[r#"
+error[E0038]: the trait alias `EqAlias` is not dyn compatible
+  ─▸ $SRC_DIR/core/src/cmp.rs:334:14
+"#]];
+    let renderer = renderer.decor_style(DecorStyle::Unicode);
+    assert_data_eq!(renderer.render(input), expected_unicode);
 }
