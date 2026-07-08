@@ -16,7 +16,7 @@ a = unresolved  # ty: ignore
 
 b = unresolved  # ty: ignore[unresolved-reference]
 
-# `blanket-ignore-comment` covers only `# ty: ignore`; we can also add `blanket-type-ignore-comment`,
+# `blanket-ignore-comment` covers only `ty: ignore`; we can also add `blanket-type-ignore-comment`,
 # parallel to `unused-ignore-comment` and `unused-type-ignore-comment`. In the meantime, blanket
 # `type: ignore` can also be caught by Ruff's PGH003 rule.
 c = unresolved  # type: ignore
