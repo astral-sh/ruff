@@ -1,6 +1,13 @@
 # Suppressing errors with `ty: ignore`
 
-Type check errors can be suppressed by a `ty: ignore` comment on the same line as the violation.
+Type check errors can be suppressed by a `ty: ignore` comment on the same line as the violation. The
+optional `blanket-ignore-comment` rule is tested separately so that these examples can exercise bare
+ignore comments.
+
+```toml
+[rules]
+blanket-ignore-comment = "ignore"
+```
 
 ## Simple `ty: ignore`
 

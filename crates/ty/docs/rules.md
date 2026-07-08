@@ -159,6 +159,42 @@ def _(x: int):
         assert_type(x, int)
 ```
 
+## `blanket-ignore-comment`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.57">0.0.57</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22blanket-ignore-comment%22" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Fsuppression.rs#L61" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+
+Checks for `ty: ignore` comments that don't specify which rules to ignore.
+
+**Why is this bad?**
+
+
+A blanket `ty: ignore` comment suppresses every type-checking diagnostic on the
+applicable line or file. Specifying rule codes documents which diagnostics are
+expected and prevents the comment from silencing unrelated errors.
+
+**Examples**
+
+
+```py
+# error
+value = unknown  # ty: ignore
+```
+
+Use instead:
+
+```py
+value = unknown  # ty: ignore[unresolved-reference]
+```
+
 ## `call-abstract-method`
 
 <small>
