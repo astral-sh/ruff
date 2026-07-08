@@ -741,8 +741,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     nested_scope: popped_scope_id,
                     name: symbol.name().clone(),
                     laziness: popped_scope_laziness,
-                    // Deferred uses whose root is not seeded here are dropped: a root
-                    // that became local was unbound at the use.
+                    // Entries left behind had roots that became local, the use was unbound.
                     multipart_uses: deferred_multipart_uses
                         .remove(symbol.name())
                         .unwrap_or_default(),
@@ -1427,135 +1426,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
         let use_id = self.current_ast_ids_mut().record_use(expr);
         self.current_use_def_map_mut().record_use(place_id, use_id);
-    }
-
-    fn record_multipart_import_use(&mut self, expr: &ast::Expr) {
-        if self.multipart_import_roots.is_empty() {
-            return;
-        }
-        let Some(dotted_name) = UnqualifiedName::from_expr(expr) else {
-            return;
-        };
-        let segments = dotted_name.segments();
-        let [imported_root, ..] = segments else {
-            return;
-        };
-        if !self.multipart_import_roots.contains(*imported_root) {
-            return;
-        }
-
-        let current_scope = self.current_scope();
-        let place_table = &self.place_tables[current_scope];
-        if let Some(symbol_id) = place_table.symbol_id(imported_root) {
-            let symbol = place_table.symbol(symbol_id);
-            if symbol.is_local() {
-                self.mark_matching_multipart_imports(current_scope, symbol_id, segments);
-                return;
-            }
-            if symbol.is_global() {
-                // A `global` declaration precedes the use, so resolution forwards
-                // directly to the module scope.
-                let global_scope = FileScopeId::global();
-                if let Some(global_symbol_id) =
-                    self.place_tables[global_scope].symbol_id(imported_root)
-                    && self.place_tables[global_scope]
-                        .symbol(global_symbol_id)
-                        .is_local()
-                {
-                    self.mark_matching_multipart_imports(global_scope, global_symbol_id, segments);
-                }
-                return;
-            }
-        }
-
-        // The root has no live local binding, so resolution must wait for the
-        // complete place table (see `PendingCaptures`).
-        self.current_scope_info_mut()
-            .deferred_multipart_uses
-            .entry(Name::new(*imported_root))
-            .or_default()
-            .push(dotted_name.to_string().into_boxed_str());
-    }
-
-    fn mark_matching_multipart_imports(
-        &mut self,
-        scope_id: FileScopeId,
-        symbol_id: ScopedSymbolId,
-        segments: &[&str],
-    ) {
-        let use_def = &self.use_def_maps[scope_id];
-        let mut all_live_definitions_are_multipart_imports = true;
-        let mut matching_definitions = SmallVec::<[ScopedDefinitionId; 4]>::new();
-        for definition_id in use_def.symbol_binding_definition_ids(symbol_id) {
-            match self.multipart_import_matches(scope_id, definition_id, segments) {
-                None => all_live_definitions_are_multipart_imports = false,
-                Some(true) => matching_definitions.push(definition_id),
-                Some(false) => {}
-            }
-        }
-
-        // When every live definition is a multipart import, also credit reachable
-        // sibling imports of the same root (`import a.b, a.c` used as `a.b.x`).
-        if all_live_definitions_are_multipart_imports {
-            matching_definitions = self.use_def_maps[scope_id]
-                .reachable_symbol_binding_definition_ids(symbol_id)
-                .into_iter()
-                .filter(|definition_id| {
-                    self.multipart_import_matches(scope_id, *definition_id, segments) == Some(true)
-                })
-                .collect();
-        }
-
-        for definition_id in matching_definitions {
-            self.use_def_maps[scope_id].mark_multipart_import_definition_used(definition_id);
-        }
-    }
-
-    /// Returns `None` if the definition is not an unaliased multipart import, otherwise
-    /// whether the dotted use `segments` goes through the imported submodule.
-    fn multipart_import_matches(
-        &self,
-        scope_id: FileScopeId,
-        definition_id: ScopedDefinitionId,
-        segments: &[&str],
-    ) -> Option<bool> {
-        let imported_name = self.unaliased_multipart_import_name_of(scope_id, definition_id)?;
-        Some(dotted_starts_with(segments.iter().copied(), imported_name))
-    }
-
-    fn unaliased_multipart_import_name_of(
-        &self,
-        scope_id: FileScopeId,
-        definition_id: ScopedDefinitionId,
-    ) -> Option<&str> {
-        let DefinitionState::Defined(definition) =
-            self.use_def_maps[scope_id].definition(definition_id)
-        else {
-            return None;
-        };
-
-        definition
-            .kind(self.db)
-            .unaliased_multipart_import_name(self.module)
-    }
-
-    fn mark_deferred_multipart_uses(
-        &mut self,
-        scope_id: FileScopeId,
-        name: &Name,
-        multipart_uses: &[Box<str>],
-    ) {
-        if multipart_uses.is_empty() {
-            return;
-        }
-        let Some(symbol_id) = self.place_tables[scope_id].symbol_id(name) else {
-            return;
-        };
-
-        for dotted in multipart_uses {
-            let segments: SmallVec<[&str; 8]> = dotted.split('.').collect();
-            self.mark_matching_multipart_imports(scope_id, symbol_id, &segments);
-        }
     }
 
     fn record_place_definition(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
@@ -4390,6 +4260,147 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             _ => {
                 walk_stmt(self, stmt);
             }
+        }
+    }
+}
+
+/// Multipart import (`import a.b`) usage tracking.
+///
+/// A dotted use (`a.b.x`) is credited to the matching multipart imports of its
+/// root name:
+/// - root bound in the current scope: matched eagerly against its live bindings,
+/// - root declared `global`: matched against the module scope,
+/// - otherwise: deferred ([`ScopeInfo::deferred_multipart_uses`]) and resolved with
+///   the pending captures at scope pop. An import recorded after the use couldn't
+///   have deferred a path and is credited without submodule matching
+///   (see `record_pending_capture_binding`).
+impl SemanticIndexBuilder<'_, '_> {
+    fn record_multipart_import_use(&mut self, expr: &ast::Expr) {
+        if self.multipart_import_roots.is_empty() {
+            return;
+        }
+        let Some(dotted_name) = UnqualifiedName::from_expr(expr) else {
+            return;
+        };
+        let segments = dotted_name.segments();
+        let [imported_root, ..] = segments else {
+            return;
+        };
+        if !self.multipart_import_roots.contains(*imported_root) {
+            return;
+        }
+
+        let current_scope = self.current_scope();
+        let place_table = &self.place_tables[current_scope];
+        if let Some(symbol_id) = place_table.symbol_id(imported_root) {
+            let symbol = place_table.symbol(symbol_id);
+            if symbol.is_local() {
+                self.mark_matching_multipart_imports(current_scope, symbol_id, segments);
+                return;
+            }
+            if symbol.is_global() {
+                // A `global` declaration precedes the use, so resolution forwards
+                // directly to the module scope.
+                let global_scope = FileScopeId::global();
+                if let Some(global_symbol_id) =
+                    self.place_tables[global_scope].symbol_id(imported_root)
+                    && self.place_tables[global_scope]
+                        .symbol(global_symbol_id)
+                        .is_local()
+                {
+                    self.mark_matching_multipart_imports(global_scope, global_symbol_id, segments);
+                }
+                return;
+            }
+        }
+
+        // The root has no live local binding, so resolution must wait for the
+        // complete place table (see `PendingCaptures`).
+        self.current_scope_info_mut()
+            .deferred_multipart_uses
+            .entry(Name::new(*imported_root))
+            .or_default()
+            .push(dotted_name.to_string().into_boxed_str());
+    }
+
+    fn mark_matching_multipart_imports(
+        &mut self,
+        scope_id: FileScopeId,
+        symbol_id: ScopedSymbolId,
+        segments: &[&str],
+    ) {
+        let use_def = &self.use_def_maps[scope_id];
+        let mut all_live_definitions_are_multipart_imports = true;
+        let mut matching_definitions = SmallVec::<[ScopedDefinitionId; 4]>::new();
+        for definition_id in use_def.symbol_binding_definition_ids(symbol_id) {
+            match self.multipart_import_matches(scope_id, definition_id, segments) {
+                None => all_live_definitions_are_multipart_imports = false,
+                Some(true) => matching_definitions.push(definition_id),
+                Some(false) => {}
+            }
+        }
+
+        // When every live definition is a multipart import, also credit reachable
+        // sibling imports of the same root (`import a.b, a.c` used as `a.b.x`).
+        if all_live_definitions_are_multipart_imports {
+            matching_definitions = self.use_def_maps[scope_id]
+                .reachable_symbol_binding_definition_ids(symbol_id)
+                .into_iter()
+                .filter(|definition_id| {
+                    self.multipart_import_matches(scope_id, *definition_id, segments) == Some(true)
+                })
+                .collect();
+        }
+
+        for definition_id in matching_definitions {
+            self.use_def_maps[scope_id].mark_multipart_import_definition_used(definition_id);
+        }
+    }
+
+    /// Returns `None` if the definition is not an unaliased multipart import, otherwise
+    /// whether the dotted use `segments` goes through the imported submodule.
+    fn multipart_import_matches(
+        &self,
+        scope_id: FileScopeId,
+        definition_id: ScopedDefinitionId,
+        segments: &[&str],
+    ) -> Option<bool> {
+        let imported_name = self.unaliased_multipart_import_name_of(scope_id, definition_id)?;
+        Some(dotted_starts_with(segments.iter().copied(), imported_name))
+    }
+
+    fn unaliased_multipart_import_name_of(
+        &self,
+        scope_id: FileScopeId,
+        definition_id: ScopedDefinitionId,
+    ) -> Option<&str> {
+        let DefinitionState::Defined(definition) =
+            self.use_def_maps[scope_id].definition(definition_id)
+        else {
+            return None;
+        };
+
+        definition
+            .kind(self.db)
+            .unaliased_multipart_import_name(self.module)
+    }
+
+    fn mark_deferred_multipart_uses(
+        &mut self,
+        scope_id: FileScopeId,
+        name: &Name,
+        multipart_uses: &[Box<str>],
+    ) {
+        if multipart_uses.is_empty() {
+            return;
+        }
+        let Some(symbol_id) = self.place_tables[scope_id].symbol_id(name) else {
+            return;
+        };
+
+        for dotted in multipart_uses {
+            let segments: SmallVec<[&str; 8]> = dotted.split('.').collect();
+            self.mark_matching_multipart_imports(scope_id, symbol_id, &segments);
         }
     }
 }
