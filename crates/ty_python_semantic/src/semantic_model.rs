@@ -477,8 +477,7 @@ impl<'db> SemanticModel<'db> {
     /// ## Panics
     ///
     /// Panics if reaching definitions recording is disabled in the database.
-    #[expect(dead_code, reason = "used by downstream IDE features")]
-    fn reaching_definitions(&self, name: &ast::ExprName) -> Option<DefinitionResolution<'db>> {
+    pub fn reaching_definitions(&self, name: &ast::ExprName) -> Option<DefinitionResolution<'db>> {
         assert!(
             crate::db::should_record_reaching_definitions(self.db()),
             "reaching definitions recording is disabled"
@@ -497,8 +496,7 @@ impl<'db> SemanticModel<'db> {
     /// Returns `None` if the module has no file or the name has no entry in its symbol table.
     /// Note however that a result does not guarantee the name is bound: the caller must still
     /// inspect its resolution flags before editing.
-    #[expect(dead_code, reason = "used by downstream IDE features")]
-    fn definitions_for_module_global(
+    pub fn definitions_for_module_global(
         &self,
         module: Module<'db>,
         name: &str,

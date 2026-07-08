@@ -812,7 +812,7 @@ pub(crate) mod testing {
         }
 
         /// Creates a test database with the given recording policy.
-        fn with_reaching_definitions_recording_mode(
+        pub fn with_reaching_definitions_recording_mode(
             project: ProjectMetadata,
             recording_mode: ReachingDefinitionsRecordingMode,
         ) -> Self {
