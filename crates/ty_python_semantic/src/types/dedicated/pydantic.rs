@@ -342,6 +342,8 @@ fn model_config_from_dict(db: &dyn Db, definition: Definition<'_>, dict: &ExprDi
             .as_ref()
             .and_then(|key| key.as_string_literal_expr())
         else {
+            // A dynamic key or dictionary unpacking can override any recognized option. Ignoring
+            // it could incorrectly preserve a lower-precedence configuration value.
             return ModelConfig::unknown();
         };
         let value = definition_expression_type(db, definition, &item.value);
