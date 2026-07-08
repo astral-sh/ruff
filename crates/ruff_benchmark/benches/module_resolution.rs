@@ -15,15 +15,16 @@ use ty_project::metadata::value::RelativePathBuf;
 use ty_project::{ProjectDatabase, ProjectMetadata};
 
 const SEEDED_TARGETS: &[&str] = &["target_0", "target_1", "target_2", "target_3", "target_4"];
+// Exercise stub-overlay discovery followed by normal fallback.
 const NONEXISTENT_NAMES: &[&str] = &[
-    "nonexistent_0",
-    "nonexistent_1",
-    "nonexistent_2",
-    "nonexistent_3",
-    "nonexistent_4",
-    "nonexistent_5",
-    "nonexistent_6",
-    "nonexistent_7",
+    "nonexistent_0.child",
+    "nonexistent_1.child",
+    "nonexistent_2.child",
+    "nonexistent_3.child",
+    "nonexistent_4.child",
+    "nonexistent_5.child",
+    "nonexistent_6.child",
+    "nonexistent_7.child",
 ];
 const STDLIB_NAMES: &[&str] = &[
     "os",
