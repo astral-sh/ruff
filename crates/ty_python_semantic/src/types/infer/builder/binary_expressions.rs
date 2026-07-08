@@ -36,17 +36,10 @@ impl<'db> HasIdentity<'db> for (Type<'db>, ast::Operator, Type<'db>) {
 
     fn has_recursive_identity_cycle(&self, db: &'db dyn Db, seen: &[Self]) -> bool {
         let identity = self.to_identity(db);
-        let active_matches = |active: &Self| active.to_identity(db) == identity;
-
-        type_pair_has_recursive_identity_cycle(
-            db,
-            self.0,
-            self.2,
-            seen,
-            |active| active.0,
-            |active| active.2,
-            active_matches,
-        )
+        seen.iter().any(|active| {
+            active.to_identity(db) == identity
+                && type_pair_has_recursive_identity_cycle(db, self.0, self.2, active.0, active.2)
+        })
     }
 }
 
