@@ -693,6 +693,36 @@ help: A TypedDict is not usually assignable to any `dict[..]` type; `dict` types
 help: Consider using `Mapping[..]` instead of `dict[..]`.
 ```
 
+## Type variable upper bounds
+
+Assignability context is included when an explicit type argument does not satisfy a type variable's
+upper bound:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", bound=tuple[int, bytes, bool])
+
+class Box(Generic[T]): ...
+
+bad: Box[tuple[int, str, bool]]  # snapshot: invalid-type-arguments
+```
+
+```snapshot
+error[invalid-type-arguments]: Type `tuple[int, str, bool]` is not assignable to upper bound `tuple[int, bytes, bool]` of type variable `T@Box`
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | T = TypeVar("T", bound=tuple[int, bytes, bool])
+  | - Type variable defined here
+4 |
+5 | class Box(Generic[T]): ...
+6 |
+7 | bad: Box[tuple[int, str, bool]]  # snapshot: invalid-type-arguments
+  |          ^^^^^^^^^^^^^^^^^^^^^
+  |
+info: the second tuple element is not compatible: `str` is not assignable to `bytes`
+```
+
 ## Protocols
 
 Missing protocol members:
