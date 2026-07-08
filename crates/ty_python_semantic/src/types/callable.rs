@@ -734,11 +734,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if source.kind(db) == CallableTypeKind::ParamSpecValue
             || target.kind(db) == CallableTypeKind::ParamSpecValue
         {
-            return self.check_paramspec_value_signature_pair(
-                db,
-                source.signatures(db),
-                target.signatures(db),
-            );
+            let source_signatures = source.signatures(db);
+            let target_signatures = target.signatures(db);
+            let inferable = self
+                .inferable
+                .merge(db, source_signatures.inferable_typevars(db))
+                .merge(db, target_signatures.inferable_typevars(db));
+            return self
+                .with_inferable_typevars(inferable)
+                .check_callable_signature_pair(db, source_signatures, target_signatures);
         }
         self.check_callable_signature_pair(db, source.signatures(db), target.signatures(db))
     }

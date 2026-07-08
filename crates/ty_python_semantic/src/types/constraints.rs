@@ -86,7 +86,7 @@
 //!
 //! [duboc]: https://gldubc.github.io/#thesis
 
-use std::cell::{Cell, Ref, RefCell};
+use std::cell::{Ref, RefCell};
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
@@ -108,8 +108,8 @@ use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarInstance, IntersectionType, KnownInstanceType, Type, TypeVarBoundOrConstraints,
-    TypeVarVariance, UnionType,
+    BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, TypeVarVariance,
+    UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 
@@ -460,81 +460,26 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.node.satisfied_by_all_typevars(db, builder, inferable)
     }
 
-    /// Returns whether this constraint set holds for every joint specialization of `typevars` and
-    /// any additional non-inferable type variables that the predicate mentions.
+    /// Returns whether this constraint set holds throughout the joint static domain of `typevars`.
     ///
-    /// This operation only supports fully static, independent domains and closed predicates. It
-    /// returns `None` if a type variable has an unsupported domain or if the predicate mentions an
-    /// additional inferable type variable whose constraints must be preserved for the caller.
-    pub(crate) fn satisfied_by_all_static_specializations(
+    /// Gradual alternatives are intentionally ignored. This operation is used for the
+    /// rigid-target approximation when comparing generic callables, where preserving a symbolic
+    /// source solution is more important than exhaustively quantifying gradual materializations.
+    pub(crate) fn satisfied_by_all_joint_specializations(
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         typevars: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
-        inferable: InferableTypeVars<'db>,
-    ) -> Option<bool> {
+    ) -> bool {
         self.verify_builder(builder);
 
-        let mut typevars = typevars.into_iter().collect::<Vec<_>>();
-        let quantified = RefCell::new(
-            typevars
-                .iter()
-                .map(|typevar| typevar.identity(db))
-                .collect::<FxHashSet<_>>(),
-        );
-        let additional = RefCell::new(FxOrderSet::default());
-        let is_supported = Cell::new(true);
-        let include = |typevar: BoundTypeVarInstance<'db>| {
-            let identity = typevar.identity(db);
-            if quantified.borrow_mut().insert(identity) {
-                if identity.is_inferable(db, inferable) {
-                    is_supported.set(false);
-                } else {
-                    additional.borrow_mut().insert(typevar);
-                }
-            }
-        };
-        self.node
-            .for_each_unique_constraint(builder, &mut |constraint, _| {
-                let constraint = builder.constraint_data(constraint);
-                include(constraint.typevar);
-                for bound in [constraint.bounds.lower, constraint.bounds.upper]
-                    .into_iter()
-                    .flatten()
-                {
-                    any_over_type(db, bound, true, |nested| match nested {
-                        Type::KnownInstance(KnownInstanceType::TypeVar(_)) => {
-                            is_supported.set(false);
-                            true
-                        }
-                        Type::TypeVar(typevar) => {
-                            include(typevar);
-                            false
-                        }
-                        _ => false,
-                    });
-                }
+        let domain = typevars
+            .into_iter()
+            .fold(Self::always(builder), |domain, typevar| {
+                let (required, _gradual) = typevar.required_specializations(db, builder);
+                domain.and(db, builder, || Self::from_node(builder, required))
             });
-        if !is_supported.get() {
-            return None;
-        }
-        typevars.extend(additional.into_inner());
-
-        let mut domain = Self::always(builder);
-        for typevar in typevars {
-            if !typevar.has_fully_static_independent_domain(db) {
-                return None;
-            }
-
-            let (required, gradual) = typevar.required_specializations(db, builder);
-            if !gradual.is_empty() {
-                return None;
-            }
-            let required = Self::from_node(builder, required);
-            domain = domain.and(db, builder, || required);
-        }
-
-        Some(domain.implies(db, builder, || self).is_always_satisfied(db))
+        domain.implies(db, builder, || self).is_always_satisfied(db)
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
@@ -3501,20 +3446,6 @@ impl<'db> PathBound<'db> {
 
     pub(crate) fn has_upper(&self) -> bool {
         self.upper.has_explicit_bound()
-    }
-
-    pub(crate) fn lower_is_compatible_with_upper(
-        &self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-    ) -> bool {
-        self.lower.is_none_or(|lower| {
-            self.upper.is_satisfied_by(db, lower)
-                || !self
-                    .upper
-                    .when_satisfied_by(db, builder, lower)
-                    .is_never_satisfied(db)
-        })
     }
 
     fn has_only_gradual_evidence(&self) -> bool {
@@ -7015,31 +6946,6 @@ impl SatisfiedClauses {
 }
 
 impl<'db> BoundTypeVarInstance<'db> {
-    /// Returns whether this type variable's domain can be quantified exactly by the constraint
-    /// solver without consulting lazy structural types or gradual materializations.
-    pub(crate) fn has_fully_static_independent_domain(self, db: &'db dyn Db) -> bool {
-        let type_is_supported = |ty: Type<'db>| {
-            !any_over_type(db, ty, true, |nested| {
-                nested.is_dynamic()
-                    || matches!(nested, Type::TypeVar(_))
-                    || matches!(nested, Type::KnownInstance(KnownInstanceType::TypeVar(_)))
-                    || matches!(nested, Type::ProtocolInstance(_) | Type::TypedDict(_))
-                    || matches!(nested, Type::NominalInstance(instance) if instance
-                        .inherits_from_explicit_any())
-            }) && ty.bottom_materialization(db) == ty.top_materialization(db)
-        };
-
-        match self.typevar(db).bound_or_constraints(db) {
-            None => true,
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => type_is_supported(bound),
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                .elements(db)
-                .iter()
-                .copied()
-                .all(type_is_supported),
-        }
-    }
-
     /// Returns the valid specializations of a typevar. This is used when checking a constraint set
     /// when this typevar is in inferable position, where we only need _some_ specialization to
     /// satisfy the constraint set.

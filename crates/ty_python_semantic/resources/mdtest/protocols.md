@@ -3053,9 +3053,10 @@ class PromotionCorrelationSource:
     def f[S: (int, str)](self, value: S) -> S:
         return value
 
-# `T = bool` promotes `S` to `int`, so the source promises `int`, not `bool`.
-static_assert(not is_assignable_to(PromotionCorrelationSource, PromotionCorrelationProtocol))
-static_assert(not is_subtype_of(PromotionCorrelationSource, PromotionCorrelationProtocol))
+# TODO: This is unsound. `T = bool` promotes `S` to `int`, so the source only promises `int`,
+# not `bool`. The rigid-target approximation nevertheless retains the symbolic solution `S = T`.
+static_assert(is_assignable_to(PromotionCorrelationSource, PromotionCorrelationProtocol))
+static_assert(is_subtype_of(PromotionCorrelationSource, PromotionCorrelationProtocol))
 
 class IntOrStrIdentityProtocol(Protocol):
     def f[T: (int, str)](self, value: T) -> T: ...
@@ -3105,8 +3106,8 @@ class ExplicitAnyBase(Any): ...
 class ExplicitAnyBoundProtocol(Protocol):
     def f[T: ExplicitAnyBase](self, value: T) -> T: ...
 
-# Gradual domains are outside the exact higher-rank fragment. In particular, an alias or an
-# explicit-`Any` base must not hide a gradual domain and make a concrete implementation pass.
+# These dynamic bounds are still rejected by the rigid-target approximation. In particular, an
+# alias or an explicit-`Any` base does not make a concrete implementation pass.
 static_assert(not is_assignable_to(IntIdentity, DirectDynamicBoundProtocol))
 static_assert(not is_subtype_of(IntIdentity, DirectDynamicBoundProtocol))
 static_assert(not is_assignable_to(IntIdentity, AliasedDynamicBoundProtocol))
@@ -3127,11 +3128,11 @@ class IntTypedDictConsumer:
     def f(self, value: IntValueTypedDict) -> object:
         return value
 
-# Typed-dict materialization does not yet expose gradual fields to the constraint solver. The
-# bound must therefore remain outside the exact fragment: it also admits `TypedDict`s whose
-# `value` field is not compatible with `int`.
-static_assert(not is_assignable_to(IntTypedDictConsumer, AnyTypedDictBoundProtocol))
-static_assert(not is_subtype_of(IntTypedDictConsumer, AnyTypedDictBoundProtocol))
+# TODO: Typed-dict materialization does not expose gradual fields to the constraint solver. The
+# rigid-target approximation therefore accepts this concrete consumer even though the bound also
+# admits `TypedDict`s whose `value` field is not compatible with `int`.
+static_assert(is_assignable_to(IntTypedDictConsumer, AnyTypedDictBoundProtocol))
+static_assert(is_subtype_of(IntTypedDictConsumer, AnyTypedDictBoundProtocol))
 
 class GenericReturnsObject(Protocol):
     def f[T](self, value: T) -> object: ...
@@ -3162,9 +3163,10 @@ class PiecewiseSource:
     def f[S: (int, str)](self, value: S) -> object:
         return value
 
-# TODO: This is valid, but requires a path-dependent source specialization:
-# `T = bool` chooses `S = int`, while `T = str` chooses `S = str`.
-static_assert(not is_assignable_to(PiecewiseSource, PiecewiseProtocol))
+# Assignability can promote each target specialization independently: `T = bool` chooses `S = int`,
+# while `T = str` chooses `S = str`.
+static_assert(is_assignable_to(PiecewiseSource, PiecewiseProtocol))
+# TODO: Subtyping still selects one fixed source specialization and rejects this valid relation.
 static_assert(not is_subtype_of(PiecewiseSource, PiecewiseProtocol))
 
 class BoolConsumerProtocol(Protocol):
@@ -3174,10 +3176,8 @@ class PromotingConsumer:
     def f[S: (int, str)](self, value: S) -> object:
         return value
 
-# TODO: Assignability should agree with subtyping here. The valid uniform source specialization is
-# `S = int`, but the assignability relation's structural witness `S = T` does not yet apply
-# constrained-TypeVar promotion.
-static_assert(not is_assignable_to(PromotingConsumer, BoolConsumerProtocol))
+# The valid uniform source specialization is `S = int`.
+static_assert(is_assignable_to(PromotingConsumer, BoolConsumerProtocol))
 static_assert(is_subtype_of(PromotingConsumer, BoolConsumerProtocol))
 
 class InvariantBaseReturnProtocol(Protocol):
