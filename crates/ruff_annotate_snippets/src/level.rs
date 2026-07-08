@@ -85,6 +85,7 @@ impl<'a> Level<'a> {
             id: None,
             text: text.into(),
             allows_styling: false,
+            is_fixable: false,
         }
     }
 
@@ -106,6 +107,7 @@ impl<'a> Level<'a> {
             id: None,
             text: text.into(),
             allows_styling: true,
+            is_fixable: false,
         }
     }
 

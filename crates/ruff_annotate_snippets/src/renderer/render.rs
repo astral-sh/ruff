@@ -373,6 +373,16 @@ fn render_title(
             buffer.append(buffer_msg_line_offset, "]", label_style);
             label_width += 2 + id.len();
         }
+        if title.is_fixable() {
+            buffer.append(buffer_msg_line_offset, "[", ElementStyle::NoStyle);
+            buffer.append(
+                buffer_msg_line_offset,
+                "*",
+                ElementStyle::Level(LevelInner::Help),
+            );
+            buffer.append(buffer_msg_line_offset, "]", ElementStyle::NoStyle);
+            label_width += 3;
+        }
         buffer.append(buffer_msg_line_offset, ": ", title_element_style);
         label_width += 2;
     }
@@ -2247,6 +2257,7 @@ trait MessageOrTitle {
     fn id(&self) -> Option<&Id<'_>>;
     fn text(&self) -> &str;
     fn allows_styling(&self) -> bool;
+    fn is_fixable(&self) -> bool;
 }
 
 impl MessageOrTitle for Title<'_> {
@@ -2262,6 +2273,9 @@ impl MessageOrTitle for Title<'_> {
     fn allows_styling(&self) -> bool {
         self.allows_styling
     }
+    fn is_fixable(&self) -> bool {
+        self.is_fixable
+    }
 }
 
 impl MessageOrTitle for Message<'_> {
@@ -2276,6 +2290,9 @@ impl MessageOrTitle for Message<'_> {
     }
     fn allows_styling(&self) -> bool {
         true
+    }
+    fn is_fixable(&self) -> bool {
+        false
     }
 }
 
