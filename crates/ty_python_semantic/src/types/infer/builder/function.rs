@@ -437,8 +437,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let kind = match type_param {
                             ast::TypeParam::TypeVar(_) => TypeVarKind::Pep695TypeVar,
                             ast::TypeParam::ParamSpec(_) => TypeVarKind::Pep695ParamSpec,
-                            // TODO: should be `TypeVarKind::Pep695TypeVarTuple`
-                            ast::TypeParam::TypeVarTuple(_) => TypeVarKind::Pep695TypeVar,
+                            ast::TypeParam::TypeVarTuple(_) => TypeVarKind::Pep695TypeVarTuple,
                         };
                         report_shadowed_type_variable(
                             &self.context,

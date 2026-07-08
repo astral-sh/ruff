@@ -3703,15 +3703,16 @@ pub(crate) fn report_shadowed_type_variable<'db>(
         Type::FunctionLiteral(function) => function.spans(db).signature,
         _ => return,
     };
-    if other_typevar.is_paramspec(db) {
-        diagnostic.annotate(Annotation::secondary(span).message(format_args!(
-            "ParamSpec `{typevar_name}` is bound in this enclosing scope"
-        )));
+    let other_typevar_kind = if other_typevar.is_paramspec(db) {
+        "ParamSpec"
+    } else if other_typevar.is_typevartuple(db) {
+        "TypeVarTuple"
     } else {
-        diagnostic.annotate(Annotation::secondary(span).message(format_args!(
-            "Type variable `{typevar_name}` is bound in this enclosing scope"
-        )));
-    }
+        "Type variable"
+    };
+    diagnostic.annotate(Annotation::secondary(span).message(format_args!(
+        "{other_typevar_kind} `{typevar_name}` is bound in this enclosing scope"
+    )));
 }
 
 // I tried refactoring this function to placate Clippy,
