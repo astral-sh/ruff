@@ -9,7 +9,7 @@ use ty_module_resolver::{ModuleName, file_to_module};
 use super::protocol_class::ProtocolInterface;
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
-    MaterializationKind, SubclassOfType, Type, TypeVarVariance,
+    MaterializationKind, SubclassOfInner, SubclassOfType, Type, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
@@ -579,6 +579,41 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         result.or(db, self.constraints, || structurally_satisfied)
     }
 
+    /// Return whether a class-object type inhabits `type[protocol]`.
+    ///
+    /// The effective constructor return must satisfy the instance protocol, while the class object
+    /// itself must provide the protocol's `ClassVar` and unbound method requirements. Ordinary
+    /// instance attributes and properties are intentionally not required on the class object.
+    pub(super) fn check_meta_type_satisfies_protocol(
+        &self,
+        db: &'db dyn Db,
+        meta_ty: Type<'db>,
+        protocol: ProtocolInstanceType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let source_class = match meta_ty {
+            Type::ClassLiteral(class) => Some(class.default_specialization(db)),
+            Type::GenericAlias(alias) => Some(ClassType::Generic(alias)),
+            Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+                SubclassOfInner::Class(class) => Some(class),
+                SubclassOfInner::Dynamic(_)
+                | SubclassOfInner::Protocol(_)
+                | SubclassOfInner::TypeVar(_) => None,
+            },
+            _ => None,
+        };
+        if source_class
+            .is_some_and(|class| class.is_protocol(db) || !class.abstract_methods(db).is_empty())
+        {
+            return self.never();
+        }
+
+        let constructed_ty = meta_ty.bindings(db).return_type(db);
+        self.check_type_pair(db, constructed_ty, Type::ProtocolInstance(protocol))
+            .and(db, self.constraints, || {
+                self.check_meta_protocol_members(db, constructed_ty, meta_ty, protocol)
+            })
+    }
+
     pub(super) fn check_nominal_instance_pair(
         &self,
         db: &'db dyn Db,
@@ -809,10 +844,18 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    /// Return the meta-type of this protocol-instance type.
+    /// Return the class that defines this protocol, if it is class-backed.
+    pub(super) const fn class_origin(self) -> Option<ProtocolClass<'db>> {
+        match self.inner {
+            Protocol::FromClass(class) => Some(class),
+            Protocol::Synthesized(_) => None,
+        }
+    }
+
+    /// Return the structural meta-type of this protocol-instance type.
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
         match self.inner {
-            Protocol::FromClass(class) => SubclassOfType::from(db, class),
+            Protocol::FromClass(_) => SubclassOfType::from_protocol(self),
 
             // TODO: we can and should do better here.
             //
@@ -828,6 +871,14 @@ impl<'db> ProtocolInstanceType<'db> {
             //     reveal_type(type(x).__call__)        # mypy: "def (*args: Any, **kwds: Any) -> Any"
             // ```
             Protocol::Synthesized(_) => KnownClass::Type.to_instance(db),
+        }
+    }
+
+    /// Return the nominal meta-type used for internal class-member lookup on a protocol instance.
+    pub(super) fn to_nominal_meta_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self.inner {
+            Protocol::FromClass(class) => SubclassOfType::from(db, *class),
+            Protocol::Synthesized(_) => self.to_meta_type(db),
         }
     }
 

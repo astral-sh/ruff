@@ -432,7 +432,7 @@ And as a corollary, `type[MyProtocol]` can also be called:
 
 ```py
 def f(x: type[MyProtocol]):
-    reveal_type(x())  # revealed: @Todo(type[T] for protocols)
+    reveal_type(x())  # revealed: MyProtocol
 ```
 
 ## Members of a protocol
@@ -2961,7 +2961,7 @@ class Foo(Protocol):
     def method(self) -> str: ...
 
 def f(x: Foo):
-    reveal_type(type(x).method)  # revealed: def method(self, /) -> str
+    reveal_type(type(x).method)  # revealed: (self, /) -> str
 
 class Bar:
     def __init__(self):
@@ -4368,7 +4368,7 @@ def _(r: Recursive):
     reveal_type(r.t)  # revealed: tuple[int, tuple[str, Recursive]]
     reveal_type(r.callable1)  # revealed: (int, /) -> Recursive
     reveal_type(r.callable2)  # revealed: (Recursive, /) -> int
-    reveal_type(r.subtype_of)  # revealed: @Todo(type[T] for protocols)
+    reveal_type(r.subtype_of)  # revealed: type[Recursive]
     reveal_type(r.generic)  # revealed: GenericC[Recursive]
     reveal_type(r.method(r))  # revealed: Recursive
     reveal_type(r.nested)  # revealed: Recursive | ((Recursive, tuple[Recursive, Recursive], /) -> Recursive)
@@ -4723,12 +4723,18 @@ Where `P` is a protocol type, a class object `N` can be said to inhabit the type
 - All method members on `P` exist on the class object `N`
 - Instantiating `N` creates an object that would satisfy the protocol `P`
 
-Currently meta-protocols are not fully supported by ty, but we try to keep false positives to a
-minimum in the meantime.
+Properties and ordinary instance attributes are not required to exist on `N` itself. For
+compatibility with other type checkers, however, attribute lookup on a value of type `type[P]`
+exposes ordinary instance attributes even though they are not required on `N`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
-from typing import Protocol, ClassVar
-from ty_extensions import static_assert
+from typing import Any, ClassVar, Protocol, Self
+from ty_extensions import Unknown, static_assert
 from ty_extensions._internal import TypeOf, is_assignable_to, is_subtype_of
 
 class Foo(Protocol):
@@ -4737,39 +4743,243 @@ class Foo(Protocol):
     def method(self) -> bytes: ...
 
 def _(f: type[Foo]):
-    reveal_type(f)  # revealed: type[@Todo(type[T] for protocols)]
-
-    # TODO: we should emit `unresolved-attribute` here: although we would accept this for a
-    # nominal class, we would see any class `N` as inhabiting `Foo` if it had an implicit
-    # instance attribute `x`, and implicit instance attributes are rarely bound on the class
-    # object.
-    reveal_type(f.x)  # revealed: @Todo(type[T] for protocols)
-
-    # TODO: should be `str`
-    reveal_type(f.y)  # revealed: @Todo(type[T] for protocols)
+    reveal_type(f)  # revealed: type[Foo]
+    reveal_type(f.x)  # revealed: int
+    f.x = 1
+    f.x = "bad"  # error: [invalid-assignment]
+    reveal_type(f.y)  # revealed: str
     f.y = "foo"  # fine
-
-    # TODO: should be `Callable[[Foo], bytes]`
-    reveal_type(f.method)  # revealed: @Todo(type[T] for protocols)
+    f.y = b"bad"  # error: [invalid-assignment]
+    reveal_type(f.method)  # revealed: (self, /) -> bytes
+    reveal_type(f())  # revealed: Foo
 
 class Bar: ...
 
-# TODO: these should pass
-static_assert(not is_assignable_to(type[Bar], type[Foo]))  # error: [static-assert-error]
-static_assert(not is_assignable_to(TypeOf[Bar], type[Foo]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(type[Bar], type[Foo]))
+static_assert(not is_assignable_to(TypeOf[Bar], type[Foo]))
+static_assert(not is_subtype_of(type[Bar], type[Foo]))
+static_assert(not is_subtype_of(TypeOf[Bar], type[Foo]))
 
 class Baz:
-    x: int
     y: ClassVar[str] = "foo"
+    def __init__(self) -> None:
+        self.x = 1
     def method(self) -> bytes:
         return b"foo"
 
 static_assert(is_assignable_to(type[Baz], type[Foo]))
 static_assert(is_assignable_to(TypeOf[Baz], type[Foo]))
+static_assert(is_subtype_of(type[Baz], type[Foo]))
+static_assert(is_subtype_of(TypeOf[Baz], type[Foo]))
 
-# TODO: these should pass
-static_assert(is_subtype_of(type[Baz], type[Foo]))  # error: [static-assert-error]
-static_assert(is_subtype_of(TypeOf[Baz], type[Foo]))  # error: [static-assert-error]
+class FactoryMeta(type):
+    def __call__(self) -> Baz:
+        return Baz()
+
+class Factory(metaclass=FactoryMeta):
+    y: ClassVar[str] = "foo"
+    def method(self) -> bytes:
+        return b"foo"
+
+static_assert(is_assignable_to(TypeOf[Factory], type[Foo]))
+
+class BadFactoryMeta(type):
+    def __call__(self) -> object:
+        return object()
+
+class BadFactory(metaclass=BadFactoryMeta):
+    y: ClassVar[str] = "foo"
+    def method(self) -> bytes:
+        return b"foo"
+
+static_assert(not is_assignable_to(TypeOf[BadFactory], type[Foo]))
+
+class PropertyProtocol(Protocol):
+    @property
+    def value(self) -> int: ...
+
+class PropertyImpl:
+    @property
+    def value(self) -> int:
+        return 1
+
+static_assert(is_assignable_to(TypeOf[PropertyImpl], type[PropertyProtocol]))
+
+def _(cls: type[PropertyProtocol]) -> None:
+    # Properties are discarded from the class-object requirements and retain normal class lookup.
+    reveal_type(cls.value)  # revealed: property
+
+class MissingClassVar:
+    def __init__(self) -> None:
+        self.x = 1
+    def method(self) -> bytes:
+        return b"foo"
+
+static_assert(not is_assignable_to(type[MissingClassVar], type[Foo]))
+
+class MissingMethod:
+    y: ClassVar[str] = "foo"
+    def __init__(self) -> None:
+        self.x = 1
+
+static_assert(not is_assignable_to(type[MissingMethod], type[Foo]))
+
+class MissingInstanceAttribute:
+    y: ClassVar[str] = "foo"
+    def method(self) -> bytes:
+        return b"foo"
+
+static_assert(not is_assignable_to(type[MissingInstanceAttribute], type[Foo]))
+
+class StaticMethod:
+    y: ClassVar[str] = "foo"
+    def __init__(self) -> None:
+        self.x = 1
+    @staticmethod
+    def method() -> bytes:
+        return b"foo"
+
+# The instance-side call is compatible, but the method is not available on the class with the
+# unbound signature required by `type[Foo]`.
+static_assert(not is_assignable_to(type[StaticMethod], type[Foo]))
+
+class DecoratedMethods(Protocol):
+    @staticmethod
+    def static(value: int) -> str: ...
+    @classmethod
+    def class_(cls, value: int) -> str: ...
+
+class DecoratedMethodsImpl:
+    @staticmethod
+    def static(value: int) -> str:
+        return str(value)
+    @classmethod
+    def class_(cls, value: int) -> str:
+        return str(value)
+
+static_assert(is_assignable_to(TypeOf[DecoratedMethodsImpl], type[DecoratedMethods]))
+
+def decorated_method(value: int) -> str:
+    return str(value)
+
+class InstanceOnlyDecoratedMethods:
+    def __init__(self) -> None:
+        self.static = decorated_method
+        self.class_ = decorated_method
+
+# The constructed instance satisfies the protocol, but the methods are absent from the class.
+static_assert(not is_assignable_to(TypeOf[InstanceOnlyDecoratedMethods], type[DecoratedMethods]))
+
+def _(cls: type[DecoratedMethods]) -> None:
+    reveal_type(cls.static)  # revealed: (value: int) -> str
+    reveal_type(cls.class_)  # revealed: (value: int) -> str
+
+class SelfFactory(Protocol):
+    @classmethod
+    def make(cls) -> Self: ...
+
+class SelfFactoryImpl:
+    @classmethod
+    def make(cls) -> Self:
+        return cls()
+
+static_assert(is_assignable_to(TypeOf[SelfFactoryImpl], type[SelfFactory]))
+
+from abc import ABC, ABCMeta, abstractmethod
+
+class AbstractFoo(ABC):
+    x: int
+    y: ClassVar[str] = "foo"
+    @abstractmethod
+    def method(self) -> bytes: ...
+
+# `type[Foo]` describes concrete structural implementations, not the protocol class itself or an
+# abstract implementation.
+static_assert(not is_assignable_to(TypeOf[Foo], type[Foo]))
+static_assert(not is_assignable_to(TypeOf[AbstractFoo], type[Foo]))
+
+# Structural implementations are only guaranteed to use a subclass of `type`.
+static_assert(is_subtype_of(type[Foo], type))
+static_assert(not is_subtype_of(type[Foo], ABCMeta))
+
+static_assert(is_assignable_to(type[Any], type[Foo]))
+static_assert(is_assignable_to(type[Unknown], type[Foo]))
+static_assert(not is_subtype_of(type[Any], type[Foo]))
+static_assert(not is_subtype_of(type[Unknown], type[Foo]))
+
+class InstanceAttributeProtocol(Protocol):
+    value: int
+
+class ClassVariableProtocol(Protocol):
+    value: ClassVar[int]
+
+# The intentionally broad lookup on `type[InstanceAttributeProtocol]` must not turn an ordinary
+# instance attribute into a `ClassVar` requirement for assignability.
+static_assert(not is_assignable_to(type[InstanceAttributeProtocol], type[ClassVariableProtocol]))
+
+class HidingMeta(type):
+    @property
+    def method(cls) -> int:
+        return 1
+
+class HiddenMethod(metaclass=HidingMeta):
+    y: ClassVar[str] = "foo"
+    def __init__(self) -> None:
+        self.x = 1
+    def method(self) -> bytes:
+        return b"foo"
+
+# The metaclass data descriptor wins over the otherwise-compatible unbound instance method.
+static_assert(not is_assignable_to(TypeOf[HiddenMethod], type[Foo]))
+
+class GenericFoo[T](Protocol):
+    value: T
+    def get(self) -> T: ...
+
+class IntFoo:
+    def __init__(self) -> None:
+        self.value = 1
+    def get(self) -> int:
+        return self.value
+
+class GenericFooImpl[T]:
+    def __init__(self, value: T) -> None:
+        self.value = value
+    def get(self) -> T:
+        return self.value
+
+static_assert(is_assignable_to(type[IntFoo], type[GenericFoo[int]]))
+static_assert(not is_assignable_to(type[IntFoo], type[GenericFoo[str]]))
+
+def _(f: type[GenericFoo[int]]) -> None:
+    reveal_type(f)  # revealed: type[GenericFoo[int]]
+    reveal_type(f.value)  # revealed: int
+    reveal_type(f.get)  # revealed: (self, /) -> int
+    reveal_type(f())  # revealed: GenericFoo[int]
+
+def infer_meta_protocol[T](cls: type[GenericFoo[T]]) -> T:
+    raise NotImplementedError
+
+def meta_protocol_identity[T](cls: type[GenericFoo[T]]) -> type[GenericFoo[T]]:
+    return cls
+
+reveal_type(infer_meta_protocol(IntFoo))  # revealed: int
+reveal_type(meta_protocol_identity(IntFoo))  # revealed: type[GenericFoo[int]]
+reveal_type(infer_meta_protocol(GenericFooImpl[int]))  # revealed: int
+reveal_type(meta_protocol_identity(GenericFooImpl[int]))  # revealed: type[GenericFoo[int]]
+
+def _(f: type[GenericFoo[int]]) -> None:
+    reveal_type(infer_meta_protocol(f))  # revealed: int
+
+class Producer[T](Protocol):
+    def get(self) -> T: ...
+
+def infer_producer[T](cls: type[Producer[T]]) -> T:
+    raise NotImplementedError
+
+def _(flag: bool) -> None:
+    cls = GenericFooImpl[int] if flag else GenericFooImpl[str]
+    reveal_type(infer_producer(cls))  # revealed: int | str
 ```
 
 ## Regression test for `ClassVar` members in stubs

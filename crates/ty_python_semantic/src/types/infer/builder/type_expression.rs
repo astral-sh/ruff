@@ -1226,12 +1226,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let infer_type_argument = |builder: &mut Self, slice: &ast::Expr| {
             let slice_ty = builder.infer_type_expression(slice);
-            if matches!(slice_ty, Type::ProtocolInstance(_)) {
-                return SubclassOfType::from(
-                    builder.db(),
-                    todo_type!("type[T] for protocols").expect_dynamic(),
-                );
-            }
             SubclassOfType::try_from_instance(builder.db(), slice_ty).unwrap_or_else(|| {
                 match slice_ty {
                     Type::Callable(_) => invalid_type_argument(builder, slice),
@@ -1282,12 +1276,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         _ => self.infer_subclass_of_type_expression(parameters),
                     },
                     value_ty @ Type::ClassLiteral(class_literal) => {
-                        if class_literal.is_protocol(self.db()) {
-                            SubclassOfType::from(
-                                self.db(),
-                                todo_type!("type[T] for protocols").expect_dynamic(),
-                            )
-                        } else if class_literal.is_tuple(self.db()) {
+                        if class_literal.is_tuple(self.db()) {
                             let class_type = self
                                 .infer_tuple_type_expression(subscript)
                                 .map(|tuple_type| tuple_type.to_class_type(self.db()))
@@ -1298,13 +1287,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 Some(generic_context) => {
                                     let db = self.db();
                                     let specialize = &|types: &[Option<Type<'db>>]| {
-                                        SubclassOfType::from(
-                                            db,
-                                            class_literal.apply_specialization(db, |_| {
-                                                generic_context
-                                                    .specialize_partial(db, types.iter().copied())
-                                            }),
-                                        )
+                                        let class = class_literal.apply_specialization(db, |_| {
+                                            generic_context
+                                                .specialize_partial(db, types.iter().copied())
+                                        });
+                                        if class_literal.is_protocol(db) {
+                                            match Type::instance(db, class) {
+                                                Type::ProtocolInstance(protocol) => {
+                                                    SubclassOfType::from_protocol(protocol)
+                                                }
+                                                _ => SubclassOfType::from(db, class),
+                                            }
+                                        } else {
+                                            SubclassOfType::from(db, class)
+                                        }
                                     };
                                     self.infer_explicit_callable_specialization(
                                         subscript,

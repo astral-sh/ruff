@@ -9438,6 +9438,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     "Attribute lookup on a dynamic `SubclassOf` type \
                                     should always return a bound symbol"
                                 ),
+                                SubclassOfInner::Protocol(_) => false,
                                 SubclassOfInner::TypeVar(_) => false,
                             }
                         }

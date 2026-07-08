@@ -152,6 +152,9 @@ impl<'db> Type<'db> {
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(class) => Some(class.into_callable(db)),
+                SubclassOfInner::Protocol(protocol) => protocol
+                    .class_origin()
+                    .map(|origin| (*origin).into_callable(db)),
                 SubclassOfInner::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         let upcast_callables = bound

@@ -9,7 +9,7 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::signatures::{ParametersKind, Signature};
 use crate::types::{
     CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownFunction,
-    KnownUnion, Type, TypeContext,
+    KnownUnion, SubclassOfInner, Type, TypeContext,
 };
 use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticModel};
 use itertools::Either;
@@ -214,6 +214,18 @@ pub fn definitions_for_attribute<'db>(
     let db = model.db();
     let name_str = attribute.attr.as_str();
 
+    // A structural protocol meta-type still uses its nominal protocol declaration as the source
+    // location for go-to-definition, even though the origin is not a nominal upper bound.
+    let subclass_origin = |subclass_of: SubclassOfInner<'db>| {
+        let class = match subclass_of {
+            SubclassOfInner::Protocol(protocol) => protocol.class_origin().map(|origin| *origin),
+            subclass_of => subclass_of.into_class(db),
+        }?;
+        class
+            .static_class_literal(db)
+            .map(|(literal, _)| ClassLiteral::Static(literal))
+    };
+
     let mut resolved = Vec::new();
 
     // Determine the type of the LHS
@@ -267,13 +279,12 @@ pub fn definitions_for_attribute<'db>(
 
         let class_literal = match lookup_type {
             Type::ClassLiteral(class_literal) => class_literal,
-            Type::SubclassOf(subclass) => match subclass.subclass_of().into_class(db) {
-                Some(cls) => match cls.static_class_literal(db) {
-                    Some((lit, _)) => ClassLiteral::Static(lit),
-                    None => continue,
-                },
-                None => continue,
-            },
+            Type::SubclassOf(subclass) => {
+                let Some(class_literal) = subclass_origin(subclass.subclass_of()) else {
+                    continue;
+                };
+                class_literal
+            }
             _ => continue,
         };
 
@@ -291,13 +302,12 @@ pub fn definitions_for_attribute<'db>(
         if resolved.is_empty() && meta_type != lookup_type {
             let class_literal = match meta_type {
                 Type::ClassLiteral(class_literal) => class_literal,
-                Type::SubclassOf(subclass) => match subclass.subclass_of().into_class(db) {
-                    Some(cls) => match cls.static_class_literal(db) {
-                        Some((lit, _)) => ClassLiteral::Static(lit),
-                        None => continue,
-                    },
-                    None => continue,
-                },
+                Type::SubclassOf(subclass) => {
+                    let Some(class_literal) = subclass_origin(subclass.subclass_of()) else {
+                        continue;
+                    };
+                    class_literal
+                }
                 _ => continue,
             };
 
@@ -2061,6 +2071,7 @@ fn extract_class_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassLit
                     Some(class_type.class_literal(db))
                 }
                 crate::types::SubclassOfInner::Dynamic(_)
+                | crate::types::SubclassOfInner::Protocol(_)
                 | crate::types::SubclassOfInner::TypeVar(_) => None,
             }
         }

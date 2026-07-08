@@ -466,6 +466,12 @@ impl ClassInfoConstraintFunction {
                     // e.g. `isinstance(x, list[int])` fails at runtime.
                     SubclassOfInner::Class(ClassType::Generic(_)) => None,
                     SubclassOfInner::Dynamic(dynamic) => Some(Type::Dynamic(dynamic)),
+                    SubclassOfInner::Protocol(protocol) => match self {
+                        ClassInfoConstraintFunction::IsInstance => {
+                            Some(Type::ProtocolInstance(protocol))
+                        }
+                        ClassInfoConstraintFunction::IsSubclass => Some(classinfo),
+                    },
                     SubclassOfInner::TypeVar(bound_typevar) => match self {
                         ClassInfoConstraintFunction::IsSubclass => Some(classinfo),
                         ClassInfoConstraintFunction::IsInstance => {
@@ -3079,7 +3085,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     match subclass_of.subclass_of().with_transposed_type_var(db) {
                         SubclassOfInner::Class(ClassType::NonGeneric(class)) => Some(class),
                         SubclassOfInner::Class(ClassType::Generic(_))
-                        | SubclassOfInner::Dynamic(_) => None,
+                        | SubclassOfInner::Dynamic(_)
+                        | SubclassOfInner::Protocol(_) => None,
                         SubclassOfInner::TypeVar(tvar) => {
                             find_underlying_class(db, tvar.typevar(db).upper_bound(db)?)
                         }
