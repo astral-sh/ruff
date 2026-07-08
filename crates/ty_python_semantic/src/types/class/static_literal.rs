@@ -2185,13 +2185,21 @@ impl<'db> StaticClassLiteral<'db> {
                 let mut alias = None;
                 let mut converter = None;
                 let mut strict = pydantic::ConfigBoolean::Unspecified;
-                if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
+                if field_policy.is_pydantic() {
+                    let metadata =
+                        pydantic::field_metadata(db, first_declaration, default_ty, specialization);
+                    default_ty = metadata.default_ty;
+                    init = metadata.init;
+                    alias = metadata.alias;
+                    strict = metadata.strict;
+                } else if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) =
+                    default_ty
+                {
                     default_ty = field.default_type(db);
                     init = field.init(db);
                     kw_only = field.kw_only(db);
                     alias.clone_from(field.alias(db));
                     converter = field.converter(db);
-                    strict = field.strict(db);
                 }
 
                 let kind = match field_policy {
