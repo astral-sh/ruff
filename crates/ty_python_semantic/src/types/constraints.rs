@@ -94,7 +94,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use indexmap::map::Entry;
-use itertools::{EitherOrBoth, Itertools};
+use itertools::Itertools;
 use ruff_index::{Idx, IndexVec, newtype_index};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -1132,98 +1132,6 @@ pub struct TypeVarId;
 #[newtype_index]
 #[derive(salsa::Update, get_size2::GetSize)]
 pub struct ConstraintId;
-
-#[derive(
-    Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, salsa::Update, get_size2::GetSize,
-)]
-enum NestedSubstitutionSide {
-    Lower,
-    Upper,
-}
-
-/// Identifies one nested-typevar substitution shape.
-///
-/// We key this by the typevar of the constrained constraint (which stays the same across an
-/// entire chain of derivations against a single root constraint), the typevar that we substitute
-/// _for_, and the side. Each derived path assignment records the substitution shapes in its own
-/// derivation history. This lets independent derivations apply the same substitution while
-/// preventing one derivation chain from repeatedly unfolding the same recursive pattern.
-#[derive(
-    Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, salsa::Update, get_size2::GetSize,
-)]
-struct NestedSubstitution {
-    constrained_typevar: TypeVarId,
-    substituted_typevar: TypeVarId,
-    side: NestedSubstitutionSide,
-}
-
-/// The nested substitution shapes used to derive one path assignment.
-///
-/// The substitutions are kept sorted so that histories with the same substitutions compare and
-/// hash equally regardless of the order in which the antecedents were combined.
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
-struct NestedSubstitutionHistory(SmallVec<[NestedSubstitution; 4]>);
-
-impl NestedSubstitutionHistory {
-    /// Merges two derivation histories and records `nested_substitution`. Returns `None` if either
-    /// history has already applied that substitution.
-    fn merged(
-        &self,
-        other: &Self,
-        nested_substitution: Option<NestedSubstitution>,
-    ) -> Option<Self> {
-        if let Some(substitution) = nested_substitution
-            && (self.contains(substitution) || other.contains(substitution))
-        {
-            return None;
-        }
-
-        Some(Self(
-            self.0
-                .iter()
-                .merge(other.0.iter())
-                .merge(nested_substitution.iter())
-                .dedup()
-                .copied()
-                .collect(),
-        ))
-    }
-
-    fn contains(&self, substitution: NestedSubstitution) -> bool {
-        self.0.binary_search(&substitution).is_ok()
-    }
-
-    fn is_subset_of(&self, other: &Self) -> bool {
-        self.0.len() <= other.0.len()
-            && self
-                .0
-                .iter()
-                .merge_join_by(other.0.iter(), Ord::cmp)
-                .all(|item| !matches!(item, EitherOrBoth::Left(_)))
-    }
-}
-
-/// A constraint derived from the sequent map, optionally annotated with the nested substitution
-/// step that produced it.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
-struct DerivedConstraint {
-    constraint: ConstraintId,
-    nested_substitution: Option<NestedSubstitution>,
-}
-
-fn nested_substitution<'db>(
-    db: &'db dyn Db,
-    builder: &ConstraintSetBuilder<'db>,
-    constrained_typevar: BoundTypeVarInstance<'db>,
-    substituted_typevar: BoundTypeVarInstance<'db>,
-    side: NestedSubstitutionSide,
-) -> NestedSubstitution {
-    NestedSubstitution {
-        constrained_typevar: builder.typevar_id(db, constrained_typevar),
-        substituted_typevar: builder.typevar_id(db, substituted_typevar),
-        side,
-    }
-}
 
 /// An individual constraint in a constraint set. This restricts a single typevar to be within a
 /// lower and upper bound.
@@ -5100,7 +5008,7 @@ struct SequentMap {
     /// Sequents of the form `C₁ ∧ C₂ → false`
     pair_impossibilities: FxHashSet<(ConstraintId, ConstraintId)>,
     /// Sequents of the form `C₁ ∧ C₂ → D`
-    pair_implications: FxIndexMap<(ConstraintId, ConstraintId), FxIndexSet<DerivedConstraint>>,
+    pair_implications: FxIndexMap<(ConstraintId, ConstraintId), FxIndexSet<ConstraintId>>,
     /// Sequents of the form `C → D`
     single_implications: FxIndexMap<ConstraintId, FxIndexSet<ConstraintId>>,
 }
@@ -5245,18 +5153,6 @@ impl SequentMap {
         ante2: ConstraintId,
         post: ConstraintId,
     ) {
-        self.add_pair_implication_with_provenance(db, builder, ante1, ante2, post, None);
-    }
-
-    fn add_pair_implication_with_provenance<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        ante1: ConstraintId,
-        ante2: ConstraintId,
-        post: ConstraintId,
-        nested_substitution: Option<NestedSubstitution>,
-    ) {
         // If the post constraint is unsatisfiable, then the antecedents contradict each other.
         let post_data = builder.constraint_data(post);
         let when = post_data
@@ -5272,15 +5168,11 @@ impl SequentMap {
         if ante1.implies(db, builder, post) || ante2.implies(db, builder, post) {
             return;
         }
-        let derived = DerivedConstraint {
-            constraint: post,
-            nested_substitution,
-        };
         if self
             .pair_implications
             .entry(Self::pair_key(ante1, ante2))
             .or_default()
-            .insert(derived)
+            .insert(post)
         {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
@@ -5809,19 +5701,12 @@ impl SequentMap {
                             constrained_data.bounds.lower,
                             Some(new_upper),
                         );
-                        self.add_pair_implication_with_provenance(
+                        self.add_pair_implication(
                             db,
                             builder,
                             bound_constraint,
                             constrained_constraint,
                             post,
-                            Some(nested_substitution(
-                                db,
-                                builder,
-                                constrained_typevar,
-                                bound_typevar,
-                                NestedSubstitutionSide::Upper,
-                            )),
                         );
                     }
                 }
@@ -5877,19 +5762,12 @@ impl SequentMap {
                             Some(new_lower),
                             constrained_data.bounds.upper,
                         );
-                        self.add_pair_implication_with_provenance(
+                        self.add_pair_implication(
                             db,
                             builder,
                             bound_constraint,
                             constrained_constraint,
                             post,
-                            Some(nested_substitution(
-                                db,
-                                builder,
-                                constrained_typevar,
-                                bound_typevar,
-                                NestedSubstitutionSide::Lower,
-                            )),
                         );
                     }
                 }
@@ -5977,19 +5855,12 @@ impl SequentMap {
                                 constrained_data.bounds.lower,
                                 Some(new_upper),
                             );
-                            self.add_pair_implication_with_provenance(
+                            self.add_pair_implication(
                                 db,
                                 builder,
                                 bound_constraint,
                                 constrained_constraint,
                                 post,
-                                Some(nested_substitution(
-                                    db,
-                                    builder,
-                                    constrained_typevar,
-                                    nested_typevar,
-                                    NestedSubstitutionSide::Upper,
-                                )),
                             );
                         }
                     }
@@ -6022,19 +5893,12 @@ impl SequentMap {
                                 Some(new_lower),
                                 constrained_data.bounds.upper,
                             );
-                            self.add_pair_implication_with_provenance(
+                            self.add_pair_implication(
                                 db,
                                 builder,
                                 bound_constraint,
                                 constrained_constraint,
                                 post,
-                                Some(nested_substitution(
-                                    db,
-                                    builder,
-                                    constrained_typevar,
-                                    nested_typevar,
-                                    NestedSubstitutionSide::Lower,
-                                )),
                             );
                         }
                     }
@@ -6286,7 +6150,7 @@ impl SequentMap {
                             "{} ∧ {} → {}",
                             ante1.display(self.db, self.builder),
                             ante2.display(self.db, self.builder),
-                            post.constraint.display(self.db, self.builder),
+                            post.display(self.db, self.builder),
                         )?;
                     }
                 }
@@ -6324,14 +6188,12 @@ impl SequentMap {
 #[derive(Debug)]
 pub(crate) struct PathAssignments {
     map: SequentMap,
-    /// Each assignment's source order and the first nested-substitution history that produced it.
-    /// (Most assignments have exactly one history, and so we save space and iteration overhead by
-    /// storing the first history here.)
-    assignments: FxIndexMap<ConstraintAssignment, (usize, NestedSubstitutionHistory)>,
-    /// Additional histories that can produce an assignment, keyed by its index in `assignments`.
+    /// Each assignment's source order and the first fuel value with which it was derived.
+    assignments: FxIndexMap<ConstraintAssignment, (usize, u8)>,
+    /// Additional fuel values that can derive an assignment, keyed by its index in `assignments`.
     /// These are stored separately so that branch-local additions can be rolled back by truncating
-    /// the set.
-    additional_substitution_histories: FxIndexSet<(usize, NestedSubstitutionHistory)>,
+    /// the set. Only the greatest fuel value participates in further derivation.
+    additional_fuels: FxIndexSet<(usize, u8)>,
     /// Constraints that we have discovered, mapped to whether we have processed them yet. (This
     /// ensures a stable order for all of the derived constraints that we create, while still
     /// letting us create them lazily.)
@@ -6347,7 +6209,7 @@ impl PathAssignments {
         Self {
             map: SequentMap::default(),
             assignments: FxIndexMap::default(),
-            additional_substitution_histories: FxIndexSet::default(),
+            additional_fuels: FxIndexSet::default(),
             discovered,
         }
     }
@@ -6382,11 +6244,26 @@ impl PathAssignments {
         source_order: usize,
         f: impl FnOnce(&mut Self, Range<usize>) -> R,
     ) -> Option<R> {
+        /// The maximum number of "trips through the sequent map" for any given assignment in the
+        /// path.
+        ///
+        /// Each assignment that we add to this path either comes directly from the BDD (an
+        /// "origin" constraint) or is derived from the sequent map. Each derived constraint
+        /// depends on its antecedents holding, but those antecedents might themselves be derived.
+        /// In fact, the sequent map can derive an enormous (and in recursive cases unbounded)
+        /// family of increasingly complex constraints.
+        ///
+        /// This fuel budget bounds that expansion, so that we can prevent runaway expansion and
+        /// "too complex to be useful" constraints, without pre-supposing which constraint or
+        /// derivation shapes will lead to problems. This is a heuristic; in the future we might
+        /// consider a more principled way of detecting these cases.
+        const SEQUENT_FUEL_BUDGET: u8 = 4;
+
         // Record a snapshot of the assignments that we already knew held — both so that we can
         // pass along the range of which assignments are new, and so that we can reset back to this
         // point before returning.
         let start = self.assignments.len();
-        let additional_histories_start = self.additional_substitution_histories.len();
+        let additional_fuels_start = self.additional_fuels.len();
 
         // Add the new assignment and anything we can derive from it.
         tracing::trace!(
@@ -6406,7 +6283,7 @@ impl PathAssignments {
             assignment,
             source_order,
             false,
-            NestedSubstitutionHistory::default(),
+            SEQUENT_FUEL_BUDGET,
         );
         let result = if found_conflict.is_err() {
             // If that results in the path now being impossible due to a contradiction, return
@@ -6435,8 +6312,7 @@ impl PathAssignments {
         // Reset back to where we were before following this edge, so that the caller can reuse a
         // single instance for the entire BDD traversal.
         self.assignments.truncate(start);
-        self.additional_substitution_histories
-            .truncate(additional_histories_start);
+        self.additional_fuels.truncate(additional_fuels_start);
         result
     }
 
@@ -6459,25 +6335,16 @@ impl PathAssignments {
             || self.assignment_holds(constraint.when_unconstrained())
     }
 
-    /// If `assignment` holds on this path, returns an iterator of its substitution histories.
-    /// Otherwise returns `None`.
-    fn histories_for(
-        &self,
-        assignment: ConstraintAssignment,
-    ) -> Option<impl Iterator<Item = &NestedSubstitutionHistory> + Clone> {
-        // This is complicated by the fact that we store each assignment's first history inline in
-        // the `assignments` field, and the others in `additional_substitution_histories`; and
-        // moreover that `additional_substitution_histories` interleaves histories from all
-        // assignments on this path. Assignments will typically have a single history, so it
-        // should™ be fine that we're scanning and filtering that entire list.
-        let (index, _, (_, history)) = self.assignments.get_full(&assignment)?;
-        let first = std::iter::once(history);
-        let rest = self
-            .additional_substitution_histories
+    /// Returns the greatest remaining fuel for any derivation of `assignment` on this path.
+    fn fuel_for(&self, assignment: ConstraintAssignment) -> Option<u8> {
+        let (index, _, (_, first_fuel)) = self.assignments.get_full(&assignment)?;
+        let max_fuel = self
+            .additional_fuels
             .iter()
-            .filter(move |(history_index, _)| *history_index == index)
-            .map(|(_, history)| history);
-        Some(std::iter::chain(first, rest))
+            .filter(|(fuel_index, _)| *fuel_index == index)
+            .map(|(_, fuel)| *fuel)
+            .fold(*first_fuel, u8::max);
+        Some(max_fuel)
     }
 
     /// Update our sequent map to ensure that it holds all of the sequents that involve the given
@@ -6518,7 +6385,7 @@ impl PathAssignments {
         assignment: ConstraintAssignment,
         source_order: usize,
         derived: bool,
-        history: NestedSubstitutionHistory,
+        fuel: u8,
     ) -> Result<(), PathAssignmentConflict> {
         if matches!(assignment, ConstraintAssignment::Unconstrained(_)) {
             // An `Unconstrained` assignment means "this constraint can go either way". If there is
@@ -6532,7 +6399,7 @@ impl PathAssignments {
             // derive any additional information from the sequent map. We still want to record the
             // assignment, but as an optimization we can return early without actually querying the
             // sequent map.
-            self.assignments.insert(assignment, (source_order, history));
+            self.assignments.insert(assignment, (source_order, fuel));
             return Ok(());
         }
 
@@ -6554,11 +6421,11 @@ impl PathAssignments {
 
         match self.assignments.entry(assignment) {
             Entry::Vacant(entry) => {
-                entry.insert((source_order, history));
+                entry.insert((source_order, fuel));
             }
             Entry::Occupied(mut entry) => {
                 let index = entry.index();
-                let (existing_source_order, existing_history) = entry.get_mut();
+                let (existing_source_order, existing_fuel) = entry.get_mut();
 
                 // If a constraint appears both as an "origin" constraint (it actually appears in
                 // the BDD structure) and as a "derived" constraint (we infer it from other
@@ -6568,21 +6435,36 @@ impl PathAssignments {
                     *existing_source_order = source_order;
                 }
 
-                // A smaller history blocks fewer future substitutions, so it preserves every
-                // derivation available from a larger history. If an existing history is a subset
-                // of this one, this one is redundant and does not need to be processed.
-                if existing_history.is_subset_of(&history)
-                    || self.additional_substitution_histories.iter().any(
-                        |(history_index, existing_history)| {
-                            *history_index == index && existing_history.is_subset_of(&history)
-                        },
-                    )
-                    || !self
-                        .additional_substitution_histories
-                        .insert((index, history))
+                // We've already seen this assignment, and in theory have already queried the
+                // sequent map for its consequents, which should let us return early.
+                //
+                // However, an origin constraint can replenish the fuel for this assignment, giving
+                // it more chances to participate in multi-step sequent chains. That means there
+                // might be some consequents that were skipped previously due to a lack of fuel,
+                // that can be added now because of the replinished fuel budget.
+
+                // Only origin constraints can replinish the fuel budget for this assignment.
+                if derived {
+                    return Ok(());
+                }
+
+                // There is another derivation of this assignment that already provides at least as
+                // much fuel as this origin constraint. That means replenishing the fuel won't have
+                // any effect.
+                if *existing_fuel >= fuel
+                    || self
+                        .additional_fuels
+                        .iter()
+                        .any(|(fuel_index, existing_fuel)| {
+                            *fuel_index == index && *existing_fuel >= fuel
+                        })
                 {
                     return Ok(());
                 }
+
+                // Record the replenished fuel separately so that `walk_edge` can restore the
+                // parent branch by truncating `additional_fuels`.
+                self.additional_fuels.insert((index, fuel));
             }
         }
 
@@ -6648,54 +6530,49 @@ impl PathAssignments {
             }
         }
 
-        let mut new_constraints = FxIndexSet::default();
-        for ((ante1, ante2), posts) in &self.map.pair_implications {
-            let Some(histories1) = self.histories_for(ante1.when_true()) else {
-                continue;
-            };
-            let Some(histories2) = self.histories_for(ante2.when_true()) else {
-                continue;
-            };
+        let mut new_constraints: FxIndexMap<ConstraintId, u8> = FxIndexMap::default();
+        let mut add_new_constraint = |constraint, fuel| {
+            new_constraints
+                .entry(constraint)
+                .and_modify(|existing_fuel| *existing_fuel = (*existing_fuel).max(fuel))
+                .or_insert(fuel);
+        };
 
+        for ((ante1, ante2), posts) in &self.map.pair_implications {
+            let Some(ante1_fuel) = self.fuel_for(ante1.when_true()) else {
+                continue;
+            };
+            let Some(ante2_fuel) = self.fuel_for(ante2.when_true()) else {
+                continue;
+            };
+            let Some(post_fuel) = ante1_fuel.min(ante2_fuel).checked_sub(1) else {
+                continue;
+            };
             for post in posts {
-                // The number of histories can grow combinatorially because we consider every pair
-                // of antecedent histories. `add_assignment` partially prunes this growth by
-                // discarding a new history if an existing history for the same assignment is its
-                // subset. We do not yet remove existing histories that are supersets of a new
-                // history, because those removals would have to be restored when we backtrack out
-                // of the current BDD branch.
-                //
-                // TODO: Retain only subset-minimal histories for each assignment by adding support
-                // for rolling back histories removed by dominance pruning.
-                for history1 in histories1.clone() {
-                    for history2 in histories2.clone() {
-                        if let Some(history) = history1.merged(history2, post.nested_substitution) {
-                            new_constraints.insert((post.constraint, history));
-                        }
-                    }
-                }
+                add_new_constraint(*post, post_fuel);
             }
         }
 
         for (ante, posts) in &self.map.single_implications {
-            let Some(histories) = self.histories_for(ante.when_true()) else {
+            let Some(post_fuel) = self
+                .fuel_for(ante.when_true())
+                .and_then(|ante_fuel| ante_fuel.checked_sub(1))
+            else {
                 continue;
             };
             for post in posts {
-                for history in histories.clone() {
-                    new_constraints.insert((*post, history.clone()));
-                }
+                add_new_constraint(*post, post_fuel);
             }
         }
 
-        for (new_constraint, history) in new_constraints {
+        for (new_constraint, fuel) in new_constraints {
             self.add_assignment(
                 db,
                 builder,
                 new_constraint.when_true(),
                 source_order,
                 true,
-                history,
+                fuel,
             )?;
         }
 

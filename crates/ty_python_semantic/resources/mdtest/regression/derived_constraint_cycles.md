@@ -83,4 +83,31 @@ def nested_running_min(iterable):
     )
 ```
 
+## Recursive constraint expansion for an optional tuple element
+
+Inferring this assignment produces both a base lower bound and a recursive lower bound for `T`:
+
+- `Unknown & None ≤ T`
+- `Unknown & tuple[T] ≤ T`
+
+Combining them produces the finite consequence `Unknown & tuple[Unknown & None] ≤ T`. Previously, we
+repeatedly fed each new consequence back into the recursive bound, adding another tuple layer each
+time:
+
+- `Unknown & tuple[Unknown & None] ≤ T`
+- `Unknown & tuple[Unknown & tuple[Unknown & None]] ≤ T`
+- `Unknown & tuple[Unknown & tuple[Unknown & tuple[...]]] ≤ T`
+
+The constraints therefore grew without bound instead of reaching a fixed point.
+
+```py
+def wrap[U](value: U) -> tuple[U]:
+    return (value,)
+
+def f[T](sentinel):
+    items: list[tuple[T] | None] = [None]
+    if items[0] is sentinel:
+        items[0] = wrap(sentinel)
+```
+
 [ty#24660]: https://github.com/astral-sh/ruff/pull/24660
