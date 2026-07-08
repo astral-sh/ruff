@@ -1502,7 +1502,7 @@ impl<'db> Bindings<'db> {
                                     Some("__name__") => {
                                         overload.set_return_type(Type::string_literal(
                                             db,
-                                            typevar.name(db),
+                                            typevar.name(db).as_str(),
                                         ));
                                     }
                                     Some("__bound__") => {
@@ -2203,7 +2203,7 @@ impl<'db> Bindings<'db> {
                                                 Type::heterogeneous_tuple(
                                                     db,
                                                     names.iter().map(|name| {
-                                                        Type::string_literal(db, *name)
+                                                        Type::string_literal(db, name.as_str())
                                                     }),
                                                 )
                                             }
@@ -2224,10 +2224,9 @@ impl<'db> Bindings<'db> {
                                         {
                                             Type::heterogeneous_tuple(
                                                 db,
-                                                metadata
-                                                    .members
-                                                    .keys()
-                                                    .map(|member| Type::string_literal(db, member)),
+                                                metadata.members.keys().map(|member| {
+                                                    Type::string_literal(db, member.as_str())
+                                                }),
                                             )
                                         } else {
                                             Type::unknown()
@@ -2244,10 +2243,9 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty)] = overload.parameter_types() {
                                 overload.set_return_type(Type::heterogeneous_tuple(
                                     db,
-                                    list_members::all_members(db, *ty)
-                                        .into_iter()
-                                        .sorted()
-                                        .map(|member| Type::string_literal(db, &member.name)),
+                                    list_members::all_members(db, *ty).into_iter().sorted().map(
+                                        |member| Type::string_literal(db, member.name.as_str()),
+                                    ),
                                 ));
                             }
                         }

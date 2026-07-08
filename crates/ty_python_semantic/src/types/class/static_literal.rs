@@ -1018,7 +1018,7 @@ impl<'db> StaticClassLiteral<'db> {
                     explicit_metaclass_of: class_metaclass_was_from,
                 }
             } else {
-                let name = Type::string_literal(db, class.name(db));
+                let name = Type::string_literal(db, class.name(db).as_str());
                 let bases = Type::heterogeneous_tuple(db, class.explicit_bases(db));
                 let namespace = KnownClass::Dict
                     .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
@@ -1732,7 +1732,7 @@ impl<'db> StaticClassLiteral<'db> {
                             false
                         }
                     })
-                    .map(|(name, _)| Type::string_literal(db, name));
+                    .map(|(name, _)| Type::string_literal(db, name.as_str()));
                 Some(Type::heterogeneous_tuple(db, match_args))
             }
             (field_policy @ CodeGeneratorKind::DataclassLike(_), "__weakref__")
@@ -1812,7 +1812,9 @@ impl<'db> StaticClassLiteral<'db> {
                 self.has_dataclass_param(db, field_policy, DataclassFlags::SLOTS)
                     .then(|| {
                         let fields = self.fields(db, specialization, field_policy);
-                        let slots = fields.keys().map(|name| Type::string_literal(db, name));
+                        let slots = fields
+                            .keys()
+                            .map(|name| Type::string_literal(db, name.as_str()));
                         Type::heterogeneous_tuple(db, slots)
                     })
             }
@@ -1862,7 +1864,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         let overloads = frozen_base_fields
             .keys()
-            .map(|field| setattr_signature(Type::string_literal(db, field), Type::Never))
+            .map(|field| setattr_signature(Type::string_literal(db, field.as_str()), Type::Never))
             .chain([setattr_signature(
                 KnownClass::Str.to_instance(db),
                 Type::none(db),

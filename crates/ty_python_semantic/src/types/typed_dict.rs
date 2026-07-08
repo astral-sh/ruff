@@ -349,7 +349,7 @@ impl<'db> TypedDictType<'db> {
             .iter()
             .filter(|(_, field)| field.may_be_present(db))
             .fold(UnionBuilder::new(db), |builder, (name, _)| {
-                builder.add(Type::string_literal(db, name))
+                builder.add(Type::string_literal(db, name.as_str()))
             })
             .build()
     }

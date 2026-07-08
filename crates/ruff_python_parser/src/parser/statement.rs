@@ -1,4 +1,3 @@
-use compact_str::CompactString;
 use std::fmt::{Display, Write};
 
 use ruff_python_ast::name::Name;
@@ -834,7 +833,7 @@ impl<'src> Parser<'src> {
             return first;
         }
 
-        let mut dotted_name: CompactString = first.id.into();
+        let mut dotted_name = first.id;
         let mut progress = ParserProgress::default();
 
         while self.eat(TokenKind::Dot) {
@@ -843,7 +842,7 @@ impl<'src> Parser<'src> {
             // test_err dotted_name_multiple_dots
             // import a..b
             // import a...b
-            dotted_name.push('.');
+            dotted_name.push_str(".");
             dotted_name.push_str(&self.parse_identifier());
         }
 
@@ -851,7 +850,7 @@ impl<'src> Parser<'src> {
         // import a.b.c
         // import a .  b  . c
         ast::Identifier {
-            id: self.intern_owned_name(Name::from(dotted_name)),
+            id: self.intern_owned_name(dotted_name),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }

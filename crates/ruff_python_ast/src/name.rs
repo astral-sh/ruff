@@ -122,67 +122,11 @@ impl From<Box<str>> for Name {
     }
 }
 
-impl From<compact_str::CompactString> for Name {
-    #[inline]
-    fn from(value: compact_str::CompactString) -> Self {
-        Self::new(value)
-    }
-}
-
-impl From<Name> for compact_str::CompactString {
-    #[inline]
-    fn from(name: Name) -> Self {
-        compact_str::CompactString::new(name.as_str())
-    }
-}
-
-#[cfg(feature = "salsa")]
-impl salsa::Lookup<compact_str::CompactString> for Name {
-    #[inline]
-    fn into_owned(self) -> compact_str::CompactString {
-        self.into()
-    }
-}
-
-#[cfg(feature = "salsa")]
-impl salsa::Lookup<compact_str::CompactString> for &Name {
-    #[inline]
-    fn into_owned(self) -> compact_str::CompactString {
-        compact_str::CompactString::new(self.as_str())
-    }
-}
-
 #[cfg(feature = "salsa")]
 impl salsa::Lookup<Name> for &str {
     #[inline]
     fn into_owned(self) -> Name {
         Name::new(self)
-    }
-}
-
-#[cfg(feature = "salsa")]
-impl salsa::HashEqLike<Name> for compact_str::CompactString {
-    #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        std::hash::Hash::hash(self, state);
-    }
-
-    #[inline]
-    fn eq(&self, data: &Name) -> bool {
-        self == data.as_str()
-    }
-}
-
-#[cfg(feature = "salsa")]
-impl salsa::HashEqLike<&Name> for compact_str::CompactString {
-    #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        std::hash::Hash::hash(self, state);
-    }
-
-    #[inline]
-    fn eq(&self, data: &&Name) -> bool {
-        self == data.as_str()
     }
 }
 
