@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Alias, AtomicNodeIndex, PythonVersion, Stmt, StmtImport, StmtImportFrom};
-use ruff_python_trivia::{has_leading_content, indentation_at_offset, is_python_whitespace};
+use ruff_python_trivia::{indentation_at_offset, is_python_whitespace};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -272,7 +272,9 @@ fn split_import_fix(
         return SplitImportFix::NotMixed;
     }
 
-    if has_leading_content(stmt.start(), checker.source())
+    if checker
+        .indexer()
+        .preceded_by_multi_statement_line(stmt, checker.source())
         || has_trailing_comment_or_content(stmt.end(), checker.source())
     {
         return SplitImportFix::Unavailable;

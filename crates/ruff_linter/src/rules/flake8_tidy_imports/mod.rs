@@ -278,6 +278,8 @@ mod tests {
                 import sitecustomize, typing_extensions
 
             if True: import this, typing
+            if True: \
+                import this, typing
 
             with manager():
                 from foo import bar
@@ -316,6 +318,8 @@ mod tests {
                 lazy import typing_extensions
 
             if True: import this, typing
+            if True: \
+                import this, typing
 
             with manager():
                 lazy from foo import bar
@@ -364,7 +368,7 @@ mod tests {
             },
         );
 
-        assert_eq!(diagnostics.len(), 9);
+        assert_eq!(diagnostics.len(), 10);
         assert_eq!(fixed.source_code(), expected);
     }
 
