@@ -1032,8 +1032,7 @@ class PlainDictConfig(BaseModel):
 
     name: str
 
-# TODO: this should be an error
-PlainDictConfig(name="Alice", something_else=7)
+PlainDictConfig(name="Alice", something_else=7)  # error: [unknown-argument]
 ```
 
 ## Mixins
