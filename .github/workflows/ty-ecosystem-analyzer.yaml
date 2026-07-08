@@ -127,7 +127,7 @@ jobs:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          version: "0.11.26"
+          version: "0.11.28"
           ignore-empty-workdir: true
           # The default of `enable-cache: auto` leads to warnings from setup-uv in this job,
           # since its cache-invalidation keys (pyproject.toml, uv.lock, etc.) aren't available
@@ -187,7 +187,7 @@ jobs:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          version: "0.11.26"
+          version: "0.11.28"
           ignore-empty-workdir: true
           # The default of `enable-cache: auto` leads to warnings from setup-uv in this job,
           # since its cache-invalidation keys (pyproject.toml, uv.lock, etc.) aren't available
