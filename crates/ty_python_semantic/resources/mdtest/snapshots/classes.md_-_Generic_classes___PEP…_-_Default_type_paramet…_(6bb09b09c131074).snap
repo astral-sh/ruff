@@ -36,7 +36,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/classes.
 21 | class Corge[*Ts, T1 = int, T2 = str, **P = [int, str]]: ...
 22 | 
 23 | # error: [invalid-type-variable-default]
-24 | # error: [invalid-type-form] "TypeVarTuple `Ts` cannot appear after TypeVarTuple `Us`"
+24 | # error: [invalid-type-form] "Generic class `Grault` cannot have multiple `TypeVarTuple` type parameters"
 25 | class Grault[*Us, *Ts = *tuple[int, str]]: ...
 26 | 
 27 | # These are fine:
@@ -129,7 +129,7 @@ info: See https://typing.python.org/en/latest/spec/generics.html#defaults-follow
 ```
 
 ```
-error[invalid-type-form]: Only one TypeVarTuple parameter is allowed
+error[invalid-type-form]: Generic class `Grault` cannot have multiple `TypeVarTuple` type parameters
   --> src/mdtest_snippet.py:25:14
    |
 25 | class Grault[*Us, *Ts = *tuple[int, str]]: ...

@@ -719,7 +719,7 @@ info: See https://typing.python.org/en/latest/spec/generics.html#defaults-follow
 
 ```py
 # snapshot: invalid-type-variable-default
-# error: [invalid-type-form] "TypeVarTuple `Ts` cannot appear after TypeVarTuple `Us`"
+# error: [invalid-type-form] "Type alias `Alias4` cannot have multiple `TypeVarTuple` type parameters"
 # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
 type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
 ```

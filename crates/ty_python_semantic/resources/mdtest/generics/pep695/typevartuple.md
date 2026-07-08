@@ -910,10 +910,10 @@ can be explicitly specialized, so multiple type variable tuples would make it am
 consumes each type argument.
 
 ```py
-# error: [invalid-type-form] "TypeVarTuple `Ts2` cannot appear after TypeVarTuple `Ts1`"
+# error: [invalid-type-form] "Generic class `Array` cannot have multiple `TypeVarTuple` type parameters"
 class Array[*Ts1, *Ts2]: ...
 
-# error: [invalid-type-form] "TypeVarTuple `Ts2` cannot appear after TypeVarTuple `Ts1`"
+# error: [invalid-type-form] "Type alias `Alias` cannot have multiple `TypeVarTuple` type parameters"
 type Alias[*Ts1, *Ts2] = tuple[*Ts1] | tuple[*Ts2]
 ```
 

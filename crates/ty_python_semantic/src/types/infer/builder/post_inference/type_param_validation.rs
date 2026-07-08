@@ -1,4 +1,4 @@
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, name::Name};
 use ruff_text_size::Ranged;
 
 use crate::diagnostic::format_enumeration;
@@ -6,6 +6,12 @@ use crate::types::{
     context::InferContext,
     diagnostic::{INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_DEFAULT},
 };
+
+#[derive(Clone, Copy)]
+pub(crate) enum TypeParameterOwner<'a> {
+    GenericClass(&'a Name),
+    TypeAlias(&'a Name),
+}
 
 /// Check that a PEP 695 class or type alias parameter list contains at most one `TypeVarTuple`.
 ///
@@ -15,7 +21,12 @@ use crate::types::{
 pub(crate) fn check_single_typevar_tuple_pep695(
     context: &InferContext<'_, '_>,
     type_params: &ast::TypeParams,
+    owner: TypeParameterOwner<'_>,
 ) {
+    let (owner_kind, owner_name) = match owner {
+        TypeParameterOwner::GenericClass(name) => ("Generic class", name),
+        TypeParameterOwner::TypeAlias(name) => ("Type alias", name),
+    };
     let mut first_typevar_tuple: Option<&ast::TypeParamTypeVarTuple> = None;
 
     for type_param in type_params {
@@ -32,11 +43,8 @@ pub(crate) fn check_single_typevar_tuple_pep695(
             return;
         };
 
-        let mut diagnostic = builder.into_diagnostic("Only one TypeVarTuple parameter is allowed");
-
-        diagnostic.set_concise_message(format_args!(
-            "TypeVarTuple `{}` cannot appear after TypeVarTuple `{}`",
-            &typevar_tuple.name, &first_typevar_tuple.name
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "{owner_kind} `{owner_name}` cannot have multiple `TypeVarTuple` type parameters"
         ));
 
         diagnostic.set_primary_message(format_args!(
