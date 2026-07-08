@@ -314,8 +314,8 @@ impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
             return self.value_type(db).variance_of(db, typevar);
         };
 
-        // Infers the variance of the recursive alias's own type parameters from the raw RHS.
-        // Applying alias specialization here would result in requesting the same `variance_of` query recursively.
+        // Infer an alias's own type-parameter variance from the raw RHS. Applying specialization
+        // here would recursively request the same `variance_of` query.
         if generic_context
             .variables(db)
             .any(|alias_typevar| alias_typevar.identity(db) == typevar)
