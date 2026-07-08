@@ -1734,21 +1734,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        // Most generic signatures use legacy TypeVars and retain the existing comparison. Check
-        // one variable before freshening so that path does not need to collect the entire context.
-        // The full context is validated below before entering higher-rank comparison.
-        let may_have_higher_rank_target = target.generic_context.is_some_and(|context| {
-            context.variables(db).next().is_some_and(|typevar| {
-                typevar.kind(db) == TypeVarKind::Pep695TypeVar
-                    && typevar.binding_context(db).definition() == target.definition
-            })
+        // A legacy TypeVar's owner is inferred from its uses. When an enclosing generic context
+        // is unavailable, a class variable can therefore look method-local. Restrict higher-rank
+        // comparison to PEP 695 variables lexically declared by this function.
+        let has_higher_rank_target = target.generic_context.is_some_and(|context| {
+            let mut typevars = context.variables(db);
+            typevars.len() > 0
+                && typevars.all(|typevar| {
+                    typevar.kind(db) == TypeVarKind::Pep695TypeVar
+                        && typevar.binding_context(db).definition() == target.definition
+                })
         });
 
         // A generic signature can also carry inference variables from the call site. Those remain
         // existential; they are not callable-local binders introduced by the target signature.
         // Classify them before freshening changes their identities, but only for a possible
         // higher-rank target.
-        let target_has_caller_inferable = may_have_higher_rank_target
+        let target_has_caller_inferable = has_higher_rank_target
             && target.generic_context.is_some_and(|context| {
                 context
                     .variables(db)
@@ -1782,7 +1784,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target
         };
 
-        if !may_have_higher_rank_target {
+        if !has_higher_rank_target {
             return self.check_signature_pair_infer_both(db, source, target);
         }
 
@@ -1796,16 +1798,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             .into_iter()
             .flat_map(|context| context.variables(db))
             .collect::<Vec<_>>();
-
-        // A legacy TypeVar's owner is inferred from its uses. When an enclosing generic context
-        // is unavailable, a class variable can therefore look method-local. Restrict higher-rank
-        // comparison to PEP 695 variables lexically declared by this function.
-        if !target_typevars.iter().all(|typevar| {
-            typevar.kind(db) == TypeVarKind::Pep695TypeVar
-                && typevar.binding_context(db).definition() == target.definition
-        }) {
-            return self.check_signature_pair_infer_both(db, source, target);
-        }
 
         let source_typevars = source
             .generic_context
