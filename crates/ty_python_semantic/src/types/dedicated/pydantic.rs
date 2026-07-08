@@ -189,6 +189,20 @@ pub(in crate::types) fn constructor_fields_are_keyword_only(
         .any(|base| base.is_known(db, KnownClass::PydanticRootModel))
 }
 
+/// Return `true` if fields are optional constructor parameters for `class`.
+///
+/// A settings model can populate any field from environment variables or another configured
+/// settings source, so no field value is necessarily required at the call site.
+pub(in crate::types) fn constructor_fields_are_optional(
+    db: &dyn Db,
+    class: StaticClassLiteral<'_>,
+) -> bool {
+    class
+        .iter_mro(db, None)
+        .filter_map(ClassBase::into_class)
+        .any(|base| base.is_known(db, KnownClass::PydanticBaseSettings))
+}
+
 #[salsa::tracked(
     cycle_initial=|_, _, _| ModelConfig::unknown(),
     heap_size=ruff_memory_usage::heap_size,

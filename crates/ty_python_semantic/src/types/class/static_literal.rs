@@ -1357,6 +1357,9 @@ impl<'db> StaticClassLiteral<'db> {
         let pydantic_constructor_fields_are_keyword_only =
             matches!(field_policy, CodeGeneratorKind::Pydantic(_))
                 && pydantic::constructor_fields_are_keyword_only(db, self);
+        let pydantic_constructor_fields_are_optional = name == "__init__"
+            && matches!(field_policy, CodeGeneratorKind::Pydantic(_))
+            && pydantic::constructor_fields_are_optional(db, self);
 
         let instance_ty =
             Type::instance(db, self.apply_optional_specialization(db, specialization));
@@ -1470,6 +1473,10 @@ impl<'db> StaticClassLiteral<'db> {
                     && let Some(metadata) = field_policy.pydantic_metadata()
                 {
                     field_ty = pydantic::constructor_parameter_type(db, field_ty, strict, metadata);
+                }
+
+                if pydantic_constructor_fields_are_optional && default_ty.is_none() {
+                    default_ty = Some(Type::unknown());
                 }
 
                 let is_kw_only = matches!(name, "__replace__" | "_replace")

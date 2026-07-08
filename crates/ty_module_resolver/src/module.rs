@@ -345,6 +345,8 @@ pub enum KnownModule {
     PydanticMain,
     #[strum(serialize = "pydantic.root_model")]
     PydanticRootModel,
+    #[strum(serialize = "pydantic_settings.main")]
+    PydanticSettingsMain,
     #[strum(serialize = "pydantic.types")]
     PydanticTypes,
 }
@@ -387,6 +389,7 @@ impl KnownModule {
             Self::PydanticConfig => "pydantic.config",
             Self::PydanticMain => "pydantic.main",
             Self::PydanticRootModel => "pydantic.root_model",
+            Self::PydanticSettingsMain => "pydantic_settings.main",
             Self::PydanticTypes => "pydantic.types",
         }
     }
@@ -414,6 +417,7 @@ impl KnownModule {
             Self::PydanticConfig
             | Self::PydanticMain
             | Self::PydanticRootModel
+            | Self::PydanticSettingsMain
             | Self::PydanticTypes => true,
             Self::Builtins
             | Self::Enum
