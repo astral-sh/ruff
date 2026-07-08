@@ -12,7 +12,6 @@ reveal_type(__name__)  # revealed: str
 reveal_type(__file__)  # revealed: str
 reveal_type(__loader__)  # revealed: LoaderProtocol | None
 reveal_type(__package__)  # revealed: str | None
-# This module has no docstring, so `__doc__` falls back to the typeshed type `str | None`
 reveal_type(__doc__)  # revealed: str | None
 reveal_type(__spec__)  # revealed: ModuleSpec | None
 reveal_type(__path__)  # revealed: MutableSequence[str]
@@ -54,9 +53,9 @@ reveal_type(__init__)
 
 ## `__doc__` reflects the module's actual docstring
 
-Typeshed says `types.ModuleType.__doc__` is `str | None`, but a module that has a literal docstring
-always has `__doc__` set to that string at runtime. Just like `__file__` above, `__doc__` is
-narrowed to `str` in that case, rather than the wider `str | None`:
+Typeshed annotates `types.ModuleType.__doc__` as `str | None`, but a module with a literal docstring
+always has `__doc__` set (unless Python is run in `-OO` mode, which we ignore as a possibility). In
+that case, we narrow `__doc__` to `str`:
 
 ```py
 """Some docstring"""
