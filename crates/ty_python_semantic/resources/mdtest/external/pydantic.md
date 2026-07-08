@@ -730,9 +730,10 @@ reveal_type(PersonWithExtraField.__init__)
 PersonWithExtraField(extra=1, something_else=2)
 ```
 
-## Private fields
+## Private attributes
 
-Underscore-prefixed fields are considered private and do not become fields:
+Underscore-prefixed attributes are considered private. They remain instance attributes but do not
+become model fields or constructor parameters:
 
 ```py
 from pydantic import BaseModel, PrivateAttr
@@ -740,15 +741,16 @@ from pydantic import BaseModel, PrivateAttr
 class Person(BaseModel):
     name: str
     _implicit_private: int
+    _private_with_default: int = 1
     _explicit_private: int = PrivateAttr(default=0)
 
-# TODO: This should not include `_implicit_private`
-# revealed: (self: Person, *, name: LaxStr, _implicit_private: LaxInt, **extra: Any) -> None
+# revealed: (self: Person, *, name: LaxStr, **extra: Any) -> None
 reveal_type(Person.__init__)
 
-# TODO: This should not be an error
-# error: [missing-argument]
-Person(name="Alice")
+person = Person(name="Alice")
+reveal_type(person._implicit_private)  # revealed: int
+reveal_type(person._private_with_default)  # revealed: int
+reveal_type(person._explicit_private)  # revealed: int
 ```
 
 ## Using `Annotated` to specify field metadata
