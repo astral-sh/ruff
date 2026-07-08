@@ -84,6 +84,20 @@ pub trait HasIdentity<'db> {
     fn needs_recursive_identity(&self) -> bool {
         true
     }
+
+    /// Return `true` if `self` should use the recursive fallback for an active item.
+    fn has_recursive_identity_cycle(&self, db: &'db dyn Db, seen: &[Self]) -> bool
+    where
+        Self: Sized,
+    {
+        if !self.needs_recursive_identity() {
+            return false;
+        }
+
+        let identity = self.to_identity(db);
+        seen.iter()
+            .any(|active| active.needs_recursive_identity() && active.to_identity(db) == identity)
+    }
 }
 
 impl<'db> HasIdentity<'db> for Type<'db> {
@@ -95,6 +109,10 @@ impl<'db> HasIdentity<'db> for Type<'db> {
 
     fn needs_recursive_identity(&self) -> bool {
         Type::needs_recursive_identity(*self)
+    }
+
+    fn has_recursive_identity_cycle(&self, db: &'db dyn Db, seen: &[Self]) -> bool {
+        type_has_recursive_identity_cycle(db, *self, seen, |active| *active, |_| true)
     }
 }
 
@@ -110,6 +128,167 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>) {
     fn needs_recursive_identity(&self) -> bool {
         self.0.needs_recursive_identity() || self.1.needs_recursive_identity()
     }
+
+    fn has_recursive_identity_cycle(&self, db: &'db dyn Db, seen: &[Self]) -> bool {
+        let identity = self.to_identity(db);
+        let active_matches = |active: &Self| active.to_identity(db) == identity;
+
+        type_pair_has_recursive_identity_cycle(
+            db,
+            self.0,
+            self.1,
+            seen,
+            |active| active.0,
+            |active| active.1,
+            active_matches,
+        )
+    }
+}
+
+/// Return `true` if a type should use the recursive fallback for an active type identity.
+pub(crate) fn type_has_recursive_identity_cycle<'db, S>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    seen: &[S],
+    active_type: impl Fn(&S) -> Type<'db> + Copy,
+    active_matches: impl Fn(&S) -> bool + Copy,
+) -> bool {
+    type_has_recursive_identity_cycle_impl(
+        db,
+        ty,
+        seen,
+        active_type,
+        active_matches,
+        NonNestedAliasCyclePolicy::Immediate,
+    )
+}
+
+/// Return `true` if either type should use the recursive fallback for an active item.
+pub(crate) fn type_pair_has_recursive_identity_cycle<'db, S>(
+    db: &'db dyn Db,
+    left: Type<'db>,
+    right: Type<'db>,
+    seen: &[S],
+    active_left: impl Fn(&S) -> Type<'db> + Copy,
+    active_right: impl Fn(&S) -> Type<'db> + Copy,
+    active_matches: impl Fn(&S) -> bool + Copy,
+) -> bool {
+    type_has_recursive_identity_cycle(db, left, seen, active_left, active_matches)
+        || type_has_recursive_identity_cycle(db, right, seen, active_right, active_matches)
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum NonNestedAliasCyclePolicy {
+    Immediate,
+    AfterSecondUnfold,
+}
+
+fn type_has_recursive_identity_cycle_impl<'db, S>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    seen: &[S],
+    active_type: impl Fn(&S) -> Type<'db> + Copy,
+    active_matches: impl Fn(&S) -> bool + Copy,
+    non_nested_alias_cycle_policy: NonNestedAliasCyclePolicy,
+) -> bool {
+    let Type::TypeAlias(alias) = ty else {
+        let Some(identity) = ty.recursive_identity(db) else {
+            return false;
+        };
+        return seen.iter().any(|active| {
+            active_matches(active) && active_type(active).recursive_identity(db) == Some(identity)
+        });
+    };
+
+    let identity = TypeIdentity::TypeAlias(alias.definition(db));
+    if !seen.iter().any(|active| {
+        active_matches(active) && active_type(active).recursive_identity(db) == Some(identity)
+    }) {
+        return false;
+    }
+
+    let active_alias_count = seen
+        .iter()
+        .filter(|active| {
+            active_matches(active) && active_type(active).recursive_identity(db) == Some(identity)
+        })
+        .count();
+
+    let Some(generic_context) = alias.generic_context(db) else {
+        return true;
+    };
+    if generic_context
+        .variables(db)
+        .any(|typevar| typevar.is_paramspec(db))
+    {
+        return true;
+    }
+
+    let specialization = alias
+        .specialization(db)
+        .unwrap_or_else(|| generic_context.default_specialization(db, None));
+    let nested_alias_application =
+        is_nested_alias_application(db, ty, seen, active_type, active_matches);
+
+    if nested_alias_application {
+        return false;
+    }
+
+    if specialization.types(db).iter().copied().any(|argument| {
+        any_over_type(db, argument, false, |nested| {
+            nested.recursive_identity(db).is_some_and(|identity| {
+                seen.iter().any(|active| {
+                    active_matches(active)
+                        && active_type(active).recursive_identity(db) == Some(identity)
+                })
+            })
+        })
+    }) {
+        return true;
+    }
+
+    match non_nested_alias_cycle_policy {
+        NonNestedAliasCyclePolicy::Immediate => true,
+        NonNestedAliasCyclePolicy::AfterSecondUnfold => active_alias_count > 1,
+    }
+}
+
+fn is_nested_alias_application<'db, S>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    seen: &[S],
+    active_type: impl Fn(&S) -> Type<'db> + Copy,
+    active_matches: impl Fn(&S) -> bool + Copy,
+) -> bool {
+    let Some(identity) = ty.recursive_identity(db) else {
+        return false;
+    };
+
+    seen.iter().any(|active| {
+        if !active_matches(active) {
+            return false;
+        }
+
+        let active = active_type(active);
+        let Type::TypeAlias(active_alias) = active else {
+            return false;
+        };
+        if active.recursive_identity(db) != Some(identity) {
+            return false;
+        }
+
+        let Some(generic_context) = active_alias.generic_context(db) else {
+            return false;
+        };
+        let specialization = active_alias
+            .specialization(db)
+            .unwrap_or_else(|| generic_context.default_specialization(db, None));
+        specialization
+            .types(db)
+            .iter()
+            .copied()
+            .any(|argument| any_over_type(db, argument, false, |nested| nested == ty))
+    })
 }
 
 /// `CycleDetector` is temporary, so callers should choose the capacity that keeps observed cycle
@@ -170,13 +349,8 @@ where
             return CycleDetectorVisit::Ready(self.fallback.clone());
         }
 
-        if item.needs_recursive_identity() {
-            let identity = item.to_identity(db);
-            if seen.iter().any(|active| {
-                active.needs_recursive_identity() && active.to_identity(db) == identity
-            }) {
-                return CycleDetectorVisit::Cycle(item);
-            }
+        if item.has_recursive_identity_cycle(db, &seen) {
+            return CycleDetectorVisit::Cycle(item);
         }
         drop(seen);
 
@@ -255,7 +429,7 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         }
 
         let seen = self.seen.borrow();
-        if seen.contains(&ty) || Self::needs_recursive_fallback(db, ty, &seen) {
+        if seen.contains(&ty) || type_transformer_needs_recursive_fallback(db, ty, &seen) {
             return TypeTransformerVisit::Return(ty);
         }
         drop(seen);
@@ -264,97 +438,26 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         TypeTransformerVisit::Pending(ty)
     }
 
-    fn needs_recursive_fallback(db: &'db dyn Db, ty: Type<'db>, seen: &[Type<'db>]) -> bool {
-        let Type::TypeAlias(alias) = ty else {
-            let Some(identity) = ty.recursive_identity(db) else {
-                return false;
-            };
-            return seen
-                .iter()
-                .any(|active| active.recursive_identity(db) == Some(identity));
-        };
-
-        let identity = TypeIdentity::TypeAlias(alias.definition(db));
-        if !seen
-            .iter()
-            .any(|active| active.recursive_identity(db) == Some(identity))
-        {
-            return false;
-        }
-
-        let active_alias_count = seen
-            .iter()
-            .filter(|active| active.recursive_identity(db) == Some(identity))
-            .count();
-
-        let Some(generic_context) = alias.generic_context(db) else {
-            return true;
-        };
-        if generic_context
-            .variables(db)
-            .any(|typevar| typevar.is_paramspec(db))
-        {
-            return true;
-        }
-        let specialization = alias
-            .specialization(db)
-            .unwrap_or_else(|| generic_context.default_specialization(db, None));
-        let nested_alias_application = Self::is_nested_alias_application(db, ty, seen);
-
-        // Same-identity aliases whose arguments refer back to an active recursive type are
-        // growing through the alias application itself, not merely unpacking a nested alias.
-        if !nested_alias_application
-            && specialization.types(db).iter().copied().any(|argument| {
-                any_over_type(db, argument, false, |nested| {
-                    nested.recursive_identity(db).is_some_and(|identity| {
-                        seen.iter()
-                            .any(|active| active.recursive_identity(db) == Some(identity))
-                    })
-                })
-            })
-        {
-            return true;
-        }
-
-        // For a finite alias such as `type Box[T] = tuple[T, ...]`, transforming `Box[Box[int]]`
-        // should keep descending into the nested `Box[int]`. Other same-identity specializations
-        // get one non-exact unfolding so constant specializations can stabilize before genuinely
-        // growing aliases are cut off.
-        active_alias_count > 1 && !nested_alias_application
-    }
-
-    fn is_nested_alias_application(db: &'db dyn Db, ty: Type<'db>, seen: &[Type<'db>]) -> bool {
-        let Some(identity) = ty.recursive_identity(db) else {
-            return false;
-        };
-
-        seen.iter().any(|active| {
-            let Type::TypeAlias(active_alias) = active else {
-                return false;
-            };
-            if active.recursive_identity(db) != Some(identity) {
-                return false;
-            }
-
-            let Some(generic_context) = active_alias.generic_context(db) else {
-                return false;
-            };
-            let specialization = active_alias
-                .specialization(db)
-                .unwrap_or_else(|| generic_context.default_specialization(db, None));
-            specialization
-                .types(db)
-                .iter()
-                .copied()
-                .any(|argument| any_over_type(db, argument, false, |nested| nested == ty))
-        })
-    }
-
     fn finish_visit(&self, ty: Type<'db>, result: Type<'db>) -> Type<'db> {
         self.seen.borrow_mut().pop();
         self.cache.borrow_mut().insert_completed(ty, result);
         result
     }
+}
+
+fn type_transformer_needs_recursive_fallback<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    seen: &[Type<'db>],
+) -> bool {
+    type_has_recursive_identity_cycle_impl(
+        db,
+        ty,
+        seen,
+        |active| *active,
+        |_| true,
+        NonNestedAliasCyclePolicy::AfterSecondUnfold,
+    )
 }
 
 enum TypeTransformerVisit<'db> {
