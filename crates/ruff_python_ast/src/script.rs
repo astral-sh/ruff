@@ -20,6 +20,11 @@ pub struct ScriptTag {
 }
 
 impl ScriptTag {
+    /// Returns the TOML contents of the metadata block.
+    pub fn metadata(&self) -> &str {
+        &self.metadata
+    }
+
     /// Given the contents of a Python file, extract the `script` metadata block with leading
     /// comment hashes removed, any preceding shebang or content (prelude), and the remaining Python
     /// script.
@@ -52,16 +57,27 @@ impl ScriptTag {
         // Identify the opening pragma.
         let index = FINDER.find(contents)?;
 
+        Self::parse_at(contents, index)
+    }
+
+    /// Extracts a `script` metadata block known to start at `index`.
+    ///
+    /// Returns `None` if `index` does not point to an exact opening pragma at the start of a line.
+    pub fn parse_at(contents: &[u8], index: usize) -> Option<Self> {
+        let (prelude, contents) = contents.split_at_checked(index)?;
+
         // The opening pragma must be the first line, or immediately preceded by a newline.
-        if !(index == 0 || matches!(contents[index - 1], b'\r' | b'\n')) {
+        if prelude
+            .last()
+            .is_some_and(|byte| !matches!(*byte, b'\r' | b'\n'))
+        {
             return None;
         }
 
         // Extract the preceding content.
-        let prelude = std::str::from_utf8(&contents[..index]).ok()?;
+        let prelude = std::str::from_utf8(prelude).ok()?;
 
         // Decode as UTF-8.
-        let contents = &contents[index..];
         let contents = std::str::from_utf8(contents).ok()?;
 
         let mut lines = contents.lines();

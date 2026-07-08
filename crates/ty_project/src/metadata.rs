@@ -20,6 +20,7 @@ mod configuration_file;
 pub mod options;
 pub mod pyproject;
 pub mod python_version;
+mod script;
 pub mod settings;
 pub mod value;
 

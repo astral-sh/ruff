@@ -111,6 +111,13 @@ pub struct Options {
 }
 
 impl Options {
+    pub(super) fn file_options(&self) -> FileOptions {
+        FileOptions {
+            rules: self.rules.clone(),
+            analysis: self.analysis.clone(),
+        }
+    }
+
     pub fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, TyTomlError> {
         let _guard = ValueSourceGuard::new(source, true);
         let mut options: Self = toml::from_str(content)?;
@@ -2019,6 +2026,15 @@ impl ToOverride for RangedValue<OverrideOptions> {
 pub(super) struct InnerOverrideOptions {
     /// Raw rule options as specified in the configuration.
     /// Used when multiple overrides match a file and need to be merged.
+    pub(super) rules: Option<Rules>,
+
+    pub(super) analysis: Option<AnalysisOptions>,
+}
+
+/// The settings that can vary between individual files.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Combine, get_size2::GetSize)]
+pub(super) struct FileOptions {
+    /// Raw rule options, preserved so multiple configuration layers can be merged.
     pub(super) rules: Option<Rules>,
 
     pub(super) analysis: Option<AnalysisOptions>,
