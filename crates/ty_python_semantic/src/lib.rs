@@ -9,6 +9,7 @@ use crate::suppression::{
 };
 use crate::types::check_types;
 pub use db::Db;
+pub use definition_resolution::DefinitionResolution;
 pub(crate) use diagnostic::add_inferred_python_version_hint_to_diagnostic;
 pub use diagnostic::inferred_python_version_source_annotation;
 pub use fixes::{fix_all_diagnostics, suppress_all_diagnostics};
@@ -49,7 +50,7 @@ pub use types::ide_support::{
     type_hierarchy_supertypes,
 };
 pub use types::{
-    DisplaySettings, FixtureBinding, ProgramEnvironment, TypeQualifiers,
+    DisplaySettings, FixtureBinding, ProgramEnvironment, TypeQualifiers, binding_type,
     fixture_bindings_for_parameter,
 };
 

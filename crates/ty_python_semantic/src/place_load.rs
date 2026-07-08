@@ -585,6 +585,10 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
         }
     }
 
+    pub(crate) fn crosses_scope_declaration(&self) -> bool {
+        self.crosses_scope_declaration
+    }
+
     pub(crate) fn narrowing_constraints_for(
         &self,
         source: &PlaceLoadSource<'_>,

@@ -224,7 +224,7 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
 }
 
 /// Infer the type of a binding.
-pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
+pub fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
     let inference = infer_definition_types(db, definition);
     inference.binding_type(definition)
 }
