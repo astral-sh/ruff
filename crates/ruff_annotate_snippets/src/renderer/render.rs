@@ -567,7 +567,7 @@ fn render_snippet_annotations(
             &origin,
             is_primary,
             is_first,
-            false,
+            !(show_snippet || is_cont),
             buffer_msg_line_offset,
         );
         // Put in the spacer between the location and annotated source
