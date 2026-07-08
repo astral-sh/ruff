@@ -291,6 +291,19 @@ pub struct SemanticIndex<'db> {
     /// Map expressions to their corresponding scope.
     scopes_by_expression: ExpressionsScopeMap,
 
+    /// Place loads that use all bindings reachable in their scope (e.g., `Foo`
+    /// in a deferred annotation like `x: Foo`) as opposed to bindings available
+    /// at a specific point in execution (e.g., `x = 1; print(x)`).
+    deferred_place_loads: FrozenSet<ExpressionNodeKey>,
+
+    /// Place loads that are specifically unclassified with respect to the
+    /// bindings that they use.
+    unclassified_place_loads: FrozenSet<ExpressionNodeKey>,
+
+    /// Whether place loads not recorded as deferred in [`SemanticIndex::deferred_place_loads`]
+    /// are considered unclassified rather than eager by default.
+    place_loads_are_unclassified_by_default: bool,
+
     /// Map from a node creating a definition to its definition.
     definitions_by_node: DefinitionsByNode<'db>,
 
@@ -414,6 +427,24 @@ impl<'db> SemanticIndex<'db> {
         E: HasTrackedScope,
     {
         self.scopes_by_expression.try_get(expression)
+    }
+
+    /// Returns whether a place load uses all bindings reachable in its scope.
+    ///
+    /// Returns `None` when the binding state is specifically unclassified
+    /// (ultimately helping callers to fail closed).
+    pub fn place_load_is_deferred(&self, expression: ast::ExprRef<'_>) -> Option<bool> {
+        let expression = ExpressionNodeKey::from(expression);
+
+        if self.deferred_place_loads.contains(&expression) {
+            Some(true)
+        } else if self.place_loads_are_unclassified_by_default
+            || self.unclassified_place_loads.contains(&expression)
+        {
+            None
+        } else {
+            Some(false)
+        }
     }
 
     /// Returns the [`Scope`] of the `expression`'s enclosing scope.
@@ -1073,7 +1104,10 @@ mod tests {
         files::{File, system_path_to_file},
         parsed::ParsedModuleRef,
     };
-    use ruff_python_ast as ast;
+    use ruff_python_ast::{
+        self as ast, PythonVersion,
+        visitor::{Visitor, walk_expr},
+    };
     use ruff_text_size::{Ranged, TextRange};
 
     use super::*;
@@ -1169,6 +1203,120 @@ mod tests {
             declaration.kind(&db),
             DefinitionKind::AnnotatedAssignment(_)
         ));
+    }
+
+    #[test]
+    fn place_load_deferredness() {
+        // A misplaced future import still defers annotations throughout the module.
+        assert_place_load_deferredness(
+            "test.py",
+            PythonVersion::PY313,
+            r#"
+model = load_model()
+handler: Handler
+metadata: Annotated[str, (lambda value=load_metadata(): value)]
+callback: Annotated[str, (lambda: load_from_lambda_body)()]
+member: package.Member
+element: items[key]
+fallback = load_fallback()
+
+from __future__ import annotations
+"#,
+            &[
+                ("load_model", false),
+                ("Handler", true),
+                ("load_metadata", true),
+                ("load_from_lambda_body", false),
+                ("package.Member", true),
+                ("items[key]", true),
+                ("load_fallback", false),
+            ],
+        );
+
+        // Stub annotations are deferred; unannotated assignments require type inference to determine
+        // whether they define type aliases.
+        assert_place_load_classifications(
+            "test.pyi",
+            PythonVersion::PY313,
+            r#"
+default_handler = default_handler_value
+handler: Handler
+fallback_handler = fallback_handler_value
+"#,
+            &[("Handler", true)],
+            &["default_handler_value", "fallback_handler_value"],
+        );
+
+        // Annotations are deferred by default on Python 3.14.
+        assert_place_load_deferredness(
+            "test.py",
+            PythonVersion::PY314,
+            "before = load_before()\nannotation: Annotation\nafter = load_after()",
+            &[
+                ("load_before", false),
+                ("Annotation", true),
+                ("load_after", false),
+            ],
+        );
+    }
+
+    #[test]
+    fn place_load_deferredness_in_declaration_expressions() {
+        assert_place_load_deferredness(
+            "test.py",
+            PythonVersion::PY313,
+            r#"
+def function[T: TypeBound = TypeDefault](argument=function_default): ...
+class Generic[T](Base, metaclass=metaclass): ...
+type Alias = alias_value
+"#,
+            &[
+                ("TypeBound", true),
+                ("TypeDefault", true),
+                ("function_default", false),
+                ("Base", false),
+                ("metaclass", false),
+                ("alias_value", false),
+            ],
+        );
+
+        assert_place_load_deferredness(
+            "test.pyi",
+            PythonVersion::PY313,
+            r#"
+def function(argument=function_default): ...
+class Class(Base, metaclass=metaclass): ...
+type Alias = alias_value
+"#,
+            &[
+                ("function_default", true),
+                ("Base", true),
+                ("metaclass", true),
+                ("alias_value", true),
+            ],
+        );
+    }
+
+    #[test]
+    fn place_load_deferredness_in_comprehensions() {
+        assert_place_load_classifications(
+            "test.py",
+            PythonVersion::PY313,
+            r#"
+from __future__ import annotations
+
+eager = [eager_element for item in eager_iterable]
+deferred: Annotated[int, [deferred_element for item in deferred_iterable]]
+generator = (generator_element for item in generator_iterable)
+"#,
+            &[
+                ("eager_element", false),
+                ("eager_iterable", false),
+                ("deferred_iterable", true),
+                ("generator_iterable", false),
+            ],
+            &["deferred_element", "generator_element"],
+        );
     }
 
     #[test]
@@ -2032,5 +2180,69 @@ match 1:
             .unwrap();
 
         assert!(matches!(binding.kind(&db), DefinitionKind::For(_)));
+    }
+
+    fn assert_place_load_deferredness(
+        path: &str,
+        python_version: PythonVersion,
+        python_source: &str,
+        expected: &[(&str, bool)],
+    ) {
+        assert_place_load_classifications(path, python_version, python_source, expected, &[]);
+    }
+
+    fn assert_place_load_classifications(
+        path: &str,
+        python_version: PythonVersion,
+        python_source: &str,
+        expected: &[(&str, bool)],
+        unclassified: &[&str],
+    ) {
+        let db = TestDbBuilder::new()
+            .with_python_version(python_version)
+            .with_file(path, python_source)
+            .build()
+            .unwrap();
+        let file = system_path_to_file(&db, path).unwrap();
+        let file = program_file(&db, file);
+        let module = parsed_module(&db, file.python_file(&db)).load(&db);
+        let index = semantic_index(&db, file);
+        let mut finder = PlaceLoadFinder::default();
+        finder.visit_body(module.suite());
+
+        let actual = |text: &str| {
+            let expression = finder
+                .expressions
+                .iter()
+                .find(|expression| &python_source[expression.range()] == text)
+                .expect("expected place load in test source");
+            index.place_load_is_deferred(*expression)
+        };
+
+        for &(name, expected) in expected {
+            assert_eq!(actual(name), Some(expected), "{path}: {name}");
+        }
+
+        for &name in unclassified {
+            assert_eq!(actual(name), None, "{path}: {name}");
+        }
+    }
+
+    #[derive(Default)]
+    struct PlaceLoadFinder<'a> {
+        expressions: Vec<ast::ExprRef<'a>>,
+    }
+
+    impl<'a> Visitor<'a> for PlaceLoadFinder<'a> {
+        fn visit_expr(&mut self, expression: &'a ast::Expr) {
+            if let ast::Expr::Name(ast::ExprName { ctx, .. })
+            | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
+            | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) = expression
+                && ctx.is_load()
+            {
+                self.expressions.push(expression.into());
+            }
+            walk_expr(self, expression);
+        }
     }
 }
