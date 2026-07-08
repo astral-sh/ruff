@@ -6,6 +6,7 @@ use ty_python_core::definition::{Definition, DefinitionKind};
 
 use crate::Db;
 use crate::place::{DefinedPlace, Definedness, Place, Provenance, known_module_symbol};
+use crate::types::class::CodeGeneratorKind;
 use crate::types::member::class_member;
 use crate::types::{
     ClassBase, DataclassTransformerParams, KnownClass, KnownInstanceType, KnownUnion, Parameter,
@@ -183,7 +184,11 @@ pub(in crate::types) fn constructor_fields_are_keyword_only(
     db: &dyn Db,
     class: StaticClassLiteral<'_>,
 ) -> bool {
-    !class
+    !is_root_model(db, class)
+}
+
+fn is_root_model(db: &dyn Db, class: StaticClassLiteral<'_>) -> bool {
+    class
         .iter_mro(db, None)
         .filter_map(ClassBase::into_class)
         .any(|base| base.is_known(db, KnownClass::PydanticRootModel))
@@ -387,18 +392,18 @@ fn lax_input_type<'db>(db: &'db dyn Db, field_type: Type<'db>) -> Type<'db> {
 fn lax_input_type_impl<'db>(
     db: &'db dyn Db,
     field_type: Type<'db>,
-    expanding_aliases: &mut FxHashSet<Type<'db>>,
+    expanding_types: &mut FxHashSet<Type<'db>>,
 ) -> Type<'db> {
     if field_type.is_none(db) || matches!(field_type, Type::LiteralValue(_) | Type::SubclassOf(_)) {
         return field_type;
     }
 
     if let Type::TypeAlias(alias) = field_type {
-        if !expanding_aliases.insert(field_type) {
+        if !expanding_types.insert(field_type) {
             return Type::any();
         }
-        let result = lax_input_type_impl(db, alias.value_type(db), expanding_aliases);
-        expanding_aliases.remove(&field_type);
+        let result = lax_input_type_impl(db, alias.value_type(db), expanding_types);
+        expanding_types.remove(&field_type);
         return result;
     }
 
@@ -412,8 +417,12 @@ fn lax_input_type_impl<'db>(
             union
                 .elements(db)
                 .iter()
-                .map(|element| lax_input_type_impl(db, *element, expanding_aliases)),
+                .map(|element| lax_input_type_impl(db, *element, expanding_types)),
         );
+    }
+
+    if let Some(input_type) = root_model_input_type(db, field_type, expanding_types) {
+        return input_type;
     }
 
     let known_class = field_type
@@ -436,7 +445,7 @@ fn lax_input_type_impl<'db>(
             return Type::any();
         };
         let element_type =
-            lax_input_type_impl(db, elements.homogeneous_element_type(db), expanding_aliases);
+            lax_input_type_impl(db, elements.homogeneous_element_type(db), expanding_types);
         return KnownClass::Iterable.to_specialized_instance(db, &[element_type]);
     }
 
@@ -449,7 +458,7 @@ fn lax_input_type_impl<'db>(
         let [key_type, value_type] = specialization.types(db) else {
             return Type::any();
         };
-        let value_type = lax_input_type_impl(db, *value_type, expanding_aliases);
+        let value_type = lax_input_type_impl(db, *value_type, expanding_types);
         return KnownClass::Mapping.to_specialized_instance(db, &[*key_type, value_type]);
     }
 
@@ -513,6 +522,43 @@ fn lax_input_type_impl<'db>(
     };
 
     lax_alias(db, alias)
+}
+
+/// Return the input type accepted for a Pydantic root model field.
+///
+/// This builds a union of the root model instance and its transformed raw root type. For example,
+/// a field annotated with an `IntList` derived from `RootModel[list[int]]` accepts both an
+/// `IntList` instance and an `Iterable[LaxInt]`.
+fn root_model_input_type<'db>(
+    db: &'db dyn Db,
+    field_type: Type<'db>,
+    expanding_types: &mut FxHashSet<Type<'db>>,
+) -> Option<Type<'db>> {
+    let (class, specialization) = field_type.nominal_class(db)?.static_class_literal(db)?;
+    if !is_root_model(db, class) {
+        return None;
+    }
+
+    let Some(field_policy @ CodeGeneratorKind::Pydantic(_)) =
+        CodeGeneratorKind::from_class(db, class.into())
+    else {
+        return Some(Type::any());
+    };
+    let Some(root_field) = class.fields(db, specialization, field_policy).get("root") else {
+        return Some(Type::any());
+    };
+
+    if !expanding_types.insert(field_type) {
+        return Some(Type::any());
+    }
+    let root_input_type = lax_input_type_impl(db, root_field.declared_ty, expanding_types);
+
+    expanding_types.remove(&field_type);
+    Some(UnionType::from_two_elements(
+        db,
+        field_type,
+        root_input_type,
+    ))
 }
 
 /// Return the known module, name, and class literal for an instance's nominal class.
