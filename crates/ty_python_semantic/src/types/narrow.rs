@@ -52,153 +52,9 @@ use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
-enum ContainmentBehavior<'db> {
-    /// Membership compares against the elements yielded by the wrapped type. Callers use
-    /// [`Type::try_iterate`] to determine the types that may be contained.
-    Elementwise(Type<'db>),
-    /// A statically visible `__contains__` defines different membership behavior.
-    Custom,
-    /// No containment behavior can be established from the static type.
-    Unknown,
-}
+mod containment;
 
-impl<'db> Type<'db> {
-    /// Return the containment behavior known for this type.
-    ///
-    /// For subclasses that inherit a known built-in `__contains__`, the stored type is the
-    /// specialized built-in base rather than `self`. This preserves the built-in element type even
-    /// if the subclass overrides `__iter__`.
-    fn containment_behavior(self, db: &'db dyn Db) -> ContainmentBehavior<'db> {
-        let ty = self.resolve_type_alias(db);
-
-        match ty {
-            Type::Union(union) => {
-                // Combine elementwise containment for `not in`, ordinary `in` unions, and unions
-                // reached through wrappers such as type variables. Positive unions that contain
-                // string literals are distributed in `evaluate_expr_in` instead because substring
-                // semantics depend on the value of each literal haystack.
-                let mut builder = UnionBuilder::new(db);
-                let mut has_unknown_behavior = false;
-                for element in union.elements(db) {
-                    match element.containment_behavior(db) {
-                        ContainmentBehavior::Elementwise(membership_type) => {
-                            builder = builder.add(membership_type);
-                        }
-                        ContainmentBehavior::Custom => return ContainmentBehavior::Custom,
-                        ContainmentBehavior::Unknown => has_unknown_behavior = true,
-                    }
-                }
-                if has_unknown_behavior {
-                    ContainmentBehavior::Unknown
-                } else {
-                    ContainmentBehavior::Elementwise(builder.build())
-                }
-            }
-            Type::TypeVar(type_var) => type_var
-                .typevar(db)
-                .bound_or_constraints(db)
-                .map_or(ContainmentBehavior::Unknown, |bound_or_constraints| {
-                    bound_or_constraints.as_type(db).containment_behavior(db)
-                }),
-            Type::NewTypeInstance(newtype) => {
-                newtype.concrete_base_type(db).containment_behavior(db)
-            }
-            Type::TypedDict(_) => ContainmentBehavior::Elementwise(ty),
-            Type::NominalInstance(instance) => {
-                // Walk the MRO until we find either a visible override or a supported built-in
-                // implementation. Returning the built-in base preserves its specialization;
-                // normal member lookup specializes inherited signatures for the subclass instead.
-                for base in instance.class(db).iter_mro(db) {
-                    let class = match base {
-                        ClassBase::Class(class) => class,
-                        ClassBase::Generic | ClassBase::Protocol => continue,
-                        ClassBase::Any
-                        | ClassBase::Dynamic(_)
-                        | ClassBase::Divergent(_)
-                        | ClassBase::TypedDict(_) => {
-                            return ContainmentBehavior::Unknown;
-                        }
-                    };
-                    if matches!(
-                        class.known(db),
-                        Some(
-                            KnownClass::List
-                                | KnownClass::Set
-                                | KnownClass::FrozenSet
-                                | KnownClass::Dict
-                                | KnownClass::Tuple
-                                | KnownClass::Range
-                        )
-                    ) {
-                        return ContainmentBehavior::Elementwise(Type::instance(db, class));
-                    }
-                    if !class
-                        .own_class_member(db, None, "__contains__")
-                        .is_undefined()
-                    {
-                        return ContainmentBehavior::Custom;
-                    }
-                }
-                if instance.class(db).is_final(db) {
-                    ContainmentBehavior::Elementwise(ty)
-                } else {
-                    ContainmentBehavior::Unknown
-                }
-            }
-            _ => ContainmentBehavior::Unknown,
-        }
-    }
-
-    fn elementwise_membership_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        match self.containment_behavior(db) {
-            ContainmentBehavior::Elementwise(membership_type) => Some(membership_type),
-            ContainmentBehavior::Custom | ContainmentBehavior::Unknown => None,
-        }
-    }
-}
-
-/// Maximum haystack length for which we synthesize a negative type per character.
-const MAX_STRING_MEMBERSHIP_EXCLUSIONS: usize = 128;
-
-/// Narrow membership in a known string literal using substring semantics.
-fn narrow_string_membership<'db>(
-    db: &'db dyn Db,
-    lhs_ty: Type<'db>,
-    haystack: &str,
-    is_contained: bool,
-) -> Option<Type<'db>> {
-    let lhs_ty = lhs_ty.resolve_type_alias(db);
-    let flattened_lhs_ty = lhs_ty.flatten_typevars(db);
-    let keep = |element: &Type<'db>| {
-        let element = element.resolve_type_alias(db);
-        if let Some(needle) = element.as_string_literal() {
-            haystack.contains(needle.value(db)) == is_contained
-        } else {
-            !(is_contained && element.is_disjoint_from(db, KnownClass::Str.to_instance(db)))
-        }
-    };
-
-    let mut narrowed = match flattened_lhs_ty {
-        Type::Union(union) => union.filter(db, keep),
-        _ if keep(&flattened_lhs_ty) => flattened_lhs_ty,
-        _ => Type::Never,
-    };
-
-    if !is_contained
-        && haystack
-            .chars()
-            .nth(MAX_STRING_MEMBERSHIP_EXCLUSIONS)
-            .is_none()
-    {
-        let mut builder = IntersectionBuilder::new(db).add_positive(narrowed);
-        for character in haystack.chars() {
-            builder = builder.add_negative(Type::single_char_string_literal(db, character));
-        }
-        narrowed = builder.build();
-    }
-
-    (narrowed != flattened_lhs_ty).then_some(narrowed)
-}
+use self::containment::{elements_of, narrow_string_membership};
 
 /// Return the type constraints that `test` would place on `symbol` if true and false.
 ///
@@ -3006,7 +2862,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             let narrowed = builder.build();
             return (narrowed != lhs_ty).then_some(narrowed);
         }
-        let membership_type = rhs_ty.elementwise_membership_type(self.db)?;
+        let membership_type = elements_of(self.db, rhs_ty)?;
         let iterable = membership_type.try_iterate(self.db).ok()?;
 
         if iterable
@@ -3097,7 +2953,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         if let Some(haystack) = rhs_ty.resolve_type_alias(self.db).as_string_literal() {
             return narrow_string_membership(self.db, lhs_ty, haystack.value(self.db), false);
         }
-        let membership_type = rhs_ty.elementwise_membership_type(self.db)?;
+        let membership_type = elements_of(self.db, rhs_ty)?;
         let iterable = membership_type.try_iterate(self.db).ok()?;
         let fixed_length = iterable.as_fixed_length()?;
         let mut builder = IntersectionBuilder::new(self.db);
