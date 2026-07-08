@@ -845,12 +845,22 @@ mod dto_surface_tests {
         "writes",
     ];
 
-    /// The subset of [`FUNCTION_DTO`] that `ogar-from-ruff::lift_actions`
-    /// consumes to build `ActionDef` (effect slots `reads`/`writes`/`calls`/
-    /// `raises`, guard source `guarded_writes`) and `KausalSpec`
-    /// (`constrains`/`onchange`). Renaming or removing one of these is a
-    /// cross-repo consumer break — extend consciously, never silently.
-    /// (`traverses` is deliberately NOT in the feed today.)
+    /// The subset of [`FUNCTION_DTO`] with a downstream consumer that a
+    /// rename/removal would break — extend consciously, never silently.
+    /// TWO consumers on TWO sides of the repo boundary (baton audit, odoo-rs
+    /// council R2, 2026-07-07 — do not conflate them):
+    ///
+    /// - **cross-repo**: `ogar-from-ruff::lift_actions` builds `ActionDef`
+    ///   from the effect slots `reads`/`writes`/`calls`/`raises` and
+    ///   `KausalSpec` from `constrains`/`onchange`. It does NOT read
+    ///   `guarded_writes`.
+    /// - **same-repo**: [`crate::recipe::classify`] reads `guarded_writes`
+    ///   (the J1 fact, the `Default` centroid split) plus the effect slots.
+    ///
+    /// So `guarded_writes` is pinned FOR the recipe classifier, not for the
+    /// `ActionDef` feed the constant's name suggests — a reader assuming OGAR's
+    /// `ActionDef` carries a guard-write annotation would be wrong.
+    /// (`traverses` is deliberately in NEITHER consumer today.)
     const ACTIONDEF_FEED_FUNCTION: &[&str] = &[
         "calls",
         "constrains",
