@@ -481,6 +481,26 @@ def _(
     reveal_type(a10)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
 ```
 
+### Variadic arguments require variadic aliases
+
+An unpacked type variable tuple or arbitrary-length tuple cannot be used to specialize a
+non-variadic alias.
+
+```py
+from typing import TypeVar, TypeVarTuple
+
+T = TypeVar("T")
+Ts = TypeVarTuple("Ts")
+
+Alias = tuple[int, T]
+
+# error: [invalid-type-form] "`Unpack` can only be used with a fixed tuple type in this context"
+InvalidTypeVarTuple = Alias[*Ts]
+
+# error: [invalid-type-form] "`Unpack` can only be used with a fixed tuple type in this context"
+InvalidUnboundedTuple = Alias[*tuple[float, ...]]
+```
+
 ### Unpacked tuple type arguments
 
 ```py
@@ -532,6 +552,28 @@ def _(
     reveal_type(f2)  # revealed: tuple[*tuple[int, ...], str]
     reveal_type(s1)  # revealed: tuple[int, *tuple[int, ...]]
     reveal_type(s2)  # revealed: tuple[str, *tuple[int, ...]]
+```
+
+### Type variable tuples cannot be split
+
+Unlike an arbitrary-length tuple, a type variable tuple cannot be split to satisfy a fixed type
+parameter before or after another type variable tuple.
+
+```py
+from typing import TypeVar, TypeVarTuple
+
+T = TypeVar("T")
+Ts1 = TypeVarTuple("Ts1")
+Ts2 = TypeVarTuple("Ts2")
+
+Prefix = tuple[T, *Ts1]
+Suffix = tuple[*Ts1, T]
+
+# error: [invalid-type-form] "A TypeVarTuple cannot be split to provide a fixed type argument"
+InvalidPrefix = Prefix[*Ts2]
+
+# error: [invalid-type-form] "A TypeVarTuple cannot be split to provide a fixed type argument"
+InvalidSuffix = Suffix[*Ts2]
 ```
 
 ### Variadic substitutions
