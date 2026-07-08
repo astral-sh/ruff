@@ -109,10 +109,18 @@ impl Member {
         self.as_instance_attribute() == Some(name)
     }
 
-    /// Returns the name of the first attribute segment, e.g. `y` in `x.y.z` or `x.y[0]`.
-    pub fn first_attribute_name(&self) -> Option<&str> {
-        let first_segment = self.expression().segments().next()?;
-        (first_segment.kind == SegmentKind::Attribute).then_some(first_segment.text)
+    /// Returns the symbol the member access is performed on, e.g. `x` in `x.y.z`.
+    pub(crate) fn symbol_name(&self) -> &str {
+        self.expression().symbol_name()
+    }
+
+    /// Returns the leading attribute segments, e.g. `y`, `z` for `x.y.z` and `y` for
+    /// `x.y[0].z`.
+    pub fn leading_attribute_segments(&self) -> impl Iterator<Item = &str> {
+        self.expression()
+            .segments()
+            .take_while(|segment| segment.kind == SegmentKind::Attribute)
+            .map(|segment| segment.text)
     }
 
     /// Return `Some(<ATTRIBUTE>)` if the place expression is an instance attribute.
@@ -547,6 +555,10 @@ pub(super) struct MemberTableBuilder {
 }
 
 impl MemberTableBuilder {
+    pub(super) fn members(&self) -> std::slice::Iter<'_, Member> {
+        self.table.iter()
+    }
+
     pub(super) fn member_id<'a>(
         &self,
         member: impl Into<MemberExprRef<'a>>,

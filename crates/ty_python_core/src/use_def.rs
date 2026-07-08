@@ -634,6 +634,8 @@ static ALWAYS_UNDECLARED_DECLARATIONS: LazyLock<Declarations> =
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct DefinitionUsage {
     is_used: bool,
+    /// Only meaningful for unaliased multipart imports (`import a.b`), stays
+    /// `false` for every other definition.
     is_multipart_import_used: bool,
 }
 

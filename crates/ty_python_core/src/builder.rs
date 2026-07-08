@@ -677,22 +677,31 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             return;
         };
 
-        let mut appended_to_lazy_capture = false;
+        let mut capturing_scopes = SmallVec::<[FileScopeId; 1]>::new();
         for capture in captures {
             if capture.laziness.is_lazy() {
                 capture.binding_definition_ids.push(definition_id);
-                appended_to_lazy_capture = true;
+                capturing_scopes.push(capture.nested_scope);
             }
         }
 
         // A dotted use recorded before this import couldn't have deferred its path,
-        // so credit the import without submodule matching.
-        if appended_to_lazy_capture
-            && self
-                .unaliased_multipart_import_name_of(current_scope, definition_id)
-                .is_some()
+        // so match the import against the capturing scope's member places instead.
+        if !capturing_scopes.is_empty()
+            && let Some(imported_name) =
+                self.unaliased_multipart_import_name_of(current_scope, definition_id)
+            && let Some((_, submodule_path)) = imported_name.split_once('.')
         {
-            self.use_def_maps[current_scope].mark_multipart_import_definition_used(definition_id);
+            let is_used = capturing_scopes.into_iter().any(|capturing_scope| {
+                self.place_tables[capturing_scope].members().any(|member| {
+                    member.symbol_name() == name.as_str()
+                        && dotted_starts_with(member.leading_attribute_segments(), submodule_path)
+                })
+            });
+            if is_used {
+                self.use_def_maps[current_scope]
+                    .mark_multipart_import_definition_used(definition_id);
+            }
         }
     }
 
