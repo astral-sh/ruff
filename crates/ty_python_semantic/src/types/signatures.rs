@@ -1926,6 +1926,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
+        if !(self.relation.is_assignability() && target.parameters.is_gradual())
+            && let Some(reserved_name) = source
+                .parameters
+                .reserved_keyword_names()
+                .find(|name| target.parameters.accepts_keyword_name(name))
+        {
+            if let Some(context) = self.report_context() {
+                context.push(ErrorContext::ParameterMustAcceptKeywordArguments {
+                    source_name: Some(reserved_name.clone()),
+                    target_name: reserved_name.clone(),
+                });
+            }
+            return self.never();
+        }
+
         // Fast path: if the target accepts positional calls that the source cannot accept, reject
         // without checking return types or individual parameter types. The full parameter
         // comparison below reaches the same result, but only after doing work that is expensive for
@@ -3896,6 +3911,22 @@ impl<'db> Parameters<'db> {
                 .reserved_keyword_name(name)
                 .map(|reserved_name| (index, parameter, reserved_name))
         })
+    }
+
+    /// Iterate all keyword names rejected by this parameter list.
+    fn reserved_keyword_names(&self) -> impl Iterator<Item = &Name> {
+        self.iter().flat_map(Parameter::reserved_keyword_names)
+    }
+
+    /// Returns whether callers can provide `name` as a keyword argument.
+    fn accepts_keyword_name(&self, name: &str) -> bool {
+        if self.is_top() || self.reserved_keyword_by_name(name).is_some() {
+            return false;
+        }
+
+        self.keyword_by_name(name)
+            .or_else(|| self.keyword_variadic())
+            .is_some_and(|(_, parameter)| parameter.annotated_type() != Type::Never)
     }
 
     /// Return the variadic parameter (`*args`), if any, and its index, or `None`.

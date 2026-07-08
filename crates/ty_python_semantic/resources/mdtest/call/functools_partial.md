@@ -942,7 +942,7 @@ python-version = "3.14"
 
 ```py
 from functools import Placeholder as _, partial
-from typing import Callable, ParamSpec, TypeVar, overload
+from typing import Callable, ParamSpec, Protocol, TypeVar, overload
 
 def combine(left: int, middle: str, right: float) -> tuple[int, str, float]:
     return left, middle, right
@@ -961,6 +961,12 @@ def accepts_extra(value: int, bound: str, **kwargs: object) -> None:
 with_extra = partial(accepts_extra, _, "bound")
 with_extra(1, other=2)
 with_extra(1, value=2)  # error: [positional-only-parameter-as-kwarg]
+
+class AcceptsExtra(Protocol):
+    def __call__(self, value: int, /, **kwargs: object) -> None: ...
+
+callback: AcceptsExtra = with_extra  # error: [invalid-assignment]
+gradual_callback: Callable[..., None] = with_extra
 
 filled_extra = partial(with_extra, 1)
 filled_extra(other=2)
