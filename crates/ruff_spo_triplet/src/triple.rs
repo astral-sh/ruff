@@ -21,7 +21,15 @@ use serde::{Deserialize, Serialize};
 /// This mirrors `lance_graph::graph::spo::odoo_ontology::OntologyTriple`
 /// field-for-field so the ndjson this crate writes loads into that store
 /// with no transform.
+/// `deny_unknown_fields`: the on-disk shape is exactly `{s, p, o, f, c}` for
+/// every frontend (Python/Odoo, Ruby/OpenProject, C#, C++). A corpus line
+/// carrying an accidental extra field is harvester schema drift — reject it
+/// loud rather than silently drop the field and leave downstream consumers
+/// operating on a truncated triple. The check belongs on the shared carrier so
+/// every frontend gets it, not re-implemented per consumer (odoo-rs codex P2 on
+/// odoo-rs#28, which retired odoo-rs's local `deny_unknown_fields` copy).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Triple {
     /// Subject IRI, e.g. `odoo:account_move.amount_total`.
     pub s: String,

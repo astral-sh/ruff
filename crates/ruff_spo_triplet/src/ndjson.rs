@@ -169,6 +169,19 @@ mod tests {
         );
     }
 
+    /// Strict-shape enforcement: a line carrying the expected `s/p/o/f/c`
+    /// fields PLUS an accidental extra field must fail loud, not silently drop
+    /// the extra field (odoo-rs codex P2 on odoo-rs#28 — `deny_unknown_fields`
+    /// belongs on the shared carrier so every frontend gets it). Distinct from
+    /// `unknown_predicate_is_rejected`: that guards the predicate *value*; this
+    /// guards the JSON *field* shape.
+    #[test]
+    fn extra_field_is_rejected() {
+        let text = "{\"s\":\"a\",\"p\":\"rdf:type\",\"o\":\"ogit:ObjectType\",\"f\":1.0,\"c\":1.0,\"x\":42}\n";
+        let err = from_ndjson(text).expect_err("an unexpected extra field must fail loud");
+        assert_eq!(err.line, 1);
+    }
+
     /// Every canonical predicate must parse cleanly — guards against
     /// `from_str` drifting away from the `to_ndjson` writer. Iterates the
     /// full `Predicate::ALL` surface (7 core + 27 `OpenProject` AR-shape).
