@@ -4,13 +4,7 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
-use crate::{
-    FixAvailability, Locator, Violation,
-    checkers::ast::LintContext,
-    codes::Rule,
-    noqa::{Code, Directive},
-    rule_redirects::get_redirect_target,
-};
+use crate::{FixAvailability, Locator, Violation, checkers::ast::LintContext, noqa::Directive};
 
 /// ## What it does
 ///
@@ -93,9 +87,15 @@ pub(crate) fn noqa_comment(
         return;
     }
 
-    // Skip cases with unknown codes, external or otherwise.
+    // Avoid migrating comments that are shared with another tool.
     if let Directive::Codes(codes) = directive
-        && !codes.iter().all(is_valid_code)
+        && codes.iter().any(|code| {
+            context
+                .settings()
+                .external
+                .iter()
+                .any(|prefix| code.as_str().starts_with(prefix))
+        })
     {
         return;
     }
@@ -122,10 +122,4 @@ pub(crate) fn noqa_comment(
         codes.range(),
     );
     diagnostic.set_fix(Fix::safe_edit(edit));
-}
-
-fn is_valid_code(code: &Code) -> bool {
-    let code = code.as_str();
-    let redirect = get_redirect_target(code).unwrap_or(code);
-    Rule::from_code(redirect).is_ok()
 }

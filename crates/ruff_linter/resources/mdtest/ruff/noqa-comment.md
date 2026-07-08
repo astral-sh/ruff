@@ -116,10 +116,52 @@ help: Use `ruff:file-ignore` instead
   |
 ```
 
-### A single invalid code disables the rule
+### Unknown codes do not disable the rule
+
+In case the unknown code is a typo rather than an intentionally external code, we emit both
+`invalid-rule-code` and `noqa-comment`:
+
+```toml
+[lint]
+preview = true
+select = ["noqa-comment", "unused-noqa", "invalid-rule-code", "F401"]
+```
 
 ```py
-# ruff: noqa: UNK001
+# error: [noqa-comment]
+# snapshot: invalid-rule-code
+import math  # noqa: F401, UNK001
+```
+
+```snapshot
+error[RUF102]: Invalid rule code in `# noqa`: UNK001
+ --> src/mdtest_snippet.py:3:28
+  |
+3 | import math  # noqa: F401, UNK001
+  |                            ^^^^^^
+  |
+help: Add non-Ruff rule codes to the `lint.external` configuration option
+help: Remove the rule code `UNK001`
+  |
+2 | # snapshot: invalid-rule-code
+  - import math  # noqa: F401, UNK001
+3 + import math  # noqa: F401
+  |
+```
+
+### External codes disable the rule
+
+However, if the code is intentionally marked as `external`, we *do* disable the rule:
+
+```toml
+[lint]
+preview = true
+select = ["noqa-comment", "unused-noqa", "invalid-rule-code", "F401"]
+external = ["EXT"]
+```
+
+```py
+import math  # noqa: F401, EXT001
 ```
 
 ### Any unmatched code disables the rule
