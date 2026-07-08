@@ -275,6 +275,19 @@ fn section_body_continuation<'a>(
         return None;
     }
 
+    // Returns and yields have no item syntax that distinguishes an aligned body from prose
+    // following an empty section.
+    if leading_blank_lines > 0
+        && next_line.raw_indent <= header.indent
+        && item_indent.is_none()
+        && matches!(
+            header.kind,
+            HeaderKind::Structured(SectionKind::Returns | SectionKind::Yields)
+        )
+    {
+        return None;
+    }
+
     // A blank line ends a parameter section when the following aligned text is
     // not another parameter item.
     if leading_blank_lines > 0
@@ -349,7 +362,10 @@ fn section_item_indent(header: SectionHeader, line: ParsedLine<'_>) -> Option<Te
         HeaderKind::Structured(
             SectionKind::Parameters | SectionKind::KeywordArguments | SectionKind::OtherParameters,
         ) => parse_parameter(trimmed).is_some(),
-        HeaderKind::Structured(_) => false,
+        HeaderKind::Structured(SectionKind::Attributes | SectionKind::Raises) => {
+            split_once_unbracketed_colon(trimmed).is_some_and(|(name, _)| !name.trim().is_empty())
+        }
+        HeaderKind::Structured(SectionKind::Returns | SectionKind::Yields) => !trimmed.is_empty(),
         HeaderKind::Container => false,
     };
     is_item.then_some(line.raw_indent)
@@ -402,8 +418,11 @@ impl HeaderKind {
             "other args" | "other arguments" | "other parameters" => {
                 Self::Structured(SectionKind::OtherParameters)
             }
-            "attributes" | "return" | "returns" | "yield" | "yields" | "raise" | "raises"
-            | "attention" | "caution" | "danger" | "error" | "example" | "examples" | "hint"
+            "attributes" => Self::Structured(SectionKind::Attributes),
+            "return" | "returns" => Self::Structured(SectionKind::Returns),
+            "yield" | "yields" => Self::Structured(SectionKind::Yields),
+            "raise" | "raises" => Self::Structured(SectionKind::Raises),
+            "attention" | "caution" | "danger" | "error" | "example" | "examples" | "hint"
             | "important" | "methods" | "note" | "notes" | "references" | "see also" | "tip"
             | "todo" | "todos" | "warning" | "warnings" | "warns" => Self::Container,
             _ => return None,
@@ -953,7 +972,7 @@ Args:
     }
 
     #[test]
-    fn returns_parameter_section_kinds_in_source_order() {
+    fn returns_structured_section_kinds_in_source_order() {
         let raw = "\
 Args:
     value: Documentation.
@@ -974,6 +993,7 @@ Returns:
                 SectionKind::Parameters,
                 SectionKind::KeywordArguments,
                 SectionKind::OtherParameters,
+                SectionKind::Returns,
             ]
         );
     }
@@ -982,8 +1002,8 @@ Returns:
     fn returns_section_body_range_and_header_indent() {
         let raw = "    Args:
         value: Documentation.
-Returns:
-    bool: Result.";
+Methods:
+    helper: Method documentation.";
         let lines = parsed_lines(raw);
         let sections = sections(&lines)
             .map(|section| {
@@ -1007,6 +1027,28 @@ Returns:
                 vec!["        value: Documentation."],
                 "    Args:\n        value: Documentation.",
                 TextSize::new(4),
+            )]
+        );
+    }
+
+    #[test]
+    fn ends_populated_return_section_at_aligned_prose() {
+        let raw = "\
+Returns:
+    bool: Result.
+Additional details.";
+        let lines = parsed_lines(raw);
+        let sections = sections(&lines)
+            .map(|section| (section.kind, &raw[section.range]))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            sections,
+            vec![(
+                SectionKind::Returns,
+                "\
+Returns:
+    bool: Result.",
             )]
         );
     }
