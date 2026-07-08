@@ -207,6 +207,17 @@ class WithDeclaredAttribute(SetAttrBase):
 def g(obj: WithDeclaredAttribute) -> None:
     obj.status = 1
     reveal_type(obj.status)  # revealed: int | str
+    if hasattr(obj, "other"):
+        obj.status = 1
+        reveal_type(obj.status)  # revealed: int | str
+
+class WithoutSetAttr:
+    status: int | str
+
+def h(obj: WithoutSetAttr) -> None:
+    if hasattr(obj, "other"):
+        obj.status = 1
+        reveal_type(obj.status)  # revealed: Literal[1]
 ```
 
 ## Subscript

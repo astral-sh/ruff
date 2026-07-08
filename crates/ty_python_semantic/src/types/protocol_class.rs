@@ -337,6 +337,16 @@ impl<'db> ProtocolInterface<'db> {
     }
 
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+        self.instance_member_with_policy(db, name, MemberLookupPolicy::default())
+    }
+
+    /// Resolve an interface member, applying `policy` when a missing member falls back to `object`.
+    pub(super) fn instance_member_with_policy(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
         self.member_by_name(db, name)
             .map(|member| {
                 let capabilities = member.capabilities(db);
@@ -351,7 +361,7 @@ impl<'db> ProtocolInterface<'db> {
                     qualifiers: member.qualifiers(),
                 }
             })
-            .unwrap_or_else(|| Type::object().member(db, name))
+            .unwrap_or_else(|| Type::object().member_lookup_with_policy(db, name.into(), policy))
     }
 
     pub(super) fn recursive_type_normalized_impl(

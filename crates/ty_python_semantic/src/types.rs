@@ -2746,9 +2746,11 @@ impl<'db> Type<'db> {
             }),
             // TODO: Once `to_meta_type` for the synthesized protocol is fully implemented, this handling should be removed.
             Type::ProtocolInstance(ProtocolInstanceType {
-                inner: Protocol::Synthesized(_),
+                inner: Protocol::Synthesized(synthesized),
                 ..
-            }) => self.instance_member(db, &name),
+            }) => synthesized
+                .interface()
+                .instance_member_with_policy(db, &name, policy),
 
             Type::LiteralValue(literal) if name == "__len__" => {
                 if let Some(length) = match literal.kind() {
