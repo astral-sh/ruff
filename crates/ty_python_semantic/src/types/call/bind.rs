@@ -34,7 +34,7 @@ use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, PathBound, PathBounds, Solutions,
 };
-use crate::types::dedicated::pydantic::ConfigBoolean;
+use crate::types::dedicated::pydantic::{self, ConfigBoolean};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_DATACLASS,
     MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
@@ -1686,7 +1686,7 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
-                    function @ Type::FunctionLiteral(_)
+                    function @ Type::FunctionLiteral(function_type)
                         if dataclass_field_specifiers.contains(&function) =>
                     {
                         // Helper to get the type of a keyword argument by name. We first try to get it from
@@ -1708,9 +1708,13 @@ impl<'db> Bindings<'db> {
                             })
                         };
 
-                        let has_default_value = get_argument_type("default", false).is_some()
-                            || get_argument_type("default_factory", false).is_some()
-                            || get_argument_type("factory", false).is_some();
+                        let default = get_argument_type("default", false);
+                        let has_default_value = get_argument_type("default_factory", false)
+                            .is_some()
+                            || get_argument_type("factory", false).is_some()
+                            || default.is_some_and(|default| {
+                                pydantic::field_provides_default(db, function_type, default)
+                            });
 
                         let init = get_argument_type("init", true);
                         let kw_only = get_argument_type("kw_only", true);

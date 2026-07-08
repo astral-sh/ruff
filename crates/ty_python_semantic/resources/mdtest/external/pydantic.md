@@ -92,8 +92,7 @@ class Person(BaseModel):
     name: str = Field(..., max_length=255)
 
 Person(name="Alice")
-# TODO: this should be an error
-Person()
+Person()  # error: [missing-argument]
 ```
 
 ## Strict and lax mode
