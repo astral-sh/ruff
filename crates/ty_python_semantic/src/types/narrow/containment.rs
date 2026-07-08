@@ -47,6 +47,38 @@ fn containment_behavior<'db>(db: &'db dyn Db, ty: Type<'db>) -> ContainmentBehav
                 containment_behavior(db, bound_or_constraints.as_type(db))
             }),
         Type::NewTypeInstance(newtype) => containment_behavior(db, newtype.concrete_base_type(db)),
+        Type::Intersection(intersection) => {
+            // Preserve the narrowing already supported on main for unsimplified intersections
+            // such as `Iterable[T] & tuple[object, ...]`. Replacing the component that establishes
+            // containment with its stored iteration type while retaining the unknown component
+            // lets `try_iterate` recover `T`. This is a temporary workaround for the intersection
+            // not simplifying to `tuple[T, ...]`; remove this arm once that simplification is
+            // implemented:
+            // https://github.com/astral-sh/ty/issues/3890
+            // The generic intersection work in the following PR is intended to support that fix:
+            // https://github.com/astral-sh/ruff/pull/26365
+            let mut has_elements_of = false;
+            let mut has_custom_behavior = false;
+            let elements_of =
+                intersection.map_positive(db, |element| match containment_behavior(db, *element) {
+                    ContainmentBehavior::ElementsOf(elements_of) => {
+                        has_elements_of = true;
+                        elements_of
+                    }
+                    ContainmentBehavior::Custom => {
+                        has_custom_behavior = true;
+                        *element
+                    }
+                    ContainmentBehavior::Unknown => *element,
+                });
+            if has_custom_behavior {
+                ContainmentBehavior::Custom
+            } else if has_elements_of {
+                ContainmentBehavior::ElementsOf(elements_of)
+            } else {
+                ContainmentBehavior::Unknown
+            }
+        }
         Type::TypedDict(_) => ContainmentBehavior::ElementsOf(ty),
         Type::NominalInstance(instance) => {
             // Walk the MRO until we find either a visible override or a supported built-in

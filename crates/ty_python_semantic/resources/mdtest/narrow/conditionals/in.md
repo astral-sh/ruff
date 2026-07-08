@@ -851,9 +851,13 @@ def custom_container_union(
 
 ## Intersection containers
 
-Until these intersections can be simplified to a concrete container with the correct element type,
-membership narrowing remains conservative even if one component has known containment behavior. For
-example, `Iterable[Literal[1]] & tuple[object, ...]` does not narrow the tested value.
+### A component with known containment
+
+After the `isinstance` check, `values` has type `Iterable[Literal[1]] & tuple[object, ...]`. Until
+[this intersection can be simplified](https://github.com/astral-sh/ty/issues/3890) to
+`tuple[Literal[1], ...]`, membership narrowing preserves the behavior from before containment
+semantics were checked: the `tuple` component establishes that membership compares against its
+elements, while the `Iterable` component constrains those elements to `Literal[1]`.
 
 ```py
 from collections.abc import Iterable
@@ -862,11 +866,59 @@ from typing import Literal, final
 @final
 class Token: ...
 
-def unsimplified_container_intersection(
+def tuple_component_establishes_containment(
     value: Token | Literal[1],
     values: Iterable[Literal[1]],
 ) -> None:
     if isinstance(values, tuple) and value in values:
+        reveal_type(value)  # revealed: Literal[1]
+```
+
+### No component with known containment
+
+Narrowing an iterable to `Sized` says nothing about how it implements membership. It could still be
+an instance of a class with a custom `__contains__` that accepts `Token`, so the positive branch
+must preserve both union members.
+
+```py
+from collections.abc import Iterable, Sized
+from typing import Literal, final
+
+@final
+class Token: ...
+
+def unrelated_protocol_does_not_establish_containment(
+    value: Token | Literal[1],
+    values: Iterable[Literal[1]],
+) -> None:
+    if isinstance(values, Sized) and value in values:
+        reveal_type(value)  # revealed: Token | Literal[1]
+```
+
+### A component with custom containment
+
+`CustomContainsItems` shows that this intersection can be inhabited by a class whose MRO selects the
+custom `__contains__` before `list.__contains__`. The order of intersection components does not
+describe the runtime MRO, so the visible custom implementation prevents narrowing.
+
+```py
+from typing import Literal, final
+
+@final
+class Token: ...
+
+class ContainsEverything:
+    def __contains__(self, value: object) -> bool:
+        return True
+
+class LiteralItems(list[Literal[1]]): ...
+class CustomContainsItems(ContainsEverything, LiteralItems): ...
+
+def custom_containment_component_prevents_narrowing(
+    value: Token | Literal[1],
+    values: LiteralItems,
+) -> None:
+    if isinstance(values, ContainsEverything) and value in values:
         reveal_type(value)  # revealed: Token | Literal[1]
 ```
 
