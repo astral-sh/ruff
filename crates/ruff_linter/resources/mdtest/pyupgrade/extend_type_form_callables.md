@@ -3,7 +3,7 @@
 ## Basic examples
 
 ```toml
-target-version = "py39"
+target-version = "py310"
 
 [lint]
 select = ["UP007"]
@@ -17,14 +17,14 @@ from __future__ import annotations
 from typing import Union
 from foo import my_custom_cast
 
-# This SHOULD flag (position 1 is checked)
+# This SHOULD flag and provide a fix (position 1 is checked)
 my_custom_cast("hello", Union[str, int])  # snapshot: non-pep604-annotation-union
 
-# This SHOULD flag (keyword type_arg is checked)
+# This SHOULD flag and provide a fix (keyword type_arg is checked)
 my_custom_cast("hello", type_arg=Union[str, int])  # snapshot: non-pep604-annotation-union
 
-# This should NOT flag (position 0 is not checked)
-my_custom_cast(Union[str, int], "hello")
+# This WILL flag (because of py310) but should NOT provide a fix (position 0 is not checked)
+my_custom_cast(Union[str, int], "hello")  # snapshot: non-pep604-annotation-union
 ```
 
 ```snapshot
@@ -36,12 +36,11 @@ error[UP007]: Use `X | Y` for type annotations
   |
 help: Convert to `X | Y`
   |
-5 | # This SHOULD flag (position 1 is checked)
+5 | # This SHOULD flag and provide a fix (position 1 is checked)
   - my_custom_cast("hello", Union[str, int])  # snapshot: non-pep604-annotation-union
 6 + my_custom_cast("hello", str | int)  # snapshot: non-pep604-annotation-union
 7 |
   |
-note: This is an unsafe fix and may change runtime behavior
 
 
 error[UP007]: Use `X | Y` for type annotations
@@ -52,10 +51,18 @@ error[UP007]: Use `X | Y` for type annotations
   |
 help: Convert to `X | Y`
    |
-8  | # This SHOULD flag (keyword type_arg is checked)
+8  | # This SHOULD flag and provide a fix (keyword type_arg is checked)
    - my_custom_cast("hello", type_arg=Union[str, int])  # snapshot: non-pep604-annotation-union
 9  + my_custom_cast("hello", type_arg=str | int)  # snapshot: non-pep604-annotation-union
 10 |
    |
-note: This is an unsafe fix and may change runtime behavior
+
+
+error[UP007]: Use `X | Y` for type annotations
+  --> src/mdtest_snippet.py:12:16
+   |
+12 | my_custom_cast(Union[str, int], "hello")  # snapshot: non-pep604-annotation-union
+   |                ^^^^^^^^^^^^^^^
+   |
+help: Convert to `X | Y`
 ```
