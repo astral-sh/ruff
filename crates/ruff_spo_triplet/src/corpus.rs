@@ -244,8 +244,8 @@ mod tests {
 
     /// The Odoo declarative-write arm: `(field, emitted_by, method)` is
     /// INVERTED (field subject, method object) and must fold into the
-    /// method's `writes` — without it, an emitted_by-style corpus (e.g.
-    /// odoo-rs slice_2: 388 emitted_by rows, zero writes_field) regroups
+    /// method's `writes` — without it, an `emitted_by`-style corpus (e.g.
+    /// odoo-rs `slice_2`: 388 `emitted_by` rows, zero `writes_field`) regroups
     /// write-blind and `recipe::classify` misreads every compute as
     /// Guard/Observe/Empty.
     #[test]

@@ -858,7 +858,7 @@ mod dto_surface_tests {
     ///   (the J1 fact, the `Default` centroid split) plus the effect slots.
     ///
     /// So `guarded_writes` is pinned FOR the recipe classifier, not for the
-    /// ActionDef feed the constant's name suggests — a reader assuming OGAR's
+    /// `ActionDef` feed the constant's name suggests — a reader assuming OGAR's
     /// `ActionDef` carries a guard-write annotation would be wrong.
     /// (`traverses` is deliberately in NEITHER consumer today.)
     const ACTIONDEF_FEED_FUNCTION: &[&str] = &[
