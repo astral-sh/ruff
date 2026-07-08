@@ -1,5 +1,5 @@
 use super::context::InferContext;
-use super::{Signature, Type, TypeContext, UnionType};
+use super::{ClassType, Signature, Type, TypeContext, UnionType};
 use crate::Db;
 use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
@@ -29,10 +29,21 @@ enum ReflectedMethodPriority {
 /// while a false positive could discard a valid normal-method result.
 fn has_exact_runtime_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
-        Type::LiteralValue(_) => true,
+        Type::ClassLiteral(_) | Type::LiteralValue(_) => true,
         Type::NominalInstance(instance) => instance.class(db).is_final(db),
         Type::TypeAlias(alias) => has_exact_runtime_class(db, alias.value_type(db)),
         _ => false,
+    }
+}
+
+/// Returns the nominal runtime class used to dispatch binary operators.
+///
+/// Instances dispatch through their nominal class, while class objects dispatch through their
+/// metaclass.
+fn operator_dispatch_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassType<'db>> {
+    match ty {
+        Type::ClassLiteral(class) => class.metaclass(db).to_class_type(db),
+        _ => ty.nominal_class(db),
     }
 }
 
@@ -59,10 +70,11 @@ fn reflected_method_priority<'db>(
         return ReflectedMethodPriority::Never;
     }
 
-    if let (Some(left_class), Some(right_class)) =
-        (left_ty.nominal_class(db), right_ty.nominal_class(db))
-        && left_class.class_literal(db) != right_class.class_literal(db)
-        && right_class.is_subclass_of(db, left_class)
+    if let (Some(left_class), Some(right_class)) = (
+        operator_dispatch_class(db, left_ty),
+        operator_dispatch_class(db, right_ty),
+    ) && left_class.class_literal(db) != right_class.class_literal(db)
+        && right_class.is_subtype_of_class_literal(db, left_class.class_literal(db))
     {
         if has_exact_runtime_class(db, left_ty) {
             ReflectedMethodPriority::Definitely

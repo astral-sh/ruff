@@ -296,8 +296,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             Tuple::Fixed(target) => {
                 let equal_length = source_tuple.0.len() == target.0.len();
 
-                if !equal_length && self.is_eager_assignability() {
-                    self.provide_context(|| ErrorContext::TupleLengthMismatch {
+                if let Some(context) = self.report_context()
+                    && !equal_length
+                    && self.is_eager_assignability()
+                {
+                    context.push(ErrorContext::TupleLengthMismatch {
                         source_len: source_tuple.0.len(),
                         target_len: target_tuple.len(),
                     });
@@ -313,14 +316,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             self.constraints,
                             |(&source, &target)| {
                                 let constraint_set = self.check_type_pair(db, source, target);
-                                if constraint_set.is_never_satisfied(db) {
-                                    self.provide_context(|| {
-                                        ErrorContext::TupleElementNotCompatible {
-                                            source,
-                                            target,
-                                            element_index: n,
-                                            element_count: source_tuple.0.len(),
-                                        }
+                                if let Some(context) = self.report_context()
+                                    && constraint_set.is_never_satisfied(db)
+                                {
+                                    context.push(ErrorContext::TupleElementNotCompatible {
+                                        source,
+                                        target,
+                                        element_index: n,
+                                        element_count: source_tuple.0.len(),
                                     });
                                 }
 
@@ -2275,7 +2278,7 @@ impl<'db> Tuple<Type<'db>> {
         let release_level_ty = {
             let elements: Box<[Type<'db>]> = ["alpha", "beta", "candidate", "final"]
                 .iter()
-                .map(|level| Type::string_literal(db, level))
+                .map(|level| Type::string_literal(db, *level))
                 .collect();
 
             // For most unions, it's better to go via `UnionType::from_elements` or use `UnionBuilder`;

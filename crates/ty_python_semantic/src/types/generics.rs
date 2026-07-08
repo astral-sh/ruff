@@ -16,7 +16,8 @@ use crate::types::constraints::{
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
+    TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
@@ -1284,12 +1285,47 @@ impl<'db> Specialization<'db> {
             return self.materialize_impl(db, *materialization_kind, visitor);
         }
 
+        let mut new_materialization_kind = self.materialization_kind(db);
         let types = self.map_types(db, |i, typevar, ty| {
             let tcx = TypeContext::new(tcx.get(i).copied());
-            if typevar.variance(db).is_covariant() {
-                ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-            } else {
-                ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor)
+            match (typevar.variance(db), type_mapping) {
+                (
+                    TypeVarVariance::Invariant,
+                    TypeMapping::ApplySpecializationWithMaterialization {
+                        specialization,
+                        materialization_kind,
+                    },
+                ) => {
+                    // An invariant type argument cannot be materialized in isolation. Keep the
+                    // specialized argument and record the materialization on this specialization.
+                    // Comparing both mappings distinguishes substituted gradual types from
+                    // unrelated gradual types already present in the argument. Use separate
+                    // visitors because their transformation caches are keyed only by type.
+                    let specialized = ty.apply_type_mapping_impl(
+                        db,
+                        &TypeMapping::ApplySpecialization(*specialization),
+                        tcx,
+                        &ApplyTypeMappingVisitor::default(),
+                    );
+
+                    if new_materialization_kind.is_none() {
+                        let materialized = ty.apply_type_mapping_impl(
+                            db,
+                            type_mapping,
+                            tcx,
+                            &ApplyTypeMappingVisitor::default(),
+                        );
+                        if specialized != materialized {
+                            new_materialization_kind = Some(*materialization_kind);
+                        }
+                    }
+
+                    specialized
+                }
+                (variance, _) if variance.is_covariant() => {
+                    ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                }
+                _ => ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
             }
         });
 
@@ -1299,8 +1335,9 @@ impl<'db> Specialization<'db> {
         });
 
         // Keep this check in sync with every field that can be transformed above.
-        let specialization_unchanged =
-            matches!(&types, Cow::Borrowed(_)) && tuple_inner == original_tuple_inner;
+        let specialization_unchanged = matches!(&types, Cow::Borrowed(_))
+            && tuple_inner == original_tuple_inner
+            && new_materialization_kind == self.materialization_kind(db);
         if specialization_unchanged {
             self
         } else {
@@ -1308,7 +1345,7 @@ impl<'db> Specialization<'db> {
                 db,
                 self.generic_context(db),
                 types,
-                self.materialization_kind(db),
+                new_materialization_kind,
                 tuple_inner,
             )
         }
@@ -1588,11 +1625,36 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // `Foo[list[Any]]` even if `Foo` is invariant, and even though `Any` is not equivalent to
             // `list[Any]`, because `Any` is assignable to `list[Any]` and `list[Any]` is assignable to
             // `Any`.
+            //
+            // For lazy type-variable evaluation, those two directions describe a single
+            // constraint. Constructing it directly avoids combinatorial path expansion when many
+            // invariant specializations are combined in a union. Subtyping uses the gradual
+            // type's materialization range, while assignability uses the type itself for both
+            // bounds.
             (None, None, _) => {
-                self.check_type_pair(db, target_type, source_type)
-                    .and(db, self.constraints, || {
-                        self.check_type_pair(db, source_type, target_type)
-                    })
+                if self.typevar_evaluation == TypeVarEvaluation::Lazy
+                    && let (Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar)) =
+                        (source_type, target_type)
+                    && !ty.is_type_var()
+                    // Preserve union distribution before constructing constraints. Storing the
+                    // entire union as an exact bound makes solving common generic calls involving
+                    // large unions significantly more expensive.
+                    && !ty.is_union()
+                {
+                    let ty = ty.materialized_divergent_fallback().unwrap_or(ty);
+                    let (lower, upper) = if self.relation.is_subtyping() {
+                        (ty.top_materialization(db), ty.bottom_materialization(db))
+                    } else {
+                        (ty, ty)
+                    };
+                    ConstraintSet::constrain_typevar(db, self.constraints, typevar, lower, upper)
+                } else {
+                    self.check_type_pair(db, target_type, source_type).and(
+                        db,
+                        self.constraints,
+                        || self.check_type_pair(db, source_type, target_type),
+                    )
+                }
             }
             // For gradual types, A <: B (subtyping) is defined as Top[A] <: Bottom[B]
             (
@@ -1919,6 +1981,55 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
 }
 
+/// The result of type variable inference before choosing how to handle unsolved type variables.
+///
+/// A `Some` entry means inference solved the corresponding type variable to that type. A `None`
+/// entry means the type variable was not solved and should be projected according to the use site.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) struct TypeVarInference<'db> {
+    pub(crate) generic_context: GenericContext<'db>,
+    #[returns(deref)]
+    types: Box<[Option<Type<'db>>]>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for TypeVarInference<'_> {}
+
+impl<'db> TypeVarInference<'db> {
+    /// Project this inference result into a closed specialization.
+    pub(crate) fn specialization(self, db: &'db dyn Db) -> Specialization<'db> {
+        #[salsa::tracked]
+        fn specialization_inner<'db>(
+            db: &'db dyn Db,
+            inference: TypeVarInference<'db>,
+        ) -> Specialization<'db> {
+            inference.specialization_with(db, |_, _| None)
+        }
+
+        specialization_inner(db, self)
+    }
+
+    /// Project this inference result into a specialization with explicit handling for each
+    /// type variable.
+    ///
+    /// The hook receives the type variable and its inferred type, if any. Returning `Some` overrides
+    /// the projection for that variable. Returning `None` uses the inferred type if present,
+    /// otherwise the type variable's default.
+    pub(crate) fn specialization_with(
+        self,
+        db: &'db dyn Db,
+        mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<Type<'db>>) -> Option<Type<'db>>,
+    ) -> Specialization<'db> {
+        let types = self
+            .generic_context(db)
+            .variables(db)
+            .zip(self.types(db).iter().copied())
+            .map(|(typevar, inferred)| choose(typevar, inferred).or(inferred));
+
+        self.generic_context(db).specialize_recursive(db, types)
+    }
+}
+
 impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     pub(crate) fn new(
         db: &'db dyn Db,
@@ -1965,6 +2076,22 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         generic_context.specialize_recursive(self.db, specialization)
     }
 
+    /// Build raw type-variable inference, preserving which type variables were left unsolved.
+    pub(crate) fn build_inference_with(
+        &mut self,
+        generic_context: GenericContext<'db>,
+        mut choose: impl FnMut(BoundTypeVarInstance<'db>, Option<&PathBound<'db>>) -> Option<Type<'db>>,
+    ) -> TypeVarInference<'db> {
+        let types = self.solve_pending_with(generic_context, &mut choose);
+        let inferred: Box<[_]> = generic_context
+            .variables_inner(self.db)
+            .keys()
+            .map(|identity| types.get(identity).copied())
+            .collect();
+
+        TypeVarInference::new(self.db, generic_context, inferred)
+    }
+
     fn solve_pending_with(
         &mut self,
         generic_context: GenericContext<'db>,
@@ -1990,23 +2117,24 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // was not enough: `solutions_with` still performed the expensive path traversal, and the
         // skipped projection changed precision in LiteralString tests. See the
         // `ty_micro[pydantic_core_schema_dict]` benchmark for a minimized reproducer.
-        let pending = self
-            .pending
-            .remove_noninferable(self.db, self.constraints, self.inferable);
-        let solutions =
-            match pending.solutions_with(self.db, self.constraints, |_variance, path_bound| {
+        let solutions = match self.pending.solutions_with(
+            self.db,
+            self.constraints,
+            self.inferable,
+            |_variance, path_bound| {
                 let typevar = path_bound.bound_typevar;
                 if let Some(ty) = choose(typevar, Some(path_bound)) {
                     return Ok(Some(ty));
                 }
 
                 PathBounds::default_solve(self.db, self.constraints, path_bound)
-            }) {
-                Solutions::Unsatisfiable | Solutions::Unconstrained => {
-                    return self.solve_hash_map_with(generic_context, choose);
-                }
-                Solutions::Constrained(solutions) => solutions,
-            };
+            },
+        ) {
+            Solutions::Unsatisfiable | Solutions::Unconstrained => {
+                return self.solve_hash_map_with(generic_context, choose);
+            }
+            Solutions::Constrained(solutions) => solutions,
+        };
 
         let mut types = FxHashMap::default();
         for solution in solutions {
@@ -2289,14 +2417,21 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         variance: TypeVarVariance,
     ) {
         self.insert_hash_map_type_mapping(bound_typevar, ty);
+        self.insert_pending_type_mapping(bound_typevar, ty, variance);
+    }
 
+    fn insert_pending_type_mapping(
+        &mut self,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+        variance: TypeVarVariance,
+    ) {
         let bounds = match variance {
             TypeVarVariance::Covariant => ConstraintBounds::new(Some(ty), None),
             TypeVarVariance::Contravariant => ConstraintBounds::new(None, Some(ty)),
             TypeVarVariance::Invariant => ConstraintBounds::exact(ty),
             TypeVarVariance::Bivariant => return,
         };
-
         self.intersect_pending_typevar_constraint(bound_typevar, bounds);
     }
 
@@ -2312,8 +2447,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         &mut self,
         set: ConstraintSet<'db, 'c>,
     ) -> Result<(), ()> {
-        let set = set.remove_noninferable(self.db, self.constraints, self.inferable);
-        let solutions = match set.solutions(self.db, self.constraints) {
+        let solutions = match set.solutions(self.db, self.constraints, self.inferable) {
             Solutions::Unsatisfiable => return Err(()),
             Solutions::Unconstrained => return Ok(()),
             Solutions::Constrained(solutions) => solutions,
@@ -2775,7 +2909,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             };
 
                             if is_satisfied {
-                                self.add_type_mapping(bound_typevar, *constraint, polarity);
+                                // For the old solver, we use the constraint itself as the mapped
+                                // type, since the old solver's hash map stores solutions. For the
+                                // new solver's pending constraint set, we store the type that
+                                // matched against the constraint. This is especially important
+                                // when the matched type is gradual, since it might match multiple
+                                // constraints, and we need the constraint set to be able to reason
+                                // about all of them.
+                                self.insert_hash_map_type_mapping(bound_typevar, *constraint);
+                                self.insert_pending_type_mapping(bound_typevar, ty, polarity);
                                 return Ok(());
                             }
                         }

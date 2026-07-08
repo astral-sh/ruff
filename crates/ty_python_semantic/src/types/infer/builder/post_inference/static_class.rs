@@ -319,7 +319,8 @@ pub(crate) fn check_static_class_definitions<'db>(
                             if declared_variance == TypeVarVariance::Invariant {
                                 return None;
                             }
-                            let required_variance = base_alias.variance_of(db, typevar);
+                            let required_variance =
+                                base_alias.variance_of(db, typevar.identity(db));
                             if declared_variance.join(required_variance) != declared_variance {
                                 Some((typevar, declared_variance, required_variance))
                             } else {
@@ -1364,8 +1365,10 @@ fn check_class_final_without_value<'db>(
     let place_table = index.place_table(body_scope_id);
 
     // In dataclasses (and similar code-generated classes), Final fields without
-    // defaults are initialized by the synthesized __init__, so they are valid.
-    if CodeGeneratorKind::from_class(db, class.into()).is_some() {
+    // defaults are initialized by the synthesized __init__. In protocols, the
+    // declaration describes a required instance attribute rather than storage
+    // that must be initialized by the protocol class itself.
+    if CodeGeneratorKind::from_class(db, class.into()).is_some() || class.is_protocol(db) {
         return;
     }
 

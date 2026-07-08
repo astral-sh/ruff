@@ -129,7 +129,7 @@ js-sys = { version = "0.3.69" }
 libc = { version = "0.2.153" }
 libcst = { version = "1.8.4", default-features = false }
 log = { version = "0.4.17" }
-lsp-server = { version = "0.7.6" }
+lsp-server = { version = "0.8.0" }
 lsp-types = { package = "gen-lsp-types", version = "0.9.0", features = ["url"] }
 matchit = { version = "0.9.0" }
 memchr = { version = "2.7.1" }
@@ -277,9 +277,6 @@ unused_peekable = "warn"
 # in the `if` being an order of magnitude bigger than the
 # `else`, then some might consider that harder to read.
 if_not_else = "allow"
-
-# Diagnostics are not actionable: Enable once https://github.com/rust-lang/rust-clippy/issues/13774 is resolved.
-large_stack_arrays = "allow"
 
 [profile.release]
 lto = "fat"

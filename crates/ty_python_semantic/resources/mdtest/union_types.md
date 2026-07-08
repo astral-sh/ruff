@@ -212,7 +212,8 @@ python-version = "3.12"
 
 ```py
 from typing import Literal, Union
-from ty_extensions import AlwaysTruthy, AlwaysFalsy, is_equivalent_to, static_assert
+from ty_extensions import AlwaysTruthy, AlwaysFalsy, static_assert
+from ty_extensions._internal import is_equivalent_to
 
 type strings = Literal["foo", ""]
 type ints = Literal[0, 1]

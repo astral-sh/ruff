@@ -360,6 +360,16 @@
             }
           ]
         },
+        "blanket-ignore-comment": {
+          "title": "detects blanket `ty: ignore` comments",
+          "description": "## What it does\n\nChecks for `ty: ignore` comments that don't specify which rules to ignore.\n\n## Why is this bad?\n\nA blanket `ty: ignore` comment suppresses every type-checking diagnostic on the\napplicable line or file. Specifying rule codes documents which diagnostics are\nexpected and prevents the comment from silencing unrelated errors.\n\n## Examples\n\n```py\n# error\nvalue = unknown  # ty: ignore\n```\n\nUse instead:\n\n```py\nvalue = unknown  # ty: ignore[unresolved-reference]\n```",
+          "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "call-abstract-method": {
           "title": "detects calls to abstract methods with trivial bodies on class objects",
           "description": "## What it does\n\nChecks for calls to abstract `@classmethod`s or `@staticmethod`s\nwith \"trivial bodies\" when accessed on the class object itself.\n\n\"Trivial bodies\" are bodies that solely consist of `...`, `pass`,\na docstring, and/or `raise NotImplementedError`.\n\n## Why is this bad?\n\nAn abstract method with a trivial body has no concrete implementation\nto execute, so calling such a method directly on the class will probably\nnot have the desired effect.\n\nIt is also unsound to call these methods directly on the class. Unlike\nother methods, ty permits abstract methods with trivial bodies to have\nnon-`None` return types even though they always return `None` at runtime.\nThis is because it is expected that these methods will always be\noverridden rather than being called directly. As a result of this\nexception to the normal rule, ty may infer an incorrect type if one of\nthese methods is called directly, which may then mean that type errors\nelsewhere in your code go undetected by ty.\n\nCalling abstract classmethods or staticmethods via `type[X]` is allowed,\nsince the actual runtime type could be a concrete subclass with an implementation.\n\n## Example\n\n```python\nfrom abc import ABC, abstractmethod\n\n\nclass Foo(ABC):\n    @classmethod\n    @abstractmethod\n    def method(cls) -> int: ...\n\n\n# cannot call abstract classmethod\nFoo.method()  # error\n```",
@@ -522,7 +532,7 @@
         },
         "final-without-value": {
           "title": "detects `Final` declarations without a value",
-          "description": "## What it does\n\nChecks for `Final` symbols that are declared without a value and are never\nassigned a value in their scope.\n\n## Why is this bad?\n\nA `Final` symbol must be initialized with a value at the time of declaration\nor in a subsequent assignment. At module or function scope, the assignment must\noccur in the same scope. In a class body, the assignment may occur in `__init__`.\n\n## Examples\n\n```python\nfrom typing import Final\n\n# `Final` symbol without a value\nMY_CONSTANT: Final[int]  # error\n\n# OK: `Final` symbol with a value\nINITIALIZED_CONSTANT: Final[int] = 1\n```",
+          "description": "## What it does\n\nChecks for `Final` symbols that are declared without a value and are never\nassigned a value in their scope.\n\n## Why is this bad?\n\nA `Final` symbol must be initialized with a value at the time of declaration\nor in a subsequent assignment. At module or function scope, the assignment must\noccur in the same scope. In a class body, the assignment may occur in `__init__`.\nProtocol members are declarations of an interface and do not require a value.\n\n## Examples\n\n```python\nfrom typing import Final\n\n# `Final` symbol without a value\nMY_CONSTANT: Final[int]  # error\n\n# OK: `Final` symbol with a value\nINITIALIZED_CONSTANT: Final[int] = 1\n```",
           "default": "error",
           "oneOf": [
             {
@@ -1292,7 +1302,7 @@
         },
         "redundant-final-classvar": {
           "title": "detects redundant combinations of `ClassVar` and `Final`",
-          "description": "## What it does\n\nChecks for redundant combinations of the `ClassVar` and `Final` type qualifiers.\n\n## Why is this bad?\n\nAn attribute that is marked `Final` in a class body is implicitly a class variable.\nMarking it as `ClassVar` is therefore redundant.\n\nNote that this diagnostic is not emitted for dataclass fields, where\n`ClassVar[Final[int]]` has a distinct meaning from `Final[int]`.\n\n## Examples\n\n```python\nfrom typing import ClassVar, Final\n\n\nclass C:\n    # redundant\n    x: ClassVar[Final[int]] = 1  # error\n    # redundant\n    y: Final[ClassVar[int]] = 1  # error\n```",
+          "description": "## What it does\n\nChecks for redundant combinations of the `ClassVar` and `Final` type qualifiers.\n\n## Why is this bad?\n\nAn attribute that is marked `Final` in a class body is implicitly a class variable.\nMarking it as `ClassVar` is therefore redundant.\n\nNote that this diagnostic is not emitted for dataclass fields or protocol members,\nwhere `ClassVar[Final[int]]` has a distinct meaning from `Final[int]`.\n\n## Examples\n\n```python\nfrom typing import ClassVar, Final\n\n\nclass C:\n    # redundant\n    x: ClassVar[Final[int]] = 1  # error\n    # redundant\n    y: Final[ClassVar[int]] = 1  # error\n```",
           "default": "warn",
           "oneOf": [
             {

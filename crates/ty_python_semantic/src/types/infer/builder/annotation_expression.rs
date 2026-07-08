@@ -267,8 +267,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     PEP613Policy::Disallowed,
                                 );
 
-                                // Emit a diagnostic if ClassVar and Final are combined in a class that is
-                                // not a dataclass, since Final already implies the semantics of ClassVar.
+                                // Emit a diagnostic if ClassVar and Final are combined in a class where
+                                // Final already implies the semantics of ClassVar. Dataclasses and
+                                // protocols treat an unqualified Final declaration as an instance
+                                // attribute, so the combination is meaningful in those classes.
                                 let classvar_and_final = match qualifier {
                                     TypeQualifier::Final => type_and_qualifiers
                                         .qualifiers
@@ -280,7 +282,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 };
                                 if classvar_and_final
                                     && nearest_enclosing_class(self.db(), self.index, self.scope())
-                                        .is_none_or(|class| !class.is_dataclass_like(self.db()))
+                                        .is_none_or(|class| {
+                                            !class.is_dataclass_like(self.db())
+                                                && !class.is_protocol(self.db())
+                                        })
                                     && let Some(builder) = self
                                         .context
                                         .report_lint(&REDUNDANT_FINAL_CLASSVAR, subscript)

@@ -251,11 +251,8 @@ impl<'db> Type<'db> {
                 Some(CallableTypes::one(CallableType::single(
                     db,
                     Signature::new(
-                        Parameters::new(
-                            db,
-                            [Parameter::positional_only(None)
-                                .with_annotated_type(newtype.base(db).instance_type(db))],
-                        ),
+                        Parameters::standard([Parameter::positional_only(None)
+                            .with_annotated_type(newtype.base(db).instance_type(db))]),
                         Type::NewTypeInstance(newtype),
                     ),
                 )))
@@ -270,9 +267,10 @@ impl<'db> Type<'db> {
             | Type::TypeForm(_)
             | Type::TypedDict(_) => None,
 
-            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)) => {
-                Some(CallableTypes::one(partial.partial(db)))
-            }
+            Type::KnownInstance(
+                KnownInstanceType::FunctoolsPartial(partial)
+                | KnownInstanceType::FunctoolsPartialCall(partial),
+            ) => Some(CallableTypes::one(partial.partial(db))),
 
             Type::Intersection(intersection) => {
                 intersection

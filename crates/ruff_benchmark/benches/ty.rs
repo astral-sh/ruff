@@ -1556,6 +1556,95 @@ value: list[Node] = [
     );
 }
 
+fn benchmark_invariant_generic_return_union(criterion: &mut Criterion) {
+    const NUM_VARIANTS: usize = 21;
+
+    setup_rayon();
+
+    // Regression benchmark for https://github.com/astral-sh/ty/issues/3896.
+    let mut code = String::new();
+    for i in 0..NUM_VARIANTS {
+        writeln!(&mut code, "class M{i}: pass").ok();
+    }
+    code.push_str("\nAllResults = (\n");
+    for i in 0..NUM_VARIANTS {
+        if i > 0 {
+            code.push_str(" |\n");
+        }
+        write!(&mut code, "    dict[int, M{i}]").ok();
+    }
+    code.push_str("\n)\n\nRows = (\n");
+    for i in 0..NUM_VARIANTS {
+        if i > 0 {
+            code.push_str(" |\n");
+        }
+        write!(&mut code, "    list[tuple[int, M{i}]]").ok();
+    }
+    code.push_str(
+        r#"
+)
+
+def map_rows[T](rows: list[tuple[int, T]]) -> dict[int, T]:
+    return {}
+
+def perform(rows: Rows) -> AllResults:
+    return map_rows(rows)
+"#,
+    );
+
+    criterion.bench_function("ty_micro[invariant_generic_return_union]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_invariant_generic_union_bound(criterion: &mut Criterion) {
+    const NUM_ALIASES: usize = 64;
+
+    setup_rayon();
+
+    let mut code =
+        String::from("from collections.abc import Iterable\nfrom typing import Literal\n\n");
+    for i in 0..NUM_ALIASES {
+        writeln!(
+            &mut code,
+            "type A{i} = Literal[{i}] | int | str | bytes | float"
+        )
+        .ok();
+    }
+    code.push_str("\nALIASES = {\n");
+    for i in 0..NUM_ALIASES {
+        writeln!(&mut code, "    A{i}: {{{i}: A{i}}},").ok();
+    }
+    code.push_str(
+        r#"}
+
+def consume(items: Iterable[object]) -> None: ...
+
+consume(ALIASES.items())
+"#,
+    );
+
+    criterion.bench_function("ty_micro[invariant_generic_union_bound]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_pydantic_core_schema_dict(criterion: &mut Criterion) {
     const NUM_CORE_SCHEMA_VARIANTS: usize = 24;
 
@@ -1716,7 +1805,7 @@ fn hydra(criterion: &mut Criterion) {
             max_dep_date: TY_ECOSYSTEM_PIN,
             python_version: SupportedPythonVersion::Py311,
         },
-        510,
+        520,
     );
 
     bench_project(&benchmark, criterion);
@@ -1810,6 +1899,8 @@ criterion_group!(
     benchmark_factored_upper_bounds,
     benchmark_pandas_tdd,
     benchmark_recursive_typed_dict_union_contextual_inference,
+    benchmark_invariant_generic_return_union,
+    benchmark_invariant_generic_union_bound,
     benchmark_pydantic_core_schema_dict,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);

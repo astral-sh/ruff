@@ -93,7 +93,7 @@ impl CallableParams {
     pub(crate) fn into_parameters(self, db: &TestDb) -> Parameters<'_> {
         match self {
             CallableParams::GradualForm => Parameters::gradual_form(),
-            CallableParams::List(params) => Parameters::new(
+            CallableParams::List(params) => Parameters::from_annotation(
                 db,
                 params.into_iter().map(|param| {
                     let parameter = match param.kind {

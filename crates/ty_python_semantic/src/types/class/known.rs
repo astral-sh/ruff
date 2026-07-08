@@ -155,6 +155,9 @@ pub enum KnownClass {
     TyExtensionsIterator,
     // Pydantic
     PydanticBaseModel,
+    PydanticBaseSettings,
+    PydanticConfigDict,
+    PydanticRootModel,
 }
 
 impl KnownClass {
@@ -282,7 +285,10 @@ impl KnownClass {
             | Self::FunctoolsPartial
             | Self::ExtensionTypedDictFallback
             | Self::TypedDictFallback
-            | Self::PydanticBaseModel => Some(Truthiness::Ambiguous),
+            | Self::PydanticBaseModel
+            | Self::PydanticBaseSettings
+            | Self::PydanticConfigDict
+            | Self::PydanticRootModel => Some(Truthiness::Ambiguous),
 
             Self::Tuple => None,
         }
@@ -391,7 +397,10 @@ impl KnownClass {
             | KnownClass::Template
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
-            | KnownClass::PydanticBaseModel => false,
+            | KnownClass::PydanticBaseModel
+            | KnownClass::PydanticBaseSettings
+            | KnownClass::PydanticConfigDict
+            | KnownClass::PydanticRootModel => false,
         }
     }
 
@@ -497,7 +506,11 @@ impl KnownClass {
             | KnownClass::Template
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
-            | KnownClass::PydanticBaseModel => false,
+            | KnownClass::PydanticBaseModel
+            | KnownClass::PydanticBaseSettings
+            | KnownClass::PydanticRootModel => false,
+
+            KnownClass::PydanticConfigDict => true,
         }
     }
 
@@ -602,7 +615,10 @@ impl KnownClass {
             | KnownClass::Template
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
-            | KnownClass::PydanticBaseModel => false,
+            | KnownClass::PydanticBaseModel
+            | KnownClass::PydanticBaseSettings
+            | KnownClass::PydanticConfigDict
+            | KnownClass::PydanticRootModel => false,
         }
     }
 
@@ -720,7 +736,10 @@ impl KnownClass {
             | Self::FunctoolsPartial
             | Self::Mapping
             | Self::Sequence
-            | Self::PydanticBaseModel => false,
+            | Self::PydanticBaseModel
+            | Self::PydanticBaseSettings
+            | Self::PydanticConfigDict
+            | Self::PydanticRootModel => false,
         }
     }
 
@@ -827,7 +846,10 @@ impl KnownClass {
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
             | KnownClass::Specialization
-            | KnownClass::PydanticBaseModel => false,
+            | KnownClass::PydanticBaseModel
+            | KnownClass::PydanticBaseSettings
+            | KnownClass::PydanticConfigDict
+            | KnownClass::PydanticRootModel => false,
             KnownClass::NamedTupleFallback
             | KnownClass::TypedDictFallback
             | KnownClass::ExtensionTypedDictFallback => true,
@@ -948,6 +970,9 @@ impl KnownClass {
             Self::FunctoolsPartial => "partial",
             Self::ProtocolMeta => "_ProtocolMeta",
             Self::PydanticBaseModel => "BaseModel",
+            Self::PydanticBaseSettings => "BaseSettings",
+            Self::PydanticConfigDict => "ConfigDict",
+            Self::PydanticRootModel => "RootModel",
         }
     }
 
@@ -1085,40 +1110,68 @@ impl KnownClass {
             .unwrap_or_else(Type::unknown)
     }
 
-    /// Attempt to look up a [`KnownClass`] in its canonical module and return a [`Type`]
-    /// representing that class literal.
+    /// Look up a [`KnownClass`] in its canonical module.
     ///
-    /// Return an error if the symbol cannot be found in the expected module, if the symbol is not a
-    /// class definition, or if the symbol is possibly unbound.
-    fn try_to_class_literal_without_logging(
+    /// Lookup errors are logged when the cached query executes.
+    fn lookup_class_literal(
         self,
         db: &dyn Db,
-    ) -> Result<StaticClassLiteral<'_>, KnownClassLookupError<'_>> {
-        let module = self.canonical_module(db);
-        let third_party = module.is_third_party();
-        let symbol = known_module_symbol(db, module, self.name(db)).place;
-        match symbol {
-            Place::Defined(DefinedPlace {
-                ty: Type::ClassLiteral(ClassLiteral::Static(class_literal)),
-                definedness: Definedness::AlwaysDefined,
-                ..
-            }) => Ok(class_literal),
-            Place::Defined(DefinedPlace {
-                ty: Type::ClassLiteral(ClassLiteral::Static(class_literal)),
-                definedness: Definedness::PossiblyUndefined,
-                ..
-            }) => Err(KnownClassLookupError::ClassPossiblyUnbound {
-                class_literal,
-                third_party,
-            }),
-            Place::Defined(DefinedPlace { ty: found_type, .. }) => {
-                Err(KnownClassLookupError::SymbolNotAClass {
-                    found_type,
-                    third_party,
-                })
-            }
-            Place::Undefined => Err(KnownClassLookupError::ClassNotFound { third_party }),
+    ) -> Result<Option<StaticClassLiteral<'_>>, KnownClassLookupError<'_>> {
+        #[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
+        struct KnownClassArgument {
+            class: KnownClass,
         }
+
+        #[salsa::tracked(cycle_initial=|_, _, _| Ok(None), heap_size=ruff_memory_usage::heap_size)]
+        fn known_class_to_class_literal<'db>(
+            db: &'db dyn Db,
+            class: KnownClassArgument<'db>,
+        ) -> Result<Option<StaticClassLiteral<'db>>, KnownClassLookupError<'db>> {
+            let class = class.class(db);
+            let module = class.canonical_module(db);
+            let third_party = module.is_third_party();
+            let symbol = known_module_symbol(db, module, class.name(db)).place;
+            let result = match symbol {
+                Place::Defined(DefinedPlace {
+                    ty: Type::ClassLiteral(ClassLiteral::Static(class_literal)),
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                }) => Ok(Some(class_literal)),
+                Place::Defined(DefinedPlace {
+                    ty: Type::ClassLiteral(ClassLiteral::Static(class_literal)),
+                    definedness: Definedness::PossiblyUndefined,
+                    ..
+                }) => Err(KnownClassLookupError::ClassPossiblyUnbound {
+                    class_literal,
+                    third_party,
+                }),
+                Place::Defined(DefinedPlace { ty: found_type, .. }) => {
+                    Err(KnownClassLookupError::SymbolNotAClass {
+                        found_type,
+                        third_party,
+                    })
+                }
+                Place::Undefined => Err(KnownClassLookupError::ClassNotFound { third_party }),
+            };
+
+            if let Err(lookup_error) = result {
+                if matches!(
+                    lookup_error,
+                    KnownClassLookupError::ClassPossiblyUnbound { .. }
+                ) {
+                    tracing::info!("{}", lookup_error.display(db, class));
+                } else {
+                    tracing::info!(
+                        "{}. Falling back to `Unknown` for the symbol instead.",
+                        lookup_error.display(db, class)
+                    );
+                }
+            }
+
+            result
+        }
+
+        known_class_to_class_literal(db, KnownClassArgument::new(db, self))
     }
 
     /// Look up a [`KnownClass`] in its canonical module and return a [`Type`] representing that
@@ -1126,44 +1179,16 @@ impl KnownClass {
     ///
     /// If the class cannot be found, a debug-level log message will be emitted stating this.
     pub(crate) fn try_to_class_literal(self, db: &dyn Db) -> Option<StaticClassLiteral<'_>> {
-        #[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
-        struct KnownClassArgument {
-            class: KnownClass,
+        match self.lookup_class_literal(db) {
+            Ok(class_literal) => class_literal,
+            Err(KnownClassLookupError::ClassPossiblyUnbound { class_literal, .. }) => {
+                Some(class_literal)
+            }
+            Err(
+                KnownClassLookupError::ClassNotFound { .. }
+                | KnownClassLookupError::SymbolNotAClass { .. },
+            ) => None,
         }
-
-        #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-        fn known_class_to_class_literal<'db>(
-            db: &'db dyn Db,
-            class: KnownClassArgument<'db>,
-        ) -> Option<StaticClassLiteral<'db>> {
-            let class = class.class(db);
-            class
-                .try_to_class_literal_without_logging(db)
-                .or_else(|lookup_error| {
-                    if matches!(
-                        lookup_error,
-                        KnownClassLookupError::ClassPossiblyUnbound { .. }
-                    ) {
-                        tracing::info!("{}", lookup_error.display(db, class));
-                    } else {
-                        tracing::info!(
-                            "{}. Falling back to `Unknown` for the symbol instead.",
-                            lookup_error.display(db, class)
-                        );
-                    }
-
-                    match lookup_error {
-                        KnownClassLookupError::ClassPossiblyUnbound { class_literal, .. } => {
-                            Ok(class_literal)
-                        }
-                        KnownClassLookupError::ClassNotFound { .. }
-                        | KnownClassLookupError::SymbolNotAClass { .. } => Err(()),
-                    }
-                })
-                .ok()
-        }
-
-        known_class_to_class_literal(db, KnownClassArgument::new(db, self))
     }
 
     /// Look up a [`KnownClass`] in its canonical module and return a [`Type`] representing that
@@ -1200,8 +1225,8 @@ impl KnownClass {
     /// Return `true` if this symbol can be resolved to a class definition `class` in its canonical
     /// module, *and* `class` is a subclass of `other`.
     pub(crate) fn is_subclass_of<'db>(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.try_to_class_literal_without_logging(db)
-            .is_ok_and(|class| class.is_subclass_of(db, None, other))
+        self.lookup_class_literal(db)
+            .is_ok_and(|class| class.is_some_and(|class| class.is_subclass_of(db, None, other)))
     }
 
     pub(crate) fn when_subclass_of<'db, 'c>(
@@ -1319,18 +1344,21 @@ impl KnownClass {
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field | Self::KwOnly => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
-            Self::NamedTupleLike
-            | Self::ConstraintSet
+            Self::NamedTupleLike => KnownModule::TyExtensions,
+            Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
             | Self::TyExtensionsAsyncIterable
             | Self::TyExtensionsAsyncIterator
             | Self::TyExtensionsIterable
-            | Self::TyExtensionsIterator => KnownModule::TyExtensions,
+            | Self::TyExtensionsIterator => KnownModule::TyExtensionsInternal,
             Self::Template => KnownModule::Templatelib,
             Self::Path => KnownModule::Pathlib,
             Self::FunctoolsPartial => KnownModule::Functools,
             Self::PydanticBaseModel => KnownModule::PydanticMain,
+            Self::PydanticBaseSettings => KnownModule::PydanticSettingsMain,
+            Self::PydanticConfigDict => KnownModule::PydanticConfig,
+            Self::PydanticRootModel => KnownModule::PydanticRootModel,
         }
     }
 
@@ -1438,7 +1466,10 @@ impl KnownClass {
             | Self::Path
             | Self::UnionType
             | Self::FunctoolsPartial
-            | Self::PydanticBaseModel => Some(false),
+            | Self::PydanticBaseModel
+            | Self::PydanticBaseSettings
+            | Self::PydanticConfigDict
+            | Self::PydanticRootModel => Some(false),
 
             Self::Tuple => None,
         }
@@ -1549,7 +1580,10 @@ impl KnownClass {
             | Self::Template
             | Self::Path
             | Self::FunctoolsPartial
-            | Self::PydanticBaseModel => false,
+            | Self::PydanticBaseModel
+            | Self::PydanticBaseSettings
+            | Self::PydanticConfigDict
+            | Self::PydanticRootModel => false,
         }
     }
 
@@ -1660,6 +1694,9 @@ impl KnownClass {
             "_ProtocolMeta" => &[Self::ProtocolMeta],
             "_TypedDict" => &[Self::ExtensionTypedDictFallback],
             "BaseModel" => &[Self::PydanticBaseModel],
+            "BaseSettings" => &[Self::PydanticBaseSettings],
+            "ConfigDict" => &[Self::PydanticConfigDict],
+            "RootModel" => &[Self::PydanticRootModel],
             _ => return None,
         };
 
@@ -1756,7 +1793,10 @@ impl KnownClass {
             | Self::Template
             | Self::Path
             | Self::FunctoolsPartial
-            | Self::PydanticBaseModel => module == self.canonical_module(db),
+            | Self::PydanticBaseModel
+            | Self::PydanticBaseSettings
+            | Self::PydanticConfigDict
+            | Self::PydanticRootModel => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
             | Self::TypeAliasType
@@ -1921,7 +1961,7 @@ impl KnownClass {
 }
 
 /// Enumeration of ways in which looking up a [`KnownClass`] in its canonical module could fail.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum KnownClassLookupError<'db> {
     /// There is no symbol by that name in the expected module.
     ClassNotFound { third_party: bool },
@@ -2048,7 +2088,7 @@ mod tests {
                 continue;
             }
             // Check the class can be looked up successfully
-            class.try_to_class_literal_without_logging(&db).unwrap();
+            class.try_to_class_literal(&db).unwrap();
 
             // We can't call `KnownClass::Tuple.to_instance()`;
             // there are assertions to ensure that we always call `Type::homogeneous_tuple()`
@@ -2108,7 +2148,7 @@ mod tests {
             }
 
             // Check the class can be looked up successfully
-            class.try_to_class_literal_without_logging(&db).unwrap();
+            class.try_to_class_literal(&db).unwrap();
 
             // We can't call `KnownClass::Tuple.to_instance()`;
             // there are assertions to ensure that we always call `Type::homogeneous_tuple()`

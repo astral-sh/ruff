@@ -1,3 +1,4 @@
+use compact_str::CompactString;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use super::TypeInferenceBuilder;
@@ -680,14 +681,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         LiteralValueTypeKind::String(rhs),
                         ast::Operator::Add,
                     ) => {
-                        let lhs_value = lhs.value(db).to_string();
+                        let lhs_value = lhs.value(db);
                         let rhs_value = rhs.value(db);
-                        let ty =
-                            if lhs_value.len() + rhs_value.len() <= Self::MAX_STRING_LITERAL_SIZE {
-                                Type::string_literal(db, &(lhs_value + rhs_value))
-                            } else {
-                                Type::literal_string()
-                            };
+                        let new_length = lhs_value.len() + rhs_value.len();
+                        let ty = if new_length <= Self::MAX_STRING_LITERAL_SIZE {
+                            let mut value = CompactString::with_capacity(new_length);
+                            value.push_str(lhs_value);
+                            value.push_str(rhs_value);
+                            Type::string_literal(db, value)
+                        } else {
+                            Type::literal_string()
+                        };
                         Some(ty)
                     }
 
@@ -715,7 +719,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             })
                         {
                             let new_literal = s.value(db).repeat(n);
-                            Type::string_literal(db, &new_literal)
+                            Type::string_literal(db, &*new_literal)
                         } else {
                             Type::literal_string()
                         };

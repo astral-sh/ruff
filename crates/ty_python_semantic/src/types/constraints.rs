@@ -580,26 +580,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, self.node.exists(db, builder, to_remove))
     }
 
-    pub(crate) fn remove_noninferable(
-        self,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-        inferable: InferableTypeVars<'db>,
-    ) -> Self {
-        self.verify_builder(builder);
-        if self
-            .node
-            .simple_lower_bound_conjunction(db, builder)
-            .all(|bound| bound.is_ok_and(|(typevar, _, _)| typevar.is_inferable(db, inferable)))
-        {
-            return self;
-        }
-        Self::from_node(
-            builder,
-            self.node.remove_noninferable(db, builder, inferable),
-        )
-    }
-
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
     ///
     /// The `choose` hook is called for each typevar on each BDD path with the typevar's variance
@@ -613,8 +593,9 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'db>,
     ) -> Solutions<'db> {
-        self.solutions_with(db, builder, |_variance, path_bound| {
+        self.solutions_with(db, builder, inferable, |_variance, path_bound| {
             PathBounds::default_solve(db, builder, path_bound)
         })
     }
@@ -623,10 +604,11 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'db>,
         choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
         self.verify_builder(builder);
-        self.node.solutions_with(db, builder, choose)
+        self.node.solutions_with(db, builder, inferable, choose)
     }
 
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
@@ -1301,6 +1283,13 @@ impl<'db> UpperBound<'db> {
         !self.is_empty()
     }
 
+    fn as_single_bound(&self) -> Option<Type<'db>> {
+        if self.clauses.len() != 1 {
+            return None;
+        }
+        self.clauses.first().copied()
+    }
+
     fn is_never(&self) -> bool {
         self.clauses.len() == 1 && self.clauses.contains(&Type::Never)
     }
@@ -1809,10 +1798,10 @@ impl ConstraintId {
 /// construction, interior nodes can only refer to nodes with smaller indexes (since the nodes that
 /// outgoing edges point at must already exist).
 ///
-/// BDD nodes are _quasi-reduced_, which means that there are no duplicate nodes (which we handle
-/// via Salsa interning). Unlike the typical BDD representation, which is (fully) reduced, we do
-/// allow redundant nodes, with `if_true` and `if_false` edges that point at the same node. That
-/// means that our BDDs "remember" all of the individual constraints that they were created with.
+/// TDD nodes are locally reduced when they are created. We remove duplicate nodes (via Salsa
+/// interning) and collapse several sound, local redundant-edge shapes. This is not yet a fully
+/// reduced TDD representation: for example, a node whose `if_true` and `if_false` branches match
+/// but whose `if_uncertain` branch is non-empty would require computing a union to reduce further.
 ///
 /// BDD nodes are also _ordered_, meaning that every path from the root of a BDD to a terminal node
 /// visits variables in the same order. [`ConstraintId::ordering`] defines the variable
@@ -1842,10 +1831,8 @@ enum Node {
     Interior(InteriorNode),
 }
 
-type SimpleLowerBound<'db> = (BoundTypeVarInstance<'db>, Type<'db>, usize);
-
 impl NodeId {
-    /// Creates a new BDD node, ensuring that it is quasi-reduced.
+    /// Creates a new BDD node, applying local TDD reductions.
     fn new(
         builder: &ConstraintSetBuilder<'_>,
         constraint: ConstraintId,
@@ -1863,8 +1850,7 @@ impl NodeId {
         )
     }
 
-    /// Creates a new TDD node with an explicit `if_uncertain` branch, ensuring that it is
-    /// quasi-reduced.
+    /// Creates a new TDD node with an explicit `if_uncertain` branch, applying local reductions.
     fn with_uncertain(
         builder: &ConstraintSetBuilder<'_>,
         constraint: ConstraintId,
@@ -1894,9 +1880,35 @@ impl NodeId {
                     root_constraint.ordering() > constraint.ordering()
                 })
         );
-        if if_true == ALWAYS_FALSE && if_uncertain == ALWAYS_FALSE && if_false == ALWAYS_FALSE {
-            return ALWAYS_FALSE;
+
+        if if_uncertain == ALWAYS_TRUE {
+            return ALWAYS_TRUE;
         }
+
+        if if_true == if_false {
+            if if_true == if_uncertain {
+                return if_true;
+            }
+            if if_true == ALWAYS_FALSE {
+                return if_uncertain;
+            }
+            if if_uncertain == ALWAYS_FALSE {
+                return if_true;
+            }
+
+            // TODO: A future reduction can handle this remaining `if_true == if_false` case by
+            // returning `if_true ∪ if_uncertain`. That needs an `OR` computation, but only after
+            // the local equality check has already engaged.
+        }
+
+        if if_true == if_uncertain && if_false == ALWAYS_FALSE {
+            return if_uncertain;
+        }
+
+        if if_false == if_uncertain && if_true == ALWAYS_FALSE {
+            return if_uncertain;
+        }
+
         let max_source_order = source_order
             .max(if_true.max_source_order(builder))
             .max(if_uncertain.max_source_order(builder))
@@ -1920,14 +1932,14 @@ impl Node {
         constraint: ConstraintId,
         source_order: usize,
     ) -> NodeId {
-        builder.intern_interior_node(InteriorNodeData {
+        NodeId::with_uncertain(
+            builder,
             constraint,
-            if_true: ALWAYS_TRUE,
-            if_uncertain: ALWAYS_FALSE,
-            if_false: ALWAYS_FALSE,
+            ALWAYS_TRUE,
+            ALWAYS_FALSE,
+            ALWAYS_FALSE,
             source_order,
-            max_source_order: source_order,
-        })
+        )
     }
 
     /// Creates a new BDD node for a positive, negative, or unconstrained individual constraint.
@@ -1941,39 +1953,35 @@ impl Node {
         source_order: usize,
     ) -> NodeId {
         match constraint {
-            ConstraintAssignment::Positive(constraint) => {
-                builder.intern_interior_node(InteriorNodeData {
-                    constraint,
-                    if_true: ALWAYS_TRUE,
-                    if_uncertain: ALWAYS_FALSE,
-                    if_false: ALWAYS_FALSE,
-                    source_order,
-                    max_source_order: source_order,
-                })
-            }
-            ConstraintAssignment::Negative(constraint) => {
-                builder.intern_interior_node(InteriorNodeData {
-                    constraint,
-                    if_true: ALWAYS_FALSE,
-                    if_uncertain: ALWAYS_FALSE,
-                    if_false: ALWAYS_TRUE,
-                    source_order,
-                    max_source_order: source_order,
-                })
-            }
+            ConstraintAssignment::Positive(constraint) => NodeId::with_uncertain(
+                builder,
+                constraint,
+                ALWAYS_TRUE,
+                ALWAYS_FALSE,
+                ALWAYS_FALSE,
+                source_order,
+            ),
+            ConstraintAssignment::Negative(constraint) => NodeId::with_uncertain(
+                builder,
+                constraint,
+                ALWAYS_FALSE,
+                ALWAYS_FALSE,
+                ALWAYS_TRUE,
+                source_order,
+            ),
             ConstraintAssignment::Unconstrained(constraint) => {
                 // The result holds regardless of the constraint's truth value, so only
                 // `if_uncertain` needs to be `ALWAYS_TRUE` — `n? 0: 1: 0`. It would also be
                 // correct to use `n? 1: 1: 1` (i.e., `ALWAYS_TRUE` for all outgoing edges), but
                 // that would throw away some of the efficiency gains this representation gives us.
-                builder.intern_interior_node(InteriorNodeData {
+                NodeId::with_uncertain(
+                    builder,
                     constraint,
-                    if_true: ALWAYS_FALSE,
-                    if_uncertain: ALWAYS_TRUE,
-                    if_false: ALWAYS_FALSE,
+                    ALWAYS_FALSE,
+                    ALWAYS_TRUE,
+                    ALWAYS_FALSE,
                     source_order,
-                    max_source_order: source_order,
-                })
+                )
             }
         }
     }
@@ -2050,10 +2058,11 @@ impl NodeId {
         // BDD can only represent a single conjunction if there is precisely one path from the root
         // node to the `always` terminal.
         //
-        // We can take advantage of quasi-reduction. We never create an interior node with both
-        // outgoing edges leading to `never`; those are collapsed to `never`. That means that if we
-        // ever encounter a node with both outgoing edges pointing to something other than `never`,
-        // that node must have at least two paths to the `always` terminal.
+        // We can take advantage of local reductions. We never create an interior node whose true
+        // and false branches both lead to `never` while the uncertain branch also contributes
+        // nothing. That means that if we ever encounter a node with both true and false branches
+        // pointing to something other than `never`, that node must have at least two paths to the
+        // `always` terminal.
         let mut current = self.node();
         loop {
             match current {
@@ -2083,44 +2092,6 @@ impl NodeId {
                 }
             }
         }
-    }
-
-    /// Iterates over the concrete lower bounds in this BDD if it is a single positive conjunction.
-    /// Yields an error and terminates if the BDD does not have that shape.
-    fn simple_lower_bound_conjunction<'db, 'c>(
-        self,
-        db: &'db dyn Db,
-        builder: &'c ConstraintSetBuilder<'db>,
-    ) -> impl Iterator<Item = Result<SimpleLowerBound<'db>, ()>> + use<'db, 'c> {
-        let mut node = Some(self);
-        std::iter::from_fn(move || {
-            let current = node.take()?;
-
-            match current.node() {
-                Node::AlwaysTrue => None,
-                Node::AlwaysFalse => Some(Err(())),
-                Node::Interior(_) => {
-                    let interior = builder.interior_node_data(current);
-                    if interior.if_uncertain != ALWAYS_FALSE || interior.if_false != ALWAYS_FALSE {
-                        return Some(Err(()));
-                    }
-
-                    let constraint = builder.constraint_data(interior.constraint);
-                    let Some(lower) = constraint.bounds.lower else {
-                        return Some(Err(()));
-                    };
-                    if constraint.bounds.upper.is_some()
-                        || lower.has_typevar(db)
-                        || lower.has_unspecialized_type_var(db)
-                    {
-                        return Some(Err(()));
-                    }
-
-                    node = Some(interior.if_true);
-                    Some(Ok((constraint.typevar, lower, interior.source_order)))
-                }
-            }
-        })
     }
 
     fn for_each_path<'db>(
@@ -2340,9 +2311,10 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'db>,
         choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
-        let path_bounds = PathBounds::compute(db, builder, self);
+        let path_bounds = PathBounds::compute(db, builder, self, inferable);
         path_bounds.solve_with(choose)
     }
 
@@ -3310,29 +3282,52 @@ struct InteriorNodeData {
 struct ConstraintBoundsBuilder<'db> {
     lower: FxIndexSet<Type<'db>>,
     upper: UpperBound<'db>,
+    // Classify each bound before aggregation: unioning lower bounds can otherwise make separate
+    // gradual and static evidence indistinguishable from a single gradual union.
+    has_gradual_evidence: bool,
+    has_static_evidence: bool,
 }
 
 impl<'db> ConstraintBoundsBuilder<'db> {
-    fn add_lower(&mut self, _db: &'db dyn Db, ty: Type<'db>) {
+    fn classify_evidence(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+        if ty.has_unspecialized_type_var(db) {
+            return;
+        }
+        if ty.bottom_materialization(db) == ty.top_materialization(db) {
+            self.has_static_evidence = true;
+        } else {
+            self.has_gradual_evidence = true;
+        }
+    }
+
+    fn add_lower(&mut self, db: &'db dyn Db, ty: Type<'db>) {
         // Lower bounds are unioned. Our type representation is in DNF, so unioning a new
         // element is typically cheap (in that it does not involve a combinatorial
         // explosion from distributing the clause through an existing disjunction). So we
         // don't need to be as clever here as in `add_upper`.
+        self.classify_evidence(db, ty);
         self.lower.insert(ty);
     }
 
     fn add_upper(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+        self.classify_evidence(db, ty);
         self.upper.add_clause(db, ty);
     }
 
     fn finish(self, db: &'db dyn Db, bound_typevar: BoundTypeVarInstance<'db>) -> PathBound<'db> {
-        let Self { lower, mut upper } = self;
+        let Self {
+            lower,
+            mut upper,
+            has_gradual_evidence,
+            has_static_evidence,
+        } = self;
         let lower = (!lower.is_empty()).then(|| UnionType::from_elements(db, lower));
         upper.shrink_to_fit();
         PathBound {
             bound_typevar,
             lower,
             upper,
+            has_only_gradual_evidence: has_gradual_evidence && !has_static_evidence,
         }
     }
 }
@@ -3343,6 +3338,8 @@ pub(crate) struct PathBound<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
     pub(crate) lower: Option<Type<'db>>,
     pub(crate) upper: UpperBound<'db>,
+    /// Whether the path contains gradual evidence and no static evidence.
+    has_only_gradual_evidence: bool,
 }
 
 impl<'db> PathBound<'db> {
@@ -3351,6 +3348,7 @@ impl<'db> PathBound<'db> {
             bound_typevar,
             lower: Some(ty),
             upper: UpperBound::from_clause(ty),
+            has_only_gradual_evidence: false,
         }
     }
 
@@ -3369,6 +3367,10 @@ impl<'db> PathBound<'db> {
 
     pub(crate) fn has_upper(&self) -> bool {
         self.upper.has_explicit_bound()
+    }
+
+    fn has_only_gradual_evidence(&self) -> bool {
+        self.has_only_gradual_evidence
     }
 }
 
@@ -3393,10 +3395,7 @@ impl<'db> Type<'db> {
             inferable: InferableTypeVars<'db>,
         ) -> PathBounds<'db> {
             let when = source.when_constraint_set_assignable_to_owned(db, target);
-            when.query(|builder, when| {
-                let when = when.remove_noninferable(db, builder, inferable);
-                PathBounds::compute(db, builder, when.node)
-            })
+            when.query(|builder, when| PathBounds::compute(db, builder, when.node, inferable))
         }
 
         assignable_solutions_impl(db, self, target, inferable)
@@ -3430,15 +3429,23 @@ impl<'db> PathBounds<'db> {
     ///
     /// Returns a list of paths, where each path contains the explicit lower/upper bounds for each
     /// typevar that appears in the path's constraints.
-    fn compute(db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>, node: NodeId) -> Self {
+    fn compute(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        node: NodeId,
+        inferable: InferableTypeVars<'db>,
+    ) -> Self {
+        if let Some(path_bounds) =
+            Self::compute_simple_lower_bound_conjunction(db, builder, node, inferable)
+        {
+            return path_bounds;
+        }
+
+        let node = node.remove_noninferable(db, builder, inferable);
         match node.node() {
             Node::AlwaysTrue => return PathBounds::Unconstrained,
             Node::AlwaysFalse => return PathBounds::Unsatisfiable,
             Node::Interior(_) => {}
-        }
-
-        if let Some(path_bounds) = Self::compute_simple_lower_bound_conjunction(db, builder, node) {
-            return path_bounds;
         }
 
         // Sort the constraints in each path by their `source_order`s, to ensure that we construct
@@ -3509,15 +3516,48 @@ impl<'db> PathBounds<'db> {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         node: NodeId,
+        inferable: InferableTypeVars<'db>,
     ) -> Option<Self> {
-        let mut constraints = node
-            .simple_lower_bound_conjunction(db, builder)
-            .collect::<Result<Vec<_>, _>>()
-            .ok()?;
-        constraints.sort_by_key(|(_, _, source_order)| *source_order);
+        match node.node() {
+            Node::AlwaysTrue => return Some(PathBounds::Unconstrained),
+            Node::AlwaysFalse => return Some(PathBounds::Unsatisfiable),
+            Node::Interior(_) => {}
+        }
+
+        let mut constraints = Vec::default();
+        let mut current = node;
+        loop {
+            match current.node() {
+                Node::AlwaysTrue => break,
+                Node::AlwaysFalse => return None,
+                Node::Interior(_) => {
+                    let interior = builder.interior_node_data(current);
+                    if interior.if_uncertain != ALWAYS_FALSE || interior.if_false != ALWAYS_FALSE {
+                        return None;
+                    }
+
+                    let constraint = builder.constraint_data(interior.constraint);
+                    if !constraint.typevar.is_inferable(db, inferable) {
+                        return None;
+                    }
+
+                    let lower = constraint.bounds.lower?;
+                    if constraint.bounds.upper.is_some()
+                        || lower.has_typevar(db)
+                        || lower.has_unspecialized_type_var(db)
+                    {
+                        return None;
+                    }
+
+                    current = interior.if_true;
+                    constraints.push((constraint.typevar, lower, interior.source_order));
+                }
+            }
+        }
 
         let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
             FxHashMap::default();
+        constraints.sort_by_key(|(_, _, source_order)| *source_order);
         for (typevar, lower, _) in constraints {
             mappings.entry(typevar).or_default().add_lower(db, lower);
         }
@@ -3591,8 +3631,14 @@ impl<'db> PathBounds<'db> {
         builder: &ConstraintSetBuilder<'db>,
         path_bound: &PathBound<'db>,
     ) -> Result<Option<Type<'db>>, ()> {
+        // Choose a solution type that satisfies the constraints on this path, as well as any upper
+        // bound or constraints of the typevar itself.
+        // TODO: Handle the upper bound/constraints by conjoining them with the constraint set
+        // before solving.
+
         let bound_typevar = path_bound.bound_typevar;
         let lower = path_bound.lower_or_never();
+
         match bound_typevar.typevar(db).require_bound_or_constraints(db) {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
                 let declared_upper = bound.top_materialization(db);
@@ -3635,8 +3681,52 @@ impl<'db> PathBounds<'db> {
             }
 
             TypeVarBoundOrConstraints::Constraints(constraints) => {
-                // Filter out the typevar constraints that aren't satisfied by this path.
-                let compatible_constraints = constraints.elements(db).iter().filter(|constraint| {
+                // For a constrained typevar, the solution for this path must satisfy at least one
+                // of the constraints. If it doesn't, then this path isn't a valid solution. If it
+                // satisfies exactly one constraint, that constraint is the solution.
+                //
+                // If the path satisfies more than one constraint, we behave differently depending
+                // on whether the path solution is gradual or not. If it's gradual, then the path
+                // solution has _materializations_ that satisfy more than one constraint, and we
+                // use the (gradual) path solution as our result, so that we aren't arbitrarily
+                // preferring one materialization over the others.
+                //
+                // If the path solution is fully static, and satisfies more than one constraint, we
+                // choose the "tightest" constraint as the solution.
+                //
+                // TODO: The way we are handling constrained typevars here breaks our assumption
+                // that each solution is represented by a single path in the BDD. Moreover, the
+                // logic here for disambiguating multiple solutions is different than the logic up
+                // in `SpecializationBuilder` that disambiguates solutions that come from multiple
+                // BDD paths. Ideally we would handle multiple solutions the same way in both
+                // places. The best way to do that is addressed by the TODO comment at the top of
+                // this method: we should handle typevar constraints by conjoining them into the
+                // constraint set before solving. Because typevar constraints would be modeled by
+                // an OR across the constraints, that would "break apart" this BDD path into
+                // separate paths, one for each satisfied typevar constraint. And then we would
+                // have to move this disambiguation logic up to the code that combines/chooses
+                // between solutions from multiple paths.
+
+                // Filter out the typevar constraints that aren't satisfied by this path. If
+                // multiple constraints are satisfied, track which one is "tightest".
+                let mut compatible_constraint = None;
+                let mut multiple_compatible_constraints = false;
+                let is_tighter_solution = |candidate: Type<'db>, current_best: Type<'db>| {
+                    // Lower-bound evidence asks for the narrowest compatible declared constraint
+                    // above the lower bound. With only upper-bound evidence, ask for the widest
+                    // compatible declared constraint below the upper bound. If the candidates are
+                    // equivalent or incomparable, keep the current best to preserve the TypeVar's
+                    // declared constraint order.
+                    if path_bound.lower.is_some() {
+                        candidate.is_subtype_of(db, current_best)
+                            && !current_best.is_subtype_of(db, candidate)
+                    } else {
+                        current_best.is_subtype_of(db, candidate)
+                            && !candidate.is_subtype_of(db, current_best)
+                    }
+                };
+
+                for constraint in constraints.elements(db).iter().copied() {
                     let constraint_lower = constraint.bottom_materialization(db);
                     let constraint_upper = constraint.top_materialization(db);
                     let when_lower =
@@ -3648,25 +3738,58 @@ impl<'db> PathBounds<'db> {
                     let when = builder
                         .load(db, &when_lower)
                         .and(db, builder, || when_upper);
-                    !when.is_never_satisfied(db)
-                });
-
-                // If only one constraint remains, that's our specialization for this path.
-                match compatible_constraints.at_most_one() {
-                    Ok(None) => {
-                        // This path does not satisfy any of the constraints, and is
-                        // therefore not a valid specialization.
-                        Err(())
+                    if when.is_never_satisfied(db) {
+                        continue;
                     }
 
-                    Ok(Some(compatible_constraint)) => Ok(Some(*compatible_constraint)),
+                    if compatible_constraint.is_some() {
+                        multiple_compatible_constraints = true;
+                    }
+                    if compatible_constraint
+                        .is_none_or(|best| is_tighter_solution(constraint, best))
+                    {
+                        compatible_constraint = Some(constraint);
+                    }
+                }
 
-                    Err(_) => {
-                        // This path satisfies multiple constraints. For now, don't
-                        // prefer any of them, and fall back on the default
-                        // specialization for this typevar.
+                let Some(compatible_constraint) = compatible_constraint else {
+                    // This path does not satisfy any of the constraints, and is therefore not a
+                    // valid specialization.
+                    return Err(());
+                };
+
+                if let (Some(ty @ Type::TypeVar(_)), _) | (_, Some(ty @ Type::TypeVar(_))) =
+                    (path_bound.lower, path_bound.upper.as_single_bound())
+                {
+                    // This path relates two TypeVars, such as passing `S` to a parameter typed as
+                    // `T: (int, str)`. The compatibility check above has verified that at least
+                    // one of `T`'s declared constraints can satisfy the path, but choosing a
+                    // concrete constraint here would break the relationship between `T` and `S`.
+                    // Keep that relationship as the solution instead.
+                    return Ok(Some(ty));
+                }
+
+                // See above: If the path solution satisfies exactly one constraint, use that
+                // constraint as our solution. (Even if the path solution is gradual: if we are
+                // checking `list[Any]` against `T: (int, list[int])`, we select `T = list[int]`.)
+                //
+                // If the path solution satisfies multiple constraints, then we use path solution
+                // as the result if it's gradual. (Checking `Any` against `T: (int, str)` selects
+                // `T = Any`) If the path solution is fully static, we choose the "tightest"
+                // constraint. (Checking `int` against `T: (int, int | str)` selects `T = int`.)
+                if multiple_compatible_constraints && path_bound.has_only_gradual_evidence() {
+                    if let Some(lower) = path_bound.lower {
+                        Ok(Some(lower))
+                    } else if path_bound.has_upper() {
+                        Ok(IntersectionType::bounded_from_elements(
+                            db,
+                            path_bound.upper.clauses.iter().copied(),
+                        ))
+                    } else {
                         Ok(None)
                     }
+                } else {
+                    Ok(Some(compatible_constraint))
                 }
             }
         }
@@ -5566,8 +5689,10 @@ impl SequentMap {
             |bound_constraint: ConstraintId, constrained_constraint: ConstraintId| {
                 let bound_data = builder.constraint_data(bound_constraint);
                 let bound_typevar = bound_data.typevar;
+                let bound_identity = bound_typevar.identity(db);
                 let constrained_data = builder.constraint_data(constrained_constraint);
                 let constrained_typevar = constrained_data.typevar;
+                let constrained_identity = constrained_typevar.identity(db);
                 let constrained_lower = constrained_data.bounds.materialized_lower();
                 let constrained_upper = constrained_data.bounds.materialized_upper();
 
@@ -5581,8 +5706,8 @@ impl SequentMap {
                 // instead of calling `variance_of` on them. This avoids a large number of tiny
                 // tracked `variance_of` queries in hot paths.
                 let replacement_mentions_bound_or_constrained = |replacement: Type<'db>| {
-                    replacement.variance_of(db, bound_typevar) != TypeVarVariance::Bivariant
-                        || replacement.variance_of(db, constrained_typevar)
+                    replacement.variance_of(db, bound_identity) != TypeVarVariance::Bivariant
+                        || replacement.variance_of(db, constrained_identity)
                             != TypeVarVariance::Bivariant
                 };
 
@@ -5596,7 +5721,7 @@ impl SequentMap {
                 // need an alternative representation for "typevar not present"
                 // (e.g., `Option<TypeVarVariance>`).
                 let upper_replacement = match (
-                    constrained_upper.variance_of(db, bound_typevar),
+                    constrained_upper.variance_of(db, bound_identity),
                     bound_data.bounds.lower,
                     bound_data.bounds.upper,
                 ) {
@@ -5666,7 +5791,7 @@ impl SequentMap {
 
                 // Check the lower bound of the constrained constraint for nested occurrences.
                 let lower_replacement = match (
-                    constrained_lower.variance_of(db, bound_typevar),
+                    constrained_lower.variance_of(db, bound_identity),
                     bound_data.bounds.lower,
                     bound_data.bounds.upper,
                 ) {
@@ -5792,7 +5917,7 @@ impl SequentMap {
                         && !constrained_upper.is_never()
                         && !constrained_upper.is_object()
                         && !constrained_upper.is_dynamic()
-                        && match constrained_upper.variance_of(db, nested_typevar) {
+                        && match constrained_upper.variance_of(db, nested_typevar.identity(db)) {
                             TypeVarVariance::Bivariant => false,
                             TypeVarVariance::Covariant => !is_upper_bound,
                             TypeVarVariance::Contravariant => is_upper_bound,
@@ -5837,7 +5962,7 @@ impl SequentMap {
                         && !constrained_lower.is_never()
                         && !constrained_lower.is_object()
                         && !constrained_lower.is_dynamic()
-                        && match constrained_lower.variance_of(db, nested_typevar) {
+                        && match constrained_lower.variance_of(db, nested_typevar.identity(db)) {
                             TypeVarVariance::Bivariant => false,
                             TypeVarVariance::Covariant => is_upper_bound,
                             TypeVarVariance::Contravariant => !is_upper_bound,
@@ -6871,8 +6996,7 @@ mod tests {
             )
         };
 
-        let set = set.remove_noninferable(&db, &builder, inferable);
-        let solutions = set.solutions(&db, &builder);
+        let solutions = set.solutions(&db, &builder, inferable);
         assert_eq!(
             solutions,
             Solutions::Constrained(vec![vec![TypeVarSolution {
@@ -6895,6 +7019,7 @@ mod tests {
             bound_typevar: t,
             lower: None,
             upper: UpperBound::none(),
+            has_only_gradual_evidence: false,
         };
 
         assert_eq!(

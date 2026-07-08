@@ -44,7 +44,7 @@ impl<'a> MarkdownFence<'a> {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub(super) struct PreformattedBlockScanner<'a> {
     active_markdown_fence: Option<MarkdownFence<'a>>,
-    active_doctest: bool,
+    active_doctest_indent: Option<TextSize>,
     rest_literal_blocks: RestLiteralBlockScanner,
 }
 
@@ -68,15 +68,19 @@ impl<'a> PreformattedBlockScanner<'a> {
             return true;
         }
 
-        if self.active_doctest {
+        if let Some(doctest_indent) = self.active_doctest_indent {
             if line.trim_start_matches(' ').is_empty() {
-                self.active_doctest = false;
+                self.active_doctest_indent = None;
+                return true;
+            } else if indentation(line) < doctest_indent {
+                self.active_doctest_indent = None;
+            } else {
+                return true;
             }
-            return true;
         }
 
         if Self::line_starts_doctest(line) {
-            self.active_doctest = true;
+            self.active_doctest_indent = Some(indentation(line));
             return true;
         }
 

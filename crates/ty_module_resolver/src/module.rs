@@ -307,6 +307,10 @@ pub enum KnownModule {
     Os,
     Tempfile,
     Pathlib,
+    Datetime,
+    Decimal,
+    Ipaddress,
+    Re,
     Abc,
     Dataclasses,
     Functools,
@@ -321,6 +325,10 @@ pub enum KnownModule {
     #[strum(serialize = "_typeshed._type_checker_internals")]
     TypeCheckerInternals,
     TyExtensions,
+    #[strum(serialize = "ty_extensions._internal")]
+    TyExtensionsInternal,
+    #[strum(serialize = "ty_extensions.pydantic")]
+    TyExtensionsPydantic,
     #[strum(serialize = "importlib")]
     ImportLib,
     #[strum(serialize = "unittest.mock")]
@@ -331,8 +339,18 @@ pub enum KnownModule {
     #[strum(serialize = "struct", serialize = "_struct")]
     Struct,
     // Third-party modules
+    #[strum(serialize = "pydantic.config")]
+    PydanticConfig,
+    #[strum(serialize = "pydantic.fields")]
+    PydanticFields,
     #[strum(serialize = "pydantic.main")]
     PydanticMain,
+    #[strum(serialize = "pydantic.root_model")]
+    PydanticRootModel,
+    #[strum(serialize = "pydantic_settings.main")]
+    PydanticSettingsMain,
+    #[strum(serialize = "pydantic.types")]
+    PydanticTypes,
 }
 
 impl KnownModule {
@@ -348,6 +366,10 @@ impl KnownModule {
             Self::Os => "os",
             Self::Tempfile => "tempfile",
             Self::Pathlib => "pathlib",
+            Self::Datetime => "datetime",
+            Self::Decimal => "decimal",
+            Self::Ipaddress => "ipaddress",
+            Self::Re => "re",
             Self::Abc => "abc",
             Self::Dataclasses => "dataclasses",
             Self::Functools => "functools",
@@ -357,6 +379,8 @@ impl KnownModule {
             Self::Inspect => "inspect",
             Self::TypeCheckerInternals => "_typeshed._type_checker_internals",
             Self::TyExtensions => "ty_extensions",
+            Self::TyExtensionsInternal => "ty_extensions._internal",
+            Self::TyExtensionsPydantic => "ty_extensions.pydantic",
             Self::ImportLib => "importlib",
             Self::Warnings => "warnings",
             Self::UnittestMock => "unittest.mock",
@@ -364,7 +388,12 @@ impl KnownModule {
             Self::Templatelib => "string.templatelib",
             Self::Numbers => "numbers",
             Self::Struct => "struct",
+            Self::PydanticConfig => "pydantic.config",
+            Self::PydanticFields => "pydantic.fields",
             Self::PydanticMain => "pydantic.main",
+            Self::PydanticRootModel => "pydantic.root_model",
+            Self::PydanticSettingsMain => "pydantic_settings.main",
+            Self::PydanticTypes => "pydantic.types",
         }
     }
 
@@ -388,7 +417,12 @@ impl KnownModule {
     /// Return `true` if this module is provided by a supported third-party package.
     pub const fn is_third_party(self) -> bool {
         match self {
-            Self::PydanticMain => true,
+            Self::PydanticConfig
+            | Self::PydanticFields
+            | Self::PydanticMain
+            | Self::PydanticRootModel
+            | Self::PydanticSettingsMain
+            | Self::PydanticTypes => true,
             Self::Builtins
             | Self::Enum
             | Self::Types
@@ -399,6 +433,10 @@ impl KnownModule {
             | Self::Os
             | Self::Tempfile
             | Self::Pathlib
+            | Self::Datetime
+            | Self::Decimal
+            | Self::Ipaddress
+            | Self::Re
             | Self::Abc
             | Self::Dataclasses
             | Self::Functools
@@ -409,6 +447,8 @@ impl KnownModule {
             | Self::Templatelib
             | Self::TypeCheckerInternals
             | Self::TyExtensions
+            | Self::TyExtensionsInternal
+            | Self::TyExtensionsPydantic
             | Self::ImportLib
             | Self::UnittestMock
             | Self::Uuid
@@ -432,6 +472,10 @@ impl KnownModule {
 
     pub const fn is_ty_extensions(self) -> bool {
         matches!(self, Self::TyExtensions)
+    }
+
+    pub const fn is_ty_extensions_internal(self) -> bool {
+        matches!(self, Self::TyExtensionsInternal)
     }
 
     pub const fn is_inspect(self) -> bool {

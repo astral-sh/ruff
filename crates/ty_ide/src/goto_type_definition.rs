@@ -157,7 +157,7 @@ mod tests {
            | ^^ Clicking here
            |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | AlwaysTruthy: _SpecialForm
            | ------------
@@ -185,7 +185,7 @@ mod tests {
            |     ^ Clicking here
            |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
         LL | Divergent: _SpecialForm
            | ---------
@@ -762,7 +762,7 @@ mod tests {
            |                               ^^ Clicking here
            |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
         LL | Todo: _SpecialForm
            | ----
@@ -962,7 +962,7 @@ mod tests {
            |    ^^^^^^^^^^^ Clicking here
            |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | -------
@@ -1016,7 +1016,7 @@ mod tests {
            |               ^^ Clicking here
            |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | -------
@@ -1040,7 +1040,7 @@ mod tests {
            |      ^^ Clicking here
            |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | -------
@@ -1064,7 +1064,7 @@ mod tests {
            |     ^^^^^^ Clicking here
            |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | -------
@@ -1226,7 +1226,7 @@ mod tests {
            |             ^^^^^^^^^ Clicking here
            |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | -------
@@ -1589,7 +1589,7 @@ mod tests {
            |                                      ^^ Clicking here
            |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
         LL | Todo: _SpecialForm
            | ----
@@ -2015,7 +2015,7 @@ def function():
            |     ^^^^^^ Clicking here
            |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | -------

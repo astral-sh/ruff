@@ -8,8 +8,8 @@ use ty_module_resolver::{ModuleName, file_to_module};
 
 use super::protocol_class::ProtocolInterface;
 use super::{
-    BoundTypeVarInstance, ClassType, DivergentType, KnownClass, MaterializationKind,
-    SubclassOfType, Type, TypeVarVariance,
+    BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
+    MaterializationKind, SubclassOfType, Type, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
@@ -568,8 +568,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.type_satisfies_protocol_member(db, ty, &member)
                 })
         };
-        if structurally_satisfied.is_never_satisfied(db) {
-            self.provide_context(|| ErrorContext::TypeNotCompatibleWithProtocol {
+        if let Some(context) = self.report_context()
+            && structurally_satisfied.is_never_satisfied(db)
+        {
+            context.push(ErrorContext::TypeNotCompatibleWithProtocol {
                 ty,
                 protocol: Type::ProtocolInstance(protocol),
             });
@@ -729,7 +731,7 @@ pub(crate) struct SliceLiteral {
 }
 
 impl<'db> VarianceInferable<'db> for NominalInstanceType<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         self.class(db).variance_of(db, typevar)
     }
 }
@@ -921,7 +923,7 @@ impl<'db> ProtocolInstanceType<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         self.inner.variance_of(db, typevar)
     }
 }
@@ -965,7 +967,7 @@ impl<'db> Protocol<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for Protocol<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         match self {
             Protocol::FromClass(class_type) => class_type.variance_of(db, typevar),
             Protocol::Synthesized(synthesized_protocol_type) => {
@@ -978,8 +980,9 @@ impl<'db> VarianceInferable<'db> for Protocol<'db> {
 mod synthesized_protocol {
     use crate::types::protocol_class::ProtocolInterface;
     use crate::types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, Type,
-        TypeContext, TypeMapping, TypeVarVariance, VarianceInferable,
+        ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance,
+        FindLegacyTypeVarsVisitor, Type, TypeContext, TypeMapping, TypeVarVariance,
+        VarianceInferable,
     };
     use crate::{Db, FxOrderSet};
     use ty_python_core::definition::Definition;
@@ -1037,7 +1040,7 @@ mod synthesized_protocol {
         fn variance_of(
             self,
             db: &'db dyn Db,
-            typevar: BoundTypeVarInstance<'db>,
+            typevar: BoundTypeVarIdentity<'db>,
         ) -> TypeVarVariance {
             self.0.variance_of(db, typevar)
         }

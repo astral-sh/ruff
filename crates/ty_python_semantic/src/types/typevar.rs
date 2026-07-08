@@ -572,8 +572,7 @@ impl<'db> TypeVarInstance<'db> {
                 Type::NominalInstance(nominal_instance) => nominal_instance
                     .own_tuple_spec(db)
                     .map_or_else(Parameters::unknown, |tuple_spec| {
-                        Parameters::new(
-                            db,
+                        Parameters::standard(
                             tuple_spec
                                 .iter_all_elements()
                                 .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
@@ -1078,7 +1077,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             None => match self.binding_context(db) {
                 BindingContext::Definition(definition) => binding_type(db, definition)
                     .with_polarity(polarity)
-                    .variance_of(db, self),
+                    .variance_of(db, self.identity(db)),
                 BindingContext::Synthetic => TypeVarVariance::Invariant,
             },
         }

@@ -4,12 +4,13 @@ use ruff_python_ast::name::Name;
 use crate::{
     Db, DisplaySettings,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassType, GenericContext,
-        InferenceFlags, InvalidTypeExpressionError, KnownClass, PromotionKind, PromotionMode,
-        StringLiteralType, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarNonce,
-        TypeVarVariance, UnionBuilder,
+        ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
+        ClassType, GenericContext, InferenceFlags, InvalidTypeExpressionError, KnownClass,
+        PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
+        TypeMapping, TypeVarNonce, TypeVarVariance, UnionBuilder,
         class::NamedTupleSpec,
         constraints::OwnedConstraintSet,
+        dedicated::pydantic::ConfigBoolean,
         generics::{Specialization, walk_generic_context},
         newtype::NewType,
         typevar::TypeVarInstance,
@@ -92,15 +93,15 @@ pub enum KnownInstanceType<'db> {
     Field(FieldInstance<'db>),
 
     /// A constraint set, which is exposed in mdtests as an instance of
-    /// `ty_extensions.ConstraintSet`.
+    /// `ty_extensions._internal.ConstraintSet`.
     ConstraintSet(InternedConstraintSet<'db>),
 
     /// A generic context, which is exposed in mdtests as an instance of
-    /// `ty_extensions.GenericContext`.
+    /// `ty_extensions._internal.GenericContext`.
     GenericContext(GenericContext<'db>),
 
     /// A specialization, which is exposed in mdtests as an instance of
-    /// `ty_extensions.Specialization`.
+    /// `ty_extensions._internal.Specialization`.
     Specialization(Specialization<'db>),
 
     /// A single instance of `types.UnionType`, which stores the elements of
@@ -138,6 +139,9 @@ pub enum KnownInstanceType<'db> {
 
     /// A `range(...)` call result where we could determine whether it is non-empty.
     Range { is_non_empty: bool },
+
+    /// The bound `__call__` attribute of a precise `functools.partial(...)` result.
+    FunctoolsPartialCall(FunctoolsPartialInstance<'db>),
 }
 
 pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -197,14 +201,15 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
                 visitor.visit_type(db, field.ty);
             }
         }
-        KnownInstanceType::FunctoolsPartial(partial) => {
+        KnownInstanceType::FunctoolsPartial(partial)
+        | KnownInstanceType::FunctoolsPartialCall(partial) => {
             visitor.visit_callable_type(db, partial.partial(db));
         }
     }
 }
 
 impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         match self {
             KnownInstanceType::TypeAliasType(type_alias) => {
                 type_alias.raw_value_type(db).variance_of(db, typevar)
@@ -265,6 +270,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::FunctoolsPartial(partial) => partial
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Self::FunctoolsPartial),
+            Self::FunctoolsPartialCall(partial) => partial
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Self::FunctoolsPartialCall),
         }
     }
 
@@ -295,6 +303,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::NamedTupleSpec(_) => KnownClass::Sequence,
             Self::FunctoolsPartial(_) => KnownClass::FunctoolsPartial,
             Self::Range { .. } => KnownClass::Range,
+            Self::FunctoolsPartialCall(_) => KnownClass::MethodWrapperType,
         }
     }
 
@@ -415,6 +424,11 @@ impl<'db> KnownInstanceType<'db> {
                 }
                 _ => Type::KnownInstance(self),
             },
+            KnownInstanceType::FunctoolsPartialCall(partial) => {
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(
+                    partial.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
+            }
             KnownInstanceType::TypeGenericAlias(ty) => {
                 Type::KnownInstance(KnownInstanceType::TypeGenericAlias(InternedType::new(
                     db,
@@ -493,6 +507,9 @@ pub struct FieldInstance<'db> {
     /// The first element is the input type (first positional parameter), the second is the
     /// output type (return type of the converter callable).
     pub converter: Option<(Type<'db>, Type<'db>)>,
+
+    /// The mode selected by Pydantic's `strict` argument.
+    pub strict: ConfigBoolean,
 }
 
 // The Salsa heap is tracked separately.
@@ -536,6 +553,7 @@ impl<'db> FieldInstance<'db> {
             self.kw_only(db),
             self.alias(db),
             converter,
+            self.strict(db),
         ))
     }
 }
