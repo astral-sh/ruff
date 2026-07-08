@@ -574,8 +574,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, self.node.iff_with_offset(builder, other.node))
     }
 
-    /// Reduces the set of inferable typevars for this constraint set using the ordinary raw
-    /// existential abstraction path.
+    /// Existentially removes the given inferable type variables using the cached abstraction path.
+    ///
+    /// Facts derived while projecting the variables retain their existing constraint encoding.
+    /// Higher-rank comparison instead uses [`Self::exists`], which normalizes those residual facts.
     pub(crate) fn reduce_inferable(
         self,
         db: &'db dyn Db,
@@ -591,6 +593,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// The result holds whenever the original constraint set holds for any assignment of the
     /// removed variables. A caller that wants to restrict assignments to a type variable's
     /// declared domain must conjoin that domain before calling this method.
+    ///
+    /// Positive facts derived during projection are rebuilt through the canonical constraint
+    /// constructor. This makes the result independent of type-variable interning order, at the
+    /// cost of using a separate, uncached path from [`Self::reduce_inferable`].
     pub(crate) fn exists(
         self,
         db: &'db dyn Db,
@@ -644,9 +650,9 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// Returns whether a constraint relates one of the given type variables to a type variable
     /// that will remain free.
     ///
-    /// Universal abstraction through [`Self::try_for_all`] cannot currently preserve a residual such
-    /// as `int ≤ O` when removing `T` from `(T ≤ int) → (T ≤ O)`. Callers that need to retain
-    /// constraints on free variables must reject this fragment rather than abstract it.
+    /// Universal abstraction through [`Self::try_for_all`] cannot currently preserve a residual
+    /// such as `int ≤ O` when removing `T` from `(T ≤ int) → (T ≤ O)`. Callers that need to
+    /// retain constraints on free variables must reject this fragment rather than abstract it.
     fn has_cross_quantifier_typevar(
         self,
         db: &'db dyn Db,
@@ -2994,24 +3000,32 @@ impl NodeId {
             builder,
             bound_typevars,
             &mut path,
-            |assignment, source_order| assignment.to_derived_node(db, builder, source_order),
+            |assignment, source_order| {
+                assignment.to_normalized_derived_node(db, builder, source_order)
+            },
         )
     }
 
+    /// Recursively abstracts `bound_typevars`, using `encode_derived_assignment` to reinsert
+    /// residual facts discovered while removing constraints.
     fn exists_inner_with<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         bound_typevars: InferableTypeVars<'db>,
         path: &mut PathAssignments,
-        derived_node: impl Copy + Fn(ConstraintAssignment, usize) -> NodeId,
+        encode_derived_assignment: impl Copy + Fn(ConstraintAssignment, usize) -> NodeId,
     ) -> Self {
         match self.node() {
             Node::AlwaysTrue => ALWAYS_TRUE,
             Node::AlwaysFalse => ALWAYS_FALSE,
-            Node::Interior(interior) => {
-                interior.exists_inner_with(db, builder, bound_typevars, path, derived_node)
-            }
+            Node::Interior(interior) => interior.exists_inner_with(
+                db,
+                builder,
+                bound_typevars,
+                path,
+                encode_derived_assignment,
+            ),
         }
     }
 
@@ -3028,20 +3042,26 @@ impl NodeId {
         }
     }
 
+    /// Removes matching constraints, using `encode_derived_assignment` to retain facts that the
+    /// path machinery derives from them.
     fn abstract_one_inner_with<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         should_remove: &mut dyn FnMut(ConstraintId) -> bool,
         path: &mut PathAssignments,
-        derived_node: impl Copy + Fn(ConstraintAssignment, usize) -> NodeId,
+        encode_derived_assignment: impl Copy + Fn(ConstraintAssignment, usize) -> NodeId,
     ) -> Self {
         match self.node() {
             Node::AlwaysTrue => ALWAYS_TRUE,
             Node::AlwaysFalse => ALWAYS_FALSE,
-            Node::Interior(interior) => {
-                interior.abstract_one_inner_with(db, builder, should_remove, path, derived_node)
-            }
+            Node::Interior(interior) => interior.abstract_one_inner_with(
+                db,
+                builder,
+                should_remove,
+                path,
+                encode_derived_assignment,
+            ),
         }
     }
 
@@ -4235,7 +4255,7 @@ impl InteriorNode {
         builder: &ConstraintSetBuilder<'db>,
         bound_typevars: InferableTypeVars<'db>,
         path: &mut PathAssignments,
-        derived_node: impl Copy + Fn(ConstraintAssignment, usize) -> NodeId,
+        encode_derived_assignment: impl Copy + Fn(ConstraintAssignment, usize) -> NodeId,
     ) -> NodeId {
         let mentions_typevar = |ty: Type<'db>| match ty {
             Type::TypeVar(typevar) => typevar.is_inferable(db, bound_typevars),
@@ -4261,7 +4281,7 @@ impl InteriorNode {
                         .is_some_and(|upper| any_over_type(db, upper, false, mentions_typevar))
             },
             path,
-            derived_node,
+            encode_derived_assignment,
         )
     }
 
@@ -4313,7 +4333,7 @@ impl InteriorNode {
         builder: &ConstraintSetBuilder<'db>,
         should_remove: &mut dyn FnMut(ConstraintId) -> bool,
         path: &mut PathAssignments,
-        derived_node: impl Copy + Fn(ConstraintAssignment, usize) -> NodeId,
+        encode_derived_assignment: impl Copy + Fn(ConstraintAssignment, usize) -> NodeId,
     ) -> NodeId {
         let self_interior = builder.interior_node_data(self.node());
         if should_remove(self_interior.constraint) {
@@ -4341,7 +4361,7 @@ impl InteriorNode {
                             builder,
                             should_remove,
                             path,
-                            derived_node,
+                            encode_derived_assignment,
                         );
                         path.assignments[new_range]
                             .iter()
@@ -4351,7 +4371,10 @@ impl InteriorNode {
                                 !should_remove(assignment.constraint())
                             })
                             .fold(branch, |branch, (assignment, (source_order, _))| {
-                                branch.and(builder, derived_node(*assignment, *source_order))
+                                branch.and(
+                                    builder,
+                                    encode_derived_assignment(*assignment, *source_order),
+                                )
                             })
                     },
                 )
@@ -4368,7 +4391,7 @@ impl InteriorNode {
                             builder,
                             should_remove,
                             path,
-                            derived_node,
+                            encode_derived_assignment,
                         );
                         path.assignments[new_range]
                             .iter()
@@ -4378,7 +4401,10 @@ impl InteriorNode {
                                 !should_remove(assignment.constraint())
                             })
                             .fold(branch, |branch, (assignment, (source_order, _))| {
-                                branch.and(builder, derived_node(*assignment, *source_order))
+                                branch.and(
+                                    builder,
+                                    encode_derived_assignment(*assignment, *source_order),
+                                )
                             })
                     },
                 )
@@ -4395,13 +4421,16 @@ impl InteriorNode {
                             builder,
                             should_remove,
                             path,
-                            derived_node,
+                            encode_derived_assignment,
                         );
                         path.assignments[new_range]
                             .iter()
                             .filter(|(assignment, _)| !should_remove(assignment.constraint()))
                             .fold(branch, |branch, (assignment, (source_order, _))| {
-                                branch.and(builder, derived_node(*assignment, *source_order))
+                                branch.and(
+                                    builder,
+                                    encode_derived_assignment(*assignment, *source_order),
+                                )
                             })
                     },
                 )
@@ -4421,7 +4450,7 @@ impl InteriorNode {
                             builder,
                             should_remove,
                             path,
-                            derived_node,
+                            encode_derived_assignment,
                         )
                     },
                 )
@@ -4438,7 +4467,7 @@ impl InteriorNode {
                             builder,
                             should_remove,
                             path,
-                            derived_node,
+                            encode_derived_assignment,
                         )
                     },
                 )
@@ -4455,7 +4484,7 @@ impl InteriorNode {
                             builder,
                             should_remove,
                             path,
-                            derived_node,
+                            encode_derived_assignment,
                         )
                     },
                 )
@@ -5058,8 +5087,11 @@ impl ConstraintAssignment {
         }
     }
 
-    /// Creates a normalized node for a fact derived while walking a constraint path.
-    fn to_derived_node<'db>(
+    /// Re-encodes a derived fact through the canonical constraint constructor.
+    ///
+    /// Positive assignments can contain bounds whose orientation depends on type-variable
+    /// interning order. Rebuilding them here makes higher-rank projection order-independent.
+    fn to_normalized_derived_node<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,

@@ -431,6 +431,7 @@ impl<'db> CallableSignature<'db> {
             .map(|bound_typevar| (bound_typevar, signature.return_ty))
     }
 
+    /// Returns the union of type variables that can be inferred through any overload.
     pub(super) fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {
         self.overloads
             .iter()
@@ -1860,8 +1861,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         when.reduce_inferable(db, self.constraints, signature_inferable)
     }
 
-    /// Compare signatures by existentially quantifying source-local variables inside the
-    /// universal quantification of target-local variables.
+    /// Compares generic signatures as `for all target locals, there exist source locals`.
+    ///
+    /// Source variables are projected first, so their witnesses may depend on a target variable:
+    ///
+    /// ```python
+    /// def source[S](value: S) -> list[S]: ...
+    /// def target[T](value: list[T]) -> list[list[T]]: ...
+    /// ```
+    ///
+    /// Each specialization of `target` is covered by choosing `S = list[T]` for `source`.
     fn check_signature_pair_with_quantified_locals(
         &self,
         db: &'db dyn Db,
