@@ -482,14 +482,13 @@ def assignment_expression(value: Token | Literal[1]) -> None:
         reveal_type(value)  # revealed: Literal[1]
 ```
 
-## Type wrappers and `isinstance` narrowing
+## `NewType` containers
 
-A bound or constrained type variable can use its item type only if membership checks those items for
-every possible container. A `NewType` uses the behavior of its underlying type.
+A `NewType` uses the containment behavior of its underlying type, so membership in a wrapped tuple
+can narrow the tested value to the tuple's item type.
 
 ```py
-from collections.abc import Iterable, Iterator, Sized
-from typing import Any, Literal, NewType, TypeVar, final
+from typing import Literal, NewType, final
 
 @final
 class Token: ...
@@ -502,6 +501,20 @@ def wrapped_tuple(
 ) -> None:
     if value in values:
         reveal_type(value)  # revealed: Literal[1]
+```
+
+## Type-variable containers
+
+A bound or constrained type variable can use its item type only if membership checks those items for
+every possible container. Both possible values of `ConstrainedTuple` use tuple containment, while
+`MixedContainers` also permits an open iterable that could define arbitrary containment behavior.
+
+```py
+from collections.abc import Iterator
+from typing import Literal, TypeVar, final
+
+@final
+class Token: ...
 
 BoundTuple = TypeVar("BoundTuple", bound=tuple[Literal[1], ...])
 
@@ -543,12 +556,21 @@ def mixed_constraints(
         reveal_type(value)  # revealed: Token | Literal[1]
 ```
 
-An `isinstance` check can also identify a concrete container. After narrowing to `tuple`, membership
-can use the tuple's item type. Checking only an unrelated protocol such as `Sized` does not tell us
-how membership works. A custom `__contains__` from another intersection component can precede a
-known implementation in a concrete subclass, so that intersection also remains conservative.
+## Intersection containers
+
+An `isinstance` check can identify a concrete container within an intersection. After narrowing to
+`tuple`, membership uses the intersection's iterated element type. Checking only an unrelated
+protocol such as `Sized` does not establish how membership works. A custom `__contains__` from
+another intersection component could override a known implementation in a concrete subclass, so that
+intersection also remains conservative.
 
 ```py
+from collections.abc import Iterable, Iterator, Sized
+from typing import Any, Literal, final
+
+@final
+class Token: ...
+
 def tuple_intersection(
     value: Token | Literal[1],
     values: Iterable[Literal[1]],
