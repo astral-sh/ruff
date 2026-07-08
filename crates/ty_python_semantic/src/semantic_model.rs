@@ -257,7 +257,7 @@ impl<'db> SemanticModel<'db> {
         // keeps the correct types (e.g., `__file__` is `str` for the current module,
         // not `str | None`).
         completions.extend(
-            all_implicit_module_globals(self.db).map(|(name, ty)| Completion {
+            all_implicit_module_globals(self.db, self.file).map(|(name, ty)| Completion {
                 name,
                 ty: Some(ty),
                 builtin: true,
