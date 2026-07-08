@@ -4733,7 +4733,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Any, ClassVar, Protocol, Self
+from typing import Any, ClassVar, Protocol, Self, TypeVar, runtime_checkable
 from ty_extensions import Unknown, static_assert
 from ty_extensions._internal import TypeOf, is_assignable_to, is_subtype_of
 
@@ -4970,6 +4970,21 @@ reveal_type(meta_protocol_identity(GenericFooImpl[int]))  # revealed: type[Gener
 
 def _(f: type[GenericFoo[int]]) -> None:
     reveal_type(infer_meta_protocol(f))  # revealed: int
+
+T_runtime_co = TypeVar("T_runtime_co", covariant=True)
+
+@runtime_checkable
+class RuntimeProtocol(Protocol[T_runtime_co]):
+    def get(self) -> T_runtime_co: ...
+
+def _(
+    condition: RuntimeProtocol[int] | int,
+    values: dict[type[RuntimeProtocol[object]], RuntimeProtocol[object]],
+) -> None:
+    if isinstance(condition, RuntimeProtocol):
+        reveal_type(condition)  # revealed: RuntimeProtocol[int] | (int & RuntimeProtocol[object])
+        reveal_type(type(condition))  # revealed: type[RuntimeProtocol[int]] | (type[int] & type[RuntimeProtocol[object]])
+        values[type(condition)] = condition
 
 class Producer[T](Protocol):
     def get(self) -> T: ...

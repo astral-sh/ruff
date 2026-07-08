@@ -6331,19 +6331,19 @@ impl<'db> Type<'db> {
     /// Class-backed protocols return their structural `type[Protocol]` view.
     #[must_use]
     pub(crate) fn dunder_class(self, db: &'db dyn Db) -> Type<'db> {
-        if self.is_typed_dict() {
-            return KnownClass::Dict
+        match self {
+            Type::Union(union) => union.map(db, |element| element.dunder_class(db)),
+            Type::Intersection(intersection) => intersection
+                .try_dunder_class(db)
+                .unwrap_or_else(|| self.to_meta_type(db)),
+            Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
+            Type::TypedDict(_) => KnownClass::Dict
                 .to_specialized_class_type(db, &[KnownClass::Str.to_instance(db), Type::object()])
                 .map(Type::from)
                 // Guard against user-customized typesheds with a broken `dict` class
-                .unwrap_or_else(Type::unknown);
+                .unwrap_or_else(Type::unknown),
+            _ => self.to_meta_type(db),
         }
-
-        if let Type::ProtocolInstance(protocol) = self {
-            return protocol.to_meta_type(db);
-        }
-
-        self.to_meta_type(db)
     }
 
     #[must_use]
