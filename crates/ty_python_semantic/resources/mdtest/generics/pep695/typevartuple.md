@@ -192,6 +192,15 @@ class Array[*Ts]:
 
 ## Functions
 
+### Multiple type variable tuples
+
+Generic functions can declare multiple type variable tuples because their type parameters are
+inferred from arguments; functions cannot be explicitly specialized.
+
+```py
+def pair[*Ts1, *Ts2](first: tuple[*Ts1], second: tuple[*Ts2]) -> None: ...
+```
+
 ### Tuple arguments and returns
 
 ```py
@@ -896,11 +905,16 @@ def f(pair: Row[int, str], triple: Row[int, str, bytes]) -> None:
 
 ### Multiple Type Variable Tuples not allowed
 
-Only one type variable tuple can appear in a type parameter list.
+Only one type variable tuple can appear in a generic class or type alias type parameter list. Both
+can be explicitly specialized, so multiple type variable tuples would make it ambiguous which pack
+consumes each type argument.
 
 ```py
-# error: [invalid-type-form]
+# error: [invalid-type-form] "TypeVarTuple `Ts2` cannot appear after TypeVarTuple `Ts1`"
 class Array[*Ts1, *Ts2]: ...
+
+# error: [invalid-type-form] "TypeVarTuple `Ts2` cannot appear after TypeVarTuple `Ts1`"
+type Alias[*Ts1, *Ts2] = tuple[*Ts1] | tuple[*Ts2]
 ```
 
 ### Must always be unpacked

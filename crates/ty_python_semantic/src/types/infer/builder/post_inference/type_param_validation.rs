@@ -7,7 +7,11 @@ use crate::types::{
     diagnostic::{INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_DEFAULT},
 };
 
-/// Check that a PEP 695 type parameter list contains at most one `TypeVarTuple`.
+/// Check that a PEP 695 class or type alias parameter list contains at most one `TypeVarTuple`.
+///
+/// Classes and type aliases can be explicitly specialized, so multiple `TypeVarTuple`s would make
+/// it ambiguous which pack consumes each type argument. Generic functions cannot be explicitly
+/// specialized and intentionally do not use this validation.
 pub(crate) fn check_single_typevar_tuple_pep695(
     context: &InferContext<'_, '_>,
     type_params: &ast::TypeParams,
