@@ -210,19 +210,22 @@ impl<'a, 'db> FunctoolsPartialApplicationPlan<'a, 'db> {
                 }
                 Argument::Variadic => {
                     has_variadic_argument = true;
-                    last_direct_positional_placeholder = None;
-                    has_unsupported_placeholder |= argument_ty
+                    let tuple_spec = argument_ty
                         .as_nominal_instance()
-                        .and_then(|nominal| nominal.tuple_spec(db))
+                        .and_then(|nominal| nominal.tuple_spec(db));
+                    let fixed_tuple = tuple_spec
                         .as_deref()
-                        .and_then(|spec| spec.as_fixed_length())
-                        .is_some_and(|tuple| {
-                            placeholder_ty.is_some_and(|placeholder| {
-                                tuple
-                                    .iter_all_elements()
-                                    .any(|element| !element.is_disjoint_from(db, placeholder))
-                            })
-                        });
+                        .and_then(|spec| spec.as_fixed_length());
+                    if fixed_tuple.is_none_or(|tuple| tuple.len() != 0) {
+                        last_direct_positional_placeholder = None;
+                    }
+                    has_unsupported_placeholder |= fixed_tuple.is_some_and(|tuple| {
+                        placeholder_ty.is_some_and(|placeholder| {
+                            tuple
+                                .iter_all_elements()
+                                .any(|element| !element.is_disjoint_from(db, placeholder))
+                        })
+                    });
                 }
                 Argument::Keyword(_) => {
                     if placeholder_ty == Some(argument_ty) {

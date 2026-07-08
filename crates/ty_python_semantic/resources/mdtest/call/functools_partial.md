@@ -976,6 +976,10 @@ partial(pending, _)  # error: [invalid-argument-type]
 partial(combine, 1, _)  # error: [invalid-argument-type]
 partial(combine, _, "value", _)  # error: [invalid-argument-type]
 partial(combine, *(1, _))  # error: [invalid-argument-type]
+partial(combine, _, *())  # error: [invalid-argument-type]
+
+empty: tuple[()] = ()
+partial(combine, _, *empty)  # error: [invalid-argument-type]
 
 def collect(prefix: int, *values: str) -> tuple[str, ...]:
     return values
