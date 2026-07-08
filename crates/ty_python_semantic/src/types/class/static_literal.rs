@@ -1957,7 +1957,11 @@ impl<'db> StaticClassLiteral<'db> {
                 let class = superclass.into_class()?;
 
                 if let Some((class_literal, specialization)) = class.static_class_literal(db) {
-                    if field_policy.matches(db, class_literal.into()) {
+                    // Pydantic collects annotated attributes from every class in the model's MRO,
+                    // including ordinary classes that are not themselves Pydantic models.
+                    if matches!(field_policy, CodeGeneratorKind::Pydantic(_))
+                        || field_policy.matches(db, class_literal.into())
+                    {
                         return Some(FieldSource::Static(class_literal, specialization));
                     }
                 }
