@@ -666,17 +666,12 @@ Pydantic models can also specify a `validation_alias` for a field, which takes p
 class ValidationAlias(BaseModel):
     name: int = Field(alias="alias", validation_alias="validation_alias")
 
-# TODO: no error here
-# error: [missing-argument]
 ValidationAlias(validation_alias=1)
-# TODO: this should be a `invalid-argument-type` error, not a `missing-argument` error
-# error: [missing-argument]
-ValidationAlias(validation_alias=None)
+ValidationAlias(validation_alias=None)  # error: [invalid-argument-type]
 
 ValidationAlias()  # error: [missing-argument]
 ValidationAlias(name=1)  # error: [missing-argument]
-# TODO: this should be a `missing-argument` error
-ValidationAlias(alias=1)
+ValidationAlias(alias=1)  # error: [missing-argument]
 ```
 
 ## Extra fields
