@@ -28,6 +28,7 @@ mod signature_help;
 mod stub_mapping;
 mod symbols;
 mod type_hierarchy;
+mod will_rename;
 mod workspace_symbols;
 
 pub use all_symbols::{AllSymbolInfo, all_symbols};
@@ -61,6 +62,7 @@ pub use symbols::{FlatSymbols, HierarchicalSymbols, SymbolId, SymbolInfo, Symbol
 pub use type_hierarchy::{
     TypeHierarchyItem, prepare_type_hierarchy, type_hierarchy_subtypes, type_hierarchy_supertypes,
 };
+pub use will_rename::{FileRenameEdit, PathRename, WillRenameResult, will_rename_paths};
 pub use workspace_symbols::{WorkspaceSymbolInfo, workspace_symbols};
 
 use ruff_db::{
