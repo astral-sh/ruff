@@ -574,10 +574,13 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, self.node.iff_with_offset(builder, other.node))
     }
 
-    /// Existentially removes the given inferable type variables using the cached abstraction path.
+    /// Reduces the set of inferable typevars for this constraint set. You provide the typevars that
+    /// were inferable when this constraint set was created, and which should be abstracted away.
+    /// Those typevars will be removed from the constraint set, and the constraint set will return
+    /// true whenever there was _any_ specialization of those typevars that returned true before.
     ///
-    /// Facts derived while projecting the variables retain their existing constraint encoding.
-    /// Higher-rank comparison instead uses [`Self::exists`], which normalizes those residual facts.
+    /// This cached path retains the existing encoding of facts derived during projection.
+    /// Higher-rank comparison uses [`Self::exists`] to normalize those residual facts instead.
     pub(crate) fn reduce_inferable(
         self,
         db: &'db dyn Db,
@@ -7691,35 +7694,21 @@ mod tests {
             Type::TypeVar(target),
             Type::TypeVar(target),
         );
+        let source_locals = quantified_typevars(&db, [source.identity(&db)]);
+        let target_locals = quantified_typevars(&db, [target.identity(&db)]);
 
         // Every target specialization has some equal source specialization.
         let forall_target_exists_source = equal
-            .exists(
-                &db,
-                &builder,
-                quantified_typevars(&db, [source.identity(&db)]),
-            )
-            .try_for_all(
-                &db,
-                &builder,
-                quantified_typevars(&db, [target.identity(&db)]),
-            )
+            .exists(&db, &builder, source_locals)
+            .try_for_all(&db, &builder, target_locals)
             .expect("existential abstraction removes the free source variable");
         assert!(forall_target_exists_source.is_always_satisfied(&db));
 
         // No single source specialization is equal to every target specialization.
         let exists_source_forall_target = equal
-            .try_for_all(
-                &db,
-                &builder,
-                quantified_typevars(&db, [target.identity(&db)]),
-            )
+            .try_for_all(&db, &builder, target_locals)
             .unwrap_or_else(|| ConstraintSet::never(&builder))
-            .exists(
-                &db,
-                &builder,
-                quantified_typevars(&db, [source.identity(&db)]),
-            );
+            .exists(&db, &builder, source_locals);
         assert!(exists_source_forall_target.is_never_satisfied(&db));
     }
 

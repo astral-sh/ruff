@@ -849,11 +849,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
-    pub(super) fn with_lazy_typevar_evaluation(&self) -> Self {
-        Self {
-            typevar_evaluation: TypeVarEvaluation::Lazy,
-            ..self.clone()
-        }
+    pub(super) fn with_lazy_typevar_evaluation(mut self) -> Self {
+        self.typevar_evaluation = TypeVarEvaluation::Lazy;
+        self
     }
 
     pub(super) const fn is_eager_assignability(&self) -> bool {

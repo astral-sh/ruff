@@ -457,7 +457,7 @@ impl<'db> CallableSignature<'db> {
             &signature_relation_visitor,
             &materialization_visitor,
         );
-        checker.check_callable_signature_pair(db, self, other)
+        checker.check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
     }
 }
 
@@ -679,6 +679,7 @@ impl<'db> Signature<'db> {
             pep695_generic_context,
             legacy_generic_context,
         );
+
         let (generic_context, return_ty) = match return_callable_typevar_scope {
             ReturnCallableTypeVarScope::Lexical => (full_generic_context, return_ty),
             ReturnCallableTypeVarScope::Public => {
@@ -1747,7 +1748,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // existential; they are not callable-local binders introduced by the target signature.
         // Classify them before freshening changes their identities, but only for a possible
         // higher-rank target.
-        let caller_has_inferable = may_have_higher_rank_target
+        let target_has_caller_inferable = may_have_higher_rank_target
             && target.generic_context.is_some_and(|context| {
                 context
                     .variables(db)
@@ -1785,16 +1786,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.check_signature_pair_infer_both(db, source, target);
         }
 
+        if target_has_caller_inferable {
+            // TODO: Partition caller-owned variables from callable-local variables, leaving the
+            // former free while universally quantifying the latter.
+            return self.check_signature_pair_infer_both(db, source, target);
+        }
         let target_typevars = target
             .generic_context
             .into_iter()
             .flat_map(|context| context.variables(db))
             .collect::<Vec<_>>();
-        if caller_has_inferable {
-            // TODO: Partition caller-owned variables from callable-local variables, leaving the
-            // former free while universally quantifying the latter.
-            return self.check_signature_pair_infer_both(db, source, target);
-        }
 
         // A legacy TypeVar's owner is inferred from its uses. When an enclosing generic context
         // is unavailable, a class variable can therefore look method-local. Restrict higher-rank
@@ -1811,27 +1812,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             .into_iter()
             .flat_map(|context| context.variables(db))
             .collect::<Vec<_>>();
-        let has_paramspec_or_self = source_typevars
+        if source_typevars
             .iter()
             .chain(&target_typevars)
-            .any(|typevar| typevar.is_paramspec(db) || typevar.typevar(db).is_self(db));
-        if has_paramspec_or_self {
+            .any(|typevar| typevar.is_paramspec(db) || typevar.typevar(db).is_self(db))
+        {
             return self.check_signature_pair_infer_both(db, source, target);
         }
 
-        let source_locals = InferableTypeVars::from_typevars(
-            db,
-            source_typevars
-                .iter()
-                .map(|typevar| typevar.identity(db))
-                .collect::<FxOrderSet<_>>(),
-        );
         self.check_signature_pair_with_quantified_locals(
             db,
             source,
             target,
             &source_typevars,
-            source_locals,
             &target_typevars,
         )
     }
@@ -1877,9 +1870,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
         source_typevars: &[BoundTypeVarInstance<'db>],
-        source_locals: InferableTypeVars<'db>,
         target_typevars: &[BoundTypeVarInstance<'db>],
     ) -> ConstraintSet<'db, 'c> {
+        let quantified_locals = |typevars: &[BoundTypeVarInstance<'db>]| {
+            InferableTypeVars::from_typevars(
+                db,
+                typevars
+                    .iter()
+                    .map(|typevar| typevar.identity(db))
+                    .collect(),
+            )
+        };
+        let source_locals = quantified_locals(source_typevars);
         let checker = self
             .with_inferable_typevars(self.inferable.merge(db, source_locals))
             .with_lazy_typevar_evaluation();
@@ -1909,9 +1911,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // adding the domain only as the implication below because target variables are not
         // existentially quantified, but retaining it here preserves correlations while source
         // variables are abstracted.
-        let with_domains = target_domain.and(db, self.constraints, || {
-            source_domain.and(db, self.constraints, || relation)
-        });
+        let with_domains = target_domain
+            .and(db, self.constraints, || source_domain)
+            .and(db, self.constraints, || relation);
 
         // A generic source is an intersection of its specializations. For each target
         // specialization, it is enough for some valid source specialization to satisfy the
@@ -1924,13 +1926,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // A generic target is the intersection of all of its specializations. The source must
         // therefore satisfy every valid target specialization. Source variables have already
         // been removed, which gives the required `for all target, there exists source` order.
-        let target_locals = InferableTypeVars::from_typevars(
-            db,
-            target_typevars
-                .iter()
-                .map(|typevar| typevar.identity(db))
-                .collect(),
-        );
+        let target_locals = quantified_locals(target_typevars);
         let universally_quantified = target_domain.implies(db, self.constraints, || quantified);
         let Some(result) = universally_quantified.try_for_all(db, self.constraints, target_locals)
         else {
