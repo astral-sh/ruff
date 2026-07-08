@@ -90,6 +90,31 @@ def f(
     reveal_type(unbounded)  # revealed: tuple[int, *tuple[str, ...]]
 ```
 
+## Unsupported union unpacking
+
+Unpacking a type variable tuple into `Union` is currently not supported. Both the rejected union and
+runtime element access recover to `object`.
+
+```py
+from typing import TypeVarTuple, Union, Unpack
+
+Ts = TypeVarTuple("Ts")
+
+# TODO: shouldn't error
+# error: [invalid-type-form]
+def reject_union(value: Union[Unpack[Ts]]) -> None:
+    # TODO: should reveal `Union[*Ts]` representation
+    reveal_type(value)  # revealed: object
+
+def element_types(values: tuple[Unpack[Ts]]) -> None:
+    # TODO: should reveal `Union[*Ts]` representation
+    reveal_type(values[0])  # revealed: object
+
+    for value in values:
+        # TODO: should reveal `Union[*Ts]` representation
+        reveal_type(value)  # revealed: object
+```
+
 ## Concrete and nested tuple unpacking
 
 `Unpack` can expand a concrete tuple annotation for `*args`, including a nested unbounded tuple.

@@ -2029,17 +2029,70 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let param_type = self.infer_type_expression(arguments_slice);
                 UnionType::from_elements_leave_aliases(db, [param_type, Type::none(db)])
             }
-            SpecialFormType::Union => match arguments_slice {
-                ast::Expr::Tuple(t) => {
-                    let union_ty = UnionType::from_elements_leave_aliases(
-                        db,
-                        t.iter().map(|elt| self.infer_type_expression(elt)),
-                    );
-                    self.store_expression_type(arguments_slice, union_ty);
+            SpecialFormType::Union => {
+                // TODO: Support the union of a `TypeVarTuple`'s elements. Until then, reject
+                // `Union[*Ts]` and recover to `object` rather than treating `Ts` as one member.
+                let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
+                    &*tuple.elts
+                } else {
+                    std::slice::from_ref(arguments_slice)
+                };
+                let mut has_unpacked_typevartuple = false;
+                let union_ty = UnionType::from_elements_leave_aliases(
+                    db,
+                    arguments.iter().map(|argument| {
+                        let ty = self.infer_type_expression(argument);
+                        if self
+                            .type_expression_flags(argument)
+                            .contains(TypeExpressionFlags::UNPACK)
+                        {
+                            let is_typevartuple = matches!(
+                                ty,
+                                Type::TypeVar(typevar) if typevar.is_typevartuple(db)
+                            ) || if let ast::Expr::Subscript(subscript) = argument {
+                                let previously_in_unpack_type_argument = self
+                                    .context
+                                    .inference_flags
+                                    .replace(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT, true);
+                                let inner_ty = self.infer_type_expression(&subscript.slice);
+                                self.context.inference_flags.set(
+                                    InferenceFlags::IN_UNPACK_TYPE_ARGUMENT,
+                                    previously_in_unpack_type_argument,
+                                );
+                                matches!(
+                                    inner_ty,
+                                    Type::TypeVar(typevar) if typevar.is_typevartuple(db)
+                                )
+                            } else {
+                                false
+                            };
+                            if is_typevartuple {
+                                has_unpacked_typevartuple = true;
+                                if !ty.is_unknown()
+                                    && let Some(builder) =
+                                        self.context.report_lint(&INVALID_TYPE_FORM, argument)
+                                {
+                                    diagnostic::add_type_expression_reference_link(
+                                        builder.into_diagnostic(
+                                            "Unpacking a `TypeVarTuple` in `Union` is not supported",
+                                        ),
+                                    );
+                                }
+                            }
+                        }
+                        ty
+                    }),
+                );
+                let ty = if has_unpacked_typevartuple {
+                    Type::object()
+                } else {
                     union_ty
+                };
+                if arguments_slice.is_tuple_expr() {
+                    self.store_expression_type(arguments_slice, ty);
                 }
-                _ => self.infer_type_expression(arguments_slice),
-            },
+                ty
+            }
             SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
                 self.infer_callable_type(subscript)
             }

@@ -809,6 +809,22 @@ reveal_type(First[str, bool])  # revealed: <type alias 'First[str, bool]'>
 reveal_type(Second[str, bool])  # revealed: <type alias 'Second[str, bool]'>
 ```
 
+### Unsupported union unpacking
+
+Unpacking a type variable tuple into `Union` is currently not supported. We recover to `object`
+rather than interpreting the pack as a single union member.
+
+```py
+from typing import Union
+
+# TODO: shouldn't error
+# error: [invalid-type-form]
+type VariadicUnion[*Ts] = Union[*Ts]
+
+def _(value: VariadicUnion[int, str]) -> None:
+    reveal_type(value)  # revealed: object
+```
+
 ### Using Callable
 
 ```py
@@ -841,10 +857,12 @@ type of each individual element in that segment.
 
 ```py
 def element_types[*Ts](values: tuple[*Ts]) -> None:
-    reveal_type(values[0])  # revealed: @Todo(TypeVarTuple element union)
+    # TODO: should reveal `Union[*Ts]` representation
+    reveal_type(values[0])  # revealed: object
 
     for value in values:
-        reveal_type(value)  # revealed: @Todo(TypeVarTuple element union)
+        # TODO: should reveal `Union[*Ts]` representation
+        reveal_type(value)  # revealed: object
 
 def boundaries[*Ts](values: tuple[int, *Ts, str]) -> None:
     reveal_type(values[0])  # revealed: int

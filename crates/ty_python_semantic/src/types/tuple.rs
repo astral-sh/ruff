@@ -30,7 +30,6 @@ use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
 use crate::types::set_theoretic::RecursivelyDefined;
-use crate::types::todo_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
     IntersectionType, Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
@@ -748,15 +747,14 @@ impl<'db> VariableSegment<'db> {
     pub(crate) fn element_type(self, _db: &'db dyn Db) -> Type<'db> {
         match self {
             Self::Homogeneous(element) => element,
-            Self::TypeVarTuple(_) => todo_type!("TypeVarTuple element union"),
+            Self::TypeVarTuple(_) => Type::object(),
         }
     }
 
     /// Returns the type used for the builtin tuple class's single generic parameter.
     ///
-    /// Until `Union[*Ts]` has its own representation, preserve the `TypeVarTuple` here so that
-    /// variance inference and generic-context traversal can still observe it. Runtime element
-    /// operations must use [`Self::element_type`] instead.
+    /// Preserve the `TypeVarTuple` here so that variance inference and generic-context traversal
+    /// can still observe it. Runtime element operations must use [`Self::element_type`] instead.
     fn tuple_class_type(self) -> Type<'db> {
         match self {
             Self::Homogeneous(element) => element,
