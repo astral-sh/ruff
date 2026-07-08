@@ -531,10 +531,26 @@ class MissingFrozenSet(frozenset[Literal["missing"]]): ...
 class MissingDict(dict[Literal["missing"], object]): ...
 class MissingTuple(tuple[Literal["missing"], ...]): ...
 
-def inherited_builtin_contains(
+def inherited_list_contains(x: Payload | Literal["missing"], values: MissingList):
+    if x in values:
+        reveal_type(x)  # revealed: Literal["missing"]
+
+def inherited_set_contains(x: Payload | Literal["missing"], values: MissingSet):
+    if x in values:
+        reveal_type(x)  # revealed: Literal["missing"]
+
+def inherited_frozenset_contains(
     x: Payload | Literal["missing"],
-    values: MissingList | MissingSet | MissingFrozenSet | MissingDict | MissingTuple,
+    values: MissingFrozenSet,
 ):
+    if x in values:
+        reveal_type(x)  # revealed: Literal["missing"]
+
+def inherited_dict_contains(x: Payload | Literal["missing"], values: MissingDict):
+    if x in values:
+        reveal_type(x)  # revealed: Literal["missing"]
+
+def inherited_tuple_contains(x: Payload | Literal["missing"], values: MissingTuple):
     if x in values:
         reveal_type(x)  # revealed: Literal["missing"]
 ```
@@ -694,6 +710,78 @@ MixedContainers = TypeVar(
 def mixed_constraints(
     value: Token | Literal[1],
     values: MixedContainers,
+) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: Token | Literal[1]
+```
+
+## Union containers
+
+Membership narrowing requires every possible container in a union to have known element-based
+containment. If they do, ty combines their element types. If any alternative has unknown or custom
+containment behavior, the tested value remains unchanged.
+
+### All alternatives have known containment
+
+Both alternatives use known built-in containment, so the positive branch is limited to the union of
+their element types.
+
+```py
+from typing import Literal, final
+
+@final
+class Token: ...
+
+def known_container_union(
+    value: Token | Literal[1, 2],
+    values: list[Literal[1]] | set[Literal[2]],
+) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: Literal[1, 2]
+```
+
+### An alternative has unknown containment
+
+A non-final iterable can have a runtime subclass with a custom `__contains__`, so its iterator type
+does not establish which values membership accepts.
+
+```py
+from collections.abc import Iterator
+from typing import Literal, final
+
+@final
+class Token: ...
+
+class OpenIterable:
+    def __iter__(self) -> Iterator[Literal[1]]:
+        yield 1
+
+def partially_known_container_union(
+    value: Token | Literal[1],
+    values: tuple[Literal[1], ...] | OpenIterable,
+) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: Token | Literal[1]
+```
+
+### An alternative has custom containment
+
+A visible custom `__contains__` can accept values outside the other alternative's element type, so
+the union does not narrow the tested value.
+
+```py
+from typing import Literal, final
+
+@final
+class Token: ...
+
+class ContainsEverything:
+    def __contains__(self, value: object) -> bool:
+        return True
+
+def custom_container_union(
+    value: Token | Literal[1],
+    values: tuple[Literal[1], ...] | ContainsEverything,
 ) -> None:
     if value in values:
         reveal_type(value)  # revealed: Token | Literal[1]
