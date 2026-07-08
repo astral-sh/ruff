@@ -21,7 +21,7 @@ use smallvec::{SmallVec, smallvec_inline};
 use super::{DynamicType, Type, TypeVarVariance, UnionType, semantic_index};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, Solutions,
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
@@ -38,8 +38,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
     MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
-    TypeMapping, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
-    infer_complete_scope_types, todo_type,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder,
+    VarianceInferable, any_over_type, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -448,7 +448,12 @@ impl<'db> CallableSignature<'db> {
             &signature_relation_visitor,
             &materialization_visitor,
         );
-        checker.check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
+        checker.check_callable_signature_pair_inner(
+            db,
+            &self.overloads,
+            &other.overloads,
+            GenericSignatureQuantification::HigherRankTarget,
+        )
     }
 }
 
@@ -540,6 +545,12 @@ impl<'db> SignatureRelationKey<'db> {
 }
 
 pub(crate) type SignatureRelationVisitor<'db> = ActiveRecursionDetector<SignatureRelationKey<'db>>;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum GenericSignatureQuantification {
+    Existential,
+    HigherRankTarget,
+}
 
 pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
@@ -1530,7 +1541,26 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &CallableSignature<'db>,
         target: &CallableSignature<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.check_callable_signature_pair_inner(db, &source.overloads, &target.overloads)
+        self.check_callable_signature_pair_inner(
+            db,
+            &source.overloads,
+            &target.overloads,
+            GenericSignatureQuantification::HigherRankTarget,
+        )
+    }
+
+    pub(super) fn check_paramspec_value_signature_pair(
+        &self,
+        db: &'db dyn Db,
+        source: &CallableSignature<'db>,
+        target: &CallableSignature<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.check_callable_signature_pair_inner(
+            db,
+            &source.overloads,
+            &target.overloads,
+            GenericSignatureQuantification::Existential,
+        )
     }
 
     /// Implementation of subtyping and assignability between two, possible overloaded, callable
@@ -1540,6 +1570,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         source_overloads: &[Signature<'db>],
         target_overloads: &[Signature<'db>],
+        quantification: GenericSignatureQuantification,
     ) -> ConstraintSet<'db, 'c> {
         if self.typevar_evaluation == TypeVarEvaluation::Lazy {
             // TODO: Oof, maybe ParamSpec needs to live at CallableSignature, not Signature?
@@ -1662,6 +1693,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             .is_some())
                 {
                     self.check_signature_pair_inner(db, source_signature, target_signature)
+                } else if quantification == GenericSignatureQuantification::Existential {
+                    self.check_signature_pair_infer_both(db, source_signature, target_signature)
                 } else {
                     self.check_signature_pair(db, source_signature, target_signature)
                 }
@@ -1687,6 +1720,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 db,
                                 std::slice::from_ref(self_signature),
                                 target_overloads,
+                                quantification,
                             )
                         })
                 })
@@ -1701,6 +1735,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             db,
                             source_overloads,
                             std::slice::from_ref(target_signature),
+                            quantification,
                         )
                     })
             }
@@ -1713,6 +1748,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         db,
                         source_overloads,
                         std::slice::from_ref(target_signature),
+                        quantification,
                     )
                 }),
         }
@@ -1725,10 +1761,25 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        // If either signature is generic, freshen that signature's typevars before considering
-        // them inferable for this relation. The relation only needs to find one specialization of
-        // each generic callable that causes the check to succeed, but those callable-local
-        // specializations must not collide with any same-source typevars in the other signature.
+        // A generic signature can also carry inference variables from the call site. Those remain
+        // existential; they are not callable-local binders introduced by the target signature.
+        // Classify them before freshening changes their identities.
+        let original_target_typevars = target
+            .generic_context
+            .into_iter()
+            .flat_map(|context| context.variables(db))
+            .collect::<Vec<_>>();
+        let caller_inferable_count = original_target_typevars
+            .iter()
+            .filter(|typevar| typevar.is_inferable(db, self.inferable))
+            .count();
+        let all_target_typevars_are_caller_inferable = !original_target_typevars.is_empty()
+            && caller_inferable_count == original_target_typevars.len();
+        let mixes_caller_and_callable_typevars =
+            caller_inferable_count > 0 && caller_inferable_count < original_target_typevars.len();
+
+        // Freshen callable-local typevars so variables from distinct signatures do not collide.
+        // The relation below decides which fresh variables are inferable.
         let freshened_source;
         let source = if source.generic_context != target.generic_context
             && let Some(generic_context) = source.generic_context
@@ -1754,6 +1805,79 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target
         };
 
+        let target_typevars = target
+            .generic_context
+            .into_iter()
+            .flat_map(|context| context.variables(db))
+            .collect::<Vec<_>>();
+        if target_typevars.is_empty() || all_target_typevars_are_caller_inferable {
+            return self.check_signature_pair_infer_both(db, source, target);
+        }
+        if mixes_caller_and_callable_typevars {
+            return self.never();
+        }
+
+        let source_typevars = source
+            .generic_context
+            .into_iter()
+            .flat_map(|context| context.variables(db))
+            .collect::<Vec<_>>();
+        let target_has_paramspec_or_self = target_typevars
+            .iter()
+            .any(|typevar| typevar.is_paramspec(db) || typevar.typevar(db).is_self(db));
+        let source_has_paramspec_or_self = source_typevars
+            .iter()
+            .any(|typevar| typevar.is_paramspec(db) || typevar.typevar(db).is_self(db));
+        if target_has_paramspec_or_self || source_has_paramspec_or_self {
+            return self.check_signature_pair_infer_both(db, source, target);
+        }
+
+        if !source_typevars
+            .iter()
+            .chain(&target_typevars)
+            .copied()
+            .all(|typevar| typevar.has_fully_static_independent_domain(db))
+        {
+            return self.never();
+        }
+
+        if source_typevars.is_empty() {
+            let checker = self
+                .with_inferable_typevars(InferableTypeVars::None)
+                .with_lazy_typevar_evaluation();
+            let when = checker.with_signature_recursion_guard(source, target, || {
+                checker.check_signature_pair_inner(db, source, target)
+            });
+            return ConstraintSet::from_bool(
+                self.constraints,
+                self.constraints_hold_for_all_target_specializations(db, when, &target_typevars),
+            );
+        }
+
+        let source_locals = InferableTypeVars::from_typevars(
+            db,
+            source_typevars
+                .iter()
+                .map(|typevar| typevar.identity(db))
+                .collect::<FxOrderSet<_>>(),
+        );
+        self.check_signature_pair_with_inferred_source(
+            db,
+            source,
+            target,
+            &source_typevars,
+            source_locals,
+            &target_typevars,
+        )
+    }
+
+    /// Compare signatures using the ordinary, existential treatment of both generic contexts.
+    fn check_signature_pair_infer_both(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+    ) -> ConstraintSet<'db, 'c> {
         let source_inferable = source.inferable_typevars(db);
         let target_inferable = target.inferable_typevars(db);
         let signature_inferable = source_inferable.merge(db, target_inferable);
@@ -1770,6 +1894,149 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // If we introduced new inferable typevars, those will be existentially quantified away
         // before returning.
         when.reduce_inferable(db, self.constraints, signature_inferable)
+    }
+
+    /// Infer one coherent source specialization and verify it against a rigid generic target.
+    fn check_signature_pair_with_inferred_source(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+        source_typevars: &[BoundTypeVarInstance<'db>],
+        source_locals: InferableTypeVars<'db>,
+        target_typevars: &[BoundTypeVarInstance<'db>],
+    ) -> ConstraintSet<'db, 'c> {
+        let Some(source_context) = source.generic_context else {
+            return self.never();
+        };
+        let checker = self
+            .with_inferable_typevars(source_locals)
+            .with_lazy_typevar_evaluation();
+        let relation = checker.with_signature_recursion_guard(source, target, || {
+            checker.check_signature_pair_inner(db, source, target)
+        });
+        // Infer a structural witness before checking its declared domain. This permits a source
+        // solution to contain a universally quantified target variable, such as `S = list[T]`,
+        // without expanding constrained source domains into a Cartesian product.
+        let solutions = relation.solutions_with(
+            db,
+            self.constraints,
+            source_locals,
+            |_variance, path_bound| {
+                if let Some(lower) = path_bound.lower {
+                    if !path_bound.lower_is_compatible_with_upper(db, self.constraints) {
+                        return Err(());
+                    }
+                    return Ok(Some(lower));
+                }
+                Ok(path_bound
+                    .has_upper()
+                    .then(|| path_bound.upper.materialize_exact(db)))
+            },
+        );
+        let solutions = match solutions {
+            Solutions::Unsatisfiable => return self.never(),
+            Solutions::Unconstrained => vec![Vec::new()],
+            Solutions::Constrained(solutions) => solutions,
+        };
+
+        let when = solutions.iter().when_any(db, self.constraints, |solution| {
+            let mut types = Vec::with_capacity(source_typevars.len());
+            for typevar in source_typevars {
+                if let Some(solution) = solution
+                    .iter()
+                    .find(|solution| solution.bound_typevar == *typevar)
+                {
+                    types.push(Some(solution.solution));
+                    continue;
+                }
+                match typevar.typevar(db).require_bound_or_constraints(db) {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => types.push(Some(bound)),
+                    TypeVarBoundOrConstraints::Constraints(constraints) => {
+                        let Some(constraint) = constraints.elements(db).first().copied() else {
+                            return self.never();
+                        };
+                        types.push(Some(constraint));
+                    }
+                }
+            }
+
+            let specialization = source_context.specialize_recursive(db, types);
+            if specialization.types(db).iter().any(|specialized| {
+                any_over_type(db, *specialized, true, |ty| {
+                    matches!(ty, Type::TypeVar(typevar) if source_typevars
+                        .iter()
+                        .any(|source_typevar| typevar.is_same_typevar_as(db, *source_typevar)))
+                })
+            }) {
+                return self.never();
+            }
+            let specialized_source = source.apply_specialization(db, specialization);
+            let specialization_is_valid = source_typevars
+                .iter()
+                .copied()
+                .zip(specialization.types(db).iter().copied())
+                .when_all(db, self.constraints, |(typevar, specialized)| {
+                    self.check_source_typevar_specialization(db, typevar, specialized)
+                });
+            let recheck = {
+                let checker = self
+                    .with_inferable_typevars(InferableTypeVars::None)
+                    .with_lazy_typevar_evaluation();
+                checker.with_signature_recursion_guard(&specialized_source, target, || {
+                    checker.check_signature_pair_inner(db, &specialized_source, target)
+                })
+            };
+            specialization_is_valid.and(db, self.constraints, || recheck)
+        });
+
+        ConstraintSet::from_bool(
+            self.constraints,
+            self.constraints_hold_for_all_target_specializations(db, when, target_typevars),
+        )
+    }
+
+    fn constraints_hold_for_all_target_specializations(
+        &self,
+        db: &'db dyn Db,
+        when: ConstraintSet<'db, 'c>,
+        target_typevars: &[BoundTypeVarInstance<'db>],
+    ) -> bool {
+        when.satisfied_by_all_static_specializations(
+            db,
+            self.constraints,
+            target_typevars.iter().copied(),
+            self.inferable,
+        )
+        .unwrap_or(false)
+    }
+
+    /// Check that an inferred source specialization is valid for every rigid target specialization.
+    fn check_source_typevar_specialization(
+        &self,
+        db: &'db dyn Db,
+        source: BoundTypeVarInstance<'db>,
+        specialized: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        match source.typevar(db).require_bound_or_constraints(db) {
+            TypeVarBoundOrConstraints::UpperBound(bound) => self
+                .with_lazy_typevar_evaluation()
+                .check_type_pair(db, specialized, bound),
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                let checker = self.with_lazy_typevar_evaluation();
+                constraints.elements(db).iter().copied().when_any(
+                    db,
+                    self.constraints,
+                    |constraint| {
+                        checker.check_type_pair(db, specialized, constraint).and(
+                            db,
+                            self.constraints,
+                            || checker.check_type_pair(db, constraint, specialized),
+                        )
+                    },
+                )
+            }
+        }
     }
 
     fn with_signature_recursion_guard(

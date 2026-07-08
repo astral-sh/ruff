@@ -726,6 +726,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if target.is_function_like(db) && !source.is_function_like(db) {
             return self.never();
         }
+        // A `ParamSpecValue` is an inferred parameter-list witness, not a callable contract. Its
+        // retained generic context is therefore unified existentially. Once the parameter list is
+        // spliced into a regular callable, ordinary higher-rank target comparison applies again.
+        // Either operand can be a bound on the same inferred witness, so both directions use this
+        // mode.
+        if source.kind(db) == CallableTypeKind::ParamSpecValue
+            || target.kind(db) == CallableTypeKind::ParamSpecValue
+        {
+            return self.check_paramspec_value_signature_pair(
+                db,
+                source.signatures(db),
+                target.signatures(db),
+            );
+        }
         self.check_callable_signature_pair(db, source.signatures(db), target.signatures(db))
     }
 

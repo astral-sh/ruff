@@ -2833,9 +2833,8 @@ static_assert(not is_assignable_to(NominalWithSelf, LegacyFunctionScoped))
 static_assert(is_assignable_to(NominalWithSelf, UsesSelf))
 static_assert(is_subtype_of(NominalWithSelf, UsesSelf))
 
-# TODO: these should pass
-static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NominalNotGeneric, LegacyFunctionScoped))  # error: [static-assert-error]
+static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))
+static_assert(not is_assignable_to(NominalNotGeneric, LegacyFunctionScoped))
 static_assert(not is_assignable_to(NominalNotGeneric, UsesSelf))
 
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, NewStyleFunctionScoped))
@@ -2859,6 +2858,345 @@ class BadReturnType:
 
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolImplicitSelf))
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolExplicitSelf))
+```
+
+## Quantification of generic protocol methods
+
+A protocol method's local type variables are universally quantified: an implementation must work for
+every valid specialization exposed by the protocol. Type variables local to a generic implementation
+may be specialized in terms of the protocol method's variables.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, TypedDict
+from typing_extensions import Literal, Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class IdentityProtocol(Protocol):
+    def f[T](self, value: T) -> T: ...
+
+class IntIdentity:
+    def f(self, value: int) -> int:
+        return value
+
+# A concrete implementation cannot implement an unconstrained generic identity.
+static_assert(not is_assignable_to(IntIdentity, IdentityProtocol))
+static_assert(not is_subtype_of(IntIdentity, IdentityProtocol))
+
+class GenericIdentity:
+    def f[S](self, value: S) -> S:
+        return value
+
+# The source and target variables are distinct, but the two methods are alpha-equivalent.
+static_assert(is_assignable_to(GenericIdentity, IdentityProtocol))
+static_assert(is_subtype_of(GenericIdentity, IdentityProtocol))
+
+class MarkerProtocol(Protocol):
+    marker: int
+
+class ProtocolValuedIdentity(Protocol):
+    def f[T](self, value: T) -> tuple[T, MarkerProtocol]: ...
+
+class ConcreteProtocolValuedIdentity:
+    def f(self, value: int) -> tuple[int, MarkerProtocol]:
+        raise NotImplementedError
+
+class GenericProtocolValuedIdentity:
+    def f[S](self, value: S) -> tuple[S, MarkerProtocol]:
+        raise NotImplementedError
+
+# An unrelated protocol nested in the signature does not change the target's quantification.
+static_assert(not is_assignable_to(ConcreteProtocolValuedIdentity, ProtocolValuedIdentity))
+static_assert(not is_subtype_of(ConcreteProtocolValuedIdentity, ProtocolValuedIdentity))
+static_assert(is_assignable_to(GenericProtocolValuedIdentity, ProtocolValuedIdentity))
+static_assert(is_subtype_of(GenericProtocolValuedIdentity, ProtocolValuedIdentity))
+
+class StaticRow(TypedDict):
+    item: int
+
+class TypedDictValuedIdentity(Protocol):
+    def f[T](self, value: T) -> tuple[T, StaticRow]: ...
+
+class ConcreteTypedDictValuedIdentity:
+    def f(self, value: int) -> tuple[int, StaticRow]:
+        raise NotImplementedError
+
+class GenericTypedDictValuedIdentity:
+    def f[S](self, value: S) -> tuple[S, StaticRow]:
+        raise NotImplementedError
+
+# Static typed dictionaries likewise do not disable higher-rank comparison.
+static_assert(not is_assignable_to(ConcreteTypedDictValuedIdentity, TypedDictValuedIdentity))
+static_assert(not is_subtype_of(ConcreteTypedDictValuedIdentity, TypedDictValuedIdentity))
+static_assert(is_assignable_to(GenericTypedDictValuedIdentity, TypedDictValuedIdentity))
+static_assert(is_subtype_of(GenericTypedDictValuedIdentity, TypedDictValuedIdentity))
+
+class NestedListProtocol(Protocol):
+    def f[T](self, value: list[T]) -> list[list[T]]: ...
+
+class WrapInList:
+    def f[S](self, value: S) -> list[S]:
+        return [value]
+
+# A source specialization can contain the rigid target variable: `S = list[T]`.
+static_assert(is_assignable_to(WrapInList, NestedListProtocol))
+static_assert(is_subtype_of(WrapInList, NestedListProtocol))
+
+class IntBoundIdentityProtocol(Protocol):
+    def f[T: int](self, value: T) -> T: ...
+
+class GenericListReturn:
+    def f[S](self, value: S) -> list[S]:
+        return [value]
+
+# Inferring each occurrence independently must not erase the return-type correlation.
+static_assert(not is_assignable_to(GenericListReturn, IntBoundIdentityProtocol))
+static_assert(not is_subtype_of(GenericListReturn, IntBoundIdentityProtocol))
+
+class IntBoundReturnsInt:
+    def f[S: int](self, value: S) -> int:
+        return int(value)
+
+# For `T = bool`, the target promises `bool`, while the source only promises `int`.
+static_assert(not is_assignable_to(IntBoundReturnsInt, IntBoundIdentityProtocol))
+static_assert(not is_subtype_of(IntBoundReturnsInt, IntBoundIdentityProtocol))
+
+class PairProtocol(Protocol):
+    def f[T, U](self, left: T, right: U) -> tuple[T, U]: ...
+
+class ReorderedPair:
+    def f[S, R](self, left: R, right: S) -> tuple[R, S]:
+        return left, right
+
+# Source variables are inferred from the entire signature rather than matched by declaration order:
+# `R = T` and `S = U`.
+static_assert(is_assignable_to(ReorderedPair, PairProtocol))
+static_assert(is_subtype_of(ReorderedPair, PairProtocol))
+
+class Base: ...
+class Derived(Base): ...
+
+class DerivedBoundProtocol(Protocol):
+    def f[T: Derived](self, value: T) -> T: ...
+
+class BaseBoundIdentity:
+    def f[S: Base](self, value: S) -> S:
+        return value
+
+class BaseBoundProtocol(Protocol):
+    def f[T: Base](self, value: T) -> T: ...
+
+class DerivedBoundIdentity:
+    def f[S: Derived](self, value: S) -> S:
+        return value
+
+# A broader source bound covers a narrower target bound, but not vice versa.
+static_assert(is_assignable_to(BaseBoundIdentity, DerivedBoundProtocol))
+static_assert(is_subtype_of(BaseBoundIdentity, DerivedBoundProtocol))
+static_assert(not is_assignable_to(DerivedBoundIdentity, BaseBoundProtocol))
+static_assert(not is_subtype_of(DerivedBoundIdentity, BaseBoundProtocol))
+
+class TwoDerivedProtocol(Protocol):
+    def f[T: Derived, U: Derived](self, value: tuple[T, U]) -> object: ...
+
+class BasePairConsumer:
+    def f[S: tuple[Base, Base]](self, value: S) -> object:
+        return value
+
+# All target domains participate in the universal check together.
+static_assert(is_assignable_to(BasePairConsumer, TwoDerivedProtocol))
+static_assert(is_subtype_of(BasePairConsumer, TwoDerivedProtocol))
+
+class TwoConstrainedProtocol(Protocol):
+    def f[T: (int, str), U: (bytes, float)](self, left: T, right: U) -> tuple[T, U]: ...
+
+class TwoConstrainedSource:
+    def f[S: (int, str), R: (bytes, float)](self, left: S, right: R) -> tuple[S, R]:
+        return left, right
+
+# Constrained target domains are also quantified jointly, without enumerating their product.
+static_assert(is_assignable_to(TwoConstrainedSource, TwoConstrainedProtocol))
+static_assert(is_subtype_of(TwoConstrainedSource, TwoConstrainedProtocol))
+
+class BoundedConsumerProtocol(Protocol):
+    def f[T: Base](self, value: T) -> object: ...
+
+class ConcreteBaseConsumer:
+    def f(self, value: Base) -> object:
+        return value
+
+# A nongeneric implementation can cover an entire bounded target domain.
+static_assert(is_assignable_to(ConcreteBaseConsumer, BoundedConsumerProtocol))
+static_assert(is_subtype_of(ConcreteBaseConsumer, BoundedConsumerProtocol))
+
+class LiteralOneProtocol(Protocol):
+    def f[T: Literal[1]](self) -> T: ...
+
+class LiteralOneIdentity:
+    def f(self) -> Literal[1]:
+        return 1
+
+# `Never` is also a valid specialization below `Literal[1]`, so the concrete return type is not
+# sufficiently precise for every specialization.
+static_assert(not is_assignable_to(LiteralOneIdentity, LiteralOneProtocol))
+static_assert(not is_subtype_of(LiteralOneIdentity, LiteralOneProtocol))
+
+class PromotionCorrelationProtocol(Protocol):
+    def f[T: (bool, str)](self, value: T) -> T: ...
+
+class PromotionCorrelationSource:
+    def f[S: (int, str)](self, value: S) -> S:
+        return value
+
+# `T = bool` promotes `S` to `int`, so the source promises `int`, not `bool`.
+static_assert(not is_assignable_to(PromotionCorrelationSource, PromotionCorrelationProtocol))
+static_assert(not is_subtype_of(PromotionCorrelationSource, PromotionCorrelationProtocol))
+
+class IntOrStrIdentityProtocol(Protocol):
+    def f[T: (int, str)](self, value: T) -> T: ...
+
+class IntOrStrIdentitySource:
+    def f[S: (int, str)](self, value: S) -> S:
+        return value
+
+# Matching constrained domains preserve the same promotion behavior.
+static_assert(is_assignable_to(IntOrStrIdentitySource, IntOrStrIdentityProtocol))
+static_assert(is_subtype_of(IntOrStrIdentitySource, IntOrStrIdentityProtocol))
+
+type ListAlias[A] = list[A]
+
+class AliasedListIdentityProtocol(Protocol):
+    def f[T](self, value: ListAlias[T]) -> ListAlias[T]: ...
+
+class AliasedListIdentity:
+    def f[S](self, value: ListAlias[S]) -> ListAlias[S]:
+        return value
+
+# Static aliases preserve the relationship between source and target variables.
+static_assert(is_assignable_to(AliasedListIdentity, AliasedListIdentityProtocol))
+static_assert(is_subtype_of(AliasedListIdentity, AliasedListIdentityProtocol))
+
+class ListConsumerProtocol(Protocol):
+    def f[T](self, value: list[T]) -> object: ...
+
+class AliasDependentBoundSource:
+    def f[A: str, S: ListAlias[A]](self, value: S) -> object:
+        return value
+
+# A type alias must not hide the dependency of `S`'s bound on `A`.
+static_assert(not is_assignable_to(AliasDependentBoundSource, ListConsumerProtocol))
+static_assert(not is_subtype_of(AliasDependentBoundSource, ListConsumerProtocol))
+
+type DynamicAlias = Any
+
+class DirectDynamicBoundProtocol(Protocol):
+    def f[T: Any](self, value: T) -> T: ...
+
+class AliasedDynamicBoundProtocol(Protocol):
+    def f[T: DynamicAlias](self, value: T) -> T: ...
+
+class ExplicitAnyBase(Any): ...
+
+class ExplicitAnyBoundProtocol(Protocol):
+    def f[T: ExplicitAnyBase](self, value: T) -> T: ...
+
+# Gradual domains are outside the exact higher-rank fragment. In particular, an alias or an
+# explicit-`Any` base must not hide a gradual domain and make a concrete implementation pass.
+static_assert(not is_assignable_to(IntIdentity, DirectDynamicBoundProtocol))
+static_assert(not is_subtype_of(IntIdentity, DirectDynamicBoundProtocol))
+static_assert(not is_assignable_to(IntIdentity, AliasedDynamicBoundProtocol))
+static_assert(not is_subtype_of(IntIdentity, AliasedDynamicBoundProtocol))
+static_assert(not is_assignable_to(IntIdentity, ExplicitAnyBoundProtocol))
+static_assert(not is_subtype_of(IntIdentity, ExplicitAnyBoundProtocol))
+
+class AnyValueTypedDict(TypedDict):
+    value: Any
+
+class IntValueTypedDict(TypedDict):
+    value: int
+
+class AnyTypedDictBoundProtocol(Protocol):
+    def f[T: AnyValueTypedDict](self, value: T) -> object: ...
+
+class IntTypedDictConsumer:
+    def f(self, value: IntValueTypedDict) -> object:
+        return value
+
+# Typed-dict materialization does not yet expose gradual fields to the constraint solver. The
+# bound must therefore remain outside the exact fragment: it also admits `TypedDict`s whose
+# `value` field is not compatible with `int`.
+static_assert(not is_assignable_to(IntTypedDictConsumer, AnyTypedDictBoundProtocol))
+static_assert(not is_subtype_of(IntTypedDictConsumer, AnyTypedDictBoundProtocol))
+
+class GenericReturnsObject(Protocol):
+    def f[T](self, value: T) -> object: ...
+
+class UnusedConstrainedTypevars:
+    def f[
+        S01: (int, str),
+        S02: (int, str),
+        S03: (int, str),
+        S04: (int, str),
+        S05: (int, str),
+        S06: (int, str),
+        S07: (int, str),
+        S08: (int, str),
+        S09: (int, str),
+        S10: (int, str),
+    ](self, value: object) -> object:
+        return value
+
+# Unused constrained variables do not require enumerating their Cartesian product.
+static_assert(is_assignable_to(UnusedConstrainedTypevars, GenericReturnsObject))
+static_assert(is_subtype_of(UnusedConstrainedTypevars, GenericReturnsObject))
+
+class PiecewiseProtocol(Protocol):
+    def f[T: (bool, str)](self, value: T) -> object: ...
+
+class PiecewiseSource:
+    def f[S: (int, str)](self, value: S) -> object:
+        return value
+
+# TODO: This is valid, but requires a path-dependent source specialization:
+# `T = bool` chooses `S = int`, while `T = str` chooses `S = str`.
+static_assert(not is_assignable_to(PiecewiseSource, PiecewiseProtocol))
+static_assert(not is_subtype_of(PiecewiseSource, PiecewiseProtocol))
+
+class BoolConsumerProtocol(Protocol):
+    def f[T: bool](self, value: T) -> object: ...
+
+class PromotingConsumer:
+    def f[S: (int, str)](self, value: S) -> object:
+        return value
+
+# TODO: Assignability should agree with subtyping here. The valid uniform source specialization is
+# `S = int`, but the assignability relation's structural witness `S = T` does not yet apply
+# constrained-TypeVar promotion.
+static_assert(not is_assignable_to(PromotingConsumer, BoolConsumerProtocol))
+static_assert(is_subtype_of(PromotingConsumer, BoolConsumerProtocol))
+
+class InvariantBaseReturnProtocol(Protocol):
+    def f[T: Derived](self, value: T) -> list[Base]: ...
+
+class BaseFirstConstraints:
+    def f[S: (Base, Derived)](self, value: S) -> list[S]:
+        return [value]
+
+class DerivedFirstConstraints:
+    def f[S: (Derived, Base)](self, value: S) -> list[S]:
+        return [value]
+
+# Source specialization is inferred from the whole target signature, not chosen by declaration
+# order. Here both sources can use the broader specialization `S = Base`.
+static_assert(is_assignable_to(BaseFirstConstraints, InvariantBaseReturnProtocol))
+static_assert(is_subtype_of(BaseFirstConstraints, InvariantBaseReturnProtocol))
+static_assert(is_assignable_to(DerivedFirstConstraints, InvariantBaseReturnProtocol))
+static_assert(is_subtype_of(DerivedFirstConstraints, InvariantBaseReturnProtocol))
 ```
 
 ## Subtyping of protocols with `@classmethod` or `@staticmethod` members

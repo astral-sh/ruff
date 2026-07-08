@@ -2346,6 +2346,31 @@ static_assert(is_subtype_of(RegularCallableTypeOf[identity], Callable[[int], int
 # error: [static-assert-error]
 static_assert(is_subtype_of(RegularCallableTypeOf[identity], Callable[[str], str]))
 static_assert(not is_subtype_of(RegularCallableTypeOf[identity], Callable[[str], int]))
+
+def identity_source[S](t: S) -> S:
+    return t
+
+# Distinct generic contexts are alpha-equivalent.
+static_assert(
+    is_subtype_of(
+        RegularCallableTypeOf[identity_source],
+        RegularCallableTypeOf[identity],
+    )
+)
+
+def nested_target[T](value: list[T]) -> list[list[T]]:
+    return [value]
+
+def nested_source[S](value: S) -> list[S]:
+    return [value]
+
+# A source specialization may depend on a target variable: `S = list[T]`.
+static_assert(
+    is_subtype_of(
+        RegularCallableTypeOf[nested_source],
+        RegularCallableTypeOf[nested_target],
+    )
+)
 ```
 
 The reverse is not true — if someone expects a generic function that can be called with any

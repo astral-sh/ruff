@@ -1372,7 +1372,7 @@ specializations. That means that a generic callable is assignable to any particu
 the generic callable.)
 
 ```py
-from typing import Callable, Self
+from typing import Callable, Self, overload
 from ty_extensions import static_assert
 from ty_extensions._internal import RegularCallableTypeOf, TypeOf, is_assignable_to
 
@@ -1413,6 +1413,85 @@ static_assert(is_assignable_to(RegularCallableTypeOf[constrained], Callable[[str
 static_assert(is_assignable_to(RegularCallableTypeOf[constrained], Callable[[bytes], bytes]))
 # error: [static-assert-error]
 static_assert(not is_assignable_to(RegularCallableTypeOf[constrained], Callable[[str], int]))
+
+def identity_source[S](t: S) -> S:
+    return t
+
+# Distinct generic contexts are alpha-equivalent.
+static_assert(
+    is_assignable_to(
+        RegularCallableTypeOf[identity_source],
+        RegularCallableTypeOf[identity],
+    )
+)
+
+def nested_target[T](value: list[T]) -> list[list[T]]:
+    return [value]
+
+def nested_source[S](value: S) -> list[S]:
+    return [value]
+
+# A source specialization may depend on a target variable: `S = list[T]`.
+static_assert(
+    is_assignable_to(
+        RegularCallableTypeOf[nested_source],
+        RegularCallableTypeOf[nested_target],
+    )
+)
+
+def paramspec_target[**P](*args: P.args, **kwargs: P.kwargs) -> None: ...
+def paramspec_source[**Q](*args: Q.args, **kwargs: Q.kwargs) -> None: ...
+
+# ParamSpecs retain their existing alpha-equivalent callable relation.
+static_assert(
+    is_assignable_to(
+        RegularCallableTypeOf[paramspec_source],
+        RegularCallableTypeOf[paramspec_target],
+    )
+)
+
+def one_int(value: int) -> None: ...
+
+# A concrete callable cannot cover every parameter list accepted by the generic target.
+static_assert(
+    not is_assignable_to(
+        RegularCallableTypeOf[one_int],
+        RegularCallableTypeOf[paramspec_target],
+    )
+)
+
+def mixed_target[T, **P](value: T, *args: P.args, **kwargs: P.kwargs) -> T:
+    raise NotImplementedError
+
+def mixed_concrete_source[**Q](value: int, *args: Q.args, **kwargs: Q.kwargs) -> int:
+    return value
+
+# TODO: ParamSpec-containing signatures still use the legacy relation, which incorrectly makes
+# the ordinary callable-local TypeVar existential as well.
+# error: [static-assert-error]
+static_assert(
+    not is_assignable_to(
+        RegularCallableTypeOf[mixed_concrete_source],
+        RegularCallableTypeOf[mixed_target],
+    )
+)
+
+@overload
+def overloaded_identity(value: bytes) -> bytes: ...
+@overload
+def overloaded_identity(value: str) -> str: ...
+def overloaded_identity(value: bytes | str) -> bytes | str:
+    return value
+
+# TODO: The overload set jointly covers every target specialization, but the current relation
+# requires one source overload to cover the entire generic target.
+# error: [static-assert-error]
+static_assert(
+    is_assignable_to(
+        RegularCallableTypeOf[overloaded_identity],
+        RegularCallableTypeOf[constrained],
+    )
+)
 
 # This exercises the case where a method's inferable set includes an outer class typevar in
 # addition to the typevars directly bound by the method's own generic context.
