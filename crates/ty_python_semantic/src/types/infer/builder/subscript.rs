@@ -79,7 +79,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let keys = typed_dict
                         .items(db)
                         .keys()
-                        .map(|key| Type::string_literal(db, key))
+                        .map(|key| Type::string_literal(db, key.as_str()))
                         .collect_vec();
                     (!keys.is_empty()).then(|| UnionType::from_elements(db, keys))
                 }
