@@ -165,371 +165,373 @@ help: Replace with `None`
    |
 note: This is an unsafe fix and may change runtime behavior
 
-PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]`
-  --> PYI061.py:53:33
+PYI061 [*] Use `None` rather than `Literal[None]`
+  --> PYI061.py:52:9
    |
-51 | # Regression test for https://github.com/astral-sh/ruff/issues/20729.
-52 | # Rewriting this changes `typing.get_args(options)` at runtime, so the fix is unsafe.
-53 | options = Literal["foo", "bar", None]
-   |                                 ^^^^
+51 | # From flake8-pyi
+52 | Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+   |         ^^^^
+53 | Literal[True, None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
+   |
+help: Replace with `None`
+   |
+51 | # From flake8-pyi
+   - Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+52 + None  # Y061 None inside "Literal[]" expression. Replace with "None"
+53 | Literal[True, None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]`
+  --> PYI061.py:53:15
+   |
+51 | # From flake8-pyi
+52 | Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+53 | Literal[True, None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
+   |               ^^^^
+54 |
+55 | ###
    |
 help: Replace with `Literal[...] | None`
    |
-52 | # Rewriting this changes `typing.get_args(options)` at runtime, so the fix is unsafe.
-   - options = Literal["foo", "bar", None]
-53 + options = Literal["foo", "bar"] | None
+52 | Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+   - Literal[True, None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
+53 + Literal[True] | None  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
 54 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PYI061 [*] Use `None` rather than `Literal[None]`
-  --> PYI061.py:57:9
+  --> PYI061.py:62:9
    |
-56 | # From flake8-pyi
-57 | Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+60 | # If Y061 and Y062 both apply, but all the duplicate members are None,
+61 | # only emit Y061...
+62 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
    |         ^^^^
-58 | Literal[True, None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
+63 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
    |
 help: Replace with `None`
    |
-56 | # From flake8-pyi
-   - Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "None"
-57 + None  # Y061 None inside "Literal[]" expression. Replace with "None"
-58 | Literal[True, None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
-   |
-note: This is an unsafe fix and may change runtime behavior
-
-PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]`
-  --> PYI061.py:58:15
-   |
-56 | # From flake8-pyi
-57 | Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "None"
-58 | Literal[True, None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
-   |               ^^^^
-59 |
-60 | ###
-   |
-help: Replace with `Literal[...] | None`
-   |
-57 | Literal[None]  # Y061 None inside "Literal[]" expression. Replace with "None"
-   - Literal[True, None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
-58 + Literal[True] | None  # Y061 None inside "Literal[]" expression. Replace with "Literal[True] | None"
-59 |
+61 | # only emit Y061...
+   - Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+62 + None  # Y061 None inside "Literal[]" expression. Replace with "None"
+63 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PYI061 [*] Use `None` rather than `Literal[None]`
-  --> PYI061.py:67:9
+  --> PYI061.py:62:15
    |
-65 | # If Y061 and Y062 both apply, but all the duplicate members are None,
-66 | # only emit Y061...
-67 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
-   |         ^^^^
-68 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
-   |
-help: Replace with `None`
-   |
-66 | # only emit Y061...
-   - Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
-67 + None  # Y061 None inside "Literal[]" expression. Replace with "None"
-68 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
-   |
-note: This is an unsafe fix and may change runtime behavior
-
-PYI061 [*] Use `None` rather than `Literal[None]`
-  --> PYI061.py:67:15
-   |
-65 | # If Y061 and Y062 both apply, but all the duplicate members are None,
-66 | # only emit Y061...
-67 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+60 | # If Y061 and Y062 both apply, but all the duplicate members are None,
+61 | # only emit Y061...
+62 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
    |               ^^^^
-68 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+63 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
    |
 help: Replace with `None`
    |
-66 | # only emit Y061...
+61 | # only emit Y061...
    - Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
-67 + None  # Y061 None inside "Literal[]" expression. Replace with "None"
-68 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+62 + None  # Y061 None inside "Literal[]" expression. Replace with "None"
+63 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]`
-  --> PYI061.py:68:12
+  --> PYI061.py:63:12
    |
-66 | # only emit Y061...
-67 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
-68 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+61 | # only emit Y061...
+62 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+63 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
    |            ^^^^
-69 |
-70 | # ... but if Y061 and Y062 both apply
+64 |
+65 | # ... but if Y061 and Y062 both apply
    |
 help: Replace with `Literal[...] | None`
    |
-67 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+62 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
    - Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
-68 + Literal[1, "foo"] | None  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
-69 |
+63 + Literal[1, "foo"] | None  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+64 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]`
-  --> PYI061.py:68:25
+  --> PYI061.py:63:25
    |
-66 | # only emit Y061...
-67 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
-68 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+61 | # only emit Y061...
+62 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+63 | Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
    |                         ^^^^
-69 |
-70 | # ... but if Y061 and Y062 both apply
+64 |
+65 | # ... but if Y061 and Y062 both apply
    |
 help: Replace with `Literal[...] | None`
    |
-67 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
+62 | Literal[None, None]  # Y061 None inside "Literal[]" expression. Replace with "None"
    - Literal[1, None, "foo", None]  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
-68 + Literal[1, "foo"] | None  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
-69 |
+63 + Literal[1, "foo"] | None  # Y061 None inside "Literal[]" expression. Replace with "Literal[1, 'foo'] | None"
+64 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]`
-  --> PYI061.py:73:9
+  --> PYI061.py:68:9
    |
-71 | # and there are no None members in the Literal[] slice,
-72 | # only emit Y062:
-73 | Literal[None, True, None, True]  # Y062 Duplicate "Literal[]" member "True"
+66 | # and there are no None members in the Literal[] slice,
+67 | # only emit Y062:
+68 | Literal[None, True, None, True]  # Y062 Duplicate "Literal[]" member "True"
    |         ^^^^
    |
 help: Replace with `Literal[...] | None`
    |
-72 | # only emit Y062:
+67 | # only emit Y062:
    - Literal[None, True, None, True]  # Y062 Duplicate "Literal[]" member "True"
-73 + Literal[True, True] | None  # Y062 Duplicate "Literal[]" member "True"
-74 |
+68 + Literal[True, True] | None  # Y062 Duplicate "Literal[]" member "True"
+69 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]`
-  --> PYI061.py:73:21
+  --> PYI061.py:68:21
    |
-71 | # and there are no None members in the Literal[] slice,
-72 | # only emit Y062:
-73 | Literal[None, True, None, True]  # Y062 Duplicate "Literal[]" member "True"
+66 | # and there are no None members in the Literal[] slice,
+67 | # only emit Y062:
+68 | Literal[None, True, None, True]  # Y062 Duplicate "Literal[]" member "True"
    |                     ^^^^
    |
 help: Replace with `Literal[...] | None`
    |
-72 | # only emit Y062:
+67 | # only emit Y062:
    - Literal[None, True, None, True]  # Y062 Duplicate "Literal[]" member "True"
-73 + Literal[True, True] | None  # Y062 Duplicate "Literal[]" member "True"
-74 |
+68 + Literal[True, True] | None  # Y062 Duplicate "Literal[]" member "True"
+69 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PYI061 Use `None` rather than `Literal[None]`
-  --> PYI061.py:77:12
+  --> PYI061.py:72:12
    |
-76 | # Regression tests for https://github.com/astral-sh/ruff/issues/14567
-77 | x: Literal[None] | None
+71 | # Regression tests for https://github.com/astral-sh/ruff/issues/14567
+72 | x: Literal[None] | None
    |            ^^^^
-78 | y: None | Literal[None]
-79 | z: Union[Literal[None], None]
+73 | y: None | Literal[None]
+74 | z: Union[Literal[None], None]
    |
 help: Replace with `None`
 
 PYI061 Use `None` rather than `Literal[None]`
-  --> PYI061.py:78:19
+  --> PYI061.py:73:19
    |
-76 | # Regression tests for https://github.com/astral-sh/ruff/issues/14567
-77 | x: Literal[None] | None
-78 | y: None | Literal[None]
+71 | # Regression tests for https://github.com/astral-sh/ruff/issues/14567
+72 | x: Literal[None] | None
+73 | y: None | Literal[None]
    |                   ^^^^
-79 | z: Union[Literal[None], None]
+74 | z: Union[Literal[None], None]
    |
 help: Replace with `None`
 
 PYI061 [*] Use `None` rather than `Literal[None]`
-  --> PYI061.py:79:18
+  --> PYI061.py:74:18
    |
-77 | x: Literal[None] | None
-78 | y: None | Literal[None]
-79 | z: Union[Literal[None], None]
+72 | x: Literal[None] | None
+73 | y: None | Literal[None]
+74 | z: Union[Literal[None], None]
    |                  ^^^^
-80 |
-81 | a: int | Literal[None] | None
+75 |
+76 | a: int | Literal[None] | None
    |
 help: Replace with `None`
    |
-78 | y: None | Literal[None]
+73 | y: None | Literal[None]
    - z: Union[Literal[None], None]
-79 + z: Union[None, None]
-80 |
+74 + z: Union[None, None]
+75 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PYI061 Use `None` rather than `Literal[None]`
-  --> PYI061.py:81:18
+  --> PYI061.py:76:18
    |
-79 | z: Union[Literal[None], None]
-80 |
-81 | a: int | Literal[None] | None
+74 | z: Union[Literal[None], None]
+75 |
+76 | a: int | Literal[None] | None
    |                  ^^^^
-82 | b: None | Literal[None] | None
-83 | c: (None | Literal[None]) | None
+77 | b: None | Literal[None] | None
+78 | c: (None | Literal[None]) | None
    |
 help: Replace with `None`
 
 PYI061 Use `None` rather than `Literal[None]`
-  --> PYI061.py:82:19
+  --> PYI061.py:77:19
    |
-81 | a: int | Literal[None] | None
-82 | b: None | Literal[None] | None
+76 | a: int | Literal[None] | None
+77 | b: None | Literal[None] | None
    |                   ^^^^
-83 | c: (None | Literal[None]) | None
-84 | d: None | (Literal[None] | None)
+78 | c: (None | Literal[None]) | None
+79 | d: None | (Literal[None] | None)
    |
 help: Replace with `None`
 
 PYI061 Use `None` rather than `Literal[None]`
-  --> PYI061.py:83:20
+  --> PYI061.py:78:20
    |
-81 | a: int | Literal[None] | None
-82 | b: None | Literal[None] | None
-83 | c: (None | Literal[None]) | None
+76 | a: int | Literal[None] | None
+77 | b: None | Literal[None] | None
+78 | c: (None | Literal[None]) | None
    |                    ^^^^
-84 | d: None | (Literal[None] | None)
-85 | e: None | ((None | Literal[None]) | None) | None
+79 | d: None | (Literal[None] | None)
+80 | e: None | ((None | Literal[None]) | None) | None
    |
 help: Replace with `None`
 
 PYI061 Use `None` rather than `Literal[None]`
-  --> PYI061.py:84:20
+  --> PYI061.py:79:20
    |
-82 | b: None | Literal[None] | None
-83 | c: (None | Literal[None]) | None
-84 | d: None | (Literal[None] | None)
+77 | b: None | Literal[None] | None
+78 | c: (None | Literal[None]) | None
+79 | d: None | (Literal[None] | None)
    |                    ^^^^
-85 | e: None | ((None | Literal[None]) | None) | None
+80 | e: None | ((None | Literal[None]) | None) | None
    |
 help: Replace with `None`
 
 PYI061 Use `None` rather than `Literal[None]`
-  --> PYI061.py:85:28
+  --> PYI061.py:80:28
    |
-83 | c: (None | Literal[None]) | None
-84 | d: None | (Literal[None] | None)
-85 | e: None | ((None | Literal[None]) | None) | None
+78 | c: (None | Literal[None]) | None
+79 | d: None | (Literal[None] | None)
+80 | e: None | ((None | Literal[None]) | None) | None
    |                            ^^^^
-86 |
-87 | # Test cases for operator precedence issue (https://github.com/astral-sh/ruff/issues/20265)
+81 |
+82 | # Test cases for operator precedence issue (https://github.com/astral-sh/ruff/issues/20265)
    |
 help: Replace with `None`
 
 PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]`
-  --> PYI061.py:88:18
+  --> PYI061.py:83:18
    |
-87 | # Test cases for operator precedence issue (https://github.com/astral-sh/ruff/issues/20265)
-88 | print(Literal[1, None].__dict__)  # Should become (Literal[1] | None).__dict__
+82 | # Test cases for operator precedence issue (https://github.com/astral-sh/ruff/issues/20265)
+83 | print(Literal[1, None].__dict__)  # Should become (Literal[1] | None).__dict__
    |                  ^^^^
-89 | print(Literal[1, None].method())  # Should become (Literal[1] | None).method()
-90 | print(Literal[1, None][0])  # Should become (Literal[1] | None)[0]
+84 | print(Literal[1, None].method())  # Should become (Literal[1] | None).method()
+85 | print(Literal[1, None][0])  # Should become (Literal[1] | None)[0]
    |
 help: Replace with `Literal[...] | None`
    |
-87 | # Test cases for operator precedence issue (https://github.com/astral-sh/ruff/issues/20265)
+82 | # Test cases for operator precedence issue (https://github.com/astral-sh/ruff/issues/20265)
    - print(Literal[1, None].__dict__)  # Should become (Literal[1] | None).__dict__
-88 + print((Literal[1] | None).__dict__)  # Should become (Literal[1] | None).__dict__
-89 | print(Literal[1, None].method())  # Should become (Literal[1] | None).method()
+83 + print((Literal[1] | None).__dict__)  # Should become (Literal[1] | None).__dict__
+84 | print(Literal[1, None].method())  # Should become (Literal[1] | None).method()
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]`
-  --> PYI061.py:89:18
+  --> PYI061.py:84:18
    |
-87 | # Test cases for operator precedence issue (https://github.com/astral-sh/ruff/issues/20265)
-88 | print(Literal[1, None].__dict__)  # Should become (Literal[1] | None).__dict__
-89 | print(Literal[1, None].method())  # Should become (Literal[1] | None).method()
+82 | # Test cases for operator precedence issue (https://github.com/astral-sh/ruff/issues/20265)
+83 | print(Literal[1, None].__dict__)  # Should become (Literal[1] | None).__dict__
+84 | print(Literal[1, None].method())  # Should become (Literal[1] | None).method()
    |                  ^^^^
-90 | print(Literal[1, None][0])  # Should become (Literal[1] | None)[0]
-91 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
+85 | print(Literal[1, None][0])  # Should become (Literal[1] | None)[0]
+86 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
    |
 help: Replace with `Literal[...] | None`
    |
-88 | print(Literal[1, None].__dict__)  # Should become (Literal[1] | None).__dict__
+83 | print(Literal[1, None].__dict__)  # Should become (Literal[1] | None).__dict__
    - print(Literal[1, None].method())  # Should become (Literal[1] | None).method()
-89 + print((Literal[1] | None).method())  # Should become (Literal[1] | None).method()
-90 | print(Literal[1, None][0])  # Should become (Literal[1] | None)[0]
+84 + print((Literal[1] | None).method())  # Should become (Literal[1] | None).method()
+85 | print(Literal[1, None][0])  # Should become (Literal[1] | None)[0]
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]`
-  --> PYI061.py:90:18
+  --> PYI061.py:85:18
    |
-88 | print(Literal[1, None].__dict__)  # Should become (Literal[1] | None).__dict__
-89 | print(Literal[1, None].method())  # Should become (Literal[1] | None).method()
-90 | print(Literal[1, None][0])  # Should become (Literal[1] | None)[0]
+83 | print(Literal[1, None].__dict__)  # Should become (Literal[1] | None).__dict__
+84 | print(Literal[1, None].method())  # Should become (Literal[1] | None).method()
+85 | print(Literal[1, None][0])  # Should become (Literal[1] | None)[0]
    |                  ^^^^
-91 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
-92 | print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
+86 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
+87 | print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
    |
 help: Replace with `Literal[...] | None`
    |
-89 | print(Literal[1, None].method())  # Should become (Literal[1] | None).method()
+84 | print(Literal[1, None].method())  # Should become (Literal[1] | None).method()
    - print(Literal[1, None][0])  # Should become (Literal[1] | None)[0]
-90 + print((Literal[1] | None)[0])  # Should become (Literal[1] | None)[0]
-91 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
+85 + print((Literal[1] | None)[0])  # Should become (Literal[1] | None)[0]
+86 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]`
-  --> PYI061.py:91:18
+  --> PYI061.py:86:18
    |
-89 | print(Literal[1, None].method())  # Should become (Literal[1] | None).method()
-90 | print(Literal[1, None][0])  # Should become (Literal[1] | None)[0]
-91 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
+84 | print(Literal[1, None].method())  # Should become (Literal[1] | None).method()
+85 | print(Literal[1, None][0])  # Should become (Literal[1] | None)[0]
+86 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
    |                  ^^^^
-92 | print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
-93 | print((Literal[1, None]).__dict__)  # Should become ((Literal[1] | None)).__dict__
+87 | print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
+88 | print((Literal[1, None]).__dict__)  # Should become ((Literal[1] | None)).__dict__
    |
 help: Replace with `Literal[...] | None`
    |
-90 | print(Literal[1, None][0])  # Should become (Literal[1] | None)[0]
+85 | print(Literal[1, None][0])  # Should become (Literal[1] | None)[0]
    - print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
-91 + print((Literal[1] | None) + 1)  # Should become (Literal[1] | None) + 1
-92 | print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
+86 + print((Literal[1] | None) + 1)  # Should become (Literal[1] | None) + 1
+87 | print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]`
-  --> PYI061.py:92:18
+  --> PYI061.py:87:18
    |
-90 | print(Literal[1, None][0])  # Should become (Literal[1] | None)[0]
-91 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
-92 | print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
+85 | print(Literal[1, None][0])  # Should become (Literal[1] | None)[0]
+86 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
+87 | print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
    |                  ^^^^
-93 | print((Literal[1, None]).__dict__)  # Should become ((Literal[1] | None)).__dict__
+88 | print((Literal[1, None]).__dict__)  # Should become ((Literal[1] | None)).__dict__
    |
 help: Replace with `Literal[...] | None`
    |
-91 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
+86 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
    - print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
-92 + print((Literal[1] | None) * 2)  # Should become (Literal[1] | None) * 2
-93 | print((Literal[1, None]).__dict__)  # Should become ((Literal[1] | None)).__dict__
+87 + print((Literal[1] | None) * 2)  # Should become (Literal[1] | None) * 2
+88 | print((Literal[1, None]).__dict__)  # Should become ((Literal[1] | None)).__dict__
    |
 note: This is an unsafe fix and may change runtime behavior
 
 PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]`
-  --> PYI061.py:93:19
+  --> PYI061.py:88:19
    |
-91 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
-92 | print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
-93 | print((Literal[1, None]).__dict__)  # Should become ((Literal[1] | None)).__dict__
+86 | print(Literal[1, None] + 1)  # Should become (Literal[1] | None) + 1
+87 | print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
+88 | print((Literal[1, None]).__dict__)  # Should become ((Literal[1] | None)).__dict__
    |                   ^^^^
+89 |
+90 | # Regression test for https://github.com/astral-sh/ruff/issues/20729.
    |
 help: Replace with `Literal[...] | None`
    |
-92 | print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
+87 | print(Literal[1, None] * 2)  # Should become (Literal[1] | None) * 2
    - print((Literal[1, None]).__dict__)  # Should become ((Literal[1] | None)).__dict__
-93 + print((Literal[1] | None).__dict__)  # Should become ((Literal[1] | None)).__dict__
+88 + print((Literal[1] | None).__dict__)  # Should become ((Literal[1] | None)).__dict__
+89 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]`
+  --> PYI061.py:92:33
+   |
+90 | # Regression test for https://github.com/astral-sh/ruff/issues/20729.
+91 | # Rewriting this changes `typing.get_args(options)` at runtime, so the fix is unsafe.
+92 | options = Literal["foo", "bar", None]
+   |                                 ^^^^
+   |
+help: Replace with `Literal[...] | None`
+   |
+91 | # Rewriting this changes `typing.get_args(options)` at runtime, so the fix is unsafe.
+   - options = Literal["foo", "bar", None]
+92 + options = Literal["foo", "bar"] | None
    |
 note: This is an unsafe fix and may change runtime behavior
