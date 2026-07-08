@@ -241,6 +241,9 @@ pub struct Message<'a> {
 #[derive(Clone, Debug)]
 pub struct Snippet<'a, T> {
     pub(crate) path: Option<Cow<'a, str>>,
+    /// The optional cell index in a Jupyter notebook, used for reporting source locations along
+    /// with the ranges on `annotations`.
+    pub(crate) cell_index: Option<usize>,
     pub(crate) line_start: usize,
     pub(crate) source: Cow<'a, str>,
     pub(crate) markers: Vec<T>,
@@ -261,6 +264,7 @@ impl<'a, T: Clone> Snippet<'a, T> {
         Self {
             path: None,
             line_start: 1,
+            cell_index: None,
             source: source.into(),
             markers: vec![],
             fold: true,
@@ -289,7 +293,8 @@ impl<'a, T: Clone> Snippet<'a, T> {
     }
 
     /// Attach a Jupyter notebook cell index.
-    pub fn cell_index(self, _index: Option<usize>) -> Self {
+    pub fn cell_index(mut self, index: Option<usize>) -> Self {
+        self.cell_index = index;
         self
     }
 
@@ -514,6 +519,9 @@ impl<'a> Patch<'a> {
 #[derive(Clone, Debug)]
 pub struct Origin<'a> {
     pub(crate) path: Cow<'a, str>,
+    /// The optional cell index in a Jupyter notebook, used for reporting source locations along
+    /// with the ranges on `annotations`.
+    pub(crate) cell_index: Option<usize>,
     pub(crate) line: Option<usize>,
     pub(crate) char_column: Option<usize>,
 }
@@ -529,9 +537,16 @@ impl<'a> Origin<'a> {
     pub fn path(path: impl Into<Cow<'a, str>>) -> Self {
         Self {
             path: path.into(),
+            cell_index: None,
             line: None,
             char_column: None,
         }
+    }
+
+    /// Attach a Jupyter notebook cell index.
+    pub fn cell_index(mut self, index: Option<usize>) -> Self {
+        self.cell_index = index;
+        self
     }
 
     /// Set the default line number to display

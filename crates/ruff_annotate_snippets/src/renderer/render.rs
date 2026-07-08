@@ -266,7 +266,7 @@ fn render_short_message(renderer: &Renderer, groups: &[Group<'_>]) -> Result<Str
         }
 
         if let Some(path) = &cause.path {
-            let mut origin = Origin::path(path.as_ref());
+            let mut origin = Origin::path(path.as_ref()).cell_index(cause.cell_index);
 
             let source_map = SourceMap::new(&cause.source, cause.line_start);
             let (_depth, annotated_lines) =
@@ -486,12 +486,20 @@ fn render_origin(
         );
     }
 
-    let str = match (&origin.line, &origin.char_column) {
-        (Some(line), Some(col)) => {
-            format!("{}:{}:{}", origin.path, line, col)
+    let str = {
+        use core::fmt::Write as _;
+
+        let mut buffer = origin.path.as_ref().to_owned();
+        if let Some(cell_index) = origin.cell_index {
+            write!(&mut buffer, ":cell {cell_index}").unwrap();
         }
-        (Some(line), None) => format!("{}:{}", origin.path, line),
-        _ => origin.path.to_string(),
+        if let Some(line) = origin.line {
+            write!(&mut buffer, ":{line}").unwrap();
+            if let Some(col) = origin.char_column {
+                write!(&mut buffer, ":{col}").unwrap();
+            }
+        }
+        buffer
     };
     buffer.append(buffer_msg_line_offset, &str, ElementStyle::LineAndColumn);
 }
@@ -512,7 +520,7 @@ fn render_snippet_annotations(
     let show_snippet = !snippet.markers.iter().any(|s| s.is_file_level);
 
     if let Some(path) = &snippet.path {
-        let mut origin = Origin::path(path.as_ref());
+        let mut origin = Origin::path(path.as_ref()).cell_index(snippet.cell_index);
         // print out the span location and spacer before we print the annotated source
         // to do this, we need to know if this span will be primary
         //let is_primary = primary_path == Some(&origin.path);
