@@ -187,7 +187,8 @@ pub(in crate::types) fn constructor_fields_are_keyword_only(
     !is_root_model(db, class)
 }
 
-fn is_root_model(db: &dyn Db, class: StaticClassLiteral<'_>) -> bool {
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+fn is_root_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
     class
         .iter_mro(db, None)
         .filter_map(ClassBase::into_class)
