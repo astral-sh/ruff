@@ -48,6 +48,10 @@ pub(crate) fn check_noqa(
 
     let exemption = FileExemption::from(&file_noqa_directives);
 
+    // Generate diagnostics for suppression comments before applying suppressions so that the
+    // diagnostics can themselves be suppressed.
+    suppressions.check_rule_codes(context, locator);
+
     // Indices of diagnostics that were ignored by a `noqa` directive.
     let mut ignored_diagnostics = vec![];
 

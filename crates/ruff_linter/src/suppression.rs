@@ -23,7 +23,8 @@ use crate::preview::{is_human_readable_names_enabled, is_ruff_ignore_enabled};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{
     InvalidRuleCode, InvalidRuleCodeKind, InvalidSuppressionComment, InvalidSuppressionCommentKind,
-    UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA, UnusedNOQAKind, code_is_valid,
+    RuleCodesInSuppressionComments, UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA,
+    UnusedNOQAKind, code_is_valid,
 };
 use crate::settings::LinterSettings;
 use crate::settings::types::PreviewMode;
@@ -393,6 +394,50 @@ impl Suppressions {
             }
         }
         false
+    }
+
+    /// Check for rule codes in valid suppression comments.
+    pub(crate) fn check_rule_codes(&self, context: &LintContext, locator: &Locator) {
+        if !context.is_rule_enabled(Rule::RuleCodesInSuppressionComments) {
+            return;
+        }
+
+        // Each comment or matched pair produces one valid suppression per code, all sharing the
+        // same first comment range.
+        let mut seen_comments = FxHashSet::default();
+
+        for suppression in &self.valid {
+            let first_comment = suppression.comments.first();
+            if !seen_comments.insert(first_comment.range) {
+                continue;
+            }
+
+            let second_comment = suppression.comments.second();
+            let mut edits = first_comment
+                .codes
+                .iter()
+                .chain(
+                    second_comment
+                        .into_iter()
+                        .flat_map(|comment| &comment.codes),
+                )
+                .filter_map(|range| {
+                    let original = locator.slice(range);
+                    let code = get_redirect_target(original).unwrap_or(original);
+                    let rule = Rule::from_code(code).ok()?;
+                    Some(Edit::range_replacement(rule.name().to_string(), *range))
+                });
+            let Some(first_edit) = edits.next() else {
+                continue;
+            };
+
+            let mut diagnostic =
+                context.report_diagnostic(RuleCodesInSuppressionComments, first_comment.range);
+            if let Some(second_comment) = second_comment {
+                diagnostic.secondary_annotation_without_message(second_comment.range);
+            }
+            diagnostic.set_fix(Fix::safe_edits(first_edit, edits));
+        }
     }
 
     pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
