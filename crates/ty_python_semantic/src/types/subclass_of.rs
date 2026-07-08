@@ -57,7 +57,8 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
-    /// Construct the meta-type of a class-backed protocol.
+    /// Construct the structural meta-type of a class-backed protocol while retaining its
+    /// effective interface for member lookup.
     pub(super) const fn from_protocol(protocol: ProtocolInstanceType<'db>) -> Type<'db> {
         Type::SubclassOf(Self {
             subclass_of: SubclassOfInner::Protocol(protocol),
@@ -246,7 +247,7 @@ impl<'db> SubclassOfType<'db> {
         let class_like = match self.subclass_of.with_transposed_type_var(db) {
             SubclassOfInner::Class(class) => Type::from(class),
             SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic),
-            SubclassOfInner::Protocol(protocol) => Type::from(*protocol.class_origin()?),
+            SubclassOfInner::Protocol(protocol) => Type::from(*protocol.class_origin(db)?),
             SubclassOfInner::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => unreachable!(),
@@ -440,7 +441,8 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 ///
 /// 1. A "subclass of a class": `type[C]` for any class object `C`
 /// 2. A "subclass of a dynamic type": `type[Any]`, `type[Unknown]` and `type[@Todo]`
-/// 3. A protocol meta-type: `type[P]` for a class-backed protocol `P`
+/// 3. A protocol meta-type: `type[P]` for a class-backed protocol `P`, including a materialized
+///    protocol interface
 /// 4. A "subclass of a type variable": `type[T]` for any type variable `T`
 ///
 /// In the long term, we may want to implement <https://github.com/astral-sh/ruff/issues/15381>.
