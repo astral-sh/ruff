@@ -38,7 +38,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
     MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
-    TypeMapping, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
+    TypeMapping, TypeVarKind, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
     infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
@@ -297,6 +297,7 @@ impl<'db> CallableSignature<'db> {
                             type_mapping.update_signature_generic_context(db, context)
                         }),
                         definition: self_signature.definition,
+                        has_generic_receiver: self_signature.has_generic_receiver,
                         parameters,
                         return_ty: self_signature.return_ty.apply_type_mapping_impl(
                             db,
@@ -319,6 +320,8 @@ impl<'db> CallableSignature<'db> {
                                 }),
                             ),
                             definition: signature.definition,
+                            has_generic_receiver: signature.has_generic_receiver
+                                || self_signature.has_generic_receiver,
                             parameters: signature.parameters().with_prefix(
                                 prefix_parameters.iter().map(|param| {
                                     param.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
@@ -489,6 +492,12 @@ pub struct Signature<'db> {
     /// This is useful for locating and extracting docstring information for the signature.
     pub(crate) definition: Option<Definition<'db>>,
 
+    /// Whether an explicit receiver annotation references a variable bound by this signature.
+    ///
+    /// Binding removes the receiver parameter, so retain this bit to avoid later treating a
+    /// receiver-bound variable as an independently universally quantified callable local.
+    has_generic_receiver: bool,
+
     /// Parameters, in source order.
     ///
     /// The ordering of parameters in a valid signature must be: first positional-only parameters,
@@ -623,6 +632,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: None,
             definition: None,
+            has_generic_receiver: false,
             parameters,
             return_ty,
         }
@@ -636,6 +646,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context,
             definition: None,
+            has_generic_receiver: false,
             parameters,
             return_ty,
         }
@@ -646,6 +657,7 @@ impl<'db> Signature<'db> {
         Signature {
             generic_context: None,
             definition: None,
+            has_generic_receiver: false,
             parameters: Parameters::gradual_form(),
             return_ty: signature_type,
         }
@@ -658,6 +670,7 @@ impl<'db> Signature<'db> {
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
         has_implicitly_positional_first_parameter: bool,
+        has_bound_receiver: bool,
         return_callable_typevar_scope: ReturnCallableTypeVarScope,
     ) -> Self {
         let parameters = Parameters::from_parameters(
@@ -678,6 +691,18 @@ impl<'db> Signature<'db> {
             pep695_generic_context,
             legacy_generic_context,
         );
+        let has_generic_receiver = has_bound_receiver
+            && parameters.get(0).is_some_and(|receiver| {
+                receiver.is_positional()
+                    && !receiver.inferred_annotation
+                    && full_generic_context.is_some_and(|context| {
+                        context.variables(db).any(|typevar| {
+                            receiver
+                                .annotated_type()
+                                .references_typevar(db, typevar.typevar(db).identity(db))
+                        })
+                    })
+            });
 
         let (generic_context, return_ty) = match return_callable_typevar_scope {
             ReturnCallableTypeVarScope::Lexical => (full_generic_context, return_ty),
@@ -698,6 +723,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context,
             definition: Some(definition),
+            has_generic_receiver,
             parameters,
             return_ty,
         }
@@ -770,6 +796,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self.generic_context,
             definition: self.definition,
+            has_generic_receiver: self.has_generic_receiver,
             parameters,
             return_ty,
         }
@@ -799,6 +826,7 @@ impl<'db> Signature<'db> {
         Some(Self {
             generic_context: self.generic_context,
             definition: self.definition,
+            has_generic_receiver: self.has_generic_receiver,
             parameters,
             return_ty,
         })
@@ -816,6 +844,7 @@ impl<'db> Signature<'db> {
                 .generic_context
                 .map(|context| type_mapping.update_signature_generic_context(db, context)),
             definition: self.definition,
+            has_generic_receiver: self.has_generic_receiver,
             parameters: self
                 .parameters
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -976,6 +1005,7 @@ impl<'db> Signature<'db> {
                 .generic_context
                 .map(|generic_context| generic_context.remove_self(db, binding_context)),
             definition: self.definition,
+            has_generic_receiver: self.has_generic_receiver,
             parameters,
             return_ty,
         }
@@ -1076,6 +1106,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self.generic_context,
             definition: self.definition,
+            has_generic_receiver: self.has_generic_receiver,
             parameters,
             return_ty,
         }
@@ -1781,7 +1812,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if caller_inferable_count > 0 {
             // TODO: Partition caller-owned variables from callable-local variables, leaving the
             // former free while universally quantifying the latter.
-            return self.never();
+            return self.check_signature_pair_infer_both(db, source, target);
+        }
+
+        // A legacy TypeVar's owner is inferred from its uses. When an enclosing generic context
+        // is unavailable, a class variable can therefore look method-local. Restrict higher-rank
+        // comparison to PEP 695 variables lexically declared by this function. Explicit generic
+        // receivers use the existing path too; their variable is fixed by receiver binding rather
+        // than independently chosen by every caller.
+        if target.has_generic_receiver
+            || !target_typevars.iter().all(|typevar| {
+                typevar.kind(db) == TypeVarKind::Pep695TypeVar
+                    && typevar.binding_context(db).definition() == target.definition
+            })
+        {
+            return self.check_signature_pair_infer_both(db, source, target);
         }
 
         let source_typevars = source

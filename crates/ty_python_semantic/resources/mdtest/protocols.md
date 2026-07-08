@@ -2788,6 +2788,29 @@ class LegacyFunctionScoped(Protocol):
 class UsesSelf(Protocol):
     def g(self: Self) -> Self: ...
 
+LegacyReceiverT = TypeVar("LegacyReceiverT")
+
+class UsesLegacyReceiver(Protocol):
+    def compare(self: LegacyReceiverT, other: LegacyReceiverT) -> bool: ...
+
+LegacyCopyT = TypeVar("LegacyCopyT", bound="LegacyCopyable")
+
+class LegacyCopyable(Protocol):
+    def copy(self: LegacyCopyT) -> LegacyCopyT: ...
+
+LegacyClassReceiverT = TypeVar("LegacyClassReceiverT")
+
+class UsesLegacyClassReceiver(Protocol):
+    @classmethod
+    def make(cls: type[LegacyClassReceiverT]) -> LegacyClassReceiverT: ...
+
+class UsesPep695Receiver(Protocol):
+    def compare[T](self: T, other: T) -> bool: ...
+
+class UsesPep695ClassReceiver(Protocol):
+    @classmethod
+    def make[T](cls: type[T]) -> T: ...
+
 class NominalNewStyle:
     def f[T](self, input: T) -> T:
         return input
@@ -2799,6 +2822,17 @@ class NominalLegacy:
 class NominalWithSelf:
     def g(self: Self) -> Self:
         return self
+
+class NominalLegacyReceiver:
+    def compare(self, other: "NominalLegacyReceiver") -> bool:
+        return True
+
+    def copy(self) -> "NominalLegacyReceiver":
+        return self
+
+    @classmethod
+    def make(cls) -> Self:
+        return cls()
 
 class NominalNotGeneric:
     def f(self, input: int) -> int:
@@ -2832,9 +2866,17 @@ static_assert(not is_assignable_to(NominalWithSelf, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalWithSelf, LegacyFunctionScoped))
 static_assert(is_assignable_to(NominalWithSelf, UsesSelf))
 static_assert(is_subtype_of(NominalWithSelf, UsesSelf))
+static_assert(is_assignable_to(NominalLegacyReceiver, UsesLegacyReceiver))
+static_assert(is_subtype_of(NominalLegacyReceiver, UsesLegacyReceiver))
+static_assert(is_assignable_to(NominalLegacyReceiver, LegacyCopyable))
+static_assert(is_assignable_to(NominalLegacyReceiver, UsesLegacyClassReceiver))
+static_assert(is_assignable_to(NominalLegacyReceiver, UsesPep695Receiver))
+static_assert(is_assignable_to(NominalLegacyReceiver, UsesPep695ClassReceiver))
 
 static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))
-static_assert(not is_assignable_to(NominalNotGeneric, LegacyFunctionScoped))
+# TODO: Retain receiver provenance when binding legacy generic method signatures so ordinary
+# method-local variables can be distinguished from `self: T`.
+static_assert(not is_assignable_to(NominalNotGeneric, LegacyFunctionScoped))  # error: [static-assert-error]
 static_assert(not is_assignable_to(NominalNotGeneric, UsesSelf))
 
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, NewStyleFunctionScoped))

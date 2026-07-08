@@ -434,9 +434,6 @@ class PolyRing(DefaultPrinting, IPolys[T], Generic[T]):
     symbols: tuple[object, ...]
     domain: Domain[T]
 
-    # The inherited generic overload can return `IPolys[S]` for an independent `S`, but this
-    # override always returns `PolyRing[T]`.
-    # error: [invalid-method-override]
     def clone(
         self,
         symbols: object | None = None,
