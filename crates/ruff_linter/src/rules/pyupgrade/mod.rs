@@ -561,4 +561,32 @@ mod tests {
         assert_diagnostics!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn extend_type_form_callables() -> Result<()> {
+        let snapshot = "extend_type_form_callables".to_string();
+        let diagnostics = test_path(
+            Path::new("pyupgrade/extend_type_form_callables.py"),
+            &settings::LinterSettings {
+                extend_type_form_callables: vec![(
+                    "my_custom_cast".to_string(),
+                    vec![
+                        crate::settings::types::CallArgument {
+                            position: Some(1),
+                            name: None,
+                        },
+                        crate::settings::types::CallArgument {
+                            position: None,
+                            name: Some("type_arg".to_string()),
+                        },
+                    ],
+                )]
+                .into_iter()
+                .collect(),
+                ..settings::LinterSettings::for_rule(Rule::NonPEP604AnnotationUnion)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
 }

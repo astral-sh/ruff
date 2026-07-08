@@ -1861,17 +1861,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         for (i, arg) in arguments.iter_source_order().enumerate() {
                             let mut is_type_form = false;
                             for target in args {
-                                match target {
-                                    crate::settings::types::CallArgument::Positional(pos) => {
-                                        if &i == pos && matches!(arg, ArgOrKeyword::Arg(_)) {
-                                            is_type_form = true;
-                                        }
+                                if let Some(pos) = target.position {
+                                    if i == pos && matches!(arg, ArgOrKeyword::Arg(_)) {
+                                        is_type_form = true;
                                     }
-                                    crate::settings::types::CallArgument::Keyword(kw) => {
-                                        if let ArgOrKeyword::Keyword(Keyword { arg: Some(id), .. }) = arg {
-                                            if id.as_str() == kw.as_str() {
-                                                is_type_form = true;
-                                            }
+                                }
+                                if let Some(kw) = &target.name {
+                                    if let ArgOrKeyword::Keyword(Keyword { arg: Some(id), .. }) = arg {
+                                        if id.as_str() == kw.as_str() {
+                                            is_type_form = true;
                                         }
                                     }
                                 }

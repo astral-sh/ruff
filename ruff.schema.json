@@ -879,16 +879,23 @@
       }
     },
     "CallArgument": {
-      "anyOf": [
-        {
-          "type": "integer",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "position": {
+          "type": [
+            "integer",
+            "null"
+          ],
           "format": "uint",
           "minimum": 0
-        },
-        {
-          "type": "string"
         }
-      ]
+      }
     },
     "ConstantType": {
       "type": "string",

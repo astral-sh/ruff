@@ -1,0 +1,34 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+assertion_line: 589
+---
+UP007 Use `X | Y` for type annotations
+ --> extend_type_form_callables.py:4:16
+  |
+3 | # This should NOT flag (position 0 is not checked)
+4 | my_custom_cast(Union[None, int], "hello")
+  |                ^^^^^^^^^^^^^^^^
+5 |
+6 | # This SHOULD flag (position 1 is checked)
+  |
+help: Convert to `X | Y`
+
+UP007 Use `X | Y` for type annotations
+ --> extend_type_form_callables.py:7:25
+  |
+6 | # This SHOULD flag (position 1 is checked)
+7 | my_custom_cast("hello", Union[None, int])
+  |                         ^^^^^^^^^^^^^^^^
+8 |
+9 | # This SHOULD flag (keyword type_arg is checked)
+  |
+help: Convert to `X | Y`
+
+UP007 Use `X | Y` for type annotations
+  --> extend_type_form_callables.py:10:34
+   |
+ 9 | # This SHOULD flag (keyword type_arg is checked)
+10 | my_custom_cast("hello", type_arg=Union[None, int])
+   |                                  ^^^^^^^^^^^^^^^^
+   |
+help: Convert to `X | Y`

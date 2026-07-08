@@ -1012,11 +1012,52 @@ impl Display for CompiledPerFileTargetVersionList {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[serde(untagged)]
-pub enum CallArgument {
-    Positional(usize),
-    Keyword(String),
+pub struct CallArgument {
+    pub position: Option<usize>,
+    pub name: Option<String>,
+}
+
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for CallArgument {
+    fn schema_name() -> String {
+        "CallArgument".to_string()
+    }
+
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::schema::Schema {
+        let mut schema_object = schemars::schema::SchemaObject {
+            instance_type: Some(schemars::schema::InstanceType::Object.into()),
+            ..Default::default()
+        };
+
+        schema_object.object().properties.insert(
+            "position".to_string(),
+            generator.subschema_for::<usize>(),
+        );
+        schema_object.object().properties.insert(
+            "name".to_string(),
+            generator.subschema_for::<String>(),
+        );
+
+        let any_of = vec![
+            schemars::schema::SchemaObject {
+                object: Some(Box::new(schemars::schema::ObjectValidation {
+                    required: std::collections::BTreeSet::from(["position".to_string()]),
+                    ..Default::default()
+                })),
+                ..Default::default()
+            }.into(),
+            schemars::schema::SchemaObject {
+                object: Some(Box::new(schemars::schema::ObjectValidation {
+                    required: std::collections::BTreeSet::from(["name".to_string()]),
+                    ..Default::default()
+                })),
+                ..Default::default()
+            }.into(),
+        ];
+        schema_object.subschemas().any_of = Some(any_of);
+
+        schema_object.into()
+    }
 }
 
 #[cfg(test)]
