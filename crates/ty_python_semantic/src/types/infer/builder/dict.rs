@@ -102,7 +102,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let key = keyword_names
                     .get(&elt.node_index().load())
                     .expect("keyword-only dict() fast-path requires named keywords");
-                Type::string_literal(builder.db(), key)
+                Type::string_literal(builder.db(), key.as_str())
             } else {
                 builder.infer_expression(elt, tcx)
             }
