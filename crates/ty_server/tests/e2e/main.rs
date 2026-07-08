@@ -49,6 +49,7 @@ mod script_preparation;
 mod semantic_tokens;
 mod signature_help;
 mod type_hierarchy;
+mod will_rename_files;
 mod workspace_folders;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -86,6 +87,7 @@ use lsp_types::{
     WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticRequest,
     WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceFoldersInitializeParams,
 };
+use lsp_types::{FileRename, WillRenameFilesRequest};
 #[cfg(feature = "test-uv")]
 use ruff_db::system::System as _;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, SystemVirtualPath, TestSystem};
@@ -1023,6 +1025,10 @@ impl TestServer {
                 work_done_progress_params: WorkDoneProgressParams::default(),
             }),
         )
+    }
+
+    pub(crate) fn will_rename_files(&mut self, files: Vec<FileRename>) -> Option<WorkspaceEdit> {
+        self.send_request_await::<WillRenameFilesRequest>(lsp_types::RenameFilesParams { files })
     }
 
     /// Send a `textDocument/diagnostic` request for the document at the given path.
