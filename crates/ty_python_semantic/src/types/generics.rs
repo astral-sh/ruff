@@ -26,7 +26,7 @@ use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
 };
 use crate::types::visitor::{
-    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+    RecursionGuard, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
@@ -463,7 +463,7 @@ impl<'db> GenericContext<'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
             typevars: RefCell<FxOrderSet<BoundTypeVarIdentity<'db>>>,
-            recursion_guard: TypeCollector<'db>,
+            recursion_guard: RecursionGuard<'db>,
         }
 
         impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {
@@ -738,7 +738,7 @@ impl<'db> GenericContext<'db> {
         #[derive(Default)]
         struct FindTypeVarLocations<'db> {
             locations: RefCell<TypeVarLocations<'db>>,
-            recursion_guard: TypeCollector<'db>,
+            recursion_guard: RecursionGuard<'db>,
             active_type_aliases: RefCell<FxHashSet<Definition<'db>>>,
             in_return_type: bool,
             in_callable_type: Cell<Option<CallableType<'db>>>,

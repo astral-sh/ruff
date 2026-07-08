@@ -150,7 +150,7 @@ where
     pub fn visit(&self, db: &'db dyn Db, item: T, compute: impl FnOnce() -> R) -> R {
         match self.begin_visit(db, item) {
             CycleDetectorVisit::Ready(result) => result,
-            CycleDetectorVisit::Cycle { .. } => self.fallback.clone(),
+            CycleDetectorVisit::Cycle(_) => self.fallback.clone(),
             CycleDetectorVisit::Pending(item) => {
                 let result = compute();
                 self.finish_visit(item, result)
@@ -172,13 +172,10 @@ where
 
         if item.needs_recursive_identity() {
             let identity = item.to_identity(db);
-            if let Some(active) = seen.iter().find(|active| {
+            if seen.iter().any(|active| {
                 active.needs_recursive_identity() && active.to_identity(db) == identity
             }) {
-                return CycleDetectorVisit::Cycle {
-                    active: active.clone(),
-                    current: item,
-                };
+                return CycleDetectorVisit::Cycle(item);
             }
         }
         drop(seen);
@@ -203,8 +200,8 @@ pub(crate) enum CycleDetectorVisit<T, R> {
     /// The item already has a completed result or hit an exact recursive edge.
     Ready(R),
     /// A different item with the same abstract identity is already pending.
-    /// The active item is the pending obligation; the current item is the input that hit it.
-    Cycle { active: T, current: T },
+    /// The item is the input that hit the active obligation.
+    Cycle(T),
     /// The caller should compute the result and pass it to [`CycleDetector::finish_visit`].
     Pending(T),
 }
@@ -239,10 +236,7 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         compute: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
         match self.begin_visit(db, ty) {
-            CycleDetectorVisit::Ready(result)
-            | CycleDetectorVisit::Cycle {
-                current: result, ..
-            } => result,
+            CycleDetectorVisit::Ready(result) | CycleDetectorVisit::Cycle(result) => result,
             CycleDetectorVisit::Pending(ty) => {
                 let result = compute();
                 self.finish_visit(ty, result)
@@ -263,10 +257,7 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         if seen.contains(&ty) || Self::is_growing_recursive_alias(db, ty, &seen) {
             // When a cycle is encountered, the type being visited is returned as a fallback
             // (typically a recursive type alias).
-            return CycleDetectorVisit::Cycle {
-                active: ty,
-                current: ty,
-            };
+            return CycleDetectorVisit::Cycle(ty);
         }
         drop(seen);
 
@@ -641,7 +632,7 @@ mod tests {
     }
 
     #[test]
-    fn identity_cycle_reports_active_and_current_items() {
+    fn identity_cycle_reports_current_item() {
         let db = setup_db();
         let detector = IdentityDetector::new(0);
         let first = TestItem {
@@ -657,11 +648,9 @@ mod tests {
             panic!("first visit should be pending");
         };
 
-        let CycleDetectorVisit::Cycle { active, current } = detector.begin_visit(&db, second)
-        else {
+        let CycleDetectorVisit::Cycle(current) = detector.begin_visit(&db, second) else {
             panic!("second visit should detect an identity cycle");
         };
-        assert_eq!(active, first);
         assert_eq!(current, second);
 
         detector.finish_visit(active_item, 10);
