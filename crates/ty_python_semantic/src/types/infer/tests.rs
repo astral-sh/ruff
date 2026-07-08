@@ -7,6 +7,8 @@ use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
+use ruff_python_ast as ast;
+use ruff_text_size::Ranged;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::FileScopeId;
 use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
@@ -110,6 +112,46 @@ fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
     assert_eq!(
         non_owner.bindings(first).collect::<Vec<_>>(),
         [(second, owner_type)]
+    );
+
+    Ok(())
+}
+
+#[test]
+fn expected_types_are_collected_only_in_completion_mode() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "src/a.py",
+        r#"
+        from typing_extensions import Literal
+
+        value: Literal["apple", "banana"] = "app"
+        "#,
+    )?;
+
+    let file = system_path_to_file(&db, "src/a.py").expect("file to exist");
+    let module = parsed_module(&db, file).load(&db);
+    let assignment = module.syntax().body[1]
+        .as_ann_assign_stmt()
+        .expect("annotated assignment");
+    let string_expr = assignment
+        .value
+        .as_deref()
+        .expect("annotated assignment to have a value")
+        .as_string_literal_expr()
+        .expect("string literal value");
+    let expr = ast::ExprRef::from(string_expr);
+    let scope = global_scope(&db, file);
+
+    assert!(
+        infer_complete_scope_types(&db, scope)
+            .try_expected_type(expr)
+            .is_none()
+    );
+    assert!(
+        infer_complete_scope_types_with_expected_types(&db, scope, string_expr.range())
+            .try_expected_type(expr)
+            .is_some()
     );
 
     Ok(())

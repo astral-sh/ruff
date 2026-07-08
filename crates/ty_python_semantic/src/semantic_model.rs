@@ -19,7 +19,7 @@ use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{
     CycleDetector, SpecialFormType, Type, TypeQualifiers, binding_type, infer_complete_scope_types,
-    inferred_declaration,
+    infer_complete_scope_types_with_expected_types, inferred_declaration,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place_table;
@@ -593,7 +593,8 @@ impl<'db> SemanticModel<'db> {
         let file_scope = index.try_expression_scope_id(&self.expr_ref_in_ast(expr))?;
         let scope = file_scope.to_scope_id(self.db, self.file);
 
-        infer_complete_scope_types(self.db, scope).try_expected_type(expr)
+        infer_complete_scope_types_with_expected_types(self.db, scope, string_expr.range())
+            .try_expected_type(expr)
     }
 }
 
