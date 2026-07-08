@@ -172,6 +172,7 @@ pub struct Title<'a> {
     pub(crate) id: Option<Id<'a>>,
     pub(crate) text: Cow<'a, str>,
     pub(crate) allows_styling: bool,
+    pub(crate) is_fixable: bool,
 }
 
 impl<'a> Title<'a> {
@@ -217,7 +218,8 @@ impl<'a> Title<'a> {
     ///
     /// This is rendered as a `[*]` indicator after the `id` in an annotation header, if the
     /// annotation also has `Level::None`.
-    pub fn is_fixable(self, _yes: bool) -> Self {
+    pub fn is_fixable(mut self, yes: bool) -> Self {
+        self.is_fixable = yes;
         self
     }
 }
