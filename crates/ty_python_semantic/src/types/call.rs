@@ -40,7 +40,7 @@ fn has_exact_runtime_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 ///
 /// Instances dispatch through their nominal class, while class objects dispatch through their
 /// metaclass.
-fn nominal_runtime_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassType<'db>> {
+fn operator_dispatch_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassType<'db>> {
     match ty {
         Type::ClassLiteral(class) => class.metaclass(db).to_class_type(db),
         _ => ty.nominal_class(db),
@@ -71,8 +71,8 @@ fn reflected_method_priority<'db>(
     }
 
     if let (Some(left_class), Some(right_class)) = (
-        nominal_runtime_class(db, left_ty),
-        nominal_runtime_class(db, right_ty),
+        operator_dispatch_class(db, left_ty),
+        operator_dispatch_class(db, right_ty),
     ) && left_class.class_literal(db) != right_class.class_literal(db)
         && right_class.is_subtype_of_class_literal(db, left_class.class_literal(db))
     {
