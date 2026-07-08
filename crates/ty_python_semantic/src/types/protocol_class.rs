@@ -1437,7 +1437,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             required_ty.bind_self(db, fallback_ty).when_some_and(
                 db,
                 self.constraints,
-                |required_ty| self.check_type_pair(db, attribute_type, required_ty),
+                |required_ty| {
+                    let result = self.check_type_pair(db, attribute_type, required_ty);
+                    if let Some(context) = self.report_context()
+                        && result.is_never_satisfied(db)
+                    {
+                        context.push(ErrorContext::ProtocolMemberReadTypeIncompatible {
+                            source: attribute_type,
+                            target: required_ty,
+                        });
+                    }
+                    result
+                },
             )
         }
     }
@@ -1497,7 +1508,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         db,
                         self.constraints,
                         |write_ty| {
-                            self.check_property_write(db, receiver_ty, member.name, write_ty)
+                            let result =
+                                self.check_property_write(db, receiver_ty, member.name, write_ty);
+                            if let Some(context) = self.report_context()
+                                && result.is_never_satisfied(db)
+                            {
+                                context.push(ErrorContext::ProtocolMemberWriteTypeIncompatible {
+                                    target: write_ty,
+                                });
+                            }
+                            result
                         },
                     )
                 },
@@ -1623,14 +1643,27 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 ) else {
                     return self.never();
                 };
-                self.check_type_pair(db, source, target)
+                let result = self.check_type_pair(db, source, target);
+                if let Some(context) = self.report_context()
+                    && !target_member.is_method()
+                    && result.is_never_satisfied(db)
+                {
+                    context
+                        .push(ErrorContext::ProtocolMemberReadTypeIncompatible { source, target });
+                }
+                result
             }
         };
 
         read_result.and(db, self.constraints, || {
             match (source.write, target.write) {
                 (_, None) => self.always(),
-                (None, Some(_)) => self.never(),
+                (None, Some(_)) => {
+                    if let Some(context) = self.report_context() {
+                        context.push(ErrorContext::ProtocolMemberNotWritable);
+                    }
+                    self.never()
+                }
                 (Some(source), Some(target)) => {
                     let (Some(target), Some(source)) = (
                         target.bind_self(db, source_type),
@@ -1638,7 +1671,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ) else {
                         return self.never();
                     };
-                    self.check_type_pair(db, target, source)
+                    let result = self.check_type_pair(db, target, source);
+                    if let Some(context) = self.report_context()
+                        && result.is_never_satisfied(db)
+                    {
+                        context.push(ErrorContext::ProtocolMemberWriteTypeIncompatible { target });
+                    }
+                    result
                 }
             }
         })
