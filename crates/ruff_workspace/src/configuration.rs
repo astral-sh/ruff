@@ -29,9 +29,9 @@ use ruff_linter::rules::{flake8_import_conventions, isort, pycodestyle};
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
-    CallArgument, CompiledPerFileIgnoreList, CompiledPerFileTargetVersionList, ExtensionMapping, FilePattern,
-    FilePatternSet, GlobPath, OutputFormat, PerFileIgnore, PerFileTargetVersion, PreviewMode,
-    RequiredVersion, UnsafeFixes,
+    CallArgument, CompiledPerFileIgnoreList, CompiledPerFileTargetVersionList, ExtensionMapping,
+    FilePattern, FilePatternSet, GlobPath, OutputFormat, PerFileIgnore, PerFileTargetVersion,
+    PreviewMode, RequiredVersion, UnsafeFixes,
 };
 use ruff_linter::settings::{
     DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, LinterSettings, PREVIEW_DEFAULT_SELECTORS, TASK_TAGS,
@@ -1273,7 +1273,9 @@ impl LintConfiguration {
                 .or(config.explicit_preview_rules),
             task_tags: self.task_tags.or(config.task_tags),
             typing_modules: self.typing_modules.or(config.typing_modules),
-            extend_type_form_callables: self.extend_type_form_callables.or(config.extend_type_form_callables),
+            extend_type_form_callables: self
+                .extend_type_form_callables
+                .or(config.extend_type_form_callables),
 
             // Plugins
             flake8_annotations: self.flake8_annotations.combine(config.flake8_annotations),

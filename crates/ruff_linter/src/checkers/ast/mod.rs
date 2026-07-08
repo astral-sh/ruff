@@ -1867,7 +1867,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                     }
                                 }
                                 if let Some(kw) = &target.name {
-                                    if let ArgOrKeyword::Keyword(Keyword { arg: Some(id), .. }) = arg {
+                                    if let ArgOrKeyword::Keyword(Keyword {
+                                        arg: Some(id), ..
+                                    }) = arg
+                                    {
                                         if id.as_str() == kw.as_str() {
                                             is_type_form = true;
                                         }
@@ -1895,59 +1898,56 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
 
-                let callable =
-                    qualified_name_opt
-                        .and_then(|qualified_name| {
-                            if self
-                                .semantic
-                                .match_typing_qualified_name(&qualified_name, "cast")
-                            {
-                                Some(typing::Callable::Cast)
-                            } else if self
-                                .semantic
-                                .match_typing_qualified_name(&qualified_name, "NewType")
-                            {
-                                Some(typing::Callable::NewType)
-                            } else if self
-                                .semantic
-                                .match_typing_qualified_name(&qualified_name, "TypeVar")
-                            {
-                                Some(typing::Callable::TypeVar)
-                            } else if self
-                                .semantic
-                                .match_typing_qualified_name(&qualified_name, "TypeAliasType")
-                            {
-                                Some(typing::Callable::TypeAliasType)
-                            } else if self
-                                .semantic
-                                .match_typing_qualified_name(&qualified_name, "NamedTuple")
-                            {
-                                Some(typing::Callable::NamedTuple)
-                            } else if self
-                                .semantic
-                                .match_typing_qualified_name(&qualified_name, "TypedDict")
-                            {
-                                Some(typing::Callable::TypedDict)
-                            } else if matches!(
-                                qualified_name.segments(),
-                                [
-                                    "mypy_extensions",
-                                    "Arg"
-                                        | "DefaultArg"
-                                        | "NamedArg"
-                                        | "DefaultNamedArg"
-                                        | "VarArg"
-                                        | "KwArg"
-                                ]
-                            ) {
-                                Some(typing::Callable::MypyExtension)
-                            } else if matches!(qualified_name.segments(), ["" | "builtins", "bool"])
-                            {
-                                Some(typing::Callable::Bool)
-                            } else {
-                                None
-                            }
-                        });
+                let callable = qualified_name_opt.and_then(|qualified_name| {
+                    if self
+                        .semantic
+                        .match_typing_qualified_name(&qualified_name, "cast")
+                    {
+                        Some(typing::Callable::Cast)
+                    } else if self
+                        .semantic
+                        .match_typing_qualified_name(&qualified_name, "NewType")
+                    {
+                        Some(typing::Callable::NewType)
+                    } else if self
+                        .semantic
+                        .match_typing_qualified_name(&qualified_name, "TypeVar")
+                    {
+                        Some(typing::Callable::TypeVar)
+                    } else if self
+                        .semantic
+                        .match_typing_qualified_name(&qualified_name, "TypeAliasType")
+                    {
+                        Some(typing::Callable::TypeAliasType)
+                    } else if self
+                        .semantic
+                        .match_typing_qualified_name(&qualified_name, "NamedTuple")
+                    {
+                        Some(typing::Callable::NamedTuple)
+                    } else if self
+                        .semantic
+                        .match_typing_qualified_name(&qualified_name, "TypedDict")
+                    {
+                        Some(typing::Callable::TypedDict)
+                    } else if matches!(
+                        qualified_name.segments(),
+                        [
+                            "mypy_extensions",
+                            "Arg"
+                                | "DefaultArg"
+                                | "NamedArg"
+                                | "DefaultNamedArg"
+                                | "VarArg"
+                                | "KwArg"
+                        ]
+                    ) {
+                        Some(typing::Callable::MypyExtension)
+                    } else if matches!(qualified_name.segments(), ["" | "builtins", "bool"]) {
+                        Some(typing::Callable::Bool)
+                    } else {
+                        None
+                    }
+                });
                 match callable {
                     Some(typing::Callable::Bool) => {
                         let mut args = arguments.args.iter();

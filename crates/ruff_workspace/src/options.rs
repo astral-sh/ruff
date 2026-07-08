@@ -34,7 +34,8 @@ use ruff_linter::rules::{
     pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use ruff_linter::settings::types::{
-    CallArgument, IdentifierPattern, Language, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
+    CallArgument, IdentifierPattern, Language, OutputFormat, PreviewMode, PythonVersion,
+    RequiredVersion,
 };
 use ruff_linter::{UnresolvedRuleSelector, warn_user_once};
 use ruff_macros::{CombineOptions, OptionsMetadata};

@@ -22,7 +22,9 @@ use crate::rules::{
     flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe,
     pep8_naming, pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
-use crate::settings::types::{CallArgument, CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet};
+use crate::settings::types::{
+    CallArgument, CompiledPerFileIgnoreList, ExtensionMapping, FilePatternSet,
+};
 use crate::{RuleSelector, codes, fs};
 
 use super::line_width::IndentWidth;
