@@ -1,7 +1,9 @@
 use smallvec::SmallVec;
 use ty_python_core::definition::{Definition, DefinitionState};
 use ty_python_core::scope::ScopeId;
-use ty_python_core::{BindingWithConstraintsIterator, global_scope, place_table, use_def_map};
+use ty_python_core::{
+    BindingWithConstraintsIterator, ProgramFile, global_scope, place_table, use_def_map,
+};
 
 use crate::Db;
 use crate::place::{
@@ -11,6 +13,20 @@ use crate::place::{
 use crate::place_load::{ImplicitPlaceLoad, PlaceLoadSource, PlaceLoadSourceKind};
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::ProgramEnvironment;
+
+/// Returns the definitions that may supply a module global at the end of its scope.
+pub(crate) fn definitions_for_module_global<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
+    name: &str,
+) -> Option<DefinitionResolution<'db>> {
+    let scope = global_scope(db, file);
+    let symbol = place_table(db, scope).symbol_id(name)?;
+    Some(DefinitionResolution::from_bindings(
+        db,
+        use_def_map(db, scope).end_of_scope_symbol_bindings(symbol),
+    ))
+}
 
 /// The definitions that may bind a name and information about the resolution.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -23,7 +39,6 @@ pub struct DefinitionResolution<'db> {
     pub(crate) is_complete: bool,
 }
 
-#[allow(dead_code, reason = "awaiting IDE integration")]
 impl<'db> DefinitionResolution<'db> {
     pub(crate) fn new() -> Self {
         Self {
