@@ -126,7 +126,7 @@ itertools = { version = "0.15.0" }
 jiff = { version = "0.2.0" }
 jod-thread = { version = "1.0.0" }
 js-sys = { version = "0.3.69" }
-lean_string = { git = "https://github.com/astral-sh/lean_string", rev = "1f2643ea47e97f6f67393caf734c0bc7795b4f0b" }
+lean_string = { version = "0.6.1", git = "https://github.com/astral-sh/lean_string", rev = "1f2643ea47e97f6f67393caf734c0bc7795b4f0b" }
 libc = { version = "0.2.153" }
 libcst = { version = "1.8.4", default-features = false }
 log = { version = "0.4.17" }
