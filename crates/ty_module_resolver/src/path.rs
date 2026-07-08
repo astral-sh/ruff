@@ -494,6 +494,11 @@ enum SearchPathInner {
 pub struct SearchPath(Arc<SearchPathInner>);
 
 impl SearchPath {
+    /// Derives the module name a system path would have on this search path.
+    pub fn module_name_for_system_path(&self, path: &SystemPath) -> Option<ModuleName> {
+        self.relativize_system_path(path)?.to_module_name()
+    }
+
     fn directory_path(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<SystemPathBuf> {
         if system.is_directory(&root) {
             Ok(root)
