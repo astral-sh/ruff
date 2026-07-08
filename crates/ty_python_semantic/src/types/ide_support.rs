@@ -1066,10 +1066,10 @@ fn collect_implementation_root_classes<'db>(
 /// end-of-scope bindings. Nested comprehensions can produce a chain of these proxies. Only
 /// follow sources that resolve to the same variable, so `global` and `nonlocal` writes do not
 /// become definitions of each other.
-fn user_visible_definitions<'db>(
+pub fn user_visible_definitions<'db>(
     db: &'db dyn Db,
     definitions: impl IntoIterator<Item = Definition<'db>>,
-) -> FxIndexSet<Definition<'db>> {
+) -> Vec<Definition<'db>> {
     let mut pending = definitions.into_iter().collect::<VecDeque<_>>();
     let mut seen = FxHashSet::default();
     let mut result = FxIndexSet::default();
@@ -1100,7 +1100,7 @@ fn user_visible_definitions<'db>(
         }
     }
 
-    result
+    result.into_iter().collect()
 }
 
 fn reachable_implementation_definitions<'db>(

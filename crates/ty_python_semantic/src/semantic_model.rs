@@ -17,6 +17,8 @@ use ty_module_resolver::{
 
 use crate::Db;
 use crate::place::implicit_globals::all_implicit_module_globals;
+use crate::place_load::{PlaceLoad, PlaceLoadMode, resolve_place_load};
+use crate::types::TypeExpressionFlags;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
@@ -24,6 +26,7 @@ use crate::types::{
     infer_complete_scope_types, inferred_declaration,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::place::{PlaceExpr, PlaceExprRef};
 use ty_python_core::place_table;
 use ty_python_core::scope::{FileScopeId, Scope};
 use ty_python_core::semantic_index;
@@ -82,6 +85,39 @@ impl<'db> SemanticModel<'db> {
         ProgramEnvironment::from_file(self.program_file())
     }
 
+    /// Resolves the sources that can supply the value of a name load.
+    ///
+    /// The result uses the same point-in-time, deferred, or string-annotation lookup mode as type
+    /// inference. Consumers can inspect its ordered sources without repeating name resolution.
+    pub fn name_load(&self, name: &ast::ExprName) -> Option<PlaceLoad<'db>> {
+        let file_scope = self.scope(name.into())?;
+        let index = semantic_index(self.db(), self.program_file());
+        let scope = file_scope.to_scope_id(self.db(), self.program_file());
+        let place = PlaceExpr::from_expr_name(name);
+        let mode = if self.is_in_string_annotation() {
+            PlaceLoadMode::StringAnnotation
+        } else if infer_complete_scope_types(self.db(), scope)
+            .type_expression_flags(ast::ExprRef::Name(name))
+            .contains(TypeExpressionFlags::DEFERRED_NAME_RESOLUTION)
+        {
+            PlaceLoadMode::Deferred
+        } else {
+            PlaceLoadMode::AtExpression(name.into())
+        };
+
+        Some(resolve_place_load(
+            self.db(),
+            index,
+            scope,
+            PlaceExprRef::from(&place),
+            mode,
+        ))
+    }
+
+    /// Returns whether this model is analyzing a string annotation.
+    pub(crate) fn is_in_string_annotation(&self) -> bool {
+        self.in_string_annotation_expr.is_some()
+    }
     pub fn file_path(&self) -> &FilePath {
         self.file().path(self.db)
     }
@@ -939,6 +975,74 @@ mod tests {
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ty_python_core::ProgramFile;
+    use ty_python_core::definition::DefinitionState;
+
+    #[test]
+    fn name_load_uses_point_in_time_bindings() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                "import first as value\nbefore = value\nimport second as value\n",
+            )
+            .build()?;
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let ast = parsed_module(&db, file.python_file(&db)).load(&db);
+        let use_name = ast.suite()[1]
+            .as_assign_stmt()
+            .unwrap()
+            .value
+            .as_name_expr()
+            .unwrap();
+        let model = SemanticModel::new(&db, file);
+        let load = model.name_load(use_name).unwrap();
+        let definitions = load.local_sources()[0]
+            .reachable_bindings(&db)
+            .unwrap()
+            .filter_map(|binding| match binding.state() {
+                DefinitionState::Defined(definition) => Some(definition),
+                DefinitionState::Undefined | DefinitionState::Deleted => None,
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(definitions.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn name_load_uses_end_of_scope_bindings_for_deferred_annotations() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.pyi",
+                "import first as value\nbefore: value.C\nimport second as value\n",
+            )
+            .build()?;
+        let file = system_path_to_file(&db, "/src/foo.pyi").unwrap();
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let ast = parsed_module(&db, file.python_file(&db)).load(&db);
+        let use_name = ast.suite()[1]
+            .as_ann_assign_stmt()
+            .unwrap()
+            .annotation
+            .as_attribute_expr()
+            .unwrap()
+            .value
+            .as_name_expr()
+            .unwrap();
+        let model = SemanticModel::new(&db, file);
+        let load = model.name_load(use_name).unwrap();
+        let definitions = load.local_sources()[0]
+            .reachable_bindings(&db)
+            .unwrap()
+            .filter_map(|binding| match binding.state() {
+                DefinitionState::Defined(definition) => Some(definition),
+                DefinitionState::Undefined | DefinitionState::Deleted => None,
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(definitions.len(), 2);
+        Ok(())
+    }
 
     #[test]
     fn function_type() -> anyhow::Result<()> {

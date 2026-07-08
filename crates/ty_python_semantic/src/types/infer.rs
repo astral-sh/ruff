@@ -86,6 +86,9 @@ bitflags::bitflags! {
 
         /// The operand of an `Unpack[...]` expression is neither a tuple nor a `TypeVarTuple`.
         const INVALID_UNPACK = 1 << 1;
+
+        /// Name resolution for this expression is deferred until the end of its scope.
+        const DEFERRED_NAME_RESOLUTION = 1 << 2;
     }
 }
 

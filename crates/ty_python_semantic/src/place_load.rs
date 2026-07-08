@@ -91,16 +91,18 @@
 use ruff_python_ast::{self as ast, name::Name};
 use smallvec::SmallVec;
 use ty_python_core::ast_ids::{HasScopedUseId, ScopedUseId};
-use ty_python_core::definition::Definition;
+use ty_python_core::definition::{Definition, DefinitionState};
 use ty_python_core::narrowing_constraints::ConstraintKey;
 use ty_python_core::place::{PlaceExprRef, ScopedPlaceId};
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, ScopeId, ScopeKind};
 use ty_python_core::symbol::Symbol;
 use ty_python_core::{
-    BindingWithConstraintsIterator, EnclosingSnapshotResult, ProgramFile, SemanticIndex,
+    BindingWithConstraintsIterator, BoundnessAnalysis, EnclosingSnapshotResult, ProgramFile,
+    SemanticIndex, Truthiness, global_scope, place_table, use_def_map,
 };
 
 use crate::Db;
+use crate::reachability::ReachabilityConstraintsExtension;
 
 /// Resolves a place load into its local source and ordered fallbacks.
 ///
@@ -125,7 +127,7 @@ pub(crate) fn resolve_place_load<'db>(
 }
 
 /// A semantic description of reading a place without inferring its type.
-pub(crate) struct PlaceLoad<'db> {
+pub struct PlaceLoad<'db> {
     /// The source from the load's own scope.
     local_source: Option<PlaceLoadSource<'db>>,
     /// The sources considered after the local source but before implicit globals and builtins.
@@ -137,7 +139,7 @@ pub(crate) struct PlaceLoad<'db> {
     /// The narrowing constraints collected while resolving the load.
     constraint_keys: Vec<(FileScopeId, ConstraintKey)>,
     /// The explicit `global` and `nonlocal` declarations crossed during name resolution.
-    pub(crate) scope_declarations: SmallVec<[ScopedDeclaration; 1]>,
+    scope_declarations: SmallVec<[ScopedDeclaration; 1]>,
     /// Place-expression prefix loads that must all be undefined before fallbacks are applicable.
     place_expr_prefix_loads: Option<PlaceExprPrefixLoads<'db>>,
 }
@@ -179,8 +181,13 @@ impl<'db> PlaceLoad<'db> {
     }
 
     /// Returns the name resolution failure associated with exhausting all sources.
-    pub(crate) fn failure_on_exhaustion(&self) -> PlaceLoadFailure {
+    pub fn failure_on_exhaustion(&self) -> PlaceLoadFailure {
         self.failure_on_exhaustion
+    }
+
+    /// Returns the explicit `global` and `nonlocal` declarations crossed during resolution.
+    pub fn scope_declarations(&self) -> &[ScopedDeclaration] {
+        &self.scope_declarations
     }
 
     /// Makes fallbacks conditional on every tracked place-expression prefix being undefined in
@@ -224,12 +231,12 @@ impl<'db> PlaceLoad<'db> {
     }
 
     /// Returns the source from the load's own scope as a zero-or-one slice.
-    pub(crate) fn local_sources(&self) -> &[PlaceLoadSource<'db>] {
+    pub fn local_sources(&self) -> &[PlaceLoadSource<'db>] {
         self.local_source.as_slice()
     }
 
     /// Returns the lexical and post-lexical fallbacks together with their applicability condition.
-    pub(crate) fn fallbacks(&self) -> PlaceLoadFallbacks<'_, 'db> {
+    pub fn fallbacks(&self) -> PlaceLoadFallbacks<'_, 'db> {
         self.place_expr_prefix_loads.as_ref().map_or(
             PlaceLoadFallbacks::Unconditional {
                 lexical: &self.lexical_fallbacks,
@@ -338,26 +345,26 @@ pub(crate) struct PlaceLoadConstraintCheckpoint(usize);
 ///
 /// The implicit global is narrowed by all constraints collected during resolution.
 /// The builtin fallback deliberately remains unnarrowed.
-pub(crate) struct PostLexicalFallbacks<'db> {
+pub struct PostLexicalFallbacks<'db> {
     file: ProgramFile<'db>,
     name: Name,
 }
 
 impl<'db> PostLexicalFallbacks<'db> {
     /// Returns the file containing the load.
-    pub(crate) fn file(&self) -> ProgramFile<'db> {
+    pub fn file(&self) -> ProgramFile<'db> {
         self.file
     }
 
     /// Returns the loaded name.
-    pub(crate) fn name(&self) -> &Name {
+    pub fn name(&self) -> &Name {
         &self.name
     }
 }
 
 /// The sources considered after a [`PlaceLoad`]'s local source is exhausted.
 #[derive(Clone, Copy)]
-pub(crate) enum PlaceLoadFallbacks<'a, 'db> {
+pub enum PlaceLoadFallbacks<'a, 'db> {
     /// The fallback sources are always applicable.
     Unconditional {
         /// Sources considered during lexical resolution after the local source.
@@ -398,7 +405,7 @@ pub(crate) enum PlaceLoadFallbacks<'a, 'db> {
 }
 
 /// Compact descriptions of loads for the tracked prefixes of a place expression.
-pub(crate) struct PlaceExprPrefixLoads<'db> {
+pub struct PlaceExprPrefixLoads<'db> {
     scope: ScopeId<'db>,
     loads: SmallVec<[PlaceExprPrefixLoad; 2]>,
 }
@@ -414,19 +421,19 @@ impl<'db> PlaceExprPrefixLoads<'db> {
     }
 
     /// Returns the scope containing the prefix loads.
-    pub(crate) fn scope(&self) -> ScopeId<'db> {
+    pub fn scope(&self) -> ScopeId<'db> {
         self.scope
     }
 
     /// Iterates over the prefix loads.
-    pub(crate) fn iter(&self) -> impl Iterator<Item = PlaceExprPrefixLoad> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = PlaceExprPrefixLoad> + '_ {
         self.loads.iter().copied()
     }
 }
 
 /// Describes how a consumer can evaluate one prefix of a place expression.
 #[derive(Clone, Copy)]
-pub(crate) enum PlaceExprPrefixLoad {
+pub enum PlaceExprPrefixLoad {
     /// Use the bindings that reach this expression occurrence.
     AtUse(ScopedUseId),
     /// Use every binding reachable for this place at the end of its scope.
@@ -493,7 +500,7 @@ impl PlaceLoadMode<'_> {
 /// enclosing `int | None` place to `int`. If both sources are exhausted, the key remains active
 /// for expression-level narrowing.
 #[derive(Clone)]
-pub(crate) struct PlaceLoadSource<'db> {
+pub struct PlaceLoadSource<'db> {
     /// How this source supplies the loaded value.
     pub(crate) kind: PlaceLoadSourceKind<'db>,
     /// Selects the constraints used to narrow this source.
@@ -504,10 +511,103 @@ pub(crate) struct PlaceLoadSource<'db> {
     role: PlaceLoadSourceRole,
 }
 
-impl PlaceLoadSource<'_> {
+impl<'db> PlaceLoadSource<'db> {
+    /// Returns the specialized source, when this load is not binding-backed.
+    pub fn implicit(&self) -> Option<&ImplicitPlaceLoad<'db>> {
+        match &self.kind {
+            PlaceLoadSourceKind::Implicit(implicit) => Some(implicit),
+            PlaceLoadSourceKind::Bindings(_)
+            | PlaceLoadSourceKind::DefinitionsFromOwningScope { .. } => None,
+        }
+    }
+
+    /// Returns the reachable binding states represented by this source, when it is binding-backed.
+    pub fn reachable_bindings(&self, db: &'db dyn Db) -> Option<ReachableBindings<'db>> {
+        let bindings = match &self.kind {
+            PlaceLoadSourceKind::Bindings(bindings) => bindings.clone(),
+            PlaceLoadSourceKind::DefinitionsFromOwningScope { scope, id } => {
+                use_def_map(db, *scope).reachable_bindings(*id)
+            }
+            PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::ExplicitGlobalSymbol {
+                file,
+                name,
+            }) => {
+                let scope = global_scope(db, *file);
+                let symbol = place_table(db, scope).symbol_id(name)?;
+                use_def_map(db, scope).reachable_symbol_bindings(symbol)
+            }
+            PlaceLoadSourceKind::Implicit(
+                ImplicitPlaceLoad::DunderClass(_) | ImplicitPlaceLoad::ClassBodySymbol(_),
+            ) => return None,
+        };
+
+        Some(reachable_bindings(db, bindings))
+    }
+
     /// Returns whether this source is the module fallback for a class-local name.
-    pub(crate) fn is_class_body_global_fallback(&self) -> bool {
+    pub fn is_class_body_global_fallback(&self) -> bool {
         self.role == PlaceLoadSourceRole::ClassBodyGlobalFallback
+    }
+}
+
+/// Evaluates the statically reachable states in a binding iterator.
+pub fn reachable_bindings<'db>(
+    db: &'db dyn Db,
+    bindings: BindingWithConstraintsIterator<'db, 'db>,
+) -> ReachableBindings<'db> {
+    ReachableBindings { db, bindings }
+}
+
+/// An iterator over the statically reachable binding states for a load source.
+pub struct ReachableBindings<'db> {
+    db: &'db dyn Db,
+    bindings: BindingWithConstraintsIterator<'db, 'db>,
+}
+
+impl ReachableBindings<'_> {
+    /// Returns how unbound states affect the source's boundness.
+    pub fn boundness_analysis(&self) -> BoundnessAnalysis {
+        self.bindings.boundness_analysis()
+    }
+}
+
+impl<'db> Iterator for ReachableBindings<'db> {
+    type Item = ReachableBinding<'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let binding = self.bindings.next()?;
+            let reachability = self.bindings.reachability_constraints().evaluate(
+                self.db,
+                self.bindings.predicates(),
+                binding.reachability_constraint,
+            );
+            if !reachability.is_always_false() {
+                return Some(ReachableBinding {
+                    state: binding.binding,
+                    reachability,
+                });
+            }
+        }
+    }
+}
+
+/// A binding state together with its statically known reachability.
+#[derive(Clone, Copy)]
+pub struct ReachableBinding<'db> {
+    state: DefinitionState<'db>,
+    reachability: Truthiness,
+}
+
+impl<'db> ReachableBinding<'db> {
+    /// Returns the binding state.
+    pub fn state(self) -> DefinitionState<'db> {
+        self.state
+    }
+
+    /// Returns whether the binding is reachable.
+    pub fn reachability(self) -> Truthiness {
+        self.reachability
     }
 }
 
@@ -530,7 +630,7 @@ pub(crate) enum PlaceLoadSourceKind<'db> {
 
 /// A source that consumers evaluate using a specialized query or rule.
 #[derive(Clone)]
-pub(crate) enum ImplicitPlaceLoad<'db> {
+pub enum ImplicitPlaceLoad<'db> {
     /// The implicit `__class__` cell for a method, lambda, or generator expression defined directly
     /// in a class body, e.g.:
     ///
@@ -569,7 +669,7 @@ pub(crate) enum PlaceLoadSourceRole {
 
 /// The name resolution failure associated with exhausting a place load's sources.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum PlaceLoadFailure {
+pub enum PlaceLoadFailure {
     /// No namespace supplies the name, which raises `NameError`.
     NotFound,
     /// The current function-like binding scope owns the name but supplies no value, which raises
@@ -582,7 +682,7 @@ pub(crate) enum PlaceLoadFailure {
 
 /// An explicit declaration crossed while resolving a load.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum ScopedDeclaration {
+pub enum ScopedDeclaration {
     /// A `global` declaration in this scope.
     Global(FileScopeId),
     /// A `nonlocal` declaration in this scope.

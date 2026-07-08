@@ -12,6 +12,11 @@ pub use db::Db;
 pub(crate) use diagnostic::add_inferred_python_version_hint_to_diagnostic;
 pub use diagnostic::inferred_python_version_source_annotation;
 pub use fixes::{fix_all_diagnostics, suppress_all_diagnostics};
+pub use place_load::{
+    ImplicitPlaceLoad, PlaceExprPrefixLoad, PlaceExprPrefixLoads, PlaceLoad, PlaceLoadFailure,
+    PlaceLoadFallbacks, PlaceLoadSource, PostLexicalFallbacks, ReachableBinding, ReachableBindings,
+    ScopedDeclaration, reachable_bindings,
+};
 use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
@@ -46,9 +51,9 @@ pub use types::ide_support::{
     contains_identifier, definitions_for_attribute, definitions_for_bin_op,
     definitions_for_imported_symbol, definitions_for_name, definitions_for_unary_op,
     map_stub_definition, type_hierarchy_prepare, type_hierarchy_subtypes,
-    type_hierarchy_supertypes,
+    type_hierarchy_supertypes, user_visible_definitions,
 };
-pub use types::{DisplaySettings, ProgramEnvironment, TypeQualifiers};
+pub use types::{DisplaySettings, ProgramEnvironment, TypeQualifiers, binding_type};
 
 mod db;
 mod dunder_all;

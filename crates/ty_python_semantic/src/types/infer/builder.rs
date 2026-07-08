@@ -9973,7 +9973,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_name_expression(&mut self, name: &ast::ExprName) -> Type<'db> {
         match name.ctx {
-            ExprContext::Load => self.infer_name_load(name),
+            ExprContext::Load => {
+                if self.is_deferred() {
+                    self.store_type_expression_flags(
+                        ast::ExprRef::Name(name),
+                        TypeExpressionFlags::DEFERRED_NAME_RESOLUTION,
+                    );
+                }
+                self.infer_name_load(name)
+            }
             ExprContext::Store => Type::Never,
             ExprContext::Del => {
                 self.infer_name_load(name);
