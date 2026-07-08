@@ -507,8 +507,7 @@ impl<'db> SemanticModel<'db> {
     /// Returns `None` if recording is disabled or inference did not visit the name. Note however
     /// that a result does not guarantee the name is bound: the caller must still inspect its
     /// resolution flags before editing.
-    #[expect(dead_code, reason = "used by downstream IDE features")]
-    fn reaching_definitions(&self, name: &ast::ExprName) -> Option<DefinitionResolution<'db>> {
+    pub fn reaching_definitions(&self, name: &ast::ExprName) -> Option<DefinitionResolution<'db>> {
         let scope = self
             .scope(name.into())?
             .to_scope_id(self.db(), self.program_file());
@@ -522,8 +521,7 @@ impl<'db> SemanticModel<'db> {
     /// Returns `None` if the module has no file or the name has no entry in its symbol table.
     /// Note however that a result does not guarantee the name is bound: the caller must still
     /// inspect its resolution flags before editing.
-    #[expect(dead_code, reason = "used by downstream IDE features")]
-    fn definitions_for_module_global(
+    pub fn definitions_for_module_global(
         &self,
         module: Module<'db>,
         name: &str,
