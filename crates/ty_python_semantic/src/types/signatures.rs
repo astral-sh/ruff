@@ -21,7 +21,7 @@ use smallvec::{SmallVec, smallvec_inline};
 use super::{DynamicType, Type, TypeVarVariance, UnionType, semantic_index};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, Solutions,
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
@@ -38,8 +38,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
     MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder,
-    VarianceInferable, infer_complete_scope_types, todo_type,
+    TypeMapping, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
+    infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -1779,6 +1779,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.check_signature_pair_infer_both(db, source, target);
         }
         if caller_inferable_count > 0 {
+            // TODO: Partition caller-owned variables from callable-local variables, leaving the
+            // former free while universally quantifying the latter.
             return self.never();
         }
 
@@ -1795,23 +1797,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.check_signature_pair_infer_both(db, source, target);
         }
 
-        if source_typevars.is_empty() {
-            let checker = self
-                .with_inferable_typevars(InferableTypeVars::None)
-                .with_lazy_typevar_evaluation();
-            let when = checker.with_signature_recursion_guard(source, target, || {
-                checker.check_signature_pair_inner(db, source, target)
-            });
-            return ConstraintSet::from_bool(
-                self.constraints,
-                when.satisfied_by_all_joint_specializations(
-                    db,
-                    self.constraints,
-                    target_typevars.iter().copied(),
-                ),
-            );
-        }
-
         let source_locals = InferableTypeVars::from_typevars(
             db,
             source_typevars
@@ -1819,7 +1804,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .map(|typevar| typevar.identity(db))
                 .collect::<FxOrderSet<_>>(),
         );
-        self.check_signature_pair_with_inferred_source(
+        self.check_signature_pair_with_quantified_locals(
             db,
             source,
             target,
@@ -1851,11 +1836,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // we produce, we reduce it back down to the inferable set that the caller asked about.
         // If we introduced new inferable typevars, those will be existentially quantified away
         // before returning.
-        when.reduce_inferable(db, self.constraints, signature_inferable)
+        when.exists(db, self.constraints, signature_inferable)
     }
 
-    /// Infer a source specialization while keeping the target's local variables rigid.
-    fn check_signature_pair_with_inferred_source(
+    /// Compare signatures by existentially quantifying source-local variables inside the
+    /// universal quantification of target-local variables.
+    fn check_signature_pair_with_quantified_locals(
         &self,
         db: &'db dyn Db,
         source: &Signature<'db>,
@@ -1864,75 +1850,68 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_locals: InferableTypeVars<'db>,
         target_typevars: &[BoundTypeVarInstance<'db>],
     ) -> ConstraintSet<'db, 'c> {
-        let Some(source_context) = source.generic_context else {
-            return self.never();
-        };
         let checker = self
-            .with_inferable_typevars(source_locals)
+            .with_inferable_typevars(self.inferable.merge(db, source_locals))
             .with_lazy_typevar_evaluation();
         let relation = checker.with_signature_recursion_guard(source, target, || {
             checker.check_signature_pair_inner(db, source, target)
         });
-        let solutions = match relation.solutions(db, self.constraints, source_locals) {
-            Solutions::Unsatisfiable => return self.never(),
-            Solutions::Unconstrained => vec![Vec::new()],
-            Solutions::Constrained(solutions) => solutions,
-        };
-
-        let when = solutions.iter().when_any(db, self.constraints, |solution| {
-            let specialization = source_context.specialize_recursive(
-                db,
-                source_typevars.iter().map(|typevar| {
-                    solution
-                        .iter()
-                        .find(|solution| solution.bound_typevar == *typevar)
-                        .map(|solution| solution.solution)
-                        .or_else(
-                            || match typevar.typevar(db).require_bound_or_constraints(db) {
-                                TypeVarBoundOrConstraints::UpperBound(bound) => Some(bound),
-                                TypeVarBoundOrConstraints::Constraints(constraints) => {
-                                    constraints.elements(db).first().copied()
-                                }
-                            },
-                        )
-                }),
-            );
-            let specialized_source = source.apply_specialization(db, specialization);
-            let specialization_is_valid = source_typevars
+        let target_domain =
+            target_typevars
                 .iter()
                 .copied()
-                .zip(specialization.types(db).iter().copied())
-                .when_all(db, self.constraints, |(typevar, specialized)| {
-                    let checker = self.with_lazy_typevar_evaluation();
-                    match typevar.typevar(db).require_bound_or_constraints(db) {
-                        TypeVarBoundOrConstraints::UpperBound(bound) => {
-                            checker.check_type_pair(db, specialized, bound)
-                        }
-                        TypeVarBoundOrConstraints::Constraints(constraints) => {
-                            constraints.elements(db).iter().copied().when_any(
-                                db,
-                                self.constraints,
-                                |constraint| checker.check_type_pair(db, specialized, constraint),
-                            )
-                        }
-                    }
+                .when_all(db, self.constraints, |typevar| {
+                    ConstraintSet::valid_specializations(db, self.constraints, typevar)
                 });
-            specialization_is_valid.and(db, self.constraints, || {
-                let checker = self.with_lazy_typevar_evaluation();
-                checker.with_signature_recursion_guard(&specialized_source, target, || {
-                    checker.check_signature_pair_inner(db, &specialized_source, target)
-                })
-            })
-        });
 
-        ConstraintSet::from_bool(
-            self.constraints,
-            when.satisfied_by_all_joint_specializations(
+        // TODO: A gradual target constraint requires `for all constraint choices, there exists a
+        // materialization`. Treating its top-materialized range as one universal domain is
+        // conservative but can reject a valid relation.
+
+        // Target-domain constraints can participate in source inference. This is equivalent to
+        // adding the domain only as the implication below because target variables are not
+        // existentially quantified, but retaining it here preserves correlations while source
+        // variables are abstracted.
+        let mut quantified = target_domain.and(db, self.constraints, || relation);
+
+        // A generic source is an intersection of its specializations. For each target
+        // specialization, it is enough for some valid source specialization to satisfy the
+        // relation. Quantify each source variable when adding its domain so independent
+        // constrained variables do not materialize a Cartesian product.
+        for typevar in source_typevars {
+            let source_local = InferableTypeVars::from_typevars(
+                db,
+                std::iter::once(typevar.identity(db)).collect(),
+            );
+            let with_domain = ConstraintSet::valid_specializations(db, self.constraints, *typevar)
+                .and(db, self.constraints, || quantified);
+            if with_domain.has_unprojectable_nested_typevar(
                 db,
                 self.constraints,
-                target_typevars.iter().copied(),
-            ),
-        )
+                std::iter::once(typevar.identity(db)),
+            ) {
+                return self.never();
+            }
+            quantified = with_domain.exists(db, self.constraints, source_local);
+        }
+
+        // A generic target is the intersection of all of its specializations. The source must
+        // therefore satisfy every valid target specialization. Source variables have already
+        // been removed, which gives the required `for all target, there exists source` order.
+        let target_locals = InferableTypeVars::from_typevars(
+            db,
+            target_typevars
+                .iter()
+                .map(|typevar| typevar.identity(db))
+                .collect(),
+        );
+        let universally_quantified = target_domain.implies(db, self.constraints, || quantified);
+        let Some(result) =
+            universally_quantified.try_for_all(db, self.constraints, target_locals)
+        else {
+            return self.never();
+        };
+        result
     }
 
     fn with_signature_recursion_guard(
