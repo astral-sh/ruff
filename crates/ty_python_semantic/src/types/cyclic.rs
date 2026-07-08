@@ -316,9 +316,10 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
             return true;
         }
 
-        // `Alias[Alias[T]] -> Alias[T]` should keep transforming the nested alias. Other
-        // same-identity specializations get one non-exact unfolding so constant specializations
-        // can stabilize before genuinely growing aliases are cut off.
+        // For a finite alias such as `type Box[T] = tuple[T, ...]`, transforming `Box[Box[int]]`
+        // should keep descending into the nested `Box[int]`. Other same-identity specializations
+        // get one non-exact unfolding so constant specializations can stabilize before genuinely
+        // growing aliases are cut off.
         active_alias_count > 1 && !nested_alias_application
     }
 
