@@ -139,6 +139,14 @@ pub(crate) enum ErrorContext<'db> {
     ProtocolMemberIncompatible {
         member_name: Name,
     },
+    ProtocolMemberReadTypeIncompatible {
+        source: Type<'db>,
+        target: Type<'db>,
+    },
+    ProtocolMemberNotWritable,
+    ProtocolMemberWriteTypeIncompatible {
+        target: Type<'db>,
+    },
 }
 
 impl<'db> ErrorContext<'db> {
@@ -350,6 +358,16 @@ impl<'db> ErrorContext<'db> {
             Self::ProtocolMemberIncompatible { member_name } => {
                 format!("protocol member `{member_name}` is incompatible")
             }
+            Self::ProtocolMemberReadTypeIncompatible { source, target } => format!(
+                "read type `{source}` is not assignable to `{target}`",
+                source = source.display(db),
+                target = target.display(db),
+            ),
+            Self::ProtocolMemberNotWritable => "the member is not writable".to_string(),
+            Self::ProtocolMemberWriteTypeIncompatible { target } => format!(
+                "the member does not accept writes of type `{}`",
+                target.display(db),
+            ),
         })
     }
 }
