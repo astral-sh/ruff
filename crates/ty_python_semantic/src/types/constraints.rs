@@ -1871,14 +1871,21 @@ impl ConstraintId {
         {
             return false;
         }
-        other_constraint
-            .bounds
-            .materialized_lower()
-            .is_constraint_set_assignable_to(db, self_constraint.bounds.materialized_lower())
-            && self_constraint
-                .bounds
-                .materialized_upper()
-                .is_constraint_set_assignable_to(db, other_constraint.bounds.materialized_upper())
+        // A bound can be a recursive protocol whose member comparison performs constraint
+        // abstraction and reaches this implication again. Use the cycle-aware owned query so the
+        // recursive case starts by declining to prove the implication and can then converge.
+        let is_assignable = |source: Type<'db>, target: Type<'db>| {
+            source
+                .when_constraint_set_assignable_to_owned(db, target)
+                .query(|_builder, relation| relation.is_always_satisfied(db))
+        };
+        is_assignable(
+            other_constraint.bounds.materialized_lower(),
+            self_constraint.bounds.materialized_lower(),
+        ) && is_assignable(
+            self_constraint.bounds.materialized_upper(),
+            other_constraint.bounds.materialized_upper(),
+        )
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
@@ -7155,8 +7162,10 @@ mod tests {
     use indoc::indoc;
     use pretty_assertions::assert_eq;
 
-    use crate::db::tests::setup_db;
+    use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
+    use crate::place::global_symbol;
     use crate::types::{BoundTypeVarInstance, KnownClass, TypeVarVariance};
+    use ruff_db::files::system_path_to_file;
     use ruff_python_ast::name::Name;
 
     fn create_typevar<'db>(db: &'db dyn Db, name: &'static str) -> BoundTypeVarInstance<'db> {
@@ -7328,6 +7337,60 @@ mod tests {
             Some(&false)
         );
         assert_eq!(storage.constraint_implication_cache.len(), 2);
+    }
+
+    #[test]
+    fn recursive_constraint_implication_recovers_conservatively() {
+        fn instance<'db>(db: &'db TestDb, name: &str) -> Type<'db> {
+            let file = system_path_to_file(db, "/src/a.py").expect("test file should exist");
+            global_symbol(db, file, name)
+                .place
+                .expect_type()
+                .to_instance(db)
+                .expect("symbol should be instantiable")
+        }
+
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/a.py",
+                indoc! {r#"
+                    from typing import Protocol, TypeVar
+
+                    CopyT = TypeVar("CopyT", bound="Copyable")
+
+                    class Copyable(Protocol):
+                        def copy(self: CopyT) -> CopyT: ...
+
+                    OtherT = TypeVar("OtherT", bound="Other")
+
+                    class Other:
+                        def copy(self: OtherT) -> int:
+                            return 0
+
+                    CompatibleT = TypeVar("CompatibleT", bound="Compatible")
+
+                    class Compatible:
+                        def copy(self: CompatibleT) -> CompatibleT:
+                            return self
+                "#},
+            )
+            .build()
+            .expect("valid test setup");
+        let other = instance(&db, "Other");
+        let compatible = instance(&db, "Compatible");
+        let copyable = instance(&db, "Copyable");
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let t_other = ConstraintId::new_with_bounds(&db, &builder, t, None, Some(other));
+        let t_compatible = ConstraintId::new_with_bounds(&db, &builder, t, None, Some(compatible));
+        let t_copyable = ConstraintId::new_with_bounds(&db, &builder, t, None, Some(copyable));
+
+        // Proving these implications compares recursive generic-self signatures. The owned
+        // relation query recovers conservatively instead of re-entering constraint implication
+        // with a fresh recursion context indefinitely, then iterates so the compatible relation
+        // can still converge to `true`.
+        assert!(!builder.cached_constraint_implies(&db, t_other, t_copyable));
+        assert!(builder.cached_constraint_implies(&db, t_compatible, t_copyable));
     }
 
     #[test]
