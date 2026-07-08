@@ -1853,9 +1853,52 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }) => {
                 self.visit_expr(func);
 
+                let qualified_name_opt = self.semantic.resolve_qualified_name(func);
+
+                if let Some(qualified_name) = &qualified_name_opt {
+                    let name_str = qualified_name.to_string();
+                    if let Some(args) = self.settings().linter.extend_type_form_callables.get(&name_str) {
+                        for (i, arg) in arguments.iter_source_order().enumerate() {
+                            let mut is_type_form = false;
+                            for target in args {
+                                match target {
+                                    crate::settings::types::CallArgument::Positional(pos) => {
+                                        if i == *pos && matches!(arg, ArgOrKeyword::Arg(_)) {
+                                            is_type_form = true;
+                                        }
+                                    }
+                                    crate::settings::types::CallArgument::Keyword(kw) => {
+                                        if let ArgOrKeyword::Keyword(Keyword { arg: Some(id), .. }) = arg {
+                                            if id.as_str() == kw.as_str() {
+                                                is_type_form = true;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            match arg {
+                                ArgOrKeyword::Arg(arg) => {
+                                    if is_type_form {
+                                        self.visit_type_definition(arg);
+                                    } else {
+                                        self.visit_non_type_definition(arg);
+                                    }
+                                }
+                                ArgOrKeyword::Keyword(Keyword { value, .. }) => {
+                                    if is_type_form {
+                                        self.visit_type_definition(value);
+                                    } else {
+                                        self.visit_non_type_definition(value);
+                                    }
+                                }
+                            }
+                        }
+                        return;
+                    }
+                }
+
                 let callable =
-                    self.semantic
-                        .resolve_qualified_name(func)
+                    qualified_name_opt
                         .and_then(|qualified_name| {
                             if self
                                 .semantic

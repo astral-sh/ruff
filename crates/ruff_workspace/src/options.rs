@@ -34,7 +34,7 @@ use ruff_linter::rules::{
     pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use ruff_linter::settings::types::{
-    IdentifierPattern, Language, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
+    CallArgument, IdentifierPattern, Language, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
 };
 use ruff_linter::{UnresolvedRuleSelector, warn_user_once};
 use ruff_macros::{CombineOptions, OptionsMetadata};
@@ -931,6 +931,15 @@ pub struct LintCommonOptions {
         example = r#"typing-modules = ["airflow.typing_compat"]"#
     )]
     pub typing_modules: Option<Vec<String>>,
+
+    /// A mapping of callable names to the argument names or positions that should be treated as
+    /// type forms.
+    #[option(
+        default = r#"{}"#,
+        value_type = "dict[str, list[int | str]]",
+        example = r#"extend-type-form-callables = { "typing.cast" = [0, "typ"] }"#
+    )]
+    pub extend_type_form_callables: Option<FxHashMap<String, Vec<CallArgument>>>,
 
     /// A list of rule codes or prefixes to consider non-fixable.
     #[option(
@@ -4241,6 +4250,7 @@ pub struct LintOptionsWire {
     explicit_preview_rules: Option<bool>,
     task_tags: Option<Vec<String>>,
     typing_modules: Option<Vec<String>>,
+    extend_type_form_callables: Option<FxHashMap<String, Vec<CallArgument>>>,
     unfixable: Option<Vec<UnresolvedRuleSelector>>,
     flake8_annotations: Option<Flake8AnnotationsOptions>,
     flake8_bandit: Option<Flake8BanditOptions>,
@@ -4298,6 +4308,7 @@ impl From<LintOptionsWire> for LintOptions {
             explicit_preview_rules,
             task_tags,
             typing_modules,
+            extend_type_form_callables,
             unfixable,
             flake8_annotations,
             flake8_bandit,
@@ -4354,6 +4365,7 @@ impl From<LintOptionsWire> for LintOptions {
                 explicit_preview_rules,
                 task_tags,
                 typing_modules,
+                extend_type_form_callables,
                 unfixable,
                 flake8_annotations,
                 flake8_bandit,
