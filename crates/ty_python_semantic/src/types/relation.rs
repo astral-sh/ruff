@@ -14,13 +14,11 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
-use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeAliasType, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
-    UpcastPolicy,
+    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -964,7 +962,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             .begin_visit(db, (source, target, self.relation, self.typevar_evaluation))
         {
             CycleDetectorVisit::Ready(result) => result,
-            CycleDetectorVisit::Cycle { current, .. } => {
+            CycleDetectorVisit::Cycle(current) => {
                 self.recursive_type_pair_fallback(db, current.0, current.1)
             }
             CycleDetectorVisit::Pending(item) => {
@@ -1924,7 +1922,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 Type::Callable(source_callable),
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(target_partial)),
             ) if self.relation.is_assignability() => {
-                self.with_recursion_guard(source, target, || {
+                self.with_recursion_guard(db, source, target, || {
                     self.check_callable_pair(db, source_callable, target_partial.partial(db))
                 })
             }

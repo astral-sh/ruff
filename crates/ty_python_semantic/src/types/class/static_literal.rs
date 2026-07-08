@@ -53,7 +53,7 @@ use crate::{
         tuple::{FixedLengthTuple, Tuple},
         typed_dict::{TypedDictParams, TypedDictType, typed_dict_params_from_class_def},
         variance::VarianceInferable,
-        visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
+        visitor::{RecursionGuard, TypeVisitor, walk_type_with_recursion_guard},
     },
 };
 use crate::{attribute_assignments, attribute_declarations};
@@ -368,7 +368,7 @@ impl<'db> StaticClassLiteral<'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
             typevars: RefCell<FxIndexSet<BoundTypeVarInstance<'db>>>,
-            recursion_guard: TypeCollector<'db>,
+            recursion_guard: RecursionGuard<'db>,
         }
 
         impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {

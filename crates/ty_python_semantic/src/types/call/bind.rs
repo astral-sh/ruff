@@ -60,8 +60,7 @@ use crate::types::tuple::{TupleLength, TupleSpec, TupleType, VariableSegment};
 use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
 use crate::types::visitor::{
-    TypeCollector, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
-    walk_type_with_recursion_guard,
+    RecursionGuard, TypeKind, TypeVisitor, walk_non_atomic_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
@@ -84,7 +83,7 @@ fn generic_contexts_mentioned_in_type<'db>(
 ) -> FxOrderSet<GenericContext<'db>> {
     struct GenericContextCollector<'db> {
         generic_contexts: RefCell<FxOrderSet<GenericContext<'db>>>,
-        recursion_guard: TypeCollector<'db>,
+        recursion_guard: RecursionGuard<'db>,
     }
 
     impl<'db> GenericContextCollector<'db> {
@@ -127,7 +126,7 @@ fn generic_contexts_mentioned_in_type<'db>(
 
     let collector = GenericContextCollector {
         generic_contexts: RefCell::default(),
-        recursion_guard: TypeCollector::default(),
+        recursion_guard: RecursionGuard::default(),
     };
     collector.visit_type(db, ty);
     collector.generic_contexts.into_inner()
