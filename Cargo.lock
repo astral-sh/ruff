@@ -4872,6 +4872,7 @@ dependencies = [
  "anyhow",
  "bitflags 2.13.0",
  "bitvec",
+ "compact_str",
  "get-size2",
  "hashbrown 0.17.1",
  "itertools 0.15.0",

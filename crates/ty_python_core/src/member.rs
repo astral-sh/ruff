@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, name::Name};
 use ruff_text_size::{TextLen as _, TextRange, TextSize};
 
 use bitflags::bitflags;
+use compact_str::CompactString;
 use hashbrown::hash_table::Entry;
 use rustc_hash::FxHasher;
 use smallvec::SmallVec;
@@ -173,7 +174,7 @@ impl MemberExpr {
             None
         } else {
             Some(Self {
-                path: builder.path,
+                path: Name::new(builder.path.as_str()),
                 segments: Segments::from_vec(builder.segments),
             })
         }
@@ -185,10 +186,6 @@ impl MemberExpr {
 
     fn segments(&self) -> impl Iterator<Item = Segment<'_>> + '_ {
         SegmentsIterator::new(self.path.as_str(), self.segment_infos())
-    }
-
-    fn shrink_to_fit(&mut self) {
-        self.path.shrink_to_fit();
     }
 
     /// Returns the left most part of the member expression, e.g. `x` in `x.y.z`.
@@ -213,7 +210,7 @@ impl MemberExpr {
 /// A builder for a [`MemberExpr`].
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(super) struct MemberExprBuilder {
-    path: Name,
+    path: CompactString,
     segments: SmallVec<[SegmentInfo; 8]>,
 }
 
@@ -221,7 +218,7 @@ impl MemberExprBuilder {
     pub(super) fn visit_expr(expr: ast::ExprRef) -> Option<MemberExprBuilder> {
         match expr {
             ast::ExprRef::Name(name) => Some(MemberExprBuilder {
-                path: name.id.clone(),
+                path: CompactString::new(name.id.as_str()),
                 segments: smallvec::SmallVec::new_const(),
             }),
             ast::ExprRef::Named(named) if named.target.is_name_expr() => {
@@ -552,7 +549,7 @@ impl MemberTableBuilder {
     /// Adds a member to the table or updates the flags of an existing member if it already exists.
     ///
     /// Members are identified by their expression, which is hashed to find the entry in the table.
-    pub(super) fn add(&mut self, mut member: Member) -> (ScopedMemberId, bool) {
+    pub(super) fn add(&mut self, member: Member) -> (ScopedMemberId, bool) {
         let entry = self.reverse.entry(&self.table.members, &member);
 
         match entry {
@@ -566,8 +563,6 @@ impl MemberTableBuilder {
                 (id, false)
             }
             Entry::Vacant(entry) => {
-                member.expression.shrink_to_fit();
-
                 let id = self.table.members.push(member);
                 entry.insert(id);
                 (id, true)
