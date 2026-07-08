@@ -833,7 +833,7 @@ impl<'src> Parser<'src> {
             return first;
         }
 
-        let mut dotted_name = first.id;
+        let mut dotted_name = first.id.as_str().to_owned();
         let mut progress = ParserProgress::default();
 
         while self.eat(TokenKind::Dot) {
@@ -842,15 +842,15 @@ impl<'src> Parser<'src> {
             // test_err dotted_name_multiple_dots
             // import a..b
             // import a...b
-            dotted_name.push_str(".");
-            dotted_name.push_str(&self.parse_identifier());
+            dotted_name.push('.');
+            dotted_name.push_str(self.parse_identifier().as_str());
         }
 
         // test_ok dotted_name_normalized_spaces
         // import a.b.c
         // import a .  b  . c
         ast::Identifier {
-            id: self.intern_owned_name(dotted_name),
+            id: self.intern_owned_name(Name::from(dotted_name)),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }

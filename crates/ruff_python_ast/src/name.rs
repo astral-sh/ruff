@@ -4,7 +4,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
 use arrayvec::ArrayVec;
-use lean_string::LeanString;
+use lean_string::LeanStr;
 
 use crate::Expr;
 use crate::generated::ExprName;
@@ -17,50 +17,35 @@ use crate::generated::ExprName;
     derive(schemars::JsonSchema),
     schemars(with = "String")
 )]
-pub struct Name(LeanString);
+pub struct Name(LeanStr);
 
 impl Name {
     /// The maximum number of UTF-8 bytes stored inline in a name.
-    pub const INLINE_CAPACITY: usize = std::mem::size_of::<LeanString>();
+    pub const INLINE_CAPACITY: usize = std::mem::size_of::<LeanStr>();
 
     #[inline]
     pub fn empty() -> Self {
-        Self(LeanString::new())
+        Self(LeanStr::new())
     }
 
     #[inline]
     pub fn new(name: impl AsRef<str>) -> Self {
-        Self(LeanString::from(name.as_ref()))
+        Self(LeanStr::from(name.as_ref()))
     }
 
     #[inline]
     pub const fn new_static(name: &'static str) -> Self {
-        Self(LeanString::from_static_str(name))
-    }
-
-    pub fn shrink_to_fit(&mut self) {
-        self.0.shrink_to_fit();
+        Self(LeanStr::from_static_str(name))
     }
 
     pub fn as_str(&self) -> &str {
         self.0.as_str()
-    }
-
-    pub fn push_str(&mut self, s: &str) {
-        self.0.push_str(s);
     }
 }
 
 impl Debug for Name {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Name({:?})", self.as_str())
-    }
-}
-
-impl std::fmt::Write for Name {
-    fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        self.0.push_str(s);
-        Ok(())
     }
 }
 
@@ -170,7 +155,7 @@ impl get_size2::GetSize for Name {
         mut tracker: T,
     ) -> (usize, T) {
         let size = if self.0.is_heap_allocated() && tracker.track(self.as_ptr()) {
-            self.0.capacity()
+            self.0.len()
         } else {
             0
         };
@@ -858,7 +843,7 @@ mod tests {
         assert_eq!(Name::new("inline").get_heap_size(), 0);
 
         let name = Name::new("a name too long for inline storage");
-        let expected = name.0.capacity();
+        let expected = name.len();
         let clone = name.clone();
         let (size, _) = (name, clone).get_heap_size_with_tracker(StandardTracker::new());
         assert_eq!(size, expected);

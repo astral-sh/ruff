@@ -1922,8 +1922,7 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 [[package]]
 name = "lean_string"
 version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dff9d7a64297827f9ef2cc8a111ca1d87bead398b7f9fe76ba0eb9f50d175e8d"
+source = "git+https://github.com/astral-sh/lean_string?rev=1f2643ea47e97f6f67393caf734c0bc7795b4f0b#1f2643ea47e97f6f67393caf734c0bc7795b4f0b"
 dependencies = [
  "castaway",
  "itoa",
