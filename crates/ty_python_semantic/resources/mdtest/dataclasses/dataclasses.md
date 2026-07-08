@@ -2453,6 +2453,8 @@ dataclass()(MyEnum)
 # error: [invalid-dataclass] "Cannot use `dataclass()` on a protocol class"
 dataclass(MyProtocol)
 
-# error: [invalid-dataclass] "Cannot use `dataclass()` on a protocol class"
+# A protocol class is rejected before `dataclass`-specific validation because it is not a concrete
+# inhabitant of the inferred `type[MyProtocol]` parameter.
+# error: [invalid-argument-type] "Expected `type[MyProtocol]`, found `<class 'MyProtocol'>`"
 dataclass()(MyProtocol)
 ```

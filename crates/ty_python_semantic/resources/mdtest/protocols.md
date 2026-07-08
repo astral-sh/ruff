@@ -4971,6 +4971,29 @@ reveal_type(meta_protocol_identity(GenericFooImpl[int]))  # revealed: type[Gener
 def _(f: type[GenericFoo[int]]) -> None:
     reveal_type(infer_meta_protocol(f))  # revealed: int
 
+T_identity = TypeVar("T_identity")
+
+def class_identity(cls: type[T_identity]) -> type[T_identity]:
+    return cls
+
+def _(cls: type[Foo]) -> None:
+    preserved: type[Foo] = class_identity(cls)
+
+def _(cls: type[Foo] | type[int]) -> None:
+    preserved: type[Foo] | type[int] = class_identity(cls)
+
+# A protocol class is not a concrete inhabitant of structural `type[Foo]`.
+class_identity(Foo)  # error: [invalid-argument-type]
+
+def _(cls: type[GenericFoo[int]]) -> None:
+    preserved: type[GenericFoo[int]] = class_identity(cls)
+    wrong: type[GenericFoo[str]] = class_identity(cls)  # error: [invalid-assignment]
+
+def predicate(cls: type[Foo]) -> bool:
+    return True
+
+classmethod(predicate)
+
 T_runtime_co = TypeVar("T_runtime_co", covariant=True)
 
 @runtime_checkable

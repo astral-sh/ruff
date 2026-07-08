@@ -200,7 +200,7 @@ impl<'db> SubclassOfType<'db> {
             },
             SubclassOfInner::TypeVar(typevar) => {
                 let mapped = typevar.apply_type_mapping_impl(db, type_mapping, visitor);
-                mapped.to_meta_type(db)
+                Self::try_from_instance(db, mapped).unwrap_or_else(|| mapped.to_meta_type(db))
             }
         }
     }
