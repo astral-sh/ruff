@@ -897,9 +897,11 @@ class Settings(BaseSettings):
     port: int
 
 # Would succeed at runtime if HOST and PORT environment variables are set
-# TODO: no error here
-# error: [missing-argument]
 Settings()
+Settings(host="localhost")
+Settings(port=8000)
+Settings(host="localhost", port=8000)
+Settings(host=None)  # error: [invalid-argument-type]
 
 # `BaseSettings` defines a specialized constructor and forbids extra values by default.
 Settings(host="localhost", port=8000, something_else=7)  # error: [unknown-argument]

@@ -155,6 +155,7 @@ pub enum KnownClass {
     TyExtensionsIterator,
     // Pydantic
     PydanticBaseModel,
+    PydanticBaseSettings,
     PydanticConfigDict,
     PydanticRootModel,
 }
@@ -285,6 +286,7 @@ impl KnownClass {
             | Self::ExtensionTypedDictFallback
             | Self::TypedDictFallback
             | Self::PydanticBaseModel
+            | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
             | Self::PydanticRootModel => Some(Truthiness::Ambiguous),
 
@@ -396,6 +398,7 @@ impl KnownClass {
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
             | KnownClass::PydanticBaseModel
+            | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
             | KnownClass::PydanticRootModel => false,
         }
@@ -504,6 +507,7 @@ impl KnownClass {
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
             | KnownClass::PydanticBaseModel
+            | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticRootModel => false,
 
             KnownClass::PydanticConfigDict => true,
@@ -612,6 +616,7 @@ impl KnownClass {
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
             | KnownClass::PydanticBaseModel
+            | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
             | KnownClass::PydanticRootModel => false,
         }
@@ -732,6 +737,7 @@ impl KnownClass {
             | Self::Mapping
             | Self::Sequence
             | Self::PydanticBaseModel
+            | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
             | Self::PydanticRootModel => false,
         }
@@ -841,6 +847,7 @@ impl KnownClass {
             | KnownClass::GenericContext
             | KnownClass::Specialization
             | KnownClass::PydanticBaseModel
+            | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
             | KnownClass::PydanticRootModel => false,
             KnownClass::NamedTupleFallback
@@ -963,6 +970,7 @@ impl KnownClass {
             Self::FunctoolsPartial => "partial",
             Self::ProtocolMeta => "_ProtocolMeta",
             Self::PydanticBaseModel => "BaseModel",
+            Self::PydanticBaseSettings => "BaseSettings",
             Self::PydanticConfigDict => "ConfigDict",
             Self::PydanticRootModel => "RootModel",
         }
@@ -1348,6 +1356,7 @@ impl KnownClass {
             Self::Path => KnownModule::Pathlib,
             Self::FunctoolsPartial => KnownModule::Functools,
             Self::PydanticBaseModel => KnownModule::PydanticMain,
+            Self::PydanticBaseSettings => KnownModule::PydanticSettingsMain,
             Self::PydanticConfigDict => KnownModule::PydanticConfig,
             Self::PydanticRootModel => KnownModule::PydanticRootModel,
         }
@@ -1458,6 +1467,7 @@ impl KnownClass {
             | Self::UnionType
             | Self::FunctoolsPartial
             | Self::PydanticBaseModel
+            | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
             | Self::PydanticRootModel => Some(false),
 
@@ -1571,6 +1581,7 @@ impl KnownClass {
             | Self::Path
             | Self::FunctoolsPartial
             | Self::PydanticBaseModel
+            | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
             | Self::PydanticRootModel => false,
         }
@@ -1683,6 +1694,7 @@ impl KnownClass {
             "_ProtocolMeta" => &[Self::ProtocolMeta],
             "_TypedDict" => &[Self::ExtensionTypedDictFallback],
             "BaseModel" => &[Self::PydanticBaseModel],
+            "BaseSettings" => &[Self::PydanticBaseSettings],
             "ConfigDict" => &[Self::PydanticConfigDict],
             "RootModel" => &[Self::PydanticRootModel],
             _ => return None,
@@ -1782,6 +1794,7 @@ impl KnownClass {
             | Self::Path
             | Self::FunctoolsPartial
             | Self::PydanticBaseModel
+            | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
             | Self::PydanticRootModel => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
