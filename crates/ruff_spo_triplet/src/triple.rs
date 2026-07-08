@@ -470,6 +470,25 @@ pub enum Predicate {
     /// Downstream this is the `required` axis of `DEFINE FIELD` — NOT
     /// NULL emits `TYPE <t>`, nullable emits `TYPE option<t>`.
     ColumnNotNull,
+
+    // ───── UI-navigation plane (WinForms form→form Klickweg) ─────
+    //
+    // The navigation-topology fact the entity + behaviour arms don't capture:
+    // which screen opens which. The dead-link class of bug is this fact going
+    // unmodelled — the transcode has the screens (ClassViews) but not the
+    // edges between them.
+    /// `(class, navigates_to, TargetForm)` — a WinForms navigation edge: the
+    /// class opens `TargetForm` via `new TargetForm().Show()` / `.ShowDialog()`
+    /// in a method body (typically a button-click handler). Subject is the
+    /// CLASS that navigates, object is the target form class — a screen→screen
+    /// edge, the "Klickweg". This is the "form→route" fact the README
+    /// anticipates: the relation arm the entity-level transcode skipped, which
+    /// feeds the OGAR `EdgeBlock` nav graph and the consumer-side 1:1
+    /// connectivity check. **Default tier is [`Provenance::Inferred`]**:
+    /// syntax-only form-open detection, and the two-statement
+    /// `var f = new T(); …; f.Show();` local-tracking is heuristic (a
+    /// SemanticModel upgrade would resolve the receiver's type authoritatively).
+    NavigatesTo,
 }
 
 impl Predicate {
@@ -547,6 +566,8 @@ impl Predicate {
             Self::Calls => "calls",
             // Schema-stratum extension
             Self::ColumnNotNull => "column_not_null",
+            // UI-navigation plane
+            Self::NavigatesTo => "navigates_to",
         }
     }
 
@@ -630,6 +651,8 @@ impl Predicate {
             "calls" => Self::Calls,
             // Schema-stratum extension
             "column_not_null" => Self::ColumnNotNull,
+            // UI-navigation plane
+            "navigates_to" => Self::NavigatesTo,
             _ => return None,
         })
     }
@@ -712,6 +735,8 @@ impl Predicate {
         Self::WritesIfBlank,
         Self::Calls,
         Self::ColumnNotNull,
+        // UI-navigation plane
+        Self::NavigatesTo,
     ];
 
     /// The default provenance tier for this predicate, per the Odoo
@@ -759,7 +784,10 @@ impl Predicate {
             | Self::DefinesMethod
             | Self::UsesMacroExpansion
             | Self::TemplateInstantiates
-            | Self::Calls => Provenance::Inferred,
+            | Self::Calls
+            // UI-navigation: syntax-only form-open detection; the two-statement
+            // local-tracking case is heuristic (SemanticModel would resolve it).
+            | Self::NavigatesTo => Provenance::Inferred,
             // C++ machine-plane declarative surface (the 10 remaining of 13)
             Self::InheritsFrom
             | Self::HasField
@@ -921,7 +949,7 @@ mod tests {
     }
 
     #[test]
-    fn predicate_count_locked_at_64() {
+    fn predicate_count_locked_at_65() {
         // The exact count is part of the schema contract: 7 core (Odoo
         // Python) + 32 OpenProject AR-shape (PR #15 added
         // `association_kind`; #18 added `class_name`; #21 added
@@ -940,10 +968,13 @@ mod tests {
         // `.claude/knowledge/fuzzy-recipe-codebook.md` §5 J1)
         // + 1 schema-stratum (`column_not_null` — the D-AR-3.5 migration-DSL
         // column constraint; the declared type reuses `field_type`, so
-        // nullability was the one missing fact) = 64. Council review of any
-        // new variant means this number changes — the test must change with
-        // the source.
-        assert_eq!(Predicate::ALL.len(), 64);
+        // nullability was the one missing fact) = 64.
+        // + 1 UI-navigation plane (`navigates_to` — the WinForms form→form
+        // Klickweg edge; the "form→route" the README anticipates, feeding the
+        // OGAR EdgeBlock nav graph + the consumer 1:1 connectivity check) = 65.
+        // Council review of any new variant means this number changes — the
+        // test must change with the source.
+        assert_eq!(Predicate::ALL.len(), 65);
     }
 
     #[test]

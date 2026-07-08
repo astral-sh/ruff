@@ -126,6 +126,30 @@ mod tests {
         assert_eq!(triples[0].s, "csharp:Widget.SetDefaults");
     }
 
+    /// The UI-navigation arm — the WinForms form→form `navigates_to` Klickweg
+    /// edge (`EmitNavArm`). Subject is the CLASS that navigates, object is the
+    /// target form class. Shaped exactly as the harvester emits it (verified by
+    /// running the real harvester over `harvester/fixtures/nav_shapes.cs`, which
+    /// yields exactly these three edges — the `SaveFileDialog` CommonDialog is
+    /// excluded). A clean load is the standing proof the nav arm stays inside
+    /// the closed vocabulary.
+    #[test]
+    fn loads_and_validates_nav_arm_ndjson() {
+        let ndjson = concat!(
+            r#"{"s":"csharp:MainScreen","p":"navigates_to","o":"csharp:OrderScreen","f":1.0,"c":0.9}"#,
+            "\n",
+            r#"{"s":"csharp:MainScreen","p":"navigates_to","o":"csharp:SettingsScreen","f":1.0,"c":0.9}"#,
+            "\n",
+            r#"{"s":"csharp:MainScreen","p":"navigates_to","o":"csharp:CustomerScreen","f":1.0,"c":0.9}"#,
+            "\n",
+        );
+        let triples = load(ndjson).expect("navigates_to is in the closed vocab");
+        assert_eq!(triples.len(), 3);
+        assert_eq!(triples[0].p, "navigates_to");
+        assert_eq!(triples[0].s, "csharp:MainScreen");
+        assert_eq!(triples[2].o, "csharp:CustomerScreen");
+    }
+
     /// A predicate the .NET tool must never emit. `load` (via `from_ndjson`)
     /// rejects it at parse time, naming the offending predicate, so the
     /// schema break is loud — a hard error, never a silently-stored triple.

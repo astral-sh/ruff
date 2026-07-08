@@ -201,6 +201,12 @@ foreach (var file in Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDire
                         // against a real production C# corpus (~97k triples,
                         // `ruff_csharp_spo::load` validates all of them).
                         EmitBodyArm(triples, ns, name, msubj, m.Body, m.ExpressionBody, f, c, isMutatorCall);
+
+                        // UI-NAVIGATION ARM — the WinForms form→form Klickweg
+                        // edge (navigates_to). Subject is the CLASS that
+                        // navigates (not the method), so a screen's edges are
+                        // the union over all its handlers.
+                        EmitNavArm(triples, ns, name, m.Body, m.ExpressionBody, f, c);
                         break;
                     }
 
@@ -348,6 +354,82 @@ static void EmitBodyArm(
                 triples.Add(new Triple(msubj, "reads_field", $"{ns}:{className}.{thisRead.Name.Identifier.Text}", f, c));
                 break;
         }
+    }
+}
+
+// UI-NAVIGATION ARM (syntax-only) — the WinForms form→form Klickweg edge.
+// Emits `(csharp:ThisClass, navigates_to, csharp:TargetForm)` when a method
+// body opens another screen via `new TargetForm().Show()` / `.ShowDialog()`
+// (one-liner) or the two-statement `var f = new TargetForm(); …; f.Show();`
+// local-tracking pattern. Subject is the CLASS that navigates (not the method),
+// so a screen's edge set is the union over all its handlers. Framework
+// CommonDialogs (MessageBox / {Open,Save}FileDialog / …) are modal system
+// dialogs, not application screens, so they are excluded — navigates_to means
+// "opens another screen", the Klickweg. `navigates_to` is Inferred in
+// ruff_spo_triplet: syntax-only, and the two-statement local-tracking is
+// heuristic (a SemanticModel upgrade would resolve the receiver's type).
+static void EmitNavArm(
+    List<Triple> triples,
+    string ns,
+    string className,
+    BlockSyntax? body,
+    ArrowExpressionClauseSyntax? expressionBody,
+    double f,
+    double c)
+{
+    SyntaxNode? root = (SyntaxNode?)body ?? expressionBody?.Expression;
+    if (root is null)
+    {
+        return;
+    }
+
+    // Framework CommonDialogs / message boxes — modal system dialogs, NOT app
+    // screens; excluded so a navigates_to edge always names a real screen.
+    var frameworkDialogs = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "MessageBox", "OpenFileDialog", "SaveFileDialog", "FolderBrowserDialog",
+        "ColorDialog", "FontDialog", "PrintDialog", "PageSetupDialog",
+        "PrintPreviewDialog",
+    };
+
+    // Pre-pass: local variable -> instantiated type, for the two-statement
+    // `var f = new TargetForm();` / `TargetForm f = new TargetForm();` pattern.
+    var localType = new Dictionary<string, string>(StringComparer.Ordinal);
+    foreach (var decl in root.DescendantNodesAndSelf().OfType<VariableDeclaratorSyntax>())
+    {
+        if (decl.Initializer?.Value is ObjectCreationExpressionSyntax oce)
+        {
+            localType[decl.Identifier.Text] = BareName(oce.Type);
+        }
+    }
+
+    // Walk for `.Show()` / `.ShowDialog()` and resolve the target screen.
+    // Dedup per method body; the SPO store dedups across methods by key.
+    var seen = new HashSet<string>(StringComparer.Ordinal);
+    foreach (var inv in root.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>())
+    {
+        if (inv.Expression is not MemberAccessExpressionSyntax mac)
+        {
+            continue;
+        }
+        var method = mac.Name.Identifier.Text;
+        if (method != "Show" && method != "ShowDialog")
+        {
+            continue;
+        }
+        string? target = mac.Expression switch
+        {
+            // `new TargetForm(...).Show()`
+            ObjectCreationExpressionSyntax oce => BareName(oce.Type),
+            // `f.Show()` where `f` was `new TargetForm()` earlier in the body
+            IdentifierNameSyntax id when localType.TryGetValue(id.Identifier.Text, out var t) => t,
+            _ => null,
+        };
+        if (target is null || frameworkDialogs.Contains(target) || !seen.Add(target))
+        {
+            continue;
+        }
+        triples.Add(new Triple($"{ns}:{className}", "navigates_to", $"{ns}:{target}", f, c));
     }
 }
 
