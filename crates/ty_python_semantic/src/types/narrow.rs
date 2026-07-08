@@ -53,7 +53,8 @@ use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 enum ContainmentBehavior<'db> {
-    /// Membership compares against the elements of this type.
+    /// Membership compares against the elements yielded by the wrapped type. Callers use
+    /// [`Type::try_iterate`] to determine the types that may be contained.
     Elementwise(Type<'db>),
     /// A statically visible `__contains__` defines different membership behavior.
     Custom,
