@@ -972,73 +972,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     fn recursive_type_pair_fallback(
         &self,
-        db: &'db dyn Db,
+        _db: &'db dyn Db,
         source: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if let (Type::TypeAlias(source_alias), Type::TypeAlias(target_alias)) = (source, target)
-            && source_alias.definition(db) == target_alias.definition(db)
-        {
-            return self.check_recursive_type_alias_specialization_pair(
-                db,
-                source_alias,
-                target_alias,
-            );
-        }
-
-        self.always()
-    }
-
-    fn check_recursive_type_alias_specialization_pair(
-        &self,
-        db: &'db dyn Db,
-        source: TypeAliasType<'db>,
-        target: TypeAliasType<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        let Some(source_specialization) = source.specialization(db).or_else(|| {
-            source
-                .generic_context(db)
-                .map(|generic_context| generic_context.default_specialization(db, None))
-        }) else {
-            return self.always();
-        };
-        let Some(target_specialization) = target.specialization(db).or_else(|| {
-            target
-                .generic_context(db)
-                .map(|generic_context| generic_context.default_specialization(db, None))
-        }) else {
-            return self.always();
-        };
-
-        let generic_context = source_specialization.generic_context(db);
-        if generic_context != target_specialization.generic_context(db) {
+        if matches!((source, target), (Type::TypeAlias(_), Type::TypeAlias(_))) {
             return self.never();
         }
 
-        itertools::izip!(
-            generic_context.variables(db),
-            source_specialization.types(db),
-            target_specialization.types(db),
-        )
-        .when_all(
-            db,
-            self.constraints,
-            |(bound_typevar, source_type, target_type)| match source.variance_of(db, bound_typevar)
-            {
-                TypeVarVariance::Covariant => self.check_type_pair(db, *source_type, *target_type),
-                TypeVarVariance::Contravariant => {
-                    self.check_type_pair(db, *target_type, *source_type)
-                }
-                TypeVarVariance::Invariant | TypeVarVariance::Bivariant => self
-                    .check_relation_in_invariant_position(
-                        db,
-                        *source_type,
-                        source_specialization.materialization_kind(db),
-                        *target_type,
-                        target_specialization.materialization_kind(db),
-                    ),
-            },
-        )
+        self.always()
     }
 
     /// Is `target` a metaclass instance (a nominal instance of a subclass of `builtins.type`)?
