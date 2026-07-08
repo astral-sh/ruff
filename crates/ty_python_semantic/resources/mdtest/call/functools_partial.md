@@ -962,6 +962,10 @@ with_extra = partial(accepts_extra, _, "bound")
 with_extra(1, other=2)
 with_extra(1, value=2)  # error: [positional-only-parameter-as-kwarg]
 
+filled_extra = partial(with_extra, 1)
+filled_extra(other=2)
+filled_extra(value=2)  # error: [positional-only-parameter-as-kwarg]
+
 def source_positional_only(value: int, /, **kwargs: object) -> None:
     pass
 

@@ -4483,15 +4483,17 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
     ) -> Result<(), ()> {
         let parameter = if let Some(parameter) = self.parameters.keyword_by_name(name) {
             parameter
-        } else if let Some((parameter_index, parameter)) =
+        } else if let Some((parameter_index, parameter, reserved_name)) =
             self.parameters.reserved_keyword_by_name(name)
         {
             self.errors
                 .push(BindingError::PositionalOnlyParameterAsKwarg {
                     argument_index: self.get_argument_index(argument_index),
-                    parameter: ParameterContext::new(parameter, parameter_index, true),
+                    parameter: ParameterContext::reserved_keyword(reserved_name.clone()),
                 });
-            self.parameter_info[parameter_index].suppress_missing_error = true;
+            if parameter.is_positional_only() {
+                self.parameter_info[parameter_index].suppress_missing_error = true;
+            }
             return Err(());
         } else if let Some(parameter) = self.parameters.keyword_variadic() {
             parameter
@@ -6639,6 +6641,9 @@ impl<'db> Binding<'db> {
                             && !parameter.is_variadic()
                             && !parameter.is_keyword_variadic()
                         {
+                            partial_application.reserve_keyword_names(
+                                parameter.reserved_keyword_names().iter().cloned(),
+                            );
                             partial_application.bind_positionally(parameter_index);
                         }
                     }
@@ -7046,6 +7051,14 @@ impl ParameterContext {
             name: parameter.display_name(),
             index,
             positional,
+        }
+    }
+
+    fn reserved_keyword(name: Name) -> Self {
+        Self {
+            name: Some(name),
+            index: 0,
+            positional: false,
         }
     }
 }
