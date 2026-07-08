@@ -289,10 +289,9 @@ fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelC
         return Some(ModelConfig::unknown());
     };
     let callee = definition_expression_type(db, definition, &call.func);
-    if !callee
-        .as_class_literal()
-        .is_some_and(|class| class.is_known(db, KnownClass::PydanticConfigDict))
-    {
+    if !callee.as_class_literal().is_some_and(|class| {
+        class.is_known(db, KnownClass::PydanticConfigDict) || class.is_known(db, KnownClass::Dict)
+    }) {
         return Some(ModelConfig::unknown());
     }
 
