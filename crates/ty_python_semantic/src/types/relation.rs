@@ -11,8 +11,7 @@ use crate::types::constraints::{
     OwnedConstraintSet,
 };
 use crate::types::cyclic::{
-    CycleDetectorVisit, HasIdentity, PairVisitor, TypeIdentity,
-    type_pair_has_recursive_identity_cycle,
+    CycleDetectorVisit, HasIdentity, PairVisitor, TypeIdentity, type_pair_recursive_identity_cycle,
 };
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
@@ -22,13 +21,15 @@ use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    SubclassOfType, TypeAliasType, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
+    UpcastPolicy,
 };
 use crate::{
     Db,
     types::{
-        ErrorContext, ErrorContextTree, Type, constraints::ConstraintSet,
-        generics::InferableTypeVars,
+        ErrorContext, ErrorContextTree, Type,
+        constraints::ConstraintSet,
+        generics::{InferableTypeVars, Specialization},
     },
 };
 
@@ -742,11 +743,11 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvalu
         self.0.needs_recursive_identity() || self.1.needs_recursive_identity()
     }
 
-    fn has_recursive_identity_cycle(&self, db: &'db dyn Db, seen: &[Self]) -> bool {
+    fn recursive_identity_cycle<'a>(&self, db: &'db dyn Db, seen: &'a [Self]) -> Option<&'a Self> {
         let identity = self.to_identity(db);
         let active_matches = |active: &Self| active.to_identity(db) == identity;
 
-        type_pair_has_recursive_identity_cycle(
+        type_pair_recursive_identity_cycle(
             db,
             self.0,
             self.1,
@@ -795,6 +796,289 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
     pub(super) signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
     pub(super) materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum ParametricTerm<'db> {
+    SourceConstructor(Box<[Self]>),
+    TargetConstructor(Box<[Self]>),
+    Concrete(Type<'db>),
+    Union(Box<[Self]>),
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum ParametricConstructorSide {
+    Source,
+    Target,
+}
+
+impl<'db> ParametricTerm<'db> {
+    fn from_type(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        active_source: TypeAliasType<'db>,
+        active_target: TypeAliasType<'db>,
+    ) -> Self {
+        match ty {
+            Type::TypeAlias(alias) if alias.definition(db) == active_source.definition(db) => {
+                Self::SourceConstructor(Self::alias_arguments(
+                    db,
+                    alias,
+                    active_source,
+                    active_target,
+                ))
+            }
+            Type::TypeAlias(alias) if alias.definition(db) == active_target.definition(db) => {
+                Self::TargetConstructor(Self::alias_arguments(
+                    db,
+                    alias,
+                    active_source,
+                    active_target,
+                ))
+            }
+            Type::Union(union) => Self::union(
+                union
+                    .elements(db)
+                    .iter()
+                    .map(|element| Self::from_type(db, *element, active_source, active_target)),
+            ),
+            _ => Self::Concrete(ty),
+        }
+    }
+
+    fn alias_arguments(
+        db: &'db dyn Db,
+        alias: TypeAliasType<'db>,
+        active_source: TypeAliasType<'db>,
+        active_target: TypeAliasType<'db>,
+    ) -> Box<[Self]> {
+        let Some(specialization) =
+            TypeRelationChecker::type_alias_specialization_or_default(db, alias)
+        else {
+            return Box::new([]);
+        };
+
+        specialization
+            .types(db)
+            .iter()
+            .map(|ty| Self::from_type(db, *ty, active_source, active_target))
+            .collect()
+    }
+
+    fn union(elements: impl IntoIterator<Item = Self>) -> Self {
+        let mut elements: Vec<_> = elements.into_iter().collect();
+        if elements.is_empty() {
+            Self::Concrete(Type::Never)
+        } else if elements.len() == 1 {
+            elements.remove(0)
+        } else {
+            Self::Union(elements.into_boxed_slice())
+        }
+    }
+}
+
+struct ParametricSubtypingRule<'db> {
+    source: Box<[ParametricTerm<'db>]>,
+    target: Box<[ParametricTerm<'db>]>,
+}
+
+impl<'db> ParametricSubtypingRule<'db> {
+    fn from_specializations(
+        db: &'db dyn Db,
+        source: Specialization<'db>,
+        target: Specialization<'db>,
+        active_source: TypeAliasType<'db>,
+        active_target: TypeAliasType<'db>,
+    ) -> Self {
+        Self {
+            source: Self::arguments_from_specialization(db, source, active_source, active_target),
+            target: Self::arguments_from_specialization(db, target, active_source, active_target),
+        }
+    }
+
+    fn arguments_from_specialization(
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+        active_source: TypeAliasType<'db>,
+        active_target: TypeAliasType<'db>,
+    ) -> Box<[ParametricTerm<'db>]> {
+        specialization
+            .types(db)
+            .iter()
+            .map(|ty| ParametricTerm::from_type(db, *ty, active_source, active_target))
+            .collect()
+    }
+
+    fn has_same_constructor_arities_as(&self, current: &Self) -> bool {
+        self.source.len() == current.source.len() && self.target.len() == current.target.len()
+    }
+}
+
+#[derive(Clone, Copy)]
+struct ParametricRuleApplication<'rule, 'db> {
+    rule: &'rule ParametricSubtypingRule<'db>,
+}
+
+impl<'rule, 'db> ParametricRuleApplication<'rule, 'db> {
+    const fn new(rule: &'rule ParametricSubtypingRule<'db>) -> Self {
+        Self { rule }
+    }
+
+    fn accepts(self, current: &ParametricSubtypingRule<'db>) -> bool {
+        self.rule.has_same_constructor_arities_as(current)
+            && self.current_is_parametric_instance(current)
+    }
+
+    fn current_is_parametric_instance(self, current: &ParametricSubtypingRule<'db>) -> bool {
+        self.arguments_are_parametric_instances(&current.source, &self.rule.source)
+            && self.arguments_are_parametric_instances(&current.target, &self.rule.target)
+    }
+
+    fn equivalent(self, left: &ParametricTerm<'db>, right: &ParametricTerm<'db>) -> bool {
+        use ParametricTerm::{Concrete, SourceConstructor, TargetConstructor, Union};
+
+        match (left, right) {
+            (SourceConstructor(left), SourceConstructor(right)) => {
+                self.arguments_are_equivalent(left, right)
+                    || self.arguments_match_same_rule_constructor(
+                        left,
+                        right,
+                        ParametricConstructorSide::Source,
+                    )
+            }
+            (TargetConstructor(left), TargetConstructor(right)) => {
+                self.arguments_are_equivalent(left, right)
+                    || self.arguments_match_same_rule_constructor(
+                        left,
+                        right,
+                        ParametricConstructorSide::Target,
+                    )
+            }
+            (Concrete(left), Concrete(right)) => left == right,
+            (Union(left), Union(right)) => {
+                left.len() == right.len()
+                    && left.iter().all(|left_element| {
+                        right
+                            .iter()
+                            .any(|right_element| self.equivalent(left_element, right_element))
+                    })
+            }
+            _ => false,
+        }
+    }
+
+    fn arguments_are_equivalent(
+        self,
+        left: &[ParametricTerm<'db>],
+        right: &[ParametricTerm<'db>],
+    ) -> bool {
+        left.len() == right.len()
+            && left
+                .iter()
+                .zip(right)
+                .all(|(left, right)| self.equivalent(left, right))
+    }
+
+    fn arguments_match_same_rule_constructor(
+        self,
+        left: &[ParametricTerm<'db>],
+        right: &[ParametricTerm<'db>],
+        side: ParametricConstructorSide,
+    ) -> bool {
+        self.any_rule_constructor_arguments(side, |rule_arguments| {
+            self.arguments_are_parametric_instances(left, rule_arguments)
+                && self.arguments_are_parametric_instances(right, rule_arguments)
+        })
+    }
+
+    fn arguments_match_rule_constructor(
+        self,
+        arguments: &[ParametricTerm<'db>],
+        side: ParametricConstructorSide,
+    ) -> bool {
+        self.any_rule_constructor_arguments(side, |rule_arguments| {
+            self.arguments_are_parametric_instances(arguments, rule_arguments)
+        })
+    }
+
+    fn any_rule_constructor_arguments(
+        self,
+        side: ParametricConstructorSide,
+        predicate: impl Fn(&[ParametricTerm<'db>]) -> bool,
+    ) -> bool {
+        let rule_arguments = match side {
+            ParametricConstructorSide::Source => &self.rule.source,
+            ParametricConstructorSide::Target => &self.rule.target,
+        };
+
+        predicate(rule_arguments)
+    }
+
+    fn arguments_are_parametric_instances(
+        self,
+        arguments: &[ParametricTerm<'db>],
+        rule_arguments: &[ParametricTerm<'db>],
+    ) -> bool {
+        arguments.len() == rule_arguments.len()
+            && arguments
+                .iter()
+                .zip(rule_arguments)
+                .all(|(argument, rule_argument)| {
+                    self.is_parametric_instance_of(argument, rule_argument)
+                })
+    }
+
+    fn is_parametric_instance_of(
+        self,
+        argument: &ParametricTerm<'db>,
+        rule_argument: &ParametricTerm<'db>,
+    ) -> bool {
+        if self.equivalent(argument, rule_argument) {
+            return true;
+        }
+
+        let ParametricTerm::Union(elements) = argument else {
+            return false;
+        };
+
+        match rule_argument {
+            ParametricTerm::Union(rule_elements) => {
+                self.union_is_parametric_instance(elements, rule_elements)
+            }
+            rule_argument => {
+                self.union_is_parametric_instance(elements, std::slice::from_ref(rule_argument))
+            }
+        }
+    }
+
+    fn union_is_parametric_instance(
+        self,
+        elements: &[ParametricTerm<'db>],
+        rule_elements: &[ParametricTerm<'db>],
+    ) -> bool {
+        rule_elements.iter().all(|rule_element| {
+            elements
+                .iter()
+                .any(|element| self.equivalent(element, rule_element))
+        }) && elements.iter().all(|element| {
+            rule_elements
+                .iter()
+                .any(|rule_element| self.equivalent(element, rule_element))
+                || self.is_recursive_constructor_application(element)
+        })
+    }
+
+    fn is_recursive_constructor_application(self, argument: &ParametricTerm<'db>) -> bool {
+        match argument {
+            ParametricTerm::SourceConstructor(arguments) => {
+                self.arguments_match_rule_constructor(arguments, ParametricConstructorSide::Source)
+            }
+            ParametricTerm::TargetConstructor(arguments) => {
+                self.arguments_match_rule_constructor(arguments, ParametricConstructorSide::Target)
+            }
+            ParametricTerm::Concrete(_) | ParametricTerm::Union(_) => false,
+        }
+    }
 }
 
 impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
@@ -977,8 +1261,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             .begin_visit(db, (source, target, self.relation, self.typevar_evaluation))
         {
             CycleDetectorVisit::Ready(result) => result,
-            CycleDetectorVisit::Cycle(current) => {
-                self.recursive_type_pair_fallback(db, current.0, current.1)
+            CycleDetectorVisit::Cycle { active, current } => {
+                self.recursive_type_pair_fallback(db, active.0, active.1, current.0, current.1)
             }
             CycleDetectorVisit::Pending(item) => {
                 let result = work();
@@ -989,18 +1273,97 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     fn recursive_type_pair_fallback(
         &self,
-        _db: &'db dyn Db,
+        db: &'db dyn Db,
+        active_source: Type<'db>,
+        active_target: Type<'db>,
         source: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if matches!((source, target), (Type::TypeAlias(_), Type::TypeAlias(_))) {
+        if let (
+            Type::TypeAlias(active_source_alias),
+            Type::TypeAlias(active_target_alias),
+            Type::TypeAlias(source_alias),
+            Type::TypeAlias(target_alias),
+        ) = (active_source, active_target, source, target)
+        {
+            if Self::recursive_type_alias_pair_has_parametric_rule(
+                db,
+                active_source_alias,
+                active_target_alias,
+                source_alias,
+                target_alias,
+            ) {
+                return self.always();
+            }
             return self.never();
         }
 
         // Mixed recursive cycles (for example, alias vs. protocol) keep the existing
-        // coinductive fallback. Alias pairs are rejected above instead of generating another
-        // recursive obligation.
+        // coinductive fallback. The parametric rule check above is only sound for alias pairs,
+        // where both recursive constructors expose comparable specialization arguments.
         self.always()
+    }
+
+    fn recursive_type_alias_pair_has_parametric_rule(
+        db: &'db dyn Db,
+        active_source: TypeAliasType<'db>,
+        active_target: TypeAliasType<'db>,
+        current_source: TypeAliasType<'db>,
+        current_target: TypeAliasType<'db>,
+    ) -> bool {
+        if active_source.definition(db) != current_source.definition(db)
+            || active_target.definition(db) != current_target.definition(db)
+        {
+            return false;
+        }
+
+        let (
+            Some(active_source_specialization),
+            Some(active_target_specialization),
+            Some(current_source_specialization),
+            Some(current_target_specialization),
+        ) = (
+            Self::type_alias_specialization_or_default(db, active_source),
+            Self::type_alias_specialization_or_default(db, active_target),
+            Self::type_alias_specialization_or_default(db, current_source),
+            Self::type_alias_specialization_or_default(db, current_target),
+        )
+        else {
+            return false;
+        };
+
+        let rule = ParametricSubtypingRule::from_specializations(
+            db,
+            active_source_specialization,
+            active_target_specialization,
+            active_source,
+            active_target,
+        );
+        let current_application = ParametricSubtypingRule::from_specializations(
+            db,
+            current_source_specialization,
+            current_target_specialization,
+            active_source,
+            active_target,
+        );
+
+        // Growing aliases can revisit the same constructor pair with larger specialization
+        // arguments. Close the cycle only when the current constructor application is an instance
+        // of the finite parametric rule induced by the active obligation. Everything else is
+        // outside this finite fragment and is rejected instead of generating another recursive
+        // obligation.
+        ParametricRuleApplication::new(&rule).accepts(&current_application)
+    }
+
+    fn type_alias_specialization_or_default(
+        db: &'db dyn Db,
+        alias: TypeAliasType<'db>,
+    ) -> Option<Specialization<'db>> {
+        alias.specialization(db).or_else(|| {
+            alias
+                .generic_context(db)
+                .map(|generic_context| generic_context.default_specialization(db, None))
+        })
     }
 
     /// Is `target` a metaclass instance (a nominal instance of a subclass of `builtins.type`)?
@@ -1219,7 +1582,18 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // that depend on multiple elements, such as all members of an enum, are visible.
             (_, Type::Union(union)) if union.has_aliases(db) => {
                 self.with_recursion_guard(db, source, target, || {
-                    self.check_type_pair(db, source, union.expand_aliases(db))
+                    let expanded = union
+                        .elements(db)
+                        .iter()
+                        .copied()
+                        .fold(
+                            UnionBuilder::new(db)
+                                .no_cyclic_query(true)
+                                .recursively_defined(union.recursively_defined(db)),
+                            UnionBuilder::add,
+                        )
+                        .build();
+                    self.check_type_pair(db, source, expanded)
                 })
             }
 

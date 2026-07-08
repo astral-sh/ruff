@@ -116,7 +116,9 @@ impl<'db> UnionType<'db> {
         elements
             .into_iter()
             .fold(
-                UnionBuilder::new(db).cycle_recovery(true),
+                UnionBuilder::new(db)
+                    .unpack_aliases(false)
+                    .no_cyclic_query(true),
                 |builder, element| builder.add(element.into()),
             )
             .build()
@@ -386,7 +388,7 @@ impl<'db> UnionType<'db> {
     ) -> Option<Type<'db>> {
         let mut builder = UnionBuilder::new(db)
             .unpack_aliases(false)
-            .cycle_recovery(true)
+            .no_cyclic_query(true)
             .recursively_defined(self.recursively_defined(db));
         let mut empty = true;
         for ty in self.elements(db) {

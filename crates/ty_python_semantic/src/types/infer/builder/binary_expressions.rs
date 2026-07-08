@@ -6,7 +6,7 @@ use crate::Db;
 use crate::types::call::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::cyclic::{
-    CycleDetector, HasIdentity, TypeIdentity, type_pair_has_recursive_identity_cycle,
+    CycleDetector, HasIdentity, TypeIdentity, type_pair_recursive_identity_cycle,
 };
 use crate::types::diagnostic::{
     DIVISION_BY_ZERO, report_unsupported_augmented_assignment, report_unsupported_binary_operation,
@@ -34,11 +34,11 @@ impl<'db> HasIdentity<'db> for (Type<'db>, ast::Operator, Type<'db>) {
         (self.0.to_identity(db), self.1, self.2.to_identity(db))
     }
 
-    fn has_recursive_identity_cycle(&self, db: &'db dyn Db, seen: &[Self]) -> bool {
+    fn recursive_identity_cycle<'a>(&self, db: &'db dyn Db, seen: &'a [Self]) -> Option<&'a Self> {
         let identity = self.to_identity(db);
         let active_matches = |active: &Self| active.to_identity(db) == identity;
 
-        type_pair_has_recursive_identity_cycle(
+        type_pair_recursive_identity_cycle(
             db,
             self.0,
             self.2,

@@ -378,11 +378,11 @@ impl<'db> UnionElement<'db> {
         &mut self,
         db: &'db dyn Db,
         other_type: Type<'db>,
-        cycle_recovery: bool,
+        no_cyclic_query: bool,
     ) -> ReduceResult<'db> {
-        if cycle_recovery {
-            // A widened literal group must absorb matching literals from later iterations for
-            // recovery to converge. Preserve that exact fallback reduction without relation queries.
+        if no_cyclic_query {
+            // Keep exact literal-fallback reductions even when relation-based reductions are
+            // disabled.
             return match self {
                 UnionElement::Type(existing) => ReduceResult::Type(*existing),
                 UnionElement::IntLiterals(_) => {
@@ -533,9 +533,11 @@ pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
     unpack_aliases: bool,
-    /// This is enabled when joining types in a `cycle_recovery` function. Because recovery cannot
-    /// introduce a new cycle, relation-based union simplifications are skipped in this mode.
-    cycle_recovery: bool,
+    /// Disable union simplifications that would issue relation queries.
+    ///
+    /// This is used while handling recursive queries or cycle recovery,
+    /// where issuing another relation query from union construction can re-enter the same recursion.
+    no_cyclic_query: bool,
     recursively_defined: RecursivelyDefined,
 }
 
@@ -601,7 +603,7 @@ impl<'db> UnionBuilder<'db> {
             db,
             elements: vec![],
             unpack_aliases: true,
-            cycle_recovery: false,
+            no_cyclic_query: false,
             recursively_defined: RecursivelyDefined::No,
         }
     }
@@ -611,11 +613,9 @@ impl<'db> UnionBuilder<'db> {
         self
     }
 
-    pub(crate) fn cycle_recovery(mut self, val: bool) -> Self {
-        self.cycle_recovery = val;
-        if self.cycle_recovery {
-            self.unpack_aliases = false;
-        }
+    /// Disable union simplifications that would issue relation queries.
+    pub(crate) fn no_cyclic_query(mut self, val: bool) -> Self {
+        self.no_cyclic_query = val;
         self
     }
 
@@ -671,9 +671,9 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
-        let cycle_recovery = self.cycle_recovery;
+        let no_cyclic_query = self.no_cyclic_query;
         let should_widen = |literals, recursively_defined: RecursivelyDefined| {
-            if recursively_defined.is_yes() && cycle_recovery {
+            if recursively_defined.is_yes() && no_cyclic_query {
                 literals >= MAX_RECURSIVE_UNION_LITERALS
             } else {
                 literals >= MAX_NON_RECURSIVE_UNION_LITERALS
@@ -693,7 +693,7 @@ impl<'db> UnionBuilder<'db> {
                 self.recursively_defined = self
                     .recursively_defined
                     .or(union.recursively_defined(self.db));
-                if self.cycle_recovery && self.recursively_defined.is_yes() {
+                if self.no_cyclic_query && self.recursively_defined.is_yes() {
                     let literals = self.elements.iter().fold(0, |acc, elem| match elem {
                         UnionElement::IntLiterals(literals) => acc + literals.len(),
                         UnionElement::StringLiterals(literals) => acc + literals.len(),
@@ -709,9 +709,23 @@ impl<'db> UnionBuilder<'db> {
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
             Type::TypeAlias(alias) if self.unpack_aliases => {
-                if seen_aliases.contains(&ty) {
-                    // Union contains itself recursively via a type alias. This is an error, just
-                    // leave out the recursive alias. TODO surface this error.
+                let seen_alias = if self.no_cyclic_query {
+                    ty.recursive_identity(self.db).is_some_and(|identity| {
+                        seen_aliases
+                            .iter()
+                            .any(|seen| seen.recursive_identity(self.db) == Some(identity))
+                    })
+                } else {
+                    seen_aliases.contains(&ty)
+                };
+
+                if seen_alias {
+                    if self.no_cyclic_query {
+                        self.push_type(ty, seen_aliases);
+                    } else {
+                        // Union contains itself recursively via a type alias. This is an error,
+                        // just leave out the recursive alias. TODO surface this error.
+                    }
                 } else {
                     seen_aliases.push(ty);
                     self.add_in_place_impl(alias.value_type(self.db), seen_aliases);
@@ -740,12 +754,12 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing)
-                                    if cycle_recovery
+                                    if no_cyclic_query
                                         && literal.fallback_instance(self.db) == *existing =>
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing) if !cycle_recovery => {
+                                UnionElement::Type(existing) if !no_cyclic_query => {
                                     // e.g. `existing` could be `Literal[""] & Any`,
                                     // and `ty` could be `Literal[""]`
                                     if ty.is_redundant_with(self.db, *existing) {
@@ -793,12 +807,12 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing)
-                                    if cycle_recovery
+                                    if no_cyclic_query
                                         && literal.fallback_instance(self.db) == *existing =>
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing) if !cycle_recovery => {
+                                UnionElement::Type(existing) if !no_cyclic_query => {
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -848,12 +862,12 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing)
-                                    if cycle_recovery
+                                    if no_cyclic_query
                                         && literal.fallback_instance(self.db) == *existing =>
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing) if !cycle_recovery => {
+                                UnionElement::Type(existing) if !no_cyclic_query => {
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -924,12 +938,12 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing)
-                                    if cycle_recovery
+                                    if no_cyclic_query
                                         && literal.fallback_instance(self.db) == *existing =>
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing) if !cycle_recovery => {
+                                UnionElement::Type(existing) if !no_cyclic_query => {
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -983,7 +997,7 @@ impl<'db> UnionBuilder<'db> {
                 }
             }
             // Adding `object` to a union results in `object`.
-            ty if ty.is_object() && !cycle_recovery => self.collapse_to_object(),
+            ty if ty.is_object() => self.collapse_to_object(),
             _ => self.push_type(ty, seen_aliases),
         }
     }
@@ -1001,13 +1015,13 @@ impl<'db> UnionBuilder<'db> {
         // If an alias gets here, it means we aren't unpacking aliases, and we also
         // shouldn't try to simplify aliases out of the union, because that will require
         // unpacking them.
-        let should_simplify_full = !matches!(ty, Type::TypeAlias(_)) && !self.cycle_recovery;
+        let should_simplify_full = !matches!(ty, Type::TypeAlias(_)) && !self.no_cyclic_query;
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
 
         for (i, element) in self.elements.iter_mut().enumerate() {
-            let element_type = match element.try_reduce(self.db, ty, self.cycle_recovery) {
+            let element_type = match element.try_reduce(self.db, ty, self.no_cyclic_query) {
                 ReduceResult::KeepIf(keep) => {
                     if !keep {
                         to_remove.push(i);
@@ -1029,11 +1043,26 @@ impl<'db> UnionBuilder<'db> {
             }
 
             // `object` already contains every possible union element.
-            if !self.cycle_recovery && element_type == Type::object() {
+            if element_type == Type::object() {
                 return;
             }
 
-            if !self.cycle_recovery && should_preserve_hashable_union(self.db, ty, element_type) {
+            if self.no_cyclic_query
+                && let Type::LiteralValue(literal) = ty
+                && literal.fallback_instance(self.db) == element_type
+            {
+                return;
+            }
+
+            if self.no_cyclic_query
+                && let Type::LiteralValue(literal) = element_type
+                && literal.fallback_instance(self.db) == ty
+            {
+                to_remove.push(i);
+                continue;
+            }
+
+            if !self.no_cyclic_query && should_preserve_hashable_union(self.db, ty, element_type) {
                 continue;
             }
 
@@ -1053,7 +1082,7 @@ impl<'db> UnionBuilder<'db> {
             }
 
             // Fold `(T & ~AlwaysTruthy) | (T & ~AlwaysFalsy)` to `T`.
-            if !self.cycle_recovery
+            if !self.no_cyclic_query
                 && let Some(merged_type) = merge_truthiness_guarded_pair(self.db, ty, element_type)
             {
                 to_remove.push(i);
@@ -1061,7 +1090,7 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             }
 
-            if !self.cycle_recovery
+            if !self.no_cyclic_query
                 && element_type
                     .as_literal_value_kind()
                     .zip(bool_pair(ty))
@@ -1124,7 +1153,7 @@ impl<'db> UnionBuilder<'db> {
     pub(crate) fn try_build(self) -> Option<Type<'db>> {
         let db = self.db;
         let unpack_aliases = self.unpack_aliases;
-        let cycle_recovery = self.cycle_recovery;
+        let no_cyclic_query = self.no_cyclic_query;
         let recursively_defined = self.recursively_defined;
 
         let type_count = self.elements.iter().map(UnionElement::type_count).sum();
@@ -1167,10 +1196,10 @@ impl<'db> UnionBuilder<'db> {
             }
         }
 
-        if normalize_enum_complement_unions(db, &mut types) {
+        if !no_cyclic_query && normalize_enum_complement_unions(db, &mut types) {
             let builder = UnionBuilder::new(db)
                 .unpack_aliases(unpack_aliases)
-                .cycle_recovery(cycle_recovery)
+                .no_cyclic_query(no_cyclic_query)
                 .recursively_defined(recursively_defined);
             return types
                 .into_iter()
@@ -1978,14 +2007,14 @@ mod tests {
     }
 
     #[test]
-    fn cycle_recovery_widens_recursive_literal_union() {
+    fn no_cyclic_query_widens_recursive_literal_union() {
         let db = setup_db();
         let literal_limit =
             i64::try_from(MAX_RECURSIVE_UNION_LITERALS).expect("literal limit fits in i64");
 
         let union = (0..=literal_limit).map(Type::int_literal).fold(
             UnionBuilder::new(&db)
-                .cycle_recovery(true)
+                .no_cyclic_query(true)
                 .recursively_defined(RecursivelyDefined::Yes),
             UnionBuilder::add,
         );
@@ -1995,7 +2024,7 @@ mod tests {
         let assert_widens = |literal, instance| {
             for (first, second) in [(literal, instance), (instance, literal)] {
                 let union = UnionBuilder::new(&db)
-                    .cycle_recovery(true)
+                    .no_cyclic_query(true)
                     .add(first)
                     .add(second)
                     .build();
@@ -2028,26 +2057,25 @@ mod tests {
     }
 
     #[test]
-    fn cycle_recovery_skips_other_redundancy_simplification() {
+    fn no_cyclic_query_preserves_relation_free_reductions() {
         let db = setup_db();
 
-        for (left, right) in [
-            (Type::string_literal(&db, "literal"), Type::literal_string()),
-            (Type::bool_literal(true), KnownClass::Bool.to_instance(&db)),
-            (Type::int_literal(1), Type::object()),
-            (Type::bool_literal(true), Type::bool_literal(false)),
-        ] {
-            for (first, second) in [(left, right), (right, left)] {
-                let union = UnionBuilder::new(&db)
-                    .cycle_recovery(true)
-                    .add(first)
-                    .add(second)
-                    .build()
-                    .expect_union();
-                assert!(union.elements(&db).contains(&left));
-                assert!(union.elements(&db).contains(&right));
-            }
-        }
+        assert_eq!(
+            UnionBuilder::new(&db)
+                .no_cyclic_query(true)
+                .add(Type::bool_literal(true))
+                .add(KnownClass::Bool.to_instance(&db))
+                .build(),
+            KnownClass::Bool.to_instance(&db)
+        );
+        assert_eq!(
+            UnionBuilder::new(&db)
+                .no_cyclic_query(true)
+                .add(Type::int_literal(1))
+                .add(Type::object())
+                .build(),
+            Type::object()
+        );
     }
 
     #[test]

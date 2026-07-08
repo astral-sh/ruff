@@ -306,6 +306,13 @@ def _(choice: Choice, config: Config) -> None:
     values: list[Selector] = []
     accept_selector(config.selector)
 
+type RecursiveSentinel = tuple[RecursiveSentinel]
+type EitherOrRecursiveSentinel = RecursiveSentinel | A | B
+
+def accept_either_or_recursive_sentinel(value: EitherOrRecursiveSentinel) -> None: ...
+def _(choice: Choice) -> None:
+    accept_either_or_recursive_sentinel(choice)
+
 class ExtendedChoice(Enum):
     A = "A"
     B = "B"
@@ -639,6 +646,192 @@ def stable_wrapped(x: StableWrapped[int], y: StableWrapped[str]):
     x = y
     # error: [invalid-assignment] "Object of type `StableWrapped[int]` is not assignable to `StableWrapped[str]`"
     y = x
+```
+
+### Subtyping of recursive generic aliases
+
+Type relation for recursive aliases is checked structurally.
+
+```py
+from typing import Callable
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+type DirectCovariantA[T] = T | tuple[DirectCovariantA[T], ...]
+type DirectCovariantB[T] = T | tuple[DirectCovariantB[T], ...]
+
+static_assert(is_subtype_of(DirectCovariantA[int], DirectCovariantB[object]))
+static_assert(is_subtype_of(DirectCovariantB[int], DirectCovariantA[object]))
+static_assert(not is_subtype_of(DirectCovariantA[object], DirectCovariantB[int]))
+static_assert(is_subtype_of(DirectCovariantA[DirectCovariantA[int]], DirectCovariantB[DirectCovariantB[object]]))
+static_assert(not is_subtype_of(DirectCovariantA[DirectCovariantA[object]], DirectCovariantB[DirectCovariantB[int]]))
+
+type DirectCovariantA2[T] = T | tuple[DirectCovariantA2[T | DirectCovariantA2[T]], ...]
+type DirectCovariantB2[T] = T | tuple[DirectCovariantB2[T | DirectCovariantB2[T]], ...]
+
+static_assert(is_subtype_of(DirectCovariantA2[int], DirectCovariantB2[int]))
+static_assert(not is_subtype_of(DirectCovariantB2[int], DirectCovariantA2[str]))
+static_assert(is_subtype_of(DirectCovariantA2[int], DirectCovariantB2[object]))
+static_assert(is_subtype_of(DirectCovariantA2[DirectCovariantA2[int]], DirectCovariantB2[DirectCovariantB2[object]]))
+static_assert(not is_subtype_of(DirectCovariantA2[DirectCovariantA2[object]], DirectCovariantB2[DirectCovariantB2[int]]))
+
+type DirectContravariantA[T] = Callable[[T], DirectContravariantA[T] | None]
+type DirectContravariantB[T] = Callable[[T], DirectContravariantB[T] | None]
+
+static_assert(is_subtype_of(DirectContravariantA[object], DirectContravariantB[int]))
+static_assert(is_subtype_of(DirectContravariantB[object], DirectContravariantA[int]))
+static_assert(not is_subtype_of(DirectContravariantA[int], DirectContravariantB[object]))
+static_assert(is_subtype_of(DirectContravariantA[DirectContravariantA[int]], DirectContravariantB[DirectContravariantB[object]]))
+static_assert(
+    not is_subtype_of(DirectContravariantA[DirectContravariantA[object]], DirectContravariantB[DirectContravariantB[int]])
+)
+
+type DirectInvariantA[T] = list[T | DirectInvariantA[T]]
+type DirectInvariantB[T] = list[T | DirectInvariantB[T]]
+
+static_assert(is_subtype_of(DirectInvariantA[int], DirectInvariantB[int]))
+static_assert(is_subtype_of(DirectInvariantB[int], DirectInvariantA[int]))
+static_assert(not is_subtype_of(DirectInvariantA[int], DirectInvariantB[str]))
+static_assert(not is_subtype_of(DirectInvariantB[str], DirectInvariantA[int]))
+static_assert(not is_subtype_of(DirectInvariantA[int], DirectInvariantB[object]))
+static_assert(not is_assignable_to(DirectInvariantA[int], DirectInvariantB[str]))
+static_assert(is_subtype_of(DirectInvariantA[DirectInvariantA[int]], DirectInvariantB[DirectInvariantB[int]]))
+static_assert(not is_subtype_of(DirectInvariantA[DirectInvariantA[int]], DirectInvariantB[DirectInvariantB[str]]))
+```
+
+### Subtyping of mutually recursive generic aliases
+
+Mutually recursive aliases can be structurally equivalent even when they have different definitions,
+but their type arguments still have to satisfy the alias variance.
+
+```py
+from typing import Callable, Never
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+type CovariantA[T] = T | tuple[CovariantB[T], ...]
+type CovariantB[T] = T | tuple[CovariantA[T], ...]
+
+static_assert(is_subtype_of(CovariantA[int], CovariantB[object]))
+static_assert(is_subtype_of(CovariantB[int], CovariantA[object]))
+static_assert(not is_subtype_of(CovariantA[object], CovariantB[int]))
+static_assert(is_subtype_of(CovariantA[CovariantA[int]], CovariantB[CovariantB[object]]))
+static_assert(not is_subtype_of(CovariantA[CovariantA[object]], CovariantB[CovariantB[int]]))
+
+type CovariantA2[T] = T | tuple[CovariantB2[T | CovariantA2[T]], ...]
+type CovariantB2[T] = T | tuple[CovariantA2[T | CovariantB2[T]], ...]
+
+static_assert(is_subtype_of(CovariantA2[int], CovariantB2[int]))
+static_assert(not is_subtype_of(CovariantB2[int], CovariantA2[str]))
+static_assert(is_subtype_of(CovariantA2[int], CovariantB2[object]))
+static_assert(is_subtype_of(CovariantA2[CovariantA2[int]], CovariantB2[CovariantB2[object]]))
+static_assert(not is_subtype_of(CovariantA2[CovariantA2[object]], CovariantB2[CovariantB2[int]]))
+static_assert(is_subtype_of(CovariantA2[int], CovariantA2[object] | CovariantB2[object]))
+
+type AliasOfCovariantA2[T] = CovariantA2[T]
+type AliasOfCovariantB2[T] = CovariantB2[T]
+
+static_assert(is_subtype_of(AliasOfCovariantA2[int], AliasOfCovariantB2[object]))
+static_assert(is_subtype_of(AliasOfCovariantA2[AliasOfCovariantA2[int]], AliasOfCovariantB2[AliasOfCovariantB2[object]]))
+static_assert(not is_subtype_of(AliasOfCovariantA2[object], AliasOfCovariantB2[int]))
+
+type ContravariantA[T] = Callable[[T], ContravariantB[T] | None]
+type ContravariantB[T] = Callable[[T], ContravariantA[T] | None]
+
+static_assert(is_subtype_of(ContravariantA[object], ContravariantB[int]))
+static_assert(is_subtype_of(ContravariantB[object], ContravariantA[int]))
+static_assert(not is_subtype_of(ContravariantA[int], ContravariantB[object]))
+static_assert(is_subtype_of(ContravariantA[ContravariantA[int]], ContravariantB[ContravariantB[object]]))
+static_assert(not is_subtype_of(ContravariantA[ContravariantA[object]], ContravariantB[ContravariantB[int]]))
+
+type InvariantA[T] = list[T | InvariantB[T]]
+type InvariantB[T] = list[T | InvariantA[T]]
+
+static_assert(is_subtype_of(InvariantA[int], InvariantB[int]))
+static_assert(is_subtype_of(InvariantB[int], InvariantA[int]))
+static_assert(not is_subtype_of(InvariantA[int], InvariantB[str]))
+static_assert(not is_subtype_of(InvariantB[str], InvariantA[int]))
+static_assert(not is_subtype_of(InvariantA[int], InvariantB[object]))
+static_assert(not is_assignable_to(InvariantA[int], InvariantB[str]))
+static_assert(is_subtype_of(InvariantA[InvariantA[int]], InvariantB[InvariantB[int]]))
+static_assert(not is_subtype_of(InvariantA[InvariantA[int]], InvariantB[InvariantB[str]]))
+
+type SwapA[T, U] = tuple[SwapB[U, T], T, U]
+type SwapB[T, U] = tuple[SwapA[U, T], U, T]
+
+static_assert(is_subtype_of(SwapA[int, str], SwapB[str, int]))
+static_assert(is_subtype_of(SwapB[int, str], SwapA[str, int]))
+static_assert(not is_subtype_of(SwapA[int, str], SwapB[int, str]))
+
+type SwapGrowA[T, U] = T | tuple[SwapGrowB[U | SwapGrowA[T, U], T]]
+type SwapGrowB[T, U] = U | tuple[SwapGrowA[U | SwapGrowB[T, U], T]]
+
+static_assert(is_subtype_of(SwapGrowA[int, str], SwapGrowB[str, int]))
+
+type DuplicateGrowA[T, U] = T | tuple[DuplicateGrowA[T | DuplicateGrowA[T, U], U | DuplicateGrowA[T, U]]]
+type DuplicateGrowB[T, U] = T | tuple[DuplicateGrowB[T | DuplicateGrowB[T, U], U | DuplicateGrowB[T, U]]]
+
+static_assert(is_subtype_of(DuplicateGrowA[int, int], DuplicateGrowB[int, int]))
+
+type ArityGrowA[T] = T | tuple[ArityGrowB[T | ArityGrowA[T], T]]
+type ArityGrowB[T, U] = T | U | tuple[ArityGrowA[T]]
+
+static_assert(is_subtype_of(ArityGrowA[int], ArityGrowB[int, int]))
+static_assert(not is_subtype_of(ArityGrowA[int], ArityGrowB[int, str]))
+
+type SourceConstraintA[T] = T | list[T] | tuple[SourceConstraintA[str]]
+type SourceConstraintB[T] = T | list[int] | tuple[SourceConstraintB[str]]
+
+static_assert(not is_subtype_of(SourceConstraintA[int], SourceConstraintB[int]))
+
+# TODO: These decidable growing relations are outside the current finite parametric-rule fragment,
+# but a more precise recursive-alias solver should eventually classify them.
+
+type DifferentGrowA[T] = T | tuple[DifferentGrowA[list[T]]]
+type DifferentGrowB[T] = T | tuple[DifferentGrowB[set[T]]]
+
+static_assert(not is_subtype_of(DifferentGrowA[int], DifferentGrowB[int]))
+
+type NeverGrowA[T] = T | tuple[NeverGrowA[Never | NeverGrowA[T]]]
+type NeverGrowB[T] = T | tuple[NeverGrowB[Never]]
+
+static_assert(not is_subtype_of(NeverGrowA[int], NeverGrowB[int]))
+
+type OneSidedGrowA[T] = T | tuple[OneSidedGrowA[T | OneSidedGrowA[str]]]
+type OneSidedGrowB[T] = T | tuple[OneSidedGrowB[T]]
+
+static_assert(not is_subtype_of(OneSidedGrowA[int], OneSidedGrowB[int]))
+
+type BadA[T] = T | tuple[BadA[BadA[str]]]
+type BadB[T] = T | tuple[BadB[BadA[int]]]
+
+static_assert(not is_subtype_of(BadA[int], BadB[int]))
+```
+
+### Recursive generic alias relations that encode context-free grammar inclusion
+
+Recursive generic aliases can encode context-free grammars by threading a continuation type through
+the alias type arguments. For arbitrary aliases of this shape, deciding
+`GrammarA[End] <: GrammarB[End]` would decide context-free language inclusion, which is undecidable.
+This section documents the encoding shape rather than a future TODO for ty to prove every relation
+in the fragment.
+
+```py
+from typing import Literal
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+type End = None
+type A[Rest] = tuple[Literal["a"], Rest]
+type B[Rest] = tuple[Literal["b"], Rest]
+
+# `AnyWord[Rest]` recognizes any word over `a | b`, followed by `Rest`.
+type AnyWord[Rest] = Rest | A[AnyWord[Rest]] | B[AnyWord[Rest]]
+
+# `Balanced[Rest]` recognizes `a^n b^n`, followed by `Rest`.
+type Balanced[Rest] = Rest | A[Balanced[B[Rest]]]
+
+static_assert(not is_subtype_of(B[End], Balanced[End]))
 ```
 
 ### Non-recursive nested generic aliases

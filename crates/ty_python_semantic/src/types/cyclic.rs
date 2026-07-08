@@ -85,18 +85,18 @@ pub trait HasIdentity<'db> {
         true
     }
 
-    /// Return `true` if `self` should use the recursive fallback for an active item.
-    fn has_recursive_identity_cycle(&self, db: &'db dyn Db, seen: &[Self]) -> bool
+    /// Return the active item that should provide the recursive fallback for `self`.
+    fn recursive_identity_cycle<'a>(&self, db: &'db dyn Db, seen: &'a [Self]) -> Option<&'a Self>
     where
         Self: Sized,
     {
         if !self.needs_recursive_identity() {
-            return false;
+            return None;
         }
 
         let identity = self.to_identity(db);
         seen.iter()
-            .any(|active| active.needs_recursive_identity() && active.to_identity(db) == identity)
+            .find(|active| active.needs_recursive_identity() && active.to_identity(db) == identity)
     }
 }
 
@@ -111,8 +111,8 @@ impl<'db> HasIdentity<'db> for Type<'db> {
         Type::needs_recursive_identity(*self)
     }
 
-    fn has_recursive_identity_cycle(&self, db: &'db dyn Db, seen: &[Self]) -> bool {
-        type_has_recursive_identity_cycle(db, *self, seen, |active| *active, |_| true)
+    fn recursive_identity_cycle<'a>(&self, db: &'db dyn Db, seen: &'a [Self]) -> Option<&'a Self> {
+        type_recursive_identity_cycle(db, *self, seen, |active| *active, |_| true)
     }
 }
 
@@ -129,11 +129,11 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>) {
         self.0.needs_recursive_identity() || self.1.needs_recursive_identity()
     }
 
-    fn has_recursive_identity_cycle(&self, db: &'db dyn Db, seen: &[Self]) -> bool {
+    fn recursive_identity_cycle<'a>(&self, db: &'db dyn Db, seen: &'a [Self]) -> Option<&'a Self> {
         let identity = self.to_identity(db);
         let active_matches = |active: &Self| active.to_identity(db) == identity;
 
-        type_pair_has_recursive_identity_cycle(
+        type_pair_recursive_identity_cycle(
             db,
             self.0,
             self.1,
@@ -145,15 +145,15 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>) {
     }
 }
 
-/// Return `true` if a type should use the recursive fallback for an active type identity.
-pub(crate) fn type_has_recursive_identity_cycle<'db, S>(
+/// Return the active item that should provide the recursive fallback for a type.
+pub(crate) fn type_recursive_identity_cycle<'a, 'db, S>(
     db: &'db dyn Db,
     ty: Type<'db>,
-    seen: &[S],
+    seen: &'a [S],
     active_type: impl Fn(&S) -> Type<'db> + Copy,
     active_matches: impl Fn(&S) -> bool + Copy,
-) -> bool {
-    type_has_recursive_identity_cycle_impl(
+) -> Option<&'a S> {
+    type_recursive_identity_cycle_impl(
         db,
         ty,
         seen,
@@ -163,18 +163,18 @@ pub(crate) fn type_has_recursive_identity_cycle<'db, S>(
     )
 }
 
-/// Return `true` if either type should use the recursive fallback for an active item.
-pub(crate) fn type_pair_has_recursive_identity_cycle<'db, S>(
+/// Return the active item that should provide the recursive fallback for either type.
+pub(crate) fn type_pair_recursive_identity_cycle<'a, 'db, S>(
     db: &'db dyn Db,
     left: Type<'db>,
     right: Type<'db>,
-    seen: &[S],
+    seen: &'a [S],
     active_left: impl Fn(&S) -> Type<'db> + Copy,
     active_right: impl Fn(&S) -> Type<'db> + Copy,
     active_matches: impl Fn(&S) -> bool + Copy,
-) -> bool {
-    type_has_recursive_identity_cycle(db, left, seen, active_left, active_matches)
-        || type_has_recursive_identity_cycle(db, right, seen, active_right, active_matches)
+) -> Option<&'a S> {
+    type_recursive_identity_cycle(db, left, seen, active_left, active_matches)
+        .or_else(|| type_recursive_identity_cycle(db, right, seen, active_right, active_matches))
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -183,29 +183,25 @@ enum NonNestedAliasCyclePolicy {
     AfterSecondUnfold,
 }
 
-fn type_has_recursive_identity_cycle_impl<'db, S>(
+fn type_recursive_identity_cycle_impl<'a, 'db, S>(
     db: &'db dyn Db,
     ty: Type<'db>,
-    seen: &[S],
+    seen: &'a [S],
     active_type: impl Fn(&S) -> Type<'db> + Copy,
     active_matches: impl Fn(&S) -> bool + Copy,
     non_nested_alias_cycle_policy: NonNestedAliasCyclePolicy,
-) -> bool {
+) -> Option<&'a S> {
     let Type::TypeAlias(alias) = ty else {
-        let Some(identity) = ty.recursive_identity(db) else {
-            return false;
-        };
-        return seen.iter().any(|active| {
+        let identity = ty.recursive_identity(db)?;
+        return seen.iter().find(|active| {
             active_matches(active) && active_type(active).recursive_identity(db) == Some(identity)
         });
     };
 
     let identity = TypeIdentity::TypeAlias(alias.definition(db));
-    if !seen.iter().any(|active| {
+    let first_matching_active = seen.iter().find(|active| {
         active_matches(active) && active_type(active).recursive_identity(db) == Some(identity)
-    }) {
-        return false;
-    }
+    })?;
 
     let active_alias_count = seen
         .iter()
@@ -215,13 +211,13 @@ fn type_has_recursive_identity_cycle_impl<'db, S>(
         .count();
 
     let Some(generic_context) = alias.generic_context(db) else {
-        return true;
+        return Some(first_matching_active);
     };
     if generic_context
         .variables(db)
         .any(|typevar| typevar.is_paramspec(db))
     {
-        return true;
+        return Some(first_matching_active);
     }
 
     let specialization = alias
@@ -231,7 +227,7 @@ fn type_has_recursive_identity_cycle_impl<'db, S>(
         is_nested_alias_application(db, ty, seen, active_type, active_matches);
 
     if nested_alias_application {
-        return false;
+        return None;
     }
 
     if specialization.types(db).iter().copied().any(|argument| {
@@ -244,12 +240,17 @@ fn type_has_recursive_identity_cycle_impl<'db, S>(
             })
         })
     }) {
-        return true;
+        return Some(first_matching_active);
     }
 
-    match non_nested_alias_cycle_policy {
+    let has_cycle = match non_nested_alias_cycle_policy {
         NonNestedAliasCyclePolicy::Immediate => true,
         NonNestedAliasCyclePolicy::AfterSecondUnfold => active_alias_count > 1,
+    };
+    if has_cycle {
+        Some(first_matching_active)
+    } else {
+        None
     }
 }
 
@@ -329,7 +330,7 @@ where
     pub fn visit(&self, db: &'db dyn Db, item: T, compute: impl FnOnce() -> R) -> R {
         match self.begin_visit(db, item) {
             CycleDetectorVisit::Ready(result) => result,
-            CycleDetectorVisit::Cycle(_) => self.fallback.clone(),
+            CycleDetectorVisit::Cycle { .. } => self.fallback.clone(),
             CycleDetectorVisit::Pending(item) => {
                 let result = compute();
                 self.finish_visit(item, result)
@@ -349,8 +350,11 @@ where
             return CycleDetectorVisit::Ready(self.fallback.clone());
         }
 
-        if item.has_recursive_identity_cycle(db, &seen) {
-            return CycleDetectorVisit::Cycle(item);
+        if let Some(active) = item.recursive_identity_cycle(db, &seen) {
+            return CycleDetectorVisit::Cycle {
+                active: active.clone(),
+                current: item,
+            };
         }
         drop(seen);
 
@@ -374,8 +378,8 @@ pub(crate) enum CycleDetectorVisit<T, R> {
     /// The item already has a completed result or hit an exact recursive edge.
     Ready(R),
     /// A different item with the same abstract identity is already pending.
-    /// The item is the input that hit the active obligation.
-    Cycle(T),
+    /// The active item is the pending obligation; the current item is the input that hit it.
+    Cycle { active: T, current: T },
     /// The caller should compute the result and pass it to [`CycleDetector::finish_visit`].
     Pending(T),
 }
@@ -450,7 +454,7 @@ fn type_transformer_needs_recursive_fallback<'db>(
     ty: Type<'db>,
     seen: &[Type<'db>],
 ) -> bool {
-    type_has_recursive_identity_cycle_impl(
+    type_recursive_identity_cycle_impl(
         db,
         ty,
         seen,
@@ -458,6 +462,7 @@ fn type_transformer_needs_recursive_fallback<'db>(
         |_| true,
         NonNestedAliasCyclePolicy::AfterSecondUnfold,
     )
+    .is_some()
 }
 
 enum TypeTransformerVisit<'db> {
@@ -740,7 +745,7 @@ mod tests {
     }
 
     #[test]
-    fn identity_cycle_reports_current_item() {
+    fn identity_cycle_reports_active_and_current_items() {
         let db = setup_db();
         let detector = IdentityDetector::new(0);
         let first = TestItem {
@@ -756,9 +761,11 @@ mod tests {
             panic!("first visit should be pending");
         };
 
-        let CycleDetectorVisit::Cycle(current) = detector.begin_visit(&db, second) else {
+        let CycleDetectorVisit::Cycle { active, current } = detector.begin_visit(&db, second)
+        else {
             panic!("second visit should detect an identity cycle");
         };
+        assert_eq!(active, first);
         assert_eq!(current, second);
 
         detector.finish_visit(active_item, 10);
