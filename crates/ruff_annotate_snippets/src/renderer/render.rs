@@ -357,7 +357,9 @@ fn render_title(
         label_width += title.level().as_str().len();
         if let Some(Id { id: Some(id), url }) = &title.id() {
             buffer.append(buffer_msg_line_offset, "[", label_style);
-            if let Some(url) = url.as_ref() {
+            if renderer.hyperlink
+                && let Some(url) = url.as_ref()
+            {
                 buffer.append(
                     buffer_msg_line_offset,
                     &format!("\x1B]8;;{url}\x1B\\"),
@@ -365,7 +367,7 @@ fn render_title(
                 );
             }
             buffer.append(buffer_msg_line_offset, id, label_style);
-            if url.is_some() {
+            if renderer.hyperlink && url.is_some() {
                 buffer.append(buffer_msg_line_offset, "\x1B]8;;\x1B\\", label_style);
             }
             buffer.append(buffer_msg_line_offset, "]", label_style);
