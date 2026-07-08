@@ -30,7 +30,7 @@ impl Name {
 
     #[inline]
     pub fn new(name: impl AsRef<str>) -> Self {
-        Self(name.as_ref().into())
+        Self(LeanString::from(name.as_ref()))
     }
 
     #[inline]
