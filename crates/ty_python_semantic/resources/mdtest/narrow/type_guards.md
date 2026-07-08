@@ -490,6 +490,49 @@ def _(x: Unrelated | Covariant[int]):
     needs_instance_of_unrelated(x)
 ```
 
+## `TypeIs` narrowing with protocol class variables
+
+`TypeIs` materializes its return type before narrowing. If a protocol class variable is `Any`, a
+class-side read after narrowing therefore has type `object`:
+
+```py
+from typing import Any, ClassVar, Protocol
+from typing_extensions import TypeIs
+
+class HasClassVar(Protocol):
+    x: ClassVar[Any]
+
+def is_has_class_var(x: object) -> TypeIs[HasClassVar]:
+    return True
+
+def _(x: object):
+    if is_has_class_var(x):
+        reveal_type(type(x).x)  # revealed: object
+```
+
+## `TypeIs` narrowing with inherited protocols
+
+Materialization must preserve protocol inheritance when none of the inherited requirements change:
+
+```py
+from typing import Any, Protocol
+from typing_extensions import TypeIs
+
+class Base(Protocol):
+    value: int
+
+class Derived(Base, Protocol):
+    marker: Any
+
+def is_derived(x: object) -> TypeIs[Derived]:
+    return True
+
+def accepts_base(x: Base) -> None: ...
+def _(x: object):
+    if is_derived(x):
+        accepts_base(x)
+```
+
 ## `TypeGuard` special cases
 
 ```py

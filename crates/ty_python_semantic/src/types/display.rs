@@ -32,10 +32,9 @@ use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
     CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceType, Protocol,
-    ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
-    Type, TypeAliasType, TypeGuardLike, TypedDictModule, TypedDictType, UnionType,
-    WrapperDescriptorKind, visitor,
+    LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceType,
+    SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType, Type, TypeAliasType,
+    TypeGuardLike, TypedDictModule, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
@@ -582,10 +581,11 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'db> {
             // Visit the class (as if it were a nominal-instance type)
             // rather than the protocol members, if it is a class-based protocol.
             // (For the purposes of displaying the type, we'll use the class name.)
-            Type::ProtocolInstance(ProtocolInstanceType {
-                inner: Protocol::FromClass(class),
-                ..
-            }) => return self.visit_type(db, Type::from(class)),
+            Type::ProtocolInstance(protocol) => {
+                if let Some(origin) = protocol.class_origin(db) {
+                    return self.visit_type(db, Type::from(origin));
+                }
+            }
             // no need to recurse into TypeVar bounds/constraints
             Type::TypeVar(_) => return,
             _ => {}
@@ -976,22 +976,38 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     (ClassType::Generic(alias), _) => alias.display_with(self.db, self.settings.clone()).fmt_detailed(f),
                 }
             }
-            Type::ProtocolInstance(protocol) => match protocol.inner {
-                Protocol::FromClass(class) => match *class {
-                    ClassType::NonGeneric(class) => class
-                        .display_with(self.db, self.settings.clone())
-                        .fmt_detailed(f),
-                    ClassType::Generic(alias) => alias
-                        .display_with(self.db, self.settings.clone())
-                        .fmt_detailed(f),
-                },
-                Protocol::Synthesized(synthetic) => {
+            Type::ProtocolInstance(protocol) => {
+                if let Some(class) = protocol.class_origin(self.db) {
+                    let wrapper = match protocol.display_materialization_kind(self.db) {
+                        Some(MaterializationKind::Top) => Some(("Top", SpecialFormType::Top)),
+                        Some(MaterializationKind::Bottom) => {
+                            Some(("Bottom", SpecialFormType::Bottom))
+                        }
+                        None => None,
+                    };
+                    if let Some((name, form)) = wrapper {
+                        f.with_type(Type::SpecialForm(form)).write_str(name)?;
+                        f.write_char('[')?;
+                    }
+                    match *class {
+                        ClassType::NonGeneric(class) => class
+                            .display_with(self.db, self.settings.clone())
+                            .fmt_detailed(f)?,
+                        ClassType::Generic(alias) => alias
+                            .display_with(self.db, self.settings.clone())
+                            .fmt_detailed(f)?,
+                    }
+                    if wrapper.is_some() {
+                        f.write_char(']')?;
+                    }
+                    Ok(())
+                } else {
                     f.set_invalid_type_annotation();
                     f.write_char('<')?;
                     f.with_type(Type::SpecialForm(SpecialFormType::Protocol))
                         .write_str("Protocol")?;
                     f.write_str(" with members ")?;
-                    let interface = synthetic.interface();
+                    let interface = protocol.interface(self.db);
                     let member_list = interface.members(self.db);
                     let num_members = member_list.len();
                     for (i, member) in member_list.enumerate() {
@@ -1003,7 +1019,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     }
                     f.write_char('>')
                 }
-            },
+            }
             Type::PropertyInstance(property) => f
                 .with_type(self.ty)
                 .write_str(property_display_name(self.db, property)),

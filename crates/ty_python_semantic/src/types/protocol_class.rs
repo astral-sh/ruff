@@ -248,10 +248,45 @@ pub(super) fn walk_protocol_instance_interface<
                     }
                 }
             }
-            ProtocolMemberKind::Attribute(attribute) => {
-                if let Some(ty) = attribute.bind_self(db, receiver_ty) {
-                    visitor.visit_type(db, ty);
+            ProtocolMemberKind::Attribute { .. } => {
+                for member_type in member.data.kind.member_types() {
+                    if let Some(ty) = member_type.bind_self(db, receiver_ty) {
+                        visitor.visit_type(db, ty);
+                    }
                 }
+            }
+        }
+    }
+}
+
+/// Visits the member types that participate in structural protocol relations.
+///
+/// For methods, the instance-access callable omits the implicit receiver while retaining every
+/// user-visible parameter and the return type. Visiting that form avoids treating the receiver's
+/// protocol type as a recursive member reference.
+pub(super) fn walk_protocol_interface_requirements<
+    'db,
+    V: super::visitor::TypeVisitor<'db> + ?Sized,
+>(
+    db: &'db dyn Db,
+    interface: ProtocolInterface<'db>,
+    visitor: &V,
+) {
+    for member in interface.members(db) {
+        let capabilities = member.capabilities(db);
+        let accesses = if member.is_method() {
+            [Some(capabilities.instance), None]
+        } else {
+            [Some(capabilities.instance), Some(capabilities.class)]
+        };
+        for member_type in accesses
+            .into_iter()
+            .flatten()
+            .flat_map(|access| [access.read, access.write])
+            .flatten()
+        {
+            if let Some(member_type) = member_type.resolve(db) {
+                visitor.visit_type(db, member_type.ty());
             }
         }
     }
@@ -347,6 +382,32 @@ impl<'db> ProtocolInterface<'db> {
 
     pub(super) fn includes_member(self, db: &'db dyn Db, name: &str) -> bool {
         self.inner(db).contains_key(name)
+    }
+
+    /// Returns whether two interfaces differ for any member named by `required`.
+    ///
+    /// Members outside `required` are deliberately ignored so an unrelated materialized member
+    /// does not disable a valid nominal relation.
+    pub(super) fn differs_for_members_required_by(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        required: Self,
+    ) -> bool {
+        required
+            .inner(db)
+            .keys()
+            .any(|name| self.inner(db).get(name) != other.inner(db).get(name))
+    }
+
+    pub(super) fn member_has_todo_type(self, db: &'db dyn Db, name: &str) -> bool {
+        self.member_by_name(db, name)
+            .is_some_and(|member| member.has_todo_type())
+    }
+
+    pub(super) fn member_is_property(self, db: &'db dyn Db, name: &str) -> bool {
+        self.member_by_name(db, name)
+            .is_some_and(|member| member.is_property())
     }
 
     /// Returns the declared instance-write requirement for a protocol member.
@@ -675,9 +736,27 @@ impl<'db> ProtocolMemberType<'db> {
             .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
         self.with_ty(ty)
     }
+
+    /// Maps a writable capability contravariantly.
+    ///
+    /// A stored property setter is still a callable, so its value parameter already introduces
+    /// the contravariance required by a write. Other writable capabilities store the exposed
+    /// value type directly and therefore require an explicit polarity flip.
+    fn apply_write_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        match self {
+            Self::PropertySetter(_) => self.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            _ => self.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
+        }
+    }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 /// The types supported by one way of accessing a protocol member.
 ///
 /// `read` is covariant and `write` is contravariant. Either operation can be absent: for example,
@@ -711,6 +790,48 @@ impl<'db> ProtocolMemberAccess<'db> {
                     .map(|member| (member.ty(), TypeVarVariance::Contravariant)),
             )
     }
+
+    fn cycle_normalized(self, db: &'db dyn Db, previous: Self, cycle: &salsa::Cycle) -> Self {
+        Self {
+            read: cycle_normalized_optional_type(db, self.read, previous.read, cycle),
+            write: cycle_normalized_optional_type(db, self.write, previous.write, cycle),
+        }
+    }
+
+    fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        Some(Self {
+            read: match self.read {
+                Some(read) => Some(read.recursive_type_normalized_impl(db, div, nested)?),
+                None => None,
+            },
+            write: match self.write {
+                Some(write) => Some(write.recursive_type_normalized_impl(db, div, nested)?),
+                None => None,
+            },
+        })
+    }
+
+    fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        Self {
+            read: self
+                .read
+                .map(|read| read.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+            write: self
+                .write
+                .map(|write| write.apply_write_type_mapping_impl(db, type_mapping, tcx, visitor)),
+        }
+    }
 }
 
 /// The readable and writable types exposed through instance and class access.
@@ -718,10 +839,59 @@ impl<'db> ProtocolMemberAccess<'db> {
 /// Instance access and class access each independently record readable and writable types. For
 /// example, a mutable `ClassVar` is readable through both, writable through the class, and
 /// read-only through an instance.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 struct ProtocolMemberCapabilities<'db> {
     instance: ProtocolMemberAccess<'db>,
     class: ProtocolMemberAccess<'db>,
+}
+
+impl<'db> ProtocolMemberCapabilities<'db> {
+    fn cycle_normalized(self, db: &'db dyn Db, previous: Self, cycle: &salsa::Cycle) -> Self {
+        Self {
+            instance: self.instance.cycle_normalized(db, previous.instance, cycle),
+            class: self.class.cycle_normalized(db, previous.class, cycle),
+        }
+    }
+
+    fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        Some(Self {
+            instance: self
+                .instance
+                .recursive_type_normalized_impl(db, div, nested)?,
+            class: self.class.recursive_type_normalized_impl(db, div, nested)?,
+        })
+    }
+
+    fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        Self {
+            instance: self
+                .instance
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            class: self
+                .class
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+        }
+    }
+
+    fn member_types(self) -> [Option<ProtocolMemberType<'db>>; 4] {
+        [
+            self.instance.read,
+            self.instance.write,
+            self.class.read,
+            self.class.write,
+        ]
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -748,6 +918,7 @@ fn cycle_normalized_optional_type<'db>(
 #[derive(Debug, PartialEq, Eq, Clone, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct ProtocolMemberData<'db> {
     kind: ProtocolMemberKind<'db>,
+    mapped_capabilities: Option<ProtocolMemberCapabilities<'db>>,
     qualifiers: TypeQualifiers,
     definition: Option<Definition<'db>>,
 }
@@ -774,6 +945,7 @@ impl<'db> ProtocolMemberData<'db> {
                 ProtocolMemberType::with_definition(Type::Callable(callable), definition),
                 method_kind,
             ),
+            mapped_capabilities: None,
             qualifiers: TypeQualifiers::default(),
             definition,
         }
@@ -786,6 +958,7 @@ impl<'db> ProtocolMemberData<'db> {
     ) -> Self {
         Self {
             kind: ProtocolMemberKind::Property { read, write },
+            mapped_capabilities: None,
             qualifiers: TypeQualifiers::default(),
             definition,
         }
@@ -800,6 +973,7 @@ impl<'db> ProtocolMemberData<'db> {
             kind: ProtocolMemberKind::Attribute(ProtocolMemberType::with_definition(
                 ty, definition,
             )),
+            mapped_capabilities: None,
             qualifiers,
             definition,
         }
@@ -810,6 +984,10 @@ impl<'db> ProtocolMemberData<'db> {
     /// These are views of the canonical method, property, or attribute representation below;
     /// keeping them derived prevents the stored member kind and its capabilities from diverging.
     fn capabilities(&self, db: &'db dyn Db) -> ProtocolMemberCapabilities<'db> {
+        if let Some(capabilities) = self.mapped_capabilities {
+            return capabilities;
+        }
+
         match self.kind {
             ProtocolMemberKind::Method(member, kind) => {
                 let instance_method = match (member.ty(), kind) {
@@ -854,6 +1032,20 @@ impl<'db> ProtocolMemberData<'db> {
     fn cycle_normalized(&self, db: &'db dyn Db, previous: &Self, cycle: &salsa::Cycle) -> Self {
         Self {
             kind: self.kind.cycle_normalized(db, previous.kind, cycle),
+            mapped_capabilities: match (self.mapped_capabilities, previous.mapped_capabilities) {
+                (Some(current), Some(previous)) => {
+                    Some(current.cycle_normalized(db, previous, cycle))
+                }
+                (Some(current), None) => Some(current.cycle_normalized(
+                    db,
+                    ProtocolMemberCapabilities {
+                        instance: ProtocolMemberAccess::NONE,
+                        class: ProtocolMemberAccess::NONE,
+                    },
+                    cycle,
+                )),
+                (None, _) => None,
+            },
             qualifiers: self.qualifiers,
             definition: self.definition,
         }
@@ -867,6 +1059,12 @@ impl<'db> ProtocolMemberData<'db> {
     ) -> Option<Self> {
         Some(Self {
             kind: self.kind.recursive_type_normalized_impl(db, div, nested)?,
+            mapped_capabilities: match self.mapped_capabilities {
+                Some(capabilities) => {
+                    Some(capabilities.recursive_type_normalized_impl(db, div, nested)?)
+                }
+                None => None,
+            },
             qualifiers: self.qualifiers,
             definition: self.definition,
         })
@@ -879,13 +1077,39 @@ impl<'db> ProtocolMemberData<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        Self {
-            kind: self
-                .kind
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+        let kind = self
+            .kind
+            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+        let mut mapped = Self {
+            kind,
+            mapped_capabilities: None,
             qualifiers: self.qualifiers,
             definition: self.definition,
+        };
+        // Method and property callables already encode the variance of their reads and writes.
+        // Their derived capabilities can cut a recursive type at a different point if mapped
+        // separately, so keep the mapped member kind as the canonical representation. Plain
+        // attributes need the sidecar because one stored value type cannot represent their
+        // independently materialized read and write capabilities.
+        if matches!(self.kind, ProtocolMemberKind::Attribute(_)) {
+            let capabilities =
+                self.capabilities(db)
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+            if mapped.capabilities(db) != capabilities {
+                mapped.mapped_capabilities = Some(capabilities);
+            }
         }
+        mapped
+    }
+
+    fn member_types(&self) -> impl Iterator<Item = ProtocolMemberType<'db>> {
+        self.mapped_capabilities
+            .map_or_else(
+                || self.kind.member_types(),
+                ProtocolMemberCapabilities::member_types,
+            )
+            .into_iter()
+            .flatten()
     }
 
     fn find_legacy_typevars_impl(
@@ -895,7 +1119,7 @@ impl<'db> ProtocolMemberData<'db> {
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         _visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
-        for member_type in self.kind.member_types() {
+        for member_type in self.member_types() {
             member_type
                 .ty()
                 .find_legacy_typevars(db, binding_context, typevars);
@@ -963,14 +1187,12 @@ enum ProtocolMethodKind {
 }
 
 impl<'db> ProtocolMemberKind<'db> {
-    fn member_types(self) -> impl Iterator<Item = ProtocolMemberType<'db>> {
+    fn member_types(self) -> [Option<ProtocolMemberType<'db>>; 4] {
         match self {
-            Self::Method(member, _) => [Some(member), None],
-            Self::Property { read, write } => [read, write],
-            Self::Attribute(attribute) => [Some(attribute), None],
+            Self::Method(method, _) => [Some(method), None, None, None],
+            Self::Property { read, write } => [read, write, None, None],
+            Self::Attribute(attribute) => [Some(attribute), None, None, None],
         }
-        .into_iter()
-        .flatten()
     }
 
     fn cycle_normalized(self, db: &'db dyn Db, previous: Self, cycle: &salsa::Cycle) -> Self {
@@ -1080,7 +1302,7 @@ fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     member: &ProtocolMember<'_, 'db>,
     visitor: &V,
 ) {
-    for member_type in member.data.kind.member_types() {
+    for member_type in member.data.member_types() {
         visitor.visit_type(db, member_type.ty());
     }
 }
@@ -1280,7 +1502,6 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 
     fn has_todo_type(&self) -> bool {
         self.data
-            .kind
             .member_types()
             .any(|ty| matches!(ty, ProtocolMemberType::Value { ty, .. } if ty.is_todo()))
     }

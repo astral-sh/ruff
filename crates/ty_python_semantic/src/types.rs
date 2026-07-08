@@ -104,7 +104,6 @@ use crate::types::visitor::any_over_type;
 use crate::{Db, FxOrderSet, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator};
-use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
 pub(crate) use literal::{
     BytesLiteralType, EnumLiteralType, LiteralValueType, LiteralValueTypeKind, StringLiteralType,
@@ -1034,6 +1033,22 @@ struct GeneratorTypes<'db> {
     return_ty: Option<Type<'db>>,
 }
 
+impl<'db> GeneratorTypes<'db> {
+    /// Materializes inherited generator parameters according to their declared variance.
+    ///
+    /// `YieldT` and `ReturnT` are covariant, while `SendT` is contravariant.
+    fn materialize(self, db: &'db dyn Db, kind: MaterializationKind) -> Self {
+        let visitor = ApplyTypeMappingVisitor::default();
+        Self {
+            yield_ty: self.yield_ty.map(|ty| ty.materialize(db, kind, &visitor)),
+            send_ty: self
+                .send_ty
+                .map(|ty| ty.materialize(db, kind.flip(), &visitor)),
+            return_ty: self.return_ty.map(|ty| ty.materialize(db, kind, &visitor)),
+        }
+    }
+}
+
 fn object_type_form(db: &dyn Db) -> Type<'_> {
     TypeFormType::from_type_expression(db, Type::object())
 }
@@ -1309,9 +1324,9 @@ impl<'db> Type<'db> {
                         .any(|ty| ty.is_specialized_generic(db))
             }
             Type::NominalInstance(instance_type) => instance_type.is_definition_generic(db),
-            Type::ProtocolInstance(protocol) => {
-                matches!(protocol.inner, Protocol::FromClass(class) if class.is_generic())
-            }
+            Type::ProtocolInstance(protocol) => protocol
+                .class_origin(db)
+                .is_some_and(|origin| origin.is_generic()),
             Type::TypedDict(typed_dict) => typed_dict
                 .defining_class()
                 .is_some_and(ClassType::is_generic),
@@ -1420,7 +1435,9 @@ impl<'db> Type<'db> {
     pub(crate) fn nominal_class(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         match self {
             Type::NominalInstance(instance) => Some(instance.class(db)),
-            Type::ProtocolInstance(instance) => instance.to_nominal_instance().map(|i| i.class(db)),
+            Type::ProtocolInstance(instance) => {
+                instance.to_nominal_instance(db).map(|i| i.class(db))
+            }
             Type::TypeAlias(alias) => alias.value_type(db).nominal_class(db),
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).nominal_class(db),
             Type::TypeVar(typevar) => {
@@ -2007,7 +2024,7 @@ impl<'db> Type<'db> {
 
             Type::TypedDict(td) => td.defining_class().is_some(),
 
-            Type::ProtocolInstance(ProtocolInstanceType { inner, .. }) => !inner.is_synthesized(),
+            Type::ProtocolInstance(protocol) => protocol.class_origin(db).is_some(),
 
             Type::Dynamic(dynamic) => match dynamic {
                 DynamicType::Any => true,
@@ -2744,6 +2761,18 @@ impl<'db> Type<'db> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
             return fallback.class_member_with_policy(db, name, policy);
         }
+        if let Type::ProtocolInstance(protocol) = self
+            && let Some(origin) = protocol.materialized_origin(db)
+        {
+            let interface = protocol.interface(db);
+            return if !interface.includes_member(db, &name)
+                || origin.interface(db).member_has_todo_type(db, &name)
+            {
+                Type::instance(db, *origin).class_member_with_policy(db, name, policy)
+            } else {
+                self.instance_member(db, &name)
+            };
+        }
 
         match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
@@ -2752,11 +2781,11 @@ impl<'db> Type<'db> {
             Type::Intersection(inter) => inter.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.class_member_with_policy(db, name.clone(), policy)
             }),
-            // TODO: Once `to_meta_type` for the synthesized protocol is fully implemented, this handling should be removed.
-            Type::ProtocolInstance(ProtocolInstanceType {
-                inner: Protocol::Synthesized(_),
-                ..
-            }) => self.instance_member(db, &name),
+            // TODO: Once `to_meta_type` for synthesized protocols is fully implemented, this
+            // handling should be removed.
+            Type::ProtocolInstance(protocol) if protocol.class_origin(db).is_none() => {
+                self.instance_member(db, &name)
+            }
 
             Type::LiteralValue(literal)
                 if name == "__len__"
@@ -2857,7 +2886,7 @@ impl<'db> Type<'db> {
         let own_class = match self {
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Protocol(protocol) => {
-                    protocol.class_origin().map(|origin| *origin)
+                    protocol.class_origin(db).map(|origin| *origin)
                 }
                 subclass_of => subclass_of.into_class(db),
             },
@@ -4126,11 +4155,10 @@ impl<'db> Type<'db> {
                 //
                 // Note that we could do this for *all* protocols, but it's only *necessary* for synthesized
                 // ones, and the standard logic is *probably* more performant for class-based protocols?
-                Type::ProtocolInstance(ProtocolInstanceType {
-                    inner: Protocol::Synthesized(protocol),
-                    ..
-                }) if policy.mro_no_object_fallback()
-                    && !protocol.interface().includes_member(db, name_str) =>
+                Type::ProtocolInstance(protocol)
+                    if protocol.class_origin(db).is_none()
+                        && policy.mro_no_object_fallback()
+                        && !protocol.interface(db).includes_member(db, name_str) =>
                 {
                     Place::Undefined.into()
                 }
@@ -4580,7 +4608,7 @@ impl<'db> Type<'db> {
                 // checking it structurally again during call inference.
                 if self_instance
                     .as_protocol_instance()
-                    .is_some_and(|protocol| protocol.to_nominal_instance().is_some())
+                    .is_some_and(|protocol| protocol.to_nominal_instance(db).is_some())
                     && signature
                         .overloads
                         .iter()
@@ -4772,9 +4800,12 @@ impl<'db> Type<'db> {
                     Binding::single(self, Signature::dynamic(Type::Dynamic(dynamic_type))).into()
                 }
                 SubclassOfInner::Class(class) => self.constructor_bindings(db, class),
-                SubclassOfInner::Protocol(protocol) => protocol.class_origin().map_or_else(
+                SubclassOfInner::Protocol(protocol) => protocol.class_origin(db).map_or_else(
                     || Binding::single(self, Signature::dynamic(Type::unknown())).into(),
-                    |origin| self.constructor_bindings(db, *origin),
+                    |origin| {
+                        self.constructor_bindings(db, *origin)
+                            .with_constructed_instance_type(db, Type::ProtocolInstance(protocol))
+                    },
                 ),
                 SubclassOfInner::TypeVar(tvar) => {
                     let constructor_instance_type = Type::TypeVar(tvar);
@@ -5849,10 +5880,13 @@ impl<'db> Type<'db> {
                 instance.class(db).iter_mro(db).find_map(from_class_base)
             }
             Type::ProtocolInstance(instance) => {
-                if let Protocol::FromClass(class) = instance.inner {
-                    class.iter_mro(db).find_map(from_class_base)
+                let generator_types = instance
+                    .class_origin(db)
+                    .and_then(|origin| origin.iter_mro(db).find_map(from_class_base));
+                if let Some(kind) = instance.materialization_kind(db) {
+                    generator_types.map(|types| types.materialize(db, kind))
                 } else {
-                    None
+                    generator_types
                 }
             }
             Type::Union(union) => {
@@ -6534,16 +6568,14 @@ impl<'db> Type<'db> {
                 }))
             }),
 
-            Type::ProtocolInstance(instance) => {
-                // TODO: Add tests for materialization once subtyping/assignability is implemented for
-                // protocols. It _might_ require changing the logic here because:
-                //
-                // > Subtyping for protocol instances involves taking account of the fact that
-                // > read-only property members, and method members, on protocols act covariantly;
-                // > write-only property members act contravariantly; and read/write attribute
-                // > members on protocols act invariantly
-                Type::ProtocolInstance(instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-            }
+            Type::ProtocolInstance(instance) => visitor.visit(db, self, type_mapping, || {
+                Type::ProtocolInstance(instance.apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                ))
+            }),
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
@@ -7191,7 +7223,9 @@ impl<'db> Type<'db> {
             Self::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 SubclassOfInner::Dynamic(_) => None,
                 SubclassOfInner::Class(class) => class.type_definition(db),
-                SubclassOfInner::Protocol(protocol) => protocol.class_origin()?.type_definition(db),
+                SubclassOfInner::Protocol(protocol) => {
+                    protocol.class_origin(db)?.type_definition(db)
+                }
                 SubclassOfInner::TypeVar(bound_typevar) => Some(TypeDefinition::TypeVar(
                     bound_typevar.typevar(db).definition(db)?,
                 )),
@@ -7226,10 +7260,9 @@ impl<'db> Type<'db> {
                 bound_typevar.typevar(db).definition(db)?,
             )),
 
-            Self::ProtocolInstance(protocol) => match protocol.inner {
-                Protocol::FromClass(class) => class.type_definition(db),
-                Protocol::Synthesized(_) => None,
-            },
+            Self::ProtocolInstance(protocol) => protocol
+                .class_origin(db)
+                .and_then(|origin| origin.type_definition(db)),
 
             Self::TypedDict(typed_dict) => typed_dict.type_definition(db),
 

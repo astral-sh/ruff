@@ -26,9 +26,9 @@ use crate::types::tuple::TupleSpec;
 use crate::types::typed_dict::TypedDictSchema;
 use crate::types::typevar::TypeVarInstance;
 use crate::types::{
-    BoundTypeVarInstance, ClassType, DynamicType, ErrorContextTree, LintDiagnosticGuard, Protocol,
-    ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance,
-    binding_type, protocol_class::ProtocolClass,
+    BoundTypeVarInstance, ClassType, DynamicType, ErrorContextTree, LintDiagnosticGuard,
+    SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance, binding_type,
+    protocol_class::ProtocolClass,
 };
 use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarKind, TypedDictType, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
@@ -2809,10 +2809,7 @@ pub(crate) fn report_undeclared_protocol_member(
     /// We also want to avoid suggesting invalid syntax such as `x: <class 'int'> = int`.
     fn should_give_hint<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         let class = match ty {
-            Type::ProtocolInstance(ProtocolInstanceType {
-                inner: Protocol::FromClass(_),
-                ..
-            }) => return true,
+            Type::ProtocolInstance(protocol) if protocol.class_origin(db).is_some() => return true,
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Class(class) => class,
                 SubclassOfInner::Protocol(_) => return true,
