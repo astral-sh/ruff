@@ -1165,28 +1165,32 @@ struct NestedSubstitution {
 struct NestedSubstitutionHistory(SmallVec<[NestedSubstitution; 4]>);
 
 impl NestedSubstitutionHistory {
-    fn merged(&self, other: &Self) -> Self {
-        Self(
+    /// Merges two derivation histories and records `nested_substitution`. Returns `None` if either
+    /// history has already applied that substitution.
+    fn merged(
+        &self,
+        other: &Self,
+        nested_substitution: Option<NestedSubstitution>,
+    ) -> Option<Self> {
+        if let Some(substitution) = nested_substitution
+            && (self.contains(substitution) || other.contains(substitution))
+        {
+            return None;
+        }
+
+        Some(Self(
             self.0
                 .iter()
                 .merge(other.0.iter())
+                .merge(nested_substitution.iter())
                 .dedup()
                 .copied()
                 .collect(),
-        )
+        ))
     }
 
-    fn with(&self, substitution: NestedSubstitution) -> Option<Self> {
-        let mut with = self.clone();
-        with.insert(substitution).then_some(with)
-    }
-
-    fn insert(&mut self, substitution: NestedSubstitution) -> bool {
-        let Err(index) = self.0.binary_search(&substitution) else {
-            return false;
-        };
-        self.0.insert(index, substitution);
-        true
+    fn contains(&self, substitution: NestedSubstitution) -> bool {
+        self.0.binary_search(&substitution).is_ok()
     }
 }
 
@@ -6634,19 +6638,9 @@ impl PathAssignments {
             for post in posts {
                 for history1 in histories1.clone() {
                     for history2 in histories2.clone() {
-                        let history = history1.merged(history2);
-                        let history = if let Some(substitution) = post.nested_substitution {
-                            // Reject a nested substitution only if this particular derivation
-                            // chain has already applied it. Other derivations of the same
-                            // assignment can still apply the substitution independently.
-                            let Some(history) = history.with(substitution) else {
-                                continue;
-                            };
-                            history
-                        } else {
-                            history
-                        };
-                        new_constraints.insert((post.constraint, history));
+                        if let Some(history) = history1.merged(history2, post.nested_substitution) {
+                            new_constraints.insert((post.constraint, history));
+                        }
                     }
                 }
             }
