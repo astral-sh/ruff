@@ -216,11 +216,11 @@ fn test_format_no_severity() {
             .id("E0001"),
     )];
 
-    let expected_ascii = str!["This is a title"];
+    let expected_ascii = str!["E0001 This is a title"];
     let renderer = Renderer::plain();
     assert_data_eq!(renderer.render(input), expected_ascii);
 
-    let expected_unicode = str!["This is a title"];
+    let expected_unicode = str!["E0001 This is a title"];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
     assert_data_eq!(renderer.render(input), expected_unicode);
 }

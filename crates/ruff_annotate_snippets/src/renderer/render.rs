@@ -387,6 +387,35 @@ fn render_title(
         }
         buffer.append(buffer_msg_line_offset, ": ", title_element_style);
         label_width += 2;
+    } else {
+        if let Some(Id { id: Some(id), url }) = &title.id() {
+            if renderer.hyperlink
+                && let Some(url) = url.as_ref()
+            {
+                buffer.append(
+                    buffer_msg_line_offset,
+                    &format!("\x1B]8;;{url}\x1B\\"),
+                    label_style,
+                );
+            }
+            buffer.append(buffer_msg_line_offset, id, label_style);
+            if renderer.hyperlink && url.is_some() {
+                buffer.append(buffer_msg_line_offset, "\x1B]8;;\x1B\\", label_style);
+            }
+            label_width += id.len();
+            if title.is_fixable() {
+                buffer.append(buffer_msg_line_offset, " [", ElementStyle::NoStyle);
+                buffer.append(
+                    buffer_msg_line_offset,
+                    "*",
+                    ElementStyle::Level(LevelInner::Help),
+                );
+                buffer.append(buffer_msg_line_offset, "]", ElementStyle::NoStyle);
+                label_width += 4;
+            }
+            buffer.append(buffer_msg_line_offset, " ", title_element_style);
+            label_width += 1;
+        }
     }
 
     let padding = " ".repeat(if title_style == TitleStyle::Secondary {
