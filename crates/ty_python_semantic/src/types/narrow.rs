@@ -98,35 +98,6 @@ impl<'db> Type<'db> {
             Type::NewTypeInstance(newtype) => {
                 newtype.concrete_base_type(db).containment_behavior(db)
             }
-            Type::Intersection(intersection) => {
-                // Replace known positive components with the types whose elements membership
-                // compares against, but retain unknown components so that their element types
-                // still constrain iteration. A visible custom implementation can precede a known
-                // implementation in the MRO of a concrete intersection inhabitant, so it makes
-                // the combined containment behavior custom.
-                let mut has_elementwise_behavior = false;
-                let mut has_custom_behavior = false;
-                let membership_type = intersection.map_positive(db, |element| {
-                    match element.containment_behavior(db) {
-                        ContainmentBehavior::Elementwise(membership_type) => {
-                            has_elementwise_behavior = true;
-                            membership_type
-                        }
-                        ContainmentBehavior::Custom => {
-                            has_custom_behavior = true;
-                            *element
-                        }
-                        ContainmentBehavior::Unknown => *element,
-                    }
-                });
-                if has_custom_behavior {
-                    ContainmentBehavior::Custom
-                } else if has_elementwise_behavior {
-                    ContainmentBehavior::Elementwise(membership_type)
-                } else {
-                    ContainmentBehavior::Unknown
-                }
-            }
             Type::TypedDict(_) => ContainmentBehavior::Elementwise(ty),
             Type::NominalInstance(instance) => {
                 // Walk the MRO until we find either a visible override or a supported built-in
