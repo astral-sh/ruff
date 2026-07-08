@@ -181,6 +181,9 @@ impl<'db> Type<'db> {
     }
 }
 
+/// Maximum haystack length for which we synthesize a negative type per character.
+const MAX_STRING_MEMBERSHIP_EXCLUSIONS: usize = 128;
+
 /// Narrow membership in a known string literal using substring semantics.
 fn narrow_string_membership<'db>(
     db: &'db dyn Db,
@@ -205,7 +208,12 @@ fn narrow_string_membership<'db>(
         _ => Type::Never,
     };
 
-    if !is_contained {
+    if !is_contained
+        && haystack
+            .chars()
+            .nth(MAX_STRING_MEMBERSHIP_EXCLUSIONS)
+            .is_none()
+    {
         let mut builder = IntersectionBuilder::new(db).add_positive(narrowed);
         for character in haystack.chars() {
             builder = builder.add_negative(Type::single_char_string_literal(db, character));

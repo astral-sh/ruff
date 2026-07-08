@@ -107,6 +107,61 @@ def _(x: str):
         reveal_type(x)  # revealed: str & ~Literal["a"] & ~Literal["b"] & ~Literal["c"]
 ```
 
+Per-character exclusions are limited to haystacks of at most 128 characters. Longer haystacks do not
+synthesize a large intersection for a broad `str`, but they still narrow subjects that are already
+unions of string literals.
+
+```py
+from typing import Literal
+
+def at_exclusion_limit(x: str):
+    if x in (
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+    ):
+        reveal_type(x)  # revealed: str
+    else:
+        reveal_type(x)  # revealed: str & ~Literal["a"]
+
+def above_exclusion_limit(x: str):
+    if x in (
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+        "a"
+    ):
+        reveal_type(x)  # revealed: str
+    else:
+        reveal_type(x)  # revealed: str
+
+def literal_union_above_exclusion_limit(x: Literal["a", "z"]):
+    if x in (
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaa"
+        "a"
+    ):
+        reveal_type(x)  # revealed: Literal["a"]
+    else:
+        reveal_type(x)  # revealed: Literal["z"]
+```
+
 ```py
 from typing import Literal, TypeVar
 
