@@ -6316,6 +6316,8 @@ impl SequentMap {
 pub(crate) struct PathAssignments {
     map: SequentMap,
     /// Each assignment's source order and the first nested-substitution history that produced it.
+    /// (Most assignments have exactly one history, and so we save space and iteration overhead by
+    /// storing the first history here.)
     assignments: FxIndexMap<ConstraintAssignment, (usize, NestedSubstitutionHistory)>,
     /// Additional histories that can produce an assignment, keyed by its index in `assignments`.
     /// These are stored separately so that branch-local additions can be rolled back by truncating
@@ -6423,9 +6425,9 @@ impl PathAssignments {
 
         // Reset back to where we were before following this edge, so that the caller can reuse a
         // single instance for the entire BDD traversal.
+        self.assignments.truncate(start);
         self.additional_substitution_histories
             .truncate(additional_histories_start);
-        self.assignments.truncate(start);
         result
     }
 
@@ -6448,12 +6450,17 @@ impl PathAssignments {
             || self.assignment_holds(constraint.when_unconstrained())
     }
 
-    /// If `assignment` holds on this path, returns all of the substitution histories that led to
-    /// it holding. Returns `None` if the assignment does not hold on this path.
+    /// If `assignment` holds on this path, returns an iterator of its substitution histories.
+    /// Otherwise returns `None`.
     fn histories_for(
         &self,
         assignment: ConstraintAssignment,
     ) -> Option<impl Iterator<Item = &NestedSubstitutionHistory> + Clone> {
+        // This is complicated by the fact that we store each assignment's first history inline in
+        // the `assignments` field, and the others in `additional_substitution_histories`; and
+        // moreover that `additional_substitution_histories` interleaves histories from all
+        // assignments on this path. Assignments will typically have a single history, so it
+        // should™ be fine that we're scanning and filtering that entire list.
         let (index, _, (_, history)) = self.assignments.get_full(&assignment)?;
         let first = std::iter::once(history);
         let rest = self
@@ -6627,10 +6634,6 @@ impl PathAssignments {
         }
 
         let mut new_constraints = FxIndexSet::default();
-        // TODO: The number of histories can grow combinatorially because we consider every pair
-        // of antecedent histories. If this becomes pathological in practice, retain only
-        // subset-minimal histories for each assignment and prune dominated merged histories here
-        // before recursively adding them.
         for ((ante1, ante2), posts) in &self.map.pair_implications {
             let Some(histories1) = self.histories_for(ante1.when_true()) else {
                 continue;
@@ -6640,6 +6643,10 @@ impl PathAssignments {
             };
 
             for post in posts {
+                // TODO: The number of histories can grow combinatorially because we consider every
+                // pair of antecedent histories. If this becomes pathological in practice, retain
+                // only subset-minimal histories for each assignment and prune dominated merged
+                // histories here before recursively adding them.
                 for history1 in histories1.clone() {
                     for history2 in histories2.clone() {
                         if let Some(history) = history1.merged(history2, post.nested_substitution) {
