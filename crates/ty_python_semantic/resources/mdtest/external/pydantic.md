@@ -659,6 +659,26 @@ ImplicitlyOnlyName(alias=1)  # error: [missing-argument]
 ImplicitlyOnlyName(name=1)
 ```
 
+Pydantic models can also specify a `validation_alias` for a field, which takes precedence over
+`alias` when `validate_by_alias=True`:
+
+```py
+class ValidationAlias(BaseModel):
+    name: int = Field(alias="alias", validation_alias="validation_alias")
+
+# TODO: no error here
+# error: [missing-argument]
+ValidationAlias(validation_alias=1)
+# TODO: this should be a `invalid-argument-type` error, not a `missing-argument` error
+# error: [missing-argument]
+ValidationAlias(validation_alias=None)
+
+ValidationAlias()  # error: [missing-argument]
+ValidationAlias(name=1)  # error: [missing-argument]
+# TODO: this should be a `missing-argument` error
+ValidationAlias(alias=1)
+```
+
 ## Extra fields
 
 By default, Pydantic allows arbitrary extra data which is simply ignored:
@@ -715,6 +735,53 @@ reveal_type(PersonWithExtraField.__init__)
 PersonWithExtraField(extra=1, something_else=2)
 ```
 
+## Private fields
+
+Underscore-prefixed fields are considered private and do not become fields:
+
+```py
+from pydantic import BaseModel, PrivateAttr
+
+class Person(BaseModel):
+    name: str
+    _implicit_private: int
+    _explicit_private: int = PrivateAttr(default=0)
+
+# TODO: This should not include `_implicit_private`
+# revealed: (self: Person, *, name: LaxStr, _implicit_private: LaxInt, **extra: Any) -> None
+reveal_type(Person.__init__)
+
+# TODO: This should not be an error
+# error: [missing-argument]
+Person(name="Alice")
+```
+
+## Using `Annotated` to specify field metadata
+
+`Annotated[T, Field(...)]` can be used to specify field metadata:
+
+```py
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Annotated
+
+class Person(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    name: Annotated[str, Field(strict=False)]
+    id: Annotated[int, Field(default=0)]
+
+Person(name="Alice", id=1)
+# TODO: This should not be an error
+# error: [invalid-argument-type]
+Person(name=b"Alice", id=1)
+# TODO: This should not be an error
+# error: [missing-argument]
+Person(name="Alice")
+
+Person(name=None, id=1)  # error: [invalid-argument-type]
+Person(id=1)  # error: [missing-argument]
+```
+
 ## Frozen models and fields
 
 There are various ways to make a field immutable. A model can be globally frozen using a class
@@ -754,6 +821,19 @@ person = PersonFrozenName3(name="Alice", age=20)
 # TODO: this should be an error
 person.name = "Bob"
 person.age += 1
+```
+
+No error is raised when a frozen model is subclassed. The child model is also frozen:
+
+```py
+class Base(BaseModel, frozen=True):
+    value: int
+
+class Derived(Base):
+    pass
+
+derived = Derived(value=1)
+derived.value = 2  # error: [invalid-assignment]
 ```
 
 ## Validation of default values
@@ -831,7 +911,7 @@ Unlike fields on ordinary Pydantic models, a root model's `root` field can be pa
 positionally or by keyword:
 
 ```py
-from pydantic import RootModel
+from pydantic import RootModel, BaseModel
 
 class IntList(RootModel[list[int]]): ...
 
@@ -839,6 +919,22 @@ reveal_type(IntList.__init__)  # revealed: (self: IntList, root: Iterable[LaxInt
 
 IntList([1, 2, 3])
 IntList(root=[1, 2, 3])
+IntList(["1", "2", "3"])
+
+IntList(1)  # error: [invalid-argument-type]
+```
+
+When a root model field is included in a normal model, it can be set using the `root` type directly:
+
+```py
+class Model(BaseModel):
+    int_list: IntList
+
+Model(int_list=IntList([1, 2, 3]))
+Model(int_list=[1, 2, 3])
+
+# TODO: This should be an error
+Model(int_list=1)
 ```
 
 ## Model configuration
@@ -939,6 +1035,25 @@ class PlainDictConfig(BaseModel):
 
 # TODO: this should be an error
 PlainDictConfig(name="Alice", something_else=7)
+```
+
+## Mixins
+
+Annotated attributes on mixin-classes that do not inherit from `BaseModel` also become fields on the
+model:
+
+```py
+from pydantic import BaseModel, Field
+
+class Mixin:
+    mixin_field: bool
+
+class MyModel(BaseModel, Mixin):
+    model_field: bool
+
+# TODO: this should also include the field from the mixin
+# revealed: (self: MyModel, *, model_field: LaxBool, **extra: Any) -> None
+reveal_type(MyModel.__init__)
 ```
 
 ## Differences from dataclasses
