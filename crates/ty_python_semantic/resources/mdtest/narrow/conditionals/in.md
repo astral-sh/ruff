@@ -469,15 +469,57 @@ def final_iterable(x: Payload | Literal["missing"], values: FinalIterable):
         reveal_type(x)  # revealed: Literal["missing"]
 ```
 
-### Inherited built-in containment
+### Built-in containers
 
-A subclass that does not define `__contains__` uses the method inherited from its built-in base.
-Membership still checks the built-in container's stored items if the subclass changes `__iter__`. If
-the subclass, or an intermediate base, defines `__contains__`, its iterator annotation no longer
-describes membership and cannot be used to narrow:
+For `list`, `set`, `frozenset`, and `tuple`, ty uses the container's element type to describe the
+values compared by membership. For `dict`, it uses the key type.
 
 ```py
-from collections.abc import Iterator
+from typing import Literal, TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+def builtin_list(x: Payload | Literal["missing"], values: list[Literal["missing"]]):
+    if x in values:
+        reveal_type(x)  # revealed: Literal["missing"]
+
+def builtin_set(x: Payload | Literal["missing"], values: set[Literal["missing"]]):
+    if x in values:
+        reveal_type(x)  # revealed: Literal["missing"]
+
+def builtin_frozenset(
+    x: Payload | Literal["missing"],
+    values: frozenset[Literal["missing"]],
+):
+    if x in values:
+        reveal_type(x)  # revealed: Literal["missing"]
+
+def builtin_dict(
+    x: Payload | Literal["missing"],
+    values: dict[Literal["missing"], object],
+):
+    if x in values:
+        reveal_type(x)  # revealed: Literal["missing"]
+
+def builtin_tuple(x: Payload | Literal["missing"], values: tuple[Literal["missing"], ...]):
+    if x in values:
+        reveal_type(x)  # revealed: Literal["missing"]
+```
+
+### Inherited built-in containment
+
+For subclasses of these built-ins, ty intentionally assumes that an unseen runtime subclass will not
+add an incompatible `__contains__`. This is unsound: only a statically visible custom implementation
+disables narrowing today. A future diagnostic should reject incompatible overrides at their
+definition.
+
+#### Inherited built-in implementations
+
+When no custom `__contains__` is visible in the MRO, a subclass uses the element or key type of its
+specialized built-in base.
+
+```py
 from typing import Literal, TypedDict
 
 class Payload(TypedDict):
@@ -495,6 +537,20 @@ def inherited_builtin_contains(
 ):
     if x in values:
         reveal_type(x)  # revealed: Literal["missing"]
+```
+
+#### Overridden iteration
+
+An inherited built-in `__contains__` still searches the values stored in the container if the
+subclass overrides `__iter__`. Here, the list stores arbitrary objects even though iteration is
+annotated to yield only `Literal["missing"]`.
+
+```py
+from collections.abc import Iterator
+from typing import Literal, TypedDict
+
+class Payload(TypedDict):
+    value: int
 
 class OverridesBuiltinIteration(list[object]):
     def __iter__(self) -> Iterator[Literal["missing"]]:
@@ -506,6 +562,18 @@ def overridden_iteration(
 ):
     if x in values:
         reveal_type(x)  # revealed: Payload | Literal["missing"]
+```
+
+#### Visible custom implementations
+
+A custom `__contains__` on the class or an intermediate base disables both positive and negative
+membership narrowing.
+
+```py
+from typing import Literal, TypedDict
+
+class Payload(TypedDict):
+    value: int
 
 class ContainsEverythingList(list[Literal["missing"]]):
     def __contains__(self, value: object) -> bool:
