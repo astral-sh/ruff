@@ -424,6 +424,37 @@ reveal_type(invoke(positional_variadic, 1))  # revealed: tuple[int, *tuple[str, 
 reveal_type(invoke(positional_variadic))  # revealed: tuple[int, *tuple[str, ...]]
 ```
 
+### Unsupported callable checks are deferred
+
+Until call binding can infer a `TypeVarTuple` from `*args`, a generic callback can leave the
+expected callable with a gradual positional parameter list. Similarly, inferring each position from
+an overload independently loses the correlation between overload branches. Avoid reporting these
+cases until the missing inference is implemented.
+
+```py
+from collections.abc import Awaitable, Callable
+from typing import overload
+
+def start[*Ts](callback: Callable[[*Ts], Awaitable[object]], *args: *Ts) -> None: ...
+async def waiter[T](value: T, mapping: dict[T, int]) -> None: ...
+
+values: dict[int, int] = {}
+start(waiter, 1, values)
+
+def invoke[*Ts, R](callback: Callable[[*Ts], R], *args: *Ts) -> R:
+    raise NotImplementedError
+
+@overload
+def correlated(left: str, right: str) -> str: ...
+@overload
+def correlated(left: bytes, right: bytes) -> bytes: ...
+def correlated(left: str | bytes, right: str | bytes) -> str | bytes:
+    return left
+
+def wrapper[AnyStr: (str, bytes)](left: AnyStr, right: AnyStr) -> str | bytes:
+    return invoke(correlated, left, right)
+```
+
 ### Callable inference with fixed positional parameters
 
 Fixed positional parameters surrounding an unpacked `TypeVarTuple` are excluded from the inferred

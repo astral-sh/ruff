@@ -60,7 +60,8 @@ use crate::types::tuple::{TupleLength, TupleSpec, TupleType, VariableSegment};
 use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
 use crate::types::visitor::{
-    TypeCollector, TypeKind, TypeVisitor, walk_non_atomic_type, walk_type_with_recursion_guard,
+    TypeCollector, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
+    walk_type_with_recursion_guard,
 };
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
@@ -5417,6 +5418,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             && argument_type
                 .when_assignable_to(self.db, expected_ty, constraints, self.inferable_typevars)
                 .is_never_satisfied(self.db)
+            && !self.should_defer_typevartuple_callable_check(
+                parameter.annotated_type(),
+                expected_ty,
+                argument_type,
+            )
         {
             let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
                 && !parameter.is_variadic();
@@ -5468,6 +5474,66 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         matches!(parameters.kind(), ParametersKind::Gradual)
             && matches!(parameter.annotated_type(), Type::Dynamic(_))
             && (parameter.is_variadic() || parameter.is_keyword_variadic())
+    }
+
+    // TODO: Remove this workaround once call binding can infer a `TypeVarTuple` from `*args` and
+    // callable inference preserves correlations across overloads.
+    fn should_defer_typevartuple_callable_check(
+        &self,
+        declared_type: Type<'db>,
+        expected_type: Type<'db>,
+        argument_type: Type<'db>,
+    ) -> bool {
+        let Some(declared_callables) = declared_type.try_upcast_to_callable(self.db) else {
+            return false;
+        };
+        let parameters_contain_typevartuple = declared_callables.iter().any(|callable| {
+            callable.signatures(self.db).iter().any(|signature| {
+                signature.parameters().iter().any(|parameter| {
+                    any_over_type(self.db, parameter.annotated_type(), false, |ty| {
+                        matches!(
+                            ty,
+                            Type::TypeVar(typevar) if typevar.is_typevartuple(self.db)
+                        )
+                    })
+                })
+            })
+        });
+        if !parameters_contain_typevartuple {
+            return false;
+        }
+
+        let Some(argument_callables) = argument_type.try_upcast_to_callable(self.db) else {
+            return false;
+        };
+        if argument_callables
+            .iter()
+            .any(|callable| callable.signatures(self.db).overloads.len() > 1)
+        {
+            return true;
+        }
+
+        let argument_is_generic = argument_callables.iter().any(|callable| {
+            callable
+                .signatures(self.db)
+                .iter()
+                .any(|signature| signature.generic_context.is_some())
+        });
+        argument_is_generic
+            && expected_type
+                .try_upcast_to_callable(self.db)
+                .is_some_and(|callables| {
+                    callables.iter().any(|callable| {
+                        callable.signatures(self.db).iter().any(|signature| {
+                            signature
+                                .parameters()
+                                .variadic()
+                                .is_some_and(|(_, parameter)| {
+                                    parameter.annotated_type().is_dynamic()
+                                })
+                        })
+                    })
+                })
     }
 
     fn check_argument_types(&mut self, constraints: &ConstraintSetBuilder<'db>) {
