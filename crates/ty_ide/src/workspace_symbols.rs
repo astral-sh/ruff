@@ -117,25 +117,30 @@ API_BASE_URL = 'https://api.example.com'
     }
 
     #[test]
-    fn empty_query() {
+    fn empty_query_multi_file() {
         let test = CursorTest::builder()
             .source(
-                "module.py",
+                "models.py",
                 "
 class Model:
     def method(self): ...
-
+",
+            )
+            .source(
+                "constants.py",
+                "
 VALUE = 1
 <CURSOR>",
             )
             .build();
 
-        let symbol_names = workspace_symbols(&test.db, "")
+        let mut symbol_names = workspace_symbols(&test.db, "")
             .into_iter()
             .map(|info| info.symbol.name.into_owned())
             .collect::<Vec<_>>();
+        symbol_names.sort_unstable();
 
-        assert_eq!(symbol_names, ["Model", "method", "VALUE"]);
+        assert_eq!(symbol_names, ["Model", "VALUE", "method"]);
     }
 
     #[test]
