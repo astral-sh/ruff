@@ -3645,6 +3645,7 @@ d: Literal[None,] | Literal[None]
         .args(["--stdin-filename", "test.py"])
         .arg("--preview")
         .arg("--diff")
+        .arg("--unsafe-fixes")
         .arg("-")
         .pass_stdin(snippet), @"
     success: false
