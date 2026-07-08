@@ -930,96 +930,168 @@ reveal_type(p2)  # revealed: partial[(c: int | float) -> bool]
 
 ### Placeholder arguments
 
-`functools.Placeholder` reserves positional arguments in Python 3.14 and later. Placeholder slots
-must be filled positionally, and a partial cannot end in a placeholder. ty only interprets exact,
-direct positional arguments as placeholders. Uncertain values, unpacked arguments, `ParamSpec`s,
-unpacked variadics, callable unions, and signatures with `**kwargs` retain the existing gradual
-`partial` behavior.
+Python 3.14 adds `functools.Placeholder`, which reserves a positional argument in a partial. Each
+placeholder must be filled by a later call, and a partial cannot be constructed with a placeholder
+as its final positional argument.
+
+ty produces a precise signature only for exact `Placeholder` values passed directly as positional
+arguments. In other cases, ty falls back to `partial[R]`, whose call signature is unknown, and
+continues checking the arguments bound at construction.
 
 ```toml
 [environment]
 python-version = "3.14"
 ```
 
+#### Basic signature
+
+An exact `Placeholder` keeps the corresponding parameter in the partial's signature. The parameter
+is required and positional-only; later arguments bound at construction are removed.
+
 ```py
 from functools import Placeholder as _, partial
-from typing import Callable, ParamSpec, TypeVar, overload
 
 def combine(left: int, middle: str, right: float) -> tuple[int, str, float]:
     return left, middle, right
 
 pending = partial(combine, _, "value")
 reveal_type(pending)  # revealed: partial[(left: int, /, right: int | float) -> tuple[int, str, int | float]]
-reveal_type(pending(1, 2.0))  # revealed: tuple[int, str, int | float]
-pending("bad", 2.0)  # error: [invalid-argument-type]
-pending(1)  # error: [missing-argument]
 pending(left=1, right=2.0)  # error: [positional-only-parameter-as-kwarg]
+```
+
+`Placeholder` has no special meaning in an ordinary call:
+
+```py
 combine(_, "value", 2.0)  # error: [invalid-argument-type]
+```
 
-def accepts_extra(value: int, bound: str, **kwargs: object) -> None:
-    pass
+#### Nested partials
 
-with_extra = partial(accepts_extra, _, "bound")
-reveal_type(with_extra)  # revealed: partial[None]
-with_extra(1, other=2)
+Applying `partial` again can either retain or fill an existing placeholder. A nested partial that
+still ends in a placeholder is invalid.
+
+```py
+from functools import Placeholder as _, partial
+
+def combine(left: int, middle: str, right: float) -> tuple[int, str, float]:
+    return left, middle, right
+
+pending = partial(combine, _, "value")
 
 retained = partial(pending, _, 3.0)
 reveal_type(retained)  # revealed: partial[(left: int, /) -> tuple[int, str, int | float]]
 filled = partial(pending, 1, 3.0)
 reveal_type(filled)  # revealed: partial[() -> tuple[int, str, int | float]]
-partial(pending, _)  # error: [invalid-argument-type]
+partial(pending, _)  # error: [invalid-argument-type] "Trailing `functools.Placeholder` arguments are not allowed"
+```
 
-partial(combine, 1, _)  # error: [invalid-argument-type]
-partial(combine, _, "value", _)  # error: [invalid-argument-type]
-partial(combine, *(1, _))  # error: [invalid-argument-type]
-partial(combine, _, *())  # error: [invalid-argument-type]
-partial(combine, _, *[])  # error: [invalid-argument-type]
+#### Invalid placement
+
+Python rejects placeholders passed by keyword and positional argument lists that end in a
+placeholder. An empty splat does not fill a trailing placeholder.
+
+```py
+from functools import Placeholder as _, partial
+
+def combine(left: int, middle: str, right: float) -> tuple[int, str, float]:
+    return left, middle, right
+
+def accepts_any(*args: object, **kwargs: object) -> object:
+    return object()
+
+# error: [invalid-argument-type] "`functools.Placeholder` cannot be passed by keyword to `functools.partial`"
+partial(accepts_any, value=_)
+# error: [invalid-argument-type] "Trailing `functools.Placeholder` arguments are not allowed"
+partial(combine, 1, _)
+# error: [invalid-argument-type] "Trailing `functools.Placeholder` arguments are not allowed"
+partial(combine, _, *[])
 
 empty: tuple[()] = ()
-partial(combine, _, *empty)  # error: [invalid-argument-type]
+# error: [invalid-argument-type] "Trailing `functools.Placeholder` arguments are not allowed"
+partial(combine, _, *empty)
+```
+
+#### Variadic parameters
+
+For `*args: str`, every positional argument has the same type. A placeholder bound to `*args`
+reserves one required positional argument.
+
+```py
+from functools import Placeholder as _, partial
 
 def collect(prefix: int, *values: str) -> tuple[str, ...]:
     return values
 
 variadic = partial(collect, 1, _, "bound")
 reveal_type(variadic)  # revealed: partial[(str, /, *values: str) -> tuple[str, ...]]
-reveal_type(variadic("first"))  # revealed: tuple[str, ...]
 variadic()  # error: [missing-argument]
+```
+
+#### Unpacked `*args` annotations
+
+An unpacked tuple annotation can give each positional argument a different type. ty does not yet
+produce placeholder signatures for this case.
+
+```py
+from functools import Placeholder as _, partial
 
 def unpacked_variadic(*values: *tuple[int, str]) -> tuple[int, str]:
     return values
 
-unpacked_hole = partial(unpacked_variadic, _, "bound")
-reveal_type(unpacked_hole)  # revealed: partial[Unknown]
-reveal_type(unpacked_hole(1))  # revealed: Unknown
+unpacked_partial = partial(unpacked_variadic, _, "bound")
+reveal_type(unpacked_partial)  # revealed: partial[Unknown]
+```
+
+#### Default values
+
+A placeholder makes its parameter required even if the original parameter had a default.
+
+```py
+from functools import Placeholder as _, partial
 
 def defaulted(value: int = 1, suffix: str = "default") -> int:
     return value
 
 required = partial(defaulted, _, "bound")
 reveal_type(required)  # revealed: partial[(value: int, /) -> int]
-required()  # error: [missing-argument]
+```
 
-T = TypeVar("T")
+#### Generic inference from stored arguments
 
-def pair(left: T, right: T) -> tuple[T, T]:
+Arguments stored after a placeholder still participate in type-variable inference. This also applies
+when the placeholder is bound to `*args`. If the placeholder is the only parameter that uses a type
+variable, the partial remains generic.
+
+```py
+from functools import Placeholder as _, partial
+
+def pair[T](left: T, right: T) -> tuple[T, T]:
     return left, right
 
-generic = partial(pair, _, 1)
-reveal_type(generic)  # revealed: partial[(left: int, /) -> tuple[int, int]]
+pair_partial = partial(pair, _, 1)
+reveal_type(pair_partial)  # revealed: partial[(left: int, /) -> tuple[int, int]]
 
-def first(value: T, sentinel: int) -> T:
+def identity[T](value: T, sentinel: int) -> T:
     return value
 
-generic_hole = partial(first, _, 1)
-reveal_type(generic_hole)  # revealed: partial[[T](value: T, /) -> T]
-reveal_type(generic_hole("x"))  # revealed: Literal["x"]
+identity_partial = partial(identity, _, 1)
+reveal_type(identity_partial)  # revealed: partial[[T](value: T, /) -> T]
+reveal_type(identity_partial("value"))  # revealed: Literal["value"]
 
-def generic_collect(*values: T) -> tuple[T, ...]:
+def collect[T](*values: T) -> tuple[T, ...]:
     return values
 
-generic_variadic = partial(generic_collect, _, 1)
-reveal_type(generic_variadic)  # revealed: partial[(int, /, *values: int) -> tuple[int, ...]]
+collect_partial = partial(collect, _, 1)
+reveal_type(collect_partial)  # revealed: partial[(int, /, *values: int) -> tuple[int, ...]]
+```
+
+#### Overloaded functions
+
+Stored arguments after a placeholder take part in overload selection.
+
+```py
+from functools import Placeholder as _, partial
+from typing import overload
 
 @overload
 def convert(value: int, suffix: str) -> int: ...
@@ -1030,29 +1102,41 @@ def convert(value: int | str, suffix: int | str) -> int | str:
 
 overloaded = partial(convert, _, "suffix")
 reveal_type(overloaded)  # revealed: partial[(value: int, /) -> int]
+```
 
-def accepts_object(value: object) -> None:
+#### Signatures with `**kwargs`
+
+For a callable with `**kwargs`, converting a parameter to positional-only could allow a duplicate
+keyword that Python rejects at runtime. ty therefore leaves the partial's call signature unknown.
+
+```py
+from functools import Placeholder as _, partial
+
+def accepts_extra(value: int, bound: str, **kwargs: object) -> None:
     pass
 
-accepts_object(_)
-partial(accepts_object, value=_)  # error: [invalid-argument-type]
+with_extra = partial(accepts_extra, _, "bound")
+reveal_type(with_extra)  # revealed: partial[None]
+```
 
-def imprecise_target(*args: object, **kwargs: object) -> object:
-    return object()
+#### Uncertain and unpacked placeholders
 
-imprecise: Callable[..., object] = imprecise_target
-partial(imprecise, value=_)  # error: [invalid-argument-type]
+Values that might be `Placeholder`, and placeholder values inside `*args`, are not treated as
+placeholders in the resulting signature. ty leaves the call signature unknown but still checks
+arguments that are definitely invalid.
 
-def runtime_bool() -> bool:
+```py
+from functools import Placeholder as _, partial
+
+def choose() -> bool:
     raise NotImplementedError
 
 def consume(value: object, count: int) -> None:
     pass
 
-maybe_placeholder = _ if runtime_bool() else "bound"
+maybe_placeholder = _ if choose() else "bound"
 ambiguous = partial(consume, maybe_placeholder, 1)
 reveal_type(ambiguous)  # revealed: partial[None]
-ambiguous()
 partial(consume, maybe_placeholder, "bad")  # error: [invalid-argument-type]
 
 maybe_placeholder_tuple = (maybe_placeholder,)
@@ -1060,12 +1144,28 @@ partial(consume, *maybe_placeholder_tuple, "bad")  # error: [invalid-argument-ty
 
 unpacked_placeholder = partial(consume, *(_, 1))
 reveal_type(unpacked_placeholder)  # revealed: partial[None]
-unpacked_placeholder("value")
 
 def consume_integers(value: int, count: int) -> None:
     pass
 
 partial(consume_integers, *(maybe_placeholder, 1))  # error: [invalid-argument-type]
+
+def accepts_string(*, value: str) -> None:
+    pass
+
+partial(accepts_string, value=maybe_placeholder)  # error: [invalid-argument-type]
+```
+
+#### ParamSpec forwarding
+
+Filling a placeholder from arguments stored in a `ParamSpec` requires inference that ty does not yet
+model. The partial therefore keeps an unknown call signature and accepts calls allowed by the
+forwarded parameters. The same fallback applies to an overload set that mixes `ParamSpec` and fixed
+signatures.
+
+```py
+from functools import Placeholder as _, partial
+from typing import Callable, ParamSpec, TypeVar, overload
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -1094,31 +1194,39 @@ def no_args() -> str:
     return "value"
 
 mixed_paramspec(no_args)
+```
 
-def fixed(value: int, suffix: str) -> int:
+#### Callable unions
+
+When ty cannot produce a precise signature for every member of a callable union, it keeps the
+union's return type instead of dropping a member. This also applies when the union is hidden behind
+a type alias.
+
+```py
+from functools import Placeholder as _, partial
+from typing import Callable
+
+def choose() -> bool:
+    raise NotImplementedError
+
+def accepts_int(value: int, suffix: str) -> int:
     return value
 
-def unpacked(*args: *tuple[int, str]) -> str:
+def accepts_unpacked_args(*args: *tuple[int, str]) -> str:
     return args[1]
 
-wrapped = fixed if runtime_bool() else unpacked
-union_partial = partial(wrapped, _, "bound")
+callable_union = accepts_int if choose() else accepts_unpacked_args
+union_partial = partial(callable_union, _, "bound")
 reveal_type(union_partial)  # revealed: partial[int | str]
 
-type Wrapped = Callable[[int, str], int] | Callable[[str, str], str]
+type CallableUnion = Callable[[int, str], int] | Callable[[str, str], str]
 
-def string_fixed(value: str, suffix: str) -> str:
+def accepts_str(value: str, suffix: str) -> str:
     return value
 
-aliased_wrapped: Wrapped = fixed if runtime_bool() else string_fixed
-aliased_union_partial = partial(aliased_wrapped, _, "bound")
+aliased_union: CallableUnion = accepts_int if choose() else accepts_str
+aliased_union_partial = partial(aliased_union, _, "bound")
 reveal_type(aliased_union_partial)  # revealed: partial[int | str]
-aliased_callback: Callable[[int], int] = aliased_union_partial  # error: [invalid-assignment]
-
-def accepts_string(*, value: str) -> None:
-    pass
-
-partial(accepts_string, value=maybe_placeholder)  # error: [invalid-argument-type]
 ```
 
 ## Constructors and advanced signatures
