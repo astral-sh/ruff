@@ -565,16 +565,15 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, self.node.iff_with_offset(builder, other.node))
     }
 
-    /// Reduces the set of inferable typevars for this constraint set. You provide an iterator of
-    /// the typevars that were inferable when this constraint set was created, and which should be
-    /// abstracted away. Those typevars will be removed from the constraint set, and the constraint
-    /// set will return true whenever there was _any_ specialization of those typevars that
-    /// returned true before.
+    /// Reduces the set of inferable typevars for this constraint set. You provide the typevars that
+    /// were inferable when this constraint set was created, and which should be abstracted away.
+    /// Those typevars will be removed from the constraint set, and the constraint set will return
+    /// true whenever there was _any_ specialization of those typevars that returned true before.
     pub(crate) fn reduce_inferable(
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        to_remove: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
+        to_remove: InferableTypeVars<'db>,
     ) -> Self {
         self.verify_builder(builder);
         Self::from_node(builder, self.node.exists(db, builder, to_remove))
@@ -704,7 +703,7 @@ struct ConstraintSetStorage<'db> {
     negate_cache: FxHashMap<NodeId, NodeId>,
     or_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
     and_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
-    exists_one_cache: FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), NodeId>,
+    exists_cache: FxHashMap<(NodeId, InferableTypeVars<'db>), NodeId>,
     retain_one_cache: FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), NodeId>,
     restrict_one_cache: FxHashMap<(NodeId, ConstraintAssignment), (NodeId, bool)>,
     simplify_cache: FxHashMap<NodeId, NodeId>,
@@ -2765,25 +2764,42 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        bound_typevars: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
+        bound_typevars: InferableTypeVars<'db>,
     ) -> Self {
-        bound_typevars
-            .into_iter()
-            .fold(self, |abstracted, bound_typevar| {
-                abstracted.exists_one(db, builder, bound_typevar)
-            })
+        if bound_typevars == InferableTypeVars::None {
+            return self;
+        }
+
+        let Node::Interior(interior) = self.node() else {
+            return self;
+        };
+
+        let key = (self, bound_typevars);
+        let storage = builder.storage.borrow();
+        if let Some(result) = storage.exists_cache.get(&key) {
+            return *result;
+        }
+        drop(storage);
+
+        let mut path = interior.path_assignments(builder);
+        let result = self.exists_inner(db, builder, bound_typevars, &mut path);
+
+        let mut storage = builder.storage.borrow_mut();
+        storage.exists_cache.insert(key, result);
+        result
     }
 
-    fn exists_one<'db>(
+    fn exists_inner<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        bound_typevar: BoundTypeVarIdentity<'db>,
+        bound_typevars: InferableTypeVars<'db>,
+        path: &mut PathAssignments,
     ) -> Self {
         match self.node() {
             Node::AlwaysTrue => ALWAYS_TRUE,
             Node::AlwaysFalse => ALWAYS_FALSE,
-            Node::Interior(interior) => interior.exists_one(db, builder, bound_typevar),
+            Node::Interior(interior) => interior.exists_inner(db, builder, bound_typevars, path),
         }
     }
 
@@ -4000,58 +4016,38 @@ impl InteriorNode {
         result
     }
 
-    fn exists_one<'db>(
+    fn exists_inner<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        bound_typevar: BoundTypeVarIdentity<'db>,
+        bound_typevars: InferableTypeVars<'db>,
+        path: &mut PathAssignments,
     ) -> NodeId {
-        let key = (self.node(), bound_typevar);
-        let storage = builder.storage.borrow();
-        if let Some(result) = storage.exists_one_cache.get(&key) {
-            return *result;
-        }
-        drop(storage);
-
-        let mut path = self.path_assignments(builder);
         let mentions_typevar = |ty: Type<'db>| match ty {
-            Type::TypeVar(haystack) => haystack.identity(db) == bound_typevar,
+            Type::TypeVar(typevar) => typevar.is_inferable(db, bound_typevars),
             _ => false,
         };
-        let result = self.abstract_one_inner(
+        self.abstract_one_inner(
             db,
             builder,
-            // Remove any node that constrains `bound_typevar`, or that has a lower/upper bound
-            // that mentions `bound_typevar`. The sequent map ensures that derived facts are
-            // propagated for nested typevar references, using the variance of the typevar's
-            // position to determine the correct substitution.
+            // Remove any node that constrains one of `bound_typevars`, or that has a lower/upper
+            // bound that mentions one of them. Removed constraints are still added to `path`, so
+            // the sequent map can propagate any derived constraints that do not mention the
+            // quantified typevars.
             &mut |constraint| {
                 let constraint = builder.constraint_data(constraint);
-                if constraint.typevar.identity(db) == bound_typevar {
-                    return true;
-                }
-                if constraint
-                    .bounds
-                    .lower
-                    .is_some_and(|lower| any_over_type(db, lower, false, mentions_typevar))
-                {
-                    return true;
-                }
-                if constraint
-                    .bounds
-                    .upper
-                    .is_some_and(|upper| any_over_type(db, upper, false, mentions_typevar))
-                {
-                    return true;
-                }
-                false
+                constraint.typevar.is_inferable(db, bound_typevars)
+                    || constraint
+                        .bounds
+                        .lower
+                        .is_some_and(|lower| any_over_type(db, lower, false, mentions_typevar))
+                    || constraint
+                        .bounds
+                        .upper
+                        .is_some_and(|upper| any_over_type(db, upper, false, mentions_typevar))
             },
-            &mut path,
-        );
-
-        let mut storage = builder.storage.borrow_mut();
-        storage.exists_one_cache.insert(key, result);
-        result
+            path,
+        )
     }
 
     fn remove_noninferable<'db>(
@@ -7008,6 +7004,50 @@ mod tests {
         let storage = builder.storage.borrow();
         assert_eq!(storage.single_sequent_cache.len(), single_sequents);
         assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
+    }
+
+    #[test]
+    fn existentially_quantifies_multiple_typevars_in_one_pass() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let v = create_typevar(&db, "V");
+        let builder = ConstraintSetBuilder::new();
+        let int = known_instance(&db, KnownClass::Int);
+
+        // Quantifying T and U from `(int ≤ T ≤ U) ∧ (U ≤ V)` must preserve the derived
+        // constraint `int ≤ V`. In particular, the removed constraints must still be added to the
+        // path assignments so that the sequent map can derive the retained constraint.
+        let int_to_u = ConstraintSet::constrain_typevar(&db, &builder, t, int, Type::TypeVar(u));
+        let u_to_v =
+            ConstraintSet::constrain_typevar_upper_bound(&db, &builder, u, Type::TypeVar(v));
+        let set = int_to_u.and(&db, &builder, || u_to_v);
+        let inferable = InferableTypeVars::from_typevars(
+            &db,
+            [t.identity(&db), u.identity(&db)].into_iter().collect(),
+        );
+
+        let reduced = set.reduce_inferable(&db, &builder, inferable);
+
+        assert_eq!(reduced.display(&db).to_string(), "(int ≤ V)");
+        reduced
+            .node
+            .for_each_unique_constraint(&builder, &mut |constraint, _| {
+                let constraint = builder.constraint_data(constraint);
+                assert!(!constraint.typevar.is_inferable(&db, inferable));
+                assert!(!constraint.bounds.lower.is_some_and(|lower| {
+                    any_over_type(&db, lower, false, |ty| {
+                        ty.as_typevar()
+                            .is_some_and(|typevar| typevar.is_inferable(&db, inferable))
+                    })
+                }));
+                assert!(!constraint.bounds.upper.is_some_and(|upper| {
+                    any_over_type(&db, upper, false, |ty| {
+                        ty.as_typevar()
+                            .is_some_and(|typevar| typevar.is_inferable(&db, inferable))
+                    })
+                }));
+            });
     }
 
     #[test]
