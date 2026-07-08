@@ -189,6 +189,15 @@ help: Use `ruff:ignore` instead
   |
 ```
 
+## Blanket comments
+
+RUF105 does not flag blanket `noqa` comments because `ruff:ignore` requires at least one rule
+selector.
+
+```py
+import math  # noqa
+```
+
 ## Inline self-suppression
 
 ```toml
