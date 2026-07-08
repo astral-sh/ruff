@@ -6,11 +6,6 @@ use ty_project::{Db, parallel::ParallelIteratorExt};
 /// Get all workspace symbols matching the query string.
 /// Returns symbols from all files in the workspace, filtered by the query.
 pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
-    // If the query is empty, return immediately to avoid expensive file scanning
-    if query.is_empty() {
-        return Vec::new();
-    }
-
     let workspace_symbols_span = tracing::debug_span!("workspace_symbols");
     let _span = workspace_symbols_span.enter();
 
@@ -119,6 +114,28 @@ API_BASE_URL = 'https://api.example.com'
           |
         info: Constant API_BASE_URL
         ");
+    }
+
+    #[test]
+    fn empty_query() {
+        let test = CursorTest::builder()
+            .source(
+                "module.py",
+                "
+class Model:
+    def method(self): ...
+
+VALUE = 1
+<CURSOR>",
+            )
+            .build();
+
+        let symbol_names = workspace_symbols(&test.db, "")
+            .into_iter()
+            .map(|info| info.symbol.name.into_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(symbol_names, ["Model", "method", "VALUE"]);
     }
 
     #[test]
