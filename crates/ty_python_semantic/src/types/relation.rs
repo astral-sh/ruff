@@ -890,6 +890,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 | (Type::TypeVar(typevar), Type::Dynamic(_)) => {
                     typevar.is_inferable(db, self.universally_quantified)
                 }
+                (Type::TypeVar(typevar), Type::Union(union)) => {
+                    typevar.is_inferable(db, self.universally_quantified)
+                        && union.elements(db).iter().any(Type::is_dynamic)
+                }
                 _ => false,
             }
     }

@@ -2989,6 +2989,14 @@ class ObjectConsumer:
     def f(self, value: object) -> None:
         return None
 
+class GradualOptionalConsumer:
+    def f(self, value: Any | None) -> None:
+        return None
+
+class IntOptionalConsumer:
+    def f(self, value: int | None) -> None:
+        return None
+
 class ListOnlyConsumer:
     def f[S](self, value: list[S]) -> None:
         return None
@@ -3015,6 +3023,13 @@ class OptionalIdentity:
 # A non-generic source is valid when its single signature covers every target specialization.
 static_assert(is_assignable_to(ObjectConsumer, ArbitraryConsumerProtocol))
 static_assert(is_subtype_of(ObjectConsumer, ArbitraryConsumerProtocol))
+
+# The dynamic arm makes the union assignable from every target specialization. A fully static
+# union does not have the same gradual behavior.
+static_assert(is_assignable_to(GradualOptionalConsumer, ArbitraryConsumerProtocol))
+static_assert(not is_subtype_of(GradualOptionalConsumer, ArbitraryConsumerProtocol))
+static_assert(not is_assignable_to(IntOptionalConsumer, ArbitraryConsumerProtocol))
+static_assert(not is_subtype_of(IntOptionalConsumer, ArbitraryConsumerProtocol))
 
 # Projecting `S` from the obligation `T ≤ list[S]` would require an existential type. It must not
 # be treated as though some list element type can make `list[S]` cover every `T`.
