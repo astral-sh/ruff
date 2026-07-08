@@ -762,6 +762,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         typevar.identity(db).display(db),
                                     ));
                                     add_typevar_definition(db, &mut diagnostic, typevar);
+                                    provided_type
+                                        .assignability_error_context(db, bound)
+                                        .attach_to(db, &mut diagnostic);
                                 }
                                 error = Some(ExplicitSpecializationError::UnsatisfiedBound);
                                 specialization_types.push(Some(Type::unknown()));
