@@ -19,8 +19,11 @@ use crate::{
 /// ## Why is this bad?
 ///
 /// `ruff:ignore` comments allow the use of rule names instead of codes and can be used in more
-/// places than `noqa` comments. `noqa` comments should be used only for backwards compatibility
-/// with other tools.
+/// places than `noqa` comments.
+///
+/// Note that this is an opinionated, stylistic rule. `noqa` comments may be needed for backwards
+/// compatibility with other tools. You should also feel free to disable this rule if you simply
+/// prefer `noqa` comments.
 ///
 /// ## Example
 ///
@@ -39,6 +42,14 @@ use crate::{
 /// # ruff:ignore[unused-import]
 /// import os
 /// ```
+///
+/// ## Options
+///
+/// This rule will flag `noqa` comments containing rule codes that are unknown to Ruff, even if they
+/// are valid for other tools. You can tell Ruff to ignore such codes by configuring the list of
+/// known "external" rule codes with the following option:
+///
+/// - `lint.external`
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct NoqaComment {
