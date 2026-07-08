@@ -1,6 +1,6 @@
+use compact_str::CompactString;
 use rayon::prelude::*;
 use ruff_db::files::File;
-use ruff_python_ast::name::Name;
 use ty_module_resolver::{Module, ModuleName, all_modules, resolve_real_shadowable_module};
 use ty_project::{Db, parallel::ParallelIteratorExt};
 
@@ -99,7 +99,7 @@ pub struct AllSymbolInfo<'db> {
     /// When absent, this implies the symbol is the module itself.
     symbol: Option<SymbolInfo<'static>>,
     /// The fully qualified name of this symbol.
-    qualified: Name,
+    qualified: CompactString,
     /// The module containing the symbol.
     module: Module<'db>,
     /// The file containing the symbol.
@@ -116,11 +116,11 @@ impl<'db> AllSymbolInfo<'db> {
         module: Module<'db>,
         file: File,
     ) -> AllSymbolInfo<'db> {
-        let qualified = Name::from(compact_str::format_compact!(
+        let qualified = compact_str::format_compact!(
             "{module_name}.{name}",
             module_name = module.name(db),
             name = symbol.name,
-        ));
+        );
         AllSymbolInfo {
             symbol: Some(symbol),
             qualified,

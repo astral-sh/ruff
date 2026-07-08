@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, binary_heap};
 
+use compact_str::CompactString;
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::{SourceText, source_text};
@@ -286,16 +287,16 @@ pub struct Completion<'db> {
     /// The name used when matching the query and ranking this suggestion.
     pub name: Name,
     /// The label shown to the user for this suggestion.
-    pub label: Name,
+    pub label: CompactString,
     /// The fully qualified name, when available.
     ///
     /// This is only set when `module_name` is available.
-    pub qualified: Option<Name>,
+    pub qualified: Option<CompactString>,
     /// The text that should be inserted at the cursor
     /// when the completion is selected.
     ///
     /// When this is not set, [`Self::label`] is used.
-    pub insert: Option<Name>,
+    pub insert: Option<CompactString>,
     /// The format of [`Self::insert`].
     pub insert_text_format: CompletionInsertTextFormat,
     /// The type of this completion, if available.
@@ -362,8 +363,8 @@ impl<'db> Completion<'db> {
 struct CompletionBuilder<'db> {
     // See comments on `Completion` for the meaning of fields.
     name: Name,
-    qualified: Option<Name>,
-    insert: Option<Name>,
+    qualified: Option<CompactString>,
+    insert: Option<CompactString>,
     ty: Option<Type<'db>>,
     kind: Option<CompletionKind>,
     module_name: Option<&'db ModuleName>,
@@ -477,13 +478,16 @@ impl<'db> CompletionBuilder<'db> {
             .kind
             .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
         let relevance = Relevance::new(ctx, query, &self);
-        let label = self.insert.as_ref().unwrap_or(&self.name).clone();
+        let label = self
+            .insert
+            .clone()
+            .unwrap_or_else(|| CompactString::new(self.name.as_str()));
         let (insert, insert_text_format) = if ctx.should_complete_callable_parentheses(kind) {
             if ctx.capabilities.snippets {
-                let insert = Name::new(format!("{label}($0)"));
+                let insert = compact_str::format_compact!("{label}($0)");
                 (Some(insert), CompletionInsertTextFormat::Snippet)
             } else {
-                let insert = Name::new(format!("{label}()"));
+                let insert = compact_str::format_compact!("{label}()");
                 (Some(insert), CompletionInsertTextFormat::PlainText)
             }
         } else {
@@ -508,12 +512,12 @@ impl<'db> CompletionBuilder<'db> {
         }
     }
 
-    fn qualified(mut self, qualified: impl Into<Name>) -> CompletionBuilder<'db> {
+    fn qualified(mut self, qualified: impl Into<CompactString>) -> CompletionBuilder<'db> {
         self.qualified = Some(qualified.into());
         self
     }
 
-    fn insert(mut self, insert: impl Into<Name>) -> CompletionBuilder<'db> {
+    fn insert(mut self, insert: impl Into<CompactString>) -> CompletionBuilder<'db> {
         self.insert = Some(insert.into());
         self
     }
@@ -1592,7 +1596,7 @@ impl<'db> CollectionContext<'db> {
             // This handles cases like `class Foo(mod.Bar, ...)` where we want to
             // filter out auto-import suggestions for `Bar` from module `mod`.
             if let Some(ref qualified) = builder.qualified
-                && existing_class_bases.contains(qualified)
+                && existing_class_bases.contains(qualified.as_str())
             {
                 return true;
             }
