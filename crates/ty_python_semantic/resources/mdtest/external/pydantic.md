@@ -802,8 +802,7 @@ class PersonFrozenName2(BaseModel):
     name: str
 
 person = PersonFrozenName2(name="Alice")
-# TODO: This should be an error
-person.name = "Bob"
+person.name = "Bob"  # error: [invalid-assignment]
 ```
 
 Finally, individual fields can also be made immutable on a non-frozen model:

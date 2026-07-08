@@ -15,15 +15,14 @@ use crate::types::{
 };
 
 /// Metadata that controls Pydantic-specific model synthesis.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct ModelMetadata<'db> {
-    // TODO: We may want to remove this field and model Pydantic behavior more explicitly.
-    // (since this information is static and doesn't vary between Pydantic models). To do
-    // this, we could only retain field specifier information and expose it through a new
-    // `CodeGeneratorKind` method. Maybe we could even skip the field specifiers as well.
-    transformer_params: DataclassTransformerParams<'db>,
+    #[returns(deref)]
+    pub(in crate::types) field_specifiers: Box<[Type<'db>]>,
     config: ModelConfig,
 }
+
+impl get_size2::GetSize for ModelMetadata<'_> {}
 
 impl<'db> ModelMetadata<'db> {
     pub(in crate::types) fn from_class(
@@ -31,46 +30,50 @@ impl<'db> ModelMetadata<'db> {
         class: StaticClassLiteral<'db>,
         transformer_params: DataclassTransformerParams<'db>,
     ) -> Self {
-        Self {
-            transformer_params,
-            config: model_config(db, class),
-        }
+        Self::new(
+            db,
+            transformer_params.field_specifiers(db),
+            model_config(db, class),
+        )
     }
 
-    pub(in crate::types) const fn transformer_params(self) -> DataclassTransformerParams<'db> {
-        self.transformer_params
+    fn accepts_extra(self, db: &'db dyn Db) -> bool {
+        !matches!(self.config(db).extra, Some(ExtraBehavior::Forbid))
     }
 
-    const fn accepts_extra(self) -> bool {
-        !matches!(self.config.extra, Some(ExtraBehavior::Forbid))
+    pub(in crate::types) fn validates_by_alias(self, db: &'db dyn Db) -> bool {
+        self.config(db).validate_by_alias.enabled_or(true)
     }
 
-    pub(in crate::types) const fn validates_by_alias(self) -> bool {
-        self.config.validate_by_alias.enabled_or(true)
-    }
-
-    pub(in crate::types) const fn validates_by_name(self) -> bool {
-        let validate_by_name = self.config.validate_by_name;
+    pub(in crate::types) fn validates_by_name(self, db: &'db dyn Db) -> bool {
+        let config = self.config(db);
+        let validate_by_name = config.validate_by_name;
         // If `validate_by_alias=False` is set without specifying `validate_by_name`, Pydantic
         // implicitly enables validation by name.
         if matches!(validate_by_name, ConfigBoolean::Unspecified)
-            && matches!(self.config.validate_by_alias, ConfigBoolean::Disabled)
+            && matches!(config.validate_by_alias, ConfigBoolean::Disabled)
         {
             true
         } else {
             validate_by_name.enabled_or(false)
         }
     }
+
+    pub(in crate::types) fn is_frozen(self, db: &'db dyn Db) -> bool {
+        matches!(self.config(db).frozen, ConfigBoolean::Enabled)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-struct ModelConfig {
+pub(crate) struct ModelConfig {
     /// The `extra` configuration controls whether the synthesized constructor accepts keyword
     /// arguments that do not correspond to declared model fields.
     extra: Option<ExtraBehavior>,
     /// The `strict` configuration controls whether constructor parameters accept values that
     /// Pydantic can coerce to the declared field type.
     strict: ConfigBoolean,
+    /// Whether assignments to fields on model instances are forbidden.
+    frozen: ConfigBoolean,
     /// Whether fields with aliases can be initialized by their alias.
     validate_by_alias: ConfigBoolean,
     /// Whether fields with aliases can be initialized by their field name.
@@ -82,6 +85,7 @@ impl ModelConfig {
         Self {
             extra: Some(ExtraBehavior::Unknown),
             strict: ConfigBoolean::Unknown,
+            frozen: ConfigBoolean::Unknown,
             validate_by_alias: ConfigBoolean::Unknown,
             validate_by_name: ConfigBoolean::Unknown,
         }
@@ -91,6 +95,7 @@ impl ModelConfig {
     fn merge(&mut self, other: Self) {
         self.extra = other.extra.or(self.extra);
         self.strict = other.strict.or(self.strict);
+        self.frozen = other.frozen.or(self.frozen);
         self.validate_by_alias = other.validate_by_alias.or(self.validate_by_alias);
         self.validate_by_name = other.validate_by_name.or(self.validate_by_name);
     }
@@ -333,6 +338,7 @@ fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelC
         ExtraBehavior::from_value(extra)
     });
     let strict = config_boolean(db, definition, call.arguments.find_keyword("strict"));
+    let frozen = config_boolean(db, definition, call.arguments.find_keyword("frozen"));
     let validate_by_alias = config_boolean(
         db,
         definition,
@@ -347,6 +353,7 @@ fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelC
     Some(ModelConfig {
         extra,
         strict,
+        frozen,
         validate_by_alias,
         validate_by_name,
     })
@@ -376,6 +383,7 @@ fn model_config_from_dict(db: &dyn Db, definition: Definition<'_>, dict: &ExprDi
                 ));
             }
             "strict" => config.strict = ConfigBoolean::from_type(value),
+            "frozen" => config.frozen = ConfigBoolean::from_type(value),
             "validate_by_alias" => config.validate_by_alias = ConfigBoolean::from_type(value),
             "validate_by_name" => config.validate_by_name = ConfigBoolean::from_type(value),
             _ => {}
@@ -412,6 +420,7 @@ fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConf
         ExtraBehavior::from_value(extra)
     });
     let strict = config_boolean(db, definition, arguments.find_keyword("strict"));
+    let frozen = config_boolean(db, definition, arguments.find_keyword("frozen"));
     let validate_by_alias =
         config_boolean(db, definition, arguments.find_keyword("validate_by_alias"));
     let validate_by_name =
@@ -420,6 +429,7 @@ fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConf
     ModelConfig {
         extra,
         strict,
+        frozen,
         validate_by_alias,
         validate_by_name,
     }
@@ -432,7 +442,7 @@ pub(in crate::types) fn constructor_parameter_type<'db>(
     field_strict: ConfigBoolean,
     metadata: ModelMetadata<'db>,
 ) -> Type<'db> {
-    if field_strict.or(metadata.config.strict) == ConfigBoolean::Enabled {
+    if field_strict.or(metadata.config(db).strict) == ConfigBoolean::Enabled {
         return field_type;
     }
 
@@ -645,7 +655,7 @@ pub(in crate::types) fn model_init_accepts_extra(
     class: StaticClassLiteral<'_>,
     metadata: ModelMetadata<'_>,
 ) -> bool {
-    if !metadata.accepts_extra() {
+    if !metadata.accepts_extra(db) {
         return false;
     }
 

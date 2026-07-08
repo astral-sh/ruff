@@ -859,14 +859,11 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// Return `true` if Pydantic's dataclass-transform metadata marks this model as frozen.
-    fn is_frozen_pydantic_model(
-        self,
-        db: &'db dyn Db,
-        field_policy: CodeGeneratorKind<'db>,
-    ) -> bool {
-        matches!(field_policy, CodeGeneratorKind::Pydantic(_))
-            && self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN)
+    /// Return `true` if Pydantic's effective model configuration marks this model as frozen.
+    fn is_frozen_pydantic_model(db: &'db dyn Db, field_policy: CodeGeneratorKind<'db>) -> bool {
+        field_policy
+            .pydantic_metadata()
+            .is_some_and(|metadata| metadata.is_frozen(db))
     }
 
     /// Checks if the given dataclass parameter flag is set for this class.
@@ -1508,7 +1505,10 @@ impl<'db> StaticClassLiteral<'db> {
                     && let Some(metadata) = field_policy.pydantic_metadata()
                     && let Some(alias) = alias
                 {
-                    match (metadata.validates_by_alias(), metadata.validates_by_name()) {
+                    match (
+                        metadata.validates_by_alias(db),
+                        metadata.validates_by_name(db),
+                    ) {
                         (true, true) => {
                             let alias = Name::new(&**alias);
                             if alias == *field_name {
@@ -1570,7 +1570,9 @@ impl<'db> StaticClassLiteral<'db> {
             (field_policy, "__init__")
                 if field_policy.synthesizes_constructor_signature_from_fields() =>
             {
-                if !self.has_dataclass_param(db, field_policy, DataclassFlags::INIT) {
+                if matches!(field_policy, CodeGeneratorKind::DataclassLike(_))
+                    && !self.has_dataclass_param(db, field_policy, DataclassFlags::INIT)
+                {
                     return None;
                 }
 
@@ -1749,7 +1751,7 @@ impl<'db> StaticClassLiteral<'db> {
                 "__setattr__",
             ) => {
                 if self.is_frozen_dataclass(db) == Some(true)
-                    || self.is_frozen_pydantic_model(db, field_policy)
+                    || Self::is_frozen_pydantic_model(db, field_policy)
                 {
                     let signature = Signature::new(
                         Parameters::standard([

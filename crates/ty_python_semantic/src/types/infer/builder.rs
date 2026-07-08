@@ -690,8 +690,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .or_else(|| {
                     Some(SmallVec::from(
                         CodeGeneratorKind::from_class(db, class_literal.into())?
-                            .dataclass_transformer_params()?
-                            .field_specifiers(db),
+                            .field_specifiers(db)?,
                     ))
                 })
         }
