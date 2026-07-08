@@ -43,7 +43,6 @@ fn has_exact_runtime_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 fn nominal_runtime_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassType<'db>> {
     match ty {
         Type::ClassLiteral(class) => class.metaclass(db).to_class_type(db),
-        Type::TypeAlias(alias) => nominal_runtime_class(db, alias.value_type(db)),
         _ => ty.nominal_class(db),
     }
 }
