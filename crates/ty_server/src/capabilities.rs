@@ -408,6 +408,12 @@ pub(crate) fn server_capabilities(
                 server_diagnostic_options(true),
             ))
         };
+    let rename_filter = |glob: &str, kind| {
+        types::FileOperationFilter::new(
+            Some("file".to_string()),
+            types::FileOperationPattern::new(glob.to_string(), Some(kind), None),
+        )
+    };
 
     ServerCapabilities {
         position_encoding: Some(position_encoding.into()),
@@ -500,6 +506,13 @@ pub(crate) fn server_capabilities(
                 // https://github.com/microsoft/language-server-protocol/issues/1720#issuecomment-1514732305
                 supported: Some(true),
                 change_notifications: Some(true.into()),
+            }),
+            file_operations: Some(types::FileOperationOptions {
+                will_rename: Some(types::FileOperationRegistrationOptions::new(vec![
+                    rename_filter("**/*.{py,pyi}", types::FileOperationPatternKind::File),
+                    rename_filter("**", types::FileOperationPatternKind::Folder),
+                ])),
+                ..types::FileOperationOptions::default()
             }),
             ..Default::default()
         }),

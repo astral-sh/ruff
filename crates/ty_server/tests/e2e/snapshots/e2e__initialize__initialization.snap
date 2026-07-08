@@ -106,6 +106,26 @@ expression: initialization_result
       "workspaceFolders": {
         "supported": true,
         "changeNotifications": true
+      },
+      "fileOperations": {
+        "willRename": {
+          "filters": [
+            {
+              "scheme": "file",
+              "pattern": {
+                "glob": "**/*.{py,pyi}",
+                "matches": "file"
+              }
+            },
+            {
+              "scheme": "file",
+              "pattern": {
+                "glob": "**",
+                "matches": "folder"
+              }
+            }
+          ]
+        }
       }
     }
   },

@@ -4923,6 +4923,7 @@ dependencies = [
  "jod-thread",
  "libc",
  "lsp-server",
+ "percent-encoding",
  "regex",
  "ruff_db",
  "ruff_diagnostics",

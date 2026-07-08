@@ -141,6 +141,7 @@ ordermap = { version = "1.0.0" }
 path-absolutize = { version = "3.1.1" }
 path-slash = { version = "0.2.1" }
 pathdiff = { version = "0.2.1" }
+percent-encoding = { version = "2.3.1" }
 pep440_rs = { version = "0.7.1" }
 pretty_assertions = "1.3.0"
 proc-macro2 = { version = "1.0.79" }

@@ -35,6 +35,7 @@ crossbeam = { workspace = true }
 jod-thread = { workspace = true }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
+percent-encoding = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
 serde = { workspace = true }
