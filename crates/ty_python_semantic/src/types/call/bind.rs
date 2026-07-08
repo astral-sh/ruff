@@ -6642,7 +6642,11 @@ impl<'db> Binding<'db> {
                             && !parameter.is_keyword_variadic()
                         {
                             partial_application.reserve_keyword_names(
-                                parameter.reserved_keyword_names().iter().cloned(),
+                                parameter
+                                    .keyword_name()
+                                    .into_iter()
+                                    .chain(parameter.reserved_keyword_names())
+                                    .cloned(),
                             );
                             partial_application.bind_positionally(parameter_index);
                         }

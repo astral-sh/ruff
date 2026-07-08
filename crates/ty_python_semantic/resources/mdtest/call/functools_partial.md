@@ -961,6 +961,7 @@ def accepts_extra(value: int, bound: str, **kwargs: object) -> None:
 with_extra = partial(accepts_extra, _, "bound")
 with_extra(1, other=2)
 with_extra(1, value=2)  # error: [positional-only-parameter-as-kwarg]
+with_extra(1, bound="duplicate")  # error: [positional-only-parameter-as-kwarg]
 
 class AcceptsExtra(Protocol):
     def __call__(self, value: int, /, **kwargs: object) -> None: ...
@@ -968,9 +969,15 @@ class AcceptsExtra(Protocol):
 callback: AcceptsExtra = with_extra  # error: [invalid-assignment]
 gradual_callback: Callable[..., None] = with_extra
 
+class AcceptsBound(Protocol):
+    def __call__(self, value: int, /, *, bound: object) -> None: ...
+
+bound_callback: AcceptsBound = with_extra  # error: [invalid-assignment]
+
 filled_extra = partial(with_extra, 1)
 filled_extra(other=2)
 filled_extra(value=2)  # error: [positional-only-parameter-as-kwarg]
+filled_extra(bound="duplicate")  # error: [positional-only-parameter-as-kwarg]
 
 def source_positional_only(value: int, /, **kwargs: object) -> None:
     pass
