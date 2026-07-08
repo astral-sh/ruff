@@ -414,6 +414,8 @@ def empty_tuple(x: Payload | Literal["missing"], values: tuple[()]):
 
 ## Custom containment methods
 
+### Classes that define `__contains__`
+
 When a class defines `__contains__`, membership need not check the values produced by iteration. The
 iterator's element type therefore cannot narrow the value being tested:
 
@@ -436,7 +438,7 @@ def custom_contains(
         reveal_type(x)  # revealed: Literal["present", "missing"]
 ```
 
-## Classes that only define `__iter__`
+### Classes that only define `__iter__`
 
 A subclass can add `__contains__`, so an `__iter__` annotation on a non-final class is not enough to
 narrow a membership test. A final class cannot gain a new `__contains__` method through subclassing;
