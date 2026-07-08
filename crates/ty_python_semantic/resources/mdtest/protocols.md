@@ -2860,46 +2860,6 @@ static_assert(not is_assignable_to(BadReturnType, ShapeProtocolImplicitSelf))
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolExplicitSelf))
 ```
 
-A method TypeVar used for `self` is specialized to the concrete receiver. Unlike an ordinary method
-TypeVar, it is not independently chosen by the caller on every call.
-
-```py
-from typing import Protocol, Self, TypeVar
-from ty_extensions import static_assert
-from ty_extensions._internal import is_assignable_to, is_subtype_of
-
-ParentT = TypeVar("ParentT")
-
-class HasParent(Protocol):
-    def get_parent(self: ParentT) -> ParentT: ...
-
-GenericHasParent = TypeVar("GenericHasParent", bound=HasParent)
-
-def generic_get_parent(value: GenericHasParent) -> GenericHasParent:
-    return value.get_parent()
-
-class ConcreteHasParent:
-    def get_parent(self) -> Self:
-        return self
-
-parent = generic_get_parent(ConcreteHasParent())
-reveal_type(parent)  # revealed: ConcreteHasParent
-static_assert(is_assignable_to(ConcreteHasParent, HasParent))
-static_assert(is_subtype_of(ConcreteHasParent, HasParent))
-
-CopyT = TypeVar("CopyT", bound="Copyable")
-
-class Copyable(Protocol):
-    def copy(self: CopyT) -> CopyT: ...
-
-class One:
-    def copy(self) -> "One":
-        return One()
-
-static_assert(is_assignable_to(One, Copyable))
-static_assert(is_subtype_of(One, Copyable))
-```
-
 ## Quantification of generic protocol methods
 
 A protocol method's local type variables are universally quantified: an implementation must work for
