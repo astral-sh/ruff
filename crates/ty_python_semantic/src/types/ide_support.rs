@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::FxIndexSet;
 use crate::place::builtins_module_scope;
-use crate::reachability::is_range_reachable;
+use crate::reachability::{binding_reachability, is_range_reachable};
 use crate::types::call::bind::CheckTypesMode;
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
@@ -21,8 +21,13 @@ use ruff_python_ast::{self as ast, AnyNodeRef, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::Module;
-use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_core::{attribute_scopes, global_scope, semantic_index, use_def_map};
+use ty_python_core::ast_ids::HasScopedUseId;
+use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
+use ty_python_core::{
+    BindingWithConstraintsIterator, EnclosingSnapshotResult, FileScopeId, PlaceExprRef,
+    SemanticIndex, UseDefMap, attribute_scopes, global_scope, place_table, semantic_index,
+    use_def_map,
+};
 
 mod unreachable_code;
 #[path = "ide_support/unused_bindings.rs"]
@@ -32,6 +37,241 @@ pub use resolve_definition::{ImportAliasResolution, ResolvedDefinition, map_stub
 use resolve_definition::{find_symbol_in_scope, resolve_definition};
 pub use unreachable_code::{UnreachableKind, UnreachableRange, unreachable_ranges};
 pub use unused_binding_support::{UnusedBinding, unused_bindings};
+
+impl<'db> SemanticModel<'db> {
+    /// Returns the bindings live at a name use.
+    ///
+    /// String annotations and lazy locals use reachable bindings as a fallback.
+    ///
+    /// Returns `None` if the lookup cannot be represented completely as user-visible definitions.
+    pub fn name_use_bindings(&self, name: &ast::ExprName) -> Option<LiveBindings<'db>> {
+        // Start with the lexical scope containing the use. For string annotations, `scope` maps
+        // the parsed sub-AST back to the scope of the original string literal.
+        let scope = self.scope(name.into())?;
+        let index = semantic_index(self.db(), self.file());
+
+        match self.bindings_in_use_scope(index, scope, name) {
+            UseScopeLookup::Resolved(bindings) => Some(bindings),
+            UseScopeLookup::Unrepresentable => None,
+            UseScopeLookup::SearchEnclosing {
+                depends_on_global_or_nonlocal,
+            } => self.bindings_in_visible_ancestors(
+                index,
+                scope,
+                name.id.as_str(),
+                depends_on_global_or_nonlocal,
+            ),
+        }
+    }
+
+    /// Returns the bindings live at the end of the module that defines an attribute.
+    ///
+    /// Returns `None` if the attribute has no source-backed module or if the lookup cannot be
+    /// represented completely as user-visible definitions.
+    pub fn module_attribute_bindings(
+        &self,
+        attribute: &ast::ExprAttribute,
+    ) -> Option<LiveBindings<'db>> {
+        let Type::ModuleLiteral(module) = attribute.value.inferred_type(self)? else {
+            return None;
+        };
+        let file = module.module(self.db()).file(self.db())?;
+        let scope = global_scope(self.db(), file);
+        let symbol = place_table(self.db(), scope).symbol_id(attribute.attr.as_str())?;
+        let use_def = use_def_map(self.db(), scope);
+        collect_live_bindings(
+            self.db(),
+            use_def,
+            use_def.end_of_scope_symbol_bindings(symbol),
+            false,
+        )
+    }
+
+    /// Returns the inferred type supplied by a binding.
+    pub fn binding_type(&self, definition: Definition<'db>) -> Type<'db> {
+        crate::types::binding_type(self.db(), definition)
+    }
+
+    fn bindings_in_use_scope(
+        &self,
+        index: &'db SemanticIndex<'db>,
+        scope: FileScopeId,
+        name: &ast::ExprName,
+    ) -> UseScopeLookup<'db> {
+        let table = index.place_table(scope);
+        let Some(symbol_id) = table.symbol_id(name.id.as_str()) else {
+            return UseScopeLookup::SearchEnclosing {
+                depends_on_global_or_nonlocal: false,
+            };
+        };
+
+        let symbol = table.symbol(symbol_id);
+        let use_def = index.use_def_map(scope);
+        let depends_on_global_or_nonlocal =
+            !scope.is_global() && (symbol.is_global() || symbol.is_nonlocal());
+
+        if self.is_in_string_annotation() {
+            // A parsed string annotation has no use ID in the semantic index and may refer to a
+            // definition that appears later, so consider every reachable binding instead.
+            if symbol.is_local() || scope.is_global() {
+                return UseScopeLookup::from_bindings(collect_live_bindings(
+                    self.db(),
+                    use_def,
+                    use_def.reachable_symbol_bindings(symbol_id),
+                    depends_on_global_or_nonlocal,
+                ));
+            }
+
+            return UseScopeLookup::SearchEnclosing {
+                depends_on_global_or_nonlocal,
+            };
+        }
+
+        // Ordinary source names have a precise control-flow position, so prefer the bindings live
+        // at that position.
+        let Some(bindings) = collect_live_bindings(
+            self.db(),
+            use_def,
+            use_def.bindings_at_use(name.scoped_use_id(self.db(), self.file())),
+            depends_on_global_or_nonlocal,
+        ) else {
+            return UseScopeLookup::Unrepresentable;
+        };
+        if !bindings.definitions.is_empty() || bindings.may_be_deleted {
+            return UseScopeLookup::Resolved(bindings);
+        }
+
+        // A local in a function-like scope owns the name throughout that scope, even before its
+        // first binding. Recover those later bindings for that otherwise-empty result; class and
+        // module scopes retain the point-in-time result.
+        let kind = index.scope(scope).kind();
+        if symbol.is_local() {
+            return if kind.is_class() || scope.is_global() {
+                UseScopeLookup::Resolved(bindings)
+            } else {
+                UseScopeLookup::from_bindings(collect_live_bindings(
+                    self.db(),
+                    use_def,
+                    use_def.reachable_symbol_bindings(symbol_id),
+                    depends_on_global_or_nonlocal,
+                ))
+            };
+        }
+
+        UseScopeLookup::SearchEnclosing {
+            depends_on_global_or_nonlocal,
+        }
+    }
+
+    fn bindings_in_visible_ancestors(
+        &self,
+        index: &'db SemanticIndex<'db>,
+        scope: FileScopeId,
+        name: &str,
+        mut depends_on_global_or_nonlocal: bool,
+    ) -> Option<LiveBindings<'db>> {
+        // Walk outward until finding the visible scope that owns the name. Redirecting or unbound
+        // symbols do not end that search.
+        for (ancestor, _) in index.visible_ancestor_scopes(scope).skip(1) {
+            let table = index.place_table(ancestor);
+            let Some(symbol_id) = table.symbol_id(name) else {
+                continue;
+            };
+            let symbol = table.symbol(symbol_id);
+            depends_on_global_or_nonlocal |=
+                !ancestor.is_global() && (symbol.is_global() || symbol.is_nonlocal());
+
+            if symbol.is_nonlocal() || !symbol.is_local() && !ancestor.is_global() {
+                continue;
+            }
+
+            // Use the enclosing state captured for the nested scope when available. If no such
+            // snapshot exists, fall back to every binding reachable in the owning scope.
+            let use_def = index.use_def_map(ancestor);
+            let bindings =
+                match index.enclosing_snapshot(ancestor, PlaceExprRef::Symbol(symbol), scope) {
+                    EnclosingSnapshotResult::FoundBindings(bindings) => bindings,
+                    _ => use_def.reachable_symbol_bindings(symbol_id),
+                };
+            return collect_live_bindings(
+                self.db(),
+                use_def,
+                bindings,
+                depends_on_global_or_nonlocal,
+            );
+        }
+
+        // This is a known empty result, unlike `None`, which means that a complete user-visible
+        // result could not be produced.
+        Some(LiveBindings {
+            depends_on_global_or_nonlocal,
+            ..LiveBindings::default()
+        })
+    }
+}
+
+/// User-visible bindings associated with a semantic lookup point.
+///
+/// These are normally the bindings live at that point. [`SemanticModel::name_use_bindings`] can
+/// instead use reachable bindings as a fallback for deferred contexts.
+#[derive(Default)]
+pub struct LiveBindings<'db> {
+    /// User-visible definitions that can supply the binding.
+    pub definitions: Box<[Definition<'db>]>,
+    /// Whether a deleted path can also reach the use.
+    pub may_be_deleted: bool,
+    /// Whether lookup crossed an explicit `global` or `nonlocal` in a non-module scope.
+    pub depends_on_global_or_nonlocal: bool,
+}
+
+enum UseScopeLookup<'db> {
+    Resolved(LiveBindings<'db>),
+    Unrepresentable,
+    SearchEnclosing { depends_on_global_or_nonlocal: bool },
+}
+
+impl<'db> UseScopeLookup<'db> {
+    fn from_bindings(bindings: Option<LiveBindings<'db>>) -> Self {
+        match bindings {
+            Some(bindings) => Self::Resolved(bindings),
+            None => Self::Unrepresentable,
+        }
+    }
+}
+
+fn collect_live_bindings<'db>(
+    db: &'db dyn Db,
+    use_def: &'db UseDefMap<'db>,
+    bindings: BindingWithConstraintsIterator<'_, 'db>,
+    depends_on_global_or_nonlocal: bool,
+) -> Option<LiveBindings<'db>> {
+    let mut result = LiveBindings {
+        depends_on_global_or_nonlocal,
+        ..LiveBindings::default()
+    };
+    let mut definitions = Vec::new();
+
+    for binding in bindings {
+        if binding_reachability(db, use_def, &binding).is_always_false() {
+            continue;
+        }
+
+        match binding.binding {
+            DefinitionState::Defined(definition) if definition.kind(db).is_user_visible() => {
+                definitions.push(definition);
+            }
+            // Synthetic definitions can represent additional live bindings. Omitting one would
+            // make `definitions` incomplete, so this lookup cannot be represented as
+            // `LiveBindings`.
+            DefinitionState::Defined(_) => return None,
+            DefinitionState::Deleted => result.may_be_deleted = true,
+            DefinitionState::Undefined => {}
+        }
+    }
+
+    result.definitions = definitions.into_boxed_slice();
+    Some(result)
+}
 
 /// Get the primary definition kind for a name expression within a specific file.
 /// Returns the first definition kind that is reachable for this name in its scope.
@@ -2221,11 +2461,150 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
 
 #[cfg(test)]
 mod tests {
-    use super::{CallArgumentForm, call_argument_forms};
+    use super::{CallArgumentForm, LiveBindings, call_argument_forms};
     use crate::SemanticModel;
     use crate::db::tests::TestDbBuilder;
+    use crate::types::Type;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
+
+    #[test]
+    fn name_use_bindings_track_control_flow() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+import sys
+import first as value
+before = value
+if flag:
+    import second as value
+elif remove:
+    del value
+elif sys.version_info < (3, 0):
+    import never as value
+after = value
+"#,
+            )
+            .with_file("/src/first.py", "")
+            .with_file("/src/never.py", "")
+            .with_file("/src/second.py", "")
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let model = SemanticModel::new(&db, file);
+        let before = parsed.suite()[2].as_assign_stmt().unwrap();
+        let before = before.value.as_name_expr().unwrap();
+        let after = parsed.suite()[4].as_assign_stmt().unwrap();
+        let after = after.value.as_name_expr().unwrap();
+
+        let before_bindings = model.name_use_bindings(before).unwrap();
+        assert_module_bindings(&model, &before_bindings, &["first"], false, false);
+
+        let after_bindings = model.name_use_bindings(after).unwrap();
+        assert_module_bindings(&model, &after_bindings, &["first", "second"], true, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn name_use_bindings_handle_scope_fallbacks() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+import other
+
+def declared():
+    global other
+    return other
+
+def lazy():
+    before = value
+    value = other
+
+def annotated():
+    value: "other.C"
+"#,
+            )
+            .with_file("/src/other.py", "class C: ...\n")
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let model = SemanticModel::new(&db, file);
+
+        let declared = parsed.suite()[1].as_function_def_stmt().unwrap();
+        let declared_use = declared.body[1].as_return_stmt().unwrap();
+        let declared_use = declared_use
+            .value
+            .as_deref()
+            .unwrap()
+            .as_name_expr()
+            .unwrap();
+        let declared_bindings = model.name_use_bindings(declared_use).unwrap();
+        assert_module_bindings(&model, &declared_bindings, &["other"], false, true);
+
+        let lazy = parsed.suite()[2].as_function_def_stmt().unwrap();
+        let lazy_use = lazy.body[0].as_assign_stmt().unwrap();
+        let lazy_use = lazy_use.value.as_name_expr().unwrap();
+        let lazy_bindings = model.name_use_bindings(lazy_use).unwrap();
+        assert_module_bindings(&model, &lazy_bindings, &["other"], false, false);
+
+        let annotated = parsed.suite()[3].as_function_def_stmt().unwrap();
+        let annotation = annotated.body[0].as_ann_assign_stmt().unwrap();
+        let annotation = annotation.annotation.as_string_literal_expr().unwrap();
+        let (annotation, annotation_model) = model.enter_string_annotation(annotation).unwrap();
+        let annotation = annotation.expr().as_attribute_expr().unwrap();
+        let annotation_use = annotation.value.as_name_expr().unwrap();
+        let annotation_bindings = annotation_model.name_use_bindings(annotation_use).unwrap();
+        assert_module_bindings(
+            &annotation_model,
+            &annotation_bindings,
+            &["other"],
+            false,
+            false,
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn module_attribute_bindings_report_end_state() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/pkg/__init__.py",
+                r#"
+from . import stale as current
+if bool(input()):
+    from . import first as current
+else:
+    from . import second as current
+"#,
+            )
+            .with_file("/src/pkg/first.py", "")
+            .with_file("/src/pkg/second.py", "")
+            .with_file("/src/pkg/stale.py", "")
+            .with_file("/src/use.py", "import pkg\nresult = pkg.current\n")
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/use.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let model = SemanticModel::new(&db, file);
+        let attribute = parsed.suite()[1].as_assign_stmt().unwrap();
+        let attribute = attribute.value.as_attribute_expr().unwrap();
+        let bindings = model.module_attribute_bindings(attribute).unwrap();
+        assert_module_bindings(
+            &model,
+            &bindings,
+            &["pkg.first", "pkg.second"],
+            false,
+            false,
+        );
+
+        Ok(())
+    }
 
     #[test]
     fn keyword_call_argument_forms_follow_source_order() -> anyhow::Result<()> {
@@ -2501,5 +2880,32 @@ cast(*args)
         );
 
         Ok(())
+    }
+
+    fn assert_module_bindings<'db>(
+        model: &SemanticModel<'db>,
+        bindings: &LiveBindings<'db>,
+        expected: &[&str],
+        may_be_deleted: bool,
+        depends_on_global_or_nonlocal: bool,
+    ) {
+        let db = model.db();
+        let mut modules: Vec<_> = bindings
+            .definitions
+            .iter()
+            .map(|definition| {
+                let Type::ModuleLiteral(module) = model.binding_type(*definition) else {
+                    panic!("expected a module binding");
+                };
+                module.module(db).name(db).as_str().to_string()
+            })
+            .collect();
+        modules.sort();
+        assert_eq!(modules, expected);
+        assert_eq!(bindings.may_be_deleted, may_be_deleted);
+        assert_eq!(
+            bindings.depends_on_global_or_nonlocal,
+            depends_on_global_or_nonlocal
+        );
     }
 }
