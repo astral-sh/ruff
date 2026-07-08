@@ -1032,8 +1032,14 @@ class PlainDictConfig(BaseModel):
 
     name: str
 
-# TODO: this should be an error
-PlainDictConfig(name="Alice", something_else=7)
+PlainDictConfig(name="Alice", something_else=7)  # error: [unknown-argument]
+
+class DictCallConfig(BaseModel):
+    model_config = dict(extra="forbid")
+
+    name: str
+
+DictCallConfig(name="Alice", something_else=7)  # error: [unknown-argument]
 ```
 
 ## Mixins

@@ -1,5 +1,5 @@
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::{Keyword, name::Name};
+use ruff_python_ast::{ExprDict, Keyword, name::Name};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, file_to_module};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -281,14 +281,17 @@ fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelC
         }
     };
 
+    if let Some(dict) = value.as_dict_expr() {
+        return Some(model_config_from_dict(db, definition, dict));
+    }
+
     let Some(call) = value.as_call_expr() else {
         return Some(ModelConfig::unknown());
     };
     let callee = definition_expression_type(db, definition, &call.func);
-    if !callee
-        .as_class_literal()
-        .is_some_and(|class| class.is_known(db, KnownClass::PydanticConfigDict))
-    {
+    if !callee.as_class_literal().is_some_and(|class| {
+        class.is_known(db, KnownClass::PydanticConfigDict) || class.is_known(db, KnownClass::Dict)
+    }) {
         return Some(ModelConfig::unknown());
     }
 
@@ -301,6 +304,8 @@ fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelC
         return Some(ModelConfig::unknown());
     }
 
+    // Keep this list of recognized options in sync with `model_config_from_dict` and
+    // `class_keyword_config`.
     let extra = call.arguments.find_keyword("extra").map(|extra| {
         let extra = definition_expression_type(db, definition, &extra.value)
             .as_string_literal()
@@ -327,6 +332,39 @@ fn own_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelC
     })
 }
 
+fn model_config_from_dict(db: &dyn Db, definition: Definition<'_>, dict: &ExprDict) -> ModelConfig {
+    let mut config = ModelConfig::default();
+
+    for item in dict {
+        let Some(key) = item
+            .key
+            .as_ref()
+            .and_then(|key| key.as_string_literal_expr())
+        else {
+            // A dynamic key or dictionary unpacking can override any recognized option. Ignoring
+            // it could incorrectly preserve a lower-precedence configuration value.
+            return ModelConfig::unknown();
+        };
+        let value = definition_expression_type(db, definition, &item.value);
+
+        // Keep this match in sync with the options recognized for `ConfigDict` calls in
+        // `own_model_config` and for class keywords in `class_keyword_config`.
+        match key.value.to_str() {
+            "extra" => {
+                config.extra = Some(ExtraBehavior::from_value(
+                    value.as_string_literal().map(|literal| literal.value(db)),
+                ));
+            }
+            "strict" => config.strict = ConfigBoolean::from_type(value),
+            "validate_by_alias" => config.validate_by_alias = ConfigBoolean::from_type(value),
+            "validate_by_name" => config.validate_by_name = ConfigBoolean::from_type(value),
+            _ => {}
+        }
+    }
+
+    config
+}
+
 fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConfig {
     let definition = class.definition(db);
     let module = parsed_module(db, class.file(db)).load(db);
@@ -345,6 +383,8 @@ fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConf
     {
         return ModelConfig::unknown();
     }
+    // Keep this list of recognized options in sync with `own_model_config` and
+    // `model_config_from_dict`.
     let extra = arguments.find_keyword("extra").map(|extra| {
         let extra = definition_expression_type(db, definition, &extra.value)
             .as_string_literal()
