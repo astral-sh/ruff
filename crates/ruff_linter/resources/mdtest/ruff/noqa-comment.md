@@ -191,11 +191,40 @@ help: Use `ruff:ignore` instead
 
 ## Blanket comments
 
-RUF105 does not flag blanket `noqa` comments because `ruff:ignore` requires at least one rule
-selector.
+RUF105 flags blanket comments but does not offer a fix because `ruff:ignore` requires at least one
+rule selector.
+
+### Inline
 
 ```py
+# snapshot: noqa-comment
 import math  # noqa
+```
+
+```snapshot
+error[RUF105]: `noqa` comment used instead of `ruff:ignore`
+ --> src/mdtest_snippet.py:2:14
+  |
+2 | import math  # noqa
+  |              ^^^^^^
+  |
+```
+
+### File-level
+
+```py
+# snapshot: noqa-comment
+# ruff: noqa
+import math
+```
+
+```snapshot
+error[RUF105]: `ruff: noqa` comment used instead of `ruff:file-ignore`
+ --> src/mdtest_snippet.py:2:1
+  |
+2 | # ruff: noqa
+  | ^^^^^^^^^^^^
+  |
 ```
 
 ## Inline self-suppression

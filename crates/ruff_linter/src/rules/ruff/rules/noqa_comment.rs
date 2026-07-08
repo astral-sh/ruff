@@ -5,10 +5,10 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::{
-    AlwaysFixableViolation, Locator,
+    FixAvailability, Locator, Violation,
     checkers::ast::LintContext,
     codes::Rule,
-    noqa::{Code, Codes},
+    noqa::{Code, Directive},
     rule_redirects::get_redirect_target,
 };
 
@@ -54,9 +54,12 @@ use crate::{
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct NoqaComment {
     file_level: bool,
+    has_codes: bool,
 }
 
-impl AlwaysFixableViolation for NoqaComment {
+impl Violation for NoqaComment {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         if !self.file_level {
@@ -66,12 +69,16 @@ impl AlwaysFixableViolation for NoqaComment {
         }
     }
 
-    fn fix_title(&self) -> String {
-        if self.file_level {
+    fn fix_title(&self) -> Option<String> {
+        if !self.has_codes {
+            return None;
+        }
+
+        Some(if self.file_level {
             "Use `ruff:file-ignore` instead".to_string()
         } else {
             "Use `ruff:ignore` instead".to_string()
-        }
+        })
     }
 }
 
@@ -80,18 +87,31 @@ pub(crate) fn noqa_comment(
     context: &LintContext,
     locator: &Locator,
     file_level: bool,
-    codes: &Codes,
+    directive: &Directive,
 ) {
-    if file_level && locator.slice(codes.range()).contains("flake8") {
+    if file_level && locator.slice(directive.range()).contains("flake8") {
         return;
     }
 
     // Skip cases with unknown codes, external or otherwise.
-    if !codes.iter().all(is_valid_code) {
+    if let Directive::Codes(codes) = directive
+        && !codes.iter().all(is_valid_code)
+    {
         return;
     }
 
-    let mut diagnostic = context.report_diagnostic(NoqaComment { file_level }, codes.range());
+    let has_codes = matches!(directive, Directive::Codes(_));
+    let mut diagnostic = context.report_diagnostic(
+        NoqaComment {
+            file_level,
+            has_codes,
+        },
+        directive.range(),
+    );
+
+    let Directive::Codes(codes) = directive else {
+        return;
+    };
 
     let edit = Edit::range_replacement(
         format!(

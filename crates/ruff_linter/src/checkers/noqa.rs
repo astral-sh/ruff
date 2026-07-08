@@ -140,21 +140,23 @@ pub(crate) fn check_noqa(
             );
         for (directive, matches, is_file_level) in directives {
             match directive {
-                Directive::All(directive) => {
+                Directive::All(all) => {
                     if check_unused_noqa && matches.is_empty() {
-                        let edit = delete_comment(directive.range(), locator);
+                        let edit = delete_comment(all.range(), locator);
                         let mut diagnostic = context.report_diagnostic(
                             UnusedNOQA {
                                 codes: None,
                                 kind: ruff::rules::UnusedNOQAKind::Noqa,
                             },
-                            directive.range(),
+                            all.range(),
                         );
                         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
                         diagnostic.set_fix(Fix::safe_edit(edit));
+                    } else if check_noqa_comment {
+                        ruff::rules::noqa_comment(context, locator, is_file_level, directive);
                     }
                 }
-                Directive::Codes(directive) => {
+                Directive::Codes(codes) => {
                     let mut disabled_codes = vec![];
                     let mut duplicated_codes = vec![];
                     let mut unknown_codes = vec![];
@@ -163,7 +165,7 @@ pub(crate) fn check_noqa(
                     let mut seen_codes = FxHashSet::default();
                     let mut self_ignore = false;
                     let mut suppress_noqa_comment = false;
-                    for original_code in directive.iter().map(Code::as_str) {
+                    for original_code in codes.iter().map(Code::as_str) {
                         let code = get_redirect_target(original_code).unwrap_or(original_code);
                         if seen_codes.insert(original_code) {
                             if Rule::UnusedNOQA.noqa_code() == code {
@@ -217,9 +219,9 @@ pub(crate) fn check_noqa(
 
                     if check_unused_noqa && !self_ignore && has_unused_codes {
                         let edit = if valid_codes.is_empty() {
-                            delete_comment(directive.range(), locator)
+                            delete_comment(codes.range(), locator)
                         } else {
-                            let original_text = locator.slice(directive.range());
+                            let original_text = locator.slice(codes.range());
                             let prefix = if is_file_level {
                                 if original_text.contains("flake8") {
                                     "# flake8: noqa: "
@@ -231,7 +233,7 @@ pub(crate) fn check_noqa(
                             };
                             Edit::range_replacement(
                                 format!("{}{}", prefix, valid_codes.join(", ")),
-                                directive.range(),
+                                codes.range(),
                             )
                         };
                         let mut diagnostic = context.report_diagnostic(
@@ -243,7 +245,7 @@ pub(crate) fn check_noqa(
                                 }),
                                 kind: ruff::rules::UnusedNOQAKind::Noqa,
                             },
-                            directive.range(),
+                            codes.range(),
                         );
                         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
                         diagnostic.set_fix(Fix::safe_edit(edit));
