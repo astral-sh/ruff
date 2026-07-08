@@ -343,6 +343,7 @@ impl<'db> Type<'db> {
         let checker = TypeRelationChecker {
             constraints,
             inferable,
+            universally_quantified: InferableTypeVars::None,
             relation: TypeRelation::SubtypingAssuming,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: None,
@@ -380,6 +381,7 @@ impl<'db> Type<'db> {
         let checker = TypeRelationChecker {
             constraints: &builder,
             inferable: InferableTypeVars::None,
+            universally_quantified: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new()),
@@ -584,6 +586,7 @@ impl<'db> Type<'db> {
         let checker = TypeRelationChecker {
             constraints,
             inferable,
+            universally_quantified: InferableTypeVars::None,
             relation,
             typevar_evaluation,
             context_tree: None,
@@ -739,6 +742,7 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
 pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'db>,
+    universally_quantified: InferableTypeVars<'db>,
     pub(super) relation: TypeRelation,
     pub(super) typevar_evaluation: TypeVarEvaluation,
     context_tree: Option<ErrorContextTree<'db>>,
@@ -768,6 +772,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Self {
             constraints,
             inferable,
+            universally_quantified: InferableTypeVars::None,
             relation: TypeRelation::Subtyping,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: None,
@@ -789,6 +794,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Self {
             constraints,
             inferable: InferableTypeVars::None,
+            universally_quantified: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
             context_tree: None,
@@ -810,6 +816,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Self {
             constraints,
             inferable: InferableTypeVars::None,
+            universally_quantified: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
             context_tree: Some(ErrorContextTree::new()),
@@ -831,6 +838,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Self {
             constraints,
             inferable: InferableTypeVars::None,
+            universally_quantified: InferableTypeVars::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new()),
@@ -851,6 +859,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     pub(super) fn with_lazy_typevar_evaluation(mut self) -> Self {
         self.typevar_evaluation = TypeVarEvaluation::Lazy;
+        self
+    }
+
+    /// Marks type variables that will be universally quantified after this relation is built.
+    ///
+    /// Direct gradual assignability to these variables must be evaluated immediately because an
+    /// `Any` or `Unknown` bound would otherwise be interpreted as a rigid restriction during
+    /// universal abstraction.
+    pub(super) fn with_universally_quantified_typevars(
+        mut self,
+        db: &'db dyn Db,
+        typevars: InferableTypeVars<'db>,
+    ) -> Self {
+        self.universally_quantified = self.universally_quantified.merge(db, typevars);
         self
     }
 
@@ -1071,6 +1093,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // only has to hold when the typevar has a valid specialization (i.e., one that
             // satisfies the upper bound/constraints).
             if let Type::TypeVar(bound_typevar) = source {
+                // Dynamic types are assignable to every specialization of a universally
+                // quantified type variable. Existential type variables still need a constraint
+                // so that they can infer `Any` or `Unknown` from the comparison.
+                if self.relation.is_assignability()
+                    && target.is_dynamic()
+                    && bound_typevar.is_inferable(db, self.universally_quantified)
+                {
+                    return self.always();
+                }
                 let upper = if self.relation.is_subtyping() {
                     target.bottom_materialization(db)
                 } else {
@@ -1083,6 +1114,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     upper,
                 );
             } else if let Type::TypeVar(bound_typevar) = target {
+                if self.relation.is_assignability()
+                    && source.is_dynamic()
+                    && bound_typevar.is_inferable(db, self.universally_quantified)
+                {
+                    return self.always();
+                }
                 let lower = if self.relation.is_subtyping() {
                     source.top_materialization(db)
                 } else {
@@ -2371,6 +2408,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             context_tree: None,
             given: self.given,
             inferable: InferableTypeVars::None,
+            universally_quantified: InferableTypeVars::None,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
@@ -2454,6 +2492,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             typevar_evaluation: TypeVarEvaluation::Eager,
             constraints: self.constraints,
             inferable: self.inferable,
+            universally_quantified: InferableTypeVars::None,
             context_tree: None,
             given: self.given,
             relation_visitor: self.relation_visitor,

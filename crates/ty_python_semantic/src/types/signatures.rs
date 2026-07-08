@@ -1874,8 +1874,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             )
         };
         let source_locals = quantified_locals(source_typevars);
+        let target_locals = quantified_locals(target_typevars);
         let checker = self
             .with_inferable_typevars(self.inferable.merge(db, source_locals))
+            .with_universally_quantified_typevars(db, target_locals)
             .with_lazy_typevar_evaluation();
         let relation = checker.with_signature_recursion_guard(source, target, || {
             checker.check_signature_pair_inner(db, source, target)
@@ -1918,7 +1920,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // A generic target is the intersection of all of its specializations. The source must
         // therefore satisfy every valid target specialization. Source variables have already
         // been removed, which gives the required `for all target, there exists source` order.
-        let target_locals = quantified_locals(target_typevars);
         let universally_quantified = target_domain.implies(db, self.constraints, || quantified);
         let Some(result) = universally_quantified.try_for_all(db, self.constraints, target_locals)
         else {

@@ -2905,7 +2905,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Protocol
+from typing import Any, Protocol
 from ty_extensions import static_assert
 from ty_extensions._internal import is_assignable_to, is_subtype_of
 
@@ -2927,6 +2927,20 @@ class GenericIdentity:
 # The source and target variables are distinct, but the two methods are alpha-equivalent.
 static_assert(is_assignable_to(GenericIdentity, IdentityProtocol))
 static_assert(is_subtype_of(GenericIdentity, IdentityProtocol))
+
+class AnyIdentity:
+    def f(self, value: Any) -> Any:
+        return value
+
+class UnknownIdentity:
+    def f(self, value):
+        return value
+
+# Gradual types are assignable to every specialization, but are not strict subtypes.
+static_assert(is_assignable_to(AnyIdentity, IdentityProtocol))
+static_assert(not is_subtype_of(AnyIdentity, IdentityProtocol))
+static_assert(is_assignable_to(UnknownIdentity, IdentityProtocol))
+static_assert(not is_subtype_of(UnknownIdentity, IdentityProtocol))
 
 class NestedListProtocol(Protocol):
     def f[T](self, value: list[T]) -> list[list[T]]: ...

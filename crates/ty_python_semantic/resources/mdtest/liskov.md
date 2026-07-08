@@ -868,7 +868,7 @@ python-version = "3.12"
 ```
 
 ```pyi
-from typing import Never, Self
+from typing import Any, Never, Self
 
 class A:
     def method[T](self, x: T) -> T: ...
@@ -883,6 +883,12 @@ class D(A):
     # `A.method` accepts an argument of any type,
     # but `D.method` only accepts `int`s
     def method(self, x: int) -> int: ...  # error: [invalid-method-override]
+
+class E(A):
+    def method(self, x: Any) -> Any: ...  # fine
+
+class F(A):
+    def method(self, x): ...  # fine
 
 class A2:
     def method(self, x: int) -> int: ...
