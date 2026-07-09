@@ -2906,7 +2906,7 @@ python-version = "3.12"
 
 ```py
 from collections.abc import Callable, Sequence
-from typing import Any, Protocol
+from typing import Any, Protocol, overload
 from ty_extensions import Intersection, static_assert
 from ty_extensions._internal import is_assignable_to, is_subtype_of
 
@@ -2920,6 +2920,18 @@ class IntIdentity:
 # A concrete implementation cannot implement an unconstrained generic identity.
 static_assert(not is_assignable_to(IntIdentity, IdentityProtocol))
 static_assert(not is_subtype_of(IntIdentity, IdentityProtocol))
+
+class ParamSpecOverloadSource:
+    @overload
+    def f(self, value: int) -> int: ...
+    @overload
+    def f[**Q](self, *args: Q.args, **kwargs: Q.kwargs) -> str: ...
+    def f(self, *args: object, **kwargs: object) -> object:
+        raise NotImplementedError
+
+# A ParamSpec in one source overload does not make the target variable existential in the other.
+static_assert(not is_assignable_to(ParamSpecOverloadSource, IdentityProtocol))
+static_assert(not is_subtype_of(ParamSpecOverloadSource, IdentityProtocol))
 
 class GenericIdentity:
     def f[S](self, value: S) -> S:

@@ -1439,11 +1439,11 @@ impl<'db> Signature<'db> {
         .then_some(typevars)
     }
 
-    fn has_paramspec_or_self_typevar(&self, db: &'db dyn Db) -> bool {
+    fn has_self_typevar(&self, db: &'db dyn Db) -> bool {
         self.generic_context.is_some_and(|context| {
             context
                 .variables(db)
-                .any(|typevar| typevar.is_paramspec(db) || typevar.typevar(db).is_self(db))
+                .any(|typevar| typevar.typevar(db).is_self(db))
         })
     }
 
@@ -2001,11 +2001,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let target_context = target.generic_context?;
         let target_typevars = target.higher_rank_typevars(db, self.inferable)?;
 
-        // ParamSpecs and `Self` retain the existing callable relation until their binder ownership
-        // can be represented independently from an ordinary method-local type variable.
+        // `Self` retains the existing callable relation until its binder ownership can be
+        // represented independently from an ordinary method-local type variable.
         if source_signatures
             .iter()
-            .any(|source| source.has_paramspec_or_self_typevar(db))
+            .any(|source| source.has_self_typevar(db))
         {
             return None;
         }
