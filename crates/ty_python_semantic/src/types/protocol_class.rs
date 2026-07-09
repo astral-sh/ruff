@@ -1023,6 +1023,99 @@ fn property_set_member_type<'db>(
     ))
 }
 
+/// Derive the observable instance capabilities of a descriptor-decorated protocol member.
+fn descriptor_decorated_protocol_member<'db>(
+    db: &'db dyn Db,
+    descriptor_ty: Type<'db>,
+    protocol: ClassType<'db>,
+    definition: Option<Definition<'db>>,
+) -> Option<ProtocolMemberData<'db>> {
+    let Place::Defined(DefinedPlace {
+        definedness: Definedness::AlwaysDefined,
+        ..
+    }) = descriptor_ty
+        .class_member_with_policy(db, "__get__".into(), MemberLookupPolicy::REQUIRE_CONCRETE)
+        .place
+    else {
+        return None;
+    };
+
+    let receiver_ty = Type::instance(db, protocol);
+    let (read_ty, _) =
+        descriptor_ty.try_call_dunder_get(db, Some(receiver_ty), receiver_ty.to_meta_type(db))?;
+    let read = Some(ProtocolMemberType::with_definition(read_ty, definition));
+
+    let write = if let Place::Defined(DefinedPlace {
+        ty: setter_ty,
+        definedness: Definedness::AlwaysDefined,
+        ..
+    }) = descriptor_ty
+        .class_member_with_policy(db, "__set__".into(), MemberLookupPolicy::REQUIRE_CONCRETE)
+        .place
+    {
+        descriptor_setter_write_type(db, setter_ty, descriptor_ty, receiver_ty)
+            .map(|write_ty| ProtocolMemberType::with_definition(write_ty, definition))
+    } else {
+        None
+    };
+
+    Some(ProtocolMemberData::property(read, write, definition))
+}
+
+/// Derive a write type from a single ordinary setter signature.
+fn descriptor_setter_write_type<'db>(
+    db: &'db dyn Db,
+    setter_ty: Type<'db>,
+    descriptor_ty: Type<'db>,
+    receiver_ty: Type<'db>,
+) -> Option<Type<'db>> {
+    let callable = setter_ty.try_upcast_to_callable(db)?.exactly_one()?;
+    let signatures = callable.signatures(db);
+    let [signature] = signatures.overloads.as_ref() else {
+        return None;
+    };
+
+    // Function-generic setters require quantifier-aware callable-domain analysis. Class type
+    // variables have already been specialized by member lookup; an implicit `Self` can be bound
+    // directly to the descriptor instance.
+    if signature.generic_context.is_some_and(|generic_context| {
+        generic_context.variables(db).any(|typevar| {
+            !typevar.typevar(db).is_self(db)
+                && typevar
+                    .binding_context(db)
+                    .definition()
+                    .is_some_and(|definition| definition.kind(db).is_function_def())
+        })
+    }) {
+        return None;
+    }
+
+    let parameters = signature.parameters();
+    if parameters.len() != 3 {
+        return None;
+    }
+    let descriptor_parameter = parameters
+        .get_positional(0)?
+        .annotated_type()
+        .bind_self_typevars(db, descriptor_ty);
+    let receiver_parameter = parameters
+        .get_positional(1)?
+        .annotated_type()
+        .bind_self_typevars(db, descriptor_ty);
+    if !descriptor_ty.is_assignable_to(db, descriptor_parameter)
+        || !receiver_ty.is_assignable_to(db, receiver_parameter)
+    {
+        return None;
+    }
+
+    Some(
+        parameters
+            .get_positional(2)?
+            .annotated_type()
+            .bind_self_typevars(db, descriptor_ty),
+    )
+}
+
 fn property_set_type<'db>(
     db: &'db dyn Db,
     property: PropertyInstanceType<'db>,
@@ -1982,6 +2075,18 @@ fn cached_protocol_interface<'db>(
                 }
                 Type::FunctionLiteral(function) if bound_on_class.is_yes() => {
                     ProtocolMemberData::method(function.into_callable_type(db), definition)
+                }
+                _ if bound_on_class.is_yes()
+                    && definition
+                        .is_some_and(|definition| definition.kind(db).is_function_def()) =>
+                {
+                    if let Some(descriptor) =
+                        descriptor_decorated_protocol_member(db, ty, class, definition)
+                    {
+                        descriptor
+                    } else {
+                        ProtocolMemberData::attribute(ty, qualifiers, definition)
+                    }
                 }
                 _ => ProtocolMemberData::attribute(ty, qualifiers, definition),
             };

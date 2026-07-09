@@ -2442,6 +2442,185 @@ static_assert(is_subtype_of(PropertyWithSelfSetter, HasConcretePropertySetter))
 static_assert(is_assignable_to(PropertyWithSelfSetter, HasConcretePropertySetter))
 ```
 
+## Protocol members defined using descriptor decorators
+
+### `cached_property`
+
+On an instance, a protocol member decorated with `cached_property` has the type returned by
+`cached_property.__get__`, not the type of the descriptor stored on the protocol class. The typeshed
+definition also includes a `__set__` method, whose value parameter determines which assignments are
+valid:
+
+```py
+from functools import cached_property
+from typing import Protocol
+
+class HasName(Protocol):
+    @cached_property
+    def name(self) -> str: ...
+
+class WithName:
+    @cached_property
+    def name(self) -> str:
+        return "example"
+
+has_name: HasName = WithName()
+
+def update_name(value: HasName) -> None:
+    reveal_type(value.name)  # revealed: str
+    value.name = "updated"
+    value.name = 1  # error: [invalid-assignment]
+```
+
+### Descriptor values in annotations
+
+Only a descriptor produced by decorating a protocol method changes how that member is read and
+written through an instance. An annotation whose type implements the descriptor protocol still
+declares an ordinary attribute whose protocol member type is the descriptor object. We reveal the
+protocol interface here because ordinary instance access would invoke `cached_property.__get__` and
+reveal `str` in both cases:
+
+```py
+from functools import cached_property
+from typing import Protocol
+from ty_extensions._internal import reveal_protocol_interface
+
+class StoresDescriptor(Protocol):
+    name: cached_property[str]
+
+# revealed: {"name": AttributeMember(`cached_property[str]`)}
+reveal_protocol_interface(StoresDescriptor)
+```
+
+### Overloaded setters selected by receiver type
+
+An overloaded `__set__` method can accept different values for different receiver types. For
+`HasValue`, the overloads with an `object` receiver accept `int` and `bytes`; the overload for
+`Other` does not apply.
+
+```py
+from typing import Protocol, final, overload
+
+@final
+class Other: ...
+
+class ReceiverSensitiveDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        raise NotImplementedError
+
+    @overload
+    def __set__(self, instance: object, value: int) -> None: ...
+    @overload
+    def __set__(self, instance: object, value: bytes) -> None: ...
+    @overload
+    def __set__(self, instance: Other, value: str) -> None: ...
+    def __set__(self, instance: object, value: int | bytes | str) -> None: ...
+
+class HasValue(Protocol):
+    @ReceiverSensitiveDescriptor
+    def value(self) -> int: ...
+
+def update_value(value: HasValue) -> None:
+    # TODO: These assignments should be accepted.
+    value.value = 1  # error: [invalid-assignment]
+    value.value = b"valid"  # error: [invalid-assignment]
+    value.value = "bad"  # error: [invalid-assignment]
+```
+
+### Union descriptor types
+
+If a decorator can return either of two descriptors, an assignment must be accepted by both possible
+descriptors. Here, only `str` is accepted by both.
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Descriptor(Generic[T]):
+    def __get__(self, instance: object, owner: type | None = None) -> T:
+        raise NotImplementedError
+
+    def __set__(self, instance: object, value: T) -> None: ...
+
+def either_descriptor(getter: object) -> Descriptor[int | str] | Descriptor[str | bytes]:
+    raise NotImplementedError
+
+class HasEitherValue(Protocol):
+    @either_descriptor
+    def either_value(self) -> object: ...
+
+def update_either_value(value: HasEitherValue) -> None:
+    # TODO: This assignment should be accepted.
+    value.either_value = "valid"  # error: [invalid-assignment]
+    value.either_value = 1  # error: [invalid-assignment]
+```
+
+### Overloaded setters selected by descriptor type
+
+An overload can also restrict the type of the descriptor itself. The decorator below returns
+`SelfSensitiveDescriptor[int]`, so only the overload accepting an `int` value applies.
+
+```py
+from __future__ import annotations
+
+from typing import Generic, Protocol, TypeVar, overload
+
+T = TypeVar("T")
+
+class SelfSensitiveDescriptor(Generic[T]):
+    def __get__(self, instance: object, owner: type | None = None) -> T:
+        raise NotImplementedError
+
+    @overload
+    def __set__(self: SelfSensitiveDescriptor[int], instance: object, value: int) -> None: ...
+    @overload
+    def __set__(self: SelfSensitiveDescriptor[str], instance: object, value: str) -> None: ...
+    def __set__(self, instance: object, value: int | str) -> None: ...
+
+def int_descriptor(getter: object) -> SelfSensitiveDescriptor[int]:
+    raise NotImplementedError
+
+class HasIntValue(Protocol):
+    @int_descriptor
+    def int_value(self) -> int: ...
+
+def update_int_value(value: HasIntValue) -> None:
+    # TODO: This assignment should be accepted.
+    value.int_value = 1  # error: [invalid-assignment]
+    value.int_value = "bad"  # error: [invalid-assignment]
+```
+
+### Generic setter value types
+
+A setter that uses a method type variable directly as its value parameter accepts every value
+allowed by that type variable's upper bound.
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T", bound=int)
+
+class BoundedDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__(self, instance: object, value: T) -> None: ...
+
+def bounded_descriptor(getter: object) -> BoundedDescriptor:
+    raise NotImplementedError
+
+class HasBoundedValue(Protocol):
+    @bounded_descriptor
+    def bounded_value(self) -> int: ...
+
+def update_bounded_value(value: HasBoundedValue) -> None:
+    # TODO: This assignment should be accepted.
+    value.bounded_value = 1  # error: [invalid-assignment]
+    value.bounded_value = "bad"  # error: [invalid-assignment]
+```
+
 ## Variance of generic protocols with `Final` members
 
 A `Final` attribute is readable but not writable, so it constrains an inferred type parameter
