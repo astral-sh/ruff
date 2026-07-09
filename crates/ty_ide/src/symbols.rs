@@ -2970,7 +2970,7 @@ class C: ...
 
     impl PublicTestBuilder {
         pub(super) fn build(&self) -> PublicTest {
-            let metadata = ProjectMetadata::new("test".into(), SystemPathBuf::from("/"));
+            let metadata = ProjectMetadata::new("test", SystemPathBuf::from("/"));
             let mut db = TestDb::new(metadata);
 
             db.init_program_with_python_version(self.python_version.unwrap_or_default())

@@ -1,8 +1,8 @@
+use compact_str::CompactString;
 use configuration_file::{ConfigurationFile, ConfigurationFileError};
 use ruff_db::files::FileRootKind;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_python_ast::name::Name;
 use ruff_ranged_value::ValueSource;
 use std::sync::Arc;
 use thiserror::Error;
@@ -27,7 +27,7 @@ pub mod value;
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 #[cfg_attr(test, derive(serde::Serialize))]
 pub struct ProjectMetadata {
-    pub(super) name: Name,
+    name: ProjectName,
 
     pub(super) root: SystemPathBuf,
 
@@ -46,9 +46,9 @@ pub struct ProjectMetadata {
 
 impl ProjectMetadata {
     /// Creates a project with the given name and root that uses the default options.
-    pub fn new(name: Name, root: SystemPathBuf) -> Self {
+    pub fn new(name: impl AsRef<str>, root: SystemPathBuf) -> Self {
         Self {
-            name,
+            name: ProjectName::new(name),
             root,
             extra_configuration_paths: Vec::default(),
             options: Options::default(),
@@ -72,7 +72,7 @@ impl ProjectMetadata {
         let options = config_file.into_options();
 
         Ok(Self {
-            name: Name::new(root.file_name().unwrap_or("root")),
+            name: ProjectName::new(root.file_name().unwrap_or("root")),
             root: root.to_path_buf(),
             options,
             extra_configuration_paths: vec![path],
@@ -101,8 +101,8 @@ impl ProjectMetadata {
     ) -> Result<Self, Strategy::Error<ResolveRequiresPythonError>> {
         let name = project
             .and_then(|project| project.name.as_deref())
-            .map(|name| Name::new(&**name))
-            .unwrap_or_else(|| Name::new(root.file_name().unwrap_or("root")));
+            .map(|name| ProjectName::new(&**name))
+            .unwrap_or_else(|| ProjectName::new(root.file_name().unwrap_or("root")));
 
         // If the `options` don't specify a python version but the `project.requires-python` field is set,
         // use that as a lower bound instead.
@@ -258,10 +258,7 @@ impl ProjectMetadata {
             );
 
             // Create a project with a default configuration
-            Self::new(
-                path.file_name().unwrap_or("root").into(),
-                path.to_path_buf(),
-            )
+            Self::new(path.file_name().unwrap_or("root"), path.to_path_buf())
         };
 
         Ok(metadata)
@@ -272,7 +269,7 @@ impl ProjectMetadata {
     }
 
     pub fn name(&self) -> &str {
-        &self.name
+        self.name.as_str()
     }
 
     pub fn options(&self) -> &Options {
@@ -348,6 +345,20 @@ impl ProjectMetadata {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[cfg_attr(test, derive(serde::Serialize))]
+struct ProjectName(CompactString);
+
+impl ProjectName {
+    fn new(name: impl AsRef<str>) -> Self {
+        Self(CompactString::new(name))
+    }
+
+    fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum ProjectMetadataError {
     #[error("project path '{0}' is not a directory")]
@@ -407,7 +418,7 @@ mod tests {
         with_escaped_paths(|| {
             assert_ron_snapshot!(&project, @r#"
             ProjectMetadata(
-              name: Name("app"),
+              name: ProjectName("app"),
               root: "/app",
               options: Options(),
             )
@@ -445,7 +456,7 @@ mod tests {
         with_escaped_paths(|| {
             assert_ron_snapshot!(&project, @r#"
             ProjectMetadata(
-              name: Name("backend"),
+              name: ProjectName("backend"),
               root: "/app",
               options: Options(),
             )
@@ -537,7 +548,7 @@ unclosed table, expected `]`
         with_escaped_paths(|| {
             assert_ron_snapshot!(sub_project, @r#"
             ProjectMetadata(
-              name: Name("nested-project"),
+              name: ProjectName("nested-project"),
               root: "/app/packages/a",
               options: Options(
                 src: Some(SrcOptions(
@@ -587,7 +598,7 @@ unclosed table, expected `]`
         with_escaped_paths(|| {
             assert_ron_snapshot!(root, @r#"
             ProjectMetadata(
-              name: Name("project-root"),
+              name: ProjectName("project-root"),
               root: "/app",
               options: Options(
                 src: Some(SrcOptions(
@@ -631,7 +642,7 @@ unclosed table, expected `]`
         with_escaped_paths(|| {
             assert_ron_snapshot!(sub_project, @r#"
             ProjectMetadata(
-              name: Name("nested-project"),
+              name: ProjectName("nested-project"),
               root: "/app/packages/a",
               options: Options(),
             )
@@ -674,7 +685,7 @@ unclosed table, expected `]`
         with_escaped_paths(|| {
             assert_ron_snapshot!(root, @r#"
             ProjectMetadata(
-              name: Name("project-root"),
+              name: ProjectName("project-root"),
               root: "/app",
               options: Options(
                 environment: Some(EnvironmentOptions(
@@ -726,7 +737,7 @@ unclosed table, expected `]`
         with_escaped_paths(|| {
             assert_ron_snapshot!(root, @r#"
             ProjectMetadata(
-              name: Name("super-app"),
+              name: ProjectName("super-app"),
               root: "/app",
               options: Options(
                 environment: Some(EnvironmentOptions(
