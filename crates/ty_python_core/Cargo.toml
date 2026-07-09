@@ -27,6 +27,7 @@ bitvec = { workspace = true }
 get-size2 = { workspace = true, features = ["indexmap", "ordermap", "thin-vec"] }
 hashbrown = { workspace = true }
 itertools = { workspace = true }
+lean_string = { workspace = true }
 ruff_macros = { workspace = true, optional = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true, features = ["compact_str", "ordermap"] }

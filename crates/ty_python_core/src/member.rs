@@ -1,9 +1,10 @@
 use ruff_index::{IndexVec, newtype_index};
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast as ast;
 use ruff_text_size::{TextLen as _, TextRange, TextSize};
 
 use bitflags::bitflags;
 use hashbrown::hash_table::Entry;
+use lean_string::LeanStr;
 use rustc_hash::FxHasher;
 use smallvec::SmallVec;
 
@@ -15,6 +16,35 @@ use std::ops::{Deref, DerefMut};
 // Member-expression equality is relatively expensive, and raising the cutoff to 16 regressed
 // performance for comparatively little additional memory savings.
 const LINEAR_SEARCH_THRESHOLD: usize = 8;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct MemberPath(LeanStr);
+
+impl MemberPath {
+    fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl From<String> for MemberPath {
+    fn from(path: String) -> Self {
+        Self(LeanStr::from(path))
+    }
+}
+
+impl get_size2::GetSize for MemberPath {
+    fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(
+        &self,
+        mut tracker: T,
+    ) -> (usize, T) {
+        let size = if self.0.is_heap_allocated() && tracker.track(self.0.as_ptr()) {
+            self.0.len()
+        } else {
+            0
+        };
+        (size, tracker)
+    }
+}
 
 /// A member access, e.g. `x.y` or `x[1]` or `x["foo"]`.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
@@ -156,8 +186,8 @@ impl get_size2::GetSize for MemberFlags {}
 /// The symbol name can be extracted from the path by taking the text up to the first segment's start offset.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct MemberExpr {
-    /// The entire path as a single Name
-    path: Name,
+    /// The entire path as a single immutable string.
+    path: MemberPath,
     /// Metadata for each segment (in forward order)
     segments: Segments,
 }
@@ -173,7 +203,7 @@ impl MemberExpr {
             None
         } else {
             Some(Self {
-                path: Name::from(builder.path),
+                path: MemberPath::from(builder.path),
                 segments: Segments::from_vec(builder.segments),
             })
         }

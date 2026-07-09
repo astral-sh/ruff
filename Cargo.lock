@@ -4831,6 +4831,7 @@ dependencies = [
  "get-size2",
  "hashbrown 0.17.1",
  "itertools 0.15.0",
+ "lean_string",
  "ruff_db",
  "ruff_index",
  "ruff_macros",
