@@ -352,7 +352,7 @@ pub struct Completion<'db> {
 }
 
 impl<'db> Completion<'db> {
-    fn builder(name: impl Into<Name>) -> CompletionBuilder<'db> {
+    fn builder(name: impl Into<CompactString>) -> CompletionBuilder<'db> {
         CompletionBuilder::new(name)
     }
 }
@@ -383,14 +383,9 @@ impl<'db> CompletionBuilder<'db> {
     /// All other values given to the completion by default are
     /// valid, but callers will generally want to fill in as much
     /// as is appropriate.
-    fn new(name: impl Into<Name>) -> CompletionBuilder<'db> {
-        let name: Name = name.into();
-        Self::from_name(name.into())
-    }
-
-    fn from_name(name: CompactString) -> CompletionBuilder<'db> {
+    fn new(name: impl Into<CompactString>) -> CompletionBuilder<'db> {
         CompletionBuilder {
-            name,
+            name: name.into(),
             qualified: None,
             insert: None,
             ty: None,
@@ -412,7 +407,7 @@ impl<'db> CompletionBuilder<'db> {
     ) -> CompletionBuilder<'db> {
         let definition = semantic.ty.and_then(|ty| Definitions::from_ty(db, ty));
         let documentation = definition.and_then(|def| def.docstring(db));
-        CompletionBuilder::from_name(semantic.name)
+        Completion::builder(semantic.name)
             .ty(semantic.ty)
             .builtin(semantic.builtin)
             .docstring(documentation)
@@ -422,7 +417,7 @@ impl<'db> CompletionBuilder<'db> {
     ///
     /// This is just like `CompletionBuilder::new`, but sets the kind
     /// to "keyword."
-    fn keyword(name: impl Into<Name>) -> CompletionBuilder<'db> {
+    fn keyword(name: impl Into<CompactString>) -> CompletionBuilder<'db> {
         Completion::builder(name).kind(CompletionKind::Keyword)
     }
 
@@ -483,7 +478,7 @@ impl<'db> CompletionBuilder<'db> {
             .kind
             .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
         let relevance = Relevance::new(ctx, query, &self);
-        let label = self.insert.clone().unwrap_or_else(|| self.name.clone());
+        let label = self.insert.as_ref().unwrap_or(&self.name).clone();
         let (insert, insert_text_format) = if ctx.should_complete_callable_parentheses(kind) {
             if ctx.capabilities.snippets {
                 let insert = compact_str::format_compact!("{label}($0)");
@@ -1625,9 +1620,8 @@ fn extract_base_class_names(class_def: &ast::StmtClassDef) -> FxHashSet<CompactS
     class_def
         .bases()
         .iter()
-        .filter_map(|expr| {
-            UnqualifiedName::from_expr(expr).map(|name| compact_str::format_compact!("{name}"))
-        })
+        .filter_map(UnqualifiedName::from_expr)
+        .map(|name| compact_str::format_compact!("{name}"))
         .collect()
 }
 
@@ -1716,7 +1710,7 @@ impl Relevance {
             } else {
                 Sort::Even
             },
-            name_kind: NameKind::classify(c.name.as_str()),
+            name_kind: NameKind::classify(&c.name),
             is_in_scope: if c.module_dependency_kind == Some(ModuleDependencyKind::Current) {
                 Sort::Higher
             } else {

@@ -206,7 +206,7 @@ impl<'db> SemanticModel<'db> {
             let ty = Type::module_literal(self.db, self.file, *submodule);
             let base = submodule.name(self.db).last_component();
             completions.push(Completion {
-                name: Name::new(base).into(),
+                name: CompactString::new(base),
                 ty: Some(ty),
                 builtin,
             });
