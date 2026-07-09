@@ -1,3 +1,4 @@
+use compact_str::CompactString;
 use ruff_db::files::{File, FilePath};
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::{line_index, source_text};
@@ -134,7 +135,7 @@ impl<'db> SemanticModel<'db> {
                 let builtin = module.is_known(self.db, KnownModule::Builtins);
                 let ty = Type::module_literal(self.db, self.file, module);
                 Completion {
-                    name: CompletionName::Module(module.name(self.db)),
+                    name: CompactString::new(module.name(self.db).as_str()),
                     ty: Some(ty),
                     builtin,
                 }
@@ -619,11 +620,7 @@ pub enum NameKind {
 }
 
 impl NameKind {
-    pub fn classify(name: &Name) -> NameKind {
-        Self::classify_str(name.as_str())
-    }
-
-    fn classify_str(name: &str) -> NameKind {
+    pub fn classify(name: &str) -> NameKind {
         // Dunder needs a prefix and suffix double underscore.
         // When there's only a prefix double underscore, this
         // results in explicit name mangling. We let that be
@@ -644,7 +641,7 @@ impl NameKind {
 #[derive(Clone, Debug)]
 pub struct Completion<'db> {
     /// The label shown to the user for this suggestion.
-    pub name: CompletionName<'db>,
+    pub name: CompactString,
     /// The type of this completion, if available.
     ///
     /// Generally speaking, this is always available
@@ -659,77 +656,6 @@ pub struct Completion<'db> {
     /// use it mainly in tests so that we can write less
     /// noisy tests.
     pub builtin: bool,
-}
-
-/// The name used to match and display a completion.
-#[derive(Clone, Debug)]
-pub enum CompletionName<'db> {
-    /// A Python identifier.
-    Name(Name),
-    /// An absolute, possibly dotted module name.
-    Module(&'db ModuleName),
-}
-
-impl CompletionName<'_> {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Name(name) => name.as_str(),
-            Self::Module(name) => name.as_str(),
-        }
-    }
-
-    pub fn name_kind(&self) -> NameKind {
-        match self {
-            Self::Name(name) => NameKind::classify(name),
-            Self::Module(name) => NameKind::classify_str(name.as_str()),
-        }
-    }
-}
-
-impl std::ops::Deref for CompletionName<'_> {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_str()
-    }
-}
-
-impl PartialEq for CompletionName<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.as_str() == other.as_str()
-    }
-}
-
-impl Eq for CompletionName<'_> {}
-
-impl PartialOrd for CompletionName<'_> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for CompletionName<'_> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.as_str().cmp(other.as_str())
-    }
-}
-
-impl PartialEq<str> for CompletionName<'_> {
-    fn eq(&self, other: &str) -> bool {
-        self.as_str() == other
-    }
-}
-
-impl PartialEq<&str> for CompletionName<'_> {
-    fn eq(&self, other: &&str) -> bool {
-        self.as_str() == *other
-    }
-}
-
-impl From<Name> for CompletionName<'_> {
-    fn from(name: Name) -> Self {
-        Self::Name(name)
-    }
 }
 
 #[derive(Clone, Debug)]
