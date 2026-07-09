@@ -124,8 +124,7 @@ impl<'a> Diff<'a> {
     }
 }
 
-// Get slices slightly larger than the diff groups, helps to
-// minimise changes to the existing diffs
+/// Limit diffs to a narrow range around each fix rather than diffing the whole file.
 const DIFF_CONTEXT_WINDOW: usize = 3;
 
 impl std::fmt::Display for Diff<'_> {
