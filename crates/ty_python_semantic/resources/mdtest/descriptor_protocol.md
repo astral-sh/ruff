@@ -381,7 +381,7 @@ reveal_type(UnionC.attribute)  # revealed: Any | Literal["descriptor"]
 A `TypeForm` argument describes the instances produced by a type form, not the runtime type form
 value itself. A metaclass attribute typed as `TypeForm[Descriptor]` can therefore be a class whose
 own metaclass makes it a data descriptor, and must continue to take precedence over a class
-attribute with the same name when assigning to the attribute:
+attribute with the same name when reading or assigning to the attribute:
 
 ```py
 from typing_extensions import TypeForm
@@ -398,6 +398,7 @@ class Meta(type):
 class C(metaclass=Meta):
     attribute: int = 1
 
+reveal_type(C.attribute)  # revealed: TypeForm[Descriptor] | int
 C.attribute = 1  # error: [invalid-assignment]
 C.attribute = Descriptor  # error: [invalid-assignment]
 ```
@@ -406,7 +407,7 @@ C.attribute = Descriptor  # error: [invalid-assignment]
 
 An inexact `type[Base]` attribute can hold a subclass whose custom metaclass makes the class object
 a data descriptor. It must therefore continue to take precedence over a class attribute with the
-same name when assigning to the attribute:
+same name when reading or assigning to the attribute:
 
 ```py
 class Base: ...
@@ -423,6 +424,7 @@ class Meta(type):
 class C(metaclass=Meta):
     attribute: int = 1
 
+reveal_type(C.attribute)  # revealed: type[Base] | int
 C.attribute = 1  # error: [invalid-assignment]
 C.attribute = Descriptor  # error: [invalid-assignment]
 ```

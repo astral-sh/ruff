@@ -22,10 +22,10 @@ use crate::{
     },
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-        CallableType, ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
-        InstanceFallbackShadowsNonDataDescriptor, KnownFunction, MemberLookupPolicy,
-        PropertyInstanceType, ProtocolInstanceType, SelfBinding, StaticClassLiteral, Type,
-        TypeMapping, TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable,
+        CallableType, ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor, KnownFunction,
+        MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType,
+        ReceiverMemberShadowsNonDataDescriptor, SelfBinding, StaticClassLiteral, Type, TypeMapping,
+        TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
@@ -1154,7 +1154,7 @@ fn protocol_member_read_type<'db>(
             ty,
             member.name,
             Place::Undefined.into(),
-            InstanceFallbackShadowsNonDataDescriptor::No,
+            ReceiverMemberShadowsNonDataDescriptor::No,
             // The undefined fallback excludes instance members. Keep the class
             // member lookup from reintroducing dynamic instance fallbacks.
             MemberLookupPolicy::NO_INSTANCE_FALLBACK,
