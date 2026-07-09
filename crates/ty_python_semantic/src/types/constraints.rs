@@ -822,35 +822,35 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             return Ok((self, static_typevars));
         }
 
-        let static_domain =
-            Self::valid_specializations(db, builder, static_typevars.iter().copied());
-        let gradual_locals =
-            InferableTypeVars::from_bound_typevars(db, gradual.iter().map(|(typevar, _)| *typevar));
-        let mut choice_domains = vec![ALWAYS_TRUE];
-        for (typevar, constraints) in gradual {
-            choice_domains = choice_domains
-                .into_iter()
-                .flat_map(|domain| {
-                    constraints.iter().map(move |constraint| {
-                        let choice = Constraint::new_node(
-                            db,
-                            builder,
-                            typevar,
-                            constraint.bottom_materialization(db),
-                            constraint.top_materialization(db),
-                        );
-                        domain.and(builder, choice)
-                    })
-                })
-                .collect();
-        }
-
-        let mut projected = Self::always(builder);
-        for domain in choice_domains {
-            let branch = Self::from_node(builder, domain)
-                .and(db, builder, || self)
-                .try_exists_assuming(db, builder, gradual_locals, static_domain)?;
-            projected = projected.and(db, builder, || branch);
+        let mut projected = self;
+        for (index, (typevar, constraints)) in gradual.iter().enumerate() {
+            let remaining_typevars = static_typevars
+                .iter()
+                .copied()
+                .chain(gradual[index + 1..].iter().map(|(typevar, _)| *typevar));
+            let assumptions = Self::valid_specializations(db, builder, remaining_typevars);
+            let local = InferableTypeVars::from_bound_typevars(db, [*typevar]);
+            let mut choices = Self::always(builder);
+            for constraint in *constraints {
+                let domain = Self::from_node(
+                    builder,
+                    Constraint::new_node(
+                        db,
+                        builder,
+                        *typevar,
+                        constraint.bottom_materialization(db),
+                        constraint.top_materialization(db),
+                    ),
+                );
+                let branch = domain.and(db, builder, || projected).try_exists_assuming(
+                    db,
+                    builder,
+                    local,
+                    assumptions,
+                )?;
+                choices = choices.and(db, builder, || branch);
+            }
+            projected = choices;
         }
         Ok((projected, static_typevars))
     }

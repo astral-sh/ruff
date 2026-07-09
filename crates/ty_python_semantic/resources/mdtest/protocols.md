@@ -3160,6 +3160,48 @@ class AnyParameters:
     ) -> None:
         return None
 
+class ConnectedGradualParametersProtocol(Protocol):
+    def f[
+        T0: (Any, int),
+        T1: (Any, int),
+        T2: (Any, int),
+        T3: (Any, int),
+        T4: (Any, int),
+        T5: (Any, int),
+        T6: (Any, int),
+        T7: (Any, int),
+        T8: (Any, int),
+        T9: (Any, int),
+    ](
+        self,
+        value0: T0,
+        value1: T1,
+        value2: T2,
+        value3: T3,
+        value4: T4,
+        value5: T5,
+        value6: T6,
+        value7: T7,
+        value8: T8,
+        value9: T9,
+    ) -> None: ...
+
+class SharedGradualParameter:
+    def f[S](
+        self,
+        value0: S,
+        value1: S,
+        value2: S,
+        value3: S,
+        value4: S,
+        value5: S,
+        value6: S,
+        value7: S,
+        value8: S,
+        value9: S,
+    ) -> None:
+        return None
+
 class GradualGenericIdentity:
     def f[S](self, value: S) -> S | Any:
         return value
@@ -3181,6 +3223,8 @@ static_assert(is_assignable_to(IntIdentity, GradualConstrainedIdentityProtocol))
 static_assert(not is_subtype_of(IntIdentity, GradualConstrainedIdentityProtocol))
 # The gradual constraint does not expand the other constrained parameters into a Cartesian product.
 static_assert(is_assignable_to(AnyParameters, ManyConstrainedParametersProtocol))
+# Connected gradual parameters are projected incrementally instead of enumerating every choice tuple.
+static_assert(is_assignable_to(SharedGradualParameter, ConnectedGradualParametersProtocol))
 static_assert(is_assignable_to(GradualGenericIdentity, IdentityProtocol))
 static_assert(not is_subtype_of(GradualGenericIdentity, IdentityProtocol))
 static_assert(is_assignable_to(IntersectionIdentity, IdentityProtocol))
