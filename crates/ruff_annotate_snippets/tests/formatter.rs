@@ -3719,6 +3719,82 @@ error[E0277]: the size for values of type `T` cannot be known at compilation tim
 }
 
 #[test]
+fn empty_span_end_line() {
+    let source = "#: E112\nif False:\nprint()\n#: E113\nprint()\n";
+    let input = &[Group::with_level(Level::ERROR).element(
+        Snippet::source(source)
+            .line_start(7)
+            .fold(false)
+            .annotation(AnnotationKind::Primary.span(17..17).label("E112")),
+    )];
+
+    let expected_ascii = str![[r#"
+   |
+ 7 | #: E112
+ 8 | if False:
+   |          ^ E112
+ 9 | print()
+10 | #: E113
+11 | print()
+   |
+"#]];
+    let renderer = Renderer::plain();
+    assert_data_eq!(renderer.render(input), expected_ascii);
+
+    let expected_unicode = str![[r#"
+   ╭▸ 
+ 7 │ #: E112
+ 8 │ if False:
+   │          ━ E112
+ 9 │ print()
+10 │ #: E113
+11 │ print()
+   ╰╴
+"#]];
+    let renderer = renderer.decor_style(DecorStyle::Unicode);
+    assert_data_eq!(renderer.render(input), expected_unicode);
+}
+
+#[test]
+fn span_eol() {
+    let source = "#: E112\nif False:\nprint()\n#: E113\nprint()\n";
+    let input = &[Group::with_level(Level::ERROR).element(
+        Snippet::source(source)
+            .line_start(7)
+            .fold(false)
+            .annotation(AnnotationKind::Primary.span(17..18).label("E112")),
+    )];
+
+    let expected_ascii = str![[r#"
+   |
+ 7 |   #: E112
+ 8 |   if False:
+   |  __________^
+ 9 | | print()
+   | |_^ E112
+10 |   #: E113
+11 |   print()
+   |
+"#]];
+    let renderer = Renderer::plain();
+    assert_data_eq!(renderer.render(input), expected_ascii);
+
+    let expected_unicode = str![[r#"
+   ╭▸ 
+ 7 │   #: E112
+ 8 │   if False:
+   │ ┏━━━━━━━━━━┛
+ 9 │ ┃ print()
+   │ ┗━┛ E112
+10 │   #: E113
+11 │   print()
+   ╰╴
+"#]];
+    let renderer = renderer.decor_style(DecorStyle::Unicode);
+    assert_data_eq!(renderer.render(input), expected_unicode);
+}
+
+#[test]
 fn empty_span_start_line() {
     let source = "#: E112\nif False:\nprint()\n#: E113\nprint()\n";
     let input = &[Group::with_level(Level::ERROR).element(
@@ -5527,6 +5603,82 @@ note: details
             ╰╴       ━━━━ oops
 help: suggestion
             ─▸ <current file>
+"#]];
+    let renderer = renderer.decor_style(DecorStyle::Unicode);
+    assert_data_eq!(renderer.render(input), expected_unicode);
+}
+
+#[test]
+fn trailing_newline_span() {
+    let input = &[Level::ERROR
+        .primary_title("Extra newline at end of file")
+        .id("W391")
+        .is_fixable(true)
+        .element(
+            Snippet::source("    foo()\n    bar()\n\n")
+                .path("W391_0.py")
+                .line_start(12)
+                .annotation(AnnotationKind::Primary.span(20..21))
+                .fold(false),
+        )];
+    let expected_ascii = str![[r#"
+error[W391][*]: Extra newline at end of file
+  --> W391_0.py:14:1
+   |
+12 |     foo()
+13 |     bar()
+14 |
+   | ^
+"#]];
+
+    let renderer = Renderer::plain();
+    assert_data_eq!(renderer.render(input), expected_ascii);
+
+    let expected_unicode = str![[r#"
+error[W391][*]: Extra newline at end of file
+   ╭▸ W391_0.py:14:1
+   │
+12 │     foo()
+13 │     bar()
+14 │
+   ╰╴━
+"#]];
+    let renderer = renderer.decor_style(DecorStyle::Unicode);
+    assert_data_eq!(renderer.render(input), expected_unicode);
+}
+
+#[test]
+fn multi_newline_span() {
+    let input = &[Level::ERROR
+        .primary_title("Too many newlines at end of cell")
+        .id("W391")
+        .is_fixable(true)
+        .element(
+            Snippet::source("\n\n")
+                .path("W391.ipynb")
+                .line_start(19)
+                .annotation(AnnotationKind::Primary.span(0..2))
+                .fold(false),
+        )];
+    let expected_ascii = str![[r#"
+error[W391][*]: Too many newlines at end of cell
+  --> W391.ipynb:19:1
+   |
+19 | /
+20 | |
+   | |_^
+"#]];
+
+    let renderer = Renderer::plain();
+    assert_data_eq!(renderer.render(input), expected_ascii);
+
+    let expected_unicode = str![[r#"
+error[W391][*]: Too many newlines at end of cell
+   ╭▸ W391.ipynb:19:1
+   │
+19 │ ┏
+20 │ ┃
+   ╰╴┗━┛
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
     assert_data_eq!(renderer.render(input), expected_unicode);
