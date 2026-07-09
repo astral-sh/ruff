@@ -24,7 +24,9 @@ Settings: WorkspaceSettings {
         auto_import: true,
         complete_function_parentheses: false,
     },
-    overrides: None,
+    configuration_file: None,
+    override_options: None,
+    fallback_options: None,
 }
 
 Project at XXX

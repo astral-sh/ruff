@@ -163,13 +163,10 @@ fn benchmark_incremental(criterion: &mut Criterion) {
     fn incremental(case: &mut Case) {
         let Case { db, .. } = case;
 
-        db.apply_changes(
-            &[ChangeEvent::Changed {
-                path: case.file_path.clone(),
-                kind: ChangedKind::FileContent,
-            }],
-            None,
-        );
+        db.apply_changes(&[ChangeEvent::Changed {
+            path: case.file_path.clone(),
+            kind: ChangedKind::FileContent,
+        }]);
 
         let result = db.check();
 
