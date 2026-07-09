@@ -764,7 +764,7 @@ impl<'m> Context<'m> {
                     // same scope (in which case the bases refer to the prior
                     // definition).
                     if !model.is_class_name_reassigned(class_def) {
-                        bases.insert(class_def.name.id.clone());
+                        bases.insert(CompactString::new(class_def.name.as_str()));
                     }
                     bases
                 });
@@ -1550,7 +1550,7 @@ struct CollectionContext<'db> {
     /// including the class being defined (unless its name was previously bound).
     /// Used to filter out duplicate and self-referential base class suggestions.
     /// This is only `Some` when we're in a class definition context.
-    existing_class_bases: Option<FxHashSet<Name>>,
+    existing_class_bases: Option<FxHashSet<CompactString>>,
     /// When set, the context dictates that only *these* keywords
     /// are acceptable in this context.
     valid_keywords: Option<FxHashSet<&'static str>>,
@@ -1594,14 +1594,17 @@ impl<'db> CollectionContext<'db> {
         // Exclude classes that are already listed as base classes in the class definition.
         if let Some(ref existing_class_bases) = self.existing_class_bases {
             // For in-scope completions, check if the simple name matches.
-            if builder.import.is_none() && existing_class_bases.contains(builder.name.as_str()) {
+            if builder.import.is_none()
+                && let SemanticCompletionName::Name(name) = &builder.name
+                && existing_class_bases.contains(name.as_str())
+            {
                 return true;
             }
             // For auto-import completions, check if the qualified name matches.
             // This handles cases like `class Foo(mod.Bar, ...)` where we want to
             // filter out auto-import suggestions for `Bar` from module `mod`.
             if let Some(ref qualified) = builder.qualified
-                && existing_class_bases.contains(qualified.as_str())
+                && existing_class_bases.contains(qualified)
             {
                 return true;
             }
@@ -1624,11 +1627,13 @@ impl<'db> CollectionContext<'db> {
 ///
 /// For simple name references (e.g., `Foo`), returns the name as-is.
 /// For attribute accesses (e.g., `mod.Foo`), returns the full dotted path.
-fn extract_base_class_names(class_def: &ast::StmtClassDef) -> FxHashSet<Name> {
+fn extract_base_class_names(class_def: &ast::StmtClassDef) -> FxHashSet<CompactString> {
     class_def
         .bases()
         .iter()
-        .filter_map(|expr| UnqualifiedName::from_expr(expr).map(|name| Name::new(name.to_string())))
+        .filter_map(|expr| {
+            UnqualifiedName::from_expr(expr).map(|name| compact_str::format_compact!("{name}"))
+        })
         .collect()
 }
 
@@ -1717,7 +1722,7 @@ impl Relevance {
             } else {
                 Sort::Even
             },
-            name_kind: NameKind::classify(c.name.as_str()),
+            name_kind: c.name.name_kind(),
             is_in_scope: if c.module_dependency_kind == Some(ModuleDependencyKind::Current) {
                 Sort::Higher
             } else {

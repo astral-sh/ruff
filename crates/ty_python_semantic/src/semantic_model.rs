@@ -619,7 +619,11 @@ pub enum NameKind {
 }
 
 impl NameKind {
-    pub fn classify(name: &str) -> NameKind {
+    pub fn classify(name: &Name) -> NameKind {
+        Self::classify_str(name.as_str())
+    }
+
+    fn classify_str(name: &str) -> NameKind {
         // Dunder needs a prefix and suffix double underscore.
         // When there's only a prefix double underscore, this
         // results in explicit name mangling. We let that be
@@ -671,6 +675,13 @@ impl CompletionName<'_> {
         match self {
             Self::Name(name) => name.as_str(),
             Self::Module(name) => name.as_str(),
+        }
+    }
+
+    pub fn name_kind(&self) -> NameKind {
+        match self {
+            Self::Name(name) => NameKind::classify(name),
+            Self::Module(name) => NameKind::classify_str(name.as_str()),
         }
     }
 }
