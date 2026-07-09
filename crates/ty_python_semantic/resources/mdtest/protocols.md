@@ -2907,7 +2907,7 @@ python-version = "3.12"
 ```py
 from collections.abc import Callable, Sequence
 from typing import Any, Protocol
-from ty_extensions import static_assert
+from ty_extensions import Intersection, static_assert
 from ty_extensions._internal import is_assignable_to, is_subtype_of
 
 class IdentityProtocol(Protocol):
@@ -2975,6 +2975,10 @@ class GradualGenericIdentity:
     def f[S](self, value: S) -> S | Any:
         return value
 
+class IntersectionIdentity:
+    def f[S](self, value: S) -> Intersection[S, int]:
+        raise NotImplementedError
+
 class OptionalReturnIdentity:
     def f[S](self, value: S) -> S | None:
         return value
@@ -2986,6 +2990,8 @@ static_assert(is_assignable_to(UnknownIdentity, IdentityProtocol))
 static_assert(not is_subtype_of(UnknownIdentity, IdentityProtocol))
 static_assert(is_assignable_to(GradualGenericIdentity, IdentityProtocol))
 static_assert(not is_subtype_of(GradualGenericIdentity, IdentityProtocol))
+static_assert(is_assignable_to(IntersectionIdentity, IdentityProtocol))
+static_assert(is_subtype_of(IntersectionIdentity, IdentityProtocol))
 
 # A fully static union does not acquire the same assignability from an unrelated arm.
 static_assert(not is_assignable_to(OptionalReturnIdentity, IdentityProtocol))

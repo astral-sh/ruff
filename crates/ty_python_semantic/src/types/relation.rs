@@ -1131,18 +1131,52 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             });
         }
 
-        // A source union must relate to the target through every element. Preserve that structure
-        // when the target variable is universal; lazy evaluation would otherwise capture the
-        // entire union as an opaque lower bound before reaching the ordinary union rule below.
-        if let (Type::Union(union), Type::TypeVar(typevar)) = (source, target)
+        let should_expand_intersection = |intersection: IntersectionType<'db>| {
+            intersection
+                .positive(db)
+                .iter()
+                .any(|element| match element {
+                    Type::TypeVar(tvar) => !tvar.is_inferable(db, self.inferable),
+                    Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_union(),
+                    _ => false,
+                })
+        };
+
+        // Preserve the ordinary source union/intersection rules when the target variable is
+        // universal. Lazy evaluation would otherwise capture the entire set-theoretic type as an
+        // opaque lower bound.
+        if let Type::TypeVar(typevar) = target
             && self.is_universally_quantified(db, typevar)
         {
-            return union
-                .elements(db)
-                .iter()
-                .when_all(db, self.constraints, |&element| {
-                    self.check_type_pair(db, element, target)
-                });
+            match source {
+                Type::Union(union) => {
+                    return union
+                        .elements(db)
+                        .iter()
+                        .when_all(db, self.constraints, |&element| {
+                            self.check_type_pair(db, element, target)
+                        });
+                }
+                Type::Intersection(intersection) => {
+                    return intersection
+                        .positive_elements_or_object(db)
+                        .when_any(db, self.constraints, |element| {
+                            self.check_type_pair(db, element, target)
+                        })
+                        .or(db, self.constraints, || {
+                            if should_expand_intersection(intersection) {
+                                self.check_type_pair(
+                                    db,
+                                    intersection.with_expanded_typevars_and_newtypes(db),
+                                    target,
+                                )
+                            } else {
+                                self.never()
+                            }
+                        });
+                }
+                _ => {}
+            }
         }
 
         if self.is_gradual_assignability_with_universal_typevar(db, source, target) {
@@ -1183,17 +1217,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 );
             }
         }
-
-        let should_expand_intersection = |intersection: IntersectionType<'db>| {
-            intersection
-                .positive(db)
-                .iter()
-                .any(|element| match element {
-                    Type::TypeVar(tvar) => !tvar.is_inferable(db, self.inferable),
-                    Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_union(),
-                    _ => false,
-                })
-        };
 
         match (source, target) {
             // Everything is a subtype of `object`.
