@@ -3231,6 +3231,17 @@ static_assert(is_subtype_of(ReorderedPair, PairProtocol))
 class Base: ...
 class Derived(Base): ...
 
+class BoundedOptionalIdentityProtocol(Protocol):
+    def f[T: Base](self, value: T) -> T: ...
+
+class BoundedOptionalIdentitySource:
+    def f[S: Base](self, value: S | None) -> S:
+        raise NotImplementedError
+
+# The target domain satisfies the source variable's bound, so choosing `S = T` is valid.
+static_assert(is_assignable_to(BoundedOptionalIdentitySource, BoundedOptionalIdentityProtocol))
+static_assert(is_subtype_of(BoundedOptionalIdentitySource, BoundedOptionalIdentityProtocol))
+
 class DerivedBoundProtocol(Protocol):
     def f[T: Derived](self, value: T) -> T: ...
 

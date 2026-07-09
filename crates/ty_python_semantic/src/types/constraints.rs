@@ -3092,8 +3092,22 @@ impl NodeId {
                         .as_typevar()
                         .filter(|typevar| typevar.is_inferable(db, bound_typevars))
                 }) {
-                    if typevar.typevar(db).bound_or_constraints(db).is_some() {
-                        return false;
+                    match typevar.typevar(db).bound_or_constraints(db) {
+                        None => {}
+                        Some(TypeVarBoundOrConstraints::UpperBound(upper)) => {
+                            if !assumptions
+                                .implies_subtype_of(
+                                    db,
+                                    builder,
+                                    subject,
+                                    upper.top_materialization(db),
+                                )
+                                .is_always_satisfied(db, builder)
+                            {
+                                return false;
+                            }
+                        }
+                        Some(TypeVarBoundOrConstraints::Constraints(_)) => return false,
                     }
 
                     let updated = specialized.substitute_one_typevar(db, typevar, subject);
