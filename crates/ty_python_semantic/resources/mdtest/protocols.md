@@ -2793,6 +2793,9 @@ LegacyReceiverT = TypeVar("LegacyReceiverT")
 class UsesLegacyReceiver(Protocol):
     def compare(self: LegacyReceiverT, other: LegacyReceiverT) -> bool: ...
 
+class UsesPep695Receiver(Protocol):
+    def compare[T](self: T, other: T) -> bool: ...
+
 LegacyCopyT = TypeVar("LegacyCopyT", bound="LegacyCopyable")
 
 class LegacyCopyable(Protocol):
@@ -2861,6 +2864,8 @@ static_assert(is_assignable_to(NominalWithSelf, UsesSelf))
 static_assert(is_subtype_of(NominalWithSelf, UsesSelf))
 static_assert(is_assignable_to(NominalLegacyReceiver, UsesLegacyReceiver))
 static_assert(is_subtype_of(NominalLegacyReceiver, UsesLegacyReceiver))
+static_assert(is_assignable_to(NominalLegacyReceiver, UsesPep695Receiver))
+static_assert(is_subtype_of(NominalLegacyReceiver, UsesPep695Receiver))
 static_assert(is_assignable_to(NominalLegacyReceiver, LegacyCopyable))
 static_assert(is_assignable_to(NominalLegacyReceiver, UsesLegacyClassReceiver))
 

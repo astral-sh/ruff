@@ -935,7 +935,16 @@ python-version = "3.13"
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, MutableMapping
-from typing import Protocol, TypeVar, final, overload
+from typing import Protocol, TypeVar, final, overload, override
+
+class GenericReceiverBase:
+    def compare[T](self: T, other: T) -> bool:
+        return True
+
+class GenericReceiverChild(GenericReceiverBase):
+    @override
+    def compare(self, other: GenericReceiverChild) -> bool:
+        return True
 
 class Base:
     @overload

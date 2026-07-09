@@ -137,6 +137,15 @@ impl<'db> PartialSignatureApplication<'db> {
 }
 
 impl<'db> CallableSignature<'db> {
+    /// Returns whether any overload has an unbounded PEP 695 variable as its instance receiver.
+    pub(crate) fn has_unbounded_pep695_instance_receiver(&self, db: &'db dyn Db) -> bool {
+        self.overloads.iter().any(|signature| {
+            signature
+                .unbounded_pep695_receiver_typevar(db)
+                .is_some_and(|(_, is_class_receiver)| !is_class_receiver)
+        })
+    }
+
     pub(crate) fn single(signature: Signature<'db>) -> Self {
         Self {
             overloads: smallvec_inline![signature],
@@ -949,19 +958,25 @@ impl<'db> Signature<'db> {
     }
 
     pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
-        let removed_receiver = self.parameters.get(0).is_some_and(Parameter::is_positional);
+        let bound_receiver = self.bind_pep695_receiver_typevar(db, self_type);
+        let signature = bound_receiver.as_ref().unwrap_or(self);
+
+        let removed_receiver = signature
+            .parameters
+            .get(0)
+            .is_some_and(Parameter::is_positional);
 
         // TODO: Theoretically, for a signature like `f(*args: *tuple[MyClass, int, *tuple[str, ...]])` with
         // a variadic first parameter, we should also "skip the first parameter" by modifying the tuple type.
         let mut parameters = if removed_receiver {
-            self.parameters.without_first()
+            signature.parameters.without_first()
         } else {
-            self.parameters.clone()
+            signature.parameters.clone()
         };
-        let mut return_ty = self.return_ty;
-        let binding_context = self.definition.map(BindingContext::Definition);
+        let mut return_ty = signature.return_ty;
+        let binding_context = signature.definition.map(BindingContext::Definition);
         if let Some(self_type) = self_type
-            && self.needs_self_mapping(db, removed_receiver)
+            && signature.needs_self_mapping(db, removed_receiver)
         {
             let self_mapping =
                 TypeMapping::BindSelf(SelfBinding::new(db, self_type, binding_context));
@@ -974,13 +989,60 @@ impl<'db> Signature<'db> {
             return_ty = return_ty.apply_type_mapping(db, &self_mapping, TypeContext::default());
         }
         Self {
-            generic_context: self
+            generic_context: signature
                 .generic_context
                 .map(|generic_context| generic_context.remove_self(db, binding_context)),
-            definition: self.definition,
+            definition: signature.definition,
             parameters,
             return_ty,
         }
+    }
+
+    /// Binds an unbounded PEP 695 type variable used directly by an explicit receiver annotation.
+    fn bind_pep695_receiver_typevar(
+        &self,
+        db: &'db dyn Db,
+        self_type: Option<Type<'db>>,
+    ) -> Option<Self> {
+        let (typevar, _) = self.unbounded_pep695_receiver_typevar(db)?;
+
+        let receiver_type = self_type.unwrap_or_else(|| {
+            Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+                db,
+                Type::object(),
+                typevar.binding_context(db),
+            ))
+        });
+        Some(self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(typevar, receiver_type)),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        ))
+    }
+
+    fn unbounded_pep695_receiver_typevar(
+        &self,
+        db: &'db dyn Db,
+    ) -> Option<(BoundTypeVarInstance<'db>, bool)> {
+        let receiver = self.parameters.get(0)?;
+        if !receiver.is_positional() || receiver.inferred_annotation {
+            return None;
+        }
+
+        let (typevar, is_class_receiver) = match receiver.annotated_type() {
+            Type::TypeVar(typevar) => (typevar, false),
+            Type::SubclassOf(subclass_of) => (subclass_of.into_type_var()?, true),
+            _ => return None,
+        };
+        // Bounded and constrained receivers require preserving their specialization domain when
+        // `Self` is applied later. Leave those on the existing conservative path.
+        (typevar.kind(db) == TypeVarKind::Pep695TypeVar
+            && typevar.typevar(db).bound_or_constraints(db).is_none()
+            && self.definition.is_some_and(|definition| {
+                typevar.binding_context(db).definition() == Some(definition)
+            }))
+        .then_some((typevar, is_class_receiver))
     }
 
     /// Returns `true` if this signature's first parameter can accept the bound `self` type.

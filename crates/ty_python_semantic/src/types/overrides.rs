@@ -381,13 +381,25 @@ fn check_class_declaration<'db>(
             let superclass_instance_member =
                 Type::instance(db, superclass).member(db, &member.name);
             let Place::Defined(DefinedPlace {
-                ty: superclass_type,
+                ty: mut superclass_type,
                 ..
             }) = superclass_instance_member.place
             else {
                 // If not defined on any superclass, no point in continuing to walk up the MRO
                 break;
             };
+
+            // A method-local variable used as an explicit receiver is specialized by descriptor
+            // binding. Bind the inherited method to the subclass before comparing the override.
+            if let Type::BoundMethod(method) = superclass_type
+                && method
+                    .function(db)
+                    .signature(db)
+                    .has_unbounded_pep695_instance_receiver(db)
+            {
+                superclass_type =
+                    Type::BoundMethod(method.map_self_type(db, |_| instance_of_class));
+            }
 
             subclass_overrides_superclass_declaration = true;
 
