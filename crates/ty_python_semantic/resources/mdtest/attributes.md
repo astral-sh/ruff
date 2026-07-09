@@ -1298,6 +1298,24 @@ class InitializedDerived(DeclaringBase, metaclass=DerivedInitializingMeta): ...
 reveal_type(InitializedDerived.inherited_attr)  # revealed: int
 ```
 
+An assignment through `cls` in an arbitrary metaclass method also writes to the constructed class
+object if that method is called. Class-object lookup currently treats such an inferred write as
+definitely present and drops an inherited value.
+
+```py
+class InstallingClassAttributeMeta(type):
+    def install(cls) -> None:
+        cls.installed: int = 1
+
+class InstalledClassAttributeBase:
+    installed = "inherited"
+
+class OptionallyInstalledClassAttribute(InstalledClassAttributeBase, metaclass=InstallingClassAttributeMeta): ...
+
+# TODO: Without tracking calls to `install`, lookup should conservatively reveal `int | str`.
+reveal_type(OptionallyInstalledClassAttribute.installed)  # revealed: int
+```
+
 ## Attributes stored on classes by metaclasses
 
 An attribute declared in a metaclass with an annotation but no value describes an attribute of every
@@ -1697,9 +1715,7 @@ reveal_type(ConditionalMethodAssignment().generated)  # revealed: int | str
 ```
 
 An attribute assigned in the metaclass body is available on classes that use the metaclass, but not
-on their instances. By contrast, assigning through `cls` in a metaclass instance method describes an
-instance member of the metaclass. The metaclass instance is the constructed class object, so the
-attribute is stored in that class's namespace and is available through its instances:
+on their instances:
 
 ```py
 class MetaclassAttributeOnly(type):
@@ -1711,7 +1727,13 @@ reveal_type(DoesNotInheritMetaclassAttribute.metaclass_only)  # revealed: int
 
 # error: [unresolved-attribute]
 reveal_type(DoesNotInheritMetaclassAttribute().metaclass_only)  # revealed: Unknown
+```
 
+By contrast, an assignment through `cls` in a metaclass instance method writes to the constructed
+class namespace and is available through its instances. These inferred attributes are also inherited
+from base metaclasses:
+
+```py
 class AssignmentOnlyMeta(type):
     def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
         cls.assignment_only: int = 1
@@ -1732,6 +1754,61 @@ class InfersInheritedAssignment(metaclass=InheritedAssignmentMeta): ...
 
 reveal_type(InfersInheritedAssignment.inherited_assignment)  # revealed: str
 reveal_type(InfersInheritedAssignment().inherited_assignment)  # revealed: str
+```
+
+When the constructed class inherits an attribute with the same name, lookup through an instance uses
+the same conservative behavior as ordinary instance lookup: an attribute inferred from a method does
+not completely eliminate the inherited value. This currently applies even to an unconditional
+assignment in the metaclass `__init__`.
+
+```py
+class InitializingInheritedMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.initialized: int = 1
+
+class InitializedBase:
+    initialized = "inherited"
+
+class Initialized(InitializedBase, metaclass=InitializingInheritedMeta): ...
+
+reveal_type(Initialized.initialized)  # revealed: int
+# TODO: Once we track definite initialization, this should narrow to `int`.
+reveal_type(Initialized().initialized)  # revealed: int | str
+```
+
+A conditional assignment in the metaclass `__init__` necessarily retains the inherited alternative:
+
+```py
+def metaclass_condition() -> bool:
+    raise NotImplementedError
+
+class ConditionallyInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        if metaclass_condition():
+            cls.initialized: int = 1
+
+class ConditionalBase:
+    initialized = "inherited"
+
+class ConditionallyInitialized(ConditionalBase, metaclass=ConditionallyInitializingMeta): ...
+
+reveal_type(ConditionallyInitialized().initialized)  # revealed: int | str
+```
+
+An assignment in an arbitrary metaclass method likewise retains the inherited alternative because
+the method may not have run:
+
+```py
+class InstallingMeta(type):
+    def install(cls) -> None:
+        cls.installed: int = 1
+
+class InstalledBase:
+    installed = "inherited"
+
+class OptionallyInstalled(InstalledBase, metaclass=InstallingMeta): ...
+
+reveal_type(OptionallyInstalled().installed)  # revealed: int | str
 ```
 
 ## Precedence between class and metaclass attributes

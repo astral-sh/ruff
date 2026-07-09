@@ -2891,6 +2891,19 @@ impl<'db> Type<'db> {
         }
     }
 
+    fn with_definedness(
+        member: PlaceAndQualifiers<'db>,
+        definedness: Definedness,
+    ) -> PlaceAndQualifiers<'db> {
+        match member {
+            PlaceAndQualifiers {
+                place: Place::Defined(member),
+                qualifiers,
+            } => Place::Defined(member.with_definedness(definedness)).with_qualifiers(qualifiers),
+            member => member,
+        }
+    }
+
     /// Look up metaclass instance members in a constructed class's namespace.
     ///
     /// A class object is an instance of its metaclass, and its instance storage is also the class
@@ -2933,6 +2946,9 @@ impl<'db> Type<'db> {
         if metaclass_member.is_undefined() {
             return class_attr;
         }
+        let metaclass_member_is_implicit = metaclass_member
+            .qualifiers
+            .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE);
 
         let own_class_member = class.class_literal(db).class_member_from_mro(
             db,
@@ -2967,9 +2983,21 @@ impl<'db> Type<'db> {
             class.iter_mro(db).skip(1),
         );
 
+        let metaclass_member = if metaclass_member_is_implicit {
+            Self::with_definedness(metaclass_member, Definedness::PossiblyUndefined)
+        } else {
+            metaclass_member
+        };
         let class_member = own_class_member
             .or_fall_back_to(db, || metaclass_member)
             .or_fall_back_to(db, || inherited_class_member);
+        let class_member = if metaclass_member_is_implicit {
+            // Preserve the existing convention that an inferred instance member is assumed to be
+            // available even when no lower-precedence fallback exists.
+            Self::with_definedness(class_member, Definedness::AlwaysDefined)
+        } else {
+            class_member
+        };
         if policy.no_instance_fallback() || policy.require_concrete() {
             return class_member;
         }
