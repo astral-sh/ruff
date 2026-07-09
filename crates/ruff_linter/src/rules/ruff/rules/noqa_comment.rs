@@ -47,6 +47,16 @@ use crate::{
 /// known "external" rule codes with the following option:
 ///
 /// - `lint.external`
+///
+/// Ruff will still emit a diagnostic without a fix if `external` and known codes are present in the
+/// same `noqa` comment, assuming that only the `external` codes need to remain in the `noqa`
+/// comment.
+///
+/// ## See also
+///
+/// This rule avoids offering a fix if any of the rule codes in a `noqa` comment are unused. See
+/// `unused-noqa` for a rule that will remove these and allow the remaining codes to be moved into a
+/// `ruff:ignore` comment.
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct NoqaComment {
@@ -84,6 +94,7 @@ pub(crate) fn noqa_comment(
     context: &LintContext,
     locator: &Locator,
     file_level: bool,
+    has_unused_codes: bool,
     directive: &Directive,
     suppressions: &Suppressions,
 ) {
@@ -130,6 +141,19 @@ pub(crate) fn noqa_comment(
 
     // If some codes are external, return without a fix.
     if has_external_codes {
+        return;
+    }
+
+    // Similarly, return without a fix if any unused codes are present. This avoids potentially
+    // activating an unused `noqa` comment on its own line like:
+    //
+    // ```py
+    // # noqa: F401
+    // import math
+    // ```
+    //
+    // by converting it to a valid `ruff:ignore` comment.
+    if has_unused_codes {
         return;
     }
 

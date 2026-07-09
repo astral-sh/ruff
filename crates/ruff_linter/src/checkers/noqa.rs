@@ -154,6 +154,7 @@ pub(crate) fn check_noqa(
                             context,
                             locator,
                             is_file_level,
+                            matches.is_empty(),
                             directive,
                             suppressions,
                         );
@@ -249,11 +250,12 @@ pub(crate) fn check_noqa(
                         );
                         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
                         diagnostic.set_fix(Fix::safe_edit(edit));
-                    } else if check_noqa_comment && !suppress_noqa_comment && !has_unused_codes {
+                    } else if check_noqa_comment && !suppress_noqa_comment {
                         ruff::rules::noqa_comment(
                             context,
                             locator,
                             is_file_level,
+                            has_unused_codes,
                             directive,
                             suppressions,
                         );
