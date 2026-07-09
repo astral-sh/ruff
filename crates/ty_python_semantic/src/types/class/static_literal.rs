@@ -141,10 +141,8 @@ impl<'db> StaticClassLiteral<'db> {
     /// This specifically excludes Pydantic models, even though their metaclass also uses
     /// `dataclass_transform`.
     pub(crate) fn is_dataclass_like(self, db: &'db dyn Db) -> bool {
-        matches!(
-            CodeGeneratorKind::from_class(db, ClassLiteral::Static(self)),
-            Some(CodeGeneratorKind::DataclassLike(_))
-        )
+        CodeGeneratorKind::from_class(db, ClassLiteral::Static(self))
+            .is_some_and(CodeGeneratorKind::is_dataclass_like)
     }
 
     /// Returns `true` if this class is decorated with `@dataclass(order=True)`.
@@ -1171,10 +1169,9 @@ impl<'db> StaticClassLiteral<'db> {
         name: &str,
     ) -> Member<'db> {
         // Check if this class is dataclass-like (either via @dataclass or via dataclass_transform)
-        if matches!(
-            CodeGeneratorKind::from_class(db, self.into()),
-            Some(CodeGeneratorKind::DataclassLike(_))
-        ) {
+        if CodeGeneratorKind::from_class(db, self.into())
+            .is_some_and(CodeGeneratorKind::is_dataclass_like)
+        {
             if name == "__dataclass_fields__" {
                 // Make this class look like a subclass of the `DataClassInstance` protocol
                 return Member {
@@ -1258,7 +1255,7 @@ impl<'db> StaticClassLiteral<'db> {
             .raw_type()
             .is_some_and(|ty| ty.is_instance_of(db, KnownClass::KwOnly))
             && CodeGeneratorKind::from_static_class(db, self)
-                .is_some_and(|policy| matches!(policy, CodeGeneratorKind::DataclassLike(_)))
+                .is_some_and(CodeGeneratorKind::is_dataclass_like)
         {
             return Member::unbound();
         }
@@ -1352,10 +1349,9 @@ impl<'db> StaticClassLiteral<'db> {
 
         let field_policy = CodeGeneratorKind::from_class(db, self.into())?;
         let pydantic_constructor_fields_are_keyword_only =
-            matches!(field_policy, CodeGeneratorKind::Pydantic(_))
-                && pydantic::constructor_fields_are_keyword_only(db, self);
+            field_policy.is_pydantic() && pydantic::constructor_fields_are_keyword_only(db, self);
         let pydantic_constructor_fields_are_optional = name == "__init__"
-            && matches!(field_policy, CodeGeneratorKind::Pydantic(_))
+            && field_policy.is_pydantic()
             && pydantic::constructor_fields_are_optional(db, self);
 
         let instance_ty =
@@ -1570,7 +1566,7 @@ impl<'db> StaticClassLiteral<'db> {
             (field_policy, "__init__")
                 if field_policy.synthesizes_constructor_signature_from_fields() =>
             {
-                if matches!(field_policy, CodeGeneratorKind::DataclassLike(_))
+                if field_policy.is_dataclass_like()
                     && !self.has_dataclass_param(db, field_policy, DataclassFlags::INIT)
                 {
                     return None;
@@ -1961,8 +1957,7 @@ impl<'db> StaticClassLiteral<'db> {
                 if let Some((class_literal, specialization)) = class.static_class_literal(db) {
                     // Pydantic collects annotated attributes from every class in the model's MRO,
                     // including ordinary classes that are not themselves Pydantic models.
-                    if matches!(field_policy, CodeGeneratorKind::Pydantic(_))
-                        || field_policy.matches(db, class_literal.into())
+                    if field_policy.is_pydantic() || field_policy.matches(db, class_literal.into())
                     {
                         return Some(FieldSource::Static(class_literal, specialization));
                     }
@@ -2030,7 +2025,7 @@ impl<'db> StaticClassLiteral<'db> {
 
             match name.as_str() {
                 "__setattr__" | "__delattr__" => {
-                    if matches!(field_policy, CodeGeneratorKind::DataclassLike(_))
+                    if field_policy.is_dataclass_like()
                         && self.is_frozen_dataclass(db) == Some(true)
                     {
                         if let Some(builder) = context.report_lint(
@@ -2047,7 +2042,7 @@ impl<'db> StaticClassLiteral<'db> {
                     }
                 }
                 "__lt__" | "__le__" | "__gt__" | "__ge__" => {
-                    if matches!(field_policy, CodeGeneratorKind::DataclassLike(_))
+                    if field_policy.is_dataclass_like()
                         && self.has_dataclass_param(db, field_policy, DataclassFlags::ORDER)
                     {
                         if let Some(builder) = context.report_lint(
@@ -2115,7 +2110,8 @@ impl<'db> StaticClassLiteral<'db> {
             } else {
                 false
             };
-        let dataclass_kw_only_default = matches!(field_policy, CodeGeneratorKind::DataclassLike(_))
+        let dataclass_kw_only_default = field_policy
+            .is_dataclass_like()
             .then(|| self.has_dataclass_param(db, field_policy, DataclassFlags::KW_ONLY));
         let mut kw_only_sentinel_field_seen = false;
         let mut field_declarations = Vec::new();
@@ -2242,9 +2238,7 @@ impl<'db> StaticClassLiteral<'db> {
                 };
 
                 // Check if this is a KW_ONLY sentinel and mark subsequent fields as keyword-only
-                if matches!(field_policy, CodeGeneratorKind::DataclassLike(_))
-                    && field.is_kw_only_sentinel(db)
-                {
+                if field_policy.is_dataclass_like() && field.is_kw_only_sentinel(db) {
                     kw_only_sentinel_field_seen = true;
                 }
 
@@ -2718,10 +2712,8 @@ impl<'db> StaticClassLiteral<'db> {
 
                     // `KW_ONLY` sentinels are markers, not real instance attributes.
                     if declared_ty.is_instance_of(db, KnownClass::KwOnly)
-                        && matches!(
-                            CodeGeneratorKind::from_static_class(db, self),
-                            Some(CodeGeneratorKind::DataclassLike(_))
-                        )
+                        && CodeGeneratorKind::from_static_class(db, self)
+                            .is_some_and(CodeGeneratorKind::is_dataclass_like)
                     {
                         return Member::unbound();
                     }
