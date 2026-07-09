@@ -53,8 +53,8 @@ use crate::types::generics::{
 use crate::types::infer::original_class_type;
 use crate::types::known_instance::FieldInstance;
 use crate::types::signatures::{
-    CallableSignature, Parameter, ParameterKind, Parameters, ParametersKind, PartialApplication,
-    PartialSignatureApplication,
+    CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
+    PartialApplication, PartialSignatureApplication,
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
@@ -6808,7 +6808,7 @@ impl std::fmt::Display for CallableDescription<'_> {
 /// Information needed to emit a diagnostic regarding a parameter.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ParameterContext {
-    name: Option<ast::name::Name>,
+    name: Option<ParameterDisplayName<Name>>,
     index: usize,
 
     /// Was the argument for this parameter passed positionally, and matched to a non-variadic
@@ -6820,7 +6820,9 @@ pub(crate) struct ParameterContext {
 impl ParameterContext {
     fn new(parameter: &Parameter, index: usize, positional: bool) -> Self {
         Self {
-            name: parameter.display_name(),
+            name: parameter
+                .display_name()
+                .map(ParameterDisplayName::into_owned),
             index,
             positional,
         }
