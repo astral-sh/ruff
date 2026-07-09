@@ -2905,7 +2905,7 @@ python-version = "3.12"
 ```
 
 ```py
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any, Protocol
 from ty_extensions import static_assert
 from ty_extensions._internal import is_assignable_to, is_subtype_of
@@ -3114,6 +3114,30 @@ class GenericListConsumer:
 # when `T = list[int]`, and `S = str` when `T = list[str]`.
 static_assert(is_assignable_to(GenericListConsumer, ConstrainedListConsumerProtocol))
 static_assert(is_subtype_of(GenericListConsumer, ConstrainedListConsumerProtocol))
+
+class BoundedSequenceConsumerProtocol(Protocol):
+    def f[T: Sequence[object]](self, value: T) -> None: ...
+
+class GenericSequenceConsumer:
+    def f[S](self, value: Sequence[S]) -> None:
+        return None
+
+# Every valid `T` is a subtype of `Sequence[object]`, so choosing `S = object` covers the entire
+# target domain.
+static_assert(is_assignable_to(GenericSequenceConsumer, BoundedSequenceConsumerProtocol))
+static_assert(is_subtype_of(GenericSequenceConsumer, BoundedSequenceConsumerProtocol))
+
+class JointBoundedListProtocol(Protocol):
+    def f[T: list[int], U: list[str]](self, left: T, right: U) -> None: ...
+
+class BoundedDiagonalListConsumer:
+    def f[S](self, left: list[S], right: list[S]) -> None:
+        return None
+
+# The upper bounds require different specializations of the shared source variable. Projection
+# must preserve that correlation rather than considering each parameter independently.
+static_assert(not is_assignable_to(BoundedDiagonalListConsumer, JointBoundedListProtocol))
+static_assert(not is_subtype_of(BoundedDiagonalListConsumer, JointBoundedListProtocol))
 
 class ConstrainedScalarConsumerProtocol(Protocol):
     def f[T: (int, str)](self, value: T) -> None: ...

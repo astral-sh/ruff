@@ -3036,6 +3036,7 @@ impl NodeId {
         });
 
         let mut subjects_with_concrete_domains = FxHashMap::default();
+        let mut upper_bound_coverages = Vec::new();
         let mut requires_unrepresentable_residual = false;
         constrained.for_each_unique_constraint(builder, &mut |constraint, _| {
             if requires_unrepresentable_residual {
@@ -3097,17 +3098,62 @@ impl NodeId {
                     .is_always_satisfied(db)
             };
 
-            if nested_lower.is_some()
-                || nested_upper
-                    .is_some_and(|upper| !upper_bound_allows_subject_specialization(upper))
-            {
+            // A declared upper bound on the subject can also provide one source specialization
+            // that covers its entire domain. For example, given `T ≤ Sequence[object]` and
+            // `T ≤ Sequence[S]`, choosing `S = object` satisfies the latter for every valid `T`.
+            // Keep the covering relation in the projection input so multiple nested bounds must
+            // agree on the same source-local specializations.
+            let coverage_from_subject_upper_bounds = |bound: Type<'db>| {
+                let mut subject_domain = ALWAYS_FALSE;
+                let mut coverage = ALWAYS_FALSE;
+                assumptions.for_each_unique_constraint(builder, &mut |domain, source_order| {
+                    let domain_data = builder.constraint_data(domain);
+                    if domain_data.typevar != constraint.typevar {
+                        return;
+                    }
+                    let Some(upper) = domain_data.bounds.upper else {
+                        return;
+                    };
+                    if upper.has_typevar(db)
+                        || upper.bottom_materialization(db) != upper.top_materialization(db)
+                    {
+                        return;
+                    }
+
+                    let domain =
+                        Node::new_satisfied_constraint(builder, domain.when_true(), source_order);
+                    subject_domain = subject_domain.or(builder, domain);
+                    let covers = upper.when_constraint_set_assignable_to(db, bound, builder);
+                    coverage = coverage.or(builder, domain.and(builder, covers.node));
+                });
+
+                assumptions
+                    .implies(builder, subject_domain)
+                    .is_always_satisfied(db, builder)
+                    .then_some(coverage)
+            };
+
+            if nested_lower.is_some() {
                 requires_unrepresentable_residual = true;
+            } else if let Some(upper) = nested_upper
+                && !upper_bound_allows_subject_specialization(upper)
+            {
+                if let Some(coverage) = coverage_from_subject_upper_bounds(upper) {
+                    upper_bound_coverages.push(coverage);
+                } else {
+                    requires_unrepresentable_residual = true;
+                }
             }
         });
         if requires_unrepresentable_residual {
             return Err(ConstraintProjectionError::UnrepresentableNestedBound);
         }
 
+        let constrained = upper_bound_coverages
+            .into_iter()
+            .fold(constrained, |constrained, coverage| {
+                constrained.and(builder, coverage)
+            });
         Ok(constrained.exists_normalized(db, builder, bound_typevars))
     }
 
