@@ -320,10 +320,12 @@ impl<'db> ProtocolInterface<'db> {
         })
     }
 
-    /// Returns the write requirement exposed through `type[Protocol]` lookup.
+    /// Returns the effective write requirement exposed through `type[Protocol]` lookup.
     ///
-    /// Only members required on every class object that satisfies the meta-protocol are available.
-    /// Ordinary instance attributes are required on the constructed object instead.
+    /// Attribute lookup on `type[Protocol]` intentionally exposes ordinary instance members even
+    /// though those members are not required to exist on a class object that satisfies the
+    /// meta-protocol. Prefer a member's true class capability when it has one (`ClassVar`s and
+    /// methods), and otherwise use its instance capability for this compatibility behavior.
     pub(super) fn meta_write_requirement(
         self,
         db: &'db dyn Db,
@@ -381,11 +383,13 @@ impl<'db> ProtocolInterface<'db> {
             .unwrap_or_else(|| Type::object().member(db, name))
     }
 
-    /// Looks up a member guaranteed to exist on every inhabitant of `type[Protocol]`.
+    /// Looks up a member through the compatibility behavior of `type[Protocol]`.
     ///
-    /// Methods retain their unbound signatures and `ClassVar`s retain their class-side types.
-    /// Properties are only required on the constructed instance, so they are undefined even when
-    /// the nominal protocol origin provides a property descriptor.
+    /// True class capabilities take precedence so methods retain their unbound signatures and
+    /// `ClassVar`s retain their class-side types. Ordinary instance attributes fall back to their
+    /// instance read type, matching the behavior of other type checkers even though meta-protocol
+    /// assignability does not require those members on the class object. Properties are only
+    /// required on the constructed instance, so they remain undefined.
     pub(super) fn meta_member(
         self,
         db: &'db dyn Db,
@@ -1105,7 +1109,14 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         if self.has_todo_type() {
             return None;
         }
-        Some(self.capabilities(db).class)
+        let capabilities = self.capabilities(db);
+        if self.is_property() {
+            return Some(capabilities.class);
+        }
+        Some(ProtocolMemberAccess::new(
+            capabilities.class.read.or(capabilities.instance.read),
+            capabilities.class.write.or(capabilities.instance.write),
+        ))
     }
 
     fn has_todo_type(&self) -> bool {

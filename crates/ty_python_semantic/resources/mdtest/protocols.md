@@ -898,8 +898,8 @@ class ExplicitSubclass(HasXWithDefault): ...
 reveal_type(ExplicitSubclass.x)  # revealed: int
 
 def f(arg: HasXWithDefault):
-    # `arg` may be an implicit subtype that does not define `x` on its class object.
-    type(arg).x  # error: [unresolved-attribute]
+    # Compatibility lookup exposes the protocol's instance attribute on the meta-type.
+    reveal_type(type(arg).x)  # revealed: int
 ```
 
 Assignments in a class body of a protocol -- of any kind -- are not permitted by ty unless the
@@ -4723,9 +4723,9 @@ Where `P` is a protocol type, a class object `N` can be said to inhabit the type
 - All method members on `P` exist on the class object `N`
 - Instantiating `N` creates an object that would satisfy the protocol `P`
 
-Ordinary instance attributes are required only on the object constructed by `N`, so they are not
-available through a value of type `type[P]`. Class variables and methods are available because every
-inhabitant of `type[P]` must provide them on the class object itself.
+Properties and ordinary instance attributes are not required to exist on `N` itself. For
+compatibility with other type checkers, however, attribute lookup on a value of type `type[P]`
+exposes ordinary instance attributes even though they are not required on `N`.
 
 ```toml
 [environment]
@@ -4744,8 +4744,9 @@ class Foo(Protocol):
 
 def _(f: type[Foo]):
     reveal_type(f)  # revealed: type[Foo]
-    f.x  # error: [unresolved-attribute]
-    f.x = 1  # error: [invalid-assignment]
+    reveal_type(f.x)  # revealed: int
+    f.x = 1
+    f.x = "bad"  # error: [invalid-assignment]
     reveal_type(f.y)  # revealed: str
     f.y = "foo"  # fine
     f.y = b"bad"  # error: [invalid-assignment]
@@ -4970,7 +4971,8 @@ static_assert(is_assignable_to(type[Any], type[Foo]))
 static_assert(not is_subtype_of(type[Any], type[Foo]))
 ```
 
-An ordinary instance attribute does not satisfy a `ClassVar` requirement on another meta-protocol.
+The broad attribute lookup on `type[Protocol]` does not turn an instance attribute into a `ClassVar`
+requirement.
 
 ```py
 class InstanceAttributeProtocol(Protocol):
@@ -5034,6 +5036,7 @@ static_assert(is_assignable_to(type[IntFoo], type[GenericFoo[int]]))
 static_assert(not is_assignable_to(type[IntFoo], type[GenericFoo[str]]))
 
 def _(f: type[GenericFoo[int]]) -> None:
+    reveal_type(f.value)  # revealed: int
     reveal_type(f.get)  # revealed: (self, /) -> int
     reveal_type(f())  # revealed: GenericFoo[int]
 ```
