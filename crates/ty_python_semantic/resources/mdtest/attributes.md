@@ -1833,6 +1833,26 @@ reveal_type(DecoratedInitialized.initialized)  # revealed: int | str
 reveal_type(DecoratedInitialized().initialized)  # revealed: int | str
 ```
 
+An initializer defined only in a `TYPE_CHECKING` block does not run during class construction, so
+its assignments cannot eliminate an inherited value:
+
+```py
+from typing import TYPE_CHECKING
+
+class TypeCheckingInitializingMeta(type):
+    if TYPE_CHECKING:
+        def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+            cls.initialized: int = 1
+
+class TypeCheckingInitializedBase:
+    initialized = "inherited"
+
+class TypeCheckingInitialized(TypeCheckingInitializedBase, metaclass=TypeCheckingInitializingMeta): ...
+
+reveal_type(TypeCheckingInitialized.initialized)  # revealed: int | str
+reveal_type(TypeCheckingInitialized().initialized)  # revealed: int | str
+```
+
 An inherited metaclass `__init__` remains the effective initializer when a derived metaclass does
 not override it. If the derived metaclass does override `__init__`, an assignment in the base
 initializer is no longer known to occur:

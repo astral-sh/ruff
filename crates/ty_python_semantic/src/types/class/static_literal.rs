@@ -3379,7 +3379,10 @@ fn initializer_definitely_assigns_attribute<'db>(
             continue;
         };
         let function_node = function.node(&module);
-        if !function_node.decorator_list.is_empty() {
+        if index
+            .is_in_type_checking_block(class_body_scope.file_scope_id(db), function_node.range())
+            || !function_node.decorator_list.is_empty()
+        {
             definitely_assigns = false;
             continue;
         }
