@@ -1966,29 +1966,21 @@ pub struct ToSettingsError {
 
 impl ToSettingsError {
     pub fn pretty<'a>(&'a self, db: &'a dyn Db) -> impl fmt::Display + use<'a> {
-        struct DisplayPretty<'a> {
-            db: &'a dyn ruff_db::Db,
-            error: &'a ToSettingsError,
-        }
+        let db: &dyn ruff_db::Db = db;
 
-        impl fmt::Display for DisplayPretty<'_> {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                let display_config = DisplayDiagnosticConfig::new("ty")
-                    .format(self.error.output_format.into())
-                    .color(self.error.color);
+        fmt::from_fn(move |f| {
+            let display_config = DisplayDiagnosticConfig::new("ty")
+                .format(self.output_format.into())
+                .color(self.color);
 
-                write!(
-                    f,
-                    "{}",
-                    self.error
-                        .diagnostic
-                        .to_diagnostic()
-                        .display(&self.db, &display_config)
-                )
-            }
-        }
-
-        DisplayPretty { db, error: self }
+            write!(
+                f,
+                "{}",
+                self.diagnostic
+                    .to_diagnostic()
+                    .display(&db, &display_config)
+            )
+        })
     }
 
     pub fn into_diagnostic(self) -> OptionDiagnostic {
