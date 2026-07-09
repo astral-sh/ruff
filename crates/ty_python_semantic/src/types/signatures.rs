@@ -1868,48 +1868,63 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let target_locals =
             InferableTypeVars::from_bound_typevars(db, target_typevars.iter().copied());
+        let checker = self
+            .with_universally_quantified_typevars(db, target_locals)
+            .with_lazy_typevar_evaluation();
+
+        let check_source_signature = |source: &Signature<'db>| {
+            let freshened_source;
+            let source = if source.generic_context != target.generic_context
+                && let Some(generic_context) = source.generic_context
+                && let Some(delta) = target
+                    .max_typevar_freshness_matching_generic_context(db, generic_context)
+                    .map(|freshness| freshness.increment().value())
+            {
+                freshened_source = source.freshen_bound_typevars(db, delta);
+                &freshened_source
+            } else {
+                source
+            };
+            let source_typevars = source.typevars(db);
+            let source_locals =
+                InferableTypeVars::from_bound_typevars(db, source_typevars.iter().copied());
+            let source_checker =
+                checker.with_inferable_typevars(self.inferable.merge(db, source_locals));
+            let relation = source_checker.with_signature_recursion_guard(source, target, || {
+                source_checker.check_signature_pair_inner(db, source, target)
+            });
+            (relation, source_typevars)
+        };
+
+        if let [source] = source_signatures {
+            let (relation, source_typevars) = check_source_signature(source);
+            if let Some(result) = relation.try_quantify_independent_conjuncts(
+                db,
+                self.constraints,
+                &source_typevars,
+                &target_typevars,
+            ) {
+                return Some(result);
+            }
+        }
+
         let target_domain = ConstraintSet::valid_specializations(
             db,
             self.constraints,
             target_typevars.iter().copied(),
         );
-        let checker = self
-            .with_universally_quantified_typevars(db, target_locals)
-            .with_lazy_typevar_evaluation();
-
         let check_source_signatures = || {
             source_signatures
                 .iter()
                 .when_any(db, self.constraints, |source| {
-                    let freshened_source;
-                    let source = if source.generic_context != target.generic_context
-                        && let Some(generic_context) = source.generic_context
-                        && let Some(delta) = target
-                            .max_typevar_freshness_matching_generic_context(db, generic_context)
-                            .map(|freshness| freshness.increment().value())
-                    {
-                        freshened_source = source.freshen_bound_typevars(db, delta);
-                        &freshened_source
-                    } else {
-                        source
-                    };
-                    let source_typevars = source.typevars(db);
-                    let source_locals =
-                        InferableTypeVars::from_bound_typevars(db, source_typevars.iter().copied());
-                    let source_checker =
-                        checker.with_inferable_typevars(self.inferable.merge(db, source_locals));
-                    let relation =
-                        source_checker.with_signature_recursion_guard(source, target, || {
-                            source_checker.check_signature_pair_inner(db, source, target)
-                        });
-                    let source_domain = ConstraintSet::valid_specializations(
-                        db,
-                        self.constraints,
-                        source_typevars.iter().copied(),
-                    );
-                    let with_source_domain = source_domain.and(db, self.constraints, || relation);
-                    with_source_domain
-                        .try_exists_assuming(db, self.constraints, source_locals, target_domain)
+                    let (relation, source_typevars) = check_source_signature(source);
+                    relation
+                        .try_exists_valid_specializations(
+                            db,
+                            self.constraints,
+                            source_typevars.iter().rev().copied(),
+                            target_domain,
+                        )
                         .unwrap_or_else(|_| self.never())
                 })
         };

@@ -3302,7 +3302,11 @@ class IndependentConstrainedProtocol(Protocol):
         T2: (bool, str),
         T3: (bool, str),
         T4: (bool, str),
-    ](self, a: T1, b: T2, c: T3, d: T4) -> None: ...
+        T5: (bool, str),
+        T6: (bool, str),
+        T7: (bool, str),
+        T8: (bool, str),
+    ](self, a: T1, b: T2, c: T3, d: T4, e: T5, f: T6, g: T7, h: T8) -> None: ...
 
 class IndependentConstrainedSource:
     def f[
@@ -3310,7 +3314,11 @@ class IndependentConstrainedSource:
         S2: (int, str),
         S3: (int, str),
         S4: (int, str),
-    ](self, a: S1, b: S2, c: S3, d: S4) -> None:
+        S5: (int, str),
+        S6: (int, str),
+        S7: (int, str),
+        S8: (int, str),
+    ](self, a: S1, b: S2, c: S3, d: S4, e: S5, f: S6, g: S7, h: S8) -> None:
         return None
 
 # Keep the independent target domains out of source projection to avoid constructing their

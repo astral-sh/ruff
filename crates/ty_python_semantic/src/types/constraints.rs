@@ -633,6 +633,162 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             .map(|node| Self::from_node(builder, node))
     }
 
+    /// Existentially quantifies type variables over their declared domains one at a time.
+    ///
+    /// The iterator must yield variables from the innermost quantifier to the outermost.
+    /// Keeping each domain separate avoids constructing the Cartesian product of independently
+    /// constrained variables before any of them can be removed.
+    pub(crate) fn try_exists_valid_specializations(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        typevars: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
+        assumptions: Self,
+    ) -> Result<Self, ConstraintProjectionError> {
+        typevars.into_iter().try_fold(self, |projected, typevar| {
+            let domain = Self::valid_specializations(db, builder, [typevar]);
+            domain.and(db, builder, || projected).try_exists_assuming(
+                db,
+                builder,
+                InferableTypeVars::from_bound_typevars(db, [typevar]),
+                assumptions,
+            )
+        })
+    }
+
+    /// Quantifies independent components of a conjunctive relation separately.
+    ///
+    /// This is equivalent to quantifying the complete relation because no constraint connects two
+    /// different components. Returns `None` if the relation is not a conjunction of positive
+    /// constraints or a component cannot be projected exactly.
+    pub(crate) fn try_quantify_independent_conjuncts(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        source_typevars: &[BoundTypeVarInstance<'db>],
+        target_typevars: &[BoundTypeVarInstance<'db>],
+    ) -> Option<Self> {
+        self.verify_builder(builder);
+
+        let quantified = source_typevars
+            .iter()
+            .chain(target_typevars)
+            .copied()
+            .collect::<Vec<_>>();
+        let mentioned_typevars = |constraint: ConstraintId| {
+            let constraint = builder.constraint_data(constraint);
+            quantified
+                .iter()
+                .enumerate()
+                .filter_map(|(index, typevar)| {
+                    (constraint.typevar.is_same_typevar_as(db, *typevar)
+                        || constraint
+                            .bounds
+                            .lower
+                            .into_iter()
+                            .chain(constraint.bounds.upper)
+                            .any(|bound| {
+                                any_over_type(db, bound, true, |inner| {
+                                    inner
+                                        .as_typevar()
+                                        .is_some_and(|inner| inner.is_same_typevar_as(db, *typevar))
+                                })
+                            }))
+                    .then_some(index)
+                })
+                .collect::<FxHashSet<_>>()
+        };
+
+        let mut components: Vec<(FxHashSet<usize>, NodeId)> = Vec::new();
+        let mut unquantified = ALWAYS_TRUE;
+        let mut current = self.node;
+        loop {
+            match current.node() {
+                Node::AlwaysTrue => break,
+                Node::AlwaysFalse => return Some(Self::never(builder)),
+                Node::Interior(_) => {
+                    let interior = builder.interior_node_data(current);
+                    if interior.if_true == ALWAYS_FALSE
+                        || interior.if_uncertain != ALWAYS_FALSE
+                        || interior.if_false != ALWAYS_FALSE
+                    {
+                        return None;
+                    }
+
+                    let conjunct = Node::new_satisfied_constraint(
+                        builder,
+                        interior.constraint.when_true(),
+                        interior.source_order,
+                    );
+                    let mut mentioned = mentioned_typevars(interior.constraint);
+                    if mentioned.is_empty() {
+                        unquantified = unquantified.and(builder, conjunct);
+                    } else {
+                        let mut relation = conjunct;
+                        let mut index = 0;
+                        while index < components.len() {
+                            if components[index].0.is_disjoint(&mentioned) {
+                                index += 1;
+                            } else {
+                                let (variables, component) = components.swap_remove(index);
+                                mentioned.extend(variables);
+                                relation = relation.and(builder, component);
+                            }
+                        }
+                        components.push((mentioned, relation));
+                    }
+                    current = interior.if_true;
+                }
+            }
+        }
+
+        let mut result = Self::from_node(builder, unquantified);
+        for (component_indices, component) in components {
+            let component_sources = source_typevars
+                .iter()
+                .enumerate()
+                .filter_map(|(index, typevar)| {
+                    component_indices.contains(&index).then_some(*typevar)
+                })
+                .collect::<Vec<_>>();
+            let component_targets = target_typevars
+                .iter()
+                .enumerate()
+                .filter_map(|(index, typevar)| {
+                    component_indices
+                        .contains(&(source_typevars.len() + index))
+                        .then_some(*typevar)
+                })
+                .collect::<Vec<_>>();
+            let target_domain =
+                Self::valid_specializations(db, builder, component_targets.iter().copied());
+            let projected = Self::from_node(builder, component).try_exists_valid_specializations(
+                db,
+                builder,
+                component_sources.iter().rev().copied(),
+                target_domain,
+            );
+            let quantified = projected.and_then(|projected| {
+                target_domain
+                    .implies(db, builder, || projected)
+                    .try_for_all(
+                        db,
+                        builder,
+                        InferableTypeVars::from_bound_typevars(
+                            db,
+                            component_targets.iter().copied(),
+                        ),
+                    )
+            });
+            let Ok(quantified) = quantified else {
+                return None;
+            };
+            result = result.and(db, builder, || quantified);
+        }
+
+        Some(result)
+    }
+
     /// Returns whether a constraint relates one of the given type variables to a type variable
     /// that will remain free.
     ///
