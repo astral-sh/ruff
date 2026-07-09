@@ -372,17 +372,17 @@ impl ProjectMetadata {
         }
     }
 
-    /// Applies this project's option layers to another raw configuration.
-    pub fn apply_options_to(&self, options: &Options) -> Options {
-        let mut merged = Options::default();
-
-        for options in self.options_in_precedence_order(options) {
-            merged.combine_with(options.clone());
-        }
-
-        merged
-    }
-
+    /// Returns the project's option layers from highest to lowest precedence.
+    ///
+    /// `options` is used as the raw base layer between the override and user-level options.
+    /// Layers can be merged by passing them to [`Options::combine_with`] in iterator order:
+    ///
+    /// ```ignore
+    /// let mut merged = Options::default();
+    /// for layer in metadata.options_in_precedence_order(metadata.options()) {
+    ///     merged.combine_with(layer.clone());
+    /// }
+    /// ```
     pub(crate) fn options_in_precedence_order<'a>(
         &'a self,
         options: &'a Options,
@@ -423,9 +423,15 @@ impl ProjectMetadata {
 
     /// Returns all option layers merged according to their precedence.
     pub fn to_merged_options(&self) -> MergedOptions<'_> {
+        let mut options = Options::default();
+
+        for layer in self.options_in_precedence_order(&self.options) {
+            options.combine_with(layer.clone());
+        }
+
         MergedOptions {
             metadata: self,
-            options: self.apply_options_to(&self.options),
+            options,
         }
     }
 }
