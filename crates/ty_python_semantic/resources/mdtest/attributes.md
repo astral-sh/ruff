@@ -1299,8 +1299,8 @@ reveal_type(InitializedDerived.inherited_attr)  # revealed: int
 ```
 
 An assignment through `cls` in an arbitrary metaclass method also writes to the constructed class
-object if that method is called. Class-object lookup currently treats such an inferred write as
-definitely present and drops an inherited value.
+object if that method is called. Without tracking calls to the method, lookup conservatively
+includes both the inferred write and an inherited value.
 
 ```py
 class InstallingClassAttributeMeta(type):
@@ -1312,8 +1312,7 @@ class InstalledClassAttributeBase:
 
 class OptionallyInstalledClassAttribute(InstalledClassAttributeBase, metaclass=InstallingClassAttributeMeta): ...
 
-# TODO: Without tracking calls to `install`, lookup should conservatively reveal `int | str`.
-reveal_type(OptionallyInstalledClassAttribute.installed)  # revealed: int
+reveal_type(OptionallyInstalledClassAttribute.installed)  # revealed: int | str
 ```
 
 ## Attributes stored on classes by metaclasses
@@ -1756,10 +1755,9 @@ reveal_type(InfersInheritedAssignment.inherited_assignment)  # revealed: str
 reveal_type(InfersInheritedAssignment().inherited_assignment)  # revealed: str
 ```
 
-When the constructed class inherits an attribute with the same name, lookup through an instance uses
-the same conservative behavior as ordinary instance lookup: an attribute inferred from a method does
-not completely eliminate the inherited value. This currently applies even to an unconditional
-assignment in the metaclass `__init__`.
+When the constructed class inherits an attribute with the same name, an unconditional assignment in
+the effective metaclass `__init__` eliminates the inherited value. Class construction runs the
+initializer before either the class object or its instances can be accessed.
 
 ```py
 class InitializingInheritedMeta(type):
@@ -1772,8 +1770,34 @@ class InitializedBase:
 class Initialized(InitializedBase, metaclass=InitializingInheritedMeta): ...
 
 reveal_type(Initialized.initialized)  # revealed: int
-# TODO: Once we track definite initialization, this should narrow to `int`.
-reveal_type(Initialized().initialized)  # revealed: int | str
+reveal_type(Initialized().initialized)  # revealed: int
+```
+
+An inherited metaclass `__init__` remains the effective initializer when a derived metaclass does
+not override it. If the derived metaclass does override `__init__`, an assignment in the base
+initializer is no longer known to occur:
+
+```py
+class BaseInitializingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.initialized: int = 1
+
+class InheritingMeta(BaseInitializingMeta): ...
+
+class OverridingMeta(BaseInitializingMeta):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        pass
+
+class InheritedInitializedBase:
+    initialized = "inherited"
+
+class InheritedInitialized(InheritedInitializedBase, metaclass=InheritingMeta): ...
+class OverrideInitialized(InheritedInitializedBase, metaclass=OverridingMeta): ...
+
+reveal_type(InheritedInitialized.initialized)  # revealed: int
+reveal_type(InheritedInitialized().initialized)  # revealed: int
+reveal_type(OverrideInitialized.initialized)  # revealed: int | str
+reveal_type(OverrideInitialized().initialized)  # revealed: int | str
 ```
 
 A conditional assignment in the metaclass `__init__` necessarily retains the inherited alternative:
@@ -1792,7 +1816,28 @@ class ConditionalBase:
 
 class ConditionallyInitialized(ConditionalBase, metaclass=ConditionallyInitializingMeta): ...
 
+reveal_type(ConditionallyInitialized.initialized)  # revealed: int | str
 reveal_type(ConditionallyInitialized().initialized)  # revealed: int | str
+
+class EarlyReturningMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        if metaclass_condition():
+            return
+        cls.initialized: int = 1
+
+class InitializedBeforeReturnMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.initialized: int = 1
+        if metaclass_condition():
+            return
+
+class EarlyReturning(ConditionalBase, metaclass=EarlyReturningMeta): ...
+class InitializedBeforeReturn(ConditionalBase, metaclass=InitializedBeforeReturnMeta): ...
+
+reveal_type(EarlyReturning.initialized)  # revealed: int | str
+reveal_type(EarlyReturning().initialized)  # revealed: int | str
+reveal_type(InitializedBeforeReturn.initialized)  # revealed: int
+reveal_type(InitializedBeforeReturn().initialized)  # revealed: int
 ```
 
 An assignment in an arbitrary metaclass method likewise retains the inherited alternative because

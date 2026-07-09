@@ -60,8 +60,9 @@ use crate::{attribute_assignments, attribute_declarations};
 use ty_python_core::{
     attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
+    node_key::NodeKey,
     place_table,
-    scope::{Scope, ScopeId},
+    scope::{NodeWithScopeKey, Scope, ScopeId},
     semantic_index,
     symbol::Symbol,
     use_def_map,
@@ -2302,6 +2303,23 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
+    /// Returns whether this class defines an effective `__init__` method and, if so, whether that
+    /// method definitely assigns the instance attribute named `name`.
+    ///
+    /// `None` means that this class does not define `__init__`, so lookup should continue through
+    /// the MRO. `Some(false)` is intentionally conservative for conditional, decorated, or
+    /// otherwise non-analyzable initializers.
+    pub(super) fn initializer_definitely_assigns_attribute(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> Option<bool> {
+        initializer_definitely_assigns_attribute(
+            db,
+            ImplicitAttributeName::new(db, self.body_scope(db), name, MethodDecorator::None),
+        )
+    }
+
     /// Tries to find declarations/bindings of an attribute named `name` that are only
     /// "implicitly" defined (`self.x = …`, `cls.x = …`) in a method of the class that
     /// corresponds to `class_body_scope`. The `target_method_decorator` parameter is
@@ -2357,45 +2375,7 @@ impl<'db> StaticClassLiteral<'db> {
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
         let is_valid_scope = |method_scope: &Scope| {
-            let Some(method_def) = method_scope.node().as_function() else {
-                return true;
-            };
-
-            // Check the decorators directly on the AST node to determine if this method
-            // is a classmethod or staticmethod. This is more reliable than checking the
-            // final evaluated type, which may be wrapped by other decorators like @cache.
-            let function_node = method_def.node(&module);
-            let definition = index.expect_single_definition(method_def);
-
-            let mut is_classmethod = false;
-            let mut is_staticmethod = false;
-
-            for decorator in &function_node.decorator_list {
-                let decorator_ty =
-                    definition_expression_type(db, definition, &decorator.expression);
-                if let Type::ClassLiteral(class) = decorator_ty {
-                    match class.known(db) {
-                        Some(KnownClass::Classmethod) => is_classmethod = true,
-                        Some(KnownClass::Staticmethod) => is_staticmethod = true,
-                        _ => {}
-                    }
-                }
-            }
-
-            // Also check for implicit classmethods/staticmethods based on method name
-            let method_name = function_node.name.as_str();
-            if is_implicit_classmethod(method_name) {
-                is_classmethod = true;
-            }
-            if is_implicit_staticmethod(method_name) {
-                is_staticmethod = true;
-            }
-
-            match target_method_decorator {
-                MethodDecorator::None => !is_classmethod && !is_staticmethod,
-                MethodDecorator::ClassMethod => is_classmethod,
-                MethodDecorator::StaticMethod => is_staticmethod,
-            }
+            method_matches_decorator(db, index, &module, method_scope, target_method_decorator)
         };
 
         // First check declarations
@@ -3314,6 +3294,140 @@ struct ImplicitAttributeName<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ImplicitAttributeName<'_> {}
+
+fn method_matches_decorator<'db>(
+    db: &'db dyn Db,
+    index: &ty_python_core::SemanticIndex<'db>,
+    module: &ParsedModuleRef,
+    method_scope: &Scope,
+    target_method_decorator: MethodDecorator,
+) -> bool {
+    let Some(method_def) = method_scope.node().as_function() else {
+        return true;
+    };
+
+    // Check decorators on the AST rather than the final evaluated type, which may be wrapped by
+    // another decorator.
+    let function_node = method_def.node(module);
+    let definition = index.expect_single_definition(method_def);
+
+    let mut is_classmethod = false;
+    let mut is_staticmethod = false;
+
+    for decorator in &function_node.decorator_list {
+        let decorator_ty = definition_expression_type(db, definition, &decorator.expression);
+        if let Type::ClassLiteral(class) = decorator_ty {
+            match class.known(db) {
+                Some(KnownClass::Classmethod) => is_classmethod = true,
+                Some(KnownClass::Staticmethod) => is_staticmethod = true,
+                _ => {}
+            }
+        }
+    }
+
+    let method_name = function_node.name.as_str();
+    if is_implicit_classmethod(method_name) {
+        is_classmethod = true;
+    }
+    if is_implicit_staticmethod(method_name) {
+        is_staticmethod = true;
+    }
+
+    match target_method_decorator {
+        MethodDecorator::None => !is_classmethod && !is_staticmethod,
+        MethodDecorator::ClassMethod => is_classmethod,
+        MethodDecorator::StaticMethod => is_staticmethod,
+    }
+}
+
+/// Returns whether an attribute is definitely assigned by an effective `__init__` defined in this
+/// class. `None` means that this class does not define an effective `__init__`.
+#[salsa::tracked]
+fn initializer_definitely_assigns_attribute<'db>(
+    db: &'db dyn Db,
+    attribute: ImplicitAttributeName<'db>,
+) -> Option<bool> {
+    let class_body_scope = attribute.class_body_scope(db);
+    let file = class_body_scope.file(db);
+    let module = parsed_module(db, file).load(db);
+    let index = semantic_index(db, file);
+    let class_table = place_table(db, class_body_scope);
+    let class_map = use_def_map(db, class_body_scope);
+    let initializer_symbol = class_table.symbol_id("__init__")?;
+
+    let mut saw_initializer = false;
+    let mut definitely_assigns = true;
+
+    for binding in class_map.end_of_scope_symbol_bindings(initializer_symbol) {
+        let reachability = binding_reachability(db, class_map, &binding);
+        if reachability.is_always_false() {
+            continue;
+        }
+
+        let DefinitionState::Defined(definition) = binding.binding else {
+            // A visible unbound binding means that a conditionally-defined initializer may not
+            // replace an inherited initializer.
+            definitely_assigns = false;
+            continue;
+        };
+        saw_initializer = true;
+
+        let DefinitionKind::Function(function) = definition.kind(db) else {
+            definitely_assigns = false;
+            continue;
+        };
+        let initializer_scope_id =
+            index.node_scope_by_key(NodeWithScopeKey::Function(NodeKey::from_node_ref(function)));
+        let initializer_scope = index.scope(initializer_scope_id);
+        if !method_matches_decorator(db, index, &module, initializer_scope, MethodDecorator::None)
+            || !method_definitely_assigns_attribute(
+                db,
+                index,
+                initializer_scope_id,
+                attribute.name(db),
+            )
+        {
+            definitely_assigns = false;
+        }
+    }
+
+    saw_initializer.then_some(definitely_assigns)
+}
+
+fn method_definitely_assigns_attribute<'db>(
+    db: &'db dyn Db,
+    index: &ty_python_core::SemanticIndex<'db>,
+    method_scope: ty_python_core::scope::FileScopeId,
+    name: &str,
+) -> bool {
+    let table = index.place_table(method_scope);
+    let Some(member) = table.member_id_by_instance_attribute_name(name) else {
+        return false;
+    };
+    let use_def = index.use_def_map(method_scope);
+
+    // Requiring an always-reachable assignment is conservative for branches that all initialize
+    // the attribute, but it also accounts for early returns before an assignment.
+    let has_unconditional_assignment = use_def.reachable_member_bindings(member).any(|binding| {
+        binding.binding.definition().is_some()
+            && binding_reachability(db, use_def, &binding).is_always_true()
+    });
+    if !has_unconditional_assignment {
+        return false;
+    }
+
+    let mut has_end_of_scope_binding = false;
+    for binding in use_def.end_of_scope_bindings(member.into()) {
+        if binding_reachability(db, use_def, &binding).is_always_false() {
+            continue;
+        }
+        if matches!(binding.binding, DefinitionState::Undefined) {
+            return false;
+        }
+        has_end_of_scope_binding = true;
+    }
+    has_end_of_scope_binding
+}
 
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 fn implicit_attribute_names<'db>(db: &'db dyn Db, class_body_scope: ScopeId<'db>) -> Box<[Name]> {

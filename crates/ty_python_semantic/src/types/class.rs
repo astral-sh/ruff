@@ -897,6 +897,35 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    /// Returns whether the effective `__init__` method definitely assigns the instance attribute
+    /// named `name`.
+    pub(super) fn instance_attribute_is_definitely_initialized(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> bool {
+        for base in self.iter_mro(db) {
+            match base {
+                ClassBase::Class(class) => {
+                    let Some((class, _)) = class.static_class_literal(db) else {
+                        return false;
+                    };
+                    if let Some(definitely_assigns) =
+                        class.initializer_definitely_assigns_attribute(db, name)
+                    {
+                        return definitely_assigns;
+                    }
+                }
+                ClassBase::Generic | ClassBase::Protocol => {}
+                ClassBase::Any
+                | ClassBase::Dynamic(_)
+                | ClassBase::Divergent(_)
+                | ClassBase::TypedDict(_) => return false,
+            }
+        }
+        false
+    }
+
     /// Returns the top materialization for this class.
     pub(crate) fn top_materialization(self, db: &'db dyn Db) -> ClassType<'db> {
         match self {
