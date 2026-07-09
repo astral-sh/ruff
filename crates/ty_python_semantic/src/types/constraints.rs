@@ -378,8 +378,8 @@ impl<'db, 'c> ConstraintProjection<'db, 'c> {
         }
     }
 
-    /// Applies the conservative relation policy after all exact projection strategies have run.
-    pub(crate) fn into_conservative(self) -> ConstraintSet<'db, 'c> {
+    /// Returns the representable constraints after all projection strategies have run.
+    pub(crate) fn into_constraints(self) -> ConstraintSet<'db, 'c> {
         let Self {
             constraints,
             errors,
@@ -387,7 +387,7 @@ impl<'db, 'c> ConstraintProjection<'db, 'c> {
         if !errors.is_empty() {
             tracing::trace!(
                 ?errors,
-                "conservatively rejecting unrepresentable constraint projection"
+                "quantified constraint projection encountered unrepresentable cases"
             );
         }
         constraints
@@ -8237,8 +8237,8 @@ mod tests {
 
         assert!(factored.errors().is_empty());
         assert!(general.errors().is_empty());
-        let factored = factored.into_conservative();
-        let general = general.into_conservative();
+        let factored = factored.into_constraints();
+        let general = general.into_constraints();
         assert!(factored.iff(db, builder, general).is_always_satisfied(db));
         assert_eq!(factored.is_always_satisfied(db), expected);
         assert_eq!(factored.is_never_satisfied(db), !expected);
@@ -8745,7 +8745,7 @@ mod tests {
             );
 
             assert!(projection.errors().is_empty(), "relation {relation:04b}");
-            let quantified = projection.into_conservative();
+            let quantified = projection.into_constraints();
             assert_eq!(
                 quantified.is_always_satisfied(&db),
                 expected,
@@ -8849,7 +8849,7 @@ mod tests {
             projection.errors(),
             &[ConstraintProjectionError::UnrepresentableNestedBound]
         );
-        assert!(projection.into_conservative().is_always_satisfied(&db));
+        assert!(projection.into_constraints().is_always_satisfied(&db));
     }
 
     #[test]

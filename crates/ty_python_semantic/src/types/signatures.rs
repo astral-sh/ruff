@@ -2152,7 +2152,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     &target.typevars,
                 )
             };
-            projection.into_conservative()
+            projection.into_constraints()
         };
         let result = if source_signatures.len() == 1 {
             quantify_source_signatures()
