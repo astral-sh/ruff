@@ -24,8 +24,8 @@ use crate::{
         CallableType, ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
         InstanceFallbackShadowsNonDataDescriptor, IntersectionType, KnownFunction,
         MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SelfBinding, Signature,
-        StaticClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarVariance, UnionType,
-        VarianceInferable,
+        StaticClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarBoundOrConstraints,
+        TypeVarVariance, UnionType, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
@@ -1475,11 +1475,12 @@ fn descriptor_setter_signature_write_type<'db>(
     }
 
     Some(
-        typevar
-            .typevar(db)
-            .bound_or_constraints(db)
-            .map_or(Type::object(), |bound| bound.as_type(db))
-            .bind_self_typevars(db, descriptor_ty),
+        match typevar.typevar(db).bound_or_constraints(db) {
+            None => Type::object(),
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound,
+            Some(TypeVarBoundOrConstraints::Constraints(_)) => return None,
+        }
+        .bind_self_typevars(db, descriptor_ty),
     )
 }
 

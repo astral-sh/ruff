@@ -2788,6 +2788,34 @@ def update_bounded_value(value: HasBoundedValue) -> None:
     value.bounded_value = "bad"  # error: [invalid-assignment]
 ```
 
+### Constrained generic setter value types
+
+A constrained method type variable cannot be flattened to the union of its constraints. A call must
+choose one constraint for the type variable, so a value whose type is the union of the constraints
+is not accepted.
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T", int, str)
+
+class ConstrainedDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int | str:
+        raise NotImplementedError
+
+    def __set__(self, instance: object, value: T) -> None: ...
+
+def constrained_descriptor(getter: object) -> ConstrainedDescriptor:
+    raise NotImplementedError
+
+class HasConstrainedValue(Protocol):
+    @constrained_descriptor
+    def constrained_value(self) -> int | str: ...
+
+def update_constrained_value(value: HasConstrainedValue, new_value: int | str) -> None:
+    value.constrained_value = new_value  # error: [invalid-assignment]
+```
+
 ### Optional trailing setter parameters
 
 A setter remains callable by the descriptor protocol when parameters after the assigned value can
