@@ -1863,7 +1863,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 let callable = qualified_name_opt.and_then(|qualified_name| {
                     if !self.settings().extend_type_form_callables.is_empty() {
                         for (name_str, args) in &self.settings().extend_type_form_callables {
-                            if qualified_name.segments().iter().copied().eq(name_str.split('.')) {
+                            if qualified_name == QualifiedName::user_defined(name_str) {
                                 return Some(TypeCallable::ExtendTypeForm(args));
                             }
                         }
