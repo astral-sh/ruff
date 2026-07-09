@@ -1477,15 +1477,14 @@ static_assert(
 )
 
 @overload
-def overloaded_identity(value: bytes) -> bytes: ...
+def overloaded_identity(t: bytes) -> bytes: ...
 @overload
-def overloaded_identity(value: str) -> str: ...
-def overloaded_identity(value: bytes | str) -> bytes | str:
-    return value
+def overloaded_identity(t: str) -> str: ...
+def overloaded_identity(t: bytes | str) -> bytes | str:
+    return t
 
-# TODO: The overload set jointly covers every target specialization, but the current relation
-# requires one source overload to cover the entire generic target.
-# error: [static-assert-error]
+# Source-overload selection occurs inside target quantification, so different overloads can cover
+# different target specializations.
 static_assert(
     is_assignable_to(
         RegularCallableTypeOf[overloaded_identity],

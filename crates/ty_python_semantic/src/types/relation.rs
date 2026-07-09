@@ -868,12 +868,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     /// `Any` or `Unknown` bound would otherwise be interpreted as a rigid restriction during
     /// universal abstraction.
     pub(super) fn with_universally_quantified_typevars(
-        mut self,
+        &self,
         db: &'db dyn Db,
         typevars: InferableTypeVars<'db>,
     ) -> Self {
-        self.universally_quantified = self.universally_quantified.merge(db, typevars);
-        self
+        Self {
+            universally_quantified: self.universally_quantified.merge(db, typevars),
+            ..self.clone()
+        }
     }
 
     /// Returns whether gradual assignability makes this pair valid for every specialization of a

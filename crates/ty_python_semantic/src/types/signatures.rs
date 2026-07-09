@@ -1671,6 +1671,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             .is_some())
                 {
                     self.check_signature_pair_inner(db, source_signature, target_signature)
+                } else if let Some(relation) = self
+                    .try_check_source_signatures_with_quantified_target(
+                        db,
+                        source_overloads,
+                        target_signature,
+                    )
+                {
+                    relation
                 } else {
                     self.check_signature_pair(db, source_signature, target_signature)
                 }
@@ -1678,6 +1686,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
             // source is possibly overloaded while target is definitely not overloaded.
             (_, [target_signature]) => {
+                if let Some(relation) = self.try_check_source_signatures_with_quantified_target(
+                    db,
+                    source_overloads,
+                    target_signature,
+                ) {
+                    return relation;
+                }
+
                 if let Some(aggregate_relation) = self.try_unary_overload_aggregate_relation(
                     db,
                     source_overloads,
@@ -1734,41 +1750,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        // A legacy TypeVar's owner is inferred from its uses. When an enclosing generic context
-        // is unavailable, a class variable can therefore look method-local. Restrict higher-rank
-        // comparison to PEP 695 variables lexically declared by this function. A type variable
-        // used only inside a returned `Callable` is moved onto that callable's synthetic
-        // signature, but retains the enclosing function as its binding context.
-        let has_higher_rank_target = target.generic_context.is_some_and(|context| {
-            let mut typevars = context.variables(db);
-            typevars.len() > 0
-                && typevars.all(|typevar| {
-                    typevar.kind(db) == TypeVarKind::Pep695TypeVar
-                        && match target.definition {
-                            Some(definition) => {
-                                typevar.binding_context(db).definition() == Some(definition)
-                            }
-                            None => typevar
-                                .binding_context(db)
-                                .definition()
-                                .is_some_and(|definition| definition.kind(db).is_function_def()),
-                        }
-                })
-        });
-
-        // A generic signature can also carry inference variables from the call site. Those remain
-        // existential; they are not callable-local binders introduced by the target signature.
-        // Classify them before freshening changes their identities, but only for a possible
-        // higher-rank target.
-        let target_has_caller_inferable = has_higher_rank_target
-            && target.generic_context.is_some_and(|context| {
-                context
-                    .variables(db)
-                    .any(|typevar| typevar.is_inferable(db, self.inferable))
-            });
-
         // Freshen callable-local typevars so variables from distinct signatures do not collide.
-        // The relation below decides which fresh variables are inferable.
         let freshened_source;
         let source = if source.generic_context != target.generic_context
             && let Some(generic_context) = source.generic_context
@@ -1794,41 +1776,154 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target
         };
 
-        if !has_higher_rank_target {
-            return self.check_signature_pair_infer_both(db, source, target);
+        self.check_signature_pair_infer_both(db, source, target)
+    }
+
+    /// Compares every source overload with a generic target as
+    /// `for all target locals, there exist a source overload and source locals`.
+    fn try_check_source_signatures_with_quantified_target(
+        &self,
+        db: &'db dyn Db,
+        source_signatures: &[Signature<'db>],
+        target: &Signature<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        // A legacy TypeVar's owner is inferred from its uses. When an enclosing generic context
+        // is unavailable, a class variable can therefore look method-local. Restrict higher-rank
+        // comparison to PEP 695 variables lexically declared by this function. A type variable
+        // used only inside a returned `Callable` is moved onto that callable's synthetic
+        // signature, but retains the enclosing function as its binding context.
+        let target_context = target.generic_context?;
+        let target_typevars = target_context.variables(db).collect::<Vec<_>>();
+        if target_typevars.is_empty()
+            || target_typevars.iter().any(|typevar| {
+                typevar.kind(db) != TypeVarKind::Pep695TypeVar
+                    || typevar.is_inferable(db, self.inferable)
+                    || typevar.is_paramspec(db)
+                    || typevar.typevar(db).is_self(db)
+                    || match target.definition {
+                        Some(definition) => {
+                            typevar.binding_context(db).definition() != Some(definition)
+                        }
+                        None => !typevar
+                            .binding_context(db)
+                            .definition()
+                            .is_some_and(|definition| definition.kind(db).is_function_def()),
+                    }
+            })
+        {
+            return None;
         }
 
-        if target_has_caller_inferable {
-            // TODO: Partition caller-owned variables from callable-local variables, leaving the
-            // former free while universally quantifying the latter.
-            return self.check_signature_pair_infer_both(db, source, target);
+        // ParamSpecs and `Self` retain the existing callable relation until their binder ownership
+        // can be represented independently from an ordinary method-local type variable.
+        if source_signatures
+            .iter()
+            .flat_map(|source| {
+                source
+                    .generic_context
+                    .into_iter()
+                    .flat_map(|context| context.variables(db))
+            })
+            .any(|typevar| typevar.is_paramspec(db) || typevar.typevar(db).is_self(db))
+        {
+            return None;
         }
+
+        // Freshen the target once for the whole overload set. Its identity must remain stable
+        // across source alternatives so overload selection stays inside target quantification.
+        let freshened_target;
+        let target = if let Some(delta) = source_signatures
+            .iter()
+            .filter_map(|source| {
+                source.max_typevar_freshness_matching_generic_context(db, target_context)
+            })
+            .max()
+            .map(|freshness| freshness.increment().value())
+        {
+            freshened_target = target.freshen_bound_typevars(db, delta);
+            &freshened_target
+        } else {
+            target
+        };
+
         let target_typevars = target
             .generic_context
             .into_iter()
             .flat_map(|context| context.variables(db))
             .collect::<Vec<_>>();
+        let quantified_locals = |typevars: &[BoundTypeVarInstance<'db>]| {
+            InferableTypeVars::from_typevars(
+                db,
+                typevars
+                    .iter()
+                    .map(|typevar| typevar.identity(db))
+                    .collect(),
+            )
+        };
+        let valid_domain = |typevars: &[BoundTypeVarInstance<'db>]| {
+            typevars
+                .iter()
+                .copied()
+                .when_all(db, self.constraints, |typevar| {
+                    ConstraintSet::valid_specializations(db, self.constraints, typevar)
+                })
+        };
+        let target_locals = quantified_locals(&target_typevars);
+        let target_domain = valid_domain(&target_typevars);
+        let checker = self
+            .with_universally_quantified_typevars(db, target_locals)
+            .with_lazy_typevar_evaluation();
 
-        let source_typevars = source
-            .generic_context
-            .into_iter()
-            .flat_map(|context| context.variables(db))
-            .collect::<Vec<_>>();
-        if source_typevars
-            .iter()
-            .chain(&target_typevars)
-            .any(|typevar| typevar.is_paramspec(db) || typevar.typevar(db).is_self(db))
-        {
-            return self.check_signature_pair_infer_both(db, source, target);
-        }
+        let check_source_signatures = || {
+            source_signatures
+                .iter()
+                .when_any(db, self.constraints, |source| {
+                    let freshened_source;
+                    let source = if source.generic_context != target.generic_context
+                        && let Some(generic_context) = source.generic_context
+                        && let Some(delta) = target
+                            .max_typevar_freshness_matching_generic_context(db, generic_context)
+                            .map(|freshness| freshness.increment().value())
+                    {
+                        freshened_source = source.freshen_bound_typevars(db, delta);
+                        &freshened_source
+                    } else {
+                        source
+                    };
+                    let source_typevars = source
+                        .generic_context
+                        .into_iter()
+                        .flat_map(|context| context.variables(db))
+                        .collect::<Vec<_>>();
+                    let source_locals = quantified_locals(&source_typevars);
+                    let source_checker =
+                        checker.with_inferable_typevars(self.inferable.merge(db, source_locals));
+                    let relation =
+                        source_checker.with_signature_recursion_guard(source, target, || {
+                            source_checker.check_signature_pair_inner(db, source, target)
+                        });
+                    let source_domain = valid_domain(&source_typevars);
+                    let with_source_domain = source_domain.and(db, self.constraints, || relation);
+                    with_source_domain
+                        .try_exists_assuming(db, self.constraints, source_locals, target_domain)
+                        .unwrap_or_else(|| self.never())
+                })
+        };
+        let quantified_sources = if source_signatures.len() == 1 {
+            check_source_signatures()
+        } else {
+            self.without_context_collection(check_source_signatures)
+        };
 
-        self.check_signature_pair_with_quantified_locals(
-            db,
-            source,
-            target,
-            &source_typevars,
-            &target_typevars,
-        )
+        // TODO: A gradual target constraint requires `for all constraint choices, there exists a
+        // materialization`. Treating its top-materialized range as one universal domain is
+        // conservative but can reject a valid relation.
+        let universally_quantified =
+            target_domain.implies(db, self.constraints, || quantified_sources);
+        let result = universally_quantified
+            .try_for_all(db, self.constraints, target_locals)
+            .unwrap_or_else(|| self.never());
+        Some(result)
     }
 
     /// Compare signatures using the ordinary, existential treatment of both generic contexts.
@@ -1854,86 +1949,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // If we introduced new inferable typevars, those will be existentially quantified away
         // before returning.
         when.reduce_inferable(db, self.constraints, signature_inferable)
-    }
-
-    /// Compares generic signatures as `for all target locals, there exist source locals`.
-    ///
-    /// Source variables are projected first, so a source specialization may depend on a target
-    /// specialization:
-    ///
-    /// ```python
-    /// def source[S](value: S) -> list[S]: ...
-    /// def target[T](value: list[T]) -> list[list[T]]: ...
-    /// ```
-    ///
-    /// Each specialization of `target` is covered by choosing `S = list[T]` for `source`.
-    fn check_signature_pair_with_quantified_locals(
-        &self,
-        db: &'db dyn Db,
-        source: &Signature<'db>,
-        target: &Signature<'db>,
-        source_typevars: &[BoundTypeVarInstance<'db>],
-        target_typevars: &[BoundTypeVarInstance<'db>],
-    ) -> ConstraintSet<'db, 'c> {
-        let quantified_locals = |typevars: &[BoundTypeVarInstance<'db>]| {
-            InferableTypeVars::from_typevars(
-                db,
-                typevars
-                    .iter()
-                    .map(|typevar| typevar.identity(db))
-                    .collect(),
-            )
-        };
-        let source_locals = quantified_locals(source_typevars);
-        let target_locals = quantified_locals(target_typevars);
-        let checker = self
-            .with_inferable_typevars(self.inferable.merge(db, source_locals))
-            .with_universally_quantified_typevars(db, target_locals)
-            .with_lazy_typevar_evaluation();
-        let relation = checker.with_signature_recursion_guard(source, target, || {
-            checker.check_signature_pair_inner(db, source, target)
-        });
-        let valid_domain = |typevars: &[BoundTypeVarInstance<'db>]| {
-            typevars
-                .iter()
-                .copied()
-                .when_all(db, self.constraints, |typevar| {
-                    ConstraintSet::valid_specializations(db, self.constraints, typevar)
-                })
-        };
-        let target_domain = valid_domain(target_typevars);
-        let source_domain = valid_domain(source_typevars);
-
-        // TODO: A gradual target constraint requires `for all constraint choices, there exists a
-        // materialization`. Treating its top-materialized range as one universal domain is
-        // conservative but can reject a valid relation.
-
-        // Target-domain constraints can participate in source inference. Pass them as assumptions
-        // so nested source relationships can use them without multiplying independent target
-        // alternatives into the source-domain BDD.
-        let with_source_domain = source_domain.and(db, self.constraints, || relation);
-
-        // A generic source is an intersection of its specializations. For each target
-        // specialization, it is enough for some valid source specialization to satisfy the
-        // relation. Quantify the entire source block in a single BDD traversal.
-        let Some(quantified) = with_source_domain.try_exists_assuming(
-            db,
-            self.constraints,
-            source_locals,
-            target_domain,
-        ) else {
-            return self.never();
-        };
-
-        // A generic target is the intersection of all of its specializations. The source must
-        // therefore satisfy every valid target specialization. Source variables have already
-        // been removed, which gives the required `for all target, there exists source` order.
-        let universally_quantified = target_domain.implies(db, self.constraints, || quantified);
-        let Some(result) = universally_quantified.try_for_all(db, self.constraints, target_locals)
-        else {
-            return self.never();
-        };
-        result
     }
 
     fn with_signature_recursion_guard(
