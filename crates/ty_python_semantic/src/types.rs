@@ -2838,6 +2838,25 @@ impl<'db> Type<'db> {
             }
 
             let class_member = self.class_member_with_policy(db, name.into(), policy);
+            let alternative_member = |alternative: &Type<'db>| {
+                alternative
+                    .class_member_with_policy(db, name.into(), policy)
+                    .or_fall_back_to(db, || {
+                        alternative.generated_namespace_member(db, name, policy)
+                    })
+            };
+            let member = match bound_or_constraints {
+                TypeVarBoundOrConstraints::UpperBound(Type::Union(union)) => {
+                    union.map_with_boundness_and_qualifiers(db, alternative_member)
+                }
+                TypeVarBoundOrConstraints::UpperBound(bound) => alternative_member(&bound),
+                TypeVarBoundOrConstraints::Constraints(constraints) => {
+                    constraints.map_with_boundness_and_qualifiers(db, alternative_member)
+                }
+            };
+            if member.place.is_definitely_bound() {
+                return member;
+            }
             if !class_member.is_undefined()
                 && !class_member
                     .qualifiers
@@ -2845,20 +2864,7 @@ impl<'db> Type<'db> {
             {
                 return class_member;
             }
-            let member = match bound_or_constraints {
-                TypeVarBoundOrConstraints::UpperBound(bound) => {
-                    bound.instance_lookup_class_member_with_policy(db, name, policy)
-                }
-                TypeVarBoundOrConstraints::Constraints(constraints) => constraints
-                    .map_with_boundness_and_qualifiers(db, |constraint| {
-                        constraint.instance_lookup_class_member_with_policy(db, name, policy)
-                    }),
-            };
-            return if member.place.is_definitely_bound() {
-                member
-            } else {
-                PlaceAndQualifiers::default()
-            };
+            return PlaceAndQualifiers::default();
         }
 
         let class_member = self.class_member_with_policy(db, name.into(), policy);

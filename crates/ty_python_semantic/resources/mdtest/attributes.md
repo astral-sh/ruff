@@ -1374,6 +1374,23 @@ def read_generated_union_bound(value: TGeneratedUnionBound) -> None:
     reveal_type(value.generated)  # revealed: int
 ```
 
+Ordinary and generated attributes are combined across constraints and union-bound alternatives:
+
+```py
+class OrdinaryGeneratedClass:
+    generated = "ordinary"
+
+TMixedMemberConstraints = TypeVar("TMixedMemberConstraints", GeneratedClass, OrdinaryGeneratedClass)
+
+def read_mixed_member_constraints(value: TMixedMemberConstraints) -> None:
+    reveal_type(value.generated)  # revealed: int | str
+
+TMixedMemberUnionBound = TypeVar("TMixedMemberUnionBound", bound=GeneratedClass | OrdinaryGeneratedClass)
+
+def read_mixed_member_union_bound(value: TMixedMemberUnionBound) -> None:
+    reveal_type(value.generated)  # revealed: int | str
+```
+
 Every constraint or union-bound alternative must provide the generated attribute:
 
 ```py
