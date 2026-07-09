@@ -2950,6 +2950,15 @@ def generic_return[V](value: GenericReturnProtocol[V]) -> V:
 # Universal method quantification still constrains variables inferred by the enclosing call.
 reveal_type(generic_return(GenericIdentity()))  # revealed: object
 
+class SequenceReturnProtocol[V](Protocol):
+    def f[T](self, value: Sequence[T]) -> V: ...
+
+def sequence_return[V](value: SequenceReturnProtocol[V]) -> V:
+    raise NotImplementedError
+
+# Covariant nesting projects the target domain into the enclosing inference variable.
+reveal_type(sequence_return(GenericIdentity()))  # revealed: Sequence[object]
+
 class ExplicitReceiverProtocol(Protocol):
     def compare[T](self: T, other: T) -> bool: ...
 

@@ -955,6 +955,35 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 .map(|bound| bound.as_type(db))
                 .unwrap_or(Type::object())
         };
+        let domain_lower = |_typevar: BoundTypeVarInstance<'db>| Type::Never;
+        let project_nested_bound = |bound: Type<'db>, use_upper: bool| {
+            let mut projected = bound;
+            while let Some(typevar) = find_over_type(db, projected, false, |inner| {
+                inner
+                    .as_typevar()
+                    .filter(|typevar| typevar.is_inferable(db, quantified))
+            }) {
+                let replacement = match (projected.variance_of(db, typevar.identity(db)), use_upper)
+                {
+                    (TypeVarVariance::Covariant, true)
+                    | (TypeVarVariance::Contravariant, false) => domain_upper(typevar),
+                    (TypeVarVariance::Covariant, false)
+                    | (TypeVarVariance::Contravariant, true) => domain_lower(typevar),
+                    (TypeVarVariance::Bivariant, _) => Type::Never,
+                    (TypeVarVariance::Invariant, _) => {
+                        return Err(
+                            ConstraintProjectionError::UnrepresentableFreeVariableConstraint,
+                        );
+                    }
+                };
+                let updated = projected.substitute_one_typevar(db, typevar, replacement);
+                if updated == projected {
+                    return Err(ConstraintProjectionError::UnrepresentableFreeVariableConstraint);
+                }
+                projected = updated;
+            }
+            Ok(projected)
+        };
         let mut retained = Self::always(builder);
         let mut residual = Self::always(builder);
         let mut current = self.node;
@@ -977,12 +1006,15 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             let subject_is_quantified = constraint.typevar.is_inferable(db, quantified);
             let mut project_bound = |bound: Type<'db>, is_lower: bool| {
                 let Some(bound_typevar) = bound.as_typevar() else {
-                    if any_over_type(db, bound, false, |inner| {
+                    let mentions_quantified = any_over_type(db, bound, false, |inner| {
                         inner
                             .as_typevar()
                             .is_some_and(|typevar| typevar.is_inferable(db, quantified))
-                    }) || (subject_is_quantified && bound.has_typevar(db))
-                    {
+                    });
+                    if mentions_quantified && !subject_is_quantified {
+                        return project_nested_bound(bound, is_lower).map(Some);
+                    }
+                    if mentions_quantified || (subject_is_quantified && bound.has_typevar(db)) {
                         return Err(
                             ConstraintProjectionError::UnrepresentableFreeVariableConstraint,
                         );
