@@ -1,0 +1,19 @@
+[build-system]
+requires = ["maturin>=1.9.3,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "ruff-api"
+version = "0.1.0"
+description = "Python bindings for Ruff's formatting API"
+authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
+requires-python = ">=3.8"
+license = "MIT"
+keywords = ["ruff", "formatter", "python", "pyo3"]
+
+[tool.maturin]
+bindings = "pyo3"
+manifest-path = "Cargo.toml"
+module-name = "ruff._ruff_api"
+python-source = "python"
+features = ["pyo3/extension-module"]

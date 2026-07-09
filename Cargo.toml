@@ -30,6 +30,7 @@ ruff_options_metadata = { version = "0.0.3", path = "crates/ruff_options_metadat
 ruff_python_ast = { version = "0.0.3", path = "crates/ruff_python_ast" }
 ruff_python_codegen = { version = "0.0.3", path = "crates/ruff_python_codegen" }
 ruff_python_formatter = { version = "0.0.3", path = "crates/ruff_python_formatter" }
+ruff_python = { version = "0.1.0", path = "crates/ruff_python" }
 ruff_python_importer = { version = "0.0.3", path = "crates/ruff_python_importer" }
 ruff_python_index = { version = "0.0.3", path = "crates/ruff_python_index" }
 ruff_python_literal = { version = "0.0.3", path = "crates/ruff_python_literal" }
@@ -141,6 +142,7 @@ path-absolutize = { version = "3.1.1" }
 path-slash = { version = "0.2.1" }
 pathdiff = { version = "0.2.1" }
 pep440_rs = { version = "0.7.1" }
+pyo3 = { version = "0.23", default-features = false }
 pretty_assertions = "1.3.0"
 proc-macro2 = { version = "1.0.79" }
 pyproject-toml = { version = "0.13.4" }
