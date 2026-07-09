@@ -131,6 +131,10 @@ impl Codes<'_> {
         self.iter()
             .any(|code| *needle == get_redirect_target(code.as_str()).unwrap_or(code.as_str()))
     }
+
+    pub(crate) fn len(&self) -> usize {
+        self.codes.len()
+    }
 }
 
 impl Ranged for Codes<'_> {

@@ -116,7 +116,7 @@ help: Use `ruff:file-ignore` instead
   |
 ```
 
-### Unknown codes do not disable the rule
+### Unknown codes still receive a diagnostic
 
 In case the unknown code is a typo rather than an intentionally external code, we emit both
 `invalid-rule-code` and `noqa-comment`:
@@ -148,9 +148,7 @@ help: Use `ruff:ignore` instead
   |
 ```
 
-### External codes disable the rule
-
-However, if the code is intentionally marked as `external`, we *do* allow using `noqa`:
+### External codes
 
 ```toml
 [lint]
@@ -159,8 +157,30 @@ select = ["noqa-comment", "unused-noqa", "invalid-rule-code", "F401"]
 external = ["EXT"]
 ```
 
+If all of the codes are marked `external`, no diagnostic is emitted:
+
 ```py
+# error: [unused-import]
+import math  # noqa: EXT001, EXT002
+```
+
+However, if only some of the codes are `external`, a diagnostic is emitted without an autofix. In
+this case, the external codes likely need to remain in a `noqa` comment, while the codes known by
+Ruff could potentially move into a `ruff:ignore` comment.
+
+```py
+# snapshot: noqa-comment
 import math  # noqa: F401, EXT001
+```
+
+```snapshot
+error[RUF105]: `noqa` comment used instead of `ruff:ignore`
+ --> src/mdtest_snippet.py:4:14
+  |
+4 | import math  # noqa: F401, EXT001
+  |              ^^^^^^^^^^^^^^^^^^^^
+  |
+help: Use `ruff:ignore` instead
 ```
 
 ### Any unmatched code disables the rule

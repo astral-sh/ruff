@@ -93,18 +93,27 @@ pub(crate) fn noqa_comment(
         return;
     }
 
-    // Avoid migrating comments that are shared with another tool.
-    if let Directive::Codes(codes) = directive
-        && codes.iter().any(|code| {
-            context
-                .settings()
-                .external
-                .iter()
-                .any(|prefix| code.as_str().starts_with(prefix))
-        })
-    {
-        return;
-    }
+    let has_external_codes = if let Directive::Codes(codes) = directive {
+        let external_codes = codes
+            .iter()
+            .filter(|code| {
+                context
+                    .settings()
+                    .external
+                    .iter()
+                    .any(|prefix| code.as_str().starts_with(prefix))
+            })
+            .count();
+
+        // Avoid a diagnostic if all of the codes are external.
+        if external_codes == codes.len() {
+            return;
+        }
+
+        external_codes > 0
+    } else {
+        false
+    };
 
     if suppressions.check_rule(Rule::NoqaComment, range, None) {
         return;
@@ -118,6 +127,11 @@ pub(crate) fn noqa_comment(
         },
         range,
     );
+
+    // If some codes are external, return without a fix.
+    if has_external_codes {
+        return;
+    }
 
     let Directive::Codes(codes) = directive else {
         return;
