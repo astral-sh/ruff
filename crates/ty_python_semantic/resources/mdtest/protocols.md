@@ -3202,6 +3202,75 @@ class SharedGradualParameter:
     ) -> None:
         return None
 
+class ManyNestedConstrainedProtocol(Protocol):
+    def f[
+        T0: (int, str),
+        T1: (int, str),
+        T2: (int, str),
+        T3: (int, str),
+        T4: (int, str),
+        T5: (int, str),
+        T6: (int, str),
+        T7: (int, str),
+        T8: (int, str),
+        T9: (int, str),
+        T10: (int, str),
+        T11: (int, str),
+        T12: (int, str),
+        T13: (int, str),
+    ](
+        self,
+        value0: list[T0],
+        value1: list[T1],
+        value2: list[T2],
+        value3: list[T3],
+        value4: list[T4],
+        value5: list[T5],
+        value6: list[T6],
+        value7: list[T7],
+        value8: list[T8],
+        value9: list[T9],
+        value10: list[T10],
+        value11: list[T11],
+        value12: list[T12],
+        value13: list[T13],
+    ) -> None: ...
+
+class ManyNestedConstrainedSource:
+    def f[
+        S0: (int, str),
+        S1: (int, str),
+        S2: (int, str),
+        S3: (int, str),
+        S4: (int, str),
+        S5: (int, str),
+        S6: (int, str),
+        S7: (int, str),
+        S8: (int, str),
+        S9: (int, str),
+        S10: (int, str),
+        S11: (int, str),
+        S12: (int, str),
+        S13: (int, str),
+    ](
+        self,
+        value0: list[S0],
+        value1: list[S1],
+        value2: list[S2],
+        value3: list[S3],
+        value4: list[S4],
+        value5: list[S5],
+        value6: list[S6],
+        value7: list[S7],
+        value8: list[S8],
+        value9: list[S9],
+        value10: list[S10],
+        value11: list[S11],
+        value12: list[S12],
+        value13: list[S13],
+    ) -> None:
+        return None
+
 class GradualGenericIdentity:
     def f[S](self, value: S) -> S | Any:
         return value
@@ -3225,6 +3294,9 @@ static_assert(not is_subtype_of(IntIdentity, GradualConstrainedIdentityProtocol)
 static_assert(is_assignable_to(AnyParameters, ManyConstrainedParametersProtocol))
 # Connected gradual parameters are projected incrementally instead of enumerating every choice tuple.
 static_assert(is_assignable_to(SharedGradualParameter, ConnectedGradualParametersProtocol))
+# Large nested signatures fall back to factored constraint projection instead of specialization.
+static_assert(is_assignable_to(ManyNestedConstrainedSource, ManyNestedConstrainedProtocol))
+static_assert(is_subtype_of(ManyNestedConstrainedSource, ManyNestedConstrainedProtocol))
 static_assert(is_assignable_to(GradualGenericIdentity, IdentityProtocol))
 static_assert(not is_subtype_of(GradualGenericIdentity, IdentityProtocol))
 static_assert(is_assignable_to(IntersectionIdentity, IdentityProtocol))

@@ -1377,14 +1377,23 @@ impl<'db> Signature<'db> {
             || has_nested_local(self.return_ty)
     }
 
-    /// Returns each specialization of this signature's constrained local type variables.
+    /// Returns each specialization of this signature's constrained local type variables if the
+    /// complete product fits within `limit`.
     ///
-    /// Returns `None` if any variable has an upper bound rather than a finite set of constraints.
-    fn constrained_specializations(
+    /// Returns `None` if any variable has an upper bound rather than a finite set of constraints,
+    /// or if constructing the product would exceed the limit.
+    fn constrained_specializations_with_limit(
         &self,
         db: &'db dyn Db,
         typevars: &[BoundTypeVarInstance<'db>],
+        limit: usize,
     ) -> Option<Vec<Self>> {
+        typevars.iter().try_fold(1usize, |count, typevar| {
+            count
+                .checked_mul(typevar.typevar(db).constraints(db)?.len())
+                .filter(|count| *count > 0 && *count <= limit)
+        })?;
+
         typevars
             .iter()
             .try_fold(vec![self.clone()], |signatures, typevar| {
@@ -2059,14 +2068,22 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         };
 
         if let [source] = source_signatures {
+            const SPECIALIZATION_LIMIT: usize = 64;
+
             let source_typevars = source.typevars(db);
             let has_nested_local = source.has_nested_local_typevar(db, &source_typevars)
                 || target.has_nested_local_typevar(db, &target_typevars);
             if has_nested_local
-                && let Some(source_specializations) =
-                    source.constrained_specializations(db, &source_typevars)
-                && let Some(target_specializations) =
-                    target.constrained_specializations(db, &target_typevars)
+                && let Some(source_specializations) = source.constrained_specializations_with_limit(
+                    db,
+                    &source_typevars,
+                    SPECIALIZATION_LIMIT,
+                )
+                && let Some(target_specializations) = target.constrained_specializations_with_limit(
+                    db,
+                    &target_typevars,
+                    SPECIALIZATION_LIMIT / source_specializations.len(),
+                )
             {
                 return Some(target_specializations.iter().when_all(
                     db,
