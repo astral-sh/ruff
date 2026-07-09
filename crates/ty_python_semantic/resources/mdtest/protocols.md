@@ -2963,6 +2963,45 @@ static_assert(is_subtype_of(ReceiverAndMethodImplementation, ReceiverAndMethodPr
 static_assert(not is_assignable_to(ConcreteReceiverAndMethodImplementation, ReceiverAndMethodProtocol))
 static_assert(not is_subtype_of(ConcreteReceiverAndMethodImplementation, ReceiverAndMethodProtocol))
 
+class ReceiverBase: ...
+
+class BoundedReceiverProtocol(Protocol):
+    def bounded[T: ReceiverBase](self: T) -> None: ...
+
+class ValidBoundedReceiver(ReceiverBase):
+    def bounded(self) -> None:
+        return None
+
+class InvalidBoundedReceiver:
+    def bounded(self) -> None:
+        return None
+
+# Receiver binding must retain the target variable's domain even when `T` does not occur in the
+# remaining signature.
+static_assert(is_assignable_to(ValidBoundedReceiver, BoundedReceiverProtocol))
+static_assert(is_subtype_of(ValidBoundedReceiver, BoundedReceiverProtocol))
+static_assert(not is_assignable_to(InvalidBoundedReceiver, BoundedReceiverProtocol))
+static_assert(not is_subtype_of(InvalidBoundedReceiver, BoundedReceiverProtocol))
+
+class FirstAllowedReceiver: ...
+class SecondAllowedReceiver: ...
+
+class ConstrainedReceiverProtocol(Protocol):
+    def constrained[T: (FirstAllowedReceiver, SecondAllowedReceiver)](self: T) -> None: ...
+
+class ValidConstrainedReceiver(FirstAllowedReceiver):
+    def constrained(self) -> None:
+        return None
+
+class InvalidConstrainedReceiver:
+    def constrained(self) -> None:
+        return None
+
+static_assert(is_assignable_to(ValidConstrainedReceiver, ConstrainedReceiverProtocol))
+static_assert(is_subtype_of(ValidConstrainedReceiver, ConstrainedReceiverProtocol))
+static_assert(not is_assignable_to(InvalidConstrainedReceiver, ConstrainedReceiverProtocol))
+static_assert(not is_subtype_of(InvalidConstrainedReceiver, ConstrainedReceiverProtocol))
+
 type IdentityAlias[X] = X
 type ListAlias[X] = list[X]
 
