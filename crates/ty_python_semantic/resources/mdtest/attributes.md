@@ -1755,6 +1755,21 @@ reveal_type(InfersInheritedAssignment.inherited_assignment)  # revealed: str
 reveal_type(InfersInheritedAssignment().inherited_assignment)  # revealed: str
 ```
 
+A metaclass initializer runs after the class body has populated the initial namespace. Its write
+therefore takes precedence over a plain inferred class-body value:
+
+```py
+class ReplacingOwnBindingMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.replaced: int = 1
+
+class HasReplacedOwnBinding(metaclass=ReplacingOwnBindingMeta):
+    replaced = True
+
+reveal_type(HasReplacedOwnBinding.replaced)  # revealed: int
+reveal_type(HasReplacedOwnBinding().replaced)  # revealed: int
+```
+
 When the constructed class inherits an attribute with the same name, lookup through an instance uses
 the same conservative behavior as ordinary instance lookup: an attribute inferred from a method does
 not completely eliminate the inherited value. This currently applies even to an unconditional
