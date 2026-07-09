@@ -8078,7 +8078,7 @@ impl SatisfiedClauses {
 }
 
 impl<'db> BoundTypeVarInstance<'db> {
-    /// Returns the specialization domain of a ParamSpec as an interval of parameter-list
+    /// Returns the specialization domain of a `ParamSpec` as an interval of parameter-list
     /// callables.
     ///
     /// The lower bound accepts every call and the upper bound accepts none. `P.args` and

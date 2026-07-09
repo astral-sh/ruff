@@ -1006,10 +1006,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return None;
         }
         let is_unconditionally_assignable = match (source, target) {
-            (Type::Dynamic(_), Type::TypeVar(typevar))
-            | (Type::TypeVar(typevar), Type::Dynamic(_))
-            | (Type::Divergent(_), Type::TypeVar(typevar))
-            | (Type::TypeVar(typevar), Type::Divergent(_)) => {
+            (Type::Dynamic(_) | Type::Divergent(_), Type::TypeVar(typevar))
+            | (Type::TypeVar(typevar), Type::Dynamic(_) | Type::Divergent(_)) => {
                 self.is_universally_quantified(db, typevar)
             }
             (Type::NominalInstance(source), Type::TypeVar(typevar))
