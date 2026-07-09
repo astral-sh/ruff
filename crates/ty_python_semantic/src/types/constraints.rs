@@ -955,7 +955,21 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 .map(|bound| bound.as_type(db))
                 .unwrap_or(Type::object())
         };
-        let domain_lower = |_typevar: BoundTypeVarInstance<'db>| Type::Never;
+        let domain_lower =
+            |typevar: BoundTypeVarInstance<'db>| match typevar.typevar(db).bound_or_constraints(db)
+            {
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    IntersectionType::bounded_from_elements(
+                        db,
+                        constraints
+                            .elements(db)
+                            .iter()
+                            .map(|constraint| constraint.bottom_materialization(db)),
+                    )
+                    .ok_or(ConstraintProjectionError::UnrepresentableFreeVariableConstraint)
+                }
+                None | Some(TypeVarBoundOrConstraints::UpperBound(_)) => Ok(Type::Never),
+            };
         let project_nested_bound = |bound: Type<'db>, use_upper: bool| {
             let mut projected = bound;
             while let Some(typevar) = find_over_type(db, projected, false, |inner| {
@@ -968,7 +982,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                     (TypeVarVariance::Covariant, true)
                     | (TypeVarVariance::Contravariant, false) => domain_upper(typevar),
                     (TypeVarVariance::Covariant, false)
-                    | (TypeVarVariance::Contravariant, true) => domain_lower(typevar),
+                    | (TypeVarVariance::Contravariant, true) => domain_lower(typevar)?,
                     (TypeVarVariance::Bivariant, _) => Type::Never,
                     (TypeVarVariance::Invariant, _) => {
                         return Err(
@@ -1028,14 +1042,14 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
                 let (free, lower, upper) = if subject_is_quantified {
                     if is_lower {
-                        (bound_typevar, None, Some(Type::Never))
+                        (bound_typevar, None, Some(domain_lower(constraint.typevar)?))
                     } else {
                         (bound_typevar, Some(domain_upper(constraint.typevar)), None)
                     }
                 } else if is_lower {
                     (constraint.typevar, Some(domain_upper(bound_typevar)), None)
                 } else {
-                    (constraint.typevar, None, Some(Type::Never))
+                    (constraint.typevar, None, Some(domain_lower(bound_typevar)?))
                 };
                 residual = residual.and(db, builder, || {
                     Self::constrain_typevar_with_bounds(db, builder, free, lower, upper)

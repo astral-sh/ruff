@@ -2959,6 +2959,17 @@ def sequence_return[V](value: SequenceReturnProtocol[V]) -> V:
 # Covariant nesting projects the target domain into the enclosing inference variable.
 reveal_type(sequence_return(GenericIdentity()))  # revealed: Sequence[object]
 
+class ConstrainedReturnProtocol[V](Protocol):
+    def f[T: (int, object)](self, value: V) -> T: ...
+
+def accepts_constrained_return[V: (bool, int)](
+    source: ConstrainedReturnProtocol[V],
+) -> None:
+    return None
+
+# The meet of the target choices is `int`, which admits a valid specialization of `V`.
+accepts_constrained_return(GenericIdentity())
+
 class ExplicitReceiverProtocol(Protocol):
     def compare[T](self: T, other: T) -> bool: ...
 
