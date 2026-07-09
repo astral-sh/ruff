@@ -1478,13 +1478,13 @@ class StringStoringMeta(type):
 
 class InitializesShadowedGenerated:
     def __init__(self) -> None:
-        self.generated: str = "instance"
+        self.generated: bytes = b"instance"
 
 class ShadowsInheritedGeneratedProperty(
     InitializesShadowedGenerated, InheritedGeneratedProperty, metaclass=StringStoringMeta
 ): ...
 
-reveal_type(ShadowsInheritedGeneratedProperty().generated)  # revealed: str
+reveal_type(ShadowsInheritedGeneratedProperty().generated)  # revealed: bytes
 ```
 
 If the metaclass instead stores a data descriptor on the new class, the descriptor takes precedence
