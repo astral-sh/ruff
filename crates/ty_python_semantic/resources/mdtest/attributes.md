@@ -1839,6 +1839,22 @@ reveal_type(HasReplacedOwnBinding.replaced)  # revealed: int
 reveal_type(HasReplacedOwnBinding().replaced)  # revealed: int | str
 ```
 
+An inferred value type does not make a bare `Final` declaration a plain inferred binding:
+
+```py
+from typing import Final
+
+class InstallingFinalMeta(type):
+    def install(cls) -> None:
+        cls.final_value: str = "installed"
+
+class HasBareFinal(metaclass=InstallingFinalMeta):
+    final_value: Final = "initial"
+
+reveal_type(HasBareFinal.final_value)  # revealed: Literal["initial"]
+reveal_type(HasBareFinal().final_value)  # revealed: Literal["initial"]
+```
+
 When the constructed class inherits an attribute with the same name, lookup through an instance uses
 the same conservative behavior as ordinary instance lookup: an attribute inferred from a method does
 not completely eliminate the inherited value. This currently applies even to an unconditional

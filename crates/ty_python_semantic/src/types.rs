@@ -2935,12 +2935,14 @@ impl<'db> Type<'db> {
             Some(PlaceAndQualifiers {
                 place:
                     Place::Defined(DefinedPlace {
-                        origin: TypeOrigin::Declared,
+                        origin,
                         definedness,
                         ..
                     }),
-                ..
-            }) => Some(definedness),
+                qualifiers,
+            }) if origin.is_declared() || qualifiers.contains(TypeQualifiers::FINAL) => {
+                Some(definedness)
+            }
             _ => None,
         };
         if own_declaration_definedness == Some(Definedness::AlwaysDefined) {
@@ -3062,13 +3064,15 @@ impl<'db> Type<'db> {
         } else {
             own_class_member
         };
-        let own_class_member_is_inferred = matches!(
-            own_class_member.place,
-            Place::Defined(DefinedPlace {
-                origin: TypeOrigin::Inferred,
-                ..
-            })
-        );
+        let own_class_member_is_plain_inferred =
+            !own_class_member.qualifiers.contains(TypeQualifiers::FINAL)
+                && matches!(
+                    own_class_member.place,
+                    Place::Defined(DefinedPlace {
+                        origin: TypeOrigin::Inferred,
+                        ..
+                    })
+                );
         let inherited_class_member = class.class_literal(db).class_member_from_mro(
             db,
             name,
@@ -3081,7 +3085,7 @@ impl<'db> Type<'db> {
         } else {
             metaclass_member
         };
-        let class_member = if metaclass_member_is_implicit && own_class_member_is_inferred {
+        let class_member = if metaclass_member_is_implicit && own_class_member_is_plain_inferred {
             metaclass_member.or_fall_back_to(db, || own_class_member)
         } else {
             own_class_member.or_fall_back_to(db, || metaclass_member)
