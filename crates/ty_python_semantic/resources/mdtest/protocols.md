@@ -3065,6 +3065,16 @@ class OptionalIdentity:
     def f[S](self, value: S | None) -> S:
         raise NotImplementedError
 
+class ConstrainedOptionalReturnProtocol(Protocol):
+    def f[T: (int, str)](self, value: int) -> T | None: ...
+
+class ConstrainedOptionalReturnSource:
+    def f[S: (int, str)](self, value: S) -> S | None:
+        return value
+
+class SequenceReturnProtocol(Protocol):
+    def f[T](self, value: T) -> Sequence[T]: ...
+
 # A non-generic source is valid when its single signature covers every target specialization.
 static_assert(is_assignable_to(ObjectConsumer, ArbitraryConsumerProtocol))
 static_assert(is_subtype_of(ObjectConsumer, ArbitraryConsumerProtocol))
@@ -3108,6 +3118,16 @@ static_assert(not is_subtype_of(ConstrainedOptionalConsumer, ArbitraryConsumerPr
 # implementation accept every `T` while returning `int`.
 static_assert(not is_assignable_to(OptionalIdentity, IntReturningConsumerProtocol))
 static_assert(not is_subtype_of(OptionalIdentity, IntReturningConsumerProtocol))
+
+# For `T = str`, choosing `S = int` accepts the parameter but returns the wrong type; choosing
+# `S = str` returns the right type but does not accept the parameter.
+static_assert(not is_assignable_to(ConstrainedOptionalReturnSource, ConstrainedOptionalReturnProtocol))
+static_assert(not is_subtype_of(ConstrainedOptionalReturnSource, ConstrainedOptionalReturnProtocol))
+
+# The resulting obligation `T ≤ S ≤ Sequence[T]` has no valid source specialization and must be
+# rejected without attempting an unrepresentable projection.
+static_assert(not is_assignable_to(GenericIdentity, SequenceReturnProtocol))
+static_assert(not is_subtype_of(GenericIdentity, SequenceReturnProtocol))
 
 class ConstrainedListConsumerProtocol(Protocol):
     def f[T: (list[int], list[str])](self, value: T) -> None: ...
