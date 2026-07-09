@@ -1013,7 +1013,7 @@ impl<'db> Signature<'db> {
             return None;
         }
 
-        let typevar = match receiver.annotated_type().resolve_type_alias(db) {
+        let typevar = match receiver.annotated_type() {
             Type::TypeVar(typevar) => typevar,
             Type::SubclassOf(subclass_of) => subclass_of.into_type_var()?,
             _ => return None,
