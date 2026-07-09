@@ -22,7 +22,8 @@ use smallvec::{SmallVec, smallvec_inline};
 use super::{DynamicType, Type, TypeVarVariance, UnionType, semantic_index};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+    ConstraintSet, ConstraintSetBuilder, ExistentialConstraintAlternative,
+    IteratorConstraintsExtension,
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
@@ -2072,7 +2073,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     )
                 },
             );
-            (relation, source.typevars)
+            ExistentialConstraintAlternative::new(relation, source.typevars)
         };
 
         if let [source] = source_signatures {
@@ -2110,64 +2111,32 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     },
                 ));
             }
-
-            let (relation, source_typevars) = check_source_signature(source);
-            if let Some(result) = relation.try_quantify_independent_conjuncts(
-                db,
-                self.constraints,
-                &source_typevars,
-                &target.typevars,
-                self.relation.is_assignability(),
-            ) {
-                return Some(result);
-            }
         }
 
-        let target_domain = ConstraintSet::valid_specializations(
-            db,
-            self.constraints,
-            target.typevars.iter().copied(),
-        );
-        let check_source_signatures = || {
-            source_signatures
-                .iter()
-                .when_any(db, self.constraints, |source| {
-                    let (relation, source_typevars) = check_source_signature(source);
-                    relation
-                        .try_exists_valid_specializations(
-                            db,
-                            self.constraints,
-                            source_typevars.iter().rev().copied(),
-                            target_domain,
-                        )
-                        .unwrap_or_else(|_| self.never())
-                })
+        let quantify_source_signatures = || {
+            let alternatives = source_signatures.iter().map(check_source_signature);
+            let projection = if self.relation.is_assignability() {
+                ConstraintSet::quantify_for_all_exists_assignability(
+                    db,
+                    self.constraints,
+                    alternatives,
+                    &target.typevars,
+                )
+            } else {
+                ConstraintSet::quantify_for_all_exists(
+                    db,
+                    self.constraints,
+                    alternatives,
+                    &target.typevars,
+                )
+            };
+            projection.into_conservative()
         };
-        let quantified_sources = if source_signatures.len() == 1 {
-            check_source_signatures()
+        let result = if source_signatures.len() == 1 {
+            quantify_source_signatures()
         } else {
-            self.without_context_collection(check_source_signatures)
+            self.without_context_collection(quantify_source_signatures)
         };
-
-        let (quantified_sources, target_typevars) = if self.relation.is_assignability() {
-            quantified_sources
-                .try_project_gradual_specializations(db, self.constraints, &target.typevars)
-                .unwrap_or_else(|_| (self.never(), Vec::new()))
-        } else {
-            (quantified_sources, target.typevars)
-        };
-        let target_domain = ConstraintSet::valid_specializations(
-            db,
-            self.constraints,
-            target_typevars.iter().copied(),
-        );
-        let target_locals =
-            BoundTypeVarSet::from_bound_typevars(db, target_typevars.iter().copied());
-        let universally_quantified =
-            target_domain.implies(db, self.constraints, || quantified_sources);
-        let result = universally_quantified
-            .try_for_all(db, self.constraints, target_locals)
-            .unwrap_or_else(|_| self.never());
         Some(result)
     }
 

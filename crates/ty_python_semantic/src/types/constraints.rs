@@ -345,6 +345,60 @@ pub(crate) enum ConstraintProjectionError {
     UnrepresentableFreeVariableConstraint,
 }
 
+/// One source alternative in an alternating `for all target, there exists source` projection.
+pub(crate) struct ExistentialConstraintAlternative<'db, 'c> {
+    relation: ConstraintSet<'db, 'c>,
+    typevars: Box<[BoundTypeVarInstance<'db>]>,
+}
+
+impl<'db, 'c> ExistentialConstraintAlternative<'db, 'c> {
+    pub(crate) fn new(
+        relation: ConstraintSet<'db, 'c>,
+        typevars: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
+    ) -> Self {
+        Self {
+            relation,
+            typevars: typevars.into_iter().collect(),
+        }
+    }
+}
+
+/// The representable part of a quantified constraint projection and any exactness failures
+/// encountered while constructing it.
+pub(crate) struct ConstraintProjection<'db, 'c> {
+    constraints: ConstraintSet<'db, 'c>,
+    errors: SmallVec<[ConstraintProjectionError; 1]>,
+}
+
+impl<'db, 'c> ConstraintProjection<'db, 'c> {
+    fn exact(constraints: ConstraintSet<'db, 'c>) -> Self {
+        Self {
+            constraints,
+            errors: SmallVec::new(),
+        }
+    }
+
+    /// Applies the conservative relation policy after all exact projection strategies have run.
+    pub(crate) fn into_conservative(self) -> ConstraintSet<'db, 'c> {
+        let Self {
+            constraints,
+            errors,
+        } = self;
+        if !errors.is_empty() {
+            tracing::trace!(
+                ?errors,
+                "conservatively rejecting unrepresentable constraint projection"
+            );
+        }
+        constraints
+    }
+
+    #[cfg(test)]
+    fn errors(&self) -> &[ConstraintProjectionError] {
+        &self.errors
+    }
+}
+
 impl<'db, 'c> ConstraintSet<'db, 'c> {
     fn from_node(builder: &'c ConstraintSetBuilder<'db>, node: NodeId) -> Self {
         Self {
@@ -416,7 +470,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     }
 
     /// Returns the constraints describing the type variables' valid specializations.
-    pub(crate) fn valid_specializations(
+    fn valid_specializations(
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         typevars: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
@@ -638,7 +692,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// The iterator must yield variables from the innermost quantifier to the outermost.
     /// Keeping each domain separate avoids constructing the Cartesian product of independently
     /// constrained variables before any of them can be removed.
-    pub(crate) fn try_exists_valid_specializations(
+    fn try_exists_valid_specializations(
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
@@ -656,12 +710,116 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         })
     }
 
+    /// Projects existential source alternatives inside universal target quantification.
+    pub(crate) fn quantify_for_all_exists(
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        alternatives: impl ExactSizeIterator<Item = ExistentialConstraintAlternative<'db, 'c>>,
+        target_typevars: &[BoundTypeVarInstance<'db>],
+    ) -> ConstraintProjection<'db, 'c> {
+        Self::quantify_for_all_exists_inner(db, builder, alternatives, target_typevars, false)
+    }
+
+    /// Projects existential source alternatives inside universal target quantification using
+    /// assignability semantics for gradual target domains.
+    pub(crate) fn quantify_for_all_exists_assignability(
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        alternatives: impl ExactSizeIterator<Item = ExistentialConstraintAlternative<'db, 'c>>,
+        target_typevars: &[BoundTypeVarInstance<'db>],
+    ) -> ConstraintProjection<'db, 'c> {
+        Self::quantify_for_all_exists_inner(db, builder, alternatives, target_typevars, true)
+    }
+
+    fn quantify_for_all_exists_inner(
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        mut alternatives: impl ExactSizeIterator<Item = ExistentialConstraintAlternative<'db, 'c>>,
+        target_typevars: &[BoundTypeVarInstance<'db>],
+        project_gradual_specializations: bool,
+    ) -> ConstraintProjection<'db, 'c> {
+        let single_alternative = if alternatives.len() == 1 {
+            alternatives.next()
+        } else {
+            None
+        };
+        if let Some(alternative) = single_alternative.as_ref()
+            && let Some(quantified) = alternative.relation.try_quantify_independent_conjuncts(
+                db,
+                builder,
+                &alternative.typevars,
+                target_typevars,
+                project_gradual_specializations,
+            )
+        {
+            return ConstraintProjection::exact(quantified);
+        }
+
+        let target_domain =
+            Self::valid_specializations(db, builder, target_typevars.iter().copied());
+        let mut errors = SmallVec::new();
+        let mut quantified_sources = Self::never(builder);
+        let mut alternatives = single_alternative.into_iter().chain(alternatives);
+        while !quantified_sources.is_always_satisfied(db) {
+            let Some(alternative) = alternatives.next() else {
+                break;
+            };
+            match alternative.relation.try_exists_valid_specializations(
+                db,
+                builder,
+                alternative.typevars.iter().rev().copied(),
+                target_domain,
+            ) {
+                Ok(projected) => {
+                    quantified_sources = quantified_sources.or(db, builder, || projected);
+                }
+                Err(error) => errors.push(error),
+            }
+        }
+
+        let (quantified_sources, target_typevars) = if project_gradual_specializations {
+            match quantified_sources.try_project_gradual_specializations(
+                db,
+                builder,
+                target_typevars,
+            ) {
+                Ok(projected) => projected,
+                Err(error) => {
+                    errors.push(error);
+                    return ConstraintProjection {
+                        constraints: Self::never(builder),
+                        errors,
+                    };
+                }
+            }
+        } else {
+            (quantified_sources, target_typevars.to_vec())
+        };
+
+        let target_domain =
+            Self::valid_specializations(db, builder, target_typevars.iter().copied());
+        let target_locals =
+            BoundTypeVarSet::from_bound_typevars(db, target_typevars.iter().copied());
+        let universally_quantified = target_domain.implies(db, builder, || quantified_sources);
+        let constraints = match universally_quantified.try_for_all(db, builder, target_locals) {
+            Ok(constraints) => constraints,
+            Err(error) => {
+                errors.push(error);
+                Self::never(builder)
+            }
+        };
+        ConstraintProjection {
+            constraints,
+            errors,
+        }
+    }
+
     /// Quantifies independent components of a conjunctive relation separately.
     ///
     /// This is equivalent to quantifying the complete relation because no constraint connects two
     /// different components. Returns `None` if the relation is not a conjunction of positive
     /// constraints or a component cannot be projected exactly.
-    pub(crate) fn try_quantify_independent_conjuncts(
+    fn try_quantify_independent_conjuncts(
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
@@ -799,7 +957,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// Only variables whose own constraint set is gradual are expanded. All other target domains
     /// remain symbolic, so unrelated constrained variables do not form a Cartesian product with a
     /// gradual constraint. The returned variables still need ordinary universal quantification.
-    pub(crate) fn try_project_gradual_specializations(
+    fn try_project_gradual_specializations(
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
@@ -8493,6 +8651,38 @@ mod tests {
             )
             .expect("the terminal constraint set can be projected exactly");
         assert!(exists_source_forall_target.is_never_satisfied(&db));
+    }
+
+    #[test]
+    fn quantified_alternatives_preserve_projection_errors() {
+        let db = setup_db();
+        let source = create_typevar(&db, "S");
+        let target = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let list_of_source =
+            KnownClass::List.to_specialized_instance(&db, &[Type::TypeVar(source)]);
+        let unrepresentable =
+            ConstraintSet::constrain_typevar_upper_bound(&db, &builder, target, list_of_source);
+
+        let projection = ConstraintSet::quantify_for_all_exists(
+            &db,
+            &builder,
+            [
+                ExistentialConstraintAlternative::new(unrepresentable, [source]),
+                ExistentialConstraintAlternative::new(
+                    ConstraintSet::always(&builder),
+                    std::iter::empty(),
+                ),
+            ]
+            .into_iter(),
+            &[target],
+        );
+
+        assert_eq!(
+            projection.errors(),
+            &[ConstraintProjectionError::UnrepresentableNestedBound]
+        );
+        assert!(projection.into_conservative().is_always_satisfied(&db));
     }
 
     #[test]
