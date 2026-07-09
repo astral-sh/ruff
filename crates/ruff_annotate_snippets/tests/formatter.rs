@@ -728,9 +728,8 @@ fn char_eol_annotate_char() {
 error: 
  --> file/path:3:1
   |
-3 | / a
-4 | | b
-  | |_^
+3 | a
+  | ^
 "#]];
     let renderer = Renderer::plain();
     assert_data_eq!(renderer.render(input), expected_ascii);
@@ -739,9 +738,8 @@ error:
 error: 
   ╭▸ file/path:3:1
   │
-3 │ ┏ a
-4 │ ┃ b
-  ╰╴┗━┛
+3 │ a
+  ╰╴━
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
     assert_data_eq!(renderer.render(input), expected_unicode);
@@ -761,11 +759,10 @@ fn char_eol_annotate_char_double_width() {
 error: 
  --> <current file>:1:2
   |
-1 |   こん
-  |  ___^
-2 | | にちは
-  | |_^
-3 |   世界
+1 | こん
+  |   ^^
+2 | にちは
+3 | 世界
   |
 "#]];
 
@@ -776,11 +773,10 @@ error:
 error: 
   ╭▸ <current file>:1:2
   │
-1 │   こん
-  │ ┏━━━┛
-2 │ ┃ にちは
-  │ ┗━┛
-3 │   世界
+1 │ こん
+  │   ━━
+2 │ にちは
+3 │ 世界
   ╰╴
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
@@ -868,10 +864,8 @@ fn annotate_eol2() {
 error: 
  --> file/path:3:2
   |
-3 |   a
-  |  __^
-4 | | b
-  | |_^
+3 | a
+  |  ^
 "#]];
     let renderer = Renderer::plain();
     assert_data_eq!(renderer.render(input), expected_ascii);
@@ -880,10 +874,8 @@ error:
 error: 
   ╭▸ file/path:3:2
   │
-3 │   a
-  │ ┏━━┛
-4 │ ┃ b
-  ╰╴┗━┛
+3 │ a
+  ╰╴ ━
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
     assert_data_eq!(renderer.render(input), expected_unicode);
@@ -903,10 +895,8 @@ fn annotate_eol3() {
 error: 
  --> file/path:3:3
   |
-3 |   a
-  |  __^
-4 | | b
-  | |_^
+3 | a
+  |  ^
 "#]];
     let renderer = Renderer::plain();
     assert_data_eq!(renderer.render(input), expected_ascii);
@@ -915,10 +905,8 @@ error:
 error: 
   ╭▸ file/path:3:3
   │
-3 │   a
-  │ ┏━━┛
-4 │ ┃ b
-  ╰╴┗━┛
+3 │ a
+  ╰╴ ━
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
     assert_data_eq!(renderer.render(input), expected_unicode);
@@ -974,11 +962,10 @@ fn annotate_eol_double_width() {
 error: 
  --> <current file>:1:4
   |
-1 |   こん
-  |  _____^
-2 | | にちは
-  | |_^
-3 |   世界
+1 | こん
+  |     ^
+2 | にちは
+3 | 世界
   |
 "#]];
 
@@ -989,11 +976,10 @@ error:
 error: 
   ╭▸ <current file>:1:4
   │
-1 │   こん
-  │ ┏━━━━━┛
-2 │ ┃ にちは
-  │ ┗━┛
-3 │   世界
+1 │ こん
+  │     ━
+2 │ にちは
+3 │ 世界
   ╰╴
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
@@ -1162,7 +1148,6 @@ error:
 3 |   a
   |  __^
 4 | | b
-5 | | c
   | |_^
 "#]];
     let renderer = Renderer::plain();
@@ -1175,7 +1160,6 @@ error:
 3 │   a
   │ ┏━━┛
 4 │ ┃ b
-5 │ ┃ c
   ╰╴┗━┛
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
@@ -1239,7 +1223,6 @@ error:
 3 |   a
   |  __^
 4 | | b
-5 | | c
   | |_^
 "#]];
     let renderer = Renderer::plain();
@@ -1252,7 +1235,6 @@ error:
 3 │   a
   │ ┏━━┛
 4 │ ┃ b
-5 │ ┃ c
   ╰╴┗━┛
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
@@ -3767,13 +3749,12 @@ fn span_eol() {
 
     let expected_ascii = str![[r#"
    |
- 7 |   #: E112
- 8 |   if False:
-   |  __________^
- 9 | | print()
-   | |_^ E112
-10 |   #: E113
-11 |   print()
+ 7 | #: E112
+ 8 | if False:
+   |          ^ E112
+ 9 | print()
+10 | #: E113
+11 | print()
    |
 "#]];
     let renderer = Renderer::plain();
@@ -3781,13 +3762,12 @@ fn span_eol() {
 
     let expected_unicode = str![[r#"
    ╭▸ 
- 7 │   #: E112
- 8 │   if False:
-   │ ┏━━━━━━━━━━┛
- 9 │ ┃ print()
-   │ ┗━┛ E112
-10 │   #: E113
-11 │   print()
+ 7 │ #: E112
+ 8 │ if False:
+   │          ━ E112
+ 9 │ print()
+10 │ #: E113
+11 │ print()
    ╰╴
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);

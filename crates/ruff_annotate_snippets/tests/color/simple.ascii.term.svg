@@ -1,4 +1,4 @@
-<svg width="740px" height="182px" xmlns="http://www.w3.org/2000/svg">
+<svg width="740px" height="164px" xmlns="http://www.w3.org/2000/svg">
   <style>
     .fg { fill: #AAAAAA }
     .bg { fill: #000000 }
@@ -25,17 +25,15 @@
 </tspan>
     <tspan x="10px" y="64px"><tspan>    </tspan><tspan class="fg-bright-blue bold">|</tspan>
 </tspan>
-    <tspan x="10px" y="82px"><tspan class="fg-bright-blue bold">169</tspan><tspan> </tspan><tspan class="fg-bright-blue bold">|</tspan><tspan>           })</tspan>
+    <tspan x="10px" y="82px"><tspan class="fg-bright-blue bold">169</tspan><tspan> </tspan><tspan class="fg-bright-blue bold">|</tspan><tspan>         })</tspan>
 </tspan>
-    <tspan x="10px" y="100px"><tspan>    </tspan><tspan class="fg-bright-blue bold">|</tspan><tspan> </tspan><tspan class="fg-bright-blue bold"> ___________-</tspan>
+    <tspan x="10px" y="100px"><tspan>    </tspan><tspan class="fg-bright-blue bold">|</tspan><tspan>           </tspan><tspan class="fg-bright-blue bold">-</tspan><tspan> </tspan><tspan class="fg-bright-blue bold">expected one of `.`, `;`, `?`, or an operator here</tspan>
 </tspan>
-    <tspan x="10px" y="118px"><tspan class="fg-bright-blue bold">170</tspan><tspan> </tspan><tspan class="fg-bright-blue bold">|</tspan><tspan> </tspan><tspan class="fg-bright-blue bold">|</tspan>
+    <tspan x="10px" y="118px"><tspan class="fg-bright-blue bold">170</tspan><tspan> </tspan><tspan class="fg-bright-blue bold">|</tspan>
 </tspan>
-    <tspan x="10px" y="136px"><tspan>    </tspan><tspan class="fg-bright-blue bold">|</tspan><tspan> </tspan><tspan class="fg-bright-blue bold">|_-</tspan><tspan> </tspan><tspan class="fg-bright-blue bold">expected one of `.`, `;`, `?`, or an operator here</tspan>
+    <tspan x="10px" y="136px"><tspan class="fg-bright-blue bold">171</tspan><tspan> </tspan><tspan class="fg-bright-blue bold">|</tspan><tspan>         for line in &amp;self.body {</tspan>
 </tspan>
-    <tspan x="10px" y="154px"><tspan class="fg-bright-blue bold">171</tspan><tspan> </tspan><tspan class="fg-bright-blue bold">|</tspan><tspan>           for line in &amp;self.body {</tspan>
-</tspan>
-    <tspan x="10px" y="172px"><tspan>    </tspan><tspan class="fg-bright-blue bold">|</tspan><tspan>           </tspan><tspan class="fg-bright-red bold">^^^</tspan><tspan> </tspan><tspan class="fg-bright-red bold">unexpected token</tspan>
+    <tspan x="10px" y="154px"><tspan>    </tspan><tspan class="fg-bright-blue bold">|</tspan><tspan>         </tspan><tspan class="fg-bright-red bold">^^^</tspan><tspan> </tspan><tspan class="fg-bright-red bold">unexpected token</tspan>
 </tspan>
   </text>
 
