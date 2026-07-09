@@ -3520,12 +3520,21 @@ impl<'db> Type<'db> {
 
     /// Returns whether this type is known not to be a data descriptor.
     ///
-    /// Gradual types and type variables remain uncertain even though
-    /// [`Type::may_be_data_descriptor`] deliberately excludes them for narrowing.
+    /// Descriptor uncertainty only propagates through outer unions, intersections, and aliases;
+    /// type arguments do not affect the runtime descriptor class.
     pub(crate) fn is_definitely_non_data_descriptor(self, db: &'db dyn Db) -> bool {
-        !self.has_dynamic(db)
-            && !self.has_typevar_or_typevar_instance(db)
-            && !self.may_be_data_descriptor(db)
+        match self {
+            Type::Dynamic(_) | Type::Divergent(_) | Type::TypeVar(_) => false,
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|ty| ty.is_definitely_non_data_descriptor(db)),
+            Type::Intersection(intersection) => intersection
+                .iter_positive(db)
+                .all(|ty| ty.is_definitely_non_data_descriptor(db)),
+            Type::TypeAlias(alias) => alias.value_type(db).is_definitely_non_data_descriptor(db),
+            _ => !self.may_be_data_descriptor(db),
+        }
     }
 
     fn is_data_descriptor_impl(self, db: &'db dyn Db, any_of_union: bool) -> bool {

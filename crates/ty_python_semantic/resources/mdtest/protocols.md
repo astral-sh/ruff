@@ -1834,7 +1834,7 @@ the non-callable attribute must be readable with the same type through both an i
 `classvars.py`:
 
 ```py
-from typing import ClassVar, Protocol
+from typing import Any, ClassVar, Protocol
 from ty_extensions import static_assert
 from ty_extensions._internal import is_subtype_of, is_assignable_to
 
@@ -1876,6 +1876,15 @@ class ClassVarXWithConflictingMetaclass(metaclass=XMeta):
 
 static_assert(is_assignable_to(ClassVarXWithConflictingMetaclass, ClassVarXProto))
 static_assert(is_subtype_of(ClassVarXWithConflictingMetaclass, ClassVarXProto))
+
+class GenericMeta(type):
+    x: list[Any] = []
+
+class ClassVarXWithGenericMetaclass(metaclass=GenericMeta):
+    x: ClassVar[int] = 42
+
+static_assert(is_assignable_to(ClassVarXWithGenericMetaclass, ClassVarXProto))
+static_assert(is_subtype_of(ClassVarXWithGenericMetaclass, ClassVarXProto))
 
 # A class-level attribute shadows a non-data descriptor on the metaclass. In particular,
 # `NotHashable.__hash__` takes precedence over the non-data `type.__hash__` descriptor.
