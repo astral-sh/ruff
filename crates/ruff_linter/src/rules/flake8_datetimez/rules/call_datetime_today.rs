@@ -18,13 +18,13 @@ use crate::rules::flake8_datetimez::helpers;
 /// some aspects of reality, which can lead to subtle bugs. Timezone-aware
 /// `datetime` objects are preferred, as they represent a specific moment in
 /// time, unlike "naive" objects.
-
-/// The name `today()` can be misleading, because it suggests a calendar date,
-/// but it actually returns the current local date and time as a `datetime`.
-/// That can make intent harder to infer when reading code.
 ///
 /// `datetime.datetime.today()` creates a "naive" object; instead, use
 /// `datetime.datetime.now(tz=...)` to create a timezone-aware object.
+///
+/// The name `today()` can be misleading, because it suggests a calendar date,
+/// but it actually returns the current local date and time as a `datetime`.
+/// That can make intent harder to infer when reading code.
 ///
 /// ## Example
 /// ```python
