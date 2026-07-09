@@ -2941,6 +2941,15 @@ class GenericIdentity:
 static_assert(is_assignable_to(GenericIdentity, IdentityProtocol))
 static_assert(is_subtype_of(GenericIdentity, IdentityProtocol))
 
+class GenericReturnProtocol[V](Protocol):
+    def f[T](self, value: T) -> V: ...
+
+def generic_return[V](value: GenericReturnProtocol[V]) -> V:
+    raise NotImplementedError
+
+# Universal method quantification still constrains variables inferred by the enclosing call.
+reveal_type(generic_return(GenericIdentity()))  # revealed: object
+
 class ExplicitReceiverProtocol(Protocol):
     def compare[T](self: T, other: T) -> bool: ...
 

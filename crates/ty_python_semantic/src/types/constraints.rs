@@ -769,16 +769,11 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 target_domain,
             );
             let quantified = projected.and_then(|projected| {
-                target_domain
-                    .implies(db, builder, || projected)
-                    .try_for_all(
-                        db,
-                        builder,
-                        InferableTypeVars::from_bound_typevars(
-                            db,
-                            component_targets.iter().copied(),
-                        ),
-                    )
+                projected.try_for_all_conjunctive_valid_specializations(
+                    db,
+                    builder,
+                    &component_targets,
+                )
             });
             let Ok(quantified) = quantified else {
                 return None;
@@ -859,6 +854,122 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 .exists_normalized(db, builder, to_remove)
                 .negate(builder),
         ))
+    }
+
+    /// Universally quantifies a conjunction over the declared domains of `typevars` while
+    /// retaining direct bounds on variables outside the quantifier.
+    ///
+    /// For example, if `T` is unbounded, `T ≤ V` for every valid `T` is equivalent to
+    /// `object ≤ V`. Returns an error for non-conjunctive formulas and nested cross-quantifier
+    /// bounds, which cannot be projected independently.
+    fn try_for_all_conjunctive_valid_specializations(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        typevars: &[BoundTypeVarInstance<'db>],
+    ) -> Result<Self, ConstraintProjectionError> {
+        let quantified = InferableTypeVars::from_bound_typevars(db, typevars.iter().copied());
+        let domain = Self::valid_specializations(db, builder, typevars.iter().copied());
+        let implication = domain.implies(db, builder, || self);
+        match implication.try_for_all(db, builder, quantified) {
+            Ok(result) => return Ok(result),
+            Err(ConstraintProjectionError::UnrepresentableFreeVariableConstraint) => {}
+            Err(error) => return Err(error),
+        }
+
+        let domain_upper = |typevar: BoundTypeVarInstance<'db>| {
+            typevar
+                .typevar(db)
+                .bound_or_constraints(db)
+                .map(|bound| bound.as_type(db))
+                .unwrap_or(Type::object())
+        };
+        let mut retained = Self::always(builder);
+        let mut residual = Self::always(builder);
+        let mut current = self.node;
+        loop {
+            let Node::Interior(_) = current.node() else {
+                if current == ALWAYS_FALSE {
+                    return Ok(Self::never(builder));
+                }
+                break;
+            };
+            let interior = builder.interior_node_data(current);
+            if interior.if_true == ALWAYS_FALSE
+                || interior.if_uncertain != ALWAYS_FALSE
+                || interior.if_false != ALWAYS_FALSE
+            {
+                return Err(ConstraintProjectionError::UnrepresentableFreeVariableConstraint);
+            }
+
+            let constraint = builder.constraint_data(interior.constraint);
+            let subject_is_quantified = constraint.typevar.is_inferable(db, quantified);
+            let mut project_bound = |bound: Type<'db>, is_lower: bool| {
+                let Some(bound_typevar) = bound.as_typevar() else {
+                    if any_over_type(db, bound, false, |inner| {
+                        inner
+                            .as_typevar()
+                            .is_some_and(|typevar| typevar.is_inferable(db, quantified))
+                    }) || (subject_is_quantified && bound.has_typevar(db))
+                    {
+                        return Err(
+                            ConstraintProjectionError::UnrepresentableFreeVariableConstraint,
+                        );
+                    }
+                    return Ok(Some(bound));
+                };
+                let bound_is_quantified = bound_typevar.is_inferable(db, quantified);
+                if subject_is_quantified == bound_is_quantified {
+                    return Ok(Some(bound));
+                }
+
+                let (free, lower, upper) = if subject_is_quantified {
+                    if is_lower {
+                        (bound_typevar, None, Some(Type::Never))
+                    } else {
+                        (bound_typevar, Some(domain_upper(constraint.typevar)), None)
+                    }
+                } else if is_lower {
+                    (constraint.typevar, Some(domain_upper(bound_typevar)), None)
+                } else {
+                    (constraint.typevar, None, Some(Type::Never))
+                };
+                residual = residual.and(db, builder, || {
+                    Self::constrain_typevar_with_bounds(db, builder, free, lower, upper)
+                });
+                Ok(None)
+            };
+
+            let lower = constraint
+                .bounds
+                .lower
+                .map(|bound| project_bound(bound, true))
+                .transpose()?
+                .flatten();
+            let upper = constraint
+                .bounds
+                .upper
+                .map(|bound| project_bound(bound, false))
+                .transpose()?
+                .flatten();
+            if lower.is_some() || upper.is_some() {
+                retained = retained.and(db, builder, || {
+                    Self::constrain_typevar_with_bounds(
+                        db,
+                        builder,
+                        constraint.typevar,
+                        lower,
+                        upper,
+                    )
+                });
+            }
+            current = interior.if_true;
+        }
+
+        let quantified = domain
+            .implies(db, builder, || retained)
+            .try_for_all(db, builder, quantified)?;
+        Ok(residual.and(db, builder, || quantified))
     }
 
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
