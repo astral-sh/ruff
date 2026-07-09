@@ -5038,7 +5038,7 @@
         "none-not-at-end-of-union",
         "nonlocal-and-global",
         "nonlocal-without-binding",
-        "noqa-comment",
+        "noqa-comments",
         "not-in-test",
         "not-is-test",
         "numeric-literal-too-long",

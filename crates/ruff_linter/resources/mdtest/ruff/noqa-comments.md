@@ -1,9 +1,9 @@
-# `noqa-comment` (`RUF105`)
+# `noqa-comments` (`RUF105`)
 
 ```toml
 [lint]
 preview = true
-select = ["noqa-comment", "F401", "F402", "F403"]
+select = ["noqa-comments", "F401", "F402", "F403"]
 ```
 
 ## File-level comments
@@ -11,7 +11,7 @@ select = ["noqa-comment", "F401", "F402", "F403"]
 ### Single code
 
 ```py
-# snapshot: noqa-comment
+# snapshot: noqa-comments
 # ruff: noqa: F401
 import math
 ```
@@ -25,7 +25,7 @@ error[RUF105]: `ruff: noqa` comment used instead of `ruff:file-ignore`
   |
 help: Use `ruff:file-ignore` instead
   |
-1 | # snapshot: noqa-comment
+1 | # snapshot: noqa-comments
   - # ruff: noqa: F401
 2 + # ruff:file-ignore[F401]
 3 | import math
@@ -35,7 +35,7 @@ help: Use `ruff:file-ignore` instead
 ### Multiple codes
 
 ```py
-# snapshot: noqa-comment
+# snapshot: noqa-comments
 # ruff: noqa: F401, F402, F403
 import math
 import os
@@ -53,7 +53,7 @@ error[RUF105]: `ruff: noqa` comment used instead of `ruff:file-ignore`
   |
 help: Use `ruff:file-ignore` instead
   |
-1 | # snapshot: noqa-comment
+1 | # snapshot: noqa-comments
   - # ruff: noqa: F401, F402, F403
 2 + # ruff:file-ignore[F401, F402, F403]
 3 | import math
@@ -63,7 +63,7 @@ help: Use `ruff:file-ignore` instead
 ### Multiple codes followed by a reason
 
 ```py
-# snapshot: noqa-comment
+# snapshot: noqa-comments
 # ruff: noqa: F401, F402, F403 for some reason
 import math
 import os
@@ -81,7 +81,7 @@ error[RUF105]: `ruff: noqa` comment used instead of `ruff:file-ignore`
   |
 help: Use `ruff:file-ignore` instead
   |
-1 | # snapshot: noqa-comment
+1 | # snapshot: noqa-comments
   - # ruff: noqa: F401, F402, F403 for some reason
 2 + # ruff:file-ignore[F401, F402, F403] for some reason
 3 | import math
@@ -91,7 +91,7 @@ help: Use `ruff:file-ignore` instead
 ### Multiple codes followed by a nested (pragma) comment
 
 ```py
-# snapshot: noqa-comment
+# snapshot: noqa-comments
 # ruff: noqa: F401, F402, F403 # fmt:skip
 import math
 import os
@@ -109,7 +109,7 @@ error[RUF105]: `ruff: noqa` comment used instead of `ruff:file-ignore`
   |
 help: Use `ruff:file-ignore` instead
   |
-1 | # snapshot: noqa-comment
+1 | # snapshot: noqa-comments
   - # ruff: noqa: F401, F402, F403 # fmt:skip
 2 + # ruff:file-ignore[F401, F402, F403] # fmt:skip
 3 | import math
@@ -119,17 +119,17 @@ help: Use `ruff:file-ignore` instead
 ### Unknown codes still receive a diagnostic
 
 In case the unknown code is a typo rather than an intentionally external code, we emit both
-`invalid-rule-code` and `noqa-comment`:
+`invalid-rule-code` and `noqa-comments`:
 
 ```toml
 [lint]
 preview = true
-select = ["noqa-comment", "unused-noqa", "invalid-rule-code", "F401"]
+select = ["noqa-comments", "unused-noqa", "invalid-rule-code", "F401"]
 ```
 
 ```py
 # error: [invalid-rule-code]
-# snapshot: noqa-comment
+# snapshot: noqa-comments
 import math  # noqa: F401, UNK001
 ```
 
@@ -142,7 +142,7 @@ error[RUF105]: `noqa` comment used instead of `ruff:ignore`
   |
 help: Use `ruff:ignore` instead
   |
-2 | # snapshot: noqa-comment
+2 | # snapshot: noqa-comments
   - import math  # noqa: F401, UNK001
 3 + import math  # ruff:ignore[F401, UNK001]
   |
@@ -153,7 +153,7 @@ help: Use `ruff:ignore` instead
 ```toml
 [lint]
 preview = true
-select = ["noqa-comment", "unused-noqa", "invalid-rule-code", "F401"]
+select = ["noqa-comments", "unused-noqa", "invalid-rule-code", "F401"]
 external = ["EXT"]
 ```
 
@@ -169,7 +169,7 @@ this case, the external codes likely need to remain in a `noqa` comment, while t
 Ruff could potentially move into a `ruff:ignore` comment.
 
 ```py
-# snapshot: noqa-comment
+# snapshot: noqa-comments
 import math  # noqa: F401, EXT001
 ```
 
@@ -190,7 +190,7 @@ important in the case of a standalone `noqa` comment, which has no effect (in al
 could become an effectful own-line `ruff:ignore` comment if `RUF105` applied.
 
 ```py
-# snapshot: noqa-comment
+# snapshot: noqa-comments
 # ruff: noqa: F401, F402
 import math
 ```
@@ -217,7 +217,7 @@ import math
 ### Basic
 
 ```py
-# snapshot: noqa-comment
+# snapshot: noqa-comments
 import math  # noqa: F401
 ```
 
@@ -230,7 +230,7 @@ error[RUF105]: `noqa` comment used instead of `ruff:ignore`
   |
 help: Use `ruff:ignore` instead
   |
-1 | # snapshot: noqa-comment
+1 | # snapshot: noqa-comments
   - import math  # noqa: F401
 2 + import math  # ruff:ignore[F401]
   |
@@ -241,7 +241,7 @@ help: Use `ruff:ignore` instead
 Just like the file-level version above, this disables the autofix but not the rule.
 
 ```py
-# snapshot: noqa-comment
+# snapshot: noqa-comments
 import os  # noqa: F401, F402
 ```
 
@@ -258,7 +258,7 @@ help: Use `ruff:ignore` instead
 ### Nested pragma comment before the directive
 
 ```py
-# snapshot: noqa-comment
+# snapshot: noqa-comments
 import math  # fmt:skip # noqa: F401
 ```
 
@@ -271,7 +271,7 @@ error[RUF105]: `noqa` comment used instead of `ruff:ignore`
   |
 help: Use `ruff:ignore` instead
   |
-1 | # snapshot: noqa-comment
+1 | # snapshot: noqa-comments
   - import math  # fmt:skip # noqa: F401
 2 + import math  # fmt:skip # ruff:ignore[F401]
   |
@@ -285,7 +285,7 @@ For inline comments, `RUF105` flags blanket comments and offers a fix containing
 actually suppressed:
 
 ```py
-# snapshot: noqa-comment
+# snapshot: noqa-comments
 import math  # noqa
 ```
 
@@ -298,17 +298,17 @@ error[RUF105]: `noqa` comment used instead of `ruff:ignore`
   |
 help: Use `ruff:ignore` instead
   |
-1 | # snapshot: noqa-comment
+1 | # snapshot: noqa-comments
   - import math  # noqa
 2 + import math  # ruff:ignore[F401]
-3 | # snapshot: noqa-comment
+3 | # snapshot: noqa-comments
   |
 ```
 
 Multiple diagnostics on the same line don't cause duplicate codes in the final comment:
 
 ```py
-# snapshot: noqa-comment
+# snapshot: noqa-comments
 import foo, bar  # noqa
 ```
 
@@ -321,7 +321,7 @@ error[RUF105]: `noqa` comment used instead of `ruff:ignore`
   |
 help: Use `ruff:ignore` instead
   |
-3 | # snapshot: noqa-comment
+3 | # snapshot: noqa-comments
   - import foo, bar  # noqa
 4 + import foo, bar  # ruff:ignore[F401]
   |
@@ -332,7 +332,7 @@ help: Use `ruff:ignore` instead
 For file-level comments, only a diagnostic is emitted, without a fix:
 
 ```py
-# snapshot: noqa-comment
+# snapshot: noqa-comments
 # ruff: noqa
 import math
 ```
@@ -352,7 +352,7 @@ help: Use `ruff:file-ignore` instead
 ```toml
 [lint]
 preview = true
-select = ["noqa-comment", "unused-noqa", "F401"]
+select = ["noqa-comments", "unused-noqa", "F401"]
 ```
 
 It should be possible to suppress `RUF105` with a `noqa` comment:
@@ -364,7 +364,7 @@ value = 1  # noqa: RUF105
 But a suppression for `RUF100` should not prevent the rule from firing:
 
 ```py
-# error: [noqa-comment]
+# error: [noqa-comments]
 import math  # noqa: RUF100, F401
 ```
 
@@ -373,7 +373,7 @@ import math  # noqa: RUF100, F401
 ```toml
 [lint]
 preview = true
-select = ["noqa-comment", "unused-noqa", "F401"]
+select = ["noqa-comments", "unused-noqa", "F401"]
 ```
 
 ### Inline suppression

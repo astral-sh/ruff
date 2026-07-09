@@ -122,7 +122,7 @@ pub(crate) fn check_noqa(
         && analyze_directives
         && !exemption.includes(Rule::UnusedNOQA);
     let check_noqa_comment =
-        context.is_rule_enabled(Rule::NoqaComment) && !exemption.enumerates(Rule::NoqaComment);
+        context.is_rule_enabled(Rule::NoqaComments) && !exemption.enumerates(Rule::NoqaComments);
 
     if check_unused_noqa || check_noqa_comment {
         let directives = noqa_directives
@@ -150,7 +150,7 @@ pub(crate) fn check_noqa(
                         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
                         diagnostic.set_fix(Fix::safe_edit(edit));
                     } else if check_noqa_comment {
-                        ruff::rules::noqa_comment(
+                        ruff::rules::noqa_comments(
                             context,
                             locator,
                             is_file_level,
@@ -182,8 +182,8 @@ pub(crate) fn check_noqa(
                                 continue;
                             }
 
-                            if context.is_rule_enabled(Rule::NoqaComment)
-                                && Rule::NoqaComment.noqa_code() == code
+                            if context.is_rule_enabled(Rule::NoqaComments)
+                                && Rule::NoqaComments.noqa_code() == code
                             {
                                 suppress_noqa_comment = true;
                                 valid_codes.push(original_code);
@@ -252,7 +252,7 @@ pub(crate) fn check_noqa(
                         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
                         diagnostic.set_fix(Fix::safe_edit(edit));
                     } else if check_noqa_comment && !suppress_noqa_comment {
-                        ruff::rules::noqa_comment(
+                        ruff::rules::noqa_comments(
                             context,
                             locator,
                             is_file_level,

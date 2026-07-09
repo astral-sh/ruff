@@ -59,11 +59,11 @@ use crate::{
 /// `ruff:ignore` comment.
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
-pub(crate) struct NoqaComment {
+pub(crate) struct NoqaComments {
     file_level: bool,
 }
 
-impl Violation for NoqaComment {
+impl Violation for NoqaComments {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -85,7 +85,7 @@ impl Violation for NoqaComment {
 }
 
 /// RUF105
-pub(crate) fn noqa_comment(
+pub(crate) fn noqa_comments(
     context: &LintContext,
     locator: &Locator,
     file_level: bool,
@@ -124,11 +124,11 @@ pub(crate) fn noqa_comment(
         false
     };
 
-    if suppressions.check_rule(Rule::NoqaComment, range, None) {
+    if suppressions.check_rule(Rule::NoqaComments, range, None) {
         return;
     }
 
-    let mut diagnostic = context.report_diagnostic(NoqaComment { file_level }, range);
+    let mut diagnostic = context.report_diagnostic(NoqaComments { file_level }, range);
 
     // If some codes are external, return without a fix.
     if has_external_codes {

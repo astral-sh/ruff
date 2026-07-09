@@ -3143,7 +3143,7 @@ mod tests {
     #[test]
     fn add_noqa_ruf105() -> Result<()> {
         let settings =
-            LinterSettings::for_rules([Rule::NoqaComment, Rule::UnusedImport]).with_preview_mode();
+            LinterSettings::for_rules([Rule::NoqaComments, Rule::UnusedImport]).with_preview_mode();
 
         assert_snapshot!(
             add_suppressions_in(
@@ -3168,7 +3168,7 @@ mod tests {
     #[test]
     fn add_ignore_ruf105() -> Result<()> {
         let settings =
-            LinterSettings::for_rules([Rule::NoqaComment, Rule::UnusedImport]).with_preview_mode();
+            LinterSettings::for_rules([Rule::NoqaComments, Rule::UnusedImport]).with_preview_mode();
 
         assert_snapshot!(
             add_suppressions_in(
@@ -3182,7 +3182,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        import math  # noqa: F401  # ruff:ignore[noqa-comment]
+        import math  # noqa: F401  # ruff:ignore[noqa-comments]
 
         ```
         "
