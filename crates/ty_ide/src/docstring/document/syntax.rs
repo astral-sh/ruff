@@ -8,33 +8,15 @@ use super::rst::is_field_list_marker;
 /// source ranges.
 ///
 /// For example, `first\r\nsecond` yields `first` at offset 0 and `second` at offset 7.
-pub(super) fn parsed_lines(raw: &str) -> Vec<ParsedLine<'_>> {
-    let mut lines = raw
+pub(super) fn parsed_lines(source: &str) -> Vec<ParsedLine<'_>> {
+    source
         .universal_newlines()
         .map(|line| ParsedLine {
             text: line.as_str(),
             range: line.range(),
-            raw_indent: indentation(line.as_str()),
-            structural_indent: TextSize::new(0),
+            indent: indentation(line.as_str()),
         })
-        .collect::<Vec<_>>();
-
-    // PEP 257 ignores indentation on the first physical line and removes the common margin from
-    // all later lines. Keep the raw indentation as well because item and block indentation can
-    // still disambiguate content within a section.
-    let continuation_margin = lines
-        .iter()
-        .skip(1)
-        .filter(|line| !line.text.trim().is_empty())
-        .map(|line| line.raw_indent)
-        .min()
-        .unwrap_or(TextSize::new(0));
-
-    for line in lines.iter_mut().skip(1) {
-        line.structural_indent = line.raw_indent.saturating_sub(continuation_margin);
-    }
-
-    lines
+        .collect()
 }
 
 /// A docstring line and its source range, excluding the newline terminator.
@@ -44,10 +26,8 @@ pub(super) struct ParsedLine<'a> {
     pub(super) text: &'a str,
     /// The byte range of `text` within the source document.
     pub(super) range: TextRange,
-    /// The indentation in the raw docstring text.
-    pub(super) raw_indent: TextSize,
-    /// The indentation after removing the PEP 257 continuation margin.
-    pub(super) structural_indent: TextSize,
+    /// The indentation in the source document.
+    pub(super) indent: TextSize,
 }
 
 /// Returns whether `line` starts with a `CommonMark` list-item marker.
@@ -80,13 +60,11 @@ pub(super) fn container_block_end(lines: &[ParsedLine<'_>], index: usize) -> Opt
         return None;
     }
 
-    // Container membership is determined before PEP 257 normalization. This keeps raw-indented
-    // section-like text inside lists, directives, and field-list entries.
     Some(
         (index + 1..lines.len())
             .find(|&end| {
                 let line = lines[end];
-                !line.text.trim().is_empty() && line.raw_indent <= marker.raw_indent
+                !line.text.trim().is_empty() && line.indent <= marker.indent
             })
             .unwrap_or(lines.len()),
     )

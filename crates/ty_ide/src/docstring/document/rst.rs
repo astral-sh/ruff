@@ -32,11 +32,13 @@ pub(in crate::docstring) fn top_level_field_lists(
 }
 
 /// Returns the parameter documentation recognized in a reST docstring.
-pub(super) fn parameter_documentation(raw: &str) -> IndexMap<String, String> {
+///
+/// `normalized_source` must have already undergone PEP-257 trimming and universal newline
+/// normalization.
+pub(super) fn parameter_documentation(normalized_source: &str) -> IndexMap<String, String> {
     let mut parameters = IndexMap::new();
-    let source = crate::docstring::documentation_trim(raw);
 
-    for field_list in top_level_field_lists(&source) {
+    for field_list in top_level_field_lists(normalized_source) {
         for field in field_list.fields {
             let Field::Parameter {
                 lookup_name,
@@ -1147,7 +1149,8 @@ Section::
     }
 
     fn parameter_documentation(docstring: &str) -> String {
-        let parameters = super::parameter_documentation(docstring);
+        let normalized_source = crate::docstring::documentation_trim(docstring);
+        let parameters = super::parameter_documentation(&normalized_source);
         let mut rendered = String::new();
 
         for (name, description) in parameters {

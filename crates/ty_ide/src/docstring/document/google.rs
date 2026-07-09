@@ -42,8 +42,11 @@ use super::syntax::{
 };
 
 /// Returns parameter documentation from recognized Google-style parameter sections.
-pub(super) fn parameter_documentation(raw: &str) -> IndexMap<String, String> {
-    let lines = parsed_lines(raw);
+///
+/// `normalized_source` must have already undergone PEP-257 trimming and universal newline
+/// normalization.
+pub(super) fn parameter_documentation(normalized_source: &str) -> IndexMap<String, String> {
+    let lines = parsed_lines(normalized_source);
     let mut parameters = Parameters::default();
     for section in sections(&lines) {
         if matches!(
@@ -57,6 +60,9 @@ pub(super) fn parameter_documentation(raw: &str) -> IndexMap<String, String> {
 }
 
 /// Returns recognized Google-style sections in source order.
+///
+/// `lines` must come from source that has already undergone PEP-257 trimming and universal
+/// newline normalization (typically via `docstring::documentation_trim`).
 pub(in crate::docstring) fn sections<'a>(
     lines: &'a [ParsedLine<'a>],
 ) -> impl Iterator<Item = Section<'a>> + 'a {
@@ -121,13 +127,13 @@ fn extend_parameter_documentation(parameters: &mut Parameters, lines: &[ParsedLi
 
         // The first recognized item establishes the sibling indentation.
         // Each item at that indentation starts a new sibling and completes its predecessor.
-        if item_indent.is_none_or(|indent| line.raw_indent == indent)
+        if item_indent.is_none_or(|indent| line.indent == indent)
             && let Some((names, description)) = parse_parameter(trimmed)
         {
             parameters.insert_documentation(
                 current.replace((names.to_string(), description.to_string())),
             );
-            item_indent = Some(line.raw_indent);
+            item_indent = Some(line.indent);
             continue;
         }
 
@@ -201,8 +207,7 @@ fn parse_section_header(lines: &[ParsedLine<'_>], index: usize) -> Option<Sectio
 
     Some(SectionHeader {
         kind,
-        indent: line.raw_indent,
-        structural_indent: line.structural_indent,
+        indent: line.indent,
         body_start_line_index: index + 1,
         range: line.range,
     })
@@ -268,7 +273,7 @@ fn section_body_continuation<'a>(
     }
 
     if leading_blank_lines > 0
-        && next_line.structural_indent <= header.structural_indent
+        && next_line.indent <= header.indent
         && (parse_section_header(lines, leading_blank_lines).is_some()
             || is_inline_section_header(next_line.text))
     {
@@ -278,7 +283,7 @@ fn section_body_continuation<'a>(
     // Returns and yields have no item syntax that distinguishes an aligned body from prose
     // following an empty section.
     if leading_blank_lines > 0
-        && next_line.raw_indent <= header.indent
+        && next_line.indent <= header.indent
         && item_indent.is_none()
         && matches!(
             header.kind,
@@ -299,7 +304,7 @@ fn section_body_continuation<'a>(
                     | SectionKind::OtherParameters
             )
         )
-        && item_indent == Some(next_line.raw_indent)
+        && item_indent == Some(next_line.indent)
         && section_item_indent(header, *next_line).is_none()
     {
         return None;
@@ -314,12 +319,11 @@ fn section_header_ends_body(lines: &[ParsedLine<'_>], index: usize, header: Sect
     let Some(line) = lines.get(index) else {
         return false;
     };
-    if line.structural_indent <= header.structural_indent && is_inline_section_header(line.text) {
+    if line.indent <= header.indent && is_inline_section_header(line.text) {
         return true;
     }
 
-    parse_section_header(lines, index)
-        .is_some_and(|next| next.structural_indent <= header.structural_indent)
+    parse_section_header(lines, index).is_some_and(|next| next.indent <= header.indent)
 }
 
 /// Returns whether `line` belongs to `header` under Google-style indentation rules.
@@ -328,12 +332,11 @@ fn line_belongs_to_body(
     line: ParsedLine<'_>,
     item_indent: Option<TextSize>,
 ) -> bool {
-    match line.raw_indent.cmp(&header.indent) {
+    match line.indent.cmp(&header.indent) {
         Ordering::Less => false,
         Ordering::Greater => true,
         Ordering::Equal => {
-            let item_indent_matches_line =
-                item_indent.is_none_or(|indent| indent == line.raw_indent);
+            let item_indent_matches_line = item_indent.is_none_or(|indent| indent == line.indent);
             let is_parameter_section = matches!(
                 header.kind,
                 HeaderKind::Structured(
@@ -368,7 +371,7 @@ fn section_item_indent(header: SectionHeader, line: ParsedLine<'_>) -> Option<Te
         HeaderKind::Structured(SectionKind::Returns | SectionKind::Yields) => !trimmed.is_empty(),
         HeaderKind::Opaque => false,
     };
-    is_item.then_some(line.raw_indent)
+    is_item.then_some(line.indent)
 }
 
 /// Returns whether `line` is a recognized section header followed by inline content.
@@ -394,7 +397,6 @@ fn is_inline_section_header(line: &str) -> bool {
 struct SectionHeader {
     kind: HeaderKind,
     indent: TextSize,
-    structural_indent: TextSize,
     body_start_line_index: usize,
     range: TextRange,
 }
@@ -739,6 +741,28 @@ This line starts at column zero.
     }
 
     #[test]
+    fn finds_parameter_section_after_first_line_literal_block() {
+        // Regression for https://github.com/pytorch/pytorch/blob/e3f5bf0b18585511e6cd7d7a574ebf82f465e5ae/torch/_native/instrumentation.py#L365-L383
+        assert_parameter_documentation(
+            "\
+Instrument a single ``@triton.jit`` kernel, stacked above the jit::
+
+        @instrument_triton_kernel(\"aten::bmm\")
+        @triton.jit
+        def _bmm_kernel(...): ...
+
+    A Triton kernel compiles lazily and caches variants on the kernel object.
+
+    Args:
+        op: Operator symbol being compiled for, e.g. ``\"aten::bmm\"``.",
+            &[(
+                "op",
+                "Operator symbol being compiled for, e.g. ``\"aten::bmm\"``.",
+            )],
+        );
+    }
+
+    #[test]
     fn keeps_colon_prose_in_parameter_documentation() {
         assert_parameter_documentation(
             "\
@@ -807,6 +831,8 @@ Args:
     fn ignores_parameter_section_in_rest_directive() {
         assert_parameter_documentation(
             "\
+Summary.
+
 .. note::
     Args:
         nested: Not parameter documentation.",
@@ -818,6 +844,8 @@ Args:
     fn ignores_parameter_section_after_blank_line_in_rest_directive() {
         assert_parameter_documentation(
             "\
+Summary.
+
 .. note::
 
         Keyword Args:
@@ -830,6 +858,8 @@ Args:
     fn ignores_parameter_section_in_unordered_markdown_list_item() {
         assert_parameter_documentation(
             "\
+Summary.
+
 - Example:
     Args:
         nested: Not parameter documentation.",
@@ -841,6 +871,8 @@ Args:
     fn ignores_parameter_section_after_blank_line_in_markdown_list_item() {
         assert_parameter_documentation(
             "\
+Summary.
+
 - Example:
 
         Args:
@@ -853,6 +885,8 @@ Args:
     fn ignores_parameter_section_in_ordered_markdown_list_item() {
         assert_parameter_documentation(
             "\
+Summary.
+
 1. Example:
     Args:
         nested: Not parameter documentation.",
@@ -864,6 +898,8 @@ Args:
     fn ignores_parameter_section_in_rest_field_list() {
         assert_parameter_documentation(
             "\
+Summary.
+
 :param value: Example input.
     Args:
         nested: Not parameter documentation.",
@@ -875,6 +911,8 @@ Args:
     fn ignores_parameter_section_in_rest_literal_block() {
         assert_parameter_documentation(
             "\
+Summary.
+
 Example::
 
         Args:
@@ -1054,7 +1092,8 @@ Returns:
     }
 
     fn display_parameters(raw: &str) -> String {
-        parameter_documentation(raw)
+        let normalized_source = crate::docstring::documentation_trim(raw);
+        parameter_documentation(&normalized_source)
             .into_iter()
             .map(|(name, documentation)| {
                 let documentation = documentation
@@ -1071,7 +1110,8 @@ Returns:
 
     #[track_caller]
     fn assert_parameter_documentation(raw: &str, expected: &[(&str, &str)]) {
-        let parameters = parameter_documentation(raw);
+        let normalized_source = crate::docstring::documentation_trim(raw);
+        let parameters = parameter_documentation(&normalized_source);
         assert_eq!(parameters.len(), expected.len(), "{raw}");
 
         for &(name, documentation) in expected {

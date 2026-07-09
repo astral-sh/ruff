@@ -58,7 +58,8 @@ impl Docstring {
     /// Extract parameter documentation from popular docstring formats.
     /// Returns a map of parameter names to their documentation.
     pub fn parameter_documentation(&self) -> IndexMap<String, String> {
-        document::parameter_documentation(&self.0, extract_numpy_style_params(&self.0))
+        let normalized_source = documentation_trim(&self.0);
+        document::parameter_documentation(&normalized_source, extract_numpy_style_params(&self.0))
     }
 }
 
