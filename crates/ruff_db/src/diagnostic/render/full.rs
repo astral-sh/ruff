@@ -124,6 +124,9 @@ impl<'a> Diff<'a> {
     }
 }
 
+/// Limit diffs to a narrow range around each fix rather than diffing the whole file.
+const DIFF_CONTEXT_WINDOW: usize = 3;
+
 impl std::fmt::Display for Diff<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let source_code = self.diagnostic_source.as_source_code();
@@ -152,6 +155,32 @@ impl std::fmt::Display for Diff<'_> {
         for (cell, offset) in cells {
             let range = TextRange::new(last_end, offset);
             last_end = offset;
+
+            // For non-notebooks, construct and diff only the source surrounding the edits.
+            let (range, line_offset) = if cell.is_none()
+                && let Some(first) = self.fix.edits().first()
+                && let Some(last) = self.fix.edits().last()
+            {
+                let start_line = source_code
+                    .line_index(first.start())
+                    .saturating_sub(DIFF_CONTEXT_WINDOW);
+                let last_source_line = source_code.line_index(source_text.text_len());
+                let end_line = source_code
+                    .line_index(last.end())
+                    .saturating_add(DIFF_CONTEXT_WINDOW)
+                    .min(last_source_line);
+
+                (
+                    TextRange::new(
+                        source_code.line_start(start_line),
+                        source_code.line_end(end_line),
+                    ),
+                    start_line.to_zero_indexed(),
+                )
+            } else {
+                (range, 0)
+            };
+
             let input = source_code.slice(range);
 
             let mut output = String::with_capacity(input.len());
@@ -201,7 +230,9 @@ impl std::fmt::Display for Diff<'_> {
             // Find the new line number with the largest number of digits to align all of the line
             // number separators.
             let last_op = grouped_ops.last().and_then(|group| group.last());
-            let largest_new = last_op.map(|op| op.new_range().end).unwrap_or_default();
+            let largest_new = last_op
+                .map(|op| op.new_range().end + line_offset)
+                .unwrap_or_default();
 
             let digit_with = OneIndexed::new(largest_new).unwrap_or_default().digits();
 
@@ -241,7 +272,9 @@ impl std::fmt::Display for Diff<'_> {
                         };
 
                         let line = Line {
-                            index: index.map(OneIndexed::from_zero_indexed),
+                            index: index.map(|i| {
+                                OneIndexed::from_zero_indexed(i).saturating_add(line_offset)
+                            }),
                             width: digit_with,
                         };
 
