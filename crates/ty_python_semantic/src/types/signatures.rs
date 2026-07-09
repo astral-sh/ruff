@@ -10,6 +10,7 @@
 //! argument types and return types. For each callable type in the union, the call expression's
 //! arguments must match _at least one_ overload.
 
+use std::borrow::Cow;
 use std::fmt;
 use std::slice::Iter;
 use std::sync::Arc;
@@ -1381,7 +1382,7 @@ impl<'db> Signature<'db> {
     ///
     /// Legacy variables, caller-owned inference variables, `Self`, and `ParamSpec`s retain the
     /// existing callable relation until their binder ownership can be represented precisely.
-    fn higher_rank_typevars(
+    fn callable_local_typevars(
         &self,
         db: &'db dyn Db,
         caller_inferable: InferableTypeVars<'db>,
@@ -1615,6 +1616,96 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
         )
         .collect()
     }
+}
+
+/// A generic callable target together with the variables that are universally quantified when
+/// comparing it with a source callable.
+struct QuantifiedCallableTarget<'a, 'db> {
+    signature: Cow<'a, Signature<'db>>,
+    typevars: Vec<BoundTypeVarInstance<'db>>,
+    locals: BoundTypeVarSet<'db>,
+}
+
+impl<'a, 'db> QuantifiedCallableTarget<'a, 'db> {
+    fn try_new(
+        db: &'db dyn Db,
+        source_signatures: &[Signature<'db>],
+        target: &'a Signature<'db>,
+        caller_inferable: InferableTypeVars<'db>,
+    ) -> Option<Self> {
+        // A legacy TypeVar's owner is inferred from its uses. When an enclosing generic context
+        // is unavailable, a class variable can therefore look method-local. Restrict quantified
+        // comparison to PEP 695 variables lexically declared by this function. A type variable
+        // used only inside a returned `Callable` is moved onto that callable's synthetic
+        // signature, but retains the enclosing function as its binding context.
+        let target_context = target.generic_context?;
+        let mut typevars = target.callable_local_typevars(db, caller_inferable)?;
+
+        // `Self` retains the existing callable relation until its binder ownership can be
+        // represented independently from an ordinary method-local type variable.
+        if source_signatures
+            .iter()
+            .any(|source| source.has_self_typevar(db))
+        {
+            return None;
+        }
+
+        // Freshen the target once for the whole overload set. Its identity must remain stable
+        // across source alternatives so overload selection stays inside target quantification.
+        let signature = source_signatures
+            .iter()
+            .filter_map(|source| {
+                source.max_typevar_freshness_matching_generic_context(db, target_context)
+            })
+            .max()
+            .map(|freshness| {
+                Cow::Owned(target.freshen_bound_typevars(db, freshness.increment().value()))
+            })
+            .unwrap_or(Cow::Borrowed(target));
+        if matches!(&signature, Cow::Owned(_)) {
+            typevars = signature.typevars(db);
+        }
+        let locals = BoundTypeVarSet::from_bound_typevars(db, typevars.iter().copied());
+
+        Some(Self {
+            signature,
+            typevars,
+            locals,
+        })
+    }
+
+    fn prepare_source<'source>(
+        &self,
+        db: &'db dyn Db,
+        source: &'source Signature<'db>,
+    ) -> QuantifiedCallableSource<'source, 'db> {
+        let target = self.signature.as_ref();
+        let signature = if source.generic_context != target.generic_context
+            && let Some(generic_context) = source.generic_context
+            && let Some(delta) = target
+                .max_typevar_freshness_matching_generic_context(db, generic_context)
+                .map(|freshness| freshness.increment().value())
+        {
+            Cow::Owned(source.freshen_bound_typevars(db, delta))
+        } else {
+            Cow::Borrowed(source)
+        };
+        let typevars = signature.typevars(db);
+        let locals = InferableTypeVars::from_bound_typevars(db, typevars.iter().copied());
+        QuantifiedCallableSource {
+            signature,
+            typevars,
+            locals,
+        }
+    }
+}
+
+/// A source signature together with the variables existentially quantified for one target
+/// specialization.
+struct QuantifiedCallableSource<'a, 'db> {
+    signature: Cow<'a, Signature<'db>>,
+    typevars: Vec<BoundTypeVarInstance<'db>>,
+    locals: InferableTypeVars<'db>,
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
@@ -1949,7 +2040,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target
         };
 
-        self.check_signature_pair_infer_both(db, source, target)
+        self.check_signature_pair_existentially(db, source, target)
     }
 
     /// Compares every source overload with a generic target as
@@ -1960,69 +2051,28 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_signatures: &[Signature<'db>],
         target: &Signature<'db>,
     ) -> Option<ConstraintSet<'db, 'c>> {
-        // A legacy TypeVar's owner is inferred from its uses. When an enclosing generic context
-        // is unavailable, a class variable can therefore look method-local. Restrict higher-rank
-        // comparison to PEP 695 variables lexically declared by this function. A type variable
-        // used only inside a returned `Callable` is moved onto that callable's synthetic
-        // signature, but retains the enclosing function as its binding context.
-        let target_context = target.generic_context?;
-        let target_typevars = target.higher_rank_typevars(db, self.inferable)?;
-
-        // `Self` retains the existing callable relation until its binder ownership can be
-        // represented independently from an ordinary method-local type variable.
-        if source_signatures
-            .iter()
-            .any(|source| source.has_self_typevar(db))
-        {
-            return None;
-        }
-
-        // Freshen the target once for the whole overload set. Its identity must remain stable
-        // across source alternatives so overload selection stays inside target quantification.
-        let freshened_target;
-        let (target, target_typevars) = if let Some(delta) = source_signatures
-            .iter()
-            .filter_map(|source| {
-                source.max_typevar_freshness_matching_generic_context(db, target_context)
-            })
-            .max()
-            .map(|freshness| freshness.increment().value())
-        {
-            freshened_target = target.freshen_bound_typevars(db, delta);
-            let target_typevars = freshened_target.typevars(db);
-            (&freshened_target, target_typevars)
-        } else {
-            (target, target_typevars)
-        };
-
-        let target_locals =
-            BoundTypeVarSet::from_bound_typevars(db, target_typevars.iter().copied());
+        let target =
+            QuantifiedCallableTarget::try_new(db, source_signatures, target, self.inferable)?;
         let checker = self
-            .with_universally_quantified_typevars(db, target_locals)
+            .with_universally_quantified_typevars(db, target.locals)
             .with_lazy_typevar_evaluation();
 
         let check_source_signature = |source: &Signature<'db>| {
-            let freshened_source;
-            let source = if source.generic_context != target.generic_context
-                && let Some(generic_context) = source.generic_context
-                && let Some(delta) = target
-                    .max_typevar_freshness_matching_generic_context(db, generic_context)
-                    .map(|freshness| freshness.increment().value())
-            {
-                freshened_source = source.freshen_bound_typevars(db, delta);
-                &freshened_source
-            } else {
-                source
-            };
-            let source_typevars = source.typevars(db);
-            let source_locals =
-                InferableTypeVars::from_bound_typevars(db, source_typevars.iter().copied());
+            let source = target.prepare_source(db, source);
             let source_checker =
-                checker.with_inferable_typevars(self.inferable.merge(db, source_locals));
-            let relation = source_checker.with_signature_recursion_guard(source, target, || {
-                source_checker.check_signature_pair_inner(db, source, target)
-            });
-            (relation, source_typevars)
+                checker.with_inferable_typevars(self.inferable.merge(db, source.locals));
+            let relation = source_checker.with_signature_recursion_guard(
+                source.signature.as_ref(),
+                target.signature.as_ref(),
+                || {
+                    source_checker.check_signature_pair_inner(
+                        db,
+                        source.signature.as_ref(),
+                        target.signature.as_ref(),
+                    )
+                },
+            );
+            (relation, source.typevars)
         };
 
         if let [source] = source_signatures {
@@ -2030,18 +2080,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
             let source_typevars = source.typevars(db);
             let has_nested_local = source.has_nested_local_typevar(db, &source_typevars)
-                || target.has_nested_local_typevar(db, &target_typevars);
+                || target
+                    .signature
+                    .has_nested_local_typevar(db, &target.typevars);
             if has_nested_local
                 && let Some(source_specializations) = source.constrained_specializations_with_limit(
                     db,
                     &source_typevars,
                     SPECIALIZATION_LIMIT,
                 )
-                && let Some(target_specializations) = target.constrained_specializations_with_limit(
-                    db,
-                    &target_typevars,
-                    SPECIALIZATION_LIMIT / source_specializations.len(),
-                )
+                && let Some(target_specializations) =
+                    target.signature.constrained_specializations_with_limit(
+                        db,
+                        &target.typevars,
+                        SPECIALIZATION_LIMIT / source_specializations.len(),
+                    )
             {
                 return Some(target_specializations.iter().when_all(
                     db,
@@ -2063,7 +2116,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 db,
                 self.constraints,
                 &source_typevars,
-                &target_typevars,
+                &target.typevars,
                 self.relation.is_assignability(),
             ) {
                 return Some(result);
@@ -2073,7 +2126,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let target_domain = ConstraintSet::valid_specializations(
             db,
             self.constraints,
-            target_typevars.iter().copied(),
+            target.typevars.iter().copied(),
         );
         let check_source_signatures = || {
             source_signatures
@@ -2098,10 +2151,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let (quantified_sources, target_typevars) = if self.relation.is_assignability() {
             quantified_sources
-                .try_project_gradual_specializations(db, self.constraints, &target_typevars)
+                .try_project_gradual_specializations(db, self.constraints, &target.typevars)
                 .unwrap_or_else(|_| (self.never(), Vec::new()))
         } else {
-            (quantified_sources, target_typevars)
+            (quantified_sources, target.typevars)
         };
         let target_domain = ConstraintSet::valid_specializations(
             db,
@@ -2119,7 +2172,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     }
 
     /// Compare signatures using the ordinary, existential treatment of both generic contexts.
-    fn check_signature_pair_infer_both(
+    fn check_signature_pair_existentially(
         &self,
         db: &'db dyn Db,
         source: &Signature<'db>,
