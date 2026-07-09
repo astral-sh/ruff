@@ -5033,10 +5033,10 @@ def _(flag: bool) -> None:
     reveal_type(infer_producer(cls))  # revealed: int | str
 ```
 
-## Protocol definition objects as `type[Self]` receivers
+## Protocol definition objects as generic self receivers
 
 A protocol definition object is not a concrete inhabitant of `type[P]`, but it remains a valid
-receiver for classmethods defined on the protocol itself.
+receiver for classmethods defined on the protocol itself using either `type[Self]` or `type[T]`.
 
 ```toml
 [environment]
@@ -5044,7 +5044,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Protocol, Self, cast
+from typing import Protocol, Self, TypeVar, cast
 
 class SelfFactory(Protocol):
     @classmethod
@@ -5067,6 +5067,31 @@ class GenericSelfFactory[T](Protocol):
         return cast(Self, object())
 
 reveal_type(GenericSelfFactory[int].make(1))  # revealed: GenericSelfFactory[int]
+
+T_legacy = TypeVar("T_legacy", bound="LegacySelfFactory")
+
+class LegacySelfFactory(Protocol):
+    @classmethod
+    def make(cls: type[T_legacy]) -> T_legacy:
+        return cast(T_legacy, object())
+
+reveal_type(LegacySelfFactory.make())  # revealed: LegacySelfFactory
+
+class Pep695SelfFactory(Protocol):
+    @classmethod
+    def make[T: Pep695SelfFactory](cls: type[T]) -> T:
+        return cast(T, object())
+
+reveal_type(Pep695SelfFactory.make())  # revealed: Pep695SelfFactory
+
+T_unrelated = TypeVar("T_unrelated", bound=int)
+
+class UnrelatedBoundFactory(Protocol):
+    @classmethod
+    def make(cls: type[T_unrelated]) -> T_unrelated:
+        return cast(T_unrelated, object())
+
+UnrelatedBoundFactory.make()  # error: [invalid-argument-type]
 
 class GenericFactory[T](Protocol):
     @classmethod

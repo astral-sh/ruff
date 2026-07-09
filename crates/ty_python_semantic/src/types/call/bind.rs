@@ -4817,13 +4817,14 @@ struct ArgumentTypeChecker<'a, 'db> {
     constraint_set_errors: Vec<bool>,
 }
 
-/// Use the structural meta-type of a protocol class when binding it to a `type[Self]` receiver.
+/// Use the structural meta-type of a protocol class when binding it to a generic `type[T]`
+/// receiver.
 ///
 /// A protocol definition object is not generally an inhabitant of `type[P]`, because it cannot be
 /// instantiated to produce a `P`. It is nevertheless a valid receiver for classmethods defined on
 /// that protocol. This conversion is limited to the synthetic receiver argument so that ordinary
 /// `type[P]` parameters retain the concrete-inhabitant requirement.
-fn normalize_protocol_class_self_receiver<'db>(
+fn normalize_protocol_class_generic_self_receiver<'db>(
     db: &'db dyn Db,
     argument: Argument<'_>,
     parameter: &Parameter<'db>,
@@ -4832,10 +4833,10 @@ fn normalize_protocol_class_self_receiver<'db>(
     let Type::SubclassOf(subclass_of) = parameter.annotated_type() else {
         return argument_type;
     };
-    let Some(typevar) = subclass_of.into_type_var() else {
+    if subclass_of.into_type_var().is_none() {
         return argument_type;
-    };
-    if !matches!(argument, Argument::Synthetic) || !typevar.typevar(db).is_self(db) {
+    }
+    if !matches!(argument, Argument::Synthetic) {
         return argument_type;
     }
 
@@ -5234,7 +5235,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 let argument_type = matched_parameter
                     .argument_type
                     .unwrap_or_else(|| argument_types.get_for_declared_type(declared_type));
-                let argument_type = normalize_protocol_class_self_receiver(
+                let argument_type = normalize_protocol_class_generic_self_receiver(
                     self.db,
                     argument,
                     &parameters[parameter_index],
@@ -5275,8 +5276,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return;
         }
 
-        argument_type =
-            normalize_protocol_class_self_receiver(self.db, argument, parameter, argument_type);
+        argument_type = normalize_protocol_class_generic_self_receiver(
+            self.db,
+            argument,
+            parameter,
+            argument_type,
+        );
 
         let mut expected_ty = parameter.annotated_type();
         if let Some(specialization) = self.specialization() {
