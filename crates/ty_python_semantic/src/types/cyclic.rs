@@ -223,6 +223,15 @@ fn type_has_recursive_identity_cycle_in_stack<'db>(
     }
 }
 
+/// Return `true` if `ty` re-enters an active recursive type identity in `seen`.
+pub(crate) fn type_has_immediate_recursive_identity_cycle<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    seen: &[Type<'db>],
+) -> bool {
+    type_has_recursive_identity_cycle_in_stack(db, ty, seen, NonNestedAliasCyclePolicy::Immediate)
+}
+
 fn type_has_recursive_identity_cycle_for_active<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,

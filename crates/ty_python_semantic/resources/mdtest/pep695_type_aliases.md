@@ -656,6 +656,15 @@ type GrowingList[T] = list[GrowingList[T | GrowingList[T]]]
 def growing_list(x: GrowingList[int]):
     reveal_type(x)  # revealed: list[GrowingList[int | GrowingList[int]]]
 
+type GrowingUnion[T] = int | GrowingUnion[list[T]]
+
+def growing_union(x: GrowingUnion[int]):
+    reveal_type(x)  # revealed: int
+
+growing_union_int: GrowingUnion[int] = 1
+# error: [invalid-assignment] "Object of type `None` is not assignable to `GrowingUnion[int]`"
+growing_union_none: GrowingUnion[int] = None
+
 type GrowingCallable[T] = Callable[[], GrowingCallable[T | GrowingCallable[T]] | None]
 
 def growing_callable(x: GrowingCallable[int]):
