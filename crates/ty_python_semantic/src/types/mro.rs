@@ -821,10 +821,9 @@ fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
         mro.push(mro_entry);
 
         // Make sure we don't try to add the candidate to the MRO twice:
+        let mro_entry_identity = mro_entry.mro_identity();
         for sequence in &mut sequences {
-            if sequence[0].mro_identity() == mro_entry.mro_identity() {
-                sequence.pop_front();
-            }
+            sequence.pop_front_if(|base| base.mro_identity() == mro_entry_identity);
         }
     }
 }
