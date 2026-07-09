@@ -2372,6 +2372,94 @@ static_assert(
     )
 )
 
+def paramspec_target[**P](*args: P.args, **kwargs: P.kwargs) -> None: ...
+def paramspec_source[**Q](*args: Q.args, **kwargs: Q.kwargs) -> None: ...
+def any_parameters(*args: object, **kwargs: object) -> None: ...
+def one_int(value: int) -> None: ...
+
+# A generic ParamSpec ranges over parameter-list callables. The bottom parameter list accepts
+# every call, while a concrete parameter list cannot cover the complete target domain.
+static_assert(
+    is_subtype_of(
+        RegularCallableTypeOf[paramspec_source],
+        RegularCallableTypeOf[paramspec_target],
+    )
+)
+static_assert(
+    is_subtype_of(
+        RegularCallableTypeOf[any_parameters],
+        RegularCallableTypeOf[paramspec_target],
+    )
+)
+static_assert(
+    not is_subtype_of(
+        RegularCallableTypeOf[one_int],
+        RegularCallableTypeOf[paramspec_target],
+    )
+)
+
+def mixed_target[T, **P](value: T, *args: P.args, **kwargs: P.kwargs) -> T:
+    raise NotImplementedError
+
+def mixed_concrete_source[**Q](value: int, *args: Q.args, **kwargs: Q.kwargs) -> int:
+    return value
+
+def mixed_source[S, **Q](value: S, *args: Q.args, **kwargs: Q.kwargs) -> S:
+    return value
+
+def mixed_any_parameters[S](value: S, *args: object, **kwargs: object) -> S:
+    return value
+
+def mixed_fixed_tail[S](value: S, extra: int) -> S:
+    return value
+
+static_assert(
+    not is_subtype_of(
+        RegularCallableTypeOf[mixed_concrete_source],
+        RegularCallableTypeOf[mixed_target],
+    )
+)
+static_assert(
+    is_subtype_of(
+        RegularCallableTypeOf[mixed_source],
+        RegularCallableTypeOf[mixed_target],
+    )
+)
+static_assert(
+    is_subtype_of(
+        RegularCallableTypeOf[mixed_any_parameters],
+        RegularCallableTypeOf[mixed_target],
+    )
+)
+static_assert(
+    not is_subtype_of(
+        RegularCallableTypeOf[mixed_fixed_tail],
+        RegularCallableTypeOf[mixed_target],
+    )
+)
+
+def callback_target[T, **P](callback: Callable[P, T]) -> Callable[P, T]:
+    return callback
+
+def callback_source[S, **Q](callback: Callable[Q, S]) -> Callable[Q, S]:
+    return callback
+
+def callback_int(callback: Callable[[int], int]) -> Callable[[int], int]:
+    return callback
+
+static_assert(
+    is_subtype_of(
+        RegularCallableTypeOf[callback_source],
+        RegularCallableTypeOf[callback_target],
+    )
+)
+static_assert(
+    not is_subtype_of(
+        RegularCallableTypeOf[callback_int],
+        RegularCallableTypeOf[callback_target],
+    )
+)
+
 def constrained_target[T: (bytes, str)](t: T) -> T:
     return t
 

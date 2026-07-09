@@ -108,8 +108,8 @@ use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, find_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionType,
+    BoundTypeVarInstance, IntersectionType, Parameters, Type, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 
@@ -8078,13 +8078,36 @@ impl SatisfiedClauses {
 }
 
 impl<'db> BoundTypeVarInstance<'db> {
+    /// Returns the specialization domain of a ParamSpec as an interval of parameter-list
+    /// callables.
+    ///
+    /// The lower bound accepts every call and the upper bound accepts none. `P.args` and
+    /// `P.kwargs` components do not have independent specialization domains.
+    fn paramspec_domain(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+    ) -> Option<NodeId> {
+        if self.paramspec_attr(db).is_some() {
+            return Some(ALWAYS_TRUE);
+        }
+        self.is_paramspec(db).then(|| {
+            Constraint::new_node(
+                db,
+                builder,
+                self,
+                Type::paramspec_value_callable(db, Parameters::bottom()),
+                Type::paramspec_value_callable(db, Parameters::top()),
+            )
+        })
+    }
+
     /// Returns the valid specializations of a typevar. This is used when checking a constraint set
     /// when this typevar is in inferable position, where we only need _some_ specialization to
     /// satisfy the constraint set.
     fn valid_specializations(self, db: &'db dyn Db, builder: &ConstraintSetBuilder<'db>) -> NodeId {
-        if self.paramspec_attr(db).is_some() {
-            // P.args and P.kwargs are variadic, and do not have an upper bound or constraints.
-            return ALWAYS_TRUE;
+        if let Some(domain) = self.paramspec_domain(db, builder) {
+            return domain;
         }
 
         // For gradual upper bounds and constraints, we are free to choose any materialization that
@@ -8136,6 +8159,9 @@ impl<'db> BoundTypeVarInstance<'db> {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
     ) -> (NodeId, Vec<NodeId>) {
+        if let Some(domain) = self.paramspec_domain(db, builder) {
+            return (domain, Vec::new());
+        }
         // For upper bounds and constraints, we are free to choose any materialization that makes
         // the check succeed. In non-inferable positions, it is most helpful to choose a
         // materialization that is as restrictive as possible, since that minimizes the number of
@@ -8179,11 +8205,33 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use crate::db::tests::setup_db;
-    use crate::types::{BoundTypeVarInstance, KnownClass, TypeVarVariance};
+    use crate::types::typevar::{TypeVarIdentity, TypeVarInstance};
+    use crate::types::{
+        BindingContext, BoundTypeVarInstance, KnownClass, Parameter, TypeVarKind, TypeVarNonce,
+        TypeVarVariance,
+    };
     use ruff_python_ast::name::Name;
 
     fn create_typevar<'db>(db: &'db dyn Db, name: &'static str) -> BoundTypeVarInstance<'db> {
         BoundTypeVarInstance::synthetic(db, Name::new_static(name), TypeVarVariance::Invariant)
+    }
+
+    fn create_paramspec<'db>(db: &'db dyn Db, name: &'static str) -> BoundTypeVarInstance<'db> {
+        let identity = TypeVarIdentity::new(
+            db,
+            Name::new_static(name),
+            None,
+            TypeVarKind::Pep695ParamSpec,
+        );
+        let typevar =
+            TypeVarInstance::new(db, identity, None, Some(TypeVarVariance::Invariant), None);
+        BoundTypeVarInstance::new(
+            db,
+            typevar,
+            BindingContext::Synthetic,
+            None,
+            TypeVarNonce::NONE,
+        )
     }
 
     fn quantified_typevars<'db>(
@@ -8692,6 +8740,52 @@ mod tests {
             )
             .expect("the terminal constraint set can be projected exactly");
         assert!(exists_source_forall_target.is_never_satisfied(&db));
+    }
+
+    #[test]
+    fn paramspec_specialization_domain_is_callable_interval() {
+        let db = setup_db();
+        let paramspec = create_paramspec(&db, "P");
+        let builder = ConstraintSetBuilder::new();
+        let domain = ConstraintSet::valid_specializations(&db, &builder, [paramspec]);
+        let concrete = Parameters::from_annotation(
+            &db,
+            [Parameter::positional_only(None)
+                .with_annotated_type(KnownClass::Int.to_instance(&db))],
+        );
+
+        for parameters in [
+            Parameters::bottom(),
+            concrete,
+            Parameters::unknown(),
+            Parameters::top(),
+        ] {
+            let specialization = Type::paramspec_value_callable(&db, parameters);
+            let exact = ConstraintSet::constrain_typevar(
+                &db,
+                &builder,
+                paramspec,
+                specialization,
+                specialization,
+            );
+            assert!(!domain.and(&db, &builder, || exact).is_never_satisfied(&db));
+        }
+
+        let int = KnownClass::Int.to_instance(&db);
+        let non_callable = ConstraintSet::constrain_typevar(&db, &builder, paramspec, int, int);
+        assert!(
+            domain
+                .and(&db, &builder, || non_callable)
+                .is_never_satisfied(&db)
+        );
+
+        let (required, gradual) = paramspec.required_specializations(&db, &builder);
+        assert!(gradual.is_empty());
+        assert!(
+            domain
+                .iff(&db, &builder, ConstraintSet::from_node(&builder, required))
+                .is_always_satisfied(&db)
+        );
     }
 
     #[test]

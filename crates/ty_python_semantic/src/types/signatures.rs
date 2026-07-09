@@ -1417,8 +1417,8 @@ impl<'db> Signature<'db> {
 
     /// Returns the PEP 695 type variables lexically bound by this function.
     ///
-    /// Legacy variables, caller-owned inference variables, `Self`, and `ParamSpec`s retain the
-    /// existing callable relation until their binder ownership can be represented precisely.
+    /// Legacy variables, caller-owned inference variables, and `Self` retain the existing callable
+    /// relation until their binder ownership can be represented precisely.
     fn callable_local_typevars(
         &self,
         db: &'db dyn Db,
@@ -1427,9 +1427,10 @@ impl<'db> Signature<'db> {
         let typevars = self.typevars(db);
         (!typevars.is_empty()
             && typevars.iter().all(|typevar| {
-                typevar.kind(db) == TypeVarKind::Pep695TypeVar
-                    && !typevar.is_inferable(db, caller_inferable)
-                    && !typevar.is_paramspec(db)
+                matches!(
+                    typevar.kind(db),
+                    TypeVarKind::Pep695TypeVar | TypeVarKind::Pep695ParamSpec
+                ) && !typevar.is_inferable(db, caller_inferable)
                     && !typevar.typevar(db).is_self(db)
                     && match self.definition {
                         Some(definition) => {
@@ -1655,12 +1656,11 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
     }
 }
 
-/// A generic callable target together with the variables that are universally quantified when
-/// comparing it with a source callable.
+/// A generic callable target together with its quantified variables.
 struct QuantifiedCallableTarget<'a, 'db> {
     signature: Cow<'a, Signature<'db>>,
-    typevars: Vec<BoundTypeVarInstance<'db>>,
-    locals: BoundTypeVarSet<'db>,
+    universal_typevars: Vec<BoundTypeVarInstance<'db>>,
+    universal_locals: BoundTypeVarSet<'db>,
 }
 
 impl<'a, 'db> QuantifiedCallableTarget<'a, 'db> {
@@ -1700,14 +1700,14 @@ impl<'a, 'db> QuantifiedCallableTarget<'a, 'db> {
             })
             .unwrap_or(Cow::Borrowed(target));
         if matches!(&signature, Cow::Owned(_)) {
-            typevars = signature.typevars(db);
+            typevars = signature.callable_local_typevars(db, caller_inferable)?;
         }
-        let locals = BoundTypeVarSet::from_bound_typevars(db, typevars.iter().copied());
+        let universal_locals = BoundTypeVarSet::from_bound_typevars(db, typevars.iter().copied());
 
         Some(Self {
             signature,
-            typevars,
-            locals,
+            universal_typevars: typevars,
+            universal_locals,
         })
     }
 
@@ -1952,7 +1952,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         match (source_overloads, target_overloads) {
             ([source_signature], [target_signature]) => {
                 // Base case: both callable types contain a single signature.
-                if self.typevar_evaluation == TypeVarEvaluation::Lazy
+                if let Some(relation) = self.try_check_source_signatures_with_quantified_target(
+                    db,
+                    source_overloads,
+                    target_signature,
+                ) {
+                    relation
+                } else if self.typevar_evaluation == TypeVarEvaluation::Lazy
                     && (source_signature
                         .parameters
                         .as_paramspec_with_prefix()
@@ -1963,14 +1969,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             .is_some())
                 {
                     self.check_signature_pair_inner(db, source_signature, target_signature)
-                } else if let Some(relation) = self
-                    .try_check_source_signatures_with_quantified_target(
-                        db,
-                        source_overloads,
-                        target_signature,
-                    )
-                {
-                    relation
                 } else {
                     self.check_signature_pair(db, source_signature, target_signature)
                 }
@@ -2066,7 +2064,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let has_nested_local = source.has_nested_local_typevar(db, &source_typevars)
             || target
                 .signature
-                .has_nested_local_typevar(db, &target.typevars);
+                .has_nested_local_typevar(db, &target.universal_typevars);
         if !has_nested_local {
             return None;
         }
@@ -2078,7 +2076,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         )?;
         let target_specializations = target.signature.constrained_specializations_with_limit(
             db,
-            &target.typevars,
+            &target.universal_typevars,
             SPECIALIZATION_LIMIT / source_specializations.len(),
         )?;
         Some(
@@ -2107,7 +2105,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let target =
             QuantifiedCallableTarget::try_new(db, source_signatures, target, self.inferable)?;
         let checker = self
-            .with_universally_quantified_typevars(db, target.locals)
+            .with_universally_quantified_typevars(db, target.universal_locals)
             .with_lazy_typevar_evaluation();
 
         let check_source_signature = |source: &Signature<'db>| {
@@ -2142,14 +2140,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     db,
                     self.constraints,
                     alternatives,
-                    &target.typevars,
+                    &target.universal_typevars,
                 )
             } else {
                 ConstraintSet::quantify_for_all_exists(
                     db,
                     self.constraints,
                     alternatives,
-                    &target.typevars,
+                    &target.universal_typevars,
                 )
             };
             projection.into_constraints()
