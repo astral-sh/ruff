@@ -2472,6 +2472,37 @@ def update_name(value: HasName) -> None:
     value.name = 1  # error: [invalid-assignment]
 ```
 
+### Generic descriptor result types
+
+Applying a generic descriptor decorator to a generic protocol method currently loses the protocol's
+type variable and produces `cached_property[Unknown]`. The protocol must preserve that descriptor
+type instead of reducing it to a bare `Unknown`, which would allow an incompatible implementation.
+
+```py
+from functools import cached_property
+from typing import Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, reveal_protocol_interface
+
+T = TypeVar("T")
+
+class HasValue(Protocol[T]):
+    @cached_property
+    def value(self) -> T: ...
+
+class StrValue:
+    @cached_property
+    def value(self) -> str:
+        return "value"
+
+static_assert(not is_assignable_to(StrValue, HasValue[int]))
+
+# TODO: This should be a property with an `int` read type once decorator calls preserve enclosing
+# type variables.
+# revealed: {"value": AttributeMember(`cached_property[Unknown]`)}
+reveal_protocol_interface(HasValue[int])
+```
+
 ### Descriptor values in annotations
 
 Only a descriptor produced by decorating a protocol method changes how that member is read and

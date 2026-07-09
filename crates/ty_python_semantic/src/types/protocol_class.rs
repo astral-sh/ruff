@@ -1030,6 +1030,14 @@ fn descriptor_decorated_protocol_member<'db>(
     protocol: ClassType<'db>,
     definition: Option<Definition<'db>>,
 ) -> Option<ProtocolMemberData<'db>> {
+    // Applying a generic descriptor decorator to a method that refers to an enclosing type
+    // variable can currently materialize that variable as `Unknown`. Reducing the descriptor to
+    // its `__get__` result would then erase the remaining descriptor structure and weaken the
+    // protocol member to a bare `Unknown`.
+    if super::visitor::any_over_type(db, descriptor_ty, false, |ty| ty.is_unknown()) {
+        return None;
+    }
+
     let Place::Defined(DefinedPlace {
         definedness: Definedness::AlwaysDefined,
         ..
@@ -1075,9 +1083,8 @@ fn descriptor_setter_write_type<'db>(
         return None;
     };
 
-    // Function-generic setters require quantifier-aware callable-domain analysis. Class type
-    // variables have already been specialized by member lookup; an implicit `Self` can be bound
-    // directly to the descriptor instance.
+    // A method type variable cannot be used as the write type directly: it is inferred separately
+    // for each call. Deriving its accepted values requires generic call analysis.
     if signature.generic_context.is_some_and(|generic_context| {
         generic_context.variables(db).any(|typevar| {
             !typevar.typevar(db).is_self(db)
