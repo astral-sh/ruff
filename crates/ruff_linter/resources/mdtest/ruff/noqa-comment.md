@@ -151,7 +151,7 @@ help: Remove the rule code `UNK001`
 
 ### External codes disable the rule
 
-However, if the code is intentionally marked as `external`, we *do* disable the rule:
+However, if the code is intentionally marked as `external`, we *do* allow using `noqa`:
 
 ```toml
 [lint]
