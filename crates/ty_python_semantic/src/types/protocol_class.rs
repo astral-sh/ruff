@@ -23,7 +23,7 @@ use crate::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
         CallableType, ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
         InstanceFallbackShadowsNonDataDescriptor, IntersectionType, KnownFunction,
-        MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SelfBinding,
+        MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SelfBinding, Signature,
         StaticClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarVariance, UnionType,
         VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
@@ -1399,7 +1399,88 @@ fn descriptor_setter_write_type_for_alternative<'db>(
     };
 
     let callables = setter_ty.try_upcast_to_callable(db)?;
-    callables.positional_parameter_domain(db, &[descriptor_ty, receiver_ty], descriptor_ty)
+    let write_types = callables
+        .iter()
+        .map(|callable| {
+            let write_ty = UnionType::from_elements(
+                db,
+                callable.signatures(db).iter().filter_map(|signature| {
+                    descriptor_setter_signature_write_type(
+                        db,
+                        signature,
+                        descriptor_ty,
+                        receiver_ty,
+                    )
+                }),
+            );
+            (!write_ty.is_never()).then_some(write_ty)
+        })
+        .collect::<Option<Vec<_>>>()?;
+    let write_ty = IntersectionType::bounded_from_elements(db, write_types)?;
+    (!write_ty.is_never()).then_some(write_ty)
+}
+
+/// Derive the values accepted by one applicable `__set__` overload.
+fn descriptor_setter_signature_write_type<'db>(
+    db: &'db dyn Db,
+    signature: &Signature<'db>,
+    descriptor_ty: Type<'db>,
+    receiver_ty: Type<'db>,
+) -> Option<Type<'db>> {
+    let parameters = signature.parameters();
+    let trailing_parameters = parameters.as_slice().get(3..)?;
+    if !trailing_parameters.iter().all(|parameter| {
+        parameter.default_type().is_some()
+            || (parameters.is_standard()
+                && (parameter.is_variadic() || parameter.is_keyword_variadic()))
+    }) {
+        return None;
+    }
+
+    let descriptor_parameter = parameters
+        .get_positional(0)?
+        .annotated_type()
+        .bind_self_typevars(db, descriptor_ty);
+    let receiver_parameter = parameters
+        .get_positional(1)?
+        .annotated_type()
+        .bind_self_typevars(db, descriptor_ty);
+    if descriptor_parameter.has_typevar(db)
+        || receiver_parameter.has_typevar(db)
+        || !descriptor_ty.is_assignable_to(db, descriptor_parameter)
+        || !receiver_ty.is_assignable_to(db, receiver_parameter)
+    {
+        return None;
+    }
+
+    let write_ty = parameters
+        .get_positional(2)?
+        .annotated_type()
+        .bind_self_typevars(db, descriptor_ty);
+    if !write_ty.has_typevar(db) {
+        return Some(write_ty);
+    }
+
+    let Type::TypeVar(typevar) = write_ty else {
+        return None;
+    };
+    let generic_context = signature.generic_context?;
+    if !generic_context.contains(db, typevar.identity(db))
+        || !typevar
+            .binding_context(db)
+            .definition()
+            .is_some_and(|definition| definition.kind(db).is_function_def())
+    {
+        return None;
+    }
+
+    Some(
+        typevar
+            .typevar(db)
+            .bound_or_constraints(db)
+            .map_or(Type::object(), |bound| bound.as_type(db))
+            .bind_self_typevars(db, descriptor_ty),
+    )
 }
 
 fn property_set_type<'db>(
