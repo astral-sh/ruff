@@ -1977,45 +1977,6 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    /// Return whether this class or any of its bases declares or assigns an instance member named
-    /// `name`.
-    ///
-    /// Dynamic bases are excluded; use [`Self::has_dynamic_instance_fallback`] to account for
-    /// instance members they may provide.
-    pub(super) fn has_instance_member(self, db: &'db dyn Db, name: &str) -> bool {
-        self.iter_mro(db)
-            .filter_map(ClassBase::into_class)
-            .any(|class| class.has_own_inheritable_instance_member(db, name))
-    }
-
-    /// Return whether this class has a dynamic base that may provide arbitrary instance members.
-    pub(super) fn has_dynamic_instance_fallback(self, db: &'db dyn Db) -> bool {
-        self.iter_mro(db).any(|base| {
-            matches!(
-                base,
-                ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_)
-            )
-        })
-    }
-
-    fn has_own_inheritable_instance_member(self, db: &'db dyn Db, name: &str) -> bool {
-        self.static_class_literal(db)
-            .is_some_and(|(class, _)| class.has_own_inheritable_instance_member(db, name))
-    }
-
-    /// Return whether this class directly declares an instance member named `name` in its body.
-    pub(super) fn has_own_instance_declaration(self, db: &'db dyn Db, name: &str) -> bool {
-        self.static_class_literal(db)
-            .is_some_and(|(class, _)| class.has_own_instance_declaration(db, name))
-    }
-
-    /// Return whether this class has an annotation-only instance declaration named `name` in its
-    /// body.
-    pub(super) fn has_own_unbound_instance_declaration(self, db: &'db dyn Db, name: &str) -> bool {
-        self.static_class_literal(db)
-            .is_some_and(|(class, _)| class.has_own_unbound_instance_declaration(db, name))
-    }
-
     /// Returns the converter input type for a dataclass field, if the field has a `converter`.
     pub(super) fn converter_input_type_for_field(
         self,

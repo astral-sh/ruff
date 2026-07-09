@@ -2907,8 +2907,8 @@ impl<'db> Type<'db> {
     /// reveal_type(C().generated)  # int
     /// ```
     ///
-    /// Ordinary class bindings and instance members shadow a normal generated attribute. A
-    /// generated data descriptor retains descriptor precedence over instance storage.
+    /// An own class binding shadows a normal generated attribute. During instance lookup, the
+    /// result participates in the existing descriptor and instance-fallback logic.
     ///
     /// Metaclass instance members participate, including inherited declarations and attributes
     /// inferred from instance methods. Class-body-only bindings remain attributes of the
@@ -2935,68 +2935,71 @@ impl<'db> Type<'db> {
             return class_attr;
         }
         let own_class_member_is_defined = !class.own_class_member(db, None, name).is_undefined();
+        // A declaration-only member describes instance storage but does not add a value to the
+        // class namespace.
+        let own_class_member_is_bound =
+            class
+                .static_class_literal(db)
+                .map_or(own_class_member_is_defined, |(class, _)| {
+                    let table = place_table(db, class.body_scope(db));
+                    table
+                        .symbol_id(name)
+                        .map_or(own_class_member_is_defined, |symbol| {
+                            table.place(symbol).is_bound()
+                        })
+                });
         if policy.no_instance_fallback() {
-            return if own_class_member_is_defined {
+            return if own_class_member_is_bound {
                 class_attr.or_fall_back_to(db, || metaclass_member)
             } else {
                 metaclass_member.or_fall_back_to(db, || class_attr)
             };
         }
-        let generated_may_be_data_descriptor = metaclass_member
-            .ignore_possibly_undefined()
-            .is_some_and(|ty| ty.may_be_data_descriptor(db));
-        let generated_data_descriptors = || match metaclass_member {
-            PlaceAndQualifiers {
-                place: Place::Defined(declaration),
-                qualifiers,
-            } => {
-                let all_arms_are_possible_data_descriptors = declaration
-                    .ty
-                    .resolve_type_alias(db)
-                    .as_union()
-                    .is_none_or(|union| {
-                        union
-                            .elements(db)
-                            .iter()
-                            .all(|ty| ty.may_be_data_descriptor(db))
-                    });
-                Place::Defined(DefinedPlace {
-                    ty: declaration
-                        .ty
-                        .filter_union(db, |ty| ty.may_be_data_descriptor(db)),
-                    definedness: if all_arms_are_possible_data_descriptors {
-                        declaration.definedness
-                    } else {
-                        Definedness::PossiblyUndefined
-                    },
-                    ..declaration
-                })
-                .with_qualifiers(qualifiers)
-            }
-            _ => metaclass_member,
-        };
-        let has_own_unbound_instance_declaration =
-            class.has_own_unbound_instance_declaration(db, name);
-        let generated_attribute_is_shadowed = if generated_may_be_data_descriptor {
-            !has_own_unbound_instance_declaration && own_class_member_is_defined
-        } else {
-            own_class_member_is_defined || class.has_own_instance_declaration(db, name)
-        };
-        if generated_attribute_is_shadowed {
+        if own_class_member_is_bound {
             return class_attr.or_fall_back_to(db, || metaclass_member);
         }
-        if class.has_dynamic_instance_fallback(db) {
-            return if generated_may_be_data_descriptor {
-                generated_data_descriptors().or_fall_back_to(db, || class_attr)
-            } else {
-                class_attr
+        if class.iter_mro(db).any(|base| {
+            matches!(
+                base,
+                ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_)
+            )
+        }) {
+            let Some(generated_ty) = metaclass_member.ignore_possibly_undefined() else {
+                return class_attr;
             };
-        }
-        if class.has_instance_member(db, name) {
-            if generated_may_be_data_descriptor {
-                return generated_data_descriptors();
+            if !generated_ty.may_be_data_descriptor(db) {
+                return class_attr;
             }
-            return Place::Undefined.into();
+            let PlaceAndQualifiers {
+                place: Place::Defined(declaration),
+                qualifiers,
+            } = metaclass_member
+            else {
+                return metaclass_member.or_fall_back_to(db, || class_attr);
+            };
+            let all_arms_are_possible_data_descriptors = declaration
+                .ty
+                .resolve_type_alias(db)
+                .as_union()
+                .is_none_or(|union| {
+                    union
+                        .elements(db)
+                        .iter()
+                        .all(|ty| ty.may_be_data_descriptor(db))
+                });
+            return Place::Defined(DefinedPlace {
+                ty: declaration
+                    .ty
+                    .filter_union(db, |ty| ty.may_be_data_descriptor(db)),
+                definedness: if all_arms_are_possible_data_descriptors {
+                    declaration.definedness
+                } else {
+                    Definedness::PossiblyUndefined
+                },
+                ..declaration
+            })
+            .with_qualifiers(qualifiers)
+            .or_fall_back_to(db, || class_attr);
         }
         metaclass_member.or_fall_back_to(db, || class_attr)
     }

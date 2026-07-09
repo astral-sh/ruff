@@ -1362,15 +1362,16 @@ class StoresGenerated(GeneratedBase, metaclass=StoringMeta): ...
 reveal_type(StoresGenerated().generated)  # revealed: int
 ```
 
-An attribute stored on an instance takes precedence over a regular class attribute, whether the
-instance assignment is defined directly or inherited from a base class:
+As with ordinary instance lookup, an instance assignment does not completely shadow a regular class
+attribute because the assignment may not have run. This applies whether the assignment is defined
+directly or inherited from a base class:
 
 ```py
 class InitializesGenerated(metaclass=StoringMeta):
     def __init__(self) -> None:
         self.generated: str = "instance"
 
-reveal_type(InitializesGenerated().generated)  # revealed: str
+reveal_type(InitializesGenerated().generated)  # revealed: int | str
 
 class InitializesInheritedGenerated:
     def __init__(self) -> None:
@@ -1378,7 +1379,7 @@ class InitializesInheritedGenerated:
 
 class InheritsGenerated(InitializesInheritedGenerated, metaclass=StoringMeta): ...
 
-reveal_type(InheritsGenerated().generated)  # revealed: str
+reveal_type(InheritsGenerated().generated)  # revealed: int | str
 ```
 
 A function is a descriptor when stored on a class, but not when stored directly on an instance. The
@@ -1436,7 +1437,7 @@ reveal_type(iter(StoresInstanceIter()))  # revealed: Iterator[int]
 ```
 
 An inherited `ClassVar` does not describe an instance attribute, but an inherited dataclass field
-does:
+adds an instance fallback:
 
 ```py
 from dataclasses import dataclass
@@ -1455,11 +1456,11 @@ class DataclassGeneratedBase:
 
 class InheritsDataclassGenerated(DataclassGeneratedBase, metaclass=StoringMeta): ...
 
-reveal_type(InheritsDataclassGenerated().generated)  # revealed: str
+reveal_type(InheritsDataclassGenerated().generated)  # revealed: int | str
 ```
 
-The attribute stored by the metaclass also shadows a descriptor inherited from a base class. An
-instance assignment can therefore take precedence over that inherited descriptor:
+The attribute stored by the metaclass also shadows a descriptor inherited from a base class. Both
+that non-data class attribute and an instance assignment remain possible:
 
 ```py
 from typing import Literal
@@ -1484,7 +1485,7 @@ class ShadowsInheritedGeneratedProperty(
     InitializesShadowedGenerated, InheritedGeneratedProperty, metaclass=StringStoringMeta
 ): ...
 
-reveal_type(ShadowsInheritedGeneratedProperty().generated)  # revealed: bytes
+reveal_type(ShadowsInheritedGeneratedProperty().generated)  # revealed: str | bytes
 ```
 
 If the metaclass instead stores a data descriptor on the new class, the descriptor takes precedence
@@ -1512,8 +1513,7 @@ reveal_type(UsesGeneratedDescriptor().generated_descriptor)  # revealed: Literal
 ```
 
 When a metaclass declaration uses a union, only the data descriptors in that union take precedence
-over an instance attribute. The `int` member must not appear in the result merely because the union
-also contains a data descriptor:
+over an instance attribute. A non-descriptor member and the instance attribute both remain possible:
 
 ```py
 class MaybeDescriptorMeta(type):
@@ -1527,7 +1527,7 @@ class UsesMaybeGeneratedDescriptorWithBytes(metaclass=MaybeDescriptorMeta):
     def __init__(self) -> None:
         self.generated_descriptor = b"instance"
 
-reveal_type(UsesMaybeGeneratedDescriptorWithBytes().generated_descriptor)  # revealed: Literal["descriptor"] | bytes
+reveal_type(UsesMaybeGeneratedDescriptorWithBytes().generated_descriptor)  # revealed: Literal["descriptor"] | int | bytes
 ```
 
 A dynamic base likewise supplies the fallback for the non-descriptor members of a union:
@@ -1538,8 +1538,8 @@ class UsesMaybeGeneratedDescriptorWithDynamicBase(DynamicGeneratedBase, metaclas
 reveal_type(UsesMaybeGeneratedDescriptorWithDynamicBase().generated_descriptor)  # revealed: Literal["descriptor"] | Any
 ```
 
-If the declaration can also be `Any`, ty cannot know that the class attribute is always a data
-descriptor. The instance attribute must remain another possible result:
+If the declaration can also be `Any`, the class attribute is not known to always be a data
+descriptor. The `Any` result subsumes the instance attribute type:
 
 ```py
 class MaybeDynamicDescriptorMeta(type):
@@ -1555,12 +1555,12 @@ class DynamicDescriptorInstanceBase:
 
 class UsesMaybeDynamicDescriptor(DynamicDescriptorInstanceBase, metaclass=MaybeDynamicDescriptorMeta): ...
 
-reveal_type(UsesMaybeDynamicDescriptor().generated_descriptor)  # revealed: Literal["descriptor"] | bytes
+reveal_type(UsesMaybeDynamicDescriptor().generated_descriptor)  # revealed: Literal["descriptor"] | Any
 ```
 
 An instance attribute annotation without a value does not store anything in the class namespace, so
-it cannot shadow a data descriptor. It does, however, replace the non-descriptor members of the
-metaclass declaration:
+it cannot shadow a data descriptor. The annotation and non-descriptor members of the metaclass
+declaration all remain possible:
 
 ```py
 class DeclaresGeneratedDescriptor(metaclass=DescriptorMeta):
@@ -1571,7 +1571,7 @@ reveal_type(DeclaresGeneratedDescriptor().generated_descriptor)  # revealed: Lit
 class DeclaresMaybeGeneratedDescriptor(metaclass=MaybeDescriptorMeta):
     generated_descriptor: bytes
 
-reveal_type(DeclaresMaybeGeneratedDescriptor().generated_descriptor)  # revealed: Literal["descriptor"] | bytes
+reveal_type(DeclaresMaybeGeneratedDescriptor().generated_descriptor)  # revealed: Literal["descriptor"] | int | bytes
 ```
 
 Assigning an attribute through the first parameter of a static method does not describe an instance

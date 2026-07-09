@@ -61,7 +61,7 @@ use ty_python_core::{
     attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
     place_table,
-    scope::{FileScopeId, ScopeId},
+    scope::{Scope, ScopeId},
     semantic_index,
     symbol::Symbol,
     use_def_map,
@@ -2354,16 +2354,56 @@ impl<'db> StaticClassLiteral<'db> {
         let file = class_body_scope.file(db);
         let module = parsed_module(db, file).load(db);
         let index = semantic_index(db, file);
+        let class_map = use_def_map(db, class_body_scope);
+        let class_table = place_table(db, class_body_scope);
+        let is_valid_scope = |method_scope: &Scope| {
+            let Some(method_def) = method_scope.node().as_function() else {
+                return true;
+            };
+
+            // Check the decorators directly on the AST node to determine if this method
+            // is a classmethod or staticmethod. This is more reliable than checking the
+            // final evaluated type, which may be wrapped by other decorators like @cache.
+            let function_node = method_def.node(&module);
+            let definition = index.expect_single_definition(method_def);
+
+            let mut is_classmethod = false;
+            let mut is_staticmethod = false;
+
+            for decorator in &function_node.decorator_list {
+                let decorator_ty =
+                    definition_expression_type(db, definition, &decorator.expression);
+                if let Type::ClassLiteral(class) = decorator_ty {
+                    match class.known(db) {
+                        Some(KnownClass::Classmethod) => is_classmethod = true,
+                        Some(KnownClass::Staticmethod) => is_staticmethod = true,
+                        _ => {}
+                    }
+                }
+            }
+
+            // Also check for implicit classmethods/staticmethods based on method name
+            let method_name = function_node.name.as_str();
+            if is_implicit_classmethod(method_name) {
+                is_classmethod = true;
+            }
+            if is_implicit_staticmethod(method_name) {
+                is_staticmethod = true;
+            }
+
+            match target_method_decorator {
+                MethodDecorator::None => !is_classmethod && !is_staticmethod,
+                MethodDecorator::ClassMethod => is_classmethod,
+                MethodDecorator::StaticMethod => is_staticmethod,
+            }
+        };
+
         // First check declarations
         for (attribute_declarations, method_scope_id) in
             attribute_declarations(db, class_body_scope, name)
         {
-            if !method_matches_decorator(
-                db,
-                class_body_scope,
-                method_scope_id,
-                target_method_decorator,
-            ) {
+            let method_scope = index.scope(method_scope_id);
+            if !is_valid_scope(method_scope) {
                 continue;
             }
 
@@ -2422,18 +2462,44 @@ impl<'db> StaticClassLiteral<'db> {
         for (attribute_assignments, attribute_binding_scope_id) in
             attribute_assignments(db, class_body_scope, name)
         {
-            if !method_matches_decorator(
-                db,
-                class_body_scope,
-                attribute_binding_scope_id,
-                target_method_decorator,
-            ) {
+            let binding_scope = index.scope(attribute_binding_scope_id);
+            if !is_valid_scope(binding_scope) {
                 continue;
             }
 
+            let scope_for_reachability_analysis = {
+                if binding_scope.node().as_function().is_some() {
+                    binding_scope
+                } else if binding_scope.is_eager() {
+                    let mut eager_scope_parent = binding_scope;
+                    while eager_scope_parent.is_eager()
+                        && let Some(parent) = eager_scope_parent.parent()
+                    {
+                        eager_scope_parent = index.scope(parent);
+                    }
+                    eager_scope_parent
+                } else {
+                    binding_scope
+                }
+            };
+
             // The attribute assignment inherits the reachability of the method which contains it
             let is_method_reachable =
-                method_reachability(db, class_body_scope, attribute_binding_scope_id);
+                if let Some(method_def) = scope_for_reachability_analysis.node().as_function() {
+                    let method = index.expect_single_definition(method_def);
+                    let method_place = class_table
+                        .symbol_id(&method_def.node(&module).name)
+                        .unwrap();
+                    class_map
+                        .reachable_symbol_bindings(method_place)
+                        .find_map(|bind| {
+                            (bind.binding.is_defined_and(|def| def == method))
+                                .then(|| binding_reachability(db, class_map, &bind))
+                        })
+                        .unwrap_or(Truthiness::AlwaysFalse)
+                } else {
+                    Truthiness::AlwaysFalse
+                };
             if is_method_reachable.is_always_false() {
                 continue;
             }
@@ -2587,59 +2653,6 @@ impl<'db> StaticClassLiteral<'db> {
                 Place::Undefined.with_qualifiers(qualifiers)
             },
         }
-    }
-
-    /// Return whether this class directly defines an instance member that can be inherited.
-    ///
-    /// This includes annotation-only declarations, assignments in unconditionally defined
-    /// instance methods, and dataclass fields. Qualifier filtering still excludes declarations
-    /// such as `ClassVar`.
-    pub(super) fn has_own_inheritable_instance_member(self, db: &'db dyn Db, name: &str) -> bool {
-        let may_have_instance_member = self.has_own_unbound_declaration(db, name)
-            || self.has_own_implicit_instance_member(db, name)
-            || self.is_own_dataclass_instance_field(db, name);
-        may_have_instance_member && !self.own_instance_member(db, name).inner.is_undefined()
-    }
-
-    fn has_own_implicit_instance_member(self, db: &'db dyn Db, name: &str) -> bool {
-        implicit_instance_attribute_names(db, self.body_scope(db))
-            .binary_search_by(|candidate| candidate.as_str().cmp(name))
-            .is_ok()
-    }
-
-    /// Return whether this class has an annotation-only declaration that contributes an instance
-    /// member after qualifier filtering.
-    pub(super) fn has_own_unbound_instance_declaration(self, db: &'db dyn Db, name: &str) -> bool {
-        self.has_own_unbound_declaration(db, name)
-            && !self.own_instance_member(db, name).inner.is_undefined()
-    }
-
-    fn has_own_unbound_declaration(self, db: &'db dyn Db, name: &str) -> bool {
-        let body_scope = self.body_scope(db);
-        let Some(symbol_id) = place_table(db, body_scope).symbol_id(name) else {
-            return false;
-        };
-        let use_def = use_def_map(db, body_scope);
-        use_def
-            .end_of_scope_symbol_declarations(symbol_id)
-            .next()
-            .is_some()
-            && !use_def
-                .end_of_scope_symbol_bindings(symbol_id)
-                .any(|binding| binding.binding.definition().is_some())
-    }
-
-    /// Return whether this class directly declares an instance member named `name` in its body.
-    pub(super) fn has_own_instance_declaration(self, db: &'db dyn Db, name: &str) -> bool {
-        let body_scope = self.body_scope(db);
-        place_table(db, body_scope)
-            .symbol_id(name)
-            .is_some_and(|symbol_id| {
-                use_def_map(db, body_scope)
-                    .end_of_scope_symbol_declarations(symbol_id)
-                    .next()
-                    .is_some()
-            })
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
@@ -3319,128 +3332,6 @@ fn implicit_attribute_names<'db>(db: &'db dyn Db, class_body_scope: ScopeId<'db>
     names.sort_unstable();
     names.dedup();
     names.into_boxed_slice()
-}
-
-/// Return attributes assigned through `self` in unconditionally defined instance methods.
-///
-/// Unlike [`implicit_attribute_names`], this excludes assignments in class methods, static
-/// methods, and conditionally defined methods. It is used only to determine whether an instance
-/// member can be inherited.
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-fn implicit_instance_attribute_names<'db>(
-    db: &'db dyn Db,
-    class_body_scope: ScopeId<'db>,
-) -> Box<[Name]> {
-    let index = semantic_index(db, class_body_scope.file(db));
-    let mut names = Vec::new();
-
-    for function_scope_id in attribute_scopes(db, class_body_scope) {
-        if !method_matches_decorator(
-            db,
-            class_body_scope,
-            function_scope_id,
-            MethodDecorator::None,
-        ) {
-            continue;
-        }
-        if !method_reachability(db, class_body_scope, function_scope_id).is_always_true() {
-            continue;
-        }
-
-        names.extend(
-            index
-                .place_table(function_scope_id)
-                .members()
-                .filter_map(|member| member.as_instance_attribute().map(Name::new)),
-        );
-    }
-
-    names.sort_unstable();
-    names.dedup();
-    names.into_boxed_slice()
-}
-
-/// Return whether a method scope has the requested decorator kind.
-///
-/// Direct decorators and implicit dunder-method rules are inspected instead of the final callable
-/// type, which another decorator may wrap. Non-function scopes are accepted; callers handle their
-/// enclosing method separately when needed.
-fn method_matches_decorator<'db>(
-    db: &'db dyn Db,
-    class_body_scope: ScopeId<'db>,
-    method_scope_id: FileScopeId,
-    target: MethodDecorator,
-) -> bool {
-    let file = class_body_scope.file(db);
-    let module = parsed_module(db, file).load(db);
-    let index = semantic_index(db, file);
-    let Some(method) = index.scope(method_scope_id).node().as_function() else {
-        return true;
-    };
-
-    let function_node = method.node(&module);
-    let definition = index.expect_single_definition(method);
-    let mut is_classmethod = is_implicit_classmethod(&function_node.name);
-    let mut is_staticmethod = is_implicit_staticmethod(&function_node.name);
-
-    for decorator in &function_node.decorator_list {
-        let Type::ClassLiteral(class) =
-            definition_expression_type(db, definition, &decorator.expression)
-        else {
-            continue;
-        };
-        match class.known(db) {
-            Some(KnownClass::Classmethod) => is_classmethod = true,
-            Some(KnownClass::Staticmethod) => is_staticmethod = true,
-            _ => {}
-        }
-    }
-
-    match target {
-        MethodDecorator::None => !is_classmethod && !is_staticmethod,
-        MethodDecorator::ClassMethod => is_classmethod,
-        MethodDecorator::StaticMethod => is_staticmethod,
-    }
-}
-
-/// Return the class-body reachability of the method binding that contains `method_scope_id`.
-///
-/// Eager child scopes are mapped back to their containing method. If the scope cannot be associated
-/// with a method binding in the class body, it is treated as unreachable.
-fn method_reachability<'db>(
-    db: &'db dyn Db,
-    class_body_scope: ScopeId<'db>,
-    method_scope_id: FileScopeId,
-) -> Truthiness {
-    let file = class_body_scope.file(db);
-    let module = parsed_module(db, file).load(db);
-    let index = semantic_index(db, file);
-    let mut method_scope = index.scope(method_scope_id);
-    while method_scope.is_eager()
-        && method_scope.node().as_function().is_none()
-        && let Some(parent) = method_scope.parent()
-    {
-        method_scope = index.scope(parent);
-    }
-
-    let Some(method_node) = method_scope.node().as_function() else {
-        return Truthiness::AlwaysFalse;
-    };
-    let method = index.expect_single_definition(method_node);
-    let class_map = use_def_map(db, class_body_scope);
-    let class_table = place_table(db, class_body_scope);
-    let Some(method_place) = class_table.symbol_id(&method_node.node(&module).name) else {
-        return Truthiness::AlwaysFalse;
-    };
-    class_map
-        .reachable_symbol_bindings(method_place)
-        .find_map(|binding| {
-            binding
-                .binding
-                .is_defined_and(|definition| definition == method)
-                .then(|| binding_reachability(db, class_map, &binding))
-        })
-        .unwrap_or(Truthiness::AlwaysFalse)
 }
 
 fn implicit_attribute_cycle_recover<'db>(
