@@ -1805,6 +1805,34 @@ reveal_type(BypassedByCall.initialized)  # revealed: int | str
 reveal_type(BypassedByCall().initialized)  # revealed: int | str
 ```
 
+A decorator can replace the metaclass initializer even when it preserves the original callable type.
+Assignments in the wrapped function body are not known to execute:
+
+```py
+from collections.abc import Callable
+
+Initializer = Callable[[type, str, tuple[type, ...], dict[str, object]], None]
+
+def no_op_initializer(function: Initializer) -> Initializer:
+    def wrapper(cls: type, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        pass
+
+    return wrapper
+
+class DecoratedInitializingMeta(type):
+    @no_op_initializer
+    def __init__(cls: type, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.initialized: int = 1
+
+class DecoratedInitializedBase:
+    initialized = "inherited"
+
+class DecoratedInitialized(DecoratedInitializedBase, metaclass=DecoratedInitializingMeta): ...
+
+reveal_type(DecoratedInitialized.initialized)  # revealed: int | str
+reveal_type(DecoratedInitialized().initialized)  # revealed: int | str
+```
+
 An inherited metaclass `__init__` remains the effective initializer when a derived metaclass does
 not override it. If the derived metaclass does override `__init__`, an assignment in the base
 initializer is no longer known to occur:

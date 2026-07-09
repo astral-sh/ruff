@@ -3376,6 +3376,10 @@ fn initializer_definitely_assigns_attribute<'db>(
             definitely_assigns = false;
             continue;
         };
+        if !function.node(&module).decorator_list.is_empty() {
+            definitely_assigns = false;
+            continue;
+        }
         let initializer_scope_id =
             index.node_scope_by_key(NodeWithScopeKey::Function(NodeKey::from_node_ref(function)));
         let initializer_scope = index.scope(initializer_scope_id);
