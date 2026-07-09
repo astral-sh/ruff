@@ -2826,31 +2826,39 @@ impl<'db> Type<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        if let Type::TypeVar(typevar) = self {
-            match typevar.typevar(db).bound_or_constraints(db) {
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    if let Some(class) = bound.nominal_class(db) {
-                        return self
-                            .to_meta_type(db)
-                            .class_namespace_member(db, class, name, policy);
-                    }
-                    return self
-                        .class_member_with_policy(db, name.into(), policy)
-                        .or_fall_back_to(db, || {
-                            bound.generated_namespace_member(db, name, policy)
-                        });
-                }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    return self
-                        .class_member_with_policy(db, name.into(), policy)
-                        .or_fall_back_to(db, || {
-                            constraints.map_with_boundness_and_qualifiers(db, |constraint| {
-                                constraint.generated_namespace_member(db, name, policy)
-                            })
-                        });
-                }
-                None => {}
+        if let Type::TypeVar(typevar) = self
+            && let Some(bound_or_constraints) = typevar.typevar(db).bound_or_constraints(db)
+        {
+            if let TypeVarBoundOrConstraints::UpperBound(bound) = bound_or_constraints
+                && let Some(class) = bound.nominal_class(db)
+            {
+                return self
+                    .to_meta_type(db)
+                    .class_namespace_member(db, class, name, policy);
             }
+
+            let class_member = self.class_member_with_policy(db, name.into(), policy);
+            if !class_member.is_undefined()
+                && !class_member
+                    .qualifiers
+                    .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
+            {
+                return class_member;
+            }
+            let member = match bound_or_constraints {
+                TypeVarBoundOrConstraints::UpperBound(bound) => {
+                    bound.instance_lookup_class_member_with_policy(db, name, policy)
+                }
+                TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                    .map_with_boundness_and_qualifiers(db, |constraint| {
+                        constraint.instance_lookup_class_member_with_policy(db, name, policy)
+                    }),
+            };
+            return if member.place.is_definitely_bound() {
+                member
+            } else {
+                PlaceAndQualifiers::default()
+            };
         }
 
         let class_member = self.class_member_with_policy(db, name.into(), policy);

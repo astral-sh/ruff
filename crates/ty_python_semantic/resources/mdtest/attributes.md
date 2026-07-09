@@ -1374,6 +1374,24 @@ def read_generated_union_bound(value: TGeneratedUnionBound) -> None:
     reveal_type(value.generated)  # revealed: int
 ```
 
+Every constraint or union-bound alternative must provide the generated attribute:
+
+```py
+class PlainClass: ...
+
+TMixedConstraints = TypeVar("TMixedConstraints", GeneratedClass, PlainClass)
+
+def read_mixed_constraints(value: TMixedConstraints) -> None:
+    # error: [unresolved-attribute]
+    reveal_type(value.generated)  # revealed: Unknown
+
+TMixedUnionBound = TypeVar("TMixedUnionBound", bound=GeneratedClass | PlainClass)
+
+def read_mixed_union_bound(value: TMixedUnionBound) -> None:
+    # error: [unresolved-attribute]
+    reveal_type(value.generated)  # revealed: Unknown
+```
+
 This also lets a generic metaclass method rely on a protocol describing the classes it accepts:
 
 ```py
