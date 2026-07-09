@@ -554,7 +554,7 @@ fn check_class_declaration<'db>(
 
             // Synthesized `__replace__` methods on dataclasses are not checked
             if &member.name == "__replace__"
-                && matches!(class_kind, Some(CodeGeneratorKind::DataclassLike(_)))
+                && class_kind.is_some_and(CodeGeneratorKind::is_dataclass_like)
             {
                 continue;
             }

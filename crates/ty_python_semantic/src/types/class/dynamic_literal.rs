@@ -395,10 +395,9 @@ impl<'db> DynamicClassLiteral<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         // Check if this dynamic class is dataclass-like (via dataclass_transform inheritance).
-        if matches!(
-            CodeGeneratorKind::from_class(db, self.into()),
-            Some(CodeGeneratorKind::DataclassLike(_))
-        ) {
+        if CodeGeneratorKind::from_class(db, self.into())
+            .is_some_and(CodeGeneratorKind::is_dataclass_like)
+        {
             if name == "__dataclass_fields__" {
                 // Make this class look like a subclass of the `DataClassInstance` protocol.
                 return Place::declared(KnownClass::Dict.to_specialized_instance(

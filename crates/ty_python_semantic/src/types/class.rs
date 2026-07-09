@@ -257,6 +257,14 @@ impl<'db> CodeGeneratorKind<'db> {
         }
     }
 
+    pub(super) const fn is_dataclass_like(self) -> bool {
+        matches!(self, Self::DataclassLike(_))
+    }
+
+    pub(super) const fn is_pydantic(self) -> bool {
+        matches!(self, Self::Pydantic(_))
+    }
+
     /// Return `true` if field declarations should be treated as instance attributes.
     ///
     /// For example, a bare annotation in a dataclass body is seen as evidence for the
