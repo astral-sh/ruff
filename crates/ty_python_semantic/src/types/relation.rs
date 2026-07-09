@@ -893,6 +893,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 | (Type::TypeVar(typevar), Type::Dynamic(_)) => {
                     self.is_universally_quantified(db, typevar)
                 }
+                (Type::NominalInstance(source), Type::TypeVar(typevar))
+                    if source.inherits_from_explicit_any() =>
+                {
+                    self.is_universally_quantified(db, typevar)
+                }
                 (Type::TypeVar(typevar), Type::Union(union)) => {
                     self.is_universally_quantified(db, typevar)
                         && union.elements(db).iter().any(Type::is_dynamic)

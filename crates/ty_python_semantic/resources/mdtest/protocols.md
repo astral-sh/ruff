@@ -3034,6 +3034,12 @@ class UnknownIdentity:
     def f(self, value):
         return value
 
+class DynamicLike(Any): ...
+
+class DynamicLikeIdentity:
+    def f[S](self, value: S) -> DynamicLike:
+        raise NotImplementedError
+
 class GradualConstrainedIdentityProtocol(Protocol):
     def f[T: (Any, int)](self, value: T) -> T: ...
 
@@ -3237,6 +3243,8 @@ static_assert(is_assignable_to(AnyIdentity, IdentityProtocol))
 static_assert(not is_subtype_of(AnyIdentity, IdentityProtocol))
 static_assert(is_assignable_to(UnknownIdentity, IdentityProtocol))
 static_assert(not is_subtype_of(UnknownIdentity, IdentityProtocol))
+static_assert(is_assignable_to(DynamicLikeIdentity, IdentityProtocol))
+static_assert(not is_subtype_of(DynamicLikeIdentity, IdentityProtocol))
 static_assert(is_assignable_to(IntIdentity, GradualConstrainedIdentityProtocol))
 static_assert(not is_subtype_of(IntIdentity, GradualConstrainedIdentityProtocol))
 # The gradual constraint does not expand the other constrained parameters into a Cartesian product.
