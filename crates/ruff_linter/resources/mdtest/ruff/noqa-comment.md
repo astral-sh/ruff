@@ -128,24 +128,23 @@ select = ["noqa-comment", "unused-noqa", "invalid-rule-code", "F401"]
 ```
 
 ```py
-# error: [noqa-comment]
-# snapshot: invalid-rule-code
+# error: [invalid-rule-code]
+# snapshot: noqa-comment
 import math  # noqa: F401, UNK001
 ```
 
 ```snapshot
-error[RUF102]: Invalid rule code in `# noqa`: UNK001
- --> src/mdtest_snippet.py:3:28
+error[RUF105]: `noqa` comment used instead of `ruff:ignore`
+ --> src/mdtest_snippet.py:3:14
   |
 3 | import math  # noqa: F401, UNK001
-  |                            ^^^^^^
+  |              ^^^^^^^^^^^^^^^^^^^^
   |
-help: Add non-Ruff rule codes to the `lint.external` configuration option
-help: Remove the rule code `UNK001`
+help: Use `ruff:ignore` instead
   |
-2 | # snapshot: invalid-rule-code
+2 | # snapshot: noqa-comment
   - import math  # noqa: F401, UNK001
-3 + import math  # noqa: F401
+3 + import math  # ruff:ignore[F401, UNK001]
   |
 ```
 
