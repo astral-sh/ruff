@@ -2883,14 +2883,7 @@ impl<'db> Type<'db> {
         let metaclass_attr = metaclass_instance.instance_member(db, name);
         let metaclass_attr_is_optional = metaclass_attr
             .qualifiers
-            .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
-            && !metaclass_instance
-                .nominal_class(db)
-                .is_some_and(|metaclass| {
-                    metaclass
-                        .class_literal(db)
-                        .instance_attribute_is_definitely_initialized(db, name)
-                });
+            .contains(TypeQualifiers::MAY_BE_UNINITIALIZED);
         let metaclass_attr = if metaclass_attr_is_optional {
             Self::with_definedness(metaclass_attr, Definedness::PossiblyUndefined)
         } else {
@@ -2968,12 +2961,9 @@ impl<'db> Type<'db> {
         if metaclass_member.is_undefined() {
             return class_attr;
         }
-        let metaclass_member_is_optional = metaclass_member
+        let metaclass_member_is_implicit = metaclass_member
             .qualifiers
-            .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
-            && !metaclass
-                .class_literal(db)
-                .instance_attribute_is_definitely_initialized(db, name);
+            .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE);
 
         let own_class_member = class.class_literal(db).class_member_from_mro(
             db,
@@ -3008,7 +2998,7 @@ impl<'db> Type<'db> {
             class.iter_mro(db).skip(1),
         );
 
-        let metaclass_member = if metaclass_member_is_optional {
+        let metaclass_member = if metaclass_member_is_implicit {
             Self::with_definedness(metaclass_member, Definedness::PossiblyUndefined)
         } else {
             metaclass_member
@@ -3016,7 +3006,7 @@ impl<'db> Type<'db> {
         let class_member = own_class_member
             .or_fall_back_to(db, || metaclass_member)
             .or_fall_back_to(db, || inherited_class_member);
-        let class_member = if metaclass_member_is_optional {
+        let class_member = if metaclass_member_is_implicit {
             // Preserve the existing convention that an inferred instance member is assumed to be
             // available even when no lower-precedence fallback exists.
             Self::with_definedness(class_member, Definedness::AlwaysDefined)
@@ -7952,7 +7942,7 @@ impl std::fmt::Display for DynamicType<'_> {
 bitflags! {
     /// Type qualifiers that appear in an annotation expression.
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, salsa::Update, Hash)]
-    pub struct TypeQualifiers: u8 {
+    pub struct TypeQualifiers: u16 {
         /// `typing.ClassVar`
         const CLASS_VAR = 1 << 0;
         /// `typing.Final`
@@ -7973,6 +7963,9 @@ bitflags! {
         /// `__getattr__` function. We need this in order to implement precedence of submodules
         /// over module-level `__getattr__`, for compatibility with other type checkers.
         const FROM_MODULE_GETATTR = 1 << 7;
+        /// A non-standard type qualifier that marks an implicit instance attribute which is not
+        /// initialized by `__init__`.
+        const MAY_BE_UNINITIALIZED = 1 << 8;
     }
 }
 
@@ -8004,8 +7997,9 @@ impl TypeQualifiers {
     /// Non-standard qualifiers are internal implementation details like
     /// `IMPLICIT_INSTANCE_ATTRIBUTE` and `FROM_MODULE_GETATTR`.
     pub fn is_non_standard(self) -> bool {
-        const NON_STANDARD: TypeQualifiers =
-            TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE.union(TypeQualifiers::FROM_MODULE_GETATTR);
+        const NON_STANDARD: TypeQualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE
+            .union(TypeQualifiers::FROM_MODULE_GETATTR)
+            .union(TypeQualifiers::MAY_BE_UNINITIALIZED);
         self.intersects(NON_STANDARD)
     }
 }
