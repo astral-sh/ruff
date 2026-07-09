@@ -2320,7 +2320,7 @@ specializations. That means that a generic callable is a subtype of any particul
 the generic callable.)
 
 ```py
-from typing import Callable
+from typing import Callable, overload
 from ty_extensions import static_assert
 from ty_extensions._internal import RegularCallableTypeOf, TypeOf, is_subtype_of
 
@@ -2369,6 +2369,24 @@ static_assert(
     is_subtype_of(
         RegularCallableTypeOf[nested_source],
         RegularCallableTypeOf[nested_target],
+    )
+)
+
+def constrained_target[T: (bytes, str)](t: T) -> T:
+    return t
+
+@overload
+def overloaded_source(t: bytes) -> bytes: ...
+@overload
+def overloaded_source(t: str) -> str: ...
+def overloaded_source(t: bytes | str) -> bytes | str:
+    return t
+
+# Different source overloads can cover different target specializations.
+static_assert(
+    is_subtype_of(
+        RegularCallableTypeOf[overloaded_source],
+        RegularCallableTypeOf[constrained_target],
     )
 )
 ```
