@@ -1634,9 +1634,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // that universal variables retain the full assignability semantics.
             (None, None, _) => {
                 if self.typevar_evaluation == TypeVarEvaluation::Lazy
-                    && !self.has_universally_quantified_typevars()
                     && let (Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar)) =
                         (source_type, target_type)
+                    && !self.is_universally_quantified(db, typevar)
                     && !ty.is_type_var()
                     // Preserve union distribution before constructing constraints. Storing the
                     // entire union as an exact bound makes solving common generic calls involving

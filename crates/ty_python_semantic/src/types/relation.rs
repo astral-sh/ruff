@@ -16,10 +16,11 @@ use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral,
+    ClassType, CycleDetector, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
+    ProtocolInstanceType, SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType,
+    UpcastPolicy,
 };
 use crate::{
     Db,
@@ -890,19 +891,23 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             && match (source, target) {
                 (Type::Dynamic(_), Type::TypeVar(typevar))
                 | (Type::TypeVar(typevar), Type::Dynamic(_)) => {
-                    typevar.is_inferable(db, self.universally_quantified)
+                    self.is_universally_quantified(db, typevar)
                 }
                 (Type::TypeVar(typevar), Type::Union(union)) => {
-                    typevar.is_inferable(db, self.universally_quantified)
+                    self.is_universally_quantified(db, typevar)
                         && union.elements(db).iter().any(Type::is_dynamic)
                 }
                 _ => false,
             }
     }
 
-    /// Returns whether this relation will be universally quantified over any type variables.
-    pub(super) const fn has_universally_quantified_typevars(&self) -> bool {
-        matches!(self.universally_quantified, InferableTypeVars::Some(_))
+    /// Returns whether `typevar` will be universally quantified after this relation is built.
+    pub(super) fn is_universally_quantified(
+        &self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> bool {
+        typevar.is_inferable(db, self.universally_quantified)
     }
 
     pub(super) const fn is_eager_assignability(&self) -> bool {
@@ -1130,7 +1135,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         // when the target variable is universal; lazy evaluation would otherwise capture the
         // entire union as an opaque lower bound before reaching the ordinary union rule below.
         if let (Type::Union(union), Type::TypeVar(typevar)) = (source, target)
-            && typevar.is_inferable(db, self.universally_quantified)
+            && self.is_universally_quantified(db, typevar)
         {
             return union
                 .elements(db)
