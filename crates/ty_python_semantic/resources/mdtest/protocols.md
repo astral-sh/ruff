@@ -3076,6 +3076,19 @@ class PromotedConstrainedReceiver(FirstAllowedReceiver):
 static_assert(is_assignable_to(PromotedConstrainedReceiver, ConstrainedReturningReceiverProtocol))
 static_assert(is_subtype_of(PromotedConstrainedReceiver, ConstrainedReturningReceiverProtocol))
 
+type ReceiverIdentity[X] = X
+
+class AliasedExplicitReceiverProtocol(Protocol):
+    def compare[T](self: ReceiverIdentity[T], other: T) -> bool: ...
+
+class AliasedExplicitReceiverImplementation:
+    def compare(self, other: "AliasedExplicitReceiverImplementation") -> bool:
+        return True
+
+# Transparent aliases do not hide that `T` is fixed by the bound receiver.
+static_assert(is_assignable_to(AliasedExplicitReceiverImplementation, AliasedExplicitReceiverProtocol))
+static_assert(is_subtype_of(AliasedExplicitReceiverImplementation, AliasedExplicitReceiverProtocol))
+
 type IdentityAlias[X] = X
 type ListAlias[X] = list[X]
 
