@@ -7,9 +7,10 @@ use crate::{
     place::Place,
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
-        FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
-        SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
+        FunctionType, InternedType, IntersectionType, KnownBoundMethodType, KnownClass,
+        KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
+        Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+        UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
@@ -703,6 +704,38 @@ impl<'db> CallableTypes<'db> {
         }
     }
 
+    /// Return the values accepted by a positional parameter for the given preceding arguments.
+    ///
+    /// Overloads of one callable expand the accepted domain, while alternatives in a callable
+    /// union restrict it to values accepted by every possible runtime callable. Signatures with
+    /// correlated or nested function type variables are skipped conservatively.
+    pub(crate) fn positional_parameter_domain(
+        &self,
+        db: &'db dyn Db,
+        prefix_arguments: &[Type<'db>],
+        self_ty: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let domains = self
+            .iter()
+            .map(|callable| {
+                let domain = UnionType::from_elements(
+                    db,
+                    callable.signatures(db).iter().filter_map(|signature| {
+                        signature_positional_parameter_domain(
+                            db,
+                            signature,
+                            prefix_arguments,
+                            self_ty,
+                        )
+                    }),
+                );
+                (!domain.is_never()).then_some(domain)
+            })
+            .collect::<Option<Vec<_>>>()?;
+        let domain = IntersectionType::bounded_from_elements(db, domains)?;
+        (!domain.is_never()).then_some(domain)
+    }
+
     pub(super) fn as_slice(&self) -> &[CallableType<'db>] {
         &self.0
     }
@@ -753,6 +786,58 @@ impl<'db> CallableTypes<'db> {
         )
         .into_precise_functools_partial_instance(db, wrapped)
     }
+}
+
+/// Return the values accepted by one signature after validating the preceding arguments.
+fn signature_positional_parameter_domain<'db>(
+    db: &'db dyn Db,
+    signature: &Signature<'db>,
+    prefix_arguments: &[Type<'db>],
+    self_ty: Type<'db>,
+) -> Option<Type<'db>> {
+    let parameters = signature.parameters();
+    if parameters.len() != prefix_arguments.len() + 1 {
+        return None;
+    }
+
+    for (index, argument) in prefix_arguments.iter().enumerate() {
+        let parameter_ty = parameters
+            .get_positional(index)?
+            .annotated_type()
+            .bind_self_typevars(db, self_ty);
+        if parameter_ty.has_typevar(db) || !argument.is_assignable_to(db, parameter_ty) {
+            return None;
+        }
+    }
+
+    let domain = parameters
+        .get_positional(prefix_arguments.len())?
+        .annotated_type()
+        .bind_self_typevars(db, self_ty);
+    if !domain.has_typevar(db) {
+        return Some(domain);
+    }
+
+    let Type::TypeVar(typevar) = domain else {
+        return None;
+    };
+    let generic_context = signature.generic_context?;
+    if !generic_context.contains(db, typevar.identity(db))
+        || !typevar
+            .binding_context(db)
+            .definition()
+            .is_some_and(|definition| definition.kind(db).is_function_def())
+    {
+        return None;
+    }
+
+    Some(
+        typevar
+            .typevar(db)
+            .bound_or_constraints(db)
+            .map_or(Type::object(), |bound| bound.as_type(db))
+            .bind_self_typevars(db, self_ty),
+    )
 }
 
 impl<'a, 'db> IntoIterator for &'a CallableTypes<'db> {

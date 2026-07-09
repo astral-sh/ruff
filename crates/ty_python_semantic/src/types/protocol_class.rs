@@ -22,9 +22,10 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
         CallableType, ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
-        InstanceFallbackShadowsNonDataDescriptor, KnownFunction, MemberLookupPolicy,
-        PropertyInstanceType, ProtocolInstanceType, SelfBinding, StaticClassLiteral, Type,
-        TypeMapping, TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable,
+        InstanceFallbackShadowsNonDataDescriptor, IntersectionType, KnownFunction,
+        MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SelfBinding,
+        StaticClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarVariance, UnionType,
+        VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
@@ -1352,77 +1353,53 @@ fn descriptor_decorated_protocol_member<'db>(
         descriptor_ty.try_call_dunder_get(db, Some(receiver_ty), receiver_ty.to_meta_type(db))?;
     let read = Some(ProtocolMemberType::with_definition(read_ty, definition));
 
-    let write = if let Place::Defined(DefinedPlace {
+    let write = descriptor_setter_write_type(db, descriptor_ty, receiver_ty)
+        .map(|write_ty| ProtocolMemberType::with_definition(write_ty, definition));
+
+    Some(ProtocolMemberData::property(read, write, definition))
+}
+
+/// Derive the values accepted by every possible descriptor setter.
+fn descriptor_setter_write_type<'db>(
+    db: &'db dyn Db,
+    descriptor_ty: Type<'db>,
+    receiver_ty: Type<'db>,
+) -> Option<Type<'db>> {
+    let write_ty = match descriptor_ty {
+        Type::Union(union) => {
+            let write_types = union
+                .elements(db)
+                .iter()
+                .map(|descriptor_ty| {
+                    descriptor_setter_write_type_for_alternative(db, *descriptor_ty, receiver_ty)
+                })
+                .collect::<Option<Vec<_>>>()?;
+            IntersectionType::bounded_from_elements(db, write_types)?
+        }
+        _ => descriptor_setter_write_type_for_alternative(db, descriptor_ty, receiver_ty)?,
+    };
+    (!write_ty.is_never()).then_some(write_ty)
+}
+
+/// Derive the values accepted by one possible runtime descriptor.
+fn descriptor_setter_write_type_for_alternative<'db>(
+    db: &'db dyn Db,
+    descriptor_ty: Type<'db>,
+    receiver_ty: Type<'db>,
+) -> Option<Type<'db>> {
+    let Place::Defined(DefinedPlace {
         ty: setter_ty,
         definedness: Definedness::AlwaysDefined,
         ..
     }) = descriptor_ty
         .class_member_with_policy(db, "__set__".into(), MemberLookupPolicy::REQUIRE_CONCRETE)
         .place
-    {
-        Some(ProtocolMemberType::with_definition(
-            descriptor_setter_write_type(db, setter_ty, descriptor_ty, receiver_ty)
-                .unwrap_or_else(Type::unknown),
-            definition,
-        ))
-    } else {
-        None
-    };
-
-    Some(ProtocolMemberData::property(read, write, definition))
-}
-
-/// Derive a write type from a single ordinary setter signature.
-fn descriptor_setter_write_type<'db>(
-    db: &'db dyn Db,
-    setter_ty: Type<'db>,
-    descriptor_ty: Type<'db>,
-    receiver_ty: Type<'db>,
-) -> Option<Type<'db>> {
-    let callable = setter_ty.try_upcast_to_callable(db)?.exactly_one()?;
-    let signatures = callable.signatures(db);
-    let [signature] = signatures.overloads.as_ref() else {
+    else {
         return None;
     };
 
-    // A method type variable cannot be used as the write type directly: it is inferred separately
-    // for each call. Deriving its accepted values requires generic call analysis.
-    if signature.generic_context.is_some_and(|generic_context| {
-        generic_context.variables(db).any(|typevar| {
-            !typevar.typevar(db).is_self(db)
-                && typevar
-                    .binding_context(db)
-                    .definition()
-                    .is_some_and(|definition| definition.kind(db).is_function_def())
-        })
-    }) {
-        return None;
-    }
-
-    let parameters = signature.parameters();
-    if parameters.len() != 3 {
-        return None;
-    }
-    let descriptor_parameter = parameters
-        .get_positional(0)?
-        .annotated_type()
-        .bind_self_typevars(db, descriptor_ty);
-    let receiver_parameter = parameters
-        .get_positional(1)?
-        .annotated_type()
-        .bind_self_typevars(db, descriptor_ty);
-    if !descriptor_ty.is_assignable_to(db, descriptor_parameter)
-        || !receiver_ty.is_assignable_to(db, receiver_parameter)
-    {
-        return None;
-    }
-
-    Some(
-        parameters
-            .get_positional(2)?
-            .annotated_type()
-            .bind_self_typevars(db, descriptor_ty),
-    )
+    let callables = setter_ty.try_upcast_to_callable(db)?;
+    callables.positional_parameter_domain(db, &[descriptor_ty, receiver_ty], descriptor_ty)
 }
 
 fn property_set_type<'db>(

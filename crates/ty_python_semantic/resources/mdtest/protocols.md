@@ -2658,8 +2658,8 @@ reveal_protocol_interface(StoresDescriptor)
 
 An overloaded `__set__` method can accept different values for different receiver types. For
 `HasValue`, the overloads with an `object` receiver accept `int` and `bytes`; the overload for
-`Other` does not apply. Until these overloads can be analyzed, `Unknown` is used as the write type.
-This preserves the writable requirement without rejecting assignments.
+`Other` does not apply. Therefore, assignments of `int` and `bytes` are valid, but assignments of
+`str` are not.
 
 ```py
 from typing import Protocol, final, overload
@@ -2694,14 +2694,14 @@ read_only: HasValue = ReadOnlyValue()  # error: [invalid-assignment]
 def update_value(value: HasValue) -> None:
     value.value = 1
     value.value = b"valid"
-    # TODO: This assignment should be rejected.
-    value.value = "bad"
+    value.value = "bad"  # error: [invalid-assignment]
 ```
 
 ### Union descriptor types
 
 If a decorator can return either of two descriptors, an assignment must be accepted by both possible
-descriptors. Here, only `str` is accepted by both.
+descriptors. Here, only `str` is accepted by both, so an `int` assignment is invalid even though one
+of the descriptors accepts it.
 
 ```py
 from typing import Generic, Protocol, TypeVar
@@ -2723,8 +2723,7 @@ class HasEitherValue(Protocol):
 
 def update_either_value(value: HasEitherValue) -> None:
     value.either_value = "valid"
-    # TODO: This assignment should be rejected.
-    value.either_value = 1
+    value.either_value = 1  # error: [invalid-assignment]
 ```
 
 ### Overloaded setters selected by descriptor type
@@ -2758,14 +2757,13 @@ class HasIntValue(Protocol):
 
 def update_int_value(value: HasIntValue) -> None:
     value.int_value = 1
-    # TODO: This assignment should be rejected.
-    value.int_value = "bad"
+    value.int_value = "bad"  # error: [invalid-assignment]
 ```
 
 ### Generic setter value types
 
 A setter that uses a method type variable directly as its value parameter accepts every value
-allowed by that type variable's upper bound.
+allowed by that type variable's upper bound. The setter below therefore accepts `int` values.
 
 ```py
 from typing import Protocol, TypeVar
@@ -2787,8 +2785,7 @@ class HasBoundedValue(Protocol):
 
 def update_bounded_value(value: HasBoundedValue) -> None:
     value.bounded_value = 1
-    # TODO: This assignment should be rejected.
-    value.bounded_value = "bad"
+    value.bounded_value = "bad"  # error: [invalid-assignment]
 ```
 
 ## Variance of generic protocols with `Final` members
