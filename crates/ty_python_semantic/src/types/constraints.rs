@@ -336,6 +336,15 @@ pub struct ConstraintSet<'db, 'c> {
     _invariant: PhantomData<fn(&'c ()) -> &'c ()>,
 }
 
+/// Why exact quantifier elimination cannot be represented as a [`ConstraintSet`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ConstraintProjectionError {
+    /// Eliminating a variable nested inside a type would require a type-level existential.
+    UnrepresentableNestedBound,
+    /// Eliminating a variable would leave a constraint relating it to a free variable.
+    UnrepresentableFreeVariableConstraint,
+}
+
 impl<'db, 'c> ConstraintSet<'db, 'c> {
     fn from_node(builder: &'c ConstraintSetBuilder<'db>, node: NodeId) -> Self {
         Self {
@@ -599,7 +608,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// removed variables. A caller that wants to restrict assignments to a type variable's
     /// declared domain must conjoin that domain before calling this method.
     ///
-    /// Returns [`None`] if this representation cannot express the exact result. This does not mean
+    /// Returns an error if this representation cannot express the exact result. This does not mean
     /// that no specialization exists, only that projection would otherwise discard information.
     /// Positive facts derived during projection are rebuilt through the canonical constraint
     /// constructor. This makes the result independent of type-variable interning order, at the
@@ -615,7 +624,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         builder: &'c ConstraintSetBuilder<'db>,
         to_remove: InferableTypeVars<'db>,
         assumptions: Self,
-    ) -> Option<Self> {
+    ) -> Result<Self, ConstraintProjectionError> {
         self.verify_builder(builder);
         assumptions.verify_builder(builder);
         self.node
@@ -670,23 +679,23 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// The result holds whenever the original constraint set holds for every assignment of the
     /// removed variables. A caller that wants to restrict assignments to a type variable's
     /// declared domain must encode that domain as an implication before calling this method.
-    /// Returns [`None`] if exact abstraction would need to preserve a relationship between a
+    /// Returns an error if exact abstraction would need to preserve a relationship between a
     /// removed variable and a variable that remains free.
     pub(crate) fn try_for_all(
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         to_remove: InferableTypeVars<'db>,
-    ) -> Option<Self> {
+    ) -> Result<Self, ConstraintProjectionError> {
         self.verify_builder(builder);
         if self.has_cross_quantifier_typevar(db, builder, to_remove) {
-            return None;
+            return Err(ConstraintProjectionError::UnrepresentableFreeVariableConstraint);
         }
         // Use the duality `∀x. F = ¬∃x. ¬F` so universal abstraction shares existential
         // abstraction's sequent propagation. In particular, a TDD's uncertain edge is an
         // unconditional disjunct; simply joining all three recursive edges with `and` would
         // incorrectly discard it.
-        Some(Self::from_node(
+        Ok(Self::from_node(
             builder,
             self.node
                 .negate(builder)
@@ -2962,9 +2971,9 @@ impl NodeId {
         builder: &ConstraintSetBuilder<'db>,
         bound_typevars: InferableTypeVars<'db>,
         assumptions: Self,
-    ) -> Option<Self> {
+    ) -> Result<Self, ConstraintProjectionError> {
         if bound_typevars == InferableTypeVars::None {
-            return Some(self);
+            return Ok(self);
         }
 
         // Bare relationships such as `T ≤ S` can be projected by the sequent machinery. First
@@ -2991,7 +3000,7 @@ impl NodeId {
             }
         });
         if nested_subjects.is_empty() {
-            return Some(self.exists_normalized(db, builder, bound_typevars));
+            return Ok(self.exists_normalized(db, builder, bound_typevars));
         }
 
         let constrained = assumptions.and(builder, self);
@@ -3095,10 +3104,10 @@ impl NodeId {
             }
         });
         if requires_unrepresentable_residual {
-            return None;
+            return Err(ConstraintProjectionError::UnrepresentableNestedBound);
         }
 
-        Some(constrained.exists_normalized(db, builder, bound_typevars))
+        Ok(constrained.exists_normalized(db, builder, bound_typevars))
     }
 
     /// Existentially abstracts all `bound_typevars` in one traversal, normalizing facts derived
@@ -7833,7 +7842,7 @@ mod tests {
         // No single source specialization is equal to every target specialization.
         let exists_source_forall_target = equal
             .try_for_all(&db, &builder, target_locals)
-            .unwrap_or_else(|| ConstraintSet::never(&builder))
+            .unwrap_or_else(|_| ConstraintSet::never(&builder))
             .try_exists_assuming(
                 &db,
                 &builder,
@@ -7860,15 +7869,14 @@ mod tests {
             Type::TypeVar(outer),
         );
         let implication = target_domain.implies(&db, &builder, || target_below_outer);
-        assert!(
-            implication
-                .try_for_all(
-                    &db,
-                    &builder,
-                    quantified_typevars(&db, [target.identity(&db)]),
-                )
-                .is_none()
-        );
+        assert!(matches!(
+            implication.try_for_all(
+                &db,
+                &builder,
+                quantified_typevars(&db, [target.identity(&db)]),
+            ),
+            Err(ConstraintProjectionError::UnrepresentableFreeVariableConstraint)
+        ));
     }
 
     #[test]
@@ -7970,16 +7978,15 @@ mod tests {
             KnownClass::List.to_specialized_instance(&db, &[Type::TypeVar(source)]),
         );
 
-        assert!(
-            relation
-                .try_exists_assuming(
-                    &db,
-                    &builder,
-                    quantified_typevars(&db, [source.identity(&db)]),
-                    ConstraintSet::always(&builder),
-                )
-                .is_none()
-        );
+        assert!(matches!(
+            relation.try_exists_assuming(
+                &db,
+                &builder,
+                quantified_typevars(&db, [source.identity(&db)]),
+                ConstraintSet::always(&builder),
+            ),
+            Err(ConstraintProjectionError::UnrepresentableNestedBound)
+        ));
     }
 
     #[test]

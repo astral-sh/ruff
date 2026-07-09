@@ -1910,7 +1910,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let with_source_domain = source_domain.and(db, self.constraints, || relation);
                     with_source_domain
                         .try_exists_assuming(db, self.constraints, source_locals, target_domain)
-                        .unwrap_or_else(|| self.never())
+                        .unwrap_or_else(|_| self.never())
                 })
         };
         let quantified_sources = if source_signatures.len() == 1 {
@@ -1926,7 +1926,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target_domain.implies(db, self.constraints, || quantified_sources);
         let result = universally_quantified
             .try_for_all(db, self.constraints, target_locals)
-            .unwrap_or_else(|| self.never());
+            .unwrap_or_else(|_| self.never());
         Some(result)
     }
 
