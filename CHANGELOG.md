@@ -7,20 +7,20 @@ Released on 2026-07-09.
 ### Preview features
 
 - Add `--add-ignore` for adding `ruff:ignore` comments ([#26346](https://github.com/astral-sh/ruff/pull/26346))
-- Drop C409 tuple comprehension preview behaviour ([#25707](https://github.com/astral-sh/ruff/pull/25707))
-- Excessive whitespace trimming with comment formatting ([#26455](https://github.com/astral-sh/ruff/pull/26455))
+- \[`flake8-comprehensions`\] Drop `C409` tuple comprehension preview behavior ([#25707](https://github.com/astral-sh/ruff/pull/25707))
+- Avoid whitespace normalization when formatting comments ([#26455](https://github.com/astral-sh/ruff/pull/26455))
 - \[`pyupgrade`\] Lint and fix use of deprecated `abc` decorators ([#26417](https://github.com/astral-sh/ruff/pull/26417))
 
 ### Bug fixes
 
 - Refine non-empty f-string detection ([#26526](https://github.com/astral-sh/ruff/pull/26526))
-- [ruff] Detect syntax errors in individual notebook cells ([#26419](https://github.com/astral-sh/ruff/pull/26419))
-- [ruff] Fix `ISC003` autofix incorrectly stripping `+` from comments ([#26554](https://github.com/astral-sh/ruff/pull/26554))
+- Detect syntax errors in individual notebook cells ([#26419](https://github.com/astral-sh/ruff/pull/26419))
+- \[`flake8-implicit-str-concat`\] Fix `ISC003` autofix incorrectly stripping `+` from comments ([#26554](https://github.com/astral-sh/ruff/pull/26554))
 
 ### Rule changes
 
 - \[`flake8-executable`\] Mark `EXE004` fix as unsafe ([#26033](https://github.com/astral-sh/ruff/pull/26033))
-- \[`flake8-pyi`\] Mark `PYI061` fixes unsafe in Python files ([#26533](https://github.com/astral-sh/ruff/pull/26533))
+- \[`flake8-pyi`\] Mark `PYI061` fixes as unsafe in Python files ([#26533](https://github.com/astral-sh/ruff/pull/26533))
 - \[`pydocstyle`\] Skip `overload-with-docstring` in stub files (`D418`) ([#26318](https://github.com/astral-sh/ruff/pull/26318))
 
 ### Performance
@@ -36,7 +36,7 @@ Released on 2026-07-09.
 
 ### Formatter
 
-- ruff: Add `--extend-exclude` to `ruff format` ([#26372](https://github.com/astral-sh/ruff/pull/26372))
+- Add `--extend-exclude` to `ruff format` ([#26372](https://github.com/astral-sh/ruff/pull/26372))
 
 ### Documentation
 
@@ -44,15 +44,6 @@ Released on 2026-07-09.
 - Fix Mozilla Firefox repository link in README ([#26537](https://github.com/astral-sh/ruff/pull/26537))
 - \[`flake8-bandit`\] Fix misleading docstring for `mako-templates` (`S702`) ([#26432](https://github.com/astral-sh/ruff/pull/26432))
 - \[`ruff`\] Fix non-triggering example for `if-key-in-dict-del` (`RUF051`) ([#26433](https://github.com/astral-sh/ruff/pull/26433))
-- [ty] Remove `Preview` rule status. ([#26377](https://github.com/astral-sh/ruff/pull/26377))
-- fix typos ([#26436](https://github.com/astral-sh/ruff/pull/26436))
-
-### Other changes
-
-- Replace the React SWC plugin in the playgrounds ([#26560](https://github.com/astral-sh/ruff/pull/26560))
-- [ruff] Migrate cache from `bincode` to `rkyv` ([#26374](https://github.com/astral-sh/ruff/pull/26374))
-- chore: lock rooster release dependency ([#26509](https://github.com/astral-sh/ruff/pull/26509))
-- chore: run prek from a locked uv dev group ([#26463](https://github.com/astral-sh/ruff/pull/26463))
 
 ### Contributors
 
