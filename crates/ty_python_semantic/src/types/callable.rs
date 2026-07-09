@@ -796,7 +796,13 @@ fn signature_positional_parameter_domain<'db>(
     self_ty: Type<'db>,
 ) -> Option<Type<'db>> {
     let parameters = signature.parameters();
-    if parameters.len() != prefix_arguments.len() + 1 {
+    let domain_index = prefix_arguments.len();
+    let trailing_parameters = parameters.as_slice().get(domain_index + 1..)?;
+    if !trailing_parameters.iter().all(|parameter| {
+        parameter.default_type().is_some()
+            || (parameters.is_standard()
+                && (parameter.is_variadic() || parameter.is_keyword_variadic()))
+    }) {
         return None;
     }
 
@@ -811,7 +817,7 @@ fn signature_positional_parameter_domain<'db>(
     }
 
     let domain = parameters
-        .get_positional(prefix_arguments.len())?
+        .get_positional(domain_index)?
         .annotated_type()
         .bind_self_typevars(db, self_ty);
     if !domain.has_typevar(db) {

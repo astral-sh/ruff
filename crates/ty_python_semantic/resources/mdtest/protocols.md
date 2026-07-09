@@ -2788,6 +2788,52 @@ def update_bounded_value(value: HasBoundedValue) -> None:
     value.bounded_value = "bad"  # error: [invalid-assignment]
 ```
 
+### Optional trailing setter parameters
+
+A setter remains callable by the descriptor protocol when parameters after the assigned value can
+all be omitted. Required trailing parameters make the setter incompatible with attribute assignment.
+
+```py
+from typing import Protocol
+
+class OptionalTrailingDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        raise NotImplementedError
+
+    def __set__(
+        self,
+        instance: object,
+        value: int,
+        notify: bool = False,
+        *metadata: str,
+        log: bool = False,
+        **named_metadata: str,
+    ) -> None: ...
+
+class HasOptionalTrailingValue(Protocol):
+    @OptionalTrailingDescriptor
+    def value(self) -> int: ...
+
+def update_optional_trailing_value(value: HasOptionalTrailingValue) -> None:
+    value.value = 1
+    value.value = "bad"  # error: [invalid-assignment]
+
+class RequiredTrailingDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        raise NotImplementedError
+
+    def __set__(self, instance: object, value: int, required: bool) -> None: ...
+
+class HasRequiredTrailingValue(Protocol):
+    @RequiredTrailingDescriptor
+    def value(self) -> int: ...
+
+def update_required_trailing_value(value: HasRequiredTrailingValue) -> None:
+    value.value = 1  # error: [invalid-assignment]
+```
+
 ## Variance of generic protocols with `Final` members
 
 A `Final` attribute is readable but not writable, so it constrains an inferred type parameter
