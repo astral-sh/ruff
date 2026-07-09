@@ -59,7 +59,8 @@ fn oscillating_generic_alias_cycle_recover<'db>(
     current.cycle_normalized(db, *previous, cycle)
 }
 
-#[salsa::tracked(returns(copy),
+#[salsa::tracked(
+    returns(copy),
     cycle_initial=|_, id| Type::divergent(id),
     cycle_fn=oscillating_generic_alias_cycle_recover,
 )]

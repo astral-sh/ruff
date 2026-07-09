@@ -1978,7 +1978,8 @@ impl BoundOnClass {
 }
 
 /// Inner Salsa query for [`ProtocolClass::interface`].
-#[salsa::tracked(returns(copy),
+#[salsa::tracked(
+    returns(copy),
     cycle_initial=|db, _, _| ProtocolInterface::empty(db),
     cycle_fn=proto_interface_cycle_recover,
     heap_size=ruff_memory_usage::heap_size,

@@ -3455,7 +3455,8 @@ impl<'db> Type<'db> {
     }
 }
 
-#[salsa::tracked(returns(copy),
+#[salsa::tracked(
+    returns(copy),
     cycle_initial = |_, _, _, _| true,
     heap_size = get_size2::GetSize::get_heap_size
 )]

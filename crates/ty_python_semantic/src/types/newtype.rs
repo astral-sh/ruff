@@ -52,7 +52,8 @@ impl<'db> NewType<'db> {
         }
     }
 
-    #[salsa::tracked(returns(copy),
+    #[salsa::tracked(
+        returns(copy),
         cycle_initial=|db, _, _| NewTypeBase::ClassType(ClassType::object(db)),
         heap_size=ruff_memory_usage::heap_size
     )]

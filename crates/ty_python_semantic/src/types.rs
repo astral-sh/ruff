@@ -1460,7 +1460,8 @@ impl<'db> Type<'db> {
         (*self).cached_materialization(db, MaterializationKind::Bottom)
     }
 
-    #[salsa::tracked(returns(copy),
+    #[salsa::tracked(
+        returns(copy),
         cycle_initial=|_, id, _, materialization_kind| {
             Type::Divergent(DivergentType::new(id).materialized(materialization_kind))
         },
@@ -2724,7 +2725,8 @@ impl<'db> Type<'db> {
         self.class_member_with_policy(db, name, MemberLookupPolicy::default())
     }
 
-    #[salsa::tracked(returns(copy),
+    #[salsa::tracked(
+        returns(copy),
         cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
         cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
             member.cycle_normalized(db, *previous, cycle)
@@ -3775,7 +3777,8 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
         receiver: Option<Type<'db>>,
     ) -> PlaceAndQualifiers<'db> {
-        #[salsa::tracked(returns(copy),
+        #[salsa::tracked(
+            returns(copy),
             cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
             cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _, _| {
                 member.cycle_normalized(db, *previous, cycle)
@@ -6383,7 +6386,8 @@ impl<'db> Type<'db> {
         self.apply_specialization_inner(db, specialization)
     }
 
-    #[salsa::tracked(returns(copy),
+    #[salsa::tracked(
+        returns(copy),
         cycle_initial=|_, id, _, _| Type::divergent(id),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, _| {
             value.cycle_normalized(db, *previous, cycle)
@@ -7047,7 +7051,8 @@ impl<'db> Type<'db> {
     }
 
     #[allow(clippy::used_underscore_binding)]
-    #[salsa::tracked(returns(copy),
+    #[salsa::tracked(
+        returns(copy),
         cycle_initial=|_, id, _, ()| Type::divergent(id),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, ()| {
             value.cycle_normalized(db, *previous, cycle)

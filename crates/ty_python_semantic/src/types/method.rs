@@ -65,7 +65,8 @@ impl<'db> BoundMethodType<'db> {
         Self::new(db, self.function(db), f(self.self_instance(db)))
     }
 
-    #[salsa::tracked(returns(copy),
+    #[salsa::tracked(
+        returns(copy),
         cycle_initial=|db, _, _| CallableType::bottom(db),
         heap_size=ruff_memory_usage::heap_size
     )]

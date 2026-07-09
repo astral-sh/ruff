@@ -235,7 +235,8 @@ impl<'db> TypedDictType<'db> {
     /// A class-based `TypedDict` inherits the first explicit policy from its bases unless it
     /// declares its own `closed` or `extra_items` argument.
     pub(crate) fn openness(self, db: &'db dyn Db) -> TypedDictOpenness<'db> {
-        #[salsa::tracked(returns(copy),
+        #[salsa::tracked(
+            returns(copy),
             cycle_initial=|_, _, _| TypedDictOpenness::ImplicitlyOpen,
             heap_size=ruff_memory_usage::heap_size
         )]
@@ -1323,7 +1324,8 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
 /// ```python
 /// Movie = TypedDict("Movie", {"name": str}, extra_items=ReadOnly[int])
 /// ```
-#[salsa::tracked(returns(copy),
+#[salsa::tracked(
+    returns(copy),
     cycle_initial = |_, _, _| TypedDictOpenness::ImplicitlyOpen,
     heap_size = ruff_memory_usage::heap_size
 )]

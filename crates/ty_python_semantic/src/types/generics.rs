@@ -490,7 +490,8 @@ impl<'db> GenericContext<'db> {
             }
         }
 
-        #[salsa::tracked(returns(copy),
+        #[salsa::tracked(
+            returns(copy),
             cycle_initial=|_, _, _| InferableTypeVars::None,
             heap_size=ruff_memory_usage::heap_size,
         )]

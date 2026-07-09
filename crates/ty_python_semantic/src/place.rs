@@ -981,7 +981,8 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
     }
 }
 
-#[salsa::tracked(returns(copy),
+#[salsa::tracked(
+    returns(copy),
     cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
     cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, _, _, _, _| {
         place.cycle_normalized(db, *previous, cycle)
@@ -1331,7 +1332,8 @@ fn symbol_impl<'db>(
 }
 
 /// Pre-computed reachability analysis for loop-back bindings in a loop header.
-#[salsa::tracked(returns(clone),
+#[salsa::tracked(
+    returns(clone),
     cycle_initial=|db, _, definition| loop_header_reachability_impl(db, definition, true),
     cycle_fn=loop_header_reachability_cycle_recover,
     heap_size = ruff_memory_usage::heap_size,

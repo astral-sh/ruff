@@ -467,7 +467,8 @@ impl<'db> TypeVarInstance<'db> {
 
     /// Returns the "unchecked" upper bound of a type variable instance.
     /// `lazy_bound` checks if the upper bound type is generic (generic upper bound is not allowed).
-    #[salsa::tracked(returns(copy),
+    #[salsa::tracked(
+        returns(copy),
         cycle_fn=lazy_bound_cycle_recover,
         cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size
@@ -505,7 +506,8 @@ impl<'db> TypeVarInstance<'db> {
 
     /// Returns the "unchecked" constraints of a type variable instance.
     /// `lazy_constraints` checks if any of the constraint types are generic (generic constraints are not allowed).
-    #[salsa::tracked(returns(copy),
+    #[salsa::tracked(
+        returns(copy),
         cycle_fn=lazy_constraints_cycle_recover,
         cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size
@@ -1476,7 +1478,8 @@ impl<'db> BoundTypeVarIdentity<'db> {
     }
 }
 
-#[salsa::tracked(returns(copy),
+#[salsa::tracked(
+    returns(copy),
     cycle_initial=|_, id, _| Some(Type::divergent(id)),
     cycle_fn=bound_typevar_default_type_cycle_recover,
     heap_size=ruff_memory_usage::heap_size

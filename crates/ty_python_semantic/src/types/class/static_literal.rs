@@ -296,7 +296,8 @@ impl<'db> StaticClassLiteral<'db> {
         self.pep695_generic_context_inner(db)
     }
 
-    #[salsa::tracked(returns(copy),
+    #[salsa::tracked(
+        returns(copy),
         cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size,
     )]
@@ -326,7 +327,8 @@ impl<'db> StaticClassLiteral<'db> {
         self,
         db: &'db dyn Db,
     ) -> Option<GenericContext<'db>> {
-        #[salsa::tracked(returns(copy),
+        #[salsa::tracked(
+            returns(copy),
             cycle_initial=|_, _, _| None,
             heap_size=ruff_memory_usage::heap_size,
         )]
@@ -713,7 +715,8 @@ impl<'db> StaticClassLiteral<'db> {
 
     /// Return the properties that affect how instances of this class are represented.
     pub(super) fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
-        #[salsa::tracked(returns(copy),
+        #[salsa::tracked(
+            returns(copy),
             cycle_initial=|_, _, _| ClassInstanceFlags::empty(),
             heap_size=ruff_memory_usage::heap_size,
         )]
@@ -943,7 +946,8 @@ impl<'db> StaticClassLiteral<'db> {
         self,
         db: &'db dyn Db,
     ) -> Result<(Type<'db>, Option<MetaclassTransformInfo<'db>>), MetaclassError<'db>> {
-        #[salsa::tracked(returns(clone),
+        #[salsa::tracked(
+            returns(clone),
             cycle_initial=|_, _, _| Err(MetaclassError {
                 kind: MetaclassErrorKind::Cycle,
             }),
@@ -2369,7 +2373,8 @@ impl<'db> StaticClassLiteral<'db> {
         )
     }
 
-    #[salsa::tracked(returns(copy),
+    #[salsa::tracked(
+        returns(copy),
         cycle_fn=implicit_attribute_cycle_recover,
         cycle_initial=|_, id, _| Member {
             inner: Place::bound(Type::divergent(id)).into(),
