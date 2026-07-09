@@ -880,42 +880,183 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
-    /// Returns whether gradual assignability makes this pair valid for every specialization of a
-    /// universally quantified type variable.
-    pub(super) fn is_gradual_assignability_with_universal_typevar(
-        &self,
-        db: &'db dyn Db,
-        source: Type<'db>,
-        target: Type<'db>,
-    ) -> bool {
-        self.relation.is_assignability()
-            && match (source, target) {
-                (Type::Dynamic(_), Type::TypeVar(typevar))
-                | (Type::TypeVar(typevar), Type::Dynamic(_))
-                | (Type::Divergent(_), Type::TypeVar(typevar))
-                | (Type::TypeVar(typevar), Type::Divergent(_)) => {
-                    self.is_universally_quantified(db, typevar)
-                }
-                (Type::NominalInstance(source), Type::TypeVar(typevar))
-                    if source.inherits_from_explicit_any() =>
-                {
-                    self.is_universally_quantified(db, typevar)
-                }
-                (Type::TypeVar(typevar), Type::Union(union)) => {
-                    self.is_universally_quantified(db, typevar)
-                        && union.elements(db).iter().any(Type::is_dynamic)
-                }
-                _ => false,
-            }
-    }
-
     /// Returns whether `typevar` will be universally quantified after this relation is built.
-    pub(super) fn is_universally_quantified(
+    fn is_universally_quantified(
         &self,
         db: &'db dyn Db,
         typevar: BoundTypeVarInstance<'db>,
     ) -> bool {
         typevar.is_in_set(db, self.universally_quantified)
+    }
+
+    /// Expands transparent aliases before relation dispatch can capture them as opaque constraint
+    /// bounds.
+    fn try_expand_alias_before_relation_dispatch(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        // Type aliases are transparent to relations. Expand them before lazy type-variable
+        // evaluation so aliases do not become opaque constraint bounds.
+        if let Type::TypeAlias(source_alias) = source {
+            return Some(self.with_recursion_guard(source, target, || {
+                self.check_type_pair(db, source_alias.value_type(db), target)
+            }));
+        }
+        if let Type::TypeAlias(target_alias) = target {
+            return Some(self.with_recursion_guard(source, target, || {
+                self.check_type_pair(db, source, target_alias.value_type(db))
+            }));
+        }
+
+        // Normalize direct alias elements together so the expanded union, rather than an opaque
+        // alias, becomes the constraint bound.
+        if let Type::Union(union) = target
+            && union.has_aliases(db)
+        {
+            return Some(self.with_recursion_guard(source, target, || {
+                self.check_type_pair(db, source, union.expand_aliases(db))
+            }));
+        }
+
+        None
+    }
+
+    fn source_intersection_requires_expansion(
+        &self,
+        db: &'db dyn Db,
+        intersection: IntersectionType<'db>,
+    ) -> bool {
+        intersection
+            .positive(db)
+            .iter()
+            .any(|element| match element {
+                Type::TypeVar(tvar) => !tvar.is_inferable(db, self.inferable),
+                Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_union(),
+                _ => false,
+            })
+    }
+
+    /// Applies universal-variable relation laws that would be lost if the comparison were
+    /// immediately captured as a lazy constraint.
+    ///
+    /// This may only apply laws whose truth is independent of the universal variable's domain.
+    /// Other relations must remain atomic until source locals have been existentially projected,
+    /// preserving `for all target, there exists source` quantifier order.
+    fn try_check_universal_typevar_relation_before_constraint_capture(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        // These targets accept every source type. Preserve that unconditional relation for a
+        // universal variable; existential inference may still need the bound as evidence for a
+        // specialization.
+        if let Type::TypeVar(typevar) = source
+            && self.is_universally_quantified(db, typevar)
+            && (target.is_object()
+                || matches!(
+                    target,
+                    Type::ProtocolInstance(protocol) if protocol.is_equivalent_to_object(db)
+                ))
+        {
+            return Some(self.always());
+        }
+
+        // Preserve the ordinary source union/intersection rules when the target variable is
+        // universal. Lazy evaluation would otherwise capture the entire set-theoretic type as an
+        // opaque lower bound.
+        if let Type::TypeVar(typevar) = target
+            && self.is_universally_quantified(db, typevar)
+        {
+            match source {
+                Type::Union(union) => {
+                    return Some(union.elements(db).iter().when_all(
+                        db,
+                        self.constraints,
+                        |&element| self.check_type_pair(db, element, target),
+                    ));
+                }
+                Type::Intersection(intersection) => {
+                    return Some(
+                        intersection
+                            .positive_elements_or_object(db)
+                            .when_any(db, self.constraints, |element| {
+                                self.check_type_pair(db, element, target)
+                            })
+                            .or(db, self.constraints, || {
+                                if self.source_intersection_requires_expansion(db, intersection) {
+                                    self.check_type_pair(
+                                        db,
+                                        intersection.with_expanded_typevars_and_newtypes(db),
+                                        target,
+                                    )
+                                } else {
+                                    self.never()
+                                }
+                            }),
+                    );
+                }
+                _ => {}
+            }
+        }
+
+        if !self.relation.is_assignability() {
+            return None;
+        }
+        let is_unconditionally_assignable = match (source, target) {
+            (Type::Dynamic(_), Type::TypeVar(typevar))
+            | (Type::TypeVar(typevar), Type::Dynamic(_))
+            | (Type::Divergent(_), Type::TypeVar(typevar))
+            | (Type::TypeVar(typevar), Type::Divergent(_)) => {
+                self.is_universally_quantified(db, typevar)
+            }
+            (Type::NominalInstance(source), Type::TypeVar(typevar))
+                if source.inherits_from_explicit_any() =>
+            {
+                self.is_universally_quantified(db, typevar)
+            }
+            (Type::TypeVar(typevar), Type::Union(union)) => {
+                self.is_universally_quantified(db, typevar)
+                    && union.elements(db).iter().any(Type::is_dynamic)
+            }
+            _ => false,
+        };
+        is_unconditionally_assignable.then(|| self.always())
+    }
+
+    /// Constructs the compact exact constraint used for a non-universal type variable in an
+    /// invariant position, if doing so preserves the ordinary relation semantics.
+    pub(super) fn try_capture_invariant_typevar_constraint(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        if self.typevar_evaluation != TypeVarEvaluation::Lazy {
+            return None;
+        }
+        let ((Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar))) = (source, target) else {
+            return None;
+        };
+        if self.is_universally_quantified(db, typevar) || ty.is_type_var() || ty.is_union() {
+            return None;
+        }
+
+        let ty = ty.materialized_divergent_fallback().unwrap_or(ty);
+        let (lower, upper) = if self.relation.is_subtyping() {
+            (ty.top_materialization(db), ty.bottom_materialization(db))
+        } else {
+            (ty, ty)
+        };
+        Some(ConstraintSet::constrain_typevar(
+            db,
+            self.constraints,
+            typevar,
+            lower,
+            upper,
+        ))
     }
 
     pub(super) const fn is_eager_assignability(&self) -> bool {
@@ -1126,93 +1267,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .implies_subtype_of(db, self.constraints, source, target);
         }
 
-        // Type aliases are transparent to relations. Expand them before lazy type-variable
-        // evaluation so aliases do not become opaque constraint bounds.
-        if let Type::TypeAlias(source_alias) = source {
-            return self.with_recursion_guard(source, target, || {
-                self.check_type_pair(db, source_alias.value_type(db), target)
-            });
+        if let Some(result) = self.try_expand_alias_before_relation_dispatch(db, source, target) {
+            return result;
         }
-        if let Type::TypeAlias(target_alias) = target {
-            return self.with_recursion_guard(source, target, || {
-                self.check_type_pair(db, source, target_alias.value_type(db))
-            });
-        }
-
-        // Normalize direct alias elements together before lazy type-variable evaluation so the
-        // expanded union, rather than an opaque alias, becomes the constraint bound.
-        if let Type::Union(union) = target
-            && union.has_aliases(db)
+        if let Some(result) =
+            self.try_check_universal_typevar_relation_before_constraint_capture(db, source, target)
         {
-            return self.with_recursion_guard(source, target, || {
-                self.check_type_pair(db, source, union.expand_aliases(db))
-            });
-        }
-
-        // These targets accept every source type. Preserve that unconditional relation for a
-        // universal variable before lazy evaluation turns the comparison into a constraint.
-        // Other inferable variables still need the constraint for specialization inference.
-        if let Type::TypeVar(typevar) = source
-            && self.is_universally_quantified(db, typevar)
-            && (target.is_object()
-                || matches!(
-                    target,
-                    Type::ProtocolInstance(protocol) if protocol.is_equivalent_to_object(db)
-                ))
-        {
-            return self.always();
-        }
-
-        let should_expand_intersection = |intersection: IntersectionType<'db>| {
-            intersection
-                .positive(db)
-                .iter()
-                .any(|element| match element {
-                    Type::TypeVar(tvar) => !tvar.is_inferable(db, self.inferable),
-                    Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_union(),
-                    _ => false,
-                })
-        };
-
-        // Preserve the ordinary source union/intersection rules when the target variable is
-        // universal. Lazy evaluation would otherwise capture the entire set-theoretic type as an
-        // opaque lower bound.
-        if let Type::TypeVar(typevar) = target
-            && self.is_universally_quantified(db, typevar)
-        {
-            match source {
-                Type::Union(union) => {
-                    return union
-                        .elements(db)
-                        .iter()
-                        .when_all(db, self.constraints, |&element| {
-                            self.check_type_pair(db, element, target)
-                        });
-                }
-                Type::Intersection(intersection) => {
-                    return intersection
-                        .positive_elements_or_object(db)
-                        .when_any(db, self.constraints, |element| {
-                            self.check_type_pair(db, element, target)
-                        })
-                        .or(db, self.constraints, || {
-                            if should_expand_intersection(intersection) {
-                                self.check_type_pair(
-                                    db,
-                                    intersection.with_expanded_typevars_and_newtypes(db),
-                                    target,
-                                )
-                            } else {
-                                self.never()
-                            }
-                        });
-                }
-                _ => {}
-            }
-        }
-
-        if self.is_gradual_assignability_with_universal_typevar(db, source, target) {
-            return self.always();
+            return result;
         }
 
         // With lazy evaluation, comparisons with a type variable are translated directly into a
@@ -1281,14 +1342,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             {
                 self.always()
             }
-
-            (Type::TypeAlias(source_alias), _) => self.with_recursion_guard(source, target, || {
-                self.check_type_pair(db, source_alias.value_type(db), target)
-            }),
-
-            (_, Type::TypeAlias(target_alias)) => self.with_recursion_guard(source, target, || {
-                self.check_type_pair(db, source, target_alias.value_type(db))
-            }),
 
             (Type::TypeForm(source_typeform), Type::TypeForm(target_typeform)) => self
                 .with_recursion_guard(source, target, || {
@@ -1690,7 +1743,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     // constraints that exposes a union; this requires special handling.
                     match source {
                         Type::Intersection(intersection)
-                            if should_expand_intersection(intersection) =>
+                            if self.source_intersection_requires_expansion(db, intersection) =>
                         {
                             self.check_type_pair(
                                 db,
@@ -1835,7 +1888,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         result
                     })
                     .or(db, self.constraints, || {
-                        if should_expand_intersection(intersection) {
+                        if self.source_intersection_requires_expansion(db, intersection) {
                             self.check_type_pair(
                                 db,
                                 intersection.with_expanded_typevars_and_newtypes(db),
@@ -2368,6 +2421,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::KnownInstance(source), _) => {
                 self.check_type_pair(db, source.instance_fallback(db), target)
             }
+
+            // Type aliases are normally handled before this match, but these arms keep the match
+            // exhaustive and handle aliases reached through recursive relation dispatch.
+            (Type::TypeAlias(source_alias), _) => self.with_recursion_guard(source, target, || {
+                self.check_type_pair(db, source_alias.value_type(db), target)
+            }),
+            (_, Type::TypeAlias(target_alias)) => self.with_recursion_guard(source, target, || {
+                self.check_type_pair(db, source, target_alias.value_type(db))
+            }),
 
             // `bool` is a subtype of `int`, because `bool` subclasses `int`,
             // which means that all instances of `bool` are also instances of `int`

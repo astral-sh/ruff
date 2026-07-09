@@ -16,8 +16,7 @@ use crate::types::constraints::{
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
-    TypeRelationChecker, TypeVarEvaluation,
+    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
 use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
@@ -1662,23 +1661,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // bounds. Higher-rank comparisons use the ordinary relation in both directions so
             // that universal variables retain the full assignability semantics.
             (None, None, _) => {
-                if self.typevar_evaluation == TypeVarEvaluation::Lazy
-                    && let (Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar)) =
-                        (source_type, target_type)
-                    && !self.is_universally_quantified(db, typevar)
-                    && !ty.is_type_var()
-                    // Preserve union distribution before constructing constraints. Storing the
-                    // entire union as an exact bound makes solving common generic calls involving
-                    // large unions significantly more expensive.
-                    && !ty.is_union()
+                if let Some(constraint) =
+                    self.try_capture_invariant_typevar_constraint(db, source_type, target_type)
                 {
-                    let ty = ty.materialized_divergent_fallback().unwrap_or(ty);
-                    let (lower, upper) = if self.relation.is_subtyping() {
-                        (ty.top_materialization(db), ty.bottom_materialization(db))
-                    } else {
-                        (ty, ty)
-                    };
-                    ConstraintSet::constrain_typevar(db, self.constraints, typevar, lower, upper)
+                    constraint
                 } else {
                     self.check_type_pair(db, target_type, source_type).and(
                         db,
