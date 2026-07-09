@@ -1773,6 +1773,38 @@ reveal_type(Initialized.initialized)  # revealed: int
 reveal_type(Initialized().initialized)  # revealed: int
 ```
 
+A metaclass constructor can bypass its `__init__` by returning a class that is not an instance of
+the metaclass from `__new__`, or through a custom `__call__` on the meta-metaclass. In either case,
+the inferred `__init__` assignment is not definite:
+
+```py
+class ReturningPlainTypeMeta(type):
+    def __new__(mcls, name: str, bases: tuple[type, ...], namespace: dict[str, object]):
+        return type(name, bases, namespace)
+
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.initialized: int = 1
+
+class CustomMetaCall(type):
+    def __call__(mcls, name: str, bases: tuple[type, ...], namespace: dict[str, object]):
+        return type(name, bases, namespace)
+
+class BypassedByCallMeta(type, metaclass=CustomMetaCall):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.initialized: int = 1
+
+class ConstructorBypassBase:
+    initialized = "inherited"
+
+class BypassedByNew(ConstructorBypassBase, metaclass=ReturningPlainTypeMeta): ...
+class BypassedByCall(ConstructorBypassBase, metaclass=BypassedByCallMeta): ...
+
+reveal_type(BypassedByNew.initialized)  # revealed: int | str
+reveal_type(BypassedByNew().initialized)  # revealed: int | str
+reveal_type(BypassedByCall.initialized)  # revealed: int | str
+reveal_type(BypassedByCall().initialized)  # revealed: int | str
+```
+
 An inherited metaclass `__init__` remains the effective initializer when a derived metaclass does
 not override it. If the derived metaclass does override `__init__`, an assignment in the base
 initializer is no longer known to occur:

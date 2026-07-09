@@ -904,6 +904,10 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         name: &str,
     ) -> bool {
+        if !self.construction_definitely_runs_initializer(db) {
+            return false;
+        }
+
         for base in self.iter_mro(db) {
             match base {
                 ClassBase::Class(class) => {
@@ -914,6 +918,46 @@ impl<'db> ClassLiteral<'db> {
                         class.initializer_definitely_assigns_attribute(db, name)
                     {
                         return definitely_assigns;
+                    }
+                }
+                ClassBase::Generic | ClassBase::Protocol => {}
+                ClassBase::Any
+                | ClassBase::Dynamic(_)
+                | ClassBase::Divergent(_)
+                | ClassBase::TypedDict(_) => return false,
+            }
+        }
+        false
+    }
+
+    /// Returns whether constructing an instance of this class is known to use `type.__call__` and
+    /// `type.__new__`, which guarantees that the effective `__init__` runs.
+    fn construction_definitely_runs_initializer(self, db: &'db dyn Db) -> bool {
+        if !self.member_is_defined_by_known_class(db, "__new__", KnownClass::Type) {
+            return false;
+        }
+
+        self.metaclass(db)
+            .to_instance(db)
+            .and_then(|metaclass| metaclass.nominal_class(db))
+            .is_some_and(|metaclass| {
+                metaclass
+                    .class_literal(db)
+                    .member_is_defined_by_known_class(db, "__call__", KnownClass::Type)
+            })
+    }
+
+    fn member_is_defined_by_known_class(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        known_class: KnownClass,
+    ) -> bool {
+        for base in self.iter_mro(db) {
+            match base {
+                ClassBase::Class(class) => {
+                    if !class.own_class_member(db, None, name).is_undefined() {
+                        return class.is_known(db, known_class);
                     }
                 }
                 ClassBase::Generic | ClassBase::Protocol => {}
