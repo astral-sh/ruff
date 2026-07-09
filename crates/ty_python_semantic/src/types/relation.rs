@@ -1111,6 +1111,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .implies_subtype_of(db, self.constraints, source, target);
         }
 
+        // Type aliases are transparent to relations. Expand them before lazy type-variable
+        // evaluation so aliases do not become opaque constraint bounds.
+        if let Type::TypeAlias(source_alias) = source {
+            return self.with_recursion_guard(source, target, || {
+                self.check_type_pair(db, source_alias.value_type(db), target)
+            });
+        }
+        if let Type::TypeAlias(target_alias) = target {
+            return self.with_recursion_guard(source, target, || {
+                self.check_type_pair(db, source, target_alias.value_type(db))
+            });
+        }
+
         if self.is_gradual_assignability_with_universal_typevar(db, source, target) {
             return self.always();
         }

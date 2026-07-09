@@ -2929,6 +2929,23 @@ class GenericIdentity:
 static_assert(is_assignable_to(GenericIdentity, IdentityProtocol))
 static_assert(is_subtype_of(GenericIdentity, IdentityProtocol))
 
+type IdentityAlias[X] = X
+type ListAlias[X] = list[X]
+
+class AliasedGenericIdentity:
+    def f[S](self, value: S) -> IdentityAlias[S]:
+        return value
+
+class AliasedListReturn:
+    def f[S](self, value: S) -> ListAlias[S]:
+        return [value]
+
+# Type aliases are transparent when relating and projecting generic signatures.
+static_assert(is_assignable_to(AliasedGenericIdentity, IdentityProtocol))
+static_assert(is_subtype_of(AliasedGenericIdentity, IdentityProtocol))
+static_assert(not is_assignable_to(AliasedListReturn, IdentityProtocol))
+static_assert(not is_subtype_of(AliasedListReturn, IdentityProtocol))
+
 class CallableIdentityProtocol(Protocol):
     def f[T](self) -> Callable[[T], T]: ...
 
