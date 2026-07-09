@@ -25,8 +25,9 @@ use crate::types::{
 use crate::{
     Db,
     types::{
-        ErrorContext, ErrorContextTree, Type, constraints::ConstraintSet,
-        generics::InferableTypeVars,
+        ErrorContext, ErrorContextTree, Type,
+        constraints::ConstraintSet,
+        generics::{BoundTypeVarSet, InferableTypeVars},
     },
 };
 
@@ -344,7 +345,7 @@ impl<'db> Type<'db> {
         let checker = TypeRelationChecker {
             constraints,
             inferable,
-            universally_quantified: InferableTypeVars::None,
+            universally_quantified: BoundTypeVarSet::None,
             relation: TypeRelation::SubtypingAssuming,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: None,
@@ -382,7 +383,7 @@ impl<'db> Type<'db> {
         let checker = TypeRelationChecker {
             constraints: &builder,
             inferable: InferableTypeVars::None,
-            universally_quantified: InferableTypeVars::None,
+            universally_quantified: BoundTypeVarSet::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new()),
@@ -587,7 +588,7 @@ impl<'db> Type<'db> {
         let checker = TypeRelationChecker {
             constraints,
             inferable,
-            universally_quantified: InferableTypeVars::None,
+            universally_quantified: BoundTypeVarSet::None,
             relation,
             typevar_evaluation,
             context_tree: None,
@@ -743,7 +744,7 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
 pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: InferableTypeVars<'db>,
-    universally_quantified: InferableTypeVars<'db>,
+    universally_quantified: BoundTypeVarSet<'db>,
     pub(super) relation: TypeRelation,
     pub(super) typevar_evaluation: TypeVarEvaluation,
     context_tree: Option<ErrorContextTree<'db>>,
@@ -773,7 +774,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Self {
             constraints,
             inferable,
-            universally_quantified: InferableTypeVars::None,
+            universally_quantified: BoundTypeVarSet::None,
             relation: TypeRelation::Subtyping,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: None,
@@ -795,7 +796,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Self {
             constraints,
             inferable: InferableTypeVars::None,
-            universally_quantified: InferableTypeVars::None,
+            universally_quantified: BoundTypeVarSet::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
             context_tree: None,
@@ -817,7 +818,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Self {
             constraints,
             inferable: InferableTypeVars::None,
-            universally_quantified: InferableTypeVars::None,
+            universally_quantified: BoundTypeVarSet::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
             context_tree: Some(ErrorContextTree::new()),
@@ -839,7 +840,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Self {
             constraints,
             inferable: InferableTypeVars::None,
-            universally_quantified: InferableTypeVars::None,
+            universally_quantified: BoundTypeVarSet::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new()),
@@ -871,7 +872,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     pub(super) fn with_universally_quantified_typevars(
         &self,
         db: &'db dyn Db,
-        typevars: InferableTypeVars<'db>,
+        typevars: BoundTypeVarSet<'db>,
     ) -> Self {
         Self {
             universally_quantified: self.universally_quantified.merge(db, typevars),
@@ -914,7 +915,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         db: &'db dyn Db,
         typevar: BoundTypeVarInstance<'db>,
     ) -> bool {
-        typevar.is_inferable(db, self.universally_quantified)
+        typevar.is_in_set(db, self.universally_quantified)
     }
 
     pub(super) const fn is_eager_assignability(&self) -> bool {
@@ -2503,7 +2504,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             context_tree: None,
             given: self.given,
             inferable: InferableTypeVars::None,
-            universally_quantified: InferableTypeVars::None,
+            universally_quantified: BoundTypeVarSet::None,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
@@ -2587,7 +2588,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             typevar_evaluation: TypeVarEvaluation::Eager,
             constraints: self.constraints,
             inferable: self.inferable,
-            universally_quantified: InferableTypeVars::None,
+            universally_quantified: BoundTypeVarSet::None,
             context_tree: None,
             given: self.given,
             relation_visitor: self.relation_visitor,

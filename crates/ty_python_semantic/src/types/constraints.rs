@@ -101,7 +101,7 @@ use smallvec::SmallVec;
 use ty_python_core::rank::RankBitBox;
 
 use crate::types::class::GenericAlias;
-use crate::types::generics::InferableTypeVars;
+use crate::types::generics::{BoundTypeVarSet, InferableTypeVars};
 use crate::types::typevar::{BoundTypeVarIdentity, walk_bound_type_var_type};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
@@ -623,7 +623,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        to_remove: InferableTypeVars<'db>,
+        to_remove: BoundTypeVarSet<'db>,
         assumptions: Self,
     ) -> Result<Self, ConstraintProjectionError> {
         self.verify_builder(builder);
@@ -650,7 +650,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             domain.and(db, builder, || projected).try_exists_assuming(
                 db,
                 builder,
-                InferableTypeVars::from_bound_typevars(db, [typevar]),
+                BoundTypeVarSet::from_bound_typevars(db, [typevar]),
                 assumptions,
             )
         })
@@ -829,7 +829,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 .copied()
                 .chain(gradual[index + 1..].iter().map(|(typevar, _)| *typevar));
             let assumptions = Self::valid_specializations(db, builder, remaining_typevars);
-            let local = InferableTypeVars::from_bound_typevars(db, [*typevar]);
+            let local = BoundTypeVarSet::from_bound_typevars(db, [*typevar]);
             let mut choices = Self::always(builder);
             for constraint in *constraints {
                 let domain = Self::from_node(
@@ -865,17 +865,17 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        to_remove: InferableTypeVars<'db>,
+        to_remove: BoundTypeVarSet<'db>,
     ) -> bool {
         self.verify_builder(builder);
-        if to_remove == InferableTypeVars::None {
+        if to_remove == BoundTypeVarSet::None {
             return false;
         }
         let mut crosses_quantifier = false;
         self.node
             .for_each_unique_constraint(builder, &mut |constraint, _| {
                 let constraint = builder.constraint_data(constraint);
-                let subject_is_removed = constraint.typevar.is_inferable(db, to_remove);
+                let subject_is_removed = constraint.typevar.is_in_set(db, to_remove);
                 let bounds_mention = |removed| {
                     constraint
                         .bounds
@@ -885,7 +885,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                         .any(|bound| {
                             any_over_type(db, bound, false, |inner| {
                                 inner.as_typevar().is_some_and(|typevar| {
-                                    typevar.is_inferable(db, to_remove) == removed
+                                    typevar.is_in_set(db, to_remove) == removed
                                 })
                             })
                         })
@@ -908,7 +908,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        to_remove: InferableTypeVars<'db>,
+        to_remove: BoundTypeVarSet<'db>,
     ) -> Result<Self, ConstraintProjectionError> {
         self.verify_builder(builder);
         if self.has_cross_quantifier_typevar(db, builder, to_remove) {
@@ -939,7 +939,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         builder: &'c ConstraintSetBuilder<'db>,
         typevars: &[BoundTypeVarInstance<'db>],
     ) -> Result<Self, ConstraintProjectionError> {
-        let quantified = InferableTypeVars::from_bound_typevars(db, typevars.iter().copied());
+        let quantified = BoundTypeVarSet::from_bound_typevars(db, typevars.iter().copied());
         let domain = Self::valid_specializations(db, builder, typevars.iter().copied());
         let implication = domain.implies(db, builder, || self);
         match implication.try_for_all(db, builder, quantified) {
@@ -975,7 +975,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             while let Some(typevar) = find_over_type(db, projected, false, |inner| {
                 inner
                     .as_typevar()
-                    .filter(|typevar| typevar.is_inferable(db, quantified))
+                    .filter(|typevar| typevar.is_in_set(db, quantified))
             }) {
                 let variance = projected.variance_of(db, typevar.identity(db));
                 if variance == TypeVarVariance::Invariant {
@@ -1051,13 +1051,13 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             }
 
             let constraint = builder.constraint_data(interior.constraint);
-            let subject_is_quantified = constraint.typevar.is_inferable(db, quantified);
+            let subject_is_quantified = constraint.typevar.is_in_set(db, quantified);
             let mut project_bound = |bound: Type<'db>, is_lower: bool| {
                 let Some(bound_typevar) = bound.as_typevar() else {
                     let mentions_quantified = any_over_type(db, bound, false, |inner| {
                         inner
                             .as_typevar()
-                            .is_some_and(|typevar| typevar.is_inferable(db, quantified))
+                            .is_some_and(|typevar| typevar.is_in_set(db, quantified))
                     });
                     if mentions_quantified && !subject_is_quantified {
                         return project_nested_bound(bound, is_lower).map(Some);
@@ -1069,7 +1069,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                     }
                     return Ok(Some(bound));
                 };
-                let bound_is_quantified = bound_typevar.is_inferable(db, quantified);
+                let bound_is_quantified = bound_typevar.is_in_set(db, quantified);
                 if subject_is_quantified == bound_is_quantified {
                     return Ok(Some(bound));
                 }
@@ -1247,7 +1247,7 @@ struct ConstraintSetStorage<'db> {
     negate_cache: FxHashMap<NodeId, NodeId>,
     or_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
     and_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
-    exists_cache: FxHashMap<(NodeId, InferableTypeVars<'db>), NodeId>,
+    exists_cache: FxHashMap<(NodeId, BoundTypeVarSet<'db>), NodeId>,
     retain_one_cache: FxHashMap<(NodeId, BoundTypeVarIdentity<'db>), NodeId>,
     restrict_one_cache: FxHashMap<(NodeId, ConstraintAssignment), (NodeId, bool)>,
     simplify_cache: FxHashMap<NodeId, NodeId>,
@@ -3349,9 +3349,9 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        bound_typevars: InferableTypeVars<'db>,
+        bound_typevars: BoundTypeVarSet<'db>,
     ) -> Self {
-        if bound_typevars == InferableTypeVars::None {
+        if bound_typevars == BoundTypeVarSet::None {
             return self;
         }
 
@@ -3388,10 +3388,10 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        bound_typevars: InferableTypeVars<'db>,
+        bound_typevars: BoundTypeVarSet<'db>,
         assumptions: Self,
     ) -> Result<Self, ConstraintProjectionError> {
-        if bound_typevars == InferableTypeVars::None {
+        if bound_typevars == BoundTypeVarSet::None {
             return Ok(self);
         }
 
@@ -3405,13 +3405,13 @@ impl NodeId {
                 && any_over_type(db, bound, false, |inner| {
                     inner
                         .as_typevar()
-                        .is_some_and(|typevar| typevar.is_inferable(db, bound_typevars))
+                        .is_some_and(|typevar| typevar.is_in_set(db, bound_typevars))
                 })
         };
         let requires_fallible_upper_projection =
             |subject: BoundTypeVarInstance<'db>, bound: Type<'db>| {
                 mentions_nested_bound_typevar(bound)
-                    || (subject.is_inferable(db, bound_typevars) && mentions_nested_typevar(bound))
+                    || (subject.is_in_set(db, bound_typevars) && mentions_nested_typevar(bound))
             };
         let mut nested_subjects = FxHashSet::default();
         self.for_each_unique_constraint(builder, &mut |constraint, _| {
@@ -3471,7 +3471,7 @@ impl NodeId {
                 return;
             }
             let constraint = builder.constraint_data(constraint_id);
-            let subject_is_removed = constraint.typevar.is_inferable(db, bound_typevars);
+            let subject_is_removed = constraint.typevar.is_in_set(db, bound_typevars);
             let nested_lower = constraint
                 .bounds
                 .lower
@@ -3510,7 +3510,7 @@ impl NodeId {
                 while let Some(typevar) = find_over_type(db, specialized, false, |inner| {
                     inner
                         .as_typevar()
-                        .filter(|typevar| typevar.is_inferable(db, bound_typevars))
+                        .filter(|typevar| typevar.is_in_set(db, bound_typevars))
                 }) {
                     match typevar.typevar(db).bound_or_constraints(db) {
                         None => {}
@@ -3578,7 +3578,7 @@ impl NodeId {
                         let covers = if any_over_type(db, lower, false, |inner| {
                             inner
                                 .as_typevar()
-                                .is_some_and(|typevar| typevar.is_inferable(db, bound_typevars))
+                                .is_some_and(|typevar| typevar.is_in_set(db, bound_typevars))
                         }) {
                             ALWAYS_FALSE
                         } else {
@@ -3653,7 +3653,7 @@ impl NodeId {
                 let removed = find_over_type(db, lower, false, |inner| {
                     inner
                         .as_typevar()
-                        .filter(|typevar| typevar.is_inferable(db, bound_typevars))
+                        .filter(|typevar| typevar.is_in_set(db, bound_typevars))
                 })?;
                 let lower_domain = Node::new_satisfied_constraint(
                     builder,
@@ -3684,7 +3684,7 @@ impl NodeId {
                         if any_over_type(db, specialized, false, |inner| {
                             inner
                                 .as_typevar()
-                                .is_some_and(|typevar| typevar.is_inferable(db, bound_typevars))
+                                .is_some_and(|typevar| typevar.is_in_set(db, bound_typevars))
                         }) {
                             return;
                         }
@@ -3758,9 +3758,9 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        bound_typevars: InferableTypeVars<'db>,
+        bound_typevars: BoundTypeVarSet<'db>,
     ) -> Self {
-        if bound_typevars == InferableTypeVars::None {
+        if bound_typevars == BoundTypeVarSet::None {
             return self;
         }
 
@@ -3786,7 +3786,7 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        bound_typevars: InferableTypeVars<'db>,
+        bound_typevars: BoundTypeVarSet<'db>,
         path: &mut PathAssignments,
         encode_derived_assignment: impl Copy + Fn(ConstraintAssignment, usize) -> NodeId,
     ) -> Self {
@@ -5027,12 +5027,12 @@ impl InteriorNode {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        bound_typevars: InferableTypeVars<'db>,
+        bound_typevars: BoundTypeVarSet<'db>,
         path: &mut PathAssignments,
         encode_derived_assignment: impl Copy + Fn(ConstraintAssignment, usize) -> NodeId,
     ) -> NodeId {
         let mentions_typevar = |ty: Type<'db>| match ty {
-            Type::TypeVar(typevar) => typevar.is_inferable(db, bound_typevars),
+            Type::TypeVar(typevar) => typevar.is_in_set(db, bound_typevars),
             _ => false,
         };
         self.abstract_one_inner_with(
@@ -5044,7 +5044,7 @@ impl InteriorNode {
             // quantified typevars.
             &mut |constraint| {
                 let constraint = builder.constraint_data(constraint);
-                constraint.typevar.is_inferable(db, bound_typevars)
+                constraint.typevar.is_in_set(db, bound_typevars)
                     || constraint
                         .bounds
                         .lower
@@ -8031,8 +8031,8 @@ mod tests {
     fn quantified_typevars<'db>(
         db: &'db dyn Db,
         typevars: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
-    ) -> InferableTypeVars<'db> {
-        InferableTypeVars::from_typevars(db, typevars.into_iter().collect())
+    ) -> BoundTypeVarSet<'db> {
+        BoundTypeVarSet::from_typevars(db, typevars.into_iter().collect())
     }
 
     fn create_constraint<'db, 'c>(

@@ -25,8 +25,8 @@ use crate::types::constraints::{
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
-    ApplySpecialization, GenericContext, InferableTypeVars, Specialization, TypeVarInference,
-    walk_generic_context,
+    ApplySpecialization, BoundTypeVarSet, GenericContext, InferableTypeVars, Specialization,
+    TypeVarInference, walk_generic_context,
 };
 use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
@@ -1996,7 +1996,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         };
 
         let target_locals =
-            InferableTypeVars::from_bound_typevars(db, target_typevars.iter().copied());
+            BoundTypeVarSet::from_bound_typevars(db, target_typevars.iter().copied());
         let checker = self
             .with_universally_quantified_typevars(db, target_locals)
             .with_lazy_typevar_evaluation();
@@ -2109,7 +2109,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target_typevars.iter().copied(),
         );
         let target_locals =
-            InferableTypeVars::from_bound_typevars(db, target_typevars.iter().copied());
+            BoundTypeVarSet::from_bound_typevars(db, target_typevars.iter().copied());
         let universally_quantified =
             target_domain.implies(db, self.constraints, || quantified_sources);
         let result = universally_quantified

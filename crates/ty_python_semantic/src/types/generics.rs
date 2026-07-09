@@ -240,18 +240,16 @@ pub(crate) fn typing_self<'db>(
     )
 }
 
-/// The set of bound typevar occurrences that can be solved by the current inference context.
+/// A set of bound type variable occurrences.
 ///
-/// Membership is keyed by [`BoundTypeVarIdentity`], including any freshness nonce. This lets a
-/// fresh generic-callable occurrence be inferable without making the surrounding source-level
-/// typevar inferable.
+/// Membership is keyed by [`BoundTypeVarIdentity`], including any freshness nonce.
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
-pub(crate) enum InferableTypeVars<'db> {
+pub(crate) enum BoundTypeVarSet<'db> {
     None,
-    Some(InferableTypeVarsInner<'db>),
+    Some(BoundTypeVarSetInner<'db>),
 }
 
-impl<'db> InferableTypeVars<'db> {
+impl<'db> BoundTypeVarSet<'db> {
     pub(crate) fn from_bound_typevars(
         db: &'db dyn Db,
         typevars: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
@@ -270,47 +268,39 @@ impl<'db> InferableTypeVars<'db> {
         mut typevars: FxOrderSet<BoundTypeVarIdentity<'db>>,
     ) -> Self {
         if typevars.is_empty() {
-            return InferableTypeVars::None;
+            return Self::None;
         }
 
         typevars.shrink_to_fit();
-        Self::Some(InferableTypeVarsInner::new_internal(db, typevars))
+        Self::Some(BoundTypeVarSetInner::new_internal(db, typevars))
+    }
+
+    pub(crate) fn contains(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> bool {
+        match self {
+            Self::None => false,
+            Self::Some(inner) => inner.typevars(db).contains(&typevar),
+        }
     }
 }
 
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
-pub(crate) struct InferableTypeVarsInner<'db> {
+pub(crate) struct BoundTypeVarSetInner<'db> {
     #[returns(ref)]
-    inferable: FxOrderSet<BoundTypeVarIdentity<'db>>,
+    typevars: FxOrderSet<BoundTypeVarIdentity<'db>>,
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for InferableTypeVarsInner<'_> {}
-
-impl<'db> BoundTypeVarIdentity<'db> {
-    pub(crate) fn is_inferable(self, db: &'db dyn Db, inferable: InferableTypeVars<'db>) -> bool {
-        match inferable {
-            InferableTypeVars::None => false,
-            InferableTypeVars::Some(inner) => inner.inferable(db).contains(&self),
-        }
-    }
-}
-
-impl<'db> BoundTypeVarInstance<'db> {
-    pub(crate) fn is_inferable(self, db: &'db dyn Db, inferable: InferableTypeVars<'db>) -> bool {
-        self.identity(db).is_inferable(db, inferable)
-    }
-}
+impl get_size2::GetSize for BoundTypeVarSetInner<'_> {}
 
 #[salsa::tracked]
-impl<'db> InferableTypeVars<'db> {
+impl<'db> BoundTypeVarSet<'db> {
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
-            (InferableTypeVars::None, other) | (other, InferableTypeVars::None) => other,
-            (InferableTypeVars::Some(self_inner), InferableTypeVars::Some(other_inner)) => {
-                let merged = self_inner.inferable(db) | other_inner.inferable(db);
-                Self::Some(InferableTypeVarsInner::new_internal(db, merged))
+            (Self::None, other) | (other, Self::None) => other,
+            (Self::Some(self_inner), Self::Some(other_inner)) => {
+                let merged = self_inner.typevars(db) | other_inner.typevars(db);
+                Self::Some(BoundTypeVarSetInner::new_internal(db, merged))
             }
         }
     }
@@ -322,8 +312,8 @@ impl<'db> InferableTypeVars<'db> {
         db: &'db dyn Db,
     ) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> + 'db {
         match self {
-            InferableTypeVars::None => Either::Left(std::iter::empty()),
-            InferableTypeVars::Some(inner) => Either::Right(inner.inferable(db).iter().copied()),
+            Self::None => Either::Left(std::iter::empty()),
+            Self::Some(inner) => Either::Right(inner.typevars(db).iter().copied()),
         }
     }
 
@@ -336,6 +326,32 @@ impl<'db> InferableTypeVars<'db> {
                 .map(|identity| identity.display(db))
                 .format(", ")
         )
+    }
+}
+
+/// The bound type variables that can be solved by the current inference context.
+///
+/// This alias names inference-facing APIs while the underlying set is also used for operations
+/// such as universal quantification.
+pub(crate) type InferableTypeVars<'db> = BoundTypeVarSet<'db>;
+
+impl<'db> BoundTypeVarIdentity<'db> {
+    pub(crate) fn is_in_set(self, db: &'db dyn Db, typevars: BoundTypeVarSet<'db>) -> bool {
+        typevars.contains(db, self)
+    }
+
+    pub(crate) fn is_inferable(self, db: &'db dyn Db, inferable: InferableTypeVars<'db>) -> bool {
+        inferable.contains(db, self)
+    }
+}
+
+impl<'db> BoundTypeVarInstance<'db> {
+    pub(crate) fn is_in_set(self, db: &'db dyn Db, typevars: BoundTypeVarSet<'db>) -> bool {
+        self.identity(db).is_in_set(db, typevars)
+    }
+
+    pub(crate) fn is_inferable(self, db: &'db dyn Db, inferable: InferableTypeVars<'db>) -> bool {
+        self.identity(db).is_inferable(db, inferable)
     }
 }
 
