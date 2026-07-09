@@ -16,7 +16,6 @@ ruff_source_file = { workspace = true, features = ["serde"] }
 ruff_text_size = { workspace = true }
 
 anyhow = { workspace = true }
-itertools = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
