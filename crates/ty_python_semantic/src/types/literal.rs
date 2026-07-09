@@ -10,14 +10,14 @@ use ty_python_core::definition::Definition;
 use ty_python_core::{place_table, use_def_map};
 
 /// A literal value. See [`LiteralValueTypeKind`] for details.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct LiteralValueType<'db>(LiteralValueTypeInner<'db>);
 
 /// Each variant carries a [`LiteralFlags`] byte alongside its payload.
 /// Because the flags byte fits into the padding between the enum discriminant
 /// (1 byte) and the 4-byte-aligned payload, the overall size of this enum
 /// stays at 12 bytes, the same as the original flagless representation.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 enum LiteralValueTypeInner<'db> {
     Int(IntLiteralType, LiteralFlags),
     Bool(bool, LiteralFlags),
@@ -32,7 +32,7 @@ bitflags! {
     ///
     /// Stored in each [`LiteralValueTypeInner`] variant, fitting into the
     /// discriminant's padding so that the enum size is unchanged.
-    #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+    #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
     struct LiteralFlags: u8 {
         const PROMOTABLE = 1 << 0;
         const RECURSIVELY_DEFINED = 1 << 1;
@@ -72,7 +72,7 @@ impl LiteralFlags {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum LiteralValueTypeKind<'db> {
     /// An integer literal
     Int(IntLiteralType),
@@ -298,7 +298,7 @@ impl<'db> From<LiteralValueType<'db>> for Type<'db> {
 
 // This type has the same alignment as `salsa::Id`, allowing `LiteralValueType` to use a smaller
 // discriminant.
-#[derive(Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) struct IntLiteralType {
     high: u32,
     low: u32,
@@ -387,6 +387,7 @@ impl<'db> BytesLiteralType<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct EnumLiteralType<'db> {
     /// The enum class this literal belongs to.
+    #[returns(copy)]
     pub(crate) enum_class_literal: EnumClassLiteral<'db>,
     /// The name of the enum member
     #[returns(ref)]

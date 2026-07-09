@@ -416,6 +416,7 @@ pub struct CallableType<'db> {
     #[returns(ref)]
     pub(crate) signatures: CallableSignature<'db>,
 
+    #[returns(copy)]
     pub(super) kind: CallableTypeKind,
 
     /// Source-function return-annotation provenance retained by this callable.
@@ -430,6 +431,7 @@ pub struct CallableType<'db> {
     /// ```python
     /// def decorator_factory() -> Callable[[type[object]], object]: ...
     /// ```
+    #[returns(copy)]
     pub(crate) provenance: CallableFunctionProvenance,
 }
 
@@ -662,7 +664,7 @@ impl<'db> CallableType<'db> {
 ///
 /// Note that this type is guaranteed to contain at least one callable. If you need to support "no
 /// callables" as a possibility, use `Option<CallableTypes>`.
-#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct CallableTypes<'db>(SmallVec<[CallableType<'db>; 1]>);
 
 impl<'db> CallableTypes<'db> {

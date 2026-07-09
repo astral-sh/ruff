@@ -22,6 +22,7 @@ use crate::{Db, SemanticModel};
 pub(crate) struct ModelMetadata<'db> {
     #[returns(deref)]
     pub(in crate::types) field_specifiers: Box<[Type<'db>]>,
+    #[returns(copy)]
     config: ModelConfig,
 }
 
@@ -316,7 +317,7 @@ pub(in crate::types) fn field_metadata<'db>(
     metadata
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) struct ModelConfig {
     /// The `extra` configuration controls whether the synthesized constructor accepts keyword
     /// arguments that do not correspond to declared model fields.
@@ -353,7 +354,7 @@ impl ModelConfig {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 enum ExtraBehavior {
     Allow,
     Forbid,
@@ -372,7 +373,7 @@ impl ExtraBehavior {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum ConfigBoolean {
     /// No value was specified at this precedence level, so a lower-precedence value can apply.
     #[default]
@@ -458,7 +459,7 @@ pub(in crate::types) fn constructor_fields_are_keyword_only(
     !is_root_model(db, class)
 }
 
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn is_root_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
     class
         .iter_mro(db, None)
@@ -480,7 +481,7 @@ pub(in crate::types) fn constructor_fields_are_optional(
         .any(|base| base.is_known(db, KnownClass::PydanticBaseSettings))
 }
 
-#[salsa::tracked(
+#[salsa::tracked(returns(copy),
     cycle_initial=|_, _, _| ModelConfig::unknown(),
     heap_size=ruff_memory_usage::heap_size,
 )]

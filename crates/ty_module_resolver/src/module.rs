@@ -12,7 +12,7 @@ use crate::module_name::ModuleName;
 use crate::path::{SearchPath, SystemOrVendoredPathRef};
 
 /// Representation of a Python module.
-#[derive(Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype, salsa::SalsaValue)]
 pub enum Module<'db> {
     File(FileModule<'db>),
     Namespace(NamespacePackage<'db>),
@@ -256,10 +256,13 @@ fn all_submodule_names_for_package<'db>(
 pub struct FileModule<'db> {
     #[returns(ref)]
     pub(super) name: ModuleName,
+    #[returns(copy)]
     pub(super) kind: ModuleKind,
     #[returns(ref)]
     pub(super) search_path: SearchPath,
+    #[returns(copy)]
     pub(super) file: File,
+    #[returns(copy)]
     pub(super) known: Option<KnownModule>,
 }
 

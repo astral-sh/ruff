@@ -24,9 +24,11 @@ use crate::{
 pub struct BoundMethodType<'db> {
     /// The function that is being bound. Corresponds to the `__func__` attribute on a
     /// bound method object
+    #[returns(copy)]
     pub(crate) function: FunctionType<'db>,
     /// The instance on which this method has been called. Corresponds to the `__self__`
     /// attribute on a bound method object
+    #[returns(copy)]
     pub(super) self_instance: Type<'db>,
 }
 
@@ -63,7 +65,7 @@ impl<'db> BoundMethodType<'db> {
         Self::new(db, self.function(db), f(self.self_instance(db)))
     }
 
-    #[salsa::tracked(
+    #[salsa::tracked(returns(copy),
         cycle_initial=|db, _, _| CallableType::bottom(db),
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -150,7 +152,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 ///
 /// Unlike bound methods of user-defined classes, these are not generally instances
 /// of `types.BoundMethodType` at runtime.
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum KnownBoundMethodType<'db> {
     /// Method wrapper for `some_function.__get__`
     FunctionTypeDunderGet(FunctionType<'db>),
@@ -554,7 +556,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 }
 
 /// Represents a specific instance of `types.WrapperDescriptorType`
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize)]
 pub enum WrapperDescriptorKind {
     /// `FunctionType.__get__`
     FunctionTypeDunderGet,

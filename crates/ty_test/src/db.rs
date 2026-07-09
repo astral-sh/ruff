@@ -227,6 +227,7 @@ struct Settings {
     #[returns(deref)]
     rule_selection: MdtestRuleSelection,
     #[default]
+    #[returns(copy)]
     verbose: bool,
 }
 

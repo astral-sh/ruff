@@ -344,10 +344,12 @@ pub struct File {
     /// The unix permissions of the file. Only supported on unix systems. Always `None` on Windows
     /// or when the file has been deleted.
     #[default]
+    #[returns(copy)]
     pub permissions: Option<u32>,
 
     /// The path revision. A file or directory has changed if the revisions don't compare equal.
     #[default]
+    #[returns(copy)]
     pub revision: FileRevision,
 
     /// The status of the file.
@@ -355,6 +357,7 @@ pub struct File {
     /// Salsa doesn't support deleting inputs. The only way to signal dependent queries that
     /// the file has been deleted is to change the status to `Deleted`.
     #[default]
+    #[returns(copy)]
     pub status: FileStatus,
 
     /// Overrides the result of [`source_text`](crate::source::source_text).

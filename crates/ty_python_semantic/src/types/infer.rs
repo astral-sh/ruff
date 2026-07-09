@@ -78,7 +78,7 @@ mod tests;
 
 bitflags::bitflags! {
     /// Metadata for expressions inferred as type expressions.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, salsa::Update)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
     pub(crate) struct TypeExpressionFlags: u8 {
         /// The expression is syntactically an `Unpack[...]` type expression.
         const UNPACK = 1 << 0;
@@ -87,7 +87,7 @@ bitflags::bitflags! {
 
 impl get_size2::GetSize for TypeExpressionFlags {}
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 struct TypeAndRange<'db> {
     ty: Type<'db>,
     range: TextRange,
@@ -206,7 +206,7 @@ pub(crate) fn function_known_decorator_flags<'db>(
 /// Unlike [`DefinitionInference`], this stores only decorator expression types and
 /// diagnostics, plus the expression-side state that needs to be merged back into
 /// function-definition inference.
-#[derive(Debug, Eq, PartialEq, Default, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Eq, PartialEq, Default, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct FunctionDecoratorInference<'db> {
     expression_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
@@ -435,7 +435,7 @@ pub(crate) fn infer_expression_type<'db>(
     infer_expression_type_impl(db, InferExpression::new(db, expression, tcx))
 }
 
-#[salsa::tracked(
+#[salsa::tracked(returns(copy),
     cycle_initial=|_, id, _| Type::divergent(id),
     cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _| {
         result.cycle_normalized(db, *previous, cycle)
@@ -506,7 +506,7 @@ fn infer_statement_types_impl<'db>(
 ///
 /// This is a Salsa supertype used as the input to `infer_expression_types` to avoid
 /// interning an `ExpressionWithContext` unnecessarily when no type context is provided.
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update)]
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype)]
 pub(super) enum InferExpression<'db> {
     Bare(Expression<'db>),
     WithContext(ExpressionWithContext<'db>),
@@ -514,7 +514,9 @@ pub(super) enum InferExpression<'db> {
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(super) struct ExpressionWithContext<'db> {
+    #[returns(copy)]
     expression: Expression<'db>,
+    #[returns(copy)]
     tcx: TypeContext<'db>,
 }
 
@@ -543,7 +545,7 @@ impl<'db> InferExpression<'db> {
 }
 
 /// A `ScopeId` with an optional `TypeContext`.
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update)]
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype)]
 pub(super) enum InferScope<'db> {
     Bare(ScopeId<'db>),
     WithContext(ScopeWithContext<'db>),
@@ -551,7 +553,9 @@ pub(super) enum InferScope<'db> {
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(super) struct ScopeWithContext<'db> {
+    #[returns(copy)]
     scope: ScopeId<'db>,
+    #[returns(copy)]
     tcx: TypeContext<'db>,
 }
 
@@ -583,7 +587,9 @@ impl<'db> InferScope<'db> {
 ///
 /// Knowing the outer type context when inferring an expression can enable
 /// more precise inference results, aka "bidirectional type inference".
-#[derive(Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
+#[derive(
+    Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue,
+)]
 pub(crate) struct TypeContext<'db> {
     pub(crate) annotation: Option<Type<'db>>,
 }
@@ -769,7 +775,7 @@ impl<'db> InferenceRegion<'db> {
 }
 
 /// The inferred types for a scope region.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct ScopeInference<'db> {
     /// The types of every expression in this region.
     expressions: FrozenValueMap<ExpressionNodeKey, Type<'db>>,
@@ -778,7 +784,7 @@ pub(crate) struct ScopeInference<'db> {
     extra: Option<Box<ScopeInferenceExtra<'db>>>,
 }
 
-#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ScopeInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
@@ -900,7 +906,7 @@ impl<'db> ScopeInference<'db> {
 }
 
 /// The result of inferring a declaration recorded by the semantic index.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, get_size2::GetSize)]
 pub(crate) enum InferredDeclaration<'db> {
     /// A valid declaration with an inferred declared type.
     Declared(TypeAndQualifiers<'db>),
@@ -921,7 +927,7 @@ impl<'db> InferredDeclaration<'db> {
 }
 
 /// The inferred types for a definition region.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct DefinitionInference<'db> {
     /// The types of every expression in this region.
     expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
@@ -941,7 +947,7 @@ pub(crate) struct DefinitionInference<'db> {
 ///
 /// Almost all regions contain a single binding, optionally paired with a declaration for the same
 /// definition and type. Keep those cases inline instead of retaining separate allocations.
-#[derive(Debug, Default, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Default, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 enum DefinitionTypes<'db> {
     #[default]
     Empty,
@@ -954,7 +960,7 @@ enum DefinitionTypes<'db> {
 type DefinitionBinding<'db> = (Definition<'db>, Type<'db>);
 type DefinitionDeclaration<'db> = (Definition<'db>, TypeAndQualifiers<'db>);
 
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 struct OtherDefinitionTypes<'db> {
     bindings: Box<[DefinitionBinding<'db>]>,
     declarations: Box<[DefinitionDeclaration<'db>]>,
@@ -1132,7 +1138,7 @@ impl<'db> DefinitionTypes<'db> {
 
 /// Compact representations for common combinations of extra definition inference data.
 /// `Other` stores uncommon combinations that require multiple fields.
-#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 enum DefinitionInferenceExtra<'db> {
     /// Type qualifiers are the only extra data for most annotated definitions.
     Qualifiers(FrozenMap<ExpressionNodeKey, TypeQualifiers>),
@@ -1158,13 +1164,13 @@ enum DefinitionInferenceExtra<'db> {
     Other(Box<OtherDefinitionInferenceExtra<'db>>),
 }
 
-#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 struct DeferredAndUndecorated<'db> {
     deferred: Box<[Definition<'db>]>,
     undecorated_type: Type<'db>,
 }
 
-#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct OtherDefinitionInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
@@ -1495,7 +1501,7 @@ impl<'db> DefinitionInference<'db> {
 }
 
 /// The inferred types for an expression region.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct ExpressionInference<'db> {
     /// The types of every expression in this region.
     expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
@@ -1508,7 +1514,7 @@ pub(crate) struct ExpressionInference<'db> {
 }
 
 /// Extra data that only exists for few inferred expression regions.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize, Default)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ExpressionInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
@@ -1657,7 +1663,7 @@ impl<'db> StatementInference<'db> {
 }
 
 /// The inferred types for a statement region.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct StatementInferenceInner<'db> {
     /// The types of every expression in this region.
     expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
@@ -1676,7 +1682,7 @@ pub(crate) struct StatementInferenceInner<'db> {
     extra: Option<Box<StatementInferenceInnerExtra<'db>>>,
 }
 
-#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct StatementInferenceInnerExtra<'db> {
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,

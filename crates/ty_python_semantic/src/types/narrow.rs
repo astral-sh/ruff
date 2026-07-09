@@ -172,7 +172,7 @@ fn all_narrowing_constraints_for_subject_element_pattern<'db>(
 /// This positive structural analysis infers the type of each supported name bound by a successful
 /// pattern. Definite-match analysis, which is used for negative narrowing and exhaustiveness,
 /// intentionally remains separate.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct PatternSuccessTypes<'db> {
     bindings: FrozenMap<ScopedPlaceId, Type<'db>>,
     missing_binding_ty: Type<'db>,
@@ -603,7 +603,7 @@ impl ClassInfoConstraintFunction {
     }
 }
 
-#[derive(Hash, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
+#[derive(Hash, PartialEq, Debug, Eq, Clone, get_size2::GetSize, salsa::SalsaValue)]
 struct Conjunctions<'db> {
     conjuncts: SmallVec<[Type<'db>; 2]>,
 }
@@ -661,7 +661,7 @@ impl<'db> Conjunctions<'db> {
 ///   ===> `NarrowingConstraint { intersection_disjuncts: [], replacement_disjuncts: [B] }`
 ///   => `NarrowingConstraint { intersection_disjuncts: [A], replacement_disjuncts: [B] }`
 ///   => evaluates to `(P & A) | B`, where `P` is our previously-known type
-#[derive(Hash, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
+#[derive(Hash, PartialEq, Debug, Eq, Clone, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct NarrowingConstraint<'db> {
     /// Intersection constraint (from `isinstance()` narrowing comparisons, `TypeIs`, and
     /// similar). We keep these as a disjunction of conjunctions to avoid constructing
@@ -817,7 +817,7 @@ impl<'db> PatternNarrowingResult<'db> {
     }
 }
 
-#[derive(Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct ExpressionNarrowingConstraints<'db> {
     positive: Option<FrozenNarrowingConstraints<'db>>,
     negative: Option<FrozenNarrowingConstraints<'db>>,

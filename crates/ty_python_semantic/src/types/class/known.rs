@@ -1127,10 +1127,11 @@ impl KnownClass {
     ) -> Result<Option<StaticClassLiteral<'_>>, KnownClassLookupError<'_>> {
         #[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
         struct KnownClassArgument {
+            #[returns(copy)]
             class: KnownClass,
         }
 
-        #[salsa::tracked(cycle_initial=|_, _, _| Ok(None), heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| Ok(None), heap_size=ruff_memory_usage::heap_size)]
         fn known_class_to_class_literal<'db>(
             db: &'db dyn Db,
             class: KnownClassArgument<'db>,
@@ -1974,7 +1975,7 @@ impl KnownClass {
 }
 
 /// Enumeration of ways in which looking up a [`KnownClass`] in its canonical module could fail.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum KnownClassLookupError<'db> {
     /// There is no symbol by that name in the expected module.
     ClassNotFound { third_party: bool },

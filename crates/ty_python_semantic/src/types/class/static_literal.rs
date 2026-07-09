@@ -78,31 +78,42 @@ pub struct StaticClassLiteral<'db> {
     #[returns(ref)]
     pub(crate) name: Name,
 
+    #[returns(copy)]
     pub(crate) body_scope: ScopeId<'db>,
 
+    #[returns(copy)]
     pub(crate) known: Option<KnownClass>,
 
     /// If this class is deprecated, this holds the deprecation message.
+    #[returns(copy)]
     pub(crate) deprecated: Option<DeprecatedInstance<'db>>,
 
+    #[returns(copy)]
     pub(crate) type_check_only: bool,
 
+    #[returns(copy)]
     pub(crate) dataclass_params: Option<DataclassParams<'db>>,
+    #[returns(copy)]
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams<'db>>,
 
     /// Whether this class is decorated with `@functools.total_ordering`
+    #[returns(copy)]
     pub(crate) total_ordering: bool,
 
     /// Whether this class has any decorators.
+    #[returns(copy)]
     pub(crate) has_decorators: bool,
 
     /// Whether this class has PEP 695 type parameters.
+    #[returns(copy)]
     pub(crate) has_type_params: bool,
 
     /// Whether this class has any explicit base classes.
+    #[returns(copy)]
     pub(crate) has_explicit_bases: bool,
 
     /// Whether this class has an explicit `metaclass` keyword argument.
+    #[returns(copy)]
     pub(crate) has_explicit_metaclass: bool,
 }
 
@@ -179,7 +190,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// Returns `true` if this class defines any ordering method (`__lt__`, `__le__`, `__gt__`,
     /// `__ge__`) in its own body (not inherited). Used by `@total_ordering` to determine if
     /// synthesis is valid.
-    #[salsa::tracked]
+    #[salsa::tracked(returns(copy))]
     pub(crate) fn has_own_ordering_method(self, db: &'db dyn Db) -> bool {
         let body_scope = self.body_scope(db);
         ["__lt__", "__le__", "__gt__", "__ge__"]
@@ -187,7 +198,7 @@ impl<'db> StaticClassLiteral<'db> {
             .any(|method| !class_member(db, body_scope, method).is_undefined())
     }
 
-    #[salsa::tracked]
+    #[salsa::tracked(returns(copy))]
     pub(crate) fn has_own_comparison_methods(self, db: &'db dyn Db) -> bool {
         let body_scope = self.body_scope(db);
         ["__lt__", "__le__", "__gt__", "__ge__"]
@@ -285,7 +296,7 @@ impl<'db> StaticClassLiteral<'db> {
         self.pep695_generic_context_inner(db)
     }
 
-    #[salsa::tracked(
+    #[salsa::tracked(returns(copy),
         cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size,
     )]
@@ -315,7 +326,7 @@ impl<'db> StaticClassLiteral<'db> {
         self,
         db: &'db dyn Db,
     ) -> Option<GenericContext<'db>> {
-        #[salsa::tracked(
+        #[salsa::tracked(returns(copy),
             cycle_initial=|_, _, _| None,
             heap_size=ruff_memory_usage::heap_size,
         )]
@@ -702,7 +713,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     /// Return the properties that affect how instances of this class are represented.
     pub(super) fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
-        #[salsa::tracked(
+        #[salsa::tracked(returns(copy),
             cycle_initial=|_, _, _| ClassInstanceFlags::empty(),
             heap_size=ruff_memory_usage::heap_size,
         )]
@@ -737,7 +748,7 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     /// Return the module defining the `TypedDict` base of this class.
-    #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn typed_dict_module(self, db: &'db dyn Db) -> Option<TypedDictModule> {
         self.iter_mro(db, None)
             .find_map(ClassBase::typed_dict_module)
@@ -932,7 +943,7 @@ impl<'db> StaticClassLiteral<'db> {
         self,
         db: &'db dyn Db,
     ) -> Result<(Type<'db>, Option<MetaclassTransformInfo<'db>>), MetaclassError<'db>> {
-        #[salsa::tracked(
+        #[salsa::tracked(returns(clone),
             cycle_initial=|_, _, _| Err(MetaclassError {
                 kind: MetaclassErrorKind::Cycle,
             }),
@@ -2358,7 +2369,7 @@ impl<'db> StaticClassLiteral<'db> {
         )
     }
 
-    #[salsa::tracked(
+    #[salsa::tracked(returns(copy),
         cycle_fn=implicit_attribute_cycle_recover,
         cycle_initial=|_, id, _| Member {
             inner: Place::bound(Type::divergent(id)).into(),
@@ -2940,7 +2951,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// A class definition like this will fail at runtime,
     /// but we must be resilient to it or we could panic.
     pub(crate) fn inheritance_cycle(self, db: &'db dyn Db) -> Option<InheritanceCycle> {
-        #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn inheritance_cycle_inner<'db>(
             db: &'db dyn Db,
             class: StaticClassLiteral<'db>,
@@ -3146,7 +3157,7 @@ fn expanded_fixed_length_starred_class_base_tuple<'db>(
 
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
-    #[salsa::tracked(cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         let typevar_in_generic_context = self
             .generic_context(db)
@@ -3337,9 +3348,11 @@ fn explicit_bases_cycle_fn<'db>(
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct ImplicitAttributeName<'db> {
+    #[returns(copy)]
     class_body_scope: ScopeId<'db>,
     #[returns(deref)]
     name: CompactString,
+    #[returns(copy)]
     target_method_decorator: MethodDecorator,
 }
 

@@ -29,7 +29,7 @@ use ty_python_core::{definition::DefinitionKind, place_table, scope::ScopeId, us
 /// Standard-library methods and user-defined methods are both callable functions, but callers need
 /// to distinguish them: standard-library methods have modeled behavior, while user-defined or
 /// opaque methods may replace the member value arbitrarily.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, salsa::SalsaValue)]
 pub(super) enum ResolvedEnumMethod<'db> {
     #[default]
     Absent,
@@ -50,7 +50,7 @@ pub(super) enum ResolvedEnumMethod<'db> {
 ///
 /// User-defined data types are excluded because their construction, attribute access, equality, and
 /// hashing semantics can differ from the built-in scalar later in their MRO.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum KnownEnumDataTypeMixin {
     Int,
     Str,
@@ -110,7 +110,7 @@ impl<'db> ResolvedEnumMethod<'db> {
 /// Different consumers require different levels of conservatism. Value inference trusts known
 /// standard-library data types but treats user-defined data types and constructors as possible
 /// transformations, while alias detection follows the value captured before `__init__`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, salsa::SalsaValue)]
 pub(super) struct EnumValueConstruction<'db> {
     pub(super) init: ResolvedEnumMethod<'db>,
     pub(super) new: ResolvedEnumMethod<'db>,
@@ -205,7 +205,7 @@ impl<'db> EnumValueConstruction<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::SalsaValue)]
 enum EnumValueAnnotation<'db> {
     /// An annotation declared on this enum or a user-defined parent enum.
     UserDefined(Type<'db>),
@@ -221,7 +221,7 @@ impl<'db> EnumValueAnnotation<'db> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, salsa::Update)]
+#[derive(Debug, PartialEq, Eq, salsa::SalsaValue)]
 pub(crate) struct EnumMetadata<'db> {
     pub(crate) members: FxIndexMap<Name, Type<'db>>,
     pub(crate) aliases: FxHashMap<Name, Name>,
@@ -280,18 +280,21 @@ pub(super) fn class_defines_property<'db>(
 /// the underlying class literal.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct EnumClassLiteral<'db> {
+    #[returns(copy)]
     pub(crate) class_literal: ClassLiteral<'db>,
     #[returns(ref)]
     pub(crate) members: Box<[(Name, Type<'db>)]>,
     #[returns(ref)]
     pub(crate) aliases: Box<[(Name, Name)]>,
     /// Whether the canonical member and alias sets are known exactly.
+    #[returns(copy)]
     pub(super) aliases_are_known: bool,
     /// Whether the canonical members exhaust the runtime values of this enum class.
     ///
     /// `Flag` classes, transforming metaclasses, and enums with a custom `_missing_` method can
     /// create runtime members beyond those declared in the class body, so their declared members
     /// are not a closed value set.
+    #[returns(copy)]
     pub(crate) members_are_exhaustive: bool,
 }
 
@@ -304,7 +307,7 @@ impl<'db> ClassLiteral<'db> {
     }
 }
 
-#[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 fn enum_class_literal<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
@@ -639,6 +642,7 @@ impl<'db> EnumMetadata<'db> {
 /// ```
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct EnumComplementType<'db> {
+    #[returns(copy)]
     pub(crate) enum_class_literal: EnumClassLiteral<'db>,
     /// Canonical enum-member names excluded by this complement.
     #[returns(ref)]
@@ -1321,7 +1325,7 @@ fn inherited_user_defined_value_annotation<'db>(
         .find_map(|base| custom_value_annotation(db, base.body_scope(db)))
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum InheritedEnumDataType {
     #[default]
     None,

@@ -110,13 +110,16 @@ pub struct Project {
     /// This changes the behavior of `check` to either check only the open files or all files in
     /// the project including the virtual files that might exists in the editor.
     #[default]
+    #[returns(copy)]
     check_mode: CheckMode,
 
     #[default]
+    #[returns(copy)]
     verbose_flag: bool,
 
     /// Whether to enforce exclusion rules even to files explicitly passed to ty on the command line.
     #[default]
+    #[returns(copy)]
     force_exclude_flag: bool,
 }
 
