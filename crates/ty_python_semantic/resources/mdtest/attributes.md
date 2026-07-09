@@ -1821,8 +1821,9 @@ reveal_type(InfersInheritedAssignment.inherited_assignment)  # revealed: str
 reveal_type(InfersInheritedAssignment().inherited_assignment)  # revealed: str
 ```
 
-A metaclass initializer runs after the class body has populated the initial namespace. Its write
-therefore takes precedence over a plain inferred class-body value:
+Class-object lookup gives a metaclass initializer's inferred write precedence over a plain inferred
+class-body value. Instance lookup remains conservative because we do not prove that the initializer
+definitely performs the write:
 
 ```py
 class ReplacingOwnBindingMeta(type):
@@ -1830,10 +1831,12 @@ class ReplacingOwnBindingMeta(type):
         cls.replaced: int = 1
 
 class HasReplacedOwnBinding(metaclass=ReplacingOwnBindingMeta):
-    replaced = True
+    # error: [invalid-assignment]
+    replaced = "initial"
 
 reveal_type(HasReplacedOwnBinding.replaced)  # revealed: int
-reveal_type(HasReplacedOwnBinding().replaced)  # revealed: int
+# TODO: Once we track definite initialization, this should narrow to `int`.
+reveal_type(HasReplacedOwnBinding().replaced)  # revealed: int | str
 ```
 
 When the constructed class inherits an attribute with the same name, lookup through an instance uses
