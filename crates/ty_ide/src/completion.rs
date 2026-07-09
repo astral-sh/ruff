@@ -19,7 +19,8 @@ use ty_module_resolver::{KnownModule, Module, ModuleName};
 use ty_python_semantic::HasType;
 use ty_python_semantic::types::{SpecialFormType, UnionType};
 use ty_python_semantic::{
-    Completion as SemanticCompletion, NameKind, SemanticModel,
+    Completion as SemanticCompletion, CompletionName as SemanticCompletionName, NameKind,
+    SemanticModel,
     types::{CycleDetector, KnownClass, Type},
 };
 
@@ -285,7 +286,7 @@ impl<'db> Extend<CompletionBuilder<'db>> for Completions<'db> {
 #[derive(Clone, Debug)]
 pub struct Completion<'db> {
     /// The name used when matching the query and ranking this suggestion.
-    pub name: Name,
+    pub name: SemanticCompletionName<'db>,
     /// The label shown to the user for this suggestion.
     pub label: CompactString,
     /// The fully qualified name, when available.
@@ -362,7 +363,7 @@ impl<'db> Completion<'db> {
 #[expect(clippy::struct_excessive_bools)]
 struct CompletionBuilder<'db> {
     // See comments on `Completion` for the meaning of fields.
-    name: Name,
+    name: SemanticCompletionName<'db>,
     qualified: Option<CompactString>,
     insert: Option<CompactString>,
     ty: Option<Type<'db>>,
@@ -384,8 +385,12 @@ impl<'db> CompletionBuilder<'db> {
     /// valid, but callers will generally want to fill in as much
     /// as is appropriate.
     fn new(name: impl Into<Name>) -> CompletionBuilder<'db> {
+        Self::from_name(SemanticCompletionName::Name(name.into()))
+    }
+
+    fn from_name(name: SemanticCompletionName<'db>) -> CompletionBuilder<'db> {
         CompletionBuilder {
-            name: name.into(),
+            name,
             qualified: None,
             insert: None,
             ty: None,
@@ -407,7 +412,7 @@ impl<'db> CompletionBuilder<'db> {
     ) -> CompletionBuilder<'db> {
         let definition = semantic.ty.and_then(|ty| Definitions::from_ty(db, ty));
         let documentation = definition.and_then(|def| def.docstring(db));
-        Completion::builder(semantic.name)
+        CompletionBuilder::from_name(semantic.name)
             .ty(semantic.ty)
             .builtin(semantic.builtin)
             .docstring(documentation)
@@ -1589,7 +1594,7 @@ impl<'db> CollectionContext<'db> {
         // Exclude classes that are already listed as base classes in the class definition.
         if let Some(ref existing_class_bases) = self.existing_class_bases {
             // For in-scope completions, check if the simple name matches.
-            if builder.import.is_none() && existing_class_bases.contains(&builder.name) {
+            if builder.import.is_none() && existing_class_bases.contains(builder.name.as_str()) {
                 return true;
             }
             // For auto-import completions, check if the qualified name matches.
@@ -1712,7 +1717,7 @@ impl Relevance {
             } else {
                 Sort::Even
             },
-            name_kind: NameKind::classify(&c.name),
+            name_kind: NameKind::classify(c.name.as_str()),
             is_in_scope: if c.module_dependency_kind == Some(ModuleDependencyKind::Current) {
                 Sort::Higher
             } else {
