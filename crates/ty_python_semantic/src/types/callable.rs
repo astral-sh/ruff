@@ -743,7 +743,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         self.check_callable_signature_pair(db, source.signatures(db), target.signatures(db))
     }
 
-    /// Unifies the retained generic contexts of two callable-shaped ParamSpec values.
+    /// Unifies the retained generic contexts of two callable-shaped `ParamSpec` values.
     fn check_paramspec_value_pair(
         &self,
         db: &'db dyn Db,

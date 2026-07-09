@@ -1250,7 +1250,7 @@ impl<'db> Signature<'db> {
 
     /// Returns the PEP 695 type variables lexically bound by this function.
     ///
-    /// Legacy variables, caller-owned inference variables, `Self`, and ParamSpecs retain the
+    /// Legacy variables, caller-owned inference variables, `Self`, and `ParamSpec`s retain the
     /// existing callable relation until their binder ownership can be represented precisely.
     fn higher_rank_typevars(
         &self,
