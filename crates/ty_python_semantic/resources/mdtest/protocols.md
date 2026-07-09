@@ -3284,6 +3284,12 @@ class ObjectConsumer:
     def f(self, value: object) -> None:
         return None
 
+class EmptyProtocol(Protocol): ...
+
+class EmptyProtocolConsumer:
+    def f(self, value: EmptyProtocol) -> None:
+        return None
+
 type ObjectAlias = object
 
 class AliasedOptionalConsumer:
@@ -3353,6 +3359,10 @@ class IntersectionSequenceSource:
 # A non-generic source is valid when its single signature covers every target specialization.
 static_assert(is_assignable_to(ObjectConsumer, ArbitraryConsumerProtocol))
 static_assert(is_subtype_of(ObjectConsumer, ArbitraryConsumerProtocol))
+
+# An empty protocol is equivalent to `object` and accepts every target specialization.
+static_assert(is_assignable_to(EmptyProtocolConsumer, ArbitraryConsumerProtocol))
+static_assert(is_subtype_of(EmptyProtocolConsumer, ArbitraryConsumerProtocol))
 
 # Alias transparency is preserved inside a union before the target variable is quantified.
 static_assert(is_assignable_to(AliasedOptionalConsumer, ArbitraryConsumerProtocol))

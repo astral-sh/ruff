@@ -1141,6 +1141,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             });
         }
 
+        // These targets accept every source type. Preserve that unconditional relation for a
+        // universal variable before lazy evaluation turns the comparison into a constraint.
+        // Other inferable variables still need the constraint for specialization inference.
+        if let Type::TypeVar(typevar) = source
+            && self.is_universally_quantified(db, typevar)
+            && (target.is_object()
+                || matches!(
+                    target,
+                    Type::ProtocolInstance(protocol) if protocol.is_equivalent_to_object(db)
+                ))
+        {
+            return self.always();
+        }
+
         let should_expand_intersection = |intersection: IntersectionType<'db>| {
             intersection
                 .positive(db)
