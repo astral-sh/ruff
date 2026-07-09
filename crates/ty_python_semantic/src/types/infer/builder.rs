@@ -2857,7 +2857,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }),
                     ..
                 }) = assignment_attribute_members(db, object_ty, attribute)
-                    .map(|(meta_attr, _)| meta_attr)
+                    .and_then(|members| members.primary())
                 {
                     let attr_ty = attr_ty.bind_self_typevars(db, object_ty);
                     let delete_dunder_call_result = attr_ty.try_call_dunder(

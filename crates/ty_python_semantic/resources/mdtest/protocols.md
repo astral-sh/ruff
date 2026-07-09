@@ -1866,6 +1866,27 @@ class ClassVarX:
 
 static_assert(is_assignable_to(ClassVarX, ClassVarXProto))
 static_assert(is_subtype_of(ClassVarX, ClassVarXProto))
+
+class XMeta(type):
+    def x(cls) -> str:
+        return ""
+
+class ClassVarXWithConflictingMetaclass(metaclass=XMeta):
+    x: ClassVar[int] = 42
+
+static_assert(is_assignable_to(ClassVarXWithConflictingMetaclass, ClassVarXProto))
+static_assert(is_subtype_of(ClassVarXWithConflictingMetaclass, ClassVarXProto))
+
+# A class-level attribute shadows a non-data descriptor on the metaclass. In particular,
+# `NotHashable.__hash__` takes precedence over the non-data `type.__hash__` descriptor.
+class NotHashableProto(Protocol):
+    __hash__: ClassVar[None]
+
+class NotHashable:
+    __hash__: ClassVar[None] = None
+
+static_assert(is_assignable_to(NotHashable, NotHashableProto))
+static_assert(is_subtype_of(NotHashable, NotHashableProto))
 ```
 
 This is mentioned by the

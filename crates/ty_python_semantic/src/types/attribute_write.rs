@@ -143,6 +143,35 @@ pub(super) enum FallbackAttributeWriteRequirement<'db> {
     PossiblyMissing,
 }
 
+/// The members that can govern an attribute write.
+pub(super) enum AssignmentAttributeMembers<'db> {
+    /// The primary lookup result governs the write, together with a fallback when it may be
+    /// missing.
+    Primary {
+        member: PlaceAndQualifiers<'db>,
+        fallback: Option<PlaceAndQualifiers<'db>>,
+    },
+    /// A class member shadows a metaclass member that is definitely non-data.
+    ShadowingClassMember(PlaceAndQualifiers<'db>),
+}
+
+impl<'db> AssignmentAttributeMembers<'db> {
+    pub(super) fn primary(self) -> Option<PlaceAndQualifiers<'db>> {
+        match self {
+            Self::Primary { member, .. } => Some(member),
+            Self::ShadowingClassMember(_) => None,
+        }
+    }
+
+    pub(super) fn effective_members(self) -> impl Iterator<Item = PlaceAndQualifiers<'db>> {
+        let members = match self {
+            Self::Primary { member, fallback } => [Some(member), fallback],
+            Self::ShadowingClassMember(member) => [Some(member), None],
+        };
+        members.into_iter().flatten()
+    }
+}
+
 /// Resolve the receiver-level requirements for writing `object_ty.attribute`.
 ///
 /// This expands aliases, preserves the all-arms rule for unions and the any-positive-arm rule for
@@ -259,9 +288,16 @@ fn instance_attribute_write_member_requirement<'db>(
     object_ty: Type<'db>,
     attribute: &str,
 ) -> InstanceAttributeWriteMember<'db> {
-    let Some((meta_attr, fallback_attr)) = assignment_attribute_members(db, object_ty, attribute)
-    else {
+    let Some(members) = assignment_attribute_members(db, object_ty, attribute) else {
         return InstanceAttributeWriteMember::SetAttr;
+    };
+    let (meta_attr, fallback_attr) = match members {
+        AssignmentAttributeMembers::Primary { member, fallback } => (member, fallback),
+        AssignmentAttributeMembers::ShadowingClassMember(fallback) => {
+            return InstanceAttributeWriteMember::Instance(instance_fallback_write_requirement(
+                db, object_ty, attribute, fallback,
+            ));
+        }
     };
 
     match meta_attr {
@@ -307,12 +343,22 @@ fn class_attribute_write_requirement<'db>(
     object_ty: Type<'db>,
     attribute: &str,
 ) -> AttributeWriteRequirement<'db> {
-    let Some((meta_attr, fallback_attr)) = assignment_attribute_members(db, object_ty, attribute)
-    else {
+    let Some(members) = assignment_attribute_members(db, object_ty, attribute) else {
         return AttributeWriteRequirement::Unconstrained;
     };
     let Some(class_attr_self_ty) = object_ty.to_instance(db) else {
         return AttributeWriteRequirement::Unconstrained;
+    };
+    let (meta_attr, fallback_attr) = match members {
+        AssignmentAttributeMembers::Primary { member, fallback } => (member, fallback),
+        AssignmentAttributeMembers::ShadowingClassMember(fallback) => {
+            return AttributeWriteRequirement::Class {
+                object_ty,
+                member: ClassAttributeWriteMember::ClassAttribute(
+                    class_fallback_write_requirement(db, object_ty, class_attr_self_ty, fallback),
+                ),
+            };
+        }
     };
 
     let member = match meta_attr {
@@ -494,11 +540,34 @@ pub(super) fn property_setter_returns_never<'db>(
     })
 }
 
-/// Return the primary and optional fallback members considered by attribute assignment.
+/// Return the class member that shadows a definitely non-data metaclass member, if any.
+fn shadowing_class_member<'db>(
+    db: &'db dyn Db,
+    object_ty: Type<'db>,
+    attribute: &str,
+    meta_attr: PlaceAndQualifiers<'db>,
+) -> Option<PlaceAndQualifiers<'db>> {
+    if !matches!(
+        object_ty,
+        Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..)
+    ) || !meta_attr
+        .place
+        .ignore_possibly_undefined()?
+        .is_definitely_non_data_descriptor(db)
+    {
+        return None;
+    }
+
+    object_ty
+        .find_name_in_mro_with_policy(db, attribute, MemberLookupPolicy::default())
+        .filter(|class_attr| !class_attr.place.is_undefined())
+}
+
+/// Return the members considered by attribute assignment in lookup-precedence order.
 ///
-/// The primary member comes from class-member lookup. The fallback is queried only when that
-/// member is absent or possibly undefined, and is an instance member for ordinary receivers or a
-/// class-object member for class receivers. Composite and dynamic receiver types return `None`;
+/// The primary member comes from class-member lookup. Its fallback is queried when that member is
+/// absent or possibly undefined. For class objects, a class-MRO member instead shadows a
+/// definitely non-data metaclass member. Composite and dynamic receiver types return `None`;
 /// their callers either decompose them before this point or handle them without member lookup.
 ///
 /// This helper deliberately does not bind `Self` or interpret descriptors so that assignment,
@@ -507,7 +576,7 @@ pub(super) fn assignment_attribute_members<'db>(
     db: &'db dyn Db,
     object_ty: Type<'db>,
     attribute: &str,
-) -> Option<(PlaceAndQualifiers<'db>, Option<PlaceAndQualifiers<'db>>)> {
+) -> Option<AssignmentAttributeMembers<'db>> {
     // Precise `functools.partial` instances synthesize a refined `__call__` member instead of
     // using the broad signature from typeshed.
     let meta_attr = if attribute == "__call__"
@@ -519,6 +588,9 @@ pub(super) fn assignment_attribute_members<'db>(
     } else {
         object_ty.class_member(db, attribute.into())
     };
+    if let Some(class_attr) = shadowing_class_member(db, object_ty, attribute, meta_attr) {
+        return Some(AssignmentAttributeMembers::ShadowingClassMember(class_attr));
+    }
     let needs_fallback = matches!(
         meta_attr.place,
         Place::Defined(DefinedPlace {
@@ -565,5 +637,8 @@ pub(super) fn assignment_attribute_members<'db>(
     } else {
         None
     };
-    Some((meta_attr, fallback_attr))
+    Some(AssignmentAttributeMembers::Primary {
+        member: meta_attr,
+        fallback: fallback_attr,
+    })
 }

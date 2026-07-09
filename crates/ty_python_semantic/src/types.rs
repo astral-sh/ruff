@@ -3518,6 +3518,16 @@ impl<'db> Type<'db> {
         self.is_data_descriptor_impl(d, true)
     }
 
+    /// Returns whether this type is known not to be a data descriptor.
+    ///
+    /// Gradual types and type variables remain uncertain even though
+    /// [`Type::may_be_data_descriptor`] deliberately excludes them for narrowing.
+    pub(crate) fn is_definitely_non_data_descriptor(self, db: &'db dyn Db) -> bool {
+        !self.has_dynamic(db)
+            && !self.has_typevar_or_typevar_instance(db)
+            && !self.may_be_data_descriptor(db)
+    }
+
     fn is_data_descriptor_impl(self, db: &'db dyn Db, any_of_union: bool) -> bool {
         match self {
             Type::Dynamic(_) => !any_of_union,

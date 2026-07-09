@@ -365,6 +365,7 @@ class C(metaclass=Meta):
     attribute: int = 1
 
 reveal_type(C.attribute)  # revealed: Any
+C.attribute = "could be accepted by the dynamic descriptor"
 
 class UnionMeta(type):
     attribute: Any | DataDescriptor = DataDescriptor()
