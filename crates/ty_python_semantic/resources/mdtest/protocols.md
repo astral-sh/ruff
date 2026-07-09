@@ -3398,6 +3398,17 @@ class IndependentConstrainedSource:
 # Cartesian product before either quantifier is applied.
 static_assert(is_assignable_to(IndependentConstrainedSource, IndependentConstrainedProtocol))
 static_assert(is_subtype_of(IndependentConstrainedSource, IndependentConstrainedProtocol))
+
+class NestedConstrainedProtocol(Protocol):
+    def f[T: (int, str)](self, value: T) -> T: ...
+
+class NestedConstrainedSource:
+    def f[S: (int, str)](self, value: Sequence[S]) -> Sequence[S]:
+        return value
+
+# A finite constrained domain can be checked directly without projecting these nested bounds.
+static_assert(not is_assignable_to(NestedConstrainedSource, NestedConstrainedProtocol))
+static_assert(not is_subtype_of(NestedConstrainedSource, NestedConstrainedProtocol))
 ```
 
 ## Subtyping of protocols with `@classmethod` or `@staticmethod` members

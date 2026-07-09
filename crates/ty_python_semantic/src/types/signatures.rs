@@ -34,6 +34,7 @@ use crate::types::relation::{
 };
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
 use crate::types::typevar::max_typevar_freshness_matching_generic_context;
+use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
@@ -1352,6 +1353,63 @@ impl<'db> Signature<'db> {
             .collect()
     }
 
+    /// Returns whether a function-local type variable occurs inside another type in this
+    /// signature.
+    fn has_nested_local_typevar(
+        &self,
+        db: &'db dyn Db,
+        typevars: &[BoundTypeVarInstance<'db>],
+    ) -> bool {
+        let has_nested_local = |ty: Type<'db>| {
+            !ty.is_type_var()
+                && any_over_type(db, ty, true, |inner| {
+                    inner.as_typevar().is_some_and(|inner| {
+                        typevars
+                            .iter()
+                            .any(|typevar| inner.is_same_typevar_as(db, *typevar))
+                    })
+                })
+        };
+
+        self.parameters
+            .iter()
+            .any(|parameter| has_nested_local(parameter.annotated_type()))
+            || has_nested_local(self.return_ty)
+    }
+
+    /// Returns each specialization of this signature's constrained local type variables.
+    ///
+    /// Returns `None` if any variable has an upper bound rather than a finite set of constraints.
+    fn constrained_specializations(
+        &self,
+        db: &'db dyn Db,
+        typevars: &[BoundTypeVarInstance<'db>],
+    ) -> Option<Vec<Self>> {
+        typevars
+            .iter()
+            .try_fold(vec![self.clone()], |signatures, typevar| {
+                let constraints = typevar.typevar(db).constraints(db)?;
+                Some(
+                    signatures
+                        .into_iter()
+                        .flat_map(|signature| {
+                            constraints.iter().map(move |constraint| {
+                                signature.apply_type_mapping_impl(
+                                    db,
+                                    &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                                        *typevar,
+                                        *constraint,
+                                    )),
+                                    TypeContext::default(),
+                                    &ApplyTypeMappingVisitor::default(),
+                                )
+                            })
+                        })
+                        .collect(),
+                )
+            })
+    }
+
     /// Returns the PEP 695 type variables lexically bound by this function.
     ///
     /// Legacy variables, caller-owned inference variables, `Self`, and `ParamSpec`s retain the
@@ -2001,6 +2059,30 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         };
 
         if let [source] = source_signatures {
+            let source_typevars = source.typevars(db);
+            let has_nested_local = source.has_nested_local_typevar(db, &source_typevars)
+                || target.has_nested_local_typevar(db, &target_typevars);
+            if has_nested_local
+                && let Some(source_specializations) =
+                    source.constrained_specializations(db, &source_typevars)
+                && let Some(target_specializations) =
+                    target.constrained_specializations(db, &target_typevars)
+            {
+                return Some(target_specializations.iter().when_all(
+                    db,
+                    self.constraints,
+                    |target| {
+                        source_specializations
+                            .iter()
+                            .when_any(db, self.constraints, |source| {
+                                self.with_signature_recursion_guard(source, target, || {
+                                    self.check_signature_pair_inner(db, source, target)
+                                })
+                            })
+                    },
+                ));
+            }
+
             let (relation, source_typevars) = check_source_signature(source);
             if let Some(result) = relation.try_quantify_independent_conjuncts(
                 db,
