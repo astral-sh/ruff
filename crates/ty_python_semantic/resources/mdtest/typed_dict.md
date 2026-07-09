@@ -173,6 +173,11 @@ PEP 584-style immutable updates preserve the `TypedDict` type when the other ope
 reveal_type(bob | {"age": 27})  # revealed: Person
 reveal_type({"age": 27} | bob)  # revealed: Person
 
+class SingleField(TypedDict):
+    x: int
+
+both_literals: SingleField = {"x": 1} | {"x": 2}
+
 carol_update = Person(name="Carol", age=31)
 reveal_type(bob | carol_update)  # revealed: Person
 ```
@@ -817,6 +822,85 @@ def _(source: MergeExtraSource):
     MergeTarget({**source, "ccc": 3})
 ```
 
+## Built-in `dict` constructors
+
+```py
+from collections.abc import Mapping
+from typing import Any, TypedDict
+from typing_extensions import Never
+
+class TD(TypedDict):
+    x: int
+
+class BadTD(TypedDict):
+    x: str
+
+x1 = dict(x=1)
+reveal_type(x1)  # revealed: dict[str, int]
+
+x2: TD = dict(x=1)
+x3: TD = dict(**x2)
+reveal_type(x2)  # revealed: TD
+reveal_type(x3)  # revealed: TD
+
+x4: TD = dict(x="1")  # error: [invalid-argument-type]
+reveal_type(x4)  # revealed: TD
+
+def unpack_invalid_typed_dict(src: BadTD) -> TD:
+    # The fast path should validate TypedDict-shaped unpacks even when they are not assignable to
+    # the target. That preserves the key-level TypedDict diagnostic instead of falling back to a
+    # broad `dict[str, str]` assignment error.
+    # error: [invalid-argument-type] "Invalid argument to key "x" with declared type `int` on TypedDict `TD`: value of type `str`"
+    return dict(**src)
+
+def return_any_unpack(src: Any) -> TD:
+    return dict(**src)
+
+def takes_td(value: TD) -> None:
+    pass
+
+def pass_never_unpack(src: Never) -> None:
+    takes_td(dict(**src))
+
+def pass_unpack(src: TD) -> None:
+    takes_td(dict(**src))
+
+def takes_mapping(value: Mapping[str, object]) -> None:
+    pass
+
+def keep_keyword_diagnostics(kwargs: Mapping[str, object]) -> None:
+    # The TypedDict-aware `dict(...)` fast path should not lose diagnostics from named keywords
+    # when unsupported `**kwargs` forces it to fall back to ordinary dict inference.
+    # error: [unresolved-reference] "Name `missing` used when not defined"
+    # error: [invalid-assignment]
+    value: TD = dict(x=missing, **kwargs)
+    takes_mapping(value)
+
+def takes_dict(value: dict[str, object]) -> None: ...
+def takes_kwargs(**kwargs: object) -> None: ...
+def convert_typed_dict(data: TD) -> None:
+    reveal_type(dict(data))  # revealed: dict[str, object]
+    takes_dict(dict(data))
+    takes_kwargs(**dict(data))
+
+def return_dict() -> TD:
+    return dict(x=1)
+
+def return_unpack(src: TD) -> TD:
+    return dict(**src)
+
+def return_invalid_literal() -> TD:
+    # TODO: ideally, this would only emit the first error, but not `invalid-return-type` (like the
+    # `return_invalid_dict` case below).
+    # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
+    # error: [invalid-return-type]
+    return {}
+
+def return_invalid_dict() -> TD:
+    # error: [missing-typed-dict-key] "Missing required key 'x' in TypedDict `TD` constructor"
+    return dict()
+```
+
 ## Mixed positional and unpacked keyword constructors
 
 These calls mix a positional `TypedDict` argument with unpacked keyword arguments. They should
@@ -962,6 +1046,36 @@ class NestedBar(TypedDict):
 
 x1: NestedFoo | NestedBar = {"foo": [{"foo": 1, "bar": 1}]}
 reveal_type(x1)  # revealed: NestedFoo | NestedBar
+```
+
+```py
+from collections.abc import Iterable, Mapping
+from typing import TypedDict
+
+class TD(TypedDict):
+    x: int
+
+IntFloatDict = dict[int, float]
+TypedDictOrDict = TD | IntFloatDict
+TypedDictOrMapping = TD | Mapping[int, float]
+
+# The `dict[int, float]` fallback should still win when it is wrapped in an alias.
+x1: TypedDictOrDict = {1: 5.2}
+x2: TypedDictOrMapping = {1: 5.2}
+
+# A `Mapping` fallback should only suppress `TypedDict` diagnostics when it accepts the literal.
+# error: [missing-typed-dict-key]
+# error: [invalid-key]
+x3: TypedDictOrMapping = {"y": 5.2}
+
+# error: [missing-typed-dict-key]
+# error: [invalid-key]
+x4: TypedDictOrMapping = {1: "bad"}
+
+def takes_td_or_iterable(value: TD | Iterable[int]) -> None:
+    pass
+
+takes_td_or_iterable({42: 42})
 ```
 
 ## Type ignore compatibility issues
