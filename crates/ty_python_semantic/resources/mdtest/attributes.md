@@ -1312,7 +1312,9 @@ class StoringMeta(type):
         namespace["generated"] = 1
         return super().__new__(mcls, name, bases, namespace)
 
-class GeneratedClass(metaclass=StoringMeta): ...
+class GeneratedClass(metaclass=StoringMeta):
+    def method(self) -> None:
+        reveal_type(self.generated)  # revealed: int
 
 reveal_type(GeneratedClass().generated)  # revealed: int
 ```
@@ -1605,10 +1607,10 @@ class ConditionalMethodAssignment(metaclass=StoringMeta):
 reveal_type(ConditionalMethodAssignment().generated)  # revealed: int
 ```
 
-ty only applies this rule to an annotation without a class-body value. An attribute assigned in the
-metaclass body is available on classes that use the metaclass, but not on their instances.
-Similarly, assigning through `cls` in a metaclass method does not tell ty that the attribute is
-present on every created class:
+An attribute assigned in the metaclass body is available on classes that use the metaclass, but not
+on their instances. By contrast, assigning through `cls` in a metaclass instance method describes an
+instance member of the metaclass. The metaclass instance is the constructed class object, so the
+attribute is stored in that class's namespace and is available through its instances:
 
 ```py
 class MetaclassAttributeOnly(type):
@@ -1625,10 +1627,22 @@ class AssignmentOnlyMeta(type):
     def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
         cls.assignment_only: int = 1
 
-class DoesNotInferAssignment(metaclass=AssignmentOnlyMeta): ...
+class InfersAssignment(metaclass=AssignmentOnlyMeta):
+    def method(self) -> None:
+        reveal_type(self.assignment_only)  # revealed: int
 
-# error: [unresolved-attribute]
-reveal_type(DoesNotInferAssignment().assignment_only)  # revealed: Unknown
+reveal_type(InfersAssignment.assignment_only)  # revealed: int
+reveal_type(InfersAssignment().assignment_only)  # revealed: int
+
+class AssignmentBaseMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.inherited_assignment: str = "inherited"
+
+class InheritedAssignmentMeta(AssignmentBaseMeta): ...
+class InfersInheritedAssignment(metaclass=InheritedAssignmentMeta): ...
+
+reveal_type(InfersInheritedAssignment.inherited_assignment)  # revealed: str
+reveal_type(InfersInheritedAssignment().inherited_assignment)  # revealed: str
 ```
 
 ## Precedence between class and metaclass attributes

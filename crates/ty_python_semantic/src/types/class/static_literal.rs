@@ -2589,37 +2589,6 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// Look up an annotation-only instance member declared in this class's body.
-    ///
-    /// For example, this returns `x` but not `y`:
-    ///
-    /// ```python
-    /// class C:
-    ///     x: int
-    ///     y: int = 1
-    /// ```
-    ///
-    /// Inherited declarations are deliberately excluded.
-    pub(super) fn own_declared_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
-        let body_scope = self.body_scope(db);
-        let table = place_table(db, body_scope);
-        let Some(symbol_id) = table.symbol_id(name) else {
-            return Member::unbound();
-        };
-        let use_def = use_def_map(db, body_scope);
-        if place_from_declarations(db, use_def.end_of_scope_symbol_declarations(symbol_id))
-            .ignore_conflicting_declarations()
-            .place
-            .is_undefined()
-            || !place_from_bindings(db, use_def.end_of_scope_symbol_bindings(symbol_id))
-                .place
-                .is_undefined()
-        {
-            return Member::unbound();
-        }
-        self.own_instance_member(db, name)
-    }
-
     /// Return whether this class directly defines an instance member that can be inherited.
     ///
     /// This includes annotation-only declarations, assignments in unconditionally defined

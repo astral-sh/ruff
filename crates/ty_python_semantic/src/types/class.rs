@@ -1977,18 +1977,6 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    /// Look up an unbound instance declaration directly in this class's body.
-    ///
-    /// This excludes inherited declarations and declarations with a class-body binding.
-    pub(super) fn own_declared_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
-        let Some((class, specialization)) = self.static_class_literal(db) else {
-            return Member::unbound();
-        };
-        class
-            .own_declared_instance_member(db, name)
-            .map_type(|ty| ty.apply_optional_specialization(db, specialization))
-    }
-
     /// Return whether this class or any of its bases declares or assigns an instance member named
     /// `name`.
     ///

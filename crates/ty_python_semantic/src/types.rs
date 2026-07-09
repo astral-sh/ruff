@@ -2815,6 +2815,29 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Look up the class member that participates in descriptor access through an instance.
+    ///
+    /// The meta-type of a synthetic `Self` type variable preserves method binding to `Self`, but it
+    /// does not carry attributes stored in the upper-bound class's namespace by its metaclass. Add
+    /// those attributes using the same lookup as a concrete nominal instance while retaining the
+    /// type variable's meta-type for ordinary MRO lookup.
+    fn instance_lookup_class_member_with_policy(
+        self,
+        db: &'db dyn Db,
+        name: Name,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        if let Type::TypeVar(typevar) = self
+            && typevar.typevar(db).is_self(db)
+            && let Some(class) = self.nominal_class(db)
+        {
+            self.to_meta_type(db)
+                .class_namespace_member(db, class, name.as_str(), policy)
+        } else {
+            self.class_member_with_policy(db, name, policy)
+        }
+    }
+
     /// Look up attributes stored in the namespace of a class object.
     ///
     /// Besides attributes present in the class MRO, this includes attributes assigned to
@@ -2870,8 +2893,10 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Look up attributes that a metaclass declaration promises to store in each constructed
-    /// class's namespace.
+    /// Look up metaclass instance members in a constructed class's namespace.
+    ///
+    /// A class object is an instance of its metaclass, and its instance storage is also the class
+    /// namespace consulted when looking up attributes through instances of that class.
     ///
     /// ```python
     /// class Meta(type):
@@ -2885,8 +2910,9 @@ impl<'db> Type<'db> {
     /// Ordinary class bindings and instance members shadow a normal generated attribute. A
     /// generated data descriptor retains descriptor precedence over instance storage.
     ///
-    /// Only annotation-only declarations directly on the concrete metaclass participate.
-    /// Inherited declarations and declarations with a class-body binding are excluded.
+    /// Metaclass instance members participate, including inherited declarations and attributes
+    /// inferred from instance methods. Class-body-only bindings remain attributes of the
+    /// metaclass itself and are excluded.
     fn class_namespace_member(
         self,
         db: &'db dyn Db,
@@ -2896,30 +2922,30 @@ impl<'db> Type<'db> {
     ) -> PlaceAndQualifiers<'db> {
         let class_attr = self
             .find_name_in_mro_with_policy(db, name, policy)
-            .expect("The meta-type of a nominal instance should always have an MRO");
-        let Some(metaclass) = self
-            .to_meta_type(db)
+            .expect("The meta-type of an instance-like type should always have an MRO");
+        let Some(metaclass) = class
+            .metaclass(db)
             .to_instance(db)
             .and_then(|metaclass| metaclass.nominal_class(db))
         else {
             return class_attr;
         };
-        let metaclass_declaration = metaclass.own_declared_instance_member(db, name).inner;
-        if metaclass_declaration.is_undefined() {
+        let metaclass_member = metaclass.instance_member(db, name);
+        if metaclass_member.is_undefined() {
             return class_attr;
         }
         let own_class_member_is_defined = !class.own_class_member(db, None, name).is_undefined();
         if policy.no_instance_fallback() {
             return if own_class_member_is_defined {
-                class_attr.or_fall_back_to(db, || metaclass_declaration)
+                class_attr.or_fall_back_to(db, || metaclass_member)
             } else {
-                metaclass_declaration.or_fall_back_to(db, || class_attr)
+                metaclass_member.or_fall_back_to(db, || class_attr)
             };
         }
-        let generated_may_be_data_descriptor = metaclass_declaration
+        let generated_may_be_data_descriptor = metaclass_member
             .ignore_possibly_undefined()
             .is_some_and(|ty| ty.may_be_data_descriptor(db));
-        let generated_data_descriptors = || match metaclass_declaration {
+        let generated_data_descriptors = || match metaclass_member {
             PlaceAndQualifiers {
                 place: Place::Defined(declaration),
                 qualifiers,
@@ -2947,7 +2973,7 @@ impl<'db> Type<'db> {
                 })
                 .with_qualifiers(qualifiers)
             }
-            _ => metaclass_declaration,
+            _ => metaclass_member,
         };
         let has_own_unbound_instance_declaration =
             class.has_own_unbound_instance_declaration(db, name);
@@ -2957,7 +2983,7 @@ impl<'db> Type<'db> {
             own_class_member_is_defined || class.has_own_instance_declaration(db, name)
         };
         if generated_attribute_is_shadowed {
-            return class_attr.or_fall_back_to(db, || metaclass_declaration);
+            return class_attr.or_fall_back_to(db, || metaclass_member);
         }
         if class.has_dynamic_instance_fallback(db) {
             return if generated_may_be_data_descriptor {
@@ -2972,7 +2998,7 @@ impl<'db> Type<'db> {
             }
             return Place::Undefined.into();
         }
-        metaclass_declaration.or_fall_back_to(db, || class_attr)
+        metaclass_member.or_fall_back_to(db, || class_attr)
     }
 
     /// This function roughly corresponds to looking up an attribute in the `__dict__` of an object.
@@ -3501,7 +3527,7 @@ impl<'db> Type<'db> {
             meta_attr_kind,
         ) = Self::try_call_dunder_get_on_attribute(
             db,
-            self.class_member_with_policy(db, name.into(), member_policy),
+            self.instance_lookup_class_member_with_policy(db, name.into(), member_policy),
             Some(receiver),
             self.to_meta_type(db),
         );
