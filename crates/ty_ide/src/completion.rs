@@ -427,7 +427,7 @@ impl<'db> CompletionBuilder<'db> {
     fn argument(name: impl Into<Name>) -> CompletionBuilder<'db> {
         let name = name.into();
         let insert = compact_str::format_compact!("{name}=");
-        Completion::builder(name)
+        Completion::builder(CompactString::new(name.as_str()))
             .kind(CompletionKind::Variable)
             .insert(insert)
             .context_specific(true)
