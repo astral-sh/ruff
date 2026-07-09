@@ -977,8 +977,42 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                     .as_typevar()
                     .filter(|typevar| typevar.is_inferable(db, quantified))
             }) {
-                let replacement = match (projected.variance_of(db, typevar.identity(db)), use_upper)
-                {
+                let variance = projected.variance_of(db, typevar.identity(db));
+                if variance == TypeVarVariance::Invariant {
+                    projected = match typevar.typevar(db).bound_or_constraints(db) {
+                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                            let specializations =
+                                constraints.elements(db).iter().map(|constraint| {
+                                    projected.substitute_one_typevar(
+                                        db,
+                                        typevar,
+                                        if use_upper {
+                                            constraint.top_materialization(db)
+                                        } else {
+                                            constraint.bottom_materialization(db)
+                                        },
+                                    )
+                                });
+                            if use_upper {
+                                UnionType::from_elements(db, specializations)
+                            } else {
+                                IntersectionType::bounded_from_elements(db, specializations).ok_or(
+                                    ConstraintProjectionError::UnrepresentableFreeVariableConstraint,
+                                )?
+                            }
+                        }
+                        None | Some(TypeVarBoundOrConstraints::UpperBound(_)) => {
+                            if use_upper {
+                                Type::object()
+                            } else {
+                                Type::Never
+                            }
+                        }
+                    };
+                    continue;
+                }
+
+                let replacement = match (variance, use_upper) {
                     (TypeVarVariance::Covariant, true)
                     | (TypeVarVariance::Contravariant, false) => domain_upper(typevar),
                     (TypeVarVariance::Covariant, false)
@@ -3431,6 +3465,7 @@ impl NodeId {
         let mut subjects_with_concrete_domains = FxHashMap::default();
         let mut projection_requirements = Vec::new();
         let mut requires_unrepresentable_residual = false;
+        let mut projection_requires_assumptions = false;
         constrained.for_each_unique_constraint(builder, &mut |constraint_id, source_order| {
             if requires_unrepresentable_residual {
                 return;
@@ -3461,6 +3496,7 @@ impl NodeId {
                         })
                 });
             if subject_has_concrete_domain {
+                projection_requires_assumptions = true;
                 return;
             }
 
@@ -3607,14 +3643,92 @@ impl NodeId {
                 })
             };
 
-            if nested_lower.is_some() {
-                requires_unrepresentable_residual = true;
-            } else if let Some(upper) = nested_upper
+            // A lower bound that contains a removed source local can be projected when another
+            // active constraint supplies that local's specialization. For example,
+            // `T ≤ S` and `list[S] ≤ V` imply the surviving constraint `list[T] ≤ V`.
+            let requirement_from_nested_lower_bound = |lower: Type<'db>| {
+                if subject_is_removed {
+                    return None;
+                }
+                let removed = find_over_type(db, lower, false, |inner| {
+                    inner
+                        .as_typevar()
+                        .filter(|typevar| typevar.is_inferable(db, bound_typevars))
+                })?;
+                let lower_domain = Node::new_satisfied_constraint(
+                    builder,
+                    constraint_id.when_true(),
+                    source_order,
+                );
+                let mut replacement_domain = ALWAYS_FALSE;
+                let mut requirement = ALWAYS_TRUE;
+                constrained.for_each_unique_constraint(
+                    builder,
+                    &mut |candidate, candidate_source_order| {
+                        let candidate_data = builder.constraint_data(candidate);
+                        let replacement = if candidate_data.typevar == removed {
+                            candidate_data.bounds.lower
+                        } else if candidate_data.bounds.upper.is_some_and(|upper| {
+                            upper
+                                .as_typevar()
+                                .is_some_and(|upper| upper.is_same_typevar_as(db, removed))
+                        }) {
+                            Some(Type::TypeVar(candidate_data.typevar))
+                        } else {
+                            None
+                        };
+                        let Some(replacement) = replacement else {
+                            return;
+                        };
+                        let specialized = lower.substitute_one_typevar(db, removed, replacement);
+                        if any_over_type(db, specialized, false, |inner| {
+                            inner
+                                .as_typevar()
+                                .is_some_and(|typevar| typevar.is_inferable(db, bound_typevars))
+                        }) {
+                            return;
+                        }
+
+                        let candidate_domain = Node::new_satisfied_constraint(
+                            builder,
+                            candidate.when_true(),
+                            candidate_source_order,
+                        );
+                        replacement_domain = replacement_domain.or(builder, candidate_domain);
+                        let active_bounds = lower_domain.and(builder, candidate_domain);
+                        let derived = specialized
+                            .when_constraint_set_assignable_to(
+                                db,
+                                Type::TypeVar(constraint.typevar),
+                                builder,
+                            )
+                            .node;
+                        requirement =
+                            requirement.and(builder, active_bounds.implies(builder, derived));
+                    },
+                );
+
+                constrained
+                    .and(builder, lower_domain)
+                    .implies(builder, replacement_domain)
+                    .is_always_satisfied(db, builder)
+                    .then_some(requirement)
+            };
+
+            if let Some(lower) = nested_lower {
+                if let Some(requirement) = requirement_from_nested_lower_bound(lower) {
+                    projection_requirements.push(requirement);
+                } else {
+                    requires_unrepresentable_residual = true;
+                }
+            }
+            if let Some(upper) = nested_upper
                 && !upper_bound_allows_subject_specialization(upper)
             {
                 if let Some(requirement) = requirement_from_subject_lower_bounds(upper)
                     .or_else(|| requirement_from_subject_upper_bounds(upper))
                 {
+                    projection_requires_assumptions = true;
                     projection_requirements.push(requirement);
                 } else {
                     requires_unrepresentable_residual = true;
@@ -3625,9 +3739,14 @@ impl NodeId {
             return Err(ConstraintProjectionError::UnrepresentableNestedBound);
         }
 
+        let projection_input = if projection_requires_assumptions {
+            constrained
+        } else {
+            self
+        };
         let constrained = projection_requirements
             .into_iter()
-            .fold(constrained, |constrained, coverage| {
+            .fold(projection_input, |constrained, coverage| {
                 constrained.and(builder, coverage)
             });
         Ok(constrained.exists_normalized(db, builder, bound_typevars))

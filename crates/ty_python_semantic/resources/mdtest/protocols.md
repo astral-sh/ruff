@@ -2959,6 +2959,28 @@ def sequence_return[V](value: SequenceReturnProtocol[V]) -> V:
 # Covariant nesting projects the target domain into the enclosing inference variable.
 reveal_type(sequence_return(GenericIdentity()))  # revealed: Sequence[object]
 
+class ListReturnProtocol[V](Protocol):
+    def f[T](self, value: T) -> V: ...
+
+class GenericListIdentity:
+    def f[S](self, value: S) -> list[S]:
+        return [value]
+
+def list_return[V](value: ListReturnProtocol[V]) -> V:
+    raise NotImplementedError
+
+# Source projection retains `list[T] ≤ V` before universally quantifying `T`.
+reveal_type(list_return(GenericListIdentity()))  # revealed: object
+
+class ConstrainedListReturnProtocol[V](Protocol):
+    def f[T: (int, str)](self, value: T) -> V: ...
+
+def constrained_list_return[V](value: ConstrainedListReturnProtocol[V]) -> V:
+    raise NotImplementedError
+
+# A finite invariant target domain retains the union of its concrete specializations.
+reveal_type(constrained_list_return(GenericListIdentity()))  # revealed: list[int] | list[str]
+
 class ConstrainedReturnProtocol[V](Protocol):
     def f[T: (int, object)](self, value: V) -> T: ...
 
