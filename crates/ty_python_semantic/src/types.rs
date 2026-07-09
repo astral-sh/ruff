@@ -2819,7 +2819,9 @@ impl<'db> Type<'db> {
     ///
     /// The meta-type of a type variable preserves method binding to that type variable, but it does
     /// not carry attributes stored in a nominal upper-bound class's namespace by its metaclass.
-    /// Add those attributes using the same lookup as a concrete nominal instance.
+    /// For constrained and union-bounded type variables, generated lookup is accepted only when
+    /// every alternative defines the member; otherwise the ordinary lookup is preserved for its
+    /// missing-member diagnostics. Type aliases and `NewType` wrappers are transparent here.
     fn instance_lookup_class_member_with_policy(
         self,
         db: &'db dyn Db,

@@ -2397,6 +2397,7 @@ impl<'db> StaticClassLiteral<'db> {
                 MethodDecorator::StaticMethod => is_staticmethod,
             }
         };
+
         // First check declarations
         for (attribute_declarations, method_scope_id) in
             attribute_declarations(db, class_body_scope, name)
@@ -2502,6 +2503,7 @@ impl<'db> StaticClassLiteral<'db> {
             if is_method_reachable.is_always_false() {
                 continue;
             }
+
             for attribute_assignment in attribute_assignments {
                 if let DefinitionState::Undefined = attribute_assignment.binding {
                     continue;

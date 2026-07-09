@@ -1285,7 +1285,12 @@ class ConstructedByPopulatedMeta(metaclass=PopulatedMeta): ...
 
 reveal_type(PopulatedMeta.populated_on_meta)  # revealed: int
 reveal_type(ConstructedByPopulatedMeta.populated_on_meta)  # revealed: int
+```
 
+Until we can prove that a metaclass initializer stores an attribute, class-object lookup retains an
+inherited declaration as a fallback:
+
+```py
 class DerivedInitializingMeta(type):
     def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
         cls.inherited_attr: int = 1
@@ -1344,39 +1349,27 @@ def read_generated(value: TGenerated) -> None:
     reveal_type(value.generated)  # revealed: int
 ```
 
-The generated attribute remains available through a `NewType` whose base is the generated class:
+Because a `NewType` value is the same object at runtime as a value of its base class, lookup uses
+the base class's generated attribute rather than an inherited attribute with the same name:
 
 ```py
 from typing import NewType
 
-GeneratedNewType = NewType("GeneratedNewType", GeneratedClass)
+class InheritedGeneratedBase:
+    generated = "inherited"
+
+class GeneratedOverInherited(InheritedGeneratedBase, metaclass=StoringMeta): ...
+
+GeneratedNewType = NewType("GeneratedNewType", GeneratedOverInherited)
 
 def read_generated_newtype(value: GeneratedNewType) -> None:
     reveal_type(value.generated)  # revealed: int
 ```
 
-Generated attributes retain precedence over inherited members through a `NewType`:
+A generated attribute is available through a constrained type variable or a type variable with a
+union upper bound when every alternative provides it:
 
 ```py
-class NewTypeGeneratedBase:
-    generated = "inherited"
-
-class NewTypeGeneratedClass(NewTypeGeneratedBase, metaclass=StoringMeta): ...
-
-InheritedGeneratedNewType = NewType("InheritedGeneratedNewType", NewTypeGeneratedClass)
-
-reveal_type(NewTypeGeneratedClass().generated)  # revealed: int
-
-def read_inherited_generated_newtype(value: InheritedGeneratedNewType) -> None:
-    reveal_type(value.generated)  # revealed: int
-```
-
-Type variables constrained or union-bounded to generated classes expose attributes shared by every
-alternative:
-
-```py
-from typing import TypeVar
-
 class OtherGeneratedClass(metaclass=StoringMeta): ...
 
 TGeneratedConstraints = TypeVar("TGeneratedConstraints", GeneratedClass, OtherGeneratedClass)
@@ -1390,25 +1383,26 @@ def read_generated_union_bound(value: TGeneratedUnionBound) -> None:
     reveal_type(value.generated)  # revealed: int
 ```
 
-Wrapper-aware lookup composes when `NewType`s are type-variable alternatives:
+The same rule applies when every type-variable alternative is a `NewType`:
 
 ```py
-class OtherNewTypeGeneratedClass(NewTypeGeneratedBase, metaclass=StoringMeta): ...
+class OtherGeneratedOverInherited(InheritedGeneratedBase, metaclass=StoringMeta): ...
 
-OtherInheritedGeneratedNewType = NewType("OtherInheritedGeneratedNewType", OtherNewTypeGeneratedClass)
+OtherGeneratedNewType = NewType("OtherGeneratedNewType", OtherGeneratedOverInherited)
 
-TNewTypeConstraints = TypeVar("TNewTypeConstraints", InheritedGeneratedNewType, OtherInheritedGeneratedNewType)
+TNewTypeConstraints = TypeVar("TNewTypeConstraints", GeneratedNewType, OtherGeneratedNewType)
 
 def read_newtype_constraints(value: TNewTypeConstraints) -> None:
     reveal_type(value.generated)  # revealed: int
 
-TNewTypeUnionBound = TypeVar("TNewTypeUnionBound", bound=InheritedGeneratedNewType | OtherInheritedGeneratedNewType)
+TNewTypeUnionBound = TypeVar("TNewTypeUnionBound", bound=GeneratedNewType | OtherGeneratedNewType)
 
 def read_newtype_union_bound(value: TNewTypeUnionBound) -> None:
     reveal_type(value.generated)  # revealed: int
 ```
 
-Ordinary and generated attributes are combined across constraints and union-bound alternatives:
+If some alternatives provide an ordinary class attribute and others provide a generated attribute,
+lookup returns the union of their types:
 
 ```py
 class OrdinaryGeneratedClass:
@@ -1425,7 +1419,7 @@ def read_mixed_member_union_bound(value: TMixedMemberUnionBound) -> None:
     reveal_type(value.generated)  # revealed: int | str
 ```
 
-Aliases of union bounds preserve generated-attribute precedence:
+A PEP 695 alias around a union upper bound does not change attribute lookup:
 
 ```toml
 [environment]
@@ -1433,25 +1427,16 @@ python-version = "3.12"
 ```
 
 ```py
-class InheritedGeneratedBase:
-    generated = "inherited"
+type GeneratedAlternatives = GeneratedOverInherited | OtherGeneratedOverInherited
 
-class AliasedGeneratedA(InheritedGeneratedBase, metaclass=StoringMeta): ...
-class AliasedGeneratedB(InheritedGeneratedBase, metaclass=StoringMeta): ...
-
-type GeneratedAlternatives = AliasedGeneratedA | AliasedGeneratedB
-
-TDirectGeneratedBound = TypeVar("TDirectGeneratedBound", bound=AliasedGeneratedA | AliasedGeneratedB)
 TAliasedGeneratedBound = TypeVar("TAliasedGeneratedBound", bound=GeneratedAlternatives)
-
-def read_direct_generated_bound(value: TDirectGeneratedBound) -> None:
-    reveal_type(value.generated)  # revealed: int
 
 def read_aliased_generated_bound(value: TAliasedGeneratedBound) -> None:
     reveal_type(value.generated)  # revealed: int
 ```
 
-Every constraint or union-bound alternative must provide the generated attribute:
+If any constraint or union member lacks the attribute, lookup reports an unresolved attribute rather
+than silently discarding that alternative:
 
 ```py
 class PlainClass: ...
@@ -1469,7 +1454,7 @@ def read_mixed_union_bound(value: TMixedUnionBound) -> None:
     reveal_type(value.generated)  # revealed: Unknown
 ```
 
-This also lets a generic metaclass method rely on a protocol describing the classes it accepts:
+A generic metaclass method can rely on a protocol describing the classes it accepts:
 
 ```py
 from typing import Iterator, Protocol, TypeVar
@@ -1881,9 +1866,9 @@ reveal_type(InfersInheritedAssignment.inherited_assignment)  # revealed: str
 reveal_type(InfersInheritedAssignment().inherited_assignment)  # revealed: str
 ```
 
-Class-object lookup gives a metaclass initializer's inferred write precedence over a plain inferred
-class-body value. Instance lookup remains conservative because we do not prove that the initializer
-definitely performs the write:
+A class-body value is checked against the type inferred from a metaclass initializer. Both values
+still participate in instance lookup: we do not prove that the initializer runs, so the class-body
+value may remain visible.
 
 ```py
 class ReplacingOwnBindingMeta(type):
@@ -1894,12 +1879,12 @@ class HasReplacedOwnBinding(metaclass=ReplacingOwnBindingMeta):
     # error: [invalid-assignment]
     replaced = "initial"
 
-reveal_type(HasReplacedOwnBinding.replaced)  # revealed: int
 # TODO: Once we track definite initialization, this should narrow to `int`.
 reveal_type(HasReplacedOwnBinding().replaced)  # revealed: int | str
 ```
 
-An inferred value type does not make a bare `Final` declaration a plain inferred binding:
+A bare `Final` remains a declaration for both class-object and instance lookup even though its value
+type is inferred:
 
 ```py
 from typing import Final
@@ -1915,10 +1900,8 @@ reveal_type(HasBareFinal.final_value)  # revealed: Literal["initial"]
 reveal_type(HasBareFinal().final_value)  # revealed: Literal["initial"]
 ```
 
-When the constructed class inherits an attribute with the same name, lookup through an instance uses
-the same conservative behavior as ordinary instance lookup: an attribute inferred from a method does
-not completely eliminate the inherited value. This currently applies even to an unconditional
-assignment in the metaclass `__init__`.
+Without proving that a metaclass `__init__` runs, both class-object and instance lookup retain an
+inherited value with the same name:
 
 ```py
 class InitializingInheritedMeta(type):
@@ -1936,7 +1919,8 @@ reveal_type(Initialized.initialized)  # revealed: int | str
 reveal_type(Initialized().initialized)  # revealed: int | str
 ```
 
-A conditional assignment in the metaclass `__init__` necessarily retains the inherited alternative:
+A conditional assignment in the metaclass `__init__` necessarily retains the inherited alternative
+for both class-object and instance lookup:
 
 ```py
 def metaclass_condition() -> bool:
