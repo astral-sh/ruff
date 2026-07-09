@@ -6,7 +6,9 @@ use ruff_db::{
     parsed::{ParsedModuleRef, parsed_module},
 };
 use ruff_python_ast as ast;
-use ruff_python_ast::{PythonVersion, name::Name};
+use ruff_python_ast::{
+    PythonVersion, helpers::ReturnStatementVisitor, name::Name, visitor::Visitor,
+};
 use ruff_text_size::{Ranged, TextRange};
 use std::cell::RefCell;
 
@@ -3376,7 +3378,14 @@ fn initializer_definitely_assigns_attribute<'db>(
             definitely_assigns = false;
             continue;
         };
-        if !function.node(&module).decorator_list.is_empty() {
+        let function_node = function.node(&module);
+        if !function_node.decorator_list.is_empty() {
+            definitely_assigns = false;
+            continue;
+        }
+        let mut return_visitor = ReturnStatementVisitor::default();
+        return_visitor.visit_body(&function_node.body);
+        if !return_visitor.returns.is_empty() {
             definitely_assigns = false;
             continue;
         }

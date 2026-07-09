@@ -1891,13 +1891,23 @@ class InitializedBeforeReturnMeta(type):
         if metaclass_condition():
             return
 
+class DeletedBeforeReturnMeta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        cls.initialized: int = 1
+        if metaclass_condition():
+            del cls.initialized
+            return
+
 class EarlyReturning(ConditionalBase, metaclass=EarlyReturningMeta): ...
 class InitializedBeforeReturn(ConditionalBase, metaclass=InitializedBeforeReturnMeta): ...
+class DeletedBeforeReturn(ConditionalBase, metaclass=DeletedBeforeReturnMeta): ...
 
 reveal_type(EarlyReturning.initialized)  # revealed: int | str
 reveal_type(EarlyReturning().initialized)  # revealed: int | str
-reveal_type(InitializedBeforeReturn.initialized)  # revealed: int
-reveal_type(InitializedBeforeReturn().initialized)  # revealed: int
+reveal_type(InitializedBeforeReturn.initialized)  # revealed: int | str
+reveal_type(InitializedBeforeReturn().initialized)  # revealed: int | str
+reveal_type(DeletedBeforeReturn.initialized)  # revealed: int | str
+reveal_type(DeletedBeforeReturn().initialized)  # revealed: int | str
 ```
 
 An assignment in an arbitrary metaclass method likewise retains the inherited alternative because
