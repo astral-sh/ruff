@@ -2612,14 +2612,12 @@ fn main() {
 error: character constant must be escaped: `/n`
   --> $DIR/bad-char-literals.rs:10:6
    |
-10 |       '
-   |  ______^
-11 | | ';
-   | |_^
+10 |     '
+   |      ^
    |
 help: escape the character
    |
-10 |     '/n';
+10 |     '/n
    |      ++
 "#]];
     let renderer = Renderer::plain();
@@ -2629,14 +2627,12 @@ help: escape the character
 error: character constant must be escaped: `/n`
    ╭▸ $DIR/bad-char-literals.rs:10:6
    │
-10 │       '
-   │ ┏━━━━━━┛
-11 │ ┃ ';
-   │ ┗━┛
+10 │     '
+   │      ━
    ╰╴
 help: escape the character
    ╭╴
-10 │     '/n';
+10 │     '/n
    ╰╴     ++
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
@@ -2679,8 +2675,8 @@ error: unclosed frontmatter
   |
 1 | / ----cargo
 ... |
-7 | |
-  | |_^
+6 | | // are properly parsed.
+  | |_______________________^
   |
 note: frontmatter opening here was not closed
  --> $DIR/unclosed-1.rs:1:1
@@ -2697,8 +2693,8 @@ error: unclosed frontmatter
   │
 1 │ ┏ ----cargo
   ┆ ┇
-7 │ ┃
-  │ ┗━┛
+6 │ ┃ // are properly parsed.
+  │ ┗━━━━━━━━━━━━━━━━━━━━━━━┛
   ╰╴
 note: frontmatter opening here was not closed
   ╭▸ $DIR/unclosed-1.rs:1:1
@@ -2890,8 +2886,7 @@ error: unclosed frontmatter
   |
 1 | / ----cargo
 2 | | //~^ ERROR: unclosed frontmatter
-3 | |
-  | |_^
+  | |________________________________^
   |
 note: frontmatter opening here was not closed
  --> $DIR/unclosed-4.rs:1:1
@@ -2908,8 +2903,7 @@ error: unclosed frontmatter
   │
 1 │ ┏ ----cargo
 2 │ ┃ //~^ ERROR: unclosed frontmatter
-3 │ ┃
-  │ ┗━┛
+  │ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
   ╰╴
 note: frontmatter opening here was not closed
   ╭▸ $DIR/unclosed-4.rs:1:1
@@ -2958,8 +2952,8 @@ error: unclosed frontmatter
   |
 1 | / ----cargo
 ... |
-7 | |
-  | |_^
+6 | | // per unclosed-1.rs)
+  | |_____________________^
   |
 note: frontmatter opening here was not closed
  --> $DIR/unclosed-5.rs:1:1
@@ -2976,8 +2970,8 @@ error: unclosed frontmatter
   │
 1 │ ┏ ----cargo
   ┆ ┇
-7 │ ┃
-  │ ┗━┛
+6 │ ┃ // per unclosed-1.rs)
+  │ ┗━━━━━━━━━━━━━━━━━━━━━┛
   ╰╴
 note: frontmatter opening here was not closed
   ╭▸ $DIR/unclosed-5.rs:1:1

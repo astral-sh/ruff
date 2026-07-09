@@ -89,11 +89,13 @@ impl<'a> SourceMap<'a> {
             return (start, start);
         }
 
-        let end_info = self
+        let (end_idx, end_info, eof) = self
             .lines
             .iter()
-            .find(|info| span.end >= info.start_byte && span.end < info.end_byte)
-            .unwrap_or(self.lines.last().unwrap());
+            .enumerate()
+            .find(|(_, info)| span.end >= info.start_byte && span.end < info.end_byte)
+            .map(|(idx, info)| (idx, info, false))
+            .unwrap_or((self.lines.len() - 1, self.lines.last().unwrap(), true));
         let (end_char_pos, end_display_pos) = end_info.line
             [0..(span.end - end_info.start_byte).min(end_info.line.len())]
             .chars()
@@ -108,6 +110,31 @@ impl<'a> SourceMap<'a> {
             display: end_display_pos,
             byte: span.end,
         };
+        if start.line < end.line && end.char == 0 && !eof {
+            let prev_line_info = &self.lines[end_idx - 1];
+            let (end_char_pos, end_display_pos) = prev_line_info.line
+                [0..(span.end - prev_line_info.start_byte).min(prev_line_info.line.len())]
+                .chars()
+                .fold((0, 0), |(char_pos, byte_pos), c| {
+                    let display = char_width(c);
+                    (char_pos + 1, byte_pos + display)
+                });
+            if prev_line_info.end_byte == start.byte {
+                end = Loc {
+                    line: prev_line_info.line_index,
+                    char: end_char_pos + 1,
+                    display: end_display_pos + 1,
+                    byte: span.end,
+                };
+            } else {
+                end = Loc {
+                    line: prev_line_info.line_index,
+                    char: end_char_pos,
+                    display: end_display_pos,
+                    byte: span.end,
+                };
+            }
+        }
         if start.line != end.line && end.byte > end_info.end_byte - end_info.end_line_size {
             end.char += 1;
             end.display += 1;
