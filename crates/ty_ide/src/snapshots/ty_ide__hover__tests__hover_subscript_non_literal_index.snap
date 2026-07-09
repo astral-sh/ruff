@@ -2,10 +2,10 @@
 source: crates/ty_ide/src/hover.rs
 expression: test.hover()
 ---
-int
+idx: int
 ---------------------------------------------
 ```python
-int
+idx: int
 ```
 ---------------------------------------------
 info[hover]: Hovered content is

@@ -7,7 +7,10 @@ use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
-use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
+use ty_python_core::expression::ExpressionKind;
+use ty_python_semantic::types::ide_support::{
+    bound_method_hover_signature, resolved_call_signature, typed_dict_key_hover,
+};
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeAliasType, TypeVarVariance};
 
 use ty_python_semantic::{DisplaySettings, SemanticModel, TypeQualifiers};
@@ -37,9 +40,8 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
 
     let docs = if keyword_argument.is_some() || typed_dict_key.is_some() {
         None
-    } else if let GotoTarget::Call { call, .. } = goto_target {
-        resolved_call_signature(&model, call)
-            .and_then(|details| docstring_for_call_definition(db, details.definition?))
+    } else if let Some(definition) = goto_target.call_definition(&model) {
+        docstring_for_call_definition(db, definition)
             .or_else(|| {
                 // Fall back to the goto-definition targets. This is what
                 // surfaces the class docstring for a constructor call like
@@ -67,7 +69,10 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     if let Some(keyword_argument) = keyword_argument {
         contents.extend(keyword_argument);
     } else if let Some(signature) = goto_target.call_signature(&model) {
-        contents.push(HoverContent::Signature(signature));
+        let qualifier_suffix = create_qualifier_suffix(goto_target.type_qualifiers(&model));
+        contents.push(HoverContent::Signature(format!(
+            "{signature}{qualifier_suffix}"
+        )));
     } else if let Some(typed_dict_key) = typed_dict_key {
         contents.push(HoverContent::TypedDictKey {
             owner: typed_dict_key.owner,
@@ -80,43 +85,46 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     } else if let Some(ty) = goto_target.inferred_type(&model) {
         tracing::debug!("Inferred type of covering node is {}", ty.display(db));
         let qualifiers = goto_target.type_qualifiers(&model);
-        let inferred_type_hover_content = match ty {
-            Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
-                typevar.bind_pep695(db).map_or(
-                    HoverContent::Type {
-                        ty,
-                        variance: None,
-                        qualifiers,
-                    },
-                    |typevar| HoverContent::Type {
-                        ty: Type::TypeVar(typevar),
-                        variance: Some(typevar.variance(db)),
-                        qualifiers,
-                    },
-                )
-            }
-            Type::KnownInstance(KnownInstanceType::TypeAliasType(alias))
-            | Type::TypeAlias(alias) => {
-                let value_ty = alias.value_type(db);
-
-                alias_docstring = Definitions::from_ty(db, ty)
-                    .and_then(|def| def.docstring(db))
-                    .or_else(|| {
-                        Definitions::from_ty(db, value_ty).and_then(|def| def.docstring(db))
-                    });
-
-                HoverContent::TypeAlias { alias, qualifiers }
-            }
-            Type::TypeVar(typevar) => HoverContent::Type {
+        let has_standard_qualifier = qualifiers
+            .iter()
+            .any(|qualifier| !qualifier.is_non_standard());
+        let declaration_name = declaration_name(&model, &goto_target);
+        let inferred_type_hover_content = if !has_standard_qualifier
+            && declaration_name.is_some()
+            && let Some(signature) = bound_method_hover_signature(db, ty)
+        {
+            HoverContent::Signature(signature)
+        } else {
+            let type_content = |ty, variance| HoverContent::Type {
+                declaration_name,
                 ty,
-                variance: Some(typevar.variance(db)),
+                variance,
                 qualifiers,
-            },
-            _ => HoverContent::Type {
-                ty,
-                variance: None,
-                qualifiers,
-            },
+            };
+
+            match ty {
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
+                    if let Some(typevar) = typevar.bind_pep695(db) {
+                        type_content(Type::TypeVar(typevar), Some(typevar.variance(db)))
+                    } else {
+                        type_content(ty, None)
+                    }
+                }
+                Type::KnownInstance(KnownInstanceType::TypeAliasType(alias))
+                | Type::TypeAlias(alias) => {
+                    let value_ty = alias.value_type(db);
+
+                    alias_docstring = Definitions::from_ty(db, ty)
+                        .and_then(|def| def.docstring(db))
+                        .or_else(|| {
+                            Definitions::from_ty(db, value_ty).and_then(|def| def.docstring(db))
+                        });
+
+                    HoverContent::TypeAlias { alias, qualifiers }
+                }
+                Type::TypeVar(typevar) => type_content(ty, Some(typevar.variance(db))),
+                _ => type_content(ty, None),
+            }
         };
         contents.push(inferred_type_hover_content);
     }
@@ -136,6 +144,24 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         range: FileRange::new(file, goto_target.range()),
         value: Hover { contents },
     })
+}
+
+fn declaration_name(model: &SemanticModel<'_>, goto_target: &GotoTarget<'_>) -> Option<String> {
+    if matches!(
+        goto_target,
+        GotoTarget::TypeParamTypeVarName(_)
+            | GotoTarget::TypeParamParamSpecName(_)
+            | GotoTarget::TypeParamTypeVarTupleName(_)
+    ) {
+        return None;
+    }
+
+    let name = goto_target.to_string()?;
+    if goto_target.expression_kind(model) == Some(ExpressionKind::TypeExpression) {
+        return None;
+    }
+
+    Some(name.into_owned())
 }
 
 fn keyword_argument_hover_contents<'db>(
@@ -277,6 +303,8 @@ pub enum HoverContent<'db> {
     Signature(String),
     Parameter(String),
     Type {
+        /// Name used to render the type as a variable declaration.
+        declaration_name: Option<String>,
         // The type of the target being hovered
         ty: Type<'db>,
         // The type's variance
@@ -316,16 +344,24 @@ pub(crate) struct DisplayHoverContent<'a, 'db> {
 }
 
 impl<'db> DisplayHoverContent<'_, 'db> {
-    fn ty_string_and_syntax(&self, ty: &Type<'db>) -> (String, &'static str) {
+    fn ty_string_and_syntax(
+        &self,
+        declaration_name: Option<&str>,
+        ty: &Type<'db>,
+    ) -> (String, &'static str) {
         // Special types like `<special-form of whatever 'blahblah' with 'florps'>`
         // render poorly with python syntax-highlighting but well as xml
-        let ty_string = ty
+        let details = ty
             .display_with(self.db, DisplaySettings::default().multiline())
-            .to_string();
-        let syntax = if ty_string.starts_with('<') {
+            .to_string_parts();
+        let syntax = if details.label.starts_with('<') {
             "xml"
         } else {
             "python"
+        };
+        let ty_string = match declaration_name {
+            Some(name) if details.is_valid_syntax => format!("{name}: {}", details.label),
+            _ => details.label,
         };
         (ty_string, syntax)
     }
@@ -354,6 +390,7 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                 self.kind.fenced_code_block(parameter, "python").fmt(f)
             }
             HoverContent::Type {
+                declaration_name,
                 ty,
                 variance,
                 qualifiers,
@@ -368,7 +405,8 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
 
                 let qualifier_suffix = create_qualifier_suffix(*qualifiers);
 
-                let (ty_string, syntax) = self.ty_string_and_syntax(ty);
+                let (ty_string, syntax) =
+                    self.ty_string_and_syntax(declaration_name.as_deref(), ty);
                 self.kind
                     .fenced_code_block(format!("{ty_string}{variance}{qualifier_suffix}"), syntax)
                     .fmt(f)
@@ -382,7 +420,7 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                     .fmt(f)
             }
             HoverContent::TypedDictKey { owner, key, ty } => {
-                let (ty_string, syntax) = self.ty_string_and_syntax(ty);
+                let (ty_string, syntax) = self.ty_string_and_syntax(None, ty);
                 self.kind
                     .fenced_code_block(format!("(key of {owner}) {key}: {ty_string}"), syntax)
                     .fmt(f)
@@ -431,7 +469,7 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @"
-        Literal[10]
+        a: Literal[10]
         ---------------------------------------------
         This is the docs for this value
 
@@ -439,7 +477,7 @@ mod tests {
 
         ---------------------------------------------
         ```python
-        Literal[10]
+        a: Literal[10]
         ```
         ---
         This is the docs for this value<HB>
@@ -455,6 +493,251 @@ mod tests {
           | source
           |
         ");
+    }
+
+    #[test]
+    fn hover_semantic_type_expressions_omit_declaration_name() {
+        for (source, expected) in [
+            (r#"Alias = list[in<CURSOR>t]"#, "int"),
+            (
+                r#"from typing import TypeAlias
+Alias: TypeAlias = list[in<CURSOR>t]"#,
+                "int",
+            ),
+            (
+                r#"from typing import TypeAlias
+Alias: TypeAlias = "in<CURSOR>t""#,
+                "int",
+            ),
+            (
+                r#"from typing import TypeVar
+T = TypeVar("T", bound=in<CURSOR>t)"#,
+                "int",
+            ),
+            (
+                r#"from typing import NewType
+UserId = NewType("UserId", in<CURSOR>t)"#,
+                "int",
+            ),
+            (
+                r#"from typing import TypedDict
+Movie = TypedDict("Movie", {"year": in<CURSOR>t})"#,
+                "int",
+            ),
+            (
+                r#"from typing import NamedTuple
+Point = NamedTuple("Point", [("x", in<CURSOR>t)])"#,
+                "int",
+            ),
+            (
+                r#"class Decorator[T]:
+    def __init__(self, target): ...
+@Decorator[in<CURSOR>t]
+def decorated(): ..."#,
+                "int",
+            ),
+            (
+                r#"class Decorator[T]:
+    def __init__(self, target): ...
+@Decorator["in<CURSOR>t"]
+def decorated(): ..."#,
+                "int",
+            ),
+            (
+                r#"from typing import TypeVar, Union
+T = TypeVar("T")
+Alias = Union[T<CURSOR>]"#,
+                "TypeVar",
+            ),
+            (
+                r#"from typing import cast
+x = cast(flo<CURSOR>at, 1)"#,
+                "TypeForm[int | float]",
+            ),
+            (
+                r#"from typing import TypeAlias, TypeForm
+form: TypeForm[int]
+Alias: TypeAlias = form<CURSOR>"#,
+                "Unknown",
+            ),
+            (r#"x: Miss<CURSOR>ing[int]"#, "Unknown"),
+            (r#"x: "Miss<CURSOR>ing[int]""#, "Unknown"),
+            (
+                r#"from typing import Any
+module: Any
+x: mod<CURSOR>ule.Missing[int]"#,
+                "Unknown",
+            ),
+            (
+                r#"from typing import Any, TypeVar, overload
+from typing_extensions import TypeForm
+
+T = TypeVar("T")
+
+@overload
+def accepts(value: TypeForm[Any], discriminator: int) -> None: ...
+@overload
+def accepts(value: int, discriminator: str) -> None: ...
+def accepts(value, discriminator): ...
+
+accepts(T<CURSOR>, 1)"#,
+                "TypeVar",
+            ),
+            (
+                r#"from typing import Any, overload
+from typing_extensions import TypeForm
+
+@overload
+def accepts(value: TypeForm[Any], discriminator: int) -> None: ...
+@overload
+def accepts(value: int, discriminator: str) -> None: ...
+def accepts(value, discriminator): ...
+
+accepts("in<CURSOR>t", 1)"#,
+                "int",
+            ),
+            (
+                r#"from typing import Any, overload
+from typing_extensions import TypeForm
+
+module: Any
+
+@overload
+def accepts(value: object, discriminator: str) -> None: ...
+@overload
+def accepts(value: TypeForm[Any], discriminator: int) -> None: ...
+def accepts(value, discriminator): ...
+
+accepts(mod<CURSOR>ule.inner.Nested | int, 1)"#,
+                "Unknown",
+            ),
+        ] {
+            let hover = hover_test(source).hover();
+            assert_eq!(hover.lines().next(), Some(expected), "{hover}");
+        }
+    }
+
+    #[test]
+    fn hover_type_expression_value_arguments_use_declaration_context() {
+        for (source, expected) in [
+            (
+                r#"from enum import Enum
+class MyEnum(Enum):
+    ONE = 1
+    TWO = 2
+enum_val = MyEnum.TWO
+enum_<CURSOR>val"#,
+                "enum_val: Literal[MyEnum.TWO]",
+            ),
+            (
+                r#"from typing import Annotated
+metadata = 1
+value: Annotated[int, meta<CURSOR>data]"#,
+                "metadata: Literal[1]",
+            ),
+            (
+                r#"from typing import Literal
+literal_value = 1
+value: Literal[literal_<CURSOR>value]"#,
+                "literal_value: Literal[1]",
+            ),
+            (
+                r#"def f():
+    literal_value = 1
+    return
+    from typing import Literal
+    value: Literal[literal_<CURSOR>value]"#,
+                "literal_value: Literal[1]",
+            ),
+            (
+                r#"def f():
+    metadata = 1
+    return
+    from typing import Annotated
+    value: Annotated[int, meta<CURSOR>data]"#,
+                "metadata: Literal[1]",
+            ),
+            (
+                r#"from ty_extensions._internal import TypeOf
+first = 1
+second = 2
+value: TypeOf[fir<CURSOR>st, second]"#,
+                "first: Literal[1]",
+            ),
+            (
+                r#"from ty_extensions._internal import CallableTypeOf
+first = 1
+second = 2
+value: CallableTypeOf[fir<CURSOR>st, second]"#,
+                "first: Literal[1]",
+            ),
+            (
+                r#"from ty_extensions._internal import RegularCallableTypeOf
+first = 1
+second = 2
+value: RegularCallableTypeOf[fir<CURSOR>st, second]"#,
+                "first: Literal[1]",
+            ),
+            (
+                r#"from typing import TypeForm
+form: TypeForm[int]
+value: TypeForm[int] = form<CURSOR>"#,
+                "form: Unknown",
+            ),
+            (
+                r#"from typing import Annotated
+metadata = 1
+value: "Annotated[int, meta<CURSOR>data]""#,
+                "metadata: Literal[1]",
+            ),
+            (
+                r#"from typing import Annotated
+class A:
+    def method(self, value: int) -> str: ...
+a = A()
+value: "Annotated[int, a.met<CURSOR>hod]""#,
+                "def method(value: int) -> str",
+            ),
+            (
+                r#"from typing import Annotated
+class A:
+    def method(self, value: int) -> str: ...
+callback = A().method
+value: "Annotated[int, call<CURSOR>back()]""#,
+                "def method(value: int) -> str",
+            ),
+        ] {
+            let hover = hover_test(source).hover();
+            assert_eq!(hover.lines().next(), Some(expected), "{hover}");
+        }
+    }
+
+    #[test]
+    fn hover_string_annotation_call_preserves_overload_selection() {
+        let hover = hover_test(
+            r#"from typing import Annotated, overload
+
+class A:
+    @overload
+    def method(self, value: int) -> int:
+        "int docs"
+        ...
+
+    @overload
+    def method(self, value: str) -> str:
+        "str docs"
+        ...
+
+    def method(self, value): ...
+
+a = A()
+value: "Annotated[int, a.met<CURSOR>hod('value')]""#,
+        )
+        .hover();
+
+        assert_eq!(hover.lines().next(), Some("def method(value: str) -> str"));
+        assert!(hover.contains("str docs"), "{hover}");
+        assert!(!hover.contains("int docs"), "{hover}");
     }
 
     #[test]
@@ -1558,7 +1841,7 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @"
-        bound method MyClass.my_method(
+        def my_method(
             a,
             b
         ) -> Unknown
@@ -1571,7 +1854,7 @@ mod tests {
 
         ---------------------------------------------
         ```python
-        bound method MyClass.my_method(
+        def my_method(
             a,
             b
         ) -> Unknown
@@ -1593,6 +1876,132 @@ mod tests {
            |   source
            |
         ");
+    }
+
+    #[test]
+    fn hover_bound_method_references_use_declaration_context() {
+        for source in [
+            r#"class A:
+    def method(self, value: int) -> str: ...
+a = A()
+a.met<CURSOR>hod"#,
+            r#"class A:
+    def method(self, value: int) -> str: ...
+callback = A().method
+call<CURSOR>back"#,
+            r#"class A:
+    def method(self, value: int) -> str: ...
+class B:
+    def __init__(self):
+        self.callback = A().method
+b = B()
+b.call<CURSOR>back"#,
+        ] {
+            let hover = hover_test(source).hover();
+            assert_eq!(
+                hover.lines().next(),
+                Some("def method(value: int) -> str"),
+                "{hover}"
+            );
+        }
+    }
+
+    #[test]
+    fn hover_imported_bound_method_uses_declaration_context() {
+        let hover = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"class A:
+    def method(self, value: int) -> str: ...
+
+method = A().method"#,
+            )
+            .source("main.py", "from lib import met<CURSOR>hod")
+            .build()
+            .hover();
+
+        assert_eq!(hover.lines().next(), Some("def method(value: int) -> str"));
+    }
+
+    #[test]
+    fn hover_qualified_bound_method_targets_preserve_type_context() {
+        for expression in [
+            "b.call<CURSOR>back",
+            "b.call<CURSOR>back(1)",
+            "value: \"Annotated[int, b.call<CURSOR>back]\"",
+            "value: \"Annotated[int, b.call<CURSOR>back(1)]\"",
+        ] {
+            let source = format!(
+                r#"from typing import Annotated, Final
+
+class A:
+    def method(self, value: int) -> str: ...
+
+class B:
+    def __init__(self):
+        self.callback: Final = A().method
+
+b = B()
+{expression}"#,
+            );
+            let hover = hover_test(&source).hover();
+            assert_eq!(
+                hover.lines().next(),
+                Some("bound method A.method(value: int) -> str (Final)"),
+                "{hover}"
+            );
+        }
+    }
+
+    #[test]
+    fn hover_overload_selected_qualified_bound_method_preserves_qualifier() {
+        for expression in [
+            r#"callback<CURSOR>("value")"#,
+            r#"value: "Annotated[int, callback<CURSOR>('value')]""#,
+        ] {
+            let source = format!(
+                r#"from typing import Annotated, Final, overload
+
+class A:
+    @overload
+    def method(self, value: int) -> int: ...
+    @overload
+    def method(self, value: str) -> str: ...
+    def method(self, value): ...
+
+callback: Final = A().method
+{expression}"#,
+            );
+            let hover = hover_test(&source).hover();
+            assert_eq!(
+                hover.lines().next(),
+                Some("def method(value: str) -> str (Final)"),
+                "{hover}"
+            );
+        }
+    }
+
+    #[test]
+    fn hover_imported_qualified_bound_method_preserves_type_context() {
+        let hover = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"from typing import Final
+
+class A:
+    def method(self, value: int) -> str: ...
+
+callback: Final = A().method"#,
+            )
+            .source("main.py", "from lib import call<CURSOR>back")
+            .build()
+            .hover();
+
+        assert_eq!(
+            hover.lines().next(),
+            Some("bound method A.method(value: int) -> str (Final)"),
+            "{hover}"
+        );
     }
 
     #[test]
@@ -1649,7 +2058,7 @@ mod tests {
         );
 
         assert_snapshot!(string.hover(), @r#"
-        bound method str.removesuffix(suffix: str, /) -> str
+        def removesuffix(suffix: str, /) -> str
         ---------------------------------------------
         Return a str with the given suffix string removed if present.
 
@@ -1659,7 +2068,7 @@ mod tests {
 
         ---------------------------------------------
         ```python
-        bound method str.removesuffix(suffix: str, /) -> str
+        def removesuffix(suffix: str, /) -> str
         ```
         ---
         Return a str with the given suffix string removed if present.<HB>
@@ -1783,13 +2192,13 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @"
-        Unknown
+        foo: Unknown
         ---------------------------------------------
         Foo documentation
 
         ---------------------------------------------
         ```python
-        Unknown
+        foo: Unknown
         ```
         ---
         Foo documentation
@@ -2091,10 +2500,10 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @"
-        int
+        a: int
         ---------------------------------------------
         ```python
-        int
+        a: int
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -2479,10 +2888,10 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @"
-        Literal[123]
+        value: Literal[123]
         ---------------------------------------------
         ```python
-        Literal[123]
+        value: Literal[123]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -2512,10 +2921,10 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @"
-        int
+        ab: int
         ---------------------------------------------
         ```python
-        int
+        ab: int
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -3680,10 +4089,10 @@ def outer():
 
         // Should find the variable declaration in the outer scope, not the nonlocal statement
         assert_snapshot!(test.hover(), @r#"
-        Literal["modified"]
+        x: Literal["modified"]
         ---------------------------------------------
         ```python
-        Literal["modified"]
+        x: Literal["modified"]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -3732,10 +4141,10 @@ def function():
 
         // Should find the global variable declaration, not the global statement
         assert_snapshot!(test.hover(), @r#"
-        Literal["modified"]
+        global_var: Literal["modified"]
         ---------------------------------------------
         ```python
-        Literal["modified"]
+        global_var: Literal["modified"]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -3793,10 +4202,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        str
+        ab: str
         ---------------------------------------------
         ```python
-        str
+        ab: str
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -3837,10 +4246,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        list[str]
+        ab: list[str]
         ---------------------------------------------
         ```python
-        list[str]
+        ab: list[str]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -3881,10 +4290,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        str
+        ab: str
         ---------------------------------------------
         ```python
-        str
+        ab: str
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -3937,10 +4346,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        str
+        ab: str
         ---------------------------------------------
         ```python
-        str
+        ab: str
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -4319,7 +4728,7 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        Literal[1]
+        value: Literal[1]
         ---------------------------------------------
         This is the docs for this value
 
@@ -4327,7 +4736,7 @@ def function():
 
         ---------------------------------------------
         ```python
-        Literal[1]
+        value: Literal[1]
         ```
         ---
         This is the docs for this value<HB>
@@ -4367,7 +4776,7 @@ def function():
         // of the `value` symbol here in read-context is `1`. This comment mainly exists to
         // signal that it might be okay to revisit this in the future and reveal 3 instead.
         assert_snapshot!(test.hover(), @"
-        Literal[1]
+        value: Literal[1]
         ---------------------------------------------
         This is the docs for this value
 
@@ -4375,7 +4784,7 @@ def function():
 
         ---------------------------------------------
         ```python
-        Literal[1]
+        value: Literal[1]
         ```
         ---
         This is the docs for this value<HB>
@@ -4413,7 +4822,7 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        Literal[2]
+        attr: Literal[2]
         ---------------------------------------------
         This is the docs for this value
 
@@ -4421,7 +4830,7 @@ def function():
 
         ---------------------------------------------
         ```python
-        Literal[2]
+        attr: Literal[2]
         ```
         ---
         This is the docs for this value<HB>
@@ -4461,7 +4870,7 @@ def function():
         // See the comment in the `hover_augmented_assignment` test above. The same
         // reasoning applies here.
         assert_snapshot!(test.hover(), @"
-        int
+        attr: int
         ---------------------------------------------
         This is the docs for this value
 
@@ -4469,7 +4878,7 @@ def function():
 
         ---------------------------------------------
         ```python
-        int
+        attr: int
         ```
         ---
         This is the docs for this value<HB>
@@ -4501,7 +4910,7 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        int
+        a: int
         ---------------------------------------------
         This is the docs for this value
 
@@ -4509,7 +4918,7 @@ def function():
 
         ---------------------------------------------
         ```python
-        int
+        a: int
         ```
         ---
         This is the docs for this value<HB>
@@ -4541,7 +4950,7 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        Literal[1]
+        a: Literal[1]
         ---------------------------------------------
         This is the docs for this value
 
@@ -4549,7 +4958,7 @@ def function():
 
         ---------------------------------------------
         ```python
-        Literal[1]
+        a: Literal[1]
         ```
         ---
         This is the docs for this value<HB>
@@ -4584,7 +4993,7 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        int
+        a: int
         ---------------------------------------------
         This is the docs for this value
 
@@ -4592,7 +5001,7 @@ def function():
 
         ---------------------------------------------
         ```python
-        int
+        a: int
         ```
         ---
         This is the docs for this value<HB>
@@ -4625,7 +5034,7 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        int
+        a: int
         ---------------------------------------------
         This is the docs for this value
 
@@ -4633,7 +5042,7 @@ def function():
 
         ---------------------------------------------
         ```python
-        int
+        a: int
         ```
         ---
         This is the docs for this value<HB>
@@ -4669,7 +5078,7 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        int
+        a: int
         ---------------------------------------------
         This is the docs for this value
 
@@ -4677,7 +5086,7 @@ def function():
 
         ---------------------------------------------
         ```python
-        int
+        a: int
         ```
         ---
         This is the docs for this value<HB>
@@ -4708,10 +5117,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        str (Final)
+        a: str (Final)
         ---------------------------------------------
         ```python
-        str (Final)
+        a: str (Final)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -4736,10 +5145,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        Literal[1] (Final)
+        x: Literal[1] (Final)
         ---------------------------------------------
         ```python
-        Literal[1] (Final)
+        x: Literal[1] (Final)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -4765,10 +5174,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        Literal[1] (Final)
+        x: Literal[1] (Final)
         ---------------------------------------------
         ```python
-        Literal[1] (Final)
+        x: Literal[1] (Final)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -4797,10 +5206,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        int (ClassVar)
+        x: int (ClassVar)
         ---------------------------------------------
         ```python
-        int (ClassVar)
+        x: int (ClassVar)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -4829,10 +5238,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        int (Final)
+        x: int (Final)
         ---------------------------------------------
         ```python
-        int (Final)
+        x: int (Final)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -4863,10 +5272,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        str
+        a: str
         ---------------------------------------------
         ```python
-        str
+        a: str
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -5519,10 +5928,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        Literal[1]
+        ab: Literal[1]
         ---------------------------------------------
         ```python
-        Literal[1]
+        ab: Literal[1]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -5936,10 +6345,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        TypeVar
+        T: TypeVar
         ---------------------------------------------
         ```python
-        TypeVar
+        T: TypeVar
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -5992,10 +6401,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        TypeVar
+        T: TypeVar
         ---------------------------------------------
         ```python
-        TypeVar
+        T: TypeVar
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -6253,10 +6662,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        Literal[1] (Final)
+        x: Literal[1] (Final)
         ---------------------------------------------
         ```python
-        Literal[1] (Final)
+        x: Literal[1] (Final)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -6332,10 +6741,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        int
+        x: int
         ---------------------------------------------
         ```python
-        int
+        x: int
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -6356,10 +6765,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        int
+        x: int
         ---------------------------------------------
         ```python
-        int
+        x: int
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -6383,10 +6792,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        list[int]
+        _: list[int]
         ---------------------------------------------
         ```python
-        list[int]
+        _: list[int]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -6407,10 +6816,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        list[int]
+        _: list[int]
         ---------------------------------------------
         ```python
-        list[int]
+        _: list[int]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -6526,10 +6935,10 @@ def function():
 
         // Unknown is correct
         assert_snapshot!(test.hover(), @"
-        Unknown
+        submod: Unknown
         ---------------------------------------------
         ```python
-        Unknown
+        submod: Unknown
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -6644,10 +7053,10 @@ def function():
 
         // int is correct
         assert_snapshot!(test.hover(), @"
-        int
+        subpkg: int
         ---------------------------------------------
         ```python
-        int
+        subpkg: int
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -6683,10 +7092,10 @@ def function():
 
         // int is correct
         assert_snapshot!(test.hover(), @"
-        int
+        subpkg: int
         ---------------------------------------------
         ```python
-        int
+        subpkg: int
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -6728,10 +7137,10 @@ def function():
             .build();
 
         assert_snapshot!(test.hover(), @"
-        Literal[10]
+        a: Literal[10]
         ---------------------------------------------
         ```python
-        Literal[10]
+        a: Literal[10]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -6755,10 +7164,10 @@ def function():
 
         // __file__ should be `str` when accessed within a module, not `str | None`
         assert_snapshot!(test.hover(), @"
-        str
+        __file__: str
         ---------------------------------------------
         ```python
-        str
+        __file__: str
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
