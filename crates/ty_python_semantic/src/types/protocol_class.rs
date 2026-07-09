@@ -26,10 +26,11 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
         CallableType, ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor, GenericAlias,
-        GenericContext, InstanceFallbackShadowsNonDataDescriptor, IntersectionType, KnownFunction,
-        MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter, PropertyInstanceType,
-        ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral, Type, TypeMapping,
-        TypeQualifiers, TypeVarBoundOrConstraints, TypeVarVariance, UnionType, VarianceInferable,
+        GenericContext, IntersectionType, KnownFunction, MaterializationKind, MemberLookupKey,
+        MemberLookupPolicy, Parameter, PropertyInstanceType, ProtocolInstanceType,
+        ReceiverMemberShadowsNonDataDescriptor, SelfBinding, Signature, StaticClassLiteral, Type,
+        TypeMapping, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+        VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
@@ -2522,7 +2523,7 @@ fn protocol_member_read_type<'db>(
             ),
             ty,
             Place::Undefined.into(),
-            InstanceFallbackShadowsNonDataDescriptor::No,
+            ReceiverMemberShadowsNonDataDescriptor::No,
         )
         .unwrap_or_else(|error| error.fallback_member(db))
         .place
