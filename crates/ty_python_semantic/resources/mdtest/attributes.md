@@ -1587,11 +1587,14 @@ reveal_type(StaticMethodAssignment().generated)  # revealed: int
 ```
 
 A conditional class-body attribute takes precedence when it exists, while the metaclass declaration
-supplies the attribute on the other path. By contrast, an instance assignment inside a conditionally
-defined method does not establish that the instance attribute exists:
+supplies the attribute on the other path. An assignment inside a conditionally defined method is
+only a possible instance member, so the metaclass declaration remains as a fallback:
 
 ```py
-flag = bool()
+def returns_bool() -> bool:
+    raise NotImplementedError
+
+flag = returns_bool()
 
 class ConditionalGenerated(metaclass=StoringMeta):
     if flag:
@@ -1604,7 +1607,7 @@ class ConditionalMethodAssignment(metaclass=StoringMeta):
         def assign(self) -> None:
             self.generated = "instance"
 
-reveal_type(ConditionalMethodAssignment().generated)  # revealed: int
+reveal_type(ConditionalMethodAssignment().generated)  # revealed: int | str
 ```
 
 An attribute assigned in the metaclass body is available on classes that use the metaclass, but not
