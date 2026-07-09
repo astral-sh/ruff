@@ -145,28 +145,33 @@ pub(super) enum FallbackAttributeWriteRequirement<'db> {
 
 /// The members that can govern an attribute write.
 pub(super) enum AssignmentAttributeMembers<'db> {
-    /// The primary lookup result governs the write, together with a fallback when it may be
-    /// missing.
-    Primary {
+    /// A member found on the receiver's type governs the write, together with a receiver member
+    /// when the type member may be missing.
+    TypeMember {
         member: PlaceAndQualifiers<'db>,
-        fallback: Option<PlaceAndQualifiers<'db>>,
+        receiver_fallback: Option<PlaceAndQualifiers<'db>>,
     },
-    /// A class member shadows a metaclass member that is definitely non-data.
-    ShadowingClassMember(PlaceAndQualifiers<'db>),
+    /// A receiver-level member governs the write.
+    ReceiverMember(PlaceAndQualifiers<'db>),
 }
 
 impl<'db> AssignmentAttributeMembers<'db> {
-    pub(super) fn primary(self) -> Option<PlaceAndQualifiers<'db>> {
+    /// Return the member whose descriptor protocol applies to the receiver, if any.
+    pub(super) fn type_member(self) -> Option<PlaceAndQualifiers<'db>> {
         match self {
-            Self::Primary { member, .. } => Some(member),
-            Self::ShadowingClassMember(_) => None,
+            Self::TypeMember { member, .. } => Some(member),
+            Self::ReceiverMember(_) => None,
         }
     }
 
+    /// Iterate over every member that can govern the write at runtime.
     pub(super) fn effective_members(self) -> impl Iterator<Item = PlaceAndQualifiers<'db>> {
         let members = match self {
-            Self::Primary { member, fallback } => [Some(member), fallback],
-            Self::ShadowingClassMember(member) => [Some(member), None],
+            Self::TypeMember {
+                member,
+                receiver_fallback,
+            } => [Some(member), receiver_fallback],
+            Self::ReceiverMember(member) => [Some(member), None],
         };
         members.into_iter().flatten()
     }
@@ -291,17 +296,20 @@ fn instance_attribute_write_member_requirement<'db>(
     let Some(members) = assignment_attribute_members(db, object_ty, attribute) else {
         return InstanceAttributeWriteMember::SetAttr;
     };
-    let (meta_attr, fallback_attr) = match members {
-        AssignmentAttributeMembers::Primary { member, fallback } => (member, fallback),
-        AssignmentAttributeMembers::ShadowingClassMember(fallback) => {
+    let (type_member, receiver_fallback) = match members {
+        AssignmentAttributeMembers::TypeMember {
+            member,
+            receiver_fallback,
+        } => (member, receiver_fallback),
+        AssignmentAttributeMembers::ReceiverMember(member) => {
             return InstanceAttributeWriteMember::Instance(instance_fallback_write_requirement(
-                db, object_ty, attribute, fallback,
+                db, object_ty, attribute, member,
             ));
         }
     };
 
-    match meta_attr {
-        meta_attr if meta_attr.is_class_var() => InstanceAttributeWriteMember::ClassVar,
+    match type_member {
+        type_member if type_member.is_class_var() => InstanceAttributeWriteMember::ClassVar,
         PlaceAndQualifiers {
             place: Place::Defined(DefinedPlace { ty, .. }),
             qualifiers,
@@ -313,14 +321,14 @@ fn instance_attribute_write_member_requirement<'db>(
                 ty.bind_self_typevars(db, object_ty),
                 qualifiers,
             ),
-            fallback: fallback_attr.map(|fallback| {
+            fallback: receiver_fallback.map(|fallback| {
                 instance_fallback_write_requirement(db, object_ty, attribute, fallback)
             }),
         },
         PlaceAndQualifiers {
             place: Place::Undefined,
             ..
-        } => match fallback_attr {
+        } => match receiver_fallback {
             Some(
                 fallback @ PlaceAndQualifiers {
                     place: Place::Defined(_),
@@ -349,32 +357,35 @@ fn class_attribute_write_requirement<'db>(
     let Some(class_attr_self_ty) = object_ty.to_instance(db) else {
         return AttributeWriteRequirement::Unconstrained;
     };
-    let (meta_attr, fallback_attr) = match members {
-        AssignmentAttributeMembers::Primary { member, fallback } => (member, fallback),
-        AssignmentAttributeMembers::ShadowingClassMember(fallback) => {
+    let (type_member, receiver_fallback) = match members {
+        AssignmentAttributeMembers::TypeMember {
+            member,
+            receiver_fallback,
+        } => (member, receiver_fallback),
+        AssignmentAttributeMembers::ReceiverMember(member) => {
             return AttributeWriteRequirement::Class {
                 object_ty,
                 member: ClassAttributeWriteMember::ClassAttribute(
-                    class_fallback_write_requirement(db, object_ty, class_attr_self_ty, fallback),
+                    class_fallback_write_requirement(db, object_ty, class_attr_self_ty, member),
                 ),
             };
         }
     };
 
-    let member = match meta_attr {
+    let member = match type_member {
         PlaceAndQualifiers {
             place: Place::Defined(DefinedPlace { ty, .. }),
             qualifiers,
         } => ClassAttributeWriteMember::Explicit {
             member: explicit_attribute_write_requirement(db, object_ty, attribute, ty, qualifiers),
-            fallback: fallback_attr.map(|fallback| {
+            fallback: receiver_fallback.map(|fallback| {
                 class_fallback_write_requirement(db, object_ty, class_attr_self_ty, fallback)
             }),
         },
         PlaceAndQualifiers {
             place: Place::Undefined,
             ..
-        } => match fallback_attr {
+        } => match receiver_fallback {
             Some(
                 fallback @ PlaceAndQualifiers {
                     place: Place::Defined(_),
@@ -540,17 +551,17 @@ pub(super) fn property_setter_returns_never<'db>(
     })
 }
 
-/// Return the class member that shadows a definitely non-data metaclass member, if any.
-fn shadowing_class_member<'db>(
+/// Return the class member that takes precedence over a definitely non-data metaclass member.
+fn class_member_preceding_non_data_metaclass_member<'db>(
     db: &'db dyn Db,
     object_ty: Type<'db>,
     attribute: &str,
-    meta_attr: PlaceAndQualifiers<'db>,
+    type_member: PlaceAndQualifiers<'db>,
 ) -> Option<PlaceAndQualifiers<'db>> {
     if !matches!(
         object_ty,
         Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..)
-    ) || !meta_attr
+    ) || !type_member
         .place
         .ignore_possibly_undefined()?
         .is_definitely_non_data_descriptor(db)
@@ -565,10 +576,11 @@ fn shadowing_class_member<'db>(
 
 /// Return the members considered by attribute assignment in lookup-precedence order.
 ///
-/// The primary member comes from class-member lookup. Its fallback is queried when that member is
-/// absent or possibly undefined. For class objects, a class-MRO member instead shadows a
-/// definitely non-data metaclass member. Composite and dynamic receiver types return `None`;
-/// their callers either decompose them before this point or handle them without member lookup.
+/// The type member comes from class-member lookup. A member found directly on the receiver is
+/// queried when the type member is absent or possibly undefined. For class objects, a class-MRO
+/// member instead takes precedence over a definitely non-data metaclass member. Composite and
+/// dynamic receiver types return `None`; their callers either decompose them before this point or
+/// handle them without member lookup.
 ///
 /// This helper deliberately does not bind `Self` or interpret descriptors so that assignment,
 /// protocol compatibility, and `Final` validation share exactly the same lookup precedence.
@@ -579,7 +591,7 @@ pub(super) fn assignment_attribute_members<'db>(
 ) -> Option<AssignmentAttributeMembers<'db>> {
     // Precise `functools.partial` instances synthesize a refined `__call__` member instead of
     // using the broad signature from typeshed.
-    let meta_attr = if attribute == "__call__"
+    let type_member = if attribute == "__call__"
         && matches!(
             object_ty,
             Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_))
@@ -588,17 +600,19 @@ pub(super) fn assignment_attribute_members<'db>(
     } else {
         object_ty.class_member(db, attribute.into())
     };
-    if let Some(class_attr) = shadowing_class_member(db, object_ty, attribute, meta_attr) {
-        return Some(AssignmentAttributeMembers::ShadowingClassMember(class_attr));
+    if let Some(receiver_member) =
+        class_member_preceding_non_data_metaclass_member(db, object_ty, attribute, type_member)
+    {
+        return Some(AssignmentAttributeMembers::ReceiverMember(receiver_member));
     }
-    let needs_fallback = matches!(
-        meta_attr.place,
+    let needs_receiver_fallback = matches!(
+        type_member.place,
         Place::Defined(DefinedPlace {
             definedness: Definedness::PossiblyUndefined,
             ..
         }) | Place::Undefined
     );
-    let fallback_attr = if needs_fallback {
+    let receiver_fallback = if needs_receiver_fallback {
         Some(match object_ty {
             Type::NominalInstance(..)
             | Type::ProtocolInstance(_)
@@ -637,8 +651,8 @@ pub(super) fn assignment_attribute_members<'db>(
     } else {
         None
     };
-    Some(AssignmentAttributeMembers::Primary {
-        member: meta_attr,
-        fallback: fallback_attr,
+    Some(AssignmentAttributeMembers::TypeMember {
+        member: type_member,
+        receiver_fallback,
     })
 }
