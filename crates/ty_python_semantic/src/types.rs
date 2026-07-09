@@ -2839,6 +2839,7 @@ impl<'db> Type<'db> {
 
             let class_member = self.class_member_with_policy(db, name.into(), policy);
             let alternative_member = |alternative: &Type<'db>| {
+                let alternative = alternative.resolve_type_alias(db);
                 alternative
                     .class_member_with_policy(db, name.into(), policy)
                     .or_fall_back_to(db, || {

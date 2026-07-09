@@ -1391,6 +1391,32 @@ def read_mixed_member_union_bound(value: TMixedMemberUnionBound) -> None:
     reveal_type(value.generated)  # revealed: int | str
 ```
 
+Aliases of union bounds preserve generated-attribute precedence:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class InheritedGeneratedBase:
+    generated = "inherited"
+
+class AliasedGeneratedA(InheritedGeneratedBase, metaclass=StoringMeta): ...
+class AliasedGeneratedB(InheritedGeneratedBase, metaclass=StoringMeta): ...
+
+type GeneratedAlternatives = AliasedGeneratedA | AliasedGeneratedB
+
+TDirectGeneratedBound = TypeVar("TDirectGeneratedBound", bound=AliasedGeneratedA | AliasedGeneratedB)
+TAliasedGeneratedBound = TypeVar("TAliasedGeneratedBound", bound=GeneratedAlternatives)
+
+def read_direct_generated_bound(value: TDirectGeneratedBound) -> None:
+    reveal_type(value.generated)  # revealed: int
+
+def read_aliased_generated_bound(value: TAliasedGeneratedBound) -> None:
+    reveal_type(value.generated)  # revealed: int
+```
+
 Every constraint or union-bound alternative must provide the generated attribute:
 
 ```py
