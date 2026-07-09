@@ -9,7 +9,7 @@ Released on 2026-07-09.
 - Add `--add-ignore` for adding `ruff:ignore` comments ([#26346](https://github.com/astral-sh/ruff/pull/26346))
 - \[`flake8-comprehensions`\] Drop `C409` tuple comprehension preview behavior ([#25707](https://github.com/astral-sh/ruff/pull/25707))
 - Avoid whitespace normalization when formatting comments ([#26455](https://github.com/astral-sh/ruff/pull/26455))
-- \[`pyupgrade`\] Lint and fix use of deprecated `abc` decorators ([#26417](https://github.com/astral-sh/ruff/pull/26417))
+- \[`pyupgrade`\] Lint and fix use of deprecated `abc` decorators (`UP051`) ([#26417](https://github.com/astral-sh/ruff/pull/26417))
 
 ### Bug fixes
 
