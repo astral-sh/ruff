@@ -1124,6 +1124,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             });
         }
 
+        // A source union must relate to the target through every element. Preserve that structure
+        // when the target variable is universal; lazy evaluation would otherwise capture the
+        // entire union as an opaque lower bound before reaching the ordinary union rule below.
+        if let (Type::Union(union), Type::TypeVar(typevar)) = (source, target)
+            && typevar.is_inferable(db, self.universally_quantified)
+        {
+            return union
+                .elements(db)
+                .iter()
+                .when_all(db, self.constraints, |&element| {
+                    self.check_type_pair(db, element, target)
+                });
+        }
+
         if self.is_gradual_assignability_with_universal_typevar(db, source, target) {
             return self.always();
         }

@@ -2971,11 +2971,25 @@ class UnknownIdentity:
     def f(self, value):
         return value
 
+class GradualGenericIdentity:
+    def f[S](self, value: S) -> S | Any:
+        return value
+
+class OptionalReturnIdentity:
+    def f[S](self, value: S) -> S | None:
+        return value
+
 # Gradual types are assignable to every specialization, but are not strict subtypes.
 static_assert(is_assignable_to(AnyIdentity, IdentityProtocol))
 static_assert(not is_subtype_of(AnyIdentity, IdentityProtocol))
 static_assert(is_assignable_to(UnknownIdentity, IdentityProtocol))
 static_assert(not is_subtype_of(UnknownIdentity, IdentityProtocol))
+static_assert(is_assignable_to(GradualGenericIdentity, IdentityProtocol))
+static_assert(not is_subtype_of(GradualGenericIdentity, IdentityProtocol))
+
+# A fully static union does not acquire the same assignability from an unrelated arm.
+static_assert(not is_assignable_to(OptionalReturnIdentity, IdentityProtocol))
+static_assert(not is_subtype_of(OptionalReturnIdentity, IdentityProtocol))
 
 class ListIdentityProtocol(Protocol):
     def f[T](self, value: list[T]) -> list[T]: ...
