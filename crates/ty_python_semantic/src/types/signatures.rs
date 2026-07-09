@@ -815,12 +815,6 @@ impl<'db> Signature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        if let TypeMapping::BindSelf(binding) = type_mapping
-            && !self.self_type_satisfies_domains(db, binding.self_type())
-        {
-            return Self::bottom();
-        }
-
         Self {
             generic_context: self
                 .generic_context
@@ -987,15 +981,10 @@ impl<'db> Signature<'db> {
             );
             return_ty = return_ty.apply_type_mapping(db, &self_mapping, TypeContext::default());
         }
-        let generic_context = if self_type.is_none() && bound_receiver.is_some() {
-            signature.generic_context
-        } else {
-            signature
-                .generic_context
-                .map(|generic_context| generic_context.remove_self(db, binding_context))
-        };
         Self {
-            generic_context,
+            generic_context: signature
+                .generic_context
+                .map(|generic_context| generic_context.remove_self(db, binding_context)),
             definition: signature.definition,
             parameters,
             return_ty,
@@ -1026,55 +1015,23 @@ impl<'db> Signature<'db> {
             return None;
         }
 
-        let domain = typevar
-            .typevar(db)
-            .bound_or_constraints(db)
-            .map(|bound| bound.as_type(db))
-            .unwrap_or(Type::object());
-        if self_type.is_some_and(|self_type| !self_type.is_assignable_to(db, domain)) {
-            return Some(Self::bottom());
-        }
-
-        let (receiver_type, receiver_self) = if let Some(self_type) = self_type {
-            (self_type, None)
-        } else {
-            let receiver_self =
-                BoundTypeVarInstance::synthetic_self(db, domain, typevar.binding_context(db));
-            (Type::TypeVar(receiver_self), Some(receiver_self))
-        };
-        let mut signature = self.apply_type_mapping_impl(
+        let receiver_type = self_type.unwrap_or_else(|| {
+            Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+                db,
+                typevar
+                    .typevar(db)
+                    .bound_or_constraints(db)
+                    .map(|bound| bound.as_type(db))
+                    .unwrap_or(Type::object()),
+                typevar.binding_context(db),
+            ))
+        });
+        Some(self.apply_type_mapping_impl(
             db,
             &TypeMapping::ApplySpecialization(ApplySpecialization::Single(typevar, receiver_type)),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
-        );
-        if let Some(receiver_self) = receiver_self {
-            signature.generic_context = Some(GenericContext::from_typevar_instances(
-                db,
-                std::iter::once(receiver_self).chain(
-                    signature
-                        .generic_context
-                        .into_iter()
-                        .flat_map(|context| context.variables(db)),
-                ),
-            ));
-        }
-        Some(signature)
-    }
-
-    /// Returns whether `self_type` satisfies every deferred `Self` domain in this signature.
-    fn self_type_satisfies_domains(&self, db: &'db dyn Db, self_type: Type<'db>) -> bool {
-        self.generic_context
-            .into_iter()
-            .flat_map(|context| context.variables(db))
-            .filter(|typevar| typevar.typevar(db).is_self(db))
-            .all(|typevar| {
-                typevar
-                    .typevar(db)
-                    .bound_or_constraints(db)
-                    .map(|bound| self_type.is_assignable_to(db, bound.as_type(db)))
-                    .unwrap_or(true)
-            })
+        ))
     }
 
     /// Returns `true` if this signature's first parameter can accept the bound `self` type.
@@ -1151,16 +1108,8 @@ impl<'db> Signature<'db> {
     }
 
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
-        if !self.self_type_satisfies_domains(db, self_type) {
-            return Self::bottom();
-        }
-
         if !self.needs_self_mapping(db, false) {
-            let mut signature = self.clone();
-            signature.generic_context = signature.generic_context.map(|generic_context| {
-                generic_context.remove_self(db, self.definition.map(BindingContext::Definition))
-            });
-            return signature;
+            return self.clone();
         }
 
         let self_mapping = TypeMapping::BindSelf(SelfBinding::new(
@@ -1178,9 +1127,7 @@ impl<'db> Signature<'db> {
             self.return_ty
                 .apply_type_mapping(db, &self_mapping, TypeContext::default());
         Self {
-            generic_context: self.generic_context.map(|generic_context| {
-                generic_context.remove_self(db, self.definition.map(BindingContext::Definition))
-            }),
+            generic_context: self.generic_context,
             definition: self.definition,
             parameters,
             return_ty,
