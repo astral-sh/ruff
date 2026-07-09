@@ -1313,6 +1313,42 @@ impl<'db> Signature<'db> {
             .collect()
     }
 
+    /// Freshens this source signature when its local variables would otherwise collide with the
+    /// target signature's variables.
+    fn freshen_as_source_against<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        target: &Signature<'db>,
+    ) -> Cow<'a, Self> {
+        if self.generic_context != target.generic_context
+            && let Some(generic_context) = self.generic_context
+            && let Some(delta) = target
+                .max_typevar_freshness_matching_generic_context(db, generic_context)
+                .map(|freshness| freshness.increment().value())
+        {
+            Cow::Owned(self.freshen_bound_typevars(db, delta))
+        } else {
+            Cow::Borrowed(self)
+        }
+    }
+
+    /// Freshens this target signature after the source signature has been prepared.
+    fn freshen_as_target_against<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+    ) -> Cow<'a, Self> {
+        if let Some(generic_context) = self.generic_context
+            && let Some(delta) = source
+                .max_typevar_freshness_matching_generic_context(db, generic_context)
+                .map(|freshness| freshness.increment().value())
+        {
+            Cow::Owned(self.freshen_bound_typevars(db, delta))
+        } else {
+            Cow::Borrowed(self)
+        }
+    }
+
     /// Returns whether a function-local type variable occurs inside another type in this
     /// signature.
     fn has_nested_local_typevar(
@@ -1681,16 +1717,7 @@ impl<'a, 'db> QuantifiedCallableTarget<'a, 'db> {
         source: &'source Signature<'db>,
     ) -> QuantifiedCallableSource<'source, 'db> {
         let target = self.signature.as_ref();
-        let signature = if source.generic_context != target.generic_context
-            && let Some(generic_context) = source.generic_context
-            && let Some(delta) = target
-                .max_typevar_freshness_matching_generic_context(db, generic_context)
-                .map(|freshness| freshness.increment().value())
-        {
-            Cow::Owned(source.freshen_bound_typevars(db, delta))
-        } else {
-            Cow::Borrowed(source)
-        };
+        let signature = source.freshen_as_source_against(db, target);
         let typevars = signature.typevars(db);
         let locals = InferableTypeVars::from_bound_typevars(db, typevars.iter().copied());
         QuantifiedCallableSource {
@@ -2016,32 +2043,57 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
         // Freshen callable-local typevars so variables from distinct signatures do not collide.
-        let freshened_source;
-        let source = if source.generic_context != target.generic_context
-            && let Some(generic_context) = source.generic_context
-            && let Some(delta) = target
-                .max_typevar_freshness_matching_generic_context(db, generic_context)
-                .map(|freshness| freshness.increment().value())
-        {
-            freshened_source = source.freshen_bound_typevars(db, delta);
-            &freshened_source
-        } else {
-            source
-        };
+        let source = source.freshen_as_source_against(db, target);
+        let target = target.freshen_as_target_against(db, source.as_ref());
 
-        let freshened_target;
-        let target = if let Some(generic_context) = target.generic_context
-            && let Some(delta) = source
-                .max_typevar_freshness_matching_generic_context(db, generic_context)
-                .map(|freshness| freshness.increment().value())
-        {
-            freshened_target = target.freshen_bound_typevars(db, delta);
-            &freshened_target
-        } else {
-            target
-        };
+        self.check_signature_pair_existentially(db, source.as_ref(), target.as_ref())
+    }
 
-        self.check_signature_pair_existentially(db, source, target)
+    /// Directly compares finite constrained domains when variables occur inside other types.
+    ///
+    /// This is an exact bounded strategy for cases that the symbolic constraint representation
+    /// cannot always project. Returning `None` leaves the symbolic strategy responsible for the
+    /// relation.
+    fn try_check_constrained_signature_specializations(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &QuantifiedCallableTarget<'_, 'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        const SPECIALIZATION_LIMIT: usize = 64;
+
+        let source_typevars = source.typevars(db);
+        let has_nested_local = source.has_nested_local_typevar(db, &source_typevars)
+            || target
+                .signature
+                .has_nested_local_typevar(db, &target.typevars);
+        if !has_nested_local {
+            return None;
+        }
+
+        let source_specializations = source.constrained_specializations_with_limit(
+            db,
+            &source_typevars,
+            SPECIALIZATION_LIMIT,
+        )?;
+        let target_specializations = target.signature.constrained_specializations_with_limit(
+            db,
+            &target.typevars,
+            SPECIALIZATION_LIMIT / source_specializations.len(),
+        )?;
+        Some(
+            target_specializations
+                .iter()
+                .when_all(db, self.constraints, |target| {
+                    source_specializations
+                        .iter()
+                        .when_any(db, self.constraints, |source| {
+                            self.with_signature_recursion_guard(source, target, || {
+                                self.check_signature_pair_inner(db, source, target)
+                            })
+                        })
+                }),
+        )
     }
 
     /// Compares every source overload with a generic target as
@@ -2076,41 +2128,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             ExistentialConstraintAlternative::new(relation, source.typevars)
         };
 
-        if let [source] = source_signatures {
-            const SPECIALIZATION_LIMIT: usize = 64;
-
-            let source_typevars = source.typevars(db);
-            let has_nested_local = source.has_nested_local_typevar(db, &source_typevars)
-                || target
-                    .signature
-                    .has_nested_local_typevar(db, &target.typevars);
-            if has_nested_local
-                && let Some(source_specializations) = source.constrained_specializations_with_limit(
-                    db,
-                    &source_typevars,
-                    SPECIALIZATION_LIMIT,
-                )
-                && let Some(target_specializations) =
-                    target.signature.constrained_specializations_with_limit(
-                        db,
-                        &target.typevars,
-                        SPECIALIZATION_LIMIT / source_specializations.len(),
-                    )
-            {
-                return Some(target_specializations.iter().when_all(
-                    db,
-                    self.constraints,
-                    |target| {
-                        source_specializations
-                            .iter()
-                            .when_any(db, self.constraints, |source| {
-                                self.with_signature_recursion_guard(source, target, || {
-                                    self.check_signature_pair_inner(db, source, target)
-                                })
-                            })
-                    },
-                ));
-            }
+        if let [source] = source_signatures
+            && let Some(result) =
+                self.try_check_constrained_signature_specializations(db, source, &target)
+        {
+            return Some(result);
         }
 
         let quantify_source_signatures = || {
