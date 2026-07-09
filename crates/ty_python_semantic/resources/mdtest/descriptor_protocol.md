@@ -378,22 +378,22 @@ reveal_type(UnionC.attribute)  # revealed: Any | Literal["descriptor"]
 
 ### `TypeForm` metaclass attributes
 
-A metaclass attribute typed as `TypeForm[Any]` could be a class whose own metaclass makes it a data
-descriptor. It must therefore continue to take precedence over a class attribute with the same name
-when assigning to the attribute:
+A `TypeForm` argument describes the instances produced by a type form, not the runtime type form
+value itself. A metaclass attribute typed as `TypeForm[Descriptor]` can therefore be a class whose
+own metaclass makes it a data descriptor, and must continue to take precedence over a class
+attribute with the same name when assigning to the attribute:
 
 ```py
-from typing import Any
 from typing_extensions import TypeForm
 
 class DescriptorMeta(type):
-    def __set__(self, instance: object, value: object) -> None:
+    def __set__(self, instance: object, value: str) -> None:
         pass
 
 class Descriptor(metaclass=DescriptorMeta): ...
 
 class Meta(type):
-    attribute: TypeForm[Any] = Descriptor
+    attribute: TypeForm[Descriptor] = Descriptor
 
 class C(metaclass=Meta):
     attribute: int = 1
