@@ -3520,8 +3520,8 @@ impl<'db> Type<'db> {
 
     /// Returns whether this type is known not to be a data descriptor.
     ///
-    /// Descriptor uncertainty only propagates through outer unions, intersections, and aliases;
-    /// type arguments do not affect the runtime descriptor class.
+    /// Descriptor uncertainty only propagates through outer unions, intersections, aliases, and
+    /// `TypeForm` arguments. Other type arguments do not affect the runtime descriptor class.
     pub(crate) fn is_definitely_non_data_descriptor(self, db: &'db dyn Db) -> bool {
         self.is_definitely_non_data_descriptor_impl(db, ())
     }
@@ -3543,6 +3543,9 @@ impl<'db> Type<'db> {
                 .all(|ty| ty.is_definitely_non_data_descriptor_impl(db, ())),
             Type::TypeAlias(alias) => alias
                 .value_type(db)
+                .is_definitely_non_data_descriptor_impl(db, ()),
+            Type::TypeForm(type_form) => type_form
+                .type_argument(db)
                 .is_definitely_non_data_descriptor_impl(db, ()),
             _ => !self.may_be_data_descriptor(db),
         }
