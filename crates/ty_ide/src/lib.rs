@@ -512,10 +512,8 @@ mod tests {
 
     impl CursorTestBuilder {
         pub(super) fn build(&self) -> CursorTest {
-            let mut db = ty_project::TestDb::new(ProjectMetadata::new(
-                "test".into(),
-                SystemPathBuf::from("/"),
-            ));
+            let mut db =
+                ty_project::TestDb::new(ProjectMetadata::new("test", SystemPathBuf::from("/")));
 
             db.init_program_with_python_version(
                 self.python_version.unwrap_or_else(PythonVersion::latest_ty),
@@ -640,7 +638,7 @@ mod tests {
             let site_packages_path = SystemPathBuf::from("/site-packages");
 
             let mut db =
-                ty_project::TestDb::new(ProjectMetadata::new("test".into(), project_root.clone()));
+                ty_project::TestDb::new(ProjectMetadata::new("test", project_root.clone()));
 
             // Write site-packages files first (before init)
             for Source {

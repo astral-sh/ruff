@@ -809,10 +809,8 @@ mod tests {
         const START: &str = "<START>";
         const END: &str = "<END>";
 
-        let mut db = ty_project::TestDb::new(ProjectMetadata::new(
-            "test".into(),
-            SystemPathBuf::from("/"),
-        ));
+        let mut db =
+            ty_project::TestDb::new(ProjectMetadata::new("test", SystemPathBuf::from("/")));
 
         db.init_program().unwrap();
 

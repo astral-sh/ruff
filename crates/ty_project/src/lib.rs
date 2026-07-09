@@ -889,12 +889,11 @@ mod tests {
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
-    use ruff_python_ast::name::Name;
     use ty_python_semantic::types::check_types;
 
     #[test]
     fn check_file_skips_type_checking_when_file_cant_be_read() -> ruff_db::system::Result<()> {
-        let project = ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/"));
+        let project = ProjectMetadata::new("test", SystemPathBuf::from("/"));
         let mut db = TestDb::new(project);
         db.init_program().unwrap();
         let path = SystemPath::new("test.py");
@@ -941,7 +940,7 @@ mod tests {
     fn explicit_nested_included_file_is_a_literal_match() {
         let root = SystemPathBuf::from("/project");
         let explicit_file = root.join("build/keep.txt");
-        let project = ProjectMetadata::new(Name::new_static("test"), root.clone());
+        let project = ProjectMetadata::new("test", root.clone());
         let mut db = TestDb::new(project);
         let project = db.project();
 

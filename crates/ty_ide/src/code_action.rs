@@ -780,10 +780,8 @@ mod tests {
 
     impl CodeActionTest {
         pub(super) fn with_source(source: &str) -> Self {
-            let mut db = ty_project::TestDb::new(ProjectMetadata::new(
-                "test".into(),
-                SystemPathBuf::from("/"),
-            ));
+            let mut db =
+                ty_project::TestDb::new(ProjectMetadata::new("test", SystemPathBuf::from("/")));
 
             db.init_program().unwrap();
 

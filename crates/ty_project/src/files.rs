@@ -276,11 +276,10 @@ mod tests {
     use crate::files::Index;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
-    use ruff_python_ast::name::Name;
 
     #[test]
     fn re_entrance() -> anyhow::Result<()> {
-        let metadata = ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/test"));
+        let metadata = ProjectMetadata::new("test", SystemPathBuf::from("/test"));
         let mut db = TestDb::new(metadata);
 
         db.write_file("test.py", "")?;
