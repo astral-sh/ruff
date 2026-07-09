@@ -82,6 +82,8 @@ bitflags::bitflags! {
     pub(crate) struct TypeExpressionFlags: u8 {
         /// The expression is syntactically an `Unpack[...]` type expression.
         const UNPACK = 1 << 0;
+        /// The expression is interpreted as a type expression.
+        const TYPE_EXPRESSION = 1 << 1;
     }
 }
 
@@ -209,6 +211,7 @@ pub(crate) fn function_known_decorator_flags<'db>(
 #[derive(Debug, Eq, PartialEq, Default, salsa::Update, get_size2::GetSize)]
 pub(crate) struct FunctionDecoratorInference<'db> {
     expression_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
+    extra: Option<Box<FunctionDecoratorInferenceExtra>>,
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
     called_functions: Box<[FunctionType<'db>]>,
     known_decorators: FunctionDecorators,
@@ -229,6 +232,24 @@ impl<'db> FunctionDecoratorInference<'db> {
         self.expression_types.iter().copied()
     }
 
+    pub(crate) fn type_expression_flags(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (ExpressionNodeKey, TypeExpressionFlags)> + '_ {
+        match self.extra.as_deref() {
+            Some(extra) => Either::Left(extra.type_expression_flags.iter().copied()),
+            None => Either::Right(std::iter::empty()),
+        }
+    }
+
+    pub(crate) fn string_annotations(
+        &self,
+    ) -> impl ExactSizeIterator<Item = ExpressionNodeKey> + '_ {
+        match self.extra.as_deref() {
+            Some(extra) => Either::Left(extra.string_annotations.iter().copied()),
+            None => Either::Right(std::iter::empty()),
+        }
+    }
+
     pub(crate) fn bindings(
         &self,
     ) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> + '_ {
@@ -246,6 +267,12 @@ impl<'db> FunctionDecoratorInference<'db> {
     pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
         &self.diagnostics
     }
+}
+
+#[derive(Debug, Eq, PartialEq, Default, salsa::Update, get_size2::GetSize)]
+struct FunctionDecoratorInferenceExtra {
+    type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
+    string_annotations: FrozenSet<ExpressionNodeKey>,
 }
 
 /// Infer types for all deferred type expressions in a [`Definition`].
@@ -1153,6 +1180,12 @@ enum DefinitionInferenceExtra<'db> {
 
     StringAnnotations(FrozenSet<ExpressionNodeKey>),
 
+    /// Type-expression metadata is the only extra data for most annotated definitions.
+    TypeExpressionFlags(FrozenMap<ExpressionNodeKey, TypeExpressionFlags>),
+
+    /// Annotation metadata fields commonly occur together.
+    AnnotationMetadata(Box<DefinitionAnnotationMetadata>),
+
     DiscardsDictKeyAssignments,
 
     Other(Box<OtherDefinitionInferenceExtra<'db>>),
@@ -1162,6 +1195,13 @@ enum DefinitionInferenceExtra<'db> {
 struct DeferredAndUndecorated<'db> {
     deferred: Box<[Definition<'db>]>,
     undecorated_type: Type<'db>,
+}
+
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
+struct DefinitionAnnotationMetadata {
+    string_annotations: FrozenSet<ExpressionNodeKey>,
+    qualifiers: FrozenMap<ExpressionNodeKey, TypeQualifiers>,
+    type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
 }
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
@@ -1244,6 +1284,23 @@ impl<'db> DefinitionInferenceExtra<'db> {
                 string_annotations,
                 ..OtherDefinitionInferenceExtra::default()
             },
+            Self::TypeExpressionFlags(type_expression_flags) => OtherDefinitionInferenceExtra {
+                type_expression_flags,
+                ..OtherDefinitionInferenceExtra::default()
+            },
+            Self::AnnotationMetadata(metadata) => {
+                let DefinitionAnnotationMetadata {
+                    string_annotations,
+                    qualifiers,
+                    type_expression_flags,
+                } = *metadata;
+                OtherDefinitionInferenceExtra {
+                    string_annotations,
+                    type_expression_flags,
+                    qualifiers,
+                    ..OtherDefinitionInferenceExtra::default()
+                }
+            }
             Self::DiscardsDictKeyAssignments => OtherDefinitionInferenceExtra {
                 discards_dict_key_assignments: true,
                 ..OtherDefinitionInferenceExtra::default()
@@ -1378,6 +1435,11 @@ impl<'db> DefinitionInference<'db> {
             Some(DefinitionInferenceExtra::Qualifiers(qualifiers)) => {
                 qualifiers.get(&expression).copied().unwrap_or_default()
             }
+            Some(DefinitionInferenceExtra::AnnotationMetadata(metadata)) => metadata
+                .qualifiers
+                .get(&expression)
+                .copied()
+                .unwrap_or_default(),
             Some(DefinitionInferenceExtra::Other(extra)) => extra
                 .qualifiers
                 .get(&expression)
@@ -1393,6 +1455,17 @@ impl<'db> DefinitionInference<'db> {
         expression: impl Into<ExpressionNodeKey>,
     ) -> TypeExpressionFlags {
         match self.extra.as_deref() {
+            Some(DefinitionInferenceExtra::TypeExpressionFlags(type_expression_flags)) => {
+                type_expression_flags
+                    .get(&expression.into())
+                    .copied()
+                    .unwrap_or_default()
+            }
+            Some(DefinitionInferenceExtra::AnnotationMetadata(metadata)) => metadata
+                .type_expression_flags
+                .get(&expression.into())
+                .copied()
+                .unwrap_or_default(),
             Some(DefinitionInferenceExtra::Other(extra)) => extra
                 .type_expression_flags
                 .get(&expression.into())
@@ -1862,6 +1935,13 @@ bitflags::bitflags! {
 
         /// Whether we're in a context where `Unpack` can be legal.
         const IN_VALID_UNPACK_CONTEXT = 1 << 10;
+
+        /// Whether value-expression inference is traversing a semantic type expression.
+        ///
+        /// Some typing forms deliberately use value-expression inference to preserve their
+        /// runtime result. This flag keeps that implementation detail separate from how IDE
+        /// consumers should interpret the expression.
+        const INHERITED_TYPE_EXPRESSION = 1 << 11;
 
         /// Whether the visitor is currently visiting a type expression.
         const IN_TYPE_EXPRESSION = 1 << 12;

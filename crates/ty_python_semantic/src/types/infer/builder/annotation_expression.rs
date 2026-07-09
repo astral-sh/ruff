@@ -1,9 +1,11 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::is_dotted_name;
+use ty_python_core::expression::ExpressionKind;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::place::TypeOrigin;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, REDUNDANT_FINAL_CLASSVAR};
+use crate::types::infer::TypeExpressionFlags;
 use crate::types::infer::builder::InferenceFlags;
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::nearest_enclosing_class;
@@ -88,7 +90,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .context
             .inference_flags
             .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, true);
-        let annotation_ty = self.infer_annotation_expression_impl(annotation, pep_613_policy);
+        let annotation_ty = self.with_expression_kind(ExpressionKind::TypeExpression, |builder| {
+            builder.infer_annotation_expression_impl(annotation, pep_613_policy)
+        });
         self.context.inference_flags.set(
             InferenceFlags::CHECK_UNBOUND_TYPEVARS,
             previous_check_unbound_typevars,
@@ -175,6 +179,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 AnnotationExpressionInference::new(annotation_ty)
             }
         }
+
+        self.store_type_expression_flags(annotation, TypeExpressionFlags::TYPE_EXPRESSION);
 
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
         let inferred = match annotation {

@@ -17,6 +17,7 @@ use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
+use ty_python_core::expression::ExpressionKind;
 use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
@@ -132,6 +133,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Infer the type of a type expression without storing the result.
     pub(super) fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
+        self.with_expression_kind(ExpressionKind::TypeExpression, |builder| {
+            builder.infer_type_expression_no_store_impl(expression)
+        })
+    }
+
+    fn infer_type_expression_no_store_impl(&mut self, expression: &ast::Expr) -> Type<'db> {
+        self.store_type_expression_flags(expression, TypeExpressionFlags::TYPE_EXPRESSION);
+
         let ignore_runtime_errors = |builder: &Self| {
             builder.deferred_state.is_deferred()
                 || builder.in_stub()
@@ -1427,12 +1436,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         };
 
-        self.infer_explicit_callable_specialization(
-            subscript,
-            value_ty,
-            generic_context,
-            specialize,
-        )
+        let expression_kind = if in_type_expression
+            || matches!(
+                value_ty,
+                Type::KnownInstance(KnownInstanceType::TypeAliasType(
+                    TypeAliasType::ManualPEP695(_)
+                ))
+            ) {
+            ExpressionKind::TypeExpression
+        } else {
+            ExpressionKind::Normal
+        };
+        self.with_expression_kind(expression_kind, |builder| {
+            builder.infer_explicit_callable_specialization(
+                subscript,
+                value_ty,
+                generic_context,
+                specialize,
+            )
+        })
     }
 
     pub(super) fn infer_subscript_type_expression(
@@ -1456,7 +1478,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // false-positive `invalid-type-form` diagnostics (`1` is not a valid type
                 // expression).
                 if !self.in_string_annotation() {
-                    self.infer_expression(slice, TypeContext::default());
+                    self.infer_normal_expression(slice, TypeContext::default());
                 }
                 Type::unknown()
             }
@@ -2121,12 +2143,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 };
                 let num_arguments = arguments.len();
                 let type_of_type = if num_arguments == 1 {
-                    // N.B. This uses `infer_expression` rather than `infer_type_expression`
-                    self.infer_expression(&arguments[0], TypeContext::default())
+                    self.infer_normal_expression(&arguments[0], TypeContext::default())
                 } else {
                     if !self.in_string_annotation() {
                         for argument in arguments {
-                            self.infer_expression(argument, TypeContext::default());
+                            self.infer_normal_expression(argument, TypeContext::default());
                         }
                     }
                     report_invalid_argument_number_to_special_form(
@@ -2186,7 +2207,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if num_arguments != 1 {
                     if !self.in_string_annotation() {
                         for argument in arguments {
-                            self.infer_expression(argument, TypeContext::default());
+                            self.infer_normal_expression(argument, TypeContext::default());
                         }
                     }
                     report_invalid_argument_number_to_special_form(
@@ -2202,7 +2223,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return Type::unknown();
                 }
 
-                let argument_type = self.infer_expression(&arguments[0], TypeContext::default());
+                let argument_type =
+                    self.infer_normal_expression(&arguments[0], TypeContext::default());
 
                 let Some(callable_type) = argument_type
                     .try_upcast_to_callable_with_recursive_fallback(
@@ -2551,6 +2573,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     pub(crate) fn infer_literal_parameter_type<'param>(
+        &mut self,
+        parameters: &'param ast::Expr,
+    ) -> Result<Type<'db>, Vec<&'param ast::Expr>> {
+        self.with_expression_kind(ExpressionKind::Normal, |builder| {
+            builder.infer_literal_parameter_type_impl(parameters)
+        })
+    }
+
+    fn infer_literal_parameter_type_impl<'param>(
         &mut self,
         parameters: &'param ast::Expr,
     ) -> Result<Type<'db>, Vec<&'param ast::Expr>> {
