@@ -5020,6 +5020,50 @@ def _(flag: bool) -> None:
     reveal_type(infer_producer(cls))  # revealed: int | str
 ```
 
+## Protocol definition objects as `type[Self]` receivers
+
+A protocol definition object is not a concrete inhabitant of `type[P]`, but it remains a valid
+receiver for classmethods defined on the protocol itself.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, Self, cast
+
+class SelfFactory(Protocol):
+    @classmethod
+    def make(cls) -> Self:
+        return cast(Self, object())
+
+reveal_type(SelfFactory.make())  # revealed: SelfFactory
+not_concrete: type[SelfFactory] = SelfFactory  # error: [invalid-assignment]
+
+class ExplicitSelfFactory(Protocol):
+    @classmethod
+    def make(cls: type[Self]) -> Self:
+        return cast(Self, object())
+
+reveal_type(ExplicitSelfFactory.make())  # revealed: ExplicitSelfFactory
+
+class GenericSelfFactory[T](Protocol):
+    @classmethod
+    def make(cls, value: T) -> Self:
+        return cast(Self, object())
+
+reveal_type(GenericSelfFactory[int].make(1))  # revealed: GenericSelfFactory[int]
+
+class GenericFactory[T](Protocol):
+    @classmethod
+    def make(cls) -> T:
+        return cast(T, object())
+
+def build[T](factory: GenericFactory[T]) -> T:
+    return factory.make()
+```
+
 ## Regression test for `ClassVar` members in stubs
 
 In an early version of our protocol implementation, we didn't retain the `ClassVar` qualifier for
