@@ -4939,35 +4939,6 @@ struct ArgumentTypeChecker<'a, 'db> {
     constraint_set_errors: Vec<bool>,
 }
 
-/// Use the structural meta-type of a protocol class when binding it to a generic `type[T]`
-/// receiver.
-///
-/// A protocol definition object is not generally an inhabitant of `type[P]`, because it cannot be
-/// instantiated to produce a `P`. It is nevertheless a valid receiver for classmethods defined on
-/// that protocol. This conversion is limited to the synthetic receiver argument so that ordinary
-/// `type[P]` parameters retain the concrete-inhabitant requirement.
-fn normalize_protocol_class_generic_self_receiver<'db>(
-    db: &'db dyn Db,
-    argument: Argument<'_>,
-    parameter: &Parameter<'db>,
-    argument_type: Type<'db>,
-) -> Type<'db> {
-    let Type::SubclassOf(subclass_of) = parameter.annotated_type() else {
-        return argument_type;
-    };
-    if subclass_of.into_type_var().is_none() {
-        return argument_type;
-    }
-    if !matches!(argument, Argument::Synthetic) {
-        return argument_type;
-    }
-
-    match argument_type.to_instance(db) {
-        Some(Type::ProtocolInstance(protocol)) => protocol.to_meta_type(db),
-        _ => argument_type,
-    }
-}
-
 /// Result of checking only the key type of a keyword-unpack argument.
 enum KeywordUnpackKeyTypeCheck<'db> {
     /// The argument type is handled by a more specific path, or does not expose mapping keys.
@@ -5344,7 +5315,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> bool {
         let parameters = self.signature.parameters();
-        for (argument_index, adjusted_argument_index, argument, argument_types) in
+        for (argument_index, adjusted_argument_index, _, argument_types) in
             self.enumerate_argument_types()
         {
             for matched_parameter in self.argument_matches[argument_index].iter() {
@@ -5357,12 +5328,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 let argument_type = matched_parameter
                     .argument_type
                     .unwrap_or_else(|| argument_types.get_for_declared_type(declared_type));
-                let argument_type = normalize_protocol_class_generic_self_receiver(
-                    self.db,
-                    argument,
-                    &parameters[parameter_index],
-                    argument_type,
-                );
                 let specialization_result = builder.infer(declared_type, argument_type);
 
                 if let Err(error) = specialization_result {
@@ -5398,12 +5363,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return;
         }
 
-        argument_type = normalize_protocol_class_generic_self_receiver(
-            self.db,
-            argument,
-            parameter,
-            argument_type,
-        );
+        argument_type = matched_parameter.argument_type.unwrap_or(argument_type);
 
         let mut expected_ty = parameter.annotated_type();
         if let Some(specialization) = self.specialization() {
@@ -5840,10 +5800,11 @@ pub struct MatchedParameter<'db> {
     /// The index of the matched parameter.
     pub index: usize,
 
-    /// The type contributed by an unpacked positional or keyword argument.
+    /// A parameter-specific argument type.
     ///
-    /// This is `None` for non-splatted arguments because their type is not known when argument
-    /// matching runs.
+    /// This is used for values contributed by unpacking and for implicit receivers whose type is
+    /// normalized for the matched parameter. It is `None` for ordinary arguments because their
+    /// type is not known when argument matching runs.
     argument_type: Option<Type<'db>>,
 
     /// Why this parameter match exists.
@@ -6461,11 +6422,28 @@ impl<'db> Binding<'db> {
 
     fn match_parameters(&mut self, db: &'db dyn Db, arguments: &CallArguments<'_, 'db>) {
         let parameters = self.signature.parameters();
+        let normalized_bound_receiver_type = if let Type::BoundMethod(method) = self.signature_type
+            && let Some(parameter) = parameters.get_positional(0)
+            && let Some((Argument::Synthetic, argument_types)) = arguments.iter().next()
+            && let Some(argument_type) = argument_types.get_default()
+        {
+            method.normalized_receiver_argument_type(db, parameter, argument_type)
+        } else {
+            None
+        };
         let mut matcher = ArgumentMatcher::new(arguments, parameters, &mut self.errors);
         let mut keywords_arguments = vec![];
         for (argument_index, (argument, argument_types)) in arguments.iter().enumerate() {
             match argument {
-                Argument::Positional | Argument::Synthetic => {
+                Argument::Synthetic => {
+                    let _ = matcher.match_positional(
+                        argument_index,
+                        argument,
+                        normalized_bound_receiver_type,
+                        false,
+                    );
+                }
+                Argument::Positional => {
                     let _ = matcher.match_positional(argument_index, argument, None, false);
                 }
                 Argument::Keyword(name) => {

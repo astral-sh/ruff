@@ -5305,6 +5305,15 @@ static_assert(not is_assignable_to(TypeOf[Foo], type[Foo]))
 static_assert(not is_assignable_to(TypeOf[AbstractFoo], type[Foo]))
 ```
 
+By contrast, a value typed as `type[AbstractFoo]` may contain a concrete subclass. It can be
+forwarded to `type[Foo]` because every such subclass implements `Foo`.
+
+```py
+def accepts_foo(cls: type[Foo]) -> None: ...
+def forward_abstract_foo(cls: type[AbstractFoo]) -> None:
+    accepts_foo(cls)
+```
+
 A structural implementation can use any subclass of `type` as its metaclass, so `type[Foo]` is not
 limited to the protocol class's own metaclass.
 

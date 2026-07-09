@@ -2249,6 +2249,13 @@ impl<'db> ClassType<'db> {
             .is_some_and(|(class, _)| class.is_protocol(db))
     }
 
+    /// Return whether this is a concrete class.
+    ///
+    /// Protocol classes are not concrete even when all of their members have implementations.
+    pub(super) fn is_concrete(self, db: &'db dyn Db) -> bool {
+        !self.is_protocol(db) && self.abstract_methods(db).is_empty()
+    }
+
     /// Returns a [`Span`] pointing to the definition of this class.
     ///
     /// For static classes, this is the class header (name and arguments).

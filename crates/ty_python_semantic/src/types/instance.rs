@@ -9,7 +9,7 @@ use ty_module_resolver::{ModuleName, file_to_module};
 use super::protocol_class::ProtocolInterface;
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
-    MaterializationKind, SubclassOfInner, SubclassOfType, Type, TypeVarVariance,
+    MaterializationKind, SubclassOfType, Type, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
@@ -615,23 +615,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             meta_ty,
             Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::GenericAlias(_)
         ));
-
-        let source_class = match meta_ty {
-            Type::ClassLiteral(class) => Some(class.default_specialization(db)),
-            Type::GenericAlias(alias) => Some(ClassType::Generic(alias)),
-            Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
-                SubclassOfInner::Class(class) => Some(class),
-                SubclassOfInner::Dynamic(_)
-                | SubclassOfInner::Protocol(_)
-                | SubclassOfInner::TypeVar(_) => None,
-            },
-            _ => None,
-        };
-        if source_class
-            .is_some_and(|class| class.is_protocol(db) || !class.abstract_methods(db).is_empty())
-        {
-            return self.never();
-        }
 
         let constructed_ty = meta_ty.bindings(db).return_type(db);
         self.check_type_pair(db, constructed_ty, Type::ProtocolInstance(protocol))
