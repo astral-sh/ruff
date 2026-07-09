@@ -8203,6 +8203,47 @@ mod tests {
         ConstraintSet::constrain_typevar(db, builder, bound_typevar, ty, ty)
     }
 
+    fn assert_forall_exists_strategies_match<'db, 'c>(
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        relation: ConstraintSet<'db, 'c>,
+        sources: &[BoundTypeVarInstance<'db>],
+        targets: &[BoundTypeVarInstance<'db>],
+        expected: bool,
+    ) {
+        let factored = ConstraintSet::quantify_for_all_exists(
+            db,
+            builder,
+            [ExistentialConstraintAlternative::new(
+                relation,
+                sources.iter().copied(),
+            )]
+            .into_iter(),
+            targets,
+        );
+        let general = ConstraintSet::quantify_for_all_exists(
+            db,
+            builder,
+            [
+                ExistentialConstraintAlternative::new(relation, sources.iter().copied()),
+                ExistentialConstraintAlternative::new(
+                    ConstraintSet::never(builder),
+                    std::iter::empty(),
+                ),
+            ]
+            .into_iter(),
+            targets,
+        );
+
+        assert!(factored.errors().is_empty());
+        assert!(general.errors().is_empty());
+        let factored = factored.into_conservative();
+        let general = general.into_conservative();
+        assert!(factored.iff(db, builder, general).is_always_satisfied(db));
+        assert_eq!(factored.is_always_satisfied(db), expected);
+        assert_eq!(factored.is_never_satisfied(db), !expected);
+    }
+
     fn known_instance(db: &dyn Db, class: KnownClass) -> Type<'_> {
         class.to_instance(db)
     }
@@ -8651,6 +8692,132 @@ mod tests {
             )
             .expect("the terminal constraint set can be projected exactly");
         assert!(exists_source_forall_target.is_never_satisfied(&db));
+    }
+
+    #[test]
+    fn forall_exists_matches_boolean_reference() {
+        let db = setup_db();
+        let source = create_typevar(&db, "S");
+        let target = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let source_is_int = create_constraint(&db, &builder, source, KnownClass::Int);
+        let target_is_int = create_constraint(&db, &builder, target, KnownClass::Int);
+
+        // Each four-bit mask describes a Boolean relation between the predicates `S = int` and
+        // `T = int`. Exhaustively compare symbolic quantification with the literal definition
+        // `for every T, there is some S`.
+        for relation in 0u8..16 {
+            let mut alternatives = Vec::new();
+            for target_value in [false, true] {
+                for source_value in [false, true] {
+                    let bit = usize::from(target_value) * 2 + usize::from(source_value);
+                    if relation & (1 << bit) == 0 {
+                        continue;
+                    }
+                    let source_cell = if source_value {
+                        source_is_int
+                    } else {
+                        source_is_int.negate(&db, &builder)
+                    };
+                    let target_cell = if target_value {
+                        target_is_int
+                    } else {
+                        target_is_int.negate(&db, &builder)
+                    };
+                    alternatives.push(ExistentialConstraintAlternative::new(
+                        source_cell.and(&db, &builder, || target_cell),
+                        [source],
+                    ));
+                }
+            }
+
+            let expected = [false, true].into_iter().all(|target_value| {
+                [false, true].into_iter().any(|source_value| {
+                    let bit = usize::from(target_value) * 2 + usize::from(source_value);
+                    relation & (1 << bit) != 0
+                })
+            });
+            let projection = ConstraintSet::quantify_for_all_exists(
+                &db,
+                &builder,
+                alternatives.into_iter(),
+                &[target],
+            );
+
+            assert!(projection.errors().is_empty(), "relation {relation:04b}");
+            let quantified = projection.into_conservative();
+            assert_eq!(
+                quantified.is_always_satisfied(&db),
+                expected,
+                "relation {relation:04b}"
+            );
+            assert_eq!(
+                quantified.is_never_satisfied(&db),
+                !expected,
+                "relation {relation:04b}"
+            );
+        }
+    }
+
+    #[test]
+    fn factored_forall_exists_matches_general_projection() {
+        let db = setup_db();
+        let builder = ConstraintSetBuilder::new();
+
+        let source_one = create_typevar(&db, "S1");
+        let source_two = create_typevar(&db, "S2");
+        let target_one = create_typevar(&db, "T1");
+        let target_two = create_typevar(&db, "T2");
+        let independent_equalities = ConstraintSet::constrain_typevar(
+            &db,
+            &builder,
+            source_one,
+            Type::TypeVar(target_one),
+            Type::TypeVar(target_one),
+        )
+        .and(&db, &builder, || {
+            ConstraintSet::constrain_typevar(
+                &db,
+                &builder,
+                source_two,
+                Type::TypeVar(target_two),
+                Type::TypeVar(target_two),
+            )
+        });
+        assert_forall_exists_strategies_match(
+            &db,
+            &builder,
+            independent_equalities,
+            &[source_one, source_two],
+            &[target_one, target_two],
+            true,
+        );
+
+        let shared_source = create_typevar(&db, "S");
+        let correlated_equalities = ConstraintSet::constrain_typevar(
+            &db,
+            &builder,
+            shared_source,
+            Type::TypeVar(target_one),
+            Type::TypeVar(target_one),
+        )
+        .and(&db, &builder, || {
+            ConstraintSet::constrain_typevar(
+                &db,
+                &builder,
+                shared_source,
+                Type::TypeVar(target_two),
+                Type::TypeVar(target_two),
+            )
+        });
+        assert_forall_exists_strategies_match(
+            &db,
+            &builder,
+            correlated_equalities,
+            &[shared_source],
+            &[target_one, target_two],
+            false,
+        );
     }
 
     #[test]
