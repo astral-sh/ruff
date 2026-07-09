@@ -279,10 +279,10 @@ help: Use `ruff:ignore` instead
 
 ## Blanket comments
 
-RUF105 flags blanket comments but does not offer a fix because `ruff:ignore` requires at least one
-rule selector.
-
 ### Inline
+
+For inline comments, `RUF105` flags blanket comments and offers a fix containing the codes that are
+actually suppressed:
 
 ```py
 # snapshot: noqa-comment
@@ -296,9 +296,40 @@ error[RUF105]: `noqa` comment used instead of `ruff:ignore`
 2 | import math  # noqa
   |              ^^^^^^
   |
+help: Use `ruff:ignore` instead
+  |
+1 | # snapshot: noqa-comment
+  - import math  # noqa
+2 + import math  # ruff:ignore[F401]
+3 | # snapshot: noqa-comment
+  |
+```
+
+Multiple diagnostics on the same line don't cause duplicate codes in the final comment:
+
+```py
+# snapshot: noqa-comment
+import foo, bar  # noqa
+```
+
+```snapshot
+error[RUF105]: `noqa` comment used instead of `ruff:ignore`
+ --> src/mdtest_snippet.py:4:18
+  |
+4 | import foo, bar  # noqa
+  |                  ^^^^^^
+  |
+help: Use `ruff:ignore` instead
+  |
+3 | # snapshot: noqa-comment
+  - import foo, bar  # noqa
+4 + import foo, bar  # ruff:ignore[F401]
+  |
 ```
 
 ### File-level
+
+For file-level comments, only a diagnostic is emitted, without a fix:
 
 ```py
 # snapshot: noqa-comment
@@ -313,6 +344,7 @@ error[RUF105]: `ruff: noqa` comment used instead of `ruff:file-ignore`
 2 | # ruff: noqa
   | ^^^^^^^^^^^^
   |
+help: Use `ruff:file-ignore` instead
 ```
 
 ## Inline self-suppression

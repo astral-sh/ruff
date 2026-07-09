@@ -156,6 +156,7 @@ pub(crate) fn check_noqa(
                             is_file_level,
                             matches.is_empty(),
                             directive,
+                            matches,
                             suppressions,
                         );
                     }
@@ -257,6 +258,7 @@ pub(crate) fn check_noqa(
                             is_file_level,
                             has_unused_codes,
                             directive,
+                            matches,
                             suppressions,
                         );
                     }

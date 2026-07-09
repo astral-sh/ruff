@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::{
     FixAvailability, Locator, Violation, checkers::ast::LintContext, codes::Rule, noqa::Directive,
@@ -61,7 +61,6 @@ use crate::{
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct NoqaComment {
     file_level: bool,
-    has_codes: bool,
 }
 
 impl Violation for NoqaComment {
@@ -77,10 +76,6 @@ impl Violation for NoqaComment {
     }
 
     fn fix_title(&self) -> Option<String> {
-        if !self.has_codes {
-            return None;
-        }
-
         Some(if self.file_level {
             "Use `ruff:file-ignore` instead".to_string()
         } else {
@@ -96,15 +91,18 @@ pub(crate) fn noqa_comment(
     file_level: bool,
     has_unused_codes: bool,
     directive: &Directive,
+    matches: &[Rule],
     suppressions: &Suppressions,
 ) {
-    let range = directive.range();
+    let codes = Codes::from_directive(directive, matches);
+
+    let range = codes.range;
 
     if file_level && locator.slice(range).contains("flake8") {
         return;
     }
 
-    let has_external_codes = if let Directive::Codes(codes) = directive {
+    let has_external_codes = if let CodesKind::Codes(codes) = codes.kind {
         let external_codes = codes
             .iter()
             .filter(|code| {
@@ -130,14 +128,7 @@ pub(crate) fn noqa_comment(
         return;
     }
 
-    let has_codes = matches!(directive, Directive::Codes(_));
-    let mut diagnostic = context.report_diagnostic(
-        NoqaComment {
-            file_level,
-            has_codes,
-        },
-        range,
-    );
+    let mut diagnostic = context.report_diagnostic(NoqaComment { file_level }, range);
 
     // If some codes are external, return without a fix.
     if has_external_codes {
@@ -157,17 +148,54 @@ pub(crate) fn noqa_comment(
         return;
     }
 
-    let Directive::Codes(codes) = directive else {
-        return;
-    };
-
     let edit = Edit::range_replacement(
         format!(
             "# ruff:{action}[{codes}]",
             action = if file_level { "file-ignore" } else { "ignore" },
-            codes = codes.iter().join(", ")
         ),
-        codes.range(),
+        codes.range,
     );
     diagnostic.set_fix(Fix::safe_edit(edit));
+}
+
+struct Codes<'a> {
+    kind: CodesKind<'a>,
+    range: TextRange,
+}
+
+enum CodesKind<'a> {
+    Codes(&'a crate::noqa::Codes<'a>),
+    Rules(&'a [Rule]),
+}
+
+impl<'a> Codes<'a> {
+    fn from_directive(directive: &'a Directive, matches: &'a [Rule]) -> Self {
+        let kind = match directive {
+            Directive::All(_) => CodesKind::Rules(matches),
+            Directive::Codes(codes) => CodesKind::Codes(codes),
+        };
+
+        Self {
+            kind,
+            range: directive.range(),
+        }
+    }
+}
+
+impl std::fmt::Display for Codes<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.kind {
+            CodesKind::Codes(codes) => write!(f, "{}", codes.iter().join(", ")),
+            CodesKind::Rules(rules) => write!(
+                f,
+                "{}",
+                rules
+                    .iter()
+                    .map(Rule::noqa_code)
+                    .sorted()
+                    .dedup()
+                    .join(", ")
+            ),
+        }
+    }
 }
