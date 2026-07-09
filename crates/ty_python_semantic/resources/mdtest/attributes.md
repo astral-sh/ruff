@@ -1344,6 +1344,36 @@ def read_generated(value: TGenerated) -> None:
     reveal_type(value.generated)  # revealed: int
 ```
 
+The generated attribute remains available through a `NewType` whose base is the generated class:
+
+```py
+from typing import NewType
+
+GeneratedNewType = NewType("GeneratedNewType", GeneratedClass)
+
+def read_generated_newtype(value: GeneratedNewType) -> None:
+    reveal_type(value.generated)  # revealed: int
+```
+
+Type variables constrained or union-bounded to generated classes expose attributes shared by every
+alternative:
+
+```py
+from typing import TypeVar
+
+class OtherGeneratedClass(metaclass=StoringMeta): ...
+
+TGeneratedConstraints = TypeVar("TGeneratedConstraints", GeneratedClass, OtherGeneratedClass)
+
+def read_generated_constraints(value: TGeneratedConstraints) -> None:
+    reveal_type(value.generated)  # revealed: int
+
+TGeneratedUnionBound = TypeVar("TGeneratedUnionBound", bound=GeneratedClass | OtherGeneratedClass)
+
+def read_generated_union_bound(value: TGeneratedUnionBound) -> None:
+    reveal_type(value.generated)  # revealed: int
+```
+
 This also lets a generic metaclass method rely on a protocol describing the classes it accepts:
 
 ```py

@@ -2823,16 +2823,71 @@ impl<'db> Type<'db> {
     fn instance_lookup_class_member_with_policy(
         self,
         db: &'db dyn Db,
-        name: Name,
+        name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        if let Type::TypeVar(_) = self
-            && let Some(class) = self.nominal_class(db)
-        {
-            self.to_meta_type(db)
-                .class_namespace_member(db, class, name.as_str(), policy)
+        if let Type::TypeVar(typevar) = self {
+            match typevar.typevar(db).bound_or_constraints(db) {
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    if let Some(class) = bound.nominal_class(db) {
+                        return self
+                            .to_meta_type(db)
+                            .class_namespace_member(db, class, name, policy);
+                    }
+                    return self
+                        .class_member_with_policy(db, name.into(), policy)
+                        .or_fall_back_to(db, || {
+                            bound.generated_namespace_member(db, name, policy)
+                        });
+                }
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    return self
+                        .class_member_with_policy(db, name.into(), policy)
+                        .or_fall_back_to(db, || {
+                            constraints.map_with_boundness_and_qualifiers(db, |constraint| {
+                                constraint.generated_namespace_member(db, name, policy)
+                            })
+                        });
+                }
+                None => {}
+            }
+        }
+
+        let class_member = self.class_member_with_policy(db, name.into(), policy);
+        if let Type::NewTypeInstance(newtype) = self {
+            class_member.or_fall_back_to(db, || {
+                newtype
+                    .concrete_base_type(db)
+                    .generated_namespace_member(db, name, policy)
+            })
         } else {
-            self.class_member_with_policy(db, name, policy)
+            class_member
+        }
+    }
+
+    /// Look up a member stored in the namespace of an instance-like type's nominal class.
+    fn generated_namespace_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        match self {
+            Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |element| {
+                element.generated_namespace_member(db, name, policy)
+            }),
+            Type::TypeAlias(alias) => alias
+                .value_type(db)
+                .generated_namespace_member(db, name, policy),
+            Type::NewTypeInstance(newtype) => newtype
+                .concrete_base_type(db)
+                .generated_namespace_member(db, name, policy),
+            _ => self
+                .nominal_class(db)
+                .map_or_else(PlaceAndQualifiers::default, |class| {
+                    self.to_meta_type(db)
+                        .class_namespace_member(db, class, name, policy)
+                }),
         }
     }
 
@@ -3613,7 +3668,7 @@ impl<'db> Type<'db> {
             meta_attr_kind,
         ) = Self::try_call_dunder_get_on_attribute(
             db,
-            self.instance_lookup_class_member_with_policy(db, name.into(), member_policy),
+            self.instance_lookup_class_member_with_policy(db, name, member_policy),
             Some(receiver),
             self.to_meta_type(db),
         );
