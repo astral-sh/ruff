@@ -1053,7 +1053,7 @@ fn protocol_member_read_type<'db>(
             Place::Undefined.into(),
             InstanceFallbackShadowsNonDataDescriptor::No,
             // The undefined fallback excludes instance members. Keep the class
-            // member lookup from reintroducing them.
+            // member lookup from reintroducing dynamic instance fallbacks.
             MemberLookupPolicy::NO_INSTANCE_FALLBACK,
         )
         .place

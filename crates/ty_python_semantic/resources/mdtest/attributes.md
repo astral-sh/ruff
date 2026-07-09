@@ -1305,6 +1305,8 @@ class created with that metaclass. The attribute is therefore available through 
 classes:
 
 ```py
+from typing import TypeVar
+
 class StoringMeta(type):
     generated: int
 
@@ -1317,6 +1319,11 @@ class GeneratedClass(metaclass=StoringMeta):
         reveal_type(self.generated)  # revealed: int
 
 reveal_type(GeneratedClass().generated)  # revealed: int
+
+TGenerated = TypeVar("TGenerated", bound=GeneratedClass)
+
+def read_generated(value: TGenerated) -> None:
+    reveal_type(value.generated)  # revealed: int
 ```
 
 This also lets a generic metaclass method rely on a protocol describing the classes it accepts:
@@ -1403,7 +1410,8 @@ reveal_type(StoresInstanceCallable().generated_callable(1))  # revealed: str
 ```
 
 A dynamic base may provide an instance attribute of any type, so a regular attribute stored by the
-metaclass does not remove that uncertainty:
+metaclass does not remove that uncertainty. This remains true when an earlier static base provides a
+class attribute with the same name:
 
 ```py
 from typing import Any
@@ -1413,6 +1421,13 @@ DynamicGeneratedBase: Any = object
 class InheritsDynamicGenerated(DynamicGeneratedBase, metaclass=StoringMeta): ...
 
 reveal_type(InheritsDynamicGenerated().generated)  # revealed: Any
+
+class StaticGeneratedBase:
+    generated = "static"
+
+class InheritsStaticThenDynamicGenerated(StaticGeneratedBase, DynamicGeneratedBase, metaclass=StoringMeta): ...
+
+reveal_type(InheritsStaticThenDynamicGenerated().generated)  # revealed: Any
 ```
 
 Implicit special method lookup ignores attributes stored on an instance. It therefore uses the
@@ -1436,12 +1451,36 @@ class StoresInstanceIter(metaclass=IteratingMeta):
 reveal_type(iter(StoresInstanceIter()))  # revealed: Iterator[int]
 ```
 
-An inherited `ClassVar` does not describe an instance attribute, but an inherited dataclass field
-adds an instance fallback:
+Splitting the class MRO around a generated attribute preserves the usual treatment of dunder
+`Callable` attributes as bound-method descriptors:
+
+```py
+def pow_impl(value: object, exponent: int) -> object:
+    raise NotImplementedError
+
+class PowMeta(type):
+    __pow__: Callable[[object, int], object]
+
+class Tensor(metaclass=PowMeta):
+    __pow__: Callable[[object, int], object] = pow_impl
+
+reveal_type(Tensor() ** 2)  # revealed: object
+```
+
+An annotation-only `ClassVar` on the constructed class is a class-namespace contract and takes
+precedence over the metaclass-generated attribute. An inherited `ClassVar` does not describe an
+instance attribute on the constructed class, but an inherited dataclass field adds an instance
+fallback:
 
 ```py
 from dataclasses import dataclass
 from typing import ClassVar
+
+class DeclaresClassVarGenerated(metaclass=StoringMeta):
+    generated: ClassVar[str]
+
+reveal_type(DeclaresClassVarGenerated.generated)  # revealed: str
+reveal_type(DeclaresClassVarGenerated().generated)  # revealed: str
 
 class ClassVarGeneratedBase:
     generated: ClassVar[str]
@@ -1538,6 +1577,27 @@ class UsesMaybeGeneratedDescriptorWithDynamicBase(DynamicGeneratedBase, metaclas
 reveal_type(UsesMaybeGeneratedDescriptorWithDynamicBase().generated_descriptor)  # revealed: Literal["descriptor"] | Any
 ```
 
+Dynamic bases are ignored when descriptor detection requires a concrete `__get__` method:
+
+```py
+class GeneratedGetMeta(type):
+    __get__: Callable[[object, object | None, type], str]
+
+    def __new__(mcls, name: str, bases: tuple[type, ...], namespace: dict[str, object]):
+        def generated_get(descriptor: object, instance: object | None, owner: type) -> str:
+            return "generated"
+
+        namespace["__get__"] = generated_get
+        return super().__new__(mcls, name, bases, namespace)
+
+class GeneratedGetDescriptor(DynamicGeneratedBase, metaclass=GeneratedGetMeta): ...
+
+class UsesGeneratedGetDescriptor:
+    generated = GeneratedGetDescriptor()
+
+reveal_type(UsesGeneratedGetDescriptor().generated)  # revealed: str
+```
+
 If the declaration can also be `Any`, the class attribute is not known to always be a data
 descriptor. The `Any` result subsumes the instance attribute type:
 
@@ -1586,15 +1646,41 @@ class StaticMethodAssignment(metaclass=StoringMeta):
 reveal_type(StaticMethodAssignment().generated)  # revealed: int
 ```
 
-A conditional class-body attribute takes precedence when it exists, while the metaclass declaration
-supplies the attribute on the other path. An assignment inside a conditionally defined method is
-only a possible instance member, so the metaclass declaration remains as a fallback:
+An own class-body binding takes precedence when it exists, while the metaclass member supplies the
+attribute before inherited class members on other paths. An unreachable binding does not suppress
+that fallback. An assignment inside a conditionally defined method is only a possible instance
+member, so the metaclass declaration remains as a fallback:
 
 ```py
 def returns_bool() -> bool:
     raise NotImplementedError
 
 flag = returns_bool()
+
+class PrecedenceMeta(type):
+    generated: int | bytes
+
+class InheritedPrecedenceGenerated:
+    generated = "inherited"
+
+class UnreachablePrecedenceGenerated(InheritedPrecedenceGenerated, metaclass=PrecedenceMeta):
+    if False:
+        generated = b"unreachable"
+
+reveal_type(UnreachablePrecedenceGenerated().generated)  # revealed: int | bytes
+
+class DeclaredUnreachablePrecedenceGenerated(metaclass=PrecedenceMeta):
+    generated: bytes
+    if False:
+        generated = b"unreachable"
+
+reveal_type(DeclaredUnreachablePrecedenceGenerated().generated)  # revealed: int | bytes
+
+class ConditionalPrecedenceGenerated(InheritedPrecedenceGenerated, metaclass=PrecedenceMeta):
+    if flag:
+        generated = b"conditional"
+
+reveal_type(ConditionalPrecedenceGenerated().generated)  # revealed: bytes | int
 
 class ConditionalGenerated(metaclass=StoringMeta):
     if flag:

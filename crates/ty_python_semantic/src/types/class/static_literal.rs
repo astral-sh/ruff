@@ -1095,32 +1095,7 @@ impl<'db> StaticClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        fn into_function_like_callable<'d>(db: &'d dyn Db, ty: Type<'d>) -> Type<'d> {
-            match ty {
-                Type::Callable(callable_ty) => Type::Callable(CallableType::new(
-                    db,
-                    callable_ty.signatures(db),
-                    CallableTypeKind::FunctionLike,
-                    callable_ty.provenance(db),
-                )),
-                Type::Union(union) => {
-                    union.map(db, |element| into_function_like_callable(db, *element))
-                }
-                Type::Intersection(intersection) => intersection
-                    .map_positive(db, |element| into_function_like_callable(db, *element)),
-                _ => ty,
-            }
-        }
-
-        let mut member = self.class_member_inner(db, None, name, policy);
-
-        // We generally treat dunder attributes with `Callable` types as function-like callables.
-        // See `callables_as_descriptors.md` for more details.
-        if name.starts_with("__") && name.ends_with("__") {
-            member = member.map_type(|ty| into_function_like_callable(db, ty));
-        }
-
-        member
+        self.class_member_inner(db, None, name, policy)
     }
 
     pub(super) fn class_member_inner(
@@ -1140,6 +1115,23 @@ impl<'db> StaticClassLiteral<'db> {
         policy: MemberLookupPolicy,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> PlaceAndQualifiers<'db> {
+        fn into_function_like_callable<'d>(db: &'d dyn Db, ty: Type<'d>) -> Type<'d> {
+            match ty {
+                Type::Callable(callable_ty) => Type::Callable(CallableType::new(
+                    db,
+                    callable_ty.signatures(db),
+                    CallableTypeKind::FunctionLike,
+                    callable_ty.provenance(db),
+                )),
+                Type::Union(union) => {
+                    union.map(db, |element| into_function_like_callable(db, *element))
+                }
+                Type::Intersection(intersection) => intersection
+                    .map_positive(db, |element| into_function_like_callable(db, *element)),
+                _ => ty,
+            }
+        }
+
         let result = MroLookup::new(db, mro_iter).class_member(
             name,
             policy,
@@ -1147,12 +1139,20 @@ impl<'db> StaticClassLiteral<'db> {
             self.is_known(db, KnownClass::Object),
         );
 
-        match result {
+        let mut member = match result {
             ClassMemberResult::Done(result) => result.finalize(db),
             ClassMemberResult::TypedDict(module) => {
                 typed_dict_class_member(db, self.identity_specialization(db), module, policy, name)
             }
+        };
+
+        // We generally treat dunder attributes with `Callable` types as function-like callables.
+        // See `callables_as_descriptors.md` for more details.
+        if name.starts_with("__") && name.ends_with("__") {
+            member = member.map_type(|ty| into_function_like_callable(db, ty));
         }
+
+        member
     }
 
     /// Returns the inferred type of the class member named `name`. Only bound members
