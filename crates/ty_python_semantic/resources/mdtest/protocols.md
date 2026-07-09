@@ -3068,6 +3068,78 @@ class UnknownIdentity:
 class GradualConstrainedIdentityProtocol(Protocol):
     def f[T: (Any, int)](self, value: T) -> T: ...
 
+class ManyConstrainedParametersProtocol(Protocol):
+    def f[
+        T0: (Any, int),
+        T1: (int, str),
+        T2: (int, str),
+        T3: (int, str),
+        T4: (int, str),
+        T5: (int, str),
+        T6: (int, str),
+        T7: (int, str),
+        T8: (int, str),
+        T9: (int, str),
+        T10: (int, str),
+        T11: (int, str),
+        T12: (int, str),
+        T13: (int, str),
+        T14: (int, str),
+        T15: (int, str),
+        T16: (int, str),
+        T17: (int, str),
+        T18: (int, str),
+        T19: (int, str),
+    ](
+        self,
+        value0: T0,
+        value1: T1,
+        value2: T2,
+        value3: T3,
+        value4: T4,
+        value5: T5,
+        value6: T6,
+        value7: T7,
+        value8: T8,
+        value9: T9,
+        value10: T10,
+        value11: T11,
+        value12: T12,
+        value13: T13,
+        value14: T14,
+        value15: T15,
+        value16: T16,
+        value17: T17,
+        value18: T18,
+        value19: T19,
+    ) -> None: ...
+
+class AnyParameters:
+    def f(
+        self,
+        value0: Any,
+        value1: Any,
+        value2: Any,
+        value3: Any,
+        value4: Any,
+        value5: Any,
+        value6: Any,
+        value7: Any,
+        value8: Any,
+        value9: Any,
+        value10: Any,
+        value11: Any,
+        value12: Any,
+        value13: Any,
+        value14: Any,
+        value15: Any,
+        value16: Any,
+        value17: Any,
+        value18: Any,
+        value19: Any,
+    ) -> None:
+        return None
+
 class GradualGenericIdentity:
     def f[S](self, value: S) -> S | Any:
         return value
@@ -3087,6 +3159,8 @@ static_assert(is_assignable_to(UnknownIdentity, IdentityProtocol))
 static_assert(not is_subtype_of(UnknownIdentity, IdentityProtocol))
 static_assert(is_assignable_to(IntIdentity, GradualConstrainedIdentityProtocol))
 static_assert(not is_subtype_of(IntIdentity, GradualConstrainedIdentityProtocol))
+# The gradual constraint does not expand the other constrained parameters into a Cartesian product.
+static_assert(is_assignable_to(AnyParameters, ManyConstrainedParametersProtocol))
 static_assert(is_assignable_to(GradualGenericIdentity, IdentityProtocol))
 static_assert(not is_subtype_of(GradualGenericIdentity, IdentityProtocol))
 static_assert(is_assignable_to(IntersectionIdentity, IdentityProtocol))

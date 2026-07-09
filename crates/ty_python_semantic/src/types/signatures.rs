@@ -1410,22 +1410,6 @@ impl<'db> Signature<'db> {
             })
     }
 
-    fn has_gradual_typevar_constraint(
-        db: &'db dyn Db,
-        typevars: &[BoundTypeVarInstance<'db>],
-    ) -> bool {
-        typevars.iter().any(|typevar| {
-            typevar
-                .typevar(db)
-                .constraints(db)
-                .is_some_and(|constraints| {
-                    constraints
-                        .iter()
-                        .any(|constraint| constraint.has_dynamic(db))
-                })
-        })
-    }
-
     /// Returns the PEP 695 type variables lexically bound by this function.
     ///
     /// Legacy variables, caller-owned inference variables, `Self`, and `ParamSpec`s retain the
@@ -2044,26 +2028,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (target, target_typevars)
         };
 
-        // A gradual constraint denotes a separate assignability choice, not one static range.
-        // Compare each declared target constraint directly so dynamic types retain their ordinary
-        // callable relation semantics.
-        if Signature::has_gradual_typevar_constraint(db, &target_typevars)
-            && let Some(target_specializations) =
-                target.constrained_specializations(db, &target_typevars)
-        {
-            return Some(
-                target_specializations
-                    .iter()
-                    .when_all(db, self.constraints, |target| {
-                        source_signatures
-                            .iter()
-                            .when_any(db, self.constraints, |source| {
-                                self.check_signature_pair(db, source, target)
-                            })
-                    }),
-            );
-        }
-
         let target_locals =
             InferableTypeVars::from_bound_typevars(db, target_typevars.iter().copied());
         let checker = self
@@ -2125,6 +2089,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 self.constraints,
                 &source_typevars,
                 &target_typevars,
+                self.relation.is_assignability(),
             ) {
                 return Some(result);
             }
@@ -2156,6 +2121,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.without_context_collection(check_source_signatures)
         };
 
+        let (quantified_sources, target_typevars) = if self.relation.is_assignability() {
+            quantified_sources
+                .try_project_gradual_specializations(db, self.constraints, &target_typevars)
+                .unwrap_or_else(|_| (self.never(), Vec::new()))
+        } else {
+            (quantified_sources, target_typevars)
+        };
+        let target_domain = ConstraintSet::valid_specializations(
+            db,
+            self.constraints,
+            target_typevars.iter().copied(),
+        );
+        let target_locals =
+            InferableTypeVars::from_bound_typevars(db, target_typevars.iter().copied());
         let universally_quantified =
             target_domain.implies(db, self.constraints, || quantified_sources);
         let result = universally_quantified

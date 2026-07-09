@@ -667,6 +667,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         builder: &'c ConstraintSetBuilder<'db>,
         source_typevars: &[BoundTypeVarInstance<'db>],
         target_typevars: &[BoundTypeVarInstance<'db>],
+        project_gradual_specializations: bool,
     ) -> Option<Self> {
         self.verify_builder(builder);
 
@@ -769,6 +770,15 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 target_domain,
             );
             let quantified = projected.and_then(|projected| {
+                let (projected, component_targets) = if project_gradual_specializations {
+                    projected.try_project_gradual_specializations(
+                        db,
+                        builder,
+                        &component_targets,
+                    )?
+                } else {
+                    (projected, component_targets)
+                };
                 projected.try_for_all_conjunctive_valid_specializations(
                     db,
                     builder,
@@ -782,6 +792,67 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         }
 
         Some(result)
+    }
+
+    /// Projects target variables with gradual constraints one choice at a time.
+    ///
+    /// Only variables whose own constraint set is gradual are expanded. All other target domains
+    /// remain symbolic, so unrelated constrained variables do not form a Cartesian product with a
+    /// gradual constraint. The returned variables still need ordinary universal quantification.
+    pub(crate) fn try_project_gradual_specializations(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        typevars: &[BoundTypeVarInstance<'db>],
+    ) -> Result<(Self, Vec<BoundTypeVarInstance<'db>>), ConstraintProjectionError> {
+        let mut gradual = Vec::new();
+        let mut static_typevars = Vec::new();
+        for typevar in typevars {
+            if let Some(constraints) = typevar.typevar(db).constraints(db)
+                && constraints
+                    .iter()
+                    .any(|constraint| constraint.has_dynamic(db))
+            {
+                gradual.push((*typevar, constraints));
+            } else {
+                static_typevars.push(*typevar);
+            }
+        }
+        if gradual.is_empty() {
+            return Ok((self, static_typevars));
+        }
+
+        let static_domain =
+            Self::valid_specializations(db, builder, static_typevars.iter().copied());
+        let gradual_locals =
+            InferableTypeVars::from_bound_typevars(db, gradual.iter().map(|(typevar, _)| *typevar));
+        let mut choice_domains = vec![ALWAYS_TRUE];
+        for (typevar, constraints) in gradual {
+            choice_domains = choice_domains
+                .into_iter()
+                .flat_map(|domain| {
+                    constraints.iter().map(move |constraint| {
+                        let choice = Constraint::new_node(
+                            db,
+                            builder,
+                            typevar,
+                            constraint.bottom_materialization(db),
+                            constraint.top_materialization(db),
+                        );
+                        domain.and(builder, choice)
+                    })
+                })
+                .collect();
+        }
+
+        let mut projected = Self::always(builder);
+        for domain in choice_domains {
+            let branch = Self::from_node(builder, domain)
+                .and(db, builder, || self)
+                .try_exists_assuming(db, builder, gradual_locals, static_domain)?;
+            projected = projected.and(db, builder, || branch);
+        }
+        Ok((projected, static_typevars))
     }
 
     /// Returns whether a constraint relates one of the given type variables to a type variable
