@@ -574,6 +574,19 @@ pub(super) fn property_setter_returns_never<'db>(
 }
 
 /// Return the class member that takes precedence over a definitely non-data metaclass member.
+///
+/// For example, `C.attribute` governs the assignment below because `Meta.attribute` does not
+/// implement `__set__` or `__delete__`:
+///
+/// ```python
+/// class Meta(type):
+///     attribute = object()
+///
+/// class C(metaclass=Meta):
+///     attribute: int
+///
+/// C.attribute = 1
+/// ```
 fn class_member_preceding_non_data_metaclass_member<'db>(
     db: &'db dyn Db,
     object_ty: Type<'db>,
