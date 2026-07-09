@@ -3082,6 +3082,10 @@ class UpperOnlyOptionalReturnSource:
     def f[S](self, value: int) -> S:
         raise NotImplementedError
 
+class IntersectionSequenceSource:
+    def f[S](self, value: S) -> Intersection[S, list[S]]:
+        raise NotImplementedError
+
 # A non-generic source is valid when its single signature covers every target specialization.
 static_assert(is_assignable_to(ObjectConsumer, ArbitraryConsumerProtocol))
 static_assert(is_subtype_of(ObjectConsumer, ArbitraryConsumerProtocol))
@@ -3139,6 +3143,11 @@ static_assert(not is_subtype_of(GenericIdentity, SequenceReturnProtocol))
 # An upper-only source variable can always be specialized within the target return type.
 static_assert(is_assignable_to(UpperOnlyOptionalReturnSource, OptionalReturnProtocol))
 static_assert(is_subtype_of(UpperOnlyOptionalReturnSource, OptionalReturnProtocol))
+
+# The `list[S]` return arm covers the target with `S = T`; the unrelated `S` arm must not impose
+# its failed projection requirement on this sibling alternative.
+static_assert(is_assignable_to(IntersectionSequenceSource, SequenceReturnProtocol))
+static_assert(is_subtype_of(IntersectionSequenceSource, SequenceReturnProtocol))
 
 class ConstrainedListConsumerProtocol(Protocol):
     def f[T: (list[int], list[str])](self, value: T) -> None: ...

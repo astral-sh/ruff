@@ -3047,11 +3047,11 @@ impl NodeId {
         let mut subjects_with_concrete_domains = FxHashMap::default();
         let mut projection_requirements = Vec::new();
         let mut requires_unrepresentable_residual = false;
-        constrained.for_each_unique_constraint(builder, &mut |constraint, _| {
+        constrained.for_each_unique_constraint(builder, &mut |constraint_id, source_order| {
             if requires_unrepresentable_residual {
                 return;
             }
-            let constraint = builder.constraint_data(constraint);
+            let constraint = builder.constraint_data(constraint_id);
             let subject_is_removed = constraint.typevar.is_inferable(db, bound_typevars);
             let nested_lower = constraint
                 .bounds
@@ -3112,54 +3112,59 @@ impl NodeId {
             // specialization. Lower and upper bounds can appear in separate BDD constraints, so
             // retain the covering relation in the projection input. This also makes multiple
             // bounds agree on the same specialization.
-            let coverage_from_subject_lower_bounds = |upper: Type<'db>| {
+            let requirement_from_subject_lower_bounds = |upper: Type<'db>| {
                 if !subject_is_removed {
                     return None;
                 }
 
-                let mut subject_domain = ALWAYS_FALSE;
-                let mut coverage = ALWAYS_FALSE;
-                let mut has_lower_bound = false;
-                constrained.for_each_unique_constraint(builder, &mut |domain, source_order| {
-                    let domain_data = builder.constraint_data(domain);
-                    let lower = if domain_data.typevar == constraint.typevar {
-                        domain_data.bounds.lower
-                    } else if domain_data.bounds.upper.is_some_and(|upper| {
-                        upper
-                            .as_typevar()
-                            .is_some_and(|upper| upper.is_same_typevar_as(db, constraint.typevar))
-                    }) {
-                        Some(Type::TypeVar(domain_data.typevar))
-                    } else {
-                        None
-                    };
-                    let Some(lower) = lower else {
-                        return;
-                    };
-                    has_lower_bound = true;
-                    if any_over_type(db, lower, false, |inner| {
-                        inner
-                            .as_typevar()
-                            .is_some_and(|typevar| typevar.is_inferable(db, bound_typevars))
-                    }) {
-                        return;
-                    }
+                let upper_domain = Node::new_satisfied_constraint(
+                    builder,
+                    constraint_id.when_true(),
+                    source_order,
+                );
+                let mut requirement = ALWAYS_TRUE;
+                constrained.for_each_unique_constraint(
+                    builder,
+                    &mut |domain, domain_source_order| {
+                        let domain_data = builder.constraint_data(domain);
+                        let lower = if domain_data.typevar == constraint.typevar {
+                            domain_data.bounds.lower
+                        } else if domain_data.bounds.upper.is_some_and(|upper| {
+                            upper.as_typevar().is_some_and(|upper| {
+                                upper.is_same_typevar_as(db, constraint.typevar)
+                            })
+                        }) {
+                            Some(Type::TypeVar(domain_data.typevar))
+                        } else {
+                            None
+                        };
+                        let Some(lower) = lower else {
+                            return;
+                        };
+                        let covers = if any_over_type(db, lower, false, |inner| {
+                            inner
+                                .as_typevar()
+                                .is_some_and(|typevar| typevar.is_inferable(db, bound_typevars))
+                        }) {
+                            ALWAYS_FALSE
+                        } else {
+                            lower
+                                .when_constraint_set_assignable_to(db, upper, builder)
+                                .node
+                        };
 
-                    let domain =
-                        Node::new_satisfied_constraint(builder, domain.when_true(), source_order);
-                    subject_domain = subject_domain.or(builder, domain);
-                    let covers = lower.when_constraint_set_assignable_to(db, upper, builder);
-                    coverage = coverage.or(builder, domain.and(builder, covers.node));
-                });
+                        let lower_domain = Node::new_satisfied_constraint(
+                            builder,
+                            domain.when_true(),
+                            domain_source_order,
+                        );
+                        let active_bounds = upper_domain.and(builder, lower_domain);
+                        requirement =
+                            requirement.and(builder, active_bounds.implies(builder, covers));
+                    },
+                );
 
-                if has_lower_bound {
-                    constrained
-                        .implies(builder, subject_domain)
-                        .is_always_satisfied(db, builder)
-                        .then_some(coverage)
-                } else {
-                    Some(ALWAYS_TRUE)
-                }
+                Some(requirement)
             };
 
             // A declared upper bound on the subject can also provide one source specialization
@@ -3167,7 +3172,7 @@ impl NodeId {
             // `T ≤ Sequence[S]`, choosing `S = object` satisfies the latter for every valid `T`.
             // Keep the covering relation in the projection input so multiple nested bounds must
             // agree on the same source-local specializations.
-            let coverage_from_subject_upper_bounds = |bound: Type<'db>| {
+            let requirement_from_subject_upper_bounds = |bound: Type<'db>| {
                 let mut subject_domain = ALWAYS_FALSE;
                 let mut coverage = ALWAYS_FALSE;
                 assumptions.for_each_unique_constraint(builder, &mut |domain, source_order| {
@@ -3191,10 +3196,17 @@ impl NodeId {
                     coverage = coverage.or(builder, domain.and(builder, covers.node));
                 });
 
-                assumptions
+                let coverage_holds = assumptions
                     .implies(builder, subject_domain)
-                    .is_always_satisfied(db, builder)
-                    .then_some(coverage)
+                    .is_always_satisfied(db, builder);
+                coverage_holds.then(|| {
+                    let upper_domain = Node::new_satisfied_constraint(
+                        builder,
+                        constraint_id.when_true(),
+                        source_order,
+                    );
+                    upper_domain.implies(builder, coverage)
+                })
             };
 
             if nested_lower.is_some() {
@@ -3202,10 +3214,10 @@ impl NodeId {
             } else if let Some(upper) = nested_upper
                 && !upper_bound_allows_subject_specialization(upper)
             {
-                if let Some(coverage) = coverage_from_subject_lower_bounds(upper)
-                    .or_else(|| coverage_from_subject_upper_bounds(upper))
+                if let Some(requirement) = requirement_from_subject_lower_bounds(upper)
+                    .or_else(|| requirement_from_subject_upper_bounds(upper))
                 {
-                    projection_requirements.push(coverage);
+                    projection_requirements.push(requirement);
                 } else {
                     requires_unrepresentable_residual = true;
                 }
