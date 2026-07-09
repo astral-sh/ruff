@@ -1890,7 +1890,7 @@ fn datetype(criterion: &mut Criterion) {
             max_dep_date: TY_ECOSYSTEM_PIN,
             python_version: SupportedPythonVersion::Py311,
         },
-        18,
+        17,
     );
 
     bench_project(&benchmark, criterion);
