@@ -23,7 +23,7 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
         CallableType, ClassBase, ClassLiteral, ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
-        GenericAlias, GenericContext, InstanceFallbackShadowsNonDataDescriptor, KnownFunction,
+        GenericAlias, GenericContext, ReceiverMemberShadowsNonDataDescriptor, KnownFunction,
         KnownInstanceType, MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter,
         ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral, Type, TypeMapping,
         TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable, VarianceTerm,
@@ -2589,7 +2589,7 @@ fn protocol_member_read_type<'db>(
             ),
             ty,
             Place::Undefined.into(),
-            InstanceFallbackShadowsNonDataDescriptor::No,
+            ReceiverMemberShadowsNonDataDescriptor::No,
         )
         .unwrap_or_else(|error| error.fallback_member(db))
         .member(db)
