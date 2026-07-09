@@ -345,22 +345,49 @@ impl Suppressions {
             return false;
         };
 
+        self.check_suppression(
+            diagnostic.secondary_code(),
+            diagnostic.name(),
+            range,
+            diagnostic.parent(),
+        )
+    }
+
+    /// Check whether a rule is suppressed at the given range and mark the suppression as used.
+    pub(crate) fn check_rule(
+        &self,
+        rule: Rule,
+        range: TextRange,
+        parent: Option<TextSize>,
+    ) -> bool {
+        self.check_suppression(Some(&rule.noqa_code()), rule.name().as_str(), range, parent)
+    }
+
+    /// Check whether the given rule code or name corresponds to a valid suppression comment at
+    /// `range` itself or the `parent` offset.
+    fn check_suppression<C>(
+        &self,
+        code: Option<&C>,
+        name: &str,
+        range: TextRange,
+        parent: Option<TextSize>,
+    ) -> bool
+    where
+        C: for<'a> PartialEq<&'a str>,
+    {
         for suppression in &self.valid {
             let suppression_code =
                 get_redirect_target(suppression.code.as_str()).unwrap_or(suppression.code.as_str());
 
-            let code_matches = diagnostic
-                .secondary_code()
-                .is_some_and(|code| *code == suppression_code);
-
-            let name_matches = is_human_readable_names_enabled(self.preview)
-                && diagnostic.name() == suppression_code;
+            let code_matches = code.is_some_and(|code| code == &suppression_code);
+            let name_matches =
+                is_human_readable_names_enabled(self.preview) && name == suppression_code;
 
             if !code_matches && !name_matches {
                 continue;
             }
 
-            if suppression.applies_to_diagnostic(range, diagnostic.parent()) {
+            if suppression.applies_to_diagnostic(range, parent) {
                 suppression.used.set(true);
                 return true;
             }

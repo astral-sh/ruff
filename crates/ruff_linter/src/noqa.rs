@@ -65,6 +65,15 @@ pub(crate) enum Directive<'a> {
     Codes(Codes<'a>),
 }
 
+impl Ranged for Directive<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            Directive::All(all) => all.range(),
+            Directive::Codes(codes) => codes.range(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct All {
     range: TextRange,
@@ -121,6 +130,10 @@ impl Codes<'_> {
     pub(crate) fn includes<T: for<'a> PartialEq<&'a str>>(&self, needle: &T) -> bool {
         self.iter()
             .any(|code| *needle == get_redirect_target(code.as_str()).unwrap_or(code.as_str()))
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        self.codes.len()
     }
 }
 
@@ -1355,7 +1368,7 @@ mod tests {
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
-    use crate::settings::{LinterSettings, flags, types::PreviewMode};
+    use crate::settings::{LinterSettings, flags};
     use crate::source_kind::SourceKind;
     use crate::suppression::Suppressions;
     use crate::test::{print_messages, test_contents};
@@ -1417,18 +1430,8 @@ mod tests {
     fn add_suppressions_in(
         source: &str,
         suppression_kind: SuppressionKind,
-        preview: PreviewMode,
+        settings: &LinterSettings,
     ) -> Result<String> {
-        let settings = LinterSettings {
-            preview,
-            ..LinterSettings::for_rules([
-                Rule::MissingTypeFunctionArgument,
-                Rule::MissingReturnTypeUndocumentedPublicFunction,
-                Rule::UnsortedImports,
-                Rule::UnusedFunctionArgument,
-                Rule::UndocumentedPublicFunction,
-            ])
-        };
         let path = Path::new("<filename>");
         let source_map = SourceMap::default();
         let source_kind = SourceKind::from_source_code(
@@ -1437,7 +1440,7 @@ mod tests {
         )?
         .ok_or_else(|| anyhow!("test file should be Python"))?;
 
-        let (count, fixed) = add_suppressions(path, &source_kind, &settings, suppression_kind);
+        let (count, fixed) = add_suppressions(path, &source_kind, settings, suppression_kind);
         let plural = if count == 1 { "" } else { "s" };
         let mut output = String::new();
         writeln!(
@@ -1447,7 +1450,7 @@ mod tests {
 
         let source_kind = source_kind.updated(fixed, &source_map);
         let (second_count, fixed) =
-            add_suppressions(path, &source_kind, &settings, suppression_kind);
+            add_suppressions(path, &source_kind, settings, suppression_kind);
         if second_count > 0 {
             writeln!(
                 output,
@@ -1456,7 +1459,7 @@ mod tests {
         }
 
         let source_kind = source_kind.updated(fixed, &source_map);
-        let (diagnostics, _) = test_contents(&source_kind, path, &settings);
+        let (diagnostics, _) = test_contents(&source_kind, path, settings);
         if !diagnostics.is_empty() {
             writeln!(
                 output,
@@ -3054,7 +3057,12 @@ mod tests {
                     pass
                 "#,
                 SuppressionKind::Noqa,
-                PreviewMode::Disabled,
+                &LinterSettings::for_rules([
+                    Rule::MissingTypeFunctionArgument,
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::UnusedFunctionArgument,
+                    Rule::UndocumentedPublicFunction,
+                ]),
             )?,
             @"
         Added 1 suppression
@@ -3079,7 +3087,13 @@ mod tests {
                     pass
                 "#,
                 SuppressionKind::Noqa,
-                PreviewMode::Enabled,
+                &LinterSettings::for_rules([
+                    Rule::MissingTypeFunctionArgument,
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::UnusedFunctionArgument,
+                    Rule::UndocumentedPublicFunction,
+                ])
+                .with_preview_mode(),
             )?,
             @"
         Added 1 suppression
@@ -3104,7 +3118,13 @@ mod tests {
                     pass
                 "#,
                 SuppressionKind::Ignore,
-                PreviewMode::Enabled,
+                &LinterSettings::for_rules([
+                    Rule::MissingTypeFunctionArgument,
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::UnusedFunctionArgument,
+                    Rule::UndocumentedPublicFunction,
+                ])
+                .with_preview_mode(),
             )?,
             @"
         Added 1 suppression
@@ -3121,6 +3141,56 @@ mod tests {
     }
 
     #[test]
+    fn add_noqa_ruf105() -> Result<()> {
+        let settings =
+            LinterSettings::for_rules([Rule::NoqaComments, Rule::UnusedImport]).with_preview_mode();
+
+        assert_snapshot!(
+            add_suppressions_in(
+                "import math  # noqa: F401",
+                SuppressionKind::Noqa,
+                &settings,
+            )?,
+            @"
+        Added 1 suppression
+
+        ## Fixed source
+
+        ```py
+        import math  # noqa: F401, RUF105
+
+        ```
+        "
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn add_ignore_ruf105() -> Result<()> {
+        let settings =
+            LinterSettings::for_rules([Rule::NoqaComments, Rule::UnusedImport]).with_preview_mode();
+
+        assert_snapshot!(
+            add_suppressions_in(
+                "import math  # noqa: F401",
+                SuppressionKind::Ignore,
+                &settings,
+            )?,
+            @"
+        Added 1 suppression
+
+        ## Fixed source
+
+        ```py
+        import math  # noqa: F401  # ruff:ignore[noqa-comments]
+
+        ```
+        "
+        );
+        Ok(())
+    }
+
+    #[test]
     fn add_ignore_to_existing_ignore() -> Result<()> {
         assert_snapshot!(
             add_suppressions_in(
@@ -3129,7 +3199,13 @@ mod tests {
                     pass
                 "#,
                 SuppressionKind::Ignore,
-                PreviewMode::Enabled,
+                &LinterSettings::for_rules([
+                    Rule::MissingTypeFunctionArgument,
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::UnusedFunctionArgument,
+                    Rule::UndocumentedPublicFunction,
+                ])
+                .with_preview_mode(),
             )?,
             @"
         Added 1 suppression
@@ -3154,7 +3230,12 @@ mod tests {
                     pass
                 "#,
                 SuppressionKind::Ignore,
-                PreviewMode::Enabled,
+                &LinterSettings::for_rules([
+                    Rule::MissingTypeFunctionArgument,
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::UndocumentedPublicFunction,
+                ])
+                .with_preview_mode(),
             )?,
             @"
         Added 1 suppression
@@ -3180,7 +3261,7 @@ mod tests {
                 import a
                 "#,
                 SuppressionKind::Ignore,
-                PreviewMode::Enabled,
+                &LinterSettings::for_rules([Rule::UnsortedImports]).with_preview_mode(),
             )?,
             @"
         Added 1 suppression
@@ -3208,7 +3289,11 @@ mod tests {
                     return x
                 "#,
                 SuppressionKind::Ignore,
-                PreviewMode::Enabled,
+                &LinterSettings::for_rules([
+                    Rule::MissingTypeFunctionArgument,
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                ])
+                .with_preview_mode(),
             )?,
             @r#"
         Added 1 suppression
