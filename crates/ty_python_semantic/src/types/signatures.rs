@@ -39,8 +39,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
     MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarKind, TypeVarNonce, TypedDictType, UnionBuilder,
-    VarianceInferable, infer_complete_scope_types, todo_type,
+    TypeMapping, TypeVarKind, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
+    infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -1026,20 +1026,20 @@ impl<'db> Signature<'db> {
             return None;
         }
 
-        let bound_or_constraints = typevar.typevar(db).bound_or_constraints(db);
-        let domain = bound_or_constraints
+        let domain = typevar
+            .typevar(db)
+            .bound_or_constraints(db)
             .map(|bound| bound.as_type(db))
             .unwrap_or(Type::object());
+        if self_type.is_some_and(|self_type| !self_type.is_assignable_to(db, domain)) {
+            return Some(Self::bottom());
+        }
 
         let (receiver_type, receiver_self) = if let Some(self_type) = self_type {
-            let Some(receiver_type) = Self::typevar_specialization(db, typevar, self_type) else {
-                return Some(Self::bottom());
-            };
-            (receiver_type, None)
+            (self_type, None)
         } else {
             let receiver_self =
-                BoundTypeVarInstance::synthetic_self(db, domain, typevar.binding_context(db))
-                    .map_bound_or_constraints(db, |_| bound_or_constraints);
+                BoundTypeVarInstance::synthetic_self(db, domain, typevar.binding_context(db));
             (Type::TypeVar(receiver_self), Some(receiver_self))
         };
         let mut signature = self.apply_type_mapping_impl(
@@ -1062,45 +1062,19 @@ impl<'db> Signature<'db> {
         Some(signature)
     }
 
-    /// Returns the specialization of `typevar` selected by `value`.
-    fn typevar_specialization(
-        db: &'db dyn Db,
-        typevar: BoundTypeVarInstance<'db>,
-        value: Type<'db>,
-    ) -> Option<Type<'db>> {
-        match typevar.typevar(db).bound_or_constraints(db) {
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                .elements(db)
-                .iter()
-                .find(|constraint| **constraint == value)
-                .or_else(|| {
-                    constraints
-                        .elements(db)
-                        .iter()
-                        .find(|constraint| value.is_assignable_to(db, **constraint))
-                })
-                .copied(),
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                value.is_assignable_to(db, bound).then_some(value)
-            }
-            None => Some(value),
-        }
-    }
-
-    /// Returns the specialization of `self_type` that satisfies every deferred `Self` domain.
-    fn self_type_specialization(&self, db: &'db dyn Db, self_type: Type<'db>) -> Option<Type<'db>> {
+    /// Returns whether `self_type` satisfies every deferred `Self` domain in this signature.
+    fn self_type_satisfies_domains(&self, db: &'db dyn Db, self_type: Type<'db>) -> bool {
         self.generic_context
             .into_iter()
             .flat_map(|context| context.variables(db))
             .filter(|typevar| typevar.typevar(db).is_self(db))
-            .try_fold(self_type, |self_type, typevar| {
-                Self::typevar_specialization(db, typevar, self_type)
+            .all(|typevar| {
+                typevar
+                    .typevar(db)
+                    .bound_or_constraints(db)
+                    .map(|bound| self_type.is_assignable_to(db, bound.as_type(db)))
+                    .unwrap_or(true)
             })
-    }
-
-    /// Returns whether `self_type` satisfies every deferred `Self` domain in this signature.
-    fn self_type_satisfies_domains(&self, db: &'db dyn Db, self_type: Type<'db>) -> bool {
-        self.self_type_specialization(db, self_type).is_some()
     }
 
     /// Returns `true` if this signature's first parameter can accept the bound `self` type.
@@ -1177,9 +1151,9 @@ impl<'db> Signature<'db> {
     }
 
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
-        let Some(self_type) = self.self_type_specialization(db, self_type) else {
+        if !self.self_type_satisfies_domains(db, self_type) {
             return Self::bottom();
-        };
+        }
 
         if !self.needs_self_mapping(db, false) {
             let mut signature = self.clone();

@@ -3065,17 +3065,6 @@ static_assert(is_subtype_of(ValidConstrainedReceiver, ConstrainedReceiverProtoco
 static_assert(not is_assignable_to(InvalidConstrainedReceiver, ConstrainedReceiverProtocol))
 static_assert(not is_subtype_of(InvalidConstrainedReceiver, ConstrainedReceiverProtocol))
 
-class ConstrainedReturningReceiverProtocol(Protocol):
-    def constrained[T: (FirstAllowedReceiver, SecondAllowedReceiver)](self: T) -> T: ...
-
-class PromotedConstrainedReceiver(FirstAllowedReceiver):
-    def constrained(self) -> FirstAllowedReceiver:
-        return self
-
-# A constrained receiver specializes to the matching declared constraint, not its concrete subtype.
-static_assert(is_assignable_to(PromotedConstrainedReceiver, ConstrainedReturningReceiverProtocol))
-static_assert(is_subtype_of(PromotedConstrainedReceiver, ConstrainedReturningReceiverProtocol))
-
 type IdentityAlias[X] = X
 type ListAlias[X] = list[X]
 
