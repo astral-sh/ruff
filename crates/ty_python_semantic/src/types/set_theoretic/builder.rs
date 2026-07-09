@@ -40,14 +40,42 @@ use super::RecursivelyDefined;
 use crate::types::cyclic::type_has_immediate_recursive_identity_cycle;
 use crate::types::enums::EnumComplement;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
+use crate::types::visitor::any_over_type;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
-    StringLiteralType, SubclassOfType, Type, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    StringLiteralType, SubclassOfType, Type, TypeAliasType, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
+
+/// Return `true` if union relation simplification can unfold alias applications indefinitely.
+///
+/// This is not a recursive-alias predicate. It only identifies the shape where comparing a union
+/// element against another type can expand specialized aliases whose arguments already contain
+/// aliases, producing ever-growing applications before the relation cycle guard sees a stable pair.
+fn type_may_grow_during_union_relation_simplification<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    any_over_type(db, ty, false, |nested| {
+        let Type::TypeAlias(TypeAliasType::PEP695(alias)) = nested else {
+            return false;
+        };
+
+        if alias.generic_context(db).is_none() {
+            return false;
+        }
+        let Some(specialization) = alias.specialization(db) else {
+            return false;
+        };
+
+        specialization.types(db).iter().any(|argument| {
+            any_over_type(db, *argument, false, |nested| {
+                matches!(nested, Type::TypeAlias(_))
+            })
+        })
+    })
+}
 
 /// Extract `(core, guard)` from truthiness-guarded intersections.
 ///
@@ -381,6 +409,7 @@ impl<'db> UnionElement<'db> {
         db: &'db dyn Db,
         other_type: Type<'db>,
         cycle_recovery: bool,
+        allow_relation_simplification: bool,
     ) -> ReduceResult<'db> {
         if cycle_recovery {
             // A widened literal group must absorb matching literals from later iterations for
@@ -401,6 +430,16 @@ impl<'db> UnionElement<'db> {
                         .as_nominal_instance()
                         .is_none_or(|instance| instance.class_literal(db) != *enum_class),
                 ),
+            };
+        }
+
+        if !allow_relation_simplification {
+            return match self {
+                UnionElement::Type(existing) => ReduceResult::Type(*existing),
+                UnionElement::IntLiterals(_)
+                | UnionElement::StringLiterals(_)
+                | UnionElement::BytesLiterals(_)
+                | UnionElement::EnumLiterals { .. } => ReduceResult::KeepIf(true),
             };
         }
 
@@ -1009,9 +1048,18 @@ impl<'db> UnionBuilder<'db> {
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
+        let ty_may_grow_during_relation_simplification =
+            type_may_grow_during_union_relation_simplification(self.db, ty);
 
         for (i, element) in self.elements.iter_mut().enumerate() {
-            let element_type = match element.try_reduce(self.db, ty, self.cycle_recovery) {
+            let can_simplify_literal_groups_with_relations =
+                !ty_may_grow_during_relation_simplification;
+            let element_type = match element.try_reduce(
+                self.db,
+                ty,
+                self.cycle_recovery,
+                can_simplify_literal_groups_with_relations,
+            ) {
                 ReduceResult::KeepIf(keep) => {
                     if !keep {
                         to_remove.push(i);
@@ -1083,7 +1131,11 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             }
 
-            if should_simplify_full && !matches!(element_type, Type::TypeAlias(_)) {
+            if should_simplify_full
+                && !matches!(element_type, Type::TypeAlias(_))
+                && !ty_may_grow_during_relation_simplification
+                && !type_may_grow_during_union_relation_simplification(self.db, element_type)
+            {
                 if ty.is_redundant_with(self.db, element_type) {
                     return;
                 }

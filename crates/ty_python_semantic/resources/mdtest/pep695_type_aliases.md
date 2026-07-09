@@ -695,6 +695,36 @@ def stable_wrapped(x: StableWrapped[int], y: StableWrapped[str]):
     y = x
 ```
 
+### Undecidable recursive alias relations
+
+Recursive type aliases with nested specialization can encode context-free grammars (CFG). It is
+known that determining the equivalence or inclusion of two CFGs is undecidable; therefore, no
+general subtyping algorithm exists for such type aliases. When this pattern is detected, we
+immediately provide a conservative judgment and terminate.
+
+```py
+from typing import Literal, final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+@final
+class End:
+    pass
+
+type AAnd[Rest] = tuple[Literal["a"], Rest]
+type BAnd[Rest] = tuple[Literal["b"], Rest]
+
+# S -> ε | aSb
+# {a^n b^n | n >= 0}
+type S[Rest] = End | AAnd[S[BAnd[Rest]]]
+# T -> ε | aTb | aaTbb
+# {a^n b^n | n >= 0}
+type T[Rest] = End | AAnd[T[BAnd[Rest]]] | AAnd[AAnd[T[BAnd[BAnd[Rest]]]]]
+
+# S and T produce exactly the same language, but the type checker cannot tell that.
+static_assert(not is_subtype_of(S[End], T[End]))
+```
+
 ### Non-recursive nested generic aliases
 
 A repeated use of the same generic alias can be a finite alias application instead of recursion.
