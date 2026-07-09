@@ -3046,29 +3046,27 @@ impl NodeId {
                 return;
             }
 
-            // For an upper bound `T ≤ F[S]`, specializing an unbounded `S` to `T` is sufficient
-            // when the ordinary relation checker proves `T ≤ F[T]` for every `T`. This handles
-            // `T ≤ S | None` without making projection depend on any particular type shape.
+            // For an upper bound `T ≤ F[S, R, ...]`, specializing every unbounded source local to
+            // `T` is sufficient when the ordinary relation checker proves `T ≤ F[T, T, ...]` for
+            // every `T`. This handles `T ≤ S | R | None` without making projection depend on any
+            // particular type shape.
             let upper_bound_allows_subject_specialization = |bound: Type<'db>| {
-                let Some(typevar) = find_over_type(db, bound, false, |inner| {
+                let subject = Type::TypeVar(constraint.typevar);
+                let mut specialized = bound;
+                while let Some(typevar) = find_over_type(db, specialized, false, |inner| {
                     inner
                         .as_typevar()
                         .filter(|typevar| typevar.is_inferable(db, bound_typevars))
-                }) else {
-                    return false;
-                };
-                if typevar.typevar(db).bound_or_constraints(db).is_some() {
-                    return false;
-                }
-
-                let subject = Type::TypeVar(constraint.typevar);
-                let specialized = bound.substitute_one_typevar(db, typevar, subject);
-                if any_over_type(db, specialized, false, |inner| {
-                    inner
-                        .as_typevar()
-                        .is_some_and(|typevar| typevar.is_inferable(db, bound_typevars))
                 }) {
-                    return false;
+                    if typevar.typevar(db).bound_or_constraints(db).is_some() {
+                        return false;
+                    }
+
+                    let updated = specialized.substitute_one_typevar(db, typevar, subject);
+                    if updated == specialized {
+                        return false;
+                    }
+                    specialized = updated;
                 }
 
                 subject

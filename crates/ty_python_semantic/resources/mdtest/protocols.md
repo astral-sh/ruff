@@ -3014,6 +3014,14 @@ class IntOptionalConsumer:
     def f(self, value: int | None) -> None:
         return None
 
+class TwoVariableUnionConsumer:
+    def f[S, R](self, value: S | R) -> None:
+        return None
+
+class TwoVariableNestedUnionConsumer:
+    def f[S, R](self, value: list[S] | list[R]) -> None:
+        return None
+
 class ListOnlyConsumer:
     def f[S](self, value: list[S]) -> None:
         return None
@@ -3047,6 +3055,15 @@ static_assert(is_assignable_to(GradualOptionalConsumer, ArbitraryConsumerProtoco
 static_assert(not is_subtype_of(GradualOptionalConsumer, ArbitraryConsumerProtocol))
 static_assert(not is_assignable_to(IntOptionalConsumer, ArbitraryConsumerProtocol))
 static_assert(not is_subtype_of(IntOptionalConsumer, ArbitraryConsumerProtocol))
+
+# Every unbounded source variable in the union can be specialized to the target variable.
+static_assert(is_assignable_to(TwoVariableUnionConsumer, ArbitraryConsumerProtocol))
+static_assert(is_subtype_of(TwoVariableUnionConsumer, ArbitraryConsumerProtocol))
+
+# Substituting every source variable is not enough when the resulting type still does not accept
+# every target specialization.
+static_assert(not is_assignable_to(TwoVariableNestedUnionConsumer, ArbitraryConsumerProtocol))
+static_assert(not is_subtype_of(TwoVariableNestedUnionConsumer, ArbitraryConsumerProtocol))
 
 # Projecting `S` from the obligation `T ≤ list[S]` would require an existential type. It must not
 # be treated as though some list element type can make `list[S]` cover every `T`.
