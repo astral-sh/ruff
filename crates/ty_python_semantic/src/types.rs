@@ -2856,6 +2856,7 @@ impl<'db> Type<'db> {
             _ => self.to_class_type(db),
         };
         let own_class_attr = own_class.map(|class| class.own_class_member(db, None, name).inner);
+        let has_own_class_attr = own_class_attr.is_some_and(|member| !member.is_undefined());
 
         // A definitely-declared attribute in this class's own namespace is the contract for
         // values populated by metaclass initialization, analogous to a declared instance
@@ -2881,9 +2882,10 @@ impl<'db> Type<'db> {
             return class_attr;
         };
         let metaclass_attr = metaclass_instance.instance_member(db, name);
-        let metaclass_attr_is_optional = metaclass_attr
-            .qualifiers
-            .contains(TypeQualifiers::MAY_BE_UNINITIALIZED);
+        let metaclass_attr_is_optional = !has_own_class_attr
+            && metaclass_attr
+                .qualifiers
+                .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE);
         let metaclass_attr = if metaclass_attr_is_optional {
             Self::with_definedness(metaclass_attr, Definedness::PossiblyUndefined)
         } else {
@@ -7952,7 +7954,7 @@ impl std::fmt::Display for DynamicType<'_> {
 bitflags! {
     /// Type qualifiers that appear in an annotation expression.
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, salsa::Update, Hash)]
-    pub struct TypeQualifiers: u16 {
+    pub struct TypeQualifiers: u8 {
         /// `typing.ClassVar`
         const CLASS_VAR = 1 << 0;
         /// `typing.Final`
@@ -7973,9 +7975,6 @@ bitflags! {
         /// `__getattr__` function. We need this in order to implement precedence of submodules
         /// over module-level `__getattr__`, for compatibility with other type checkers.
         const FROM_MODULE_GETATTR = 1 << 7;
-        /// A non-standard type qualifier that marks an implicit instance attribute which is not
-        /// initialized by `__init__`.
-        const MAY_BE_UNINITIALIZED = 1 << 8;
     }
 }
 
@@ -8007,9 +8006,8 @@ impl TypeQualifiers {
     /// Non-standard qualifiers are internal implementation details like
     /// `IMPLICIT_INSTANCE_ATTRIBUTE` and `FROM_MODULE_GETATTR`.
     pub fn is_non_standard(self) -> bool {
-        const NON_STANDARD: TypeQualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE
-            .union(TypeQualifiers::FROM_MODULE_GETATTR)
-            .union(TypeQualifiers::MAY_BE_UNINITIALIZED);
+        const NON_STANDARD: TypeQualifiers =
+            TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE.union(TypeQualifiers::FROM_MODULE_GETATTR);
         self.intersects(NON_STANDARD)
     }
 }

@@ -2397,13 +2397,6 @@ impl<'db> StaticClassLiteral<'db> {
                 MethodDecorator::StaticMethod => is_staticmethod,
             }
         };
-        let is_initializer_scope = |method_scope: &Scope| {
-            method_scope
-                .node()
-                .as_function()
-                .is_some_and(|method| method.node(&module).name.as_str() == "__init__")
-        };
-
         // First check declarations
         for (attribute_declarations, method_scope_id) in
             attribute_declarations(db, class_body_scope, name)
@@ -2432,14 +2425,11 @@ impl<'db> StaticClassLiteral<'db> {
                 let Some(annotation) = inferred_declaration(db, declaration).declared() else {
                     continue;
                 };
-                let mut annotation_qualifiers =
-                    annotation.qualifiers | TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
-                if !is_initializer_scope(method_scope) {
-                    annotation_qualifiers |= TypeQualifiers::MAY_BE_UNINITIALIZED;
-                }
                 let annotation = Place::declared(annotation.inner)
                     .with_definition(declaration)
-                    .with_qualifiers(annotation_qualifiers);
+                    .with_qualifiers(
+                        annotation.qualifiers | TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE,
+                    );
 
                 if let Some(all_qualifiers) = annotation.is_bare_final() {
                     if let Some(value) = assignment.value(&module) {
@@ -2512,8 +2502,6 @@ impl<'db> StaticClassLiteral<'db> {
             if is_method_reachable.is_always_false() {
                 continue;
             }
-            let is_initializer = is_initializer_scope(scope_for_reachability_analysis);
-
             for attribute_assignment in attribute_assignments {
                 if let DefinitionState::Undefined = attribute_assignment.binding {
                     continue;
@@ -2525,9 +2513,6 @@ impl<'db> StaticClassLiteral<'db> {
 
                 if !is_method_reachable.is_always_false() {
                     is_attribute_bound = true;
-                    if !is_initializer {
-                        qualifiers |= TypeQualifiers::MAY_BE_UNINITIALIZED;
-                    }
                 }
 
                 let inferred_ty = match binding.kind(db) {

@@ -1295,7 +1295,8 @@ class DeclaringBase:
 
 class InitializedDerived(DeclaringBase, metaclass=DerivedInitializingMeta): ...
 
-reveal_type(InitializedDerived.inherited_attr)  # revealed: int
+# TODO: Once we track definite initialization, this should narrow to `int`.
+reveal_type(InitializedDerived.inherited_attr)  # revealed: int | str
 ```
 
 An assignment through `cls` in an arbitrary metaclass method also writes to the constructed class
@@ -1785,7 +1786,8 @@ class InitializedBase:
 
 class Initialized(InitializedBase, metaclass=InitializingInheritedMeta): ...
 
-reveal_type(Initialized.initialized)  # revealed: int
+# TODO: Once we track definite initialization, this should narrow to `int`.
+reveal_type(Initialized.initialized)  # revealed: int | str
 # TODO: Once we track definite initialization, this should narrow to `int`.
 reveal_type(Initialized().initialized)  # revealed: int | str
 ```
@@ -1806,6 +1808,7 @@ class ConditionalBase:
 
 class ConditionallyInitialized(ConditionalBase, metaclass=ConditionallyInitializingMeta): ...
 
+reveal_type(ConditionallyInitialized.initialized)  # revealed: int | str
 reveal_type(ConditionallyInitialized().initialized)  # revealed: int | str
 ```
 
