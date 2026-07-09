@@ -26,20 +26,6 @@ pub mod value;
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 #[cfg_attr(test, derive(serde::Serialize))]
-struct ProjectName(CompactString);
-
-impl ProjectName {
-    fn new(name: impl AsRef<str>) -> Self {
-        Self(CompactString::new(name))
-    }
-
-    fn as_str(&self) -> &str {
-        self.0.as_str()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
-#[cfg_attr(test, derive(serde::Serialize))]
 pub struct ProjectMetadata {
     name: ProjectName,
 
@@ -356,6 +342,20 @@ impl ProjectMetadata {
         self.extra_configuration_paths
             .push(options.path().to_owned());
         self.options.combine_with(options.into_options());
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[cfg_attr(test, derive(serde::Serialize))]
+struct ProjectName(CompactString);
+
+impl ProjectName {
+    fn new(name: impl AsRef<str>) -> Self {
+        Self(CompactString::new(name))
+    }
+
+    fn as_str(&self) -> &str {
+        self.0.as_str()
     }
 }
 
