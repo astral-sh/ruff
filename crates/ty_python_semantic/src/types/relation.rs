@@ -890,7 +890,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         self.relation.is_assignability()
             && match (source, target) {
                 (Type::Dynamic(_), Type::TypeVar(typevar))
-                | (Type::TypeVar(typevar), Type::Dynamic(_)) => {
+                | (Type::TypeVar(typevar), Type::Dynamic(_))
+                | (Type::Divergent(_), Type::TypeVar(typevar))
+                | (Type::TypeVar(typevar), Type::Divergent(_)) => {
                     self.is_universally_quantified(db, typevar)
                 }
                 (Type::NominalInstance(source), Type::TypeVar(typevar))
