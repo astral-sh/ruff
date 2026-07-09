@@ -52,22 +52,9 @@ use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
-/// Return whether `ty` includes a value with bytes-like containment semantics.
-///
-/// `bytes` and `bytearray` accept byte subsequences and objects implementing `__index__`, so their
-/// iteration element type does not describe every value that can satisfy a membership test.
-fn has_bytes_like_containment<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    match ty.resolve_type_alias(db) {
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .any(|element| has_bytes_like_containment(db, *element)),
-        ty => {
-            ty.is_subtype_of(db, KnownClass::Bytes.to_instance(db))
-                || ty.is_subtype_of(db, KnownClass::Bytearray.to_instance(db))
-        }
-    }
-}
+mod containment;
+
+use self::containment::{elements_of, narrow_string_membership};
 
 /// Return the type constraints that `test` would place on `symbol` if true and false.
 ///
@@ -2852,20 +2839,33 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     }
 
     fn evaluate_expr_in(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        if has_bytes_like_containment(self.db, rhs_ty) {
-            return None;
+        let rhs_ty = rhs_ty.resolve_type_alias(self.db);
+
+        // The supported containers compare against their iterated elements, so union arms can be
+        // combined. String membership also accepts multi-character substrings, so evaluate literal
+        // haystacks separately, including when they occur in a union.
+        if let Some(haystack) = rhs_ty.as_string_literal() {
+            return narrow_string_membership(self.db, lhs_ty, haystack.value(self.db), true);
         }
+        if let Type::Union(union) = rhs_ty
+            && union.elements(self.db).iter().any(|element| {
+                element
+                    .resolve_type_alias(self.db)
+                    .as_string_literal()
+                    .is_some()
+            })
+        {
+            let mut builder = UnionBuilder::new(self.db);
+            for element in union.elements(self.db) {
+                builder = builder.add(self.evaluate_expr_in(lhs_ty, *element)?);
+            }
+            let narrowed = builder.build();
+            return (narrowed != lhs_ty).then_some(narrowed);
+        }
+        let membership_type = elements_of(self.db, rhs_ty)?;
+        let iterable = membership_type.try_iterate(self.db).ok()?;
 
-        let iterable = rhs_ty.try_iterate(self.db).ok()?;
-
-        // A fixed-length iteration spec with no elements does not imply that membership is always
-        // false: `"" in ""` is true. Exact tuples are the fixed-length containers here whose
-        // membership is known to test their elements individually.
-        if matches!(
-            rhs_ty.resolve_type_alias(self.db),
-            Type::NominalInstance(instance)
-                if instance.has_known_class(self.db, KnownClass::Tuple)
-        ) && iterable
+        if iterable
             .as_fixed_length()
             .is_some_and(|fixed| fixed.all_elements().is_empty())
         {
@@ -2886,7 +2886,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         }
     }
 
-    /// Apply equality compatibility without losing the container's declared element domain.
+    /// Apply equality compatibility without losing the container's declared element type.
     ///
     /// Generic equality retains disjoint single-valued arms when an element subclass could define
     /// custom equality. Membership narrowing instead removes those arms unless the equality
@@ -2949,8 +2949,12 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         (narrowed != lhs_ty).then_some(narrowed)
     }
 
-    fn evaluate_expr_not_in(&self, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        let iterable = rhs_ty.try_iterate(self.db).ok()?;
+    fn evaluate_expr_not_in(&self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+        if let Some(haystack) = rhs_ty.resolve_type_alias(self.db).as_string_literal() {
+            return narrow_string_membership(self.db, lhs_ty, haystack.value(self.db), false);
+        }
+        let membership_type = elements_of(self.db, rhs_ty)?;
+        let iterable = membership_type.try_iterate(self.db).ok()?;
         let fixed_length = iterable.as_fixed_length()?;
         let mut builder = IntersectionBuilder::new(self.db);
         let mut constrained = false;
@@ -2994,7 +2998,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             }
             ast::CmpOp::Is => Some(rhs_ty),
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
-            ast::CmpOp::NotIn => self.evaluate_expr_not_in(rhs_ty),
+            ast::CmpOp::NotIn => self.evaluate_expr_not_in(lhs_ty, rhs_ty),
             _ => None,
         }
     }
