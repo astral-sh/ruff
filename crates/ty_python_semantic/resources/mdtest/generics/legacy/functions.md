@@ -1054,6 +1054,25 @@ reveal_type(result)  # revealed: Derived
 print(result.attr)  # No error
 ```
 
+## Callable instances
+
+Generic parameters can be inferred from the `__call__` method of a class instance.
+
+```py
+from typing import Callable, TypeVar
+
+R = TypeVar("R")
+
+def call(callable: Callable[[], R]) -> R:
+    return callable()
+
+class MyCallable:
+    def __call__(self) -> int:
+        return 1
+
+reveal_type(call(MyCallable()))  # revealed: int
+```
+
 ## Passing a constrained TypeVar to a function expecting a compatible constrained TypeVar
 
 A constrained TypeVar should be assignable to a different constrained TypeVar if each constraint of
