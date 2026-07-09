@@ -56,7 +56,7 @@ pub(crate) use self::type_expansion::expand_type;
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, TypeOrigin,
-    builtins_module_scope, imported_symbol, known_module_symbol,
+    builtins_module_scope, imported_symbol, known_module_symbol, place_from_bindings,
 };
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
@@ -114,7 +114,7 @@ pub(crate) use special_form::TypedDictModule;
 use ty_python_core::definition::Definition;
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
-use ty_python_core::{Truthiness, place_table, semantic_index};
+use ty_python_core::{Truthiness, place_table, semantic_index, use_def_map};
 
 mod attribute_write;
 mod bool;
@@ -2795,6 +2795,13 @@ impl<'db> Type<'db> {
                 }
             }
 
+            Type::NominalInstance(instance) => self.to_meta_type(db).class_namespace_member(
+                db,
+                instance.class(db),
+                name.as_str(),
+                policy,
+            ),
+
             Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => self
                 .to_meta_type(db)
                 .class_object_member(db, name.as_str(), policy),
@@ -2805,6 +2812,27 @@ impl<'db> Type<'db> {
                 .expect(
                     "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
                 ),
+        }
+    }
+
+    /// Look up the class member that participates in descriptor access through an instance.
+    ///
+    /// The meta-type of a type variable preserves method binding to that type variable, but it does
+    /// not carry attributes stored in a nominal upper-bound class's namespace by its metaclass.
+    /// Add those attributes using the same lookup as a concrete nominal instance.
+    fn instance_lookup_class_member_with_policy(
+        self,
+        db: &'db dyn Db,
+        name: Name,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        if let Type::TypeVar(_) = self
+            && let Some(class) = self.nominal_class(db)
+        {
+            self.to_meta_type(db)
+                .class_namespace_member(db, class, name.as_str(), policy)
+        } else {
+            self.class_member_with_policy(db, name, policy)
         }
     }
 
@@ -2861,6 +2889,167 @@ impl<'db> Type<'db> {
         } else {
             metaclass_attr.or_fall_back_to(db, || class_attr)
         }
+    }
+
+    fn with_definedness(
+        member: PlaceAndQualifiers<'db>,
+        definedness: Definedness,
+    ) -> PlaceAndQualifiers<'db> {
+        match member {
+            PlaceAndQualifiers {
+                place: Place::Defined(member),
+                qualifiers,
+            } => Place::Defined(member.with_definedness(definedness)).with_qualifiers(qualifiers),
+            member => member,
+        }
+    }
+
+    /// Look up metaclass instance members in a constructed class's namespace.
+    ///
+    /// A class object is an instance of its metaclass, and its instance storage is also the class
+    /// namespace consulted when looking up attributes through instances of that class.
+    ///
+    /// ```python
+    /// class Meta(type):
+    ///     generated: int
+    ///
+    /// class C(metaclass=Meta): ...
+    ///
+    /// reveal_type(C().generated)  # int
+    /// ```
+    ///
+    /// An own class binding or `ClassVar` contract shadows a normal generated attribute. During
+    /// instance lookup, the result participates in the existing descriptor and instance-fallback
+    /// logic.
+    ///
+    /// Metaclass instance members participate, including inherited declarations and attributes
+    /// inferred from instance methods. Class-body-only bindings remain attributes of the
+    /// metaclass itself and are excluded.
+    fn class_namespace_member(
+        self,
+        db: &'db dyn Db,
+        class: ClassType<'db>,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        let class_attr = self
+            .find_name_in_mro_with_policy(db, name, policy)
+            .expect("The meta-type of an instance-like type should always have an MRO");
+        let Some(metaclass) = class
+            .metaclass(db)
+            .to_instance(db)
+            .and_then(|metaclass| metaclass.nominal_class(db))
+        else {
+            return class_attr;
+        };
+        let metaclass_member = metaclass.instance_member(db, name);
+        if metaclass_member.is_undefined() {
+            return class_attr;
+        }
+        let metaclass_member_is_implicit = metaclass_member
+            .qualifiers
+            .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE);
+
+        let own_class_member = class.class_literal(db).class_member_from_mro(
+            db,
+            name,
+            policy,
+            class.iter_mro(db).take(1),
+        );
+        // A non-ClassVar declaration-only member describes instance storage but does not add a
+        // value to the class namespace.
+        let own_class_member = if !own_class_member.is_class_var()
+            && class.static_class_literal(db).is_some_and(|(class, _)| {
+                let scope = class.body_scope(db);
+                place_table(db, scope)
+                    .symbol_id(name)
+                    .is_some_and(|symbol| {
+                        place_from_bindings(
+                            db,
+                            use_def_map(db, scope).end_of_scope_symbol_bindings(symbol),
+                        )
+                        .place
+                        .is_undefined()
+                    })
+            }) {
+            PlaceAndQualifiers::default()
+        } else {
+            own_class_member
+        };
+        let inherited_class_member = class.class_literal(db).class_member_from_mro(
+            db,
+            name,
+            policy,
+            class.iter_mro(db).skip(1),
+        );
+
+        let metaclass_member = if metaclass_member_is_implicit {
+            Self::with_definedness(metaclass_member, Definedness::PossiblyUndefined)
+        } else {
+            metaclass_member
+        };
+        let class_member = own_class_member
+            .or_fall_back_to(db, || metaclass_member)
+            .or_fall_back_to(db, || inherited_class_member);
+        let class_member = if metaclass_member_is_implicit {
+            // Preserve the existing convention that an inferred instance member is assumed to be
+            // available even when no lower-precedence fallback exists.
+            Self::with_definedness(class_member, Definedness::AlwaysDefined)
+        } else {
+            class_member
+        };
+        if policy.no_instance_fallback() || policy.require_concrete() {
+            return class_member;
+        }
+        let Some(dynamic_instance_type) = class.iter_mro(db).find_map(|base| match base {
+            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+                Some(Type::from(base))
+            }
+            _ => None,
+        }) else {
+            return class_member;
+        };
+        let dynamic_instance_fallback = Place::bound(dynamic_instance_type).into();
+
+        // A dynamic base can provide arbitrary instance storage that shadows non-data class
+        // attributes. Preserve only the data-descriptor alternatives before falling back to the
+        // actual dynamic type.
+        let Some(class_member_ty) = class_member.ignore_possibly_undefined() else {
+            return dynamic_instance_fallback;
+        };
+        if !class_member_ty.may_be_data_descriptor(db) {
+            return dynamic_instance_fallback;
+        }
+        let PlaceAndQualifiers {
+            place: Place::Defined(declaration),
+            qualifiers,
+        } = class_member
+        else {
+            return dynamic_instance_fallback;
+        };
+        let all_arms_are_possible_data_descriptors = declaration
+            .ty
+            .resolve_type_alias(db)
+            .as_union()
+            .is_none_or(|union| {
+                union
+                    .elements(db)
+                    .iter()
+                    .all(|ty| ty.may_be_data_descriptor(db))
+            });
+        Place::Defined(DefinedPlace {
+            ty: declaration
+                .ty
+                .filter_union(db, |ty| ty.may_be_data_descriptor(db)),
+            definedness: if all_arms_are_possible_data_descriptors {
+                declaration.definedness
+            } else {
+                Definedness::PossiblyUndefined
+            },
+            ..declaration
+        })
+        .with_qualifiers(qualifiers)
+        .or_fall_back_to(db, || dynamic_instance_fallback)
     }
 
     /// This function roughly corresponds to looking up an attribute in the `__dict__` of an object.
@@ -3094,11 +3283,19 @@ impl<'db> Type<'db> {
                 return None;
             }
 
+            // Descriptor special-method lookup checks the descriptor's type, so instance storage
+            // cannot shadow `__get__`. Dynamic MRO entries still participate in the lookup.
             let Place::Defined(DefinedPlace {
                 ty: descr_get,
                 definedness: descr_get_boundness,
                 ..
-            }) = ty.class_member(db, "__get__".into()).place
+            }) = ty
+                .class_member_with_policy(
+                    db,
+                    "__get__".into(),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .place
             else {
                 return None;
             };
@@ -3389,7 +3586,7 @@ impl<'db> Type<'db> {
             meta_attr_kind,
         ) = Self::try_call_dunder_get_on_attribute(
             db,
-            self.class_member_with_policy(db, name.into(), member_policy),
+            self.instance_lookup_class_member_with_policy(db, name.into(), member_policy),
             Some(receiver),
             self.to_meta_type(db),
         );
