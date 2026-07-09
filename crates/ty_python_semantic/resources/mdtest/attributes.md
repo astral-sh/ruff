@@ -1355,6 +1355,22 @@ def read_generated_newtype(value: GeneratedNewType) -> None:
     reveal_type(value.generated)  # revealed: int
 ```
 
+Generated attributes retain precedence over inherited members through a `NewType`:
+
+```py
+class NewTypeGeneratedBase:
+    generated = "inherited"
+
+class NewTypeGeneratedClass(NewTypeGeneratedBase, metaclass=StoringMeta): ...
+
+InheritedGeneratedNewType = NewType("InheritedGeneratedNewType", NewTypeGeneratedClass)
+
+reveal_type(NewTypeGeneratedClass().generated)  # revealed: int
+
+def read_inherited_generated_newtype(value: InheritedGeneratedNewType) -> None:
+    reveal_type(value.generated)  # revealed: int
+```
+
 Type variables constrained or union-bounded to generated classes expose attributes shared by every
 alternative:
 

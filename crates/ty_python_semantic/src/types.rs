@@ -2868,16 +2868,13 @@ impl<'db> Type<'db> {
             return PlaceAndQualifiers::default();
         }
 
-        let class_member = self.class_member_with_policy(db, name.into(), policy);
         if let Type::NewTypeInstance(newtype) = self {
-            class_member.or_fall_back_to(db, || {
-                newtype
-                    .concrete_base_type(db)
-                    .generated_namespace_member(db, name, policy)
-            })
-        } else {
-            class_member
+            return newtype
+                .concrete_base_type(db)
+                .instance_lookup_class_member_with_policy(db, name, policy);
         }
+
+        self.class_member_with_policy(db, name.into(), policy)
     }
 
     /// Look up a member stored in the namespace of an instance-like type's nominal class.
