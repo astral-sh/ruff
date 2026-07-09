@@ -4994,6 +4994,19 @@ def predicate(cls: type[Foo]) -> bool:
 
 classmethod(predicate)
 
+class ConstructorProtocol(Protocol):
+    def __init__(self, *, value: int) -> None: ...
+
+class ConstructorBase: ...
+
+def _(cls: type[ConstructorProtocol]) -> ConstructorProtocol:
+    assert issubclass(cls, ConstructorBase)
+    # TODO: Preserve the structural protocol meta-type through this narrowing. The redundancy
+    # relation currently eliminates it based on inhabitant subtyping, even though it carries a
+    # constructor signature that is not present on the nominal base.
+    reveal_type(cls)  # revealed: type[ConstructorBase]
+    return cls(value=1)  # error: [unknown-argument]
+
 T_runtime_co = TypeVar("T_runtime_co", covariant=True)
 
 @runtime_checkable
