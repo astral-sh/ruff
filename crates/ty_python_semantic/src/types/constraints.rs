@@ -3119,6 +3119,7 @@ impl NodeId {
 
                 let mut subject_domain = ALWAYS_FALSE;
                 let mut coverage = ALWAYS_FALSE;
+                let mut has_lower_bound = false;
                 constrained.for_each_unique_constraint(builder, &mut |domain, source_order| {
                     let domain_data = builder.constraint_data(domain);
                     let lower = if domain_data.typevar == constraint.typevar {
@@ -3135,6 +3136,7 @@ impl NodeId {
                     let Some(lower) = lower else {
                         return;
                     };
+                    has_lower_bound = true;
                     if any_over_type(db, lower, false, |inner| {
                         inner
                             .as_typevar()
@@ -3150,10 +3152,14 @@ impl NodeId {
                     coverage = coverage.or(builder, domain.and(builder, covers.node));
                 });
 
-                constrained
-                    .implies(builder, subject_domain)
-                    .is_always_satisfied(db, builder)
-                    .then_some(coverage)
+                if has_lower_bound {
+                    constrained
+                        .implies(builder, subject_domain)
+                        .is_always_satisfied(db, builder)
+                        .then_some(coverage)
+                } else {
+                    Some(ALWAYS_TRUE)
+                }
             };
 
             // A declared upper bound on the subject can also provide one source specialization

@@ -3075,6 +3075,13 @@ class ConstrainedOptionalReturnSource:
 class SequenceReturnProtocol(Protocol):
     def f[T](self, value: T) -> Sequence[T]: ...
 
+class OptionalReturnProtocol(Protocol):
+    def f[T](self, value: int) -> T | None: ...
+
+class UpperOnlyOptionalReturnSource:
+    def f[S](self, value: int) -> S:
+        raise NotImplementedError
+
 # A non-generic source is valid when its single signature covers every target specialization.
 static_assert(is_assignable_to(ObjectConsumer, ArbitraryConsumerProtocol))
 static_assert(is_subtype_of(ObjectConsumer, ArbitraryConsumerProtocol))
@@ -3128,6 +3135,10 @@ static_assert(not is_subtype_of(ConstrainedOptionalReturnSource, ConstrainedOpti
 # rejected without attempting an unrepresentable projection.
 static_assert(not is_assignable_to(GenericIdentity, SequenceReturnProtocol))
 static_assert(not is_subtype_of(GenericIdentity, SequenceReturnProtocol))
+
+# An upper-only source variable can always be specialized within the target return type.
+static_assert(is_assignable_to(UpperOnlyOptionalReturnSource, OptionalReturnProtocol))
+static_assert(is_subtype_of(UpperOnlyOptionalReturnSource, OptionalReturnProtocol))
 
 class ConstrainedListConsumerProtocol(Protocol):
     def f[T: (list[int], list[str])](self, value: T) -> None: ...
