@@ -1300,9 +1300,9 @@ reveal_type(InitializedDerived.inherited_attr)  # revealed: int
 
 ## Attributes stored on classes by metaclasses
 
-ty treats an attribute declared in a metaclass with an annotation but no value as an attribute of
-every class created with that metaclass. The attribute is therefore available through instances of
-those classes:
+An attribute declared in a metaclass with an annotation but no value describes an attribute of every
+class created with that metaclass. The attribute is therefore available through instances of those
+classes:
 
 ```py
 class StoringMeta(type):
