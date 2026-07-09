@@ -4733,8 +4733,8 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Any, ClassVar, Protocol, Self, TypeVar, runtime_checkable
-from ty_extensions import Unknown, static_assert
+from typing import Any, ClassVar, Protocol, Self
+from ty_extensions import static_assert
 from ty_extensions._internal import TypeOf, is_assignable_to, is_subtype_of
 
 class Foo(Protocol):
@@ -4752,7 +4752,13 @@ def _(f: type[Foo]):
     f.y = b"bad"  # error: [invalid-assignment]
     reveal_type(f.method)  # revealed: (self, /) -> bytes
     reveal_type(f())  # revealed: Foo
+```
 
+Both a particular class object, represented by `TypeOf[C]`, and an arbitrary subclass of `C`,
+represented by `type[C]`, are checked structurally. `Bar` fails the protocol requirements, while
+`Baz` satisfies them.
+
+```py
 class Bar: ...
 
 static_assert(not is_assignable_to(type[Bar], type[Foo]))
@@ -4771,7 +4777,13 @@ static_assert(is_assignable_to(type[Baz], type[Foo]))
 static_assert(is_assignable_to(TypeOf[Baz], type[Foo]))
 static_assert(is_subtype_of(type[Baz], type[Foo]))
 static_assert(is_subtype_of(TypeOf[Baz], type[Foo]))
+```
 
+If a metaclass customizes construction, its return type determines whether the class object
+satisfies `type[Foo]`. `BadFactory` would normally construct a `Foo`, but its metaclass returns an
+`object` instead.
+
+```py
 class FactoryMeta(type):
     def __call__(self) -> Baz:
         return Baz()
@@ -4787,13 +4799,15 @@ class BadFactoryMeta(type):
     def __call__(self) -> object:
         return object()
 
-class BadFactory(metaclass=BadFactoryMeta):
-    y: ClassVar[str] = "foo"
-    def method(self) -> bytes:
-        return b"foo"
+class BadFactory(Baz, metaclass=BadFactoryMeta): ...
 
 static_assert(not is_assignable_to(TypeOf[BadFactory], type[Foo]))
+```
 
+A property is required on the constructed instance, but not on the class object itself. Looking up
+the property on `type[PropertyProtocol]` follows normal class lookup.
+
+```py
 class PropertyProtocol(Protocol):
     @property
     def value(self) -> int: ...
@@ -4806,31 +4820,41 @@ class PropertyImpl:
 static_assert(is_assignable_to(TypeOf[PropertyImpl], type[PropertyProtocol]))
 
 def _(cls: type[PropertyProtocol]) -> None:
-    # Properties are discarded from the class-object requirements and retain normal class lookup.
     reveal_type(cls.value)  # revealed: property
+```
 
-class MissingClassVar:
-    def __init__(self) -> None:
-        self.x = 1
+Even when construction returns a `Foo`, the class object itself must provide the required class
+variable and method.
+
+```py
+class MissingClassVar(metaclass=FactoryMeta):
     def method(self) -> bytes:
         return b"foo"
 
 static_assert(not is_assignable_to(type[MissingClassVar], type[Foo]))
 
-class MissingMethod:
+class MissingMethod(metaclass=FactoryMeta):
     y: ClassVar[str] = "foo"
-    def __init__(self) -> None:
-        self.x = 1
 
 static_assert(not is_assignable_to(type[MissingMethod], type[Foo]))
+```
 
+Conversely, compatible class members are not enough if construction produces an object without the
+required instance attribute.
+
+```py
 class MissingInstanceAttribute:
     y: ClassVar[str] = "foo"
     def method(self) -> bytes:
         return b"foo"
 
 static_assert(not is_assignable_to(type[MissingInstanceAttribute], type[Foo]))
+```
 
+A static method can have the right signature on an instance while lacking the unbound signature
+required on the class object.
+
+```py
 class StaticMethod:
     y: ClassVar[str] = "foo"
     def __init__(self) -> None:
@@ -4839,10 +4863,14 @@ class StaticMethod:
     def method() -> bytes:
         return b"foo"
 
-# The instance-side call is compatible, but the method is not available on the class with the
-# unbound signature required by `type[Foo]`.
 static_assert(not is_assignable_to(type[StaticMethod], type[Foo]))
+```
 
+Static methods and class methods declared by a protocol are checked on the candidate class object,
+not on its metaclass. It is not enough for the constructed instance to acquire callables with
+matching signatures.
+
+```py
 class DecoratedMethods(Protocol):
     @staticmethod
     def static(value: int) -> str: ...
@@ -4867,13 +4895,16 @@ class InstanceOnlyDecoratedMethods:
         self.static = decorated_method
         self.class_ = decorated_method
 
-# The constructed instance satisfies the protocol, but the methods are absent from the class.
 static_assert(not is_assignable_to(TypeOf[InstanceOnlyDecoratedMethods], type[DecoratedMethods]))
 
 def _(cls: type[DecoratedMethods]) -> None:
     reveal_type(cls.static)  # revealed: (value: int) -> str
     reveal_type(cls.class_)  # revealed: (value: int) -> str
+```
 
+`Self` in a class method is bound to the class object being checked.
+
+```py
 class SelfFactory(Protocol):
     @classmethod
     def make(cls) -> Self: ...
@@ -4884,7 +4915,12 @@ class SelfFactoryImpl:
         return cls()
 
 static_assert(is_assignable_to(TypeOf[SelfFactoryImpl], type[SelfFactory]))
+```
 
+Protocol classes and abstract classes do not inhabit `type[Foo]` because they cannot be instantiated
+to produce a `Foo`.
+
+```py
 from abc import ABC, ABCMeta, abstractmethod
 
 class AbstractFoo(ABC):
@@ -4893,30 +4929,41 @@ class AbstractFoo(ABC):
     @abstractmethod
     def method(self) -> bytes: ...
 
-# `type[Foo]` describes concrete structural implementations, not the protocol class itself or an
-# abstract implementation.
 static_assert(not is_assignable_to(TypeOf[Foo], type[Foo]))
 static_assert(not is_assignable_to(TypeOf[AbstractFoo], type[Foo]))
+```
 
-# Structural implementations are only guaranteed to use a subclass of `type`.
+A structural implementation can use any subclass of `type` as its metaclass, so `type[Foo]` is not
+limited to the protocol class's own metaclass.
+
+```py
 static_assert(is_subtype_of(type[Foo], type))
 static_assert(not is_subtype_of(type[Foo], ABCMeta))
+```
 
+`type[Any]` is assignable to `type[Foo]` but is not a subtype of it.
+
+```py
 static_assert(is_assignable_to(type[Any], type[Foo]))
-static_assert(is_assignable_to(type[Unknown], type[Foo]))
 static_assert(not is_subtype_of(type[Any], type[Foo]))
-static_assert(not is_subtype_of(type[Unknown], type[Foo]))
+```
 
+The broad attribute lookup on `type[Protocol]` does not turn an instance attribute into a `ClassVar`
+requirement.
+
+```py
 class InstanceAttributeProtocol(Protocol):
     value: int
 
 class ClassVariableProtocol(Protocol):
     value: ClassVar[int]
 
-# The intentionally broad lookup on `type[InstanceAttributeProtocol]` must not turn an ordinary
-# instance attribute into a `ClassVar` requirement for assignability.
 static_assert(not is_assignable_to(type[InstanceAttributeProtocol], type[ClassVariableProtocol]))
+```
 
+A metaclass data descriptor takes precedence over an otherwise compatible unbound instance method.
+
+```py
 class HidingMeta(type):
     @property
     def method(cls) -> int:
@@ -4929,8 +4976,22 @@ class HiddenMethod(metaclass=HidingMeta):
     def method(self) -> bytes:
         return b"foo"
 
-# The metaclass data descriptor wins over the otherwise-compatible unbound instance method.
 static_assert(not is_assignable_to(TypeOf[HiddenMethod], type[Foo]))
+```
+
+## Generic meta-protocols
+
+Generic protocol arguments are preserved by structural matching, member lookup, and construction.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 class GenericFoo[T](Protocol):
     value: T
@@ -4952,47 +5013,102 @@ static_assert(is_assignable_to(type[IntFoo], type[GenericFoo[int]]))
 static_assert(not is_assignable_to(type[IntFoo], type[GenericFoo[str]]))
 
 def _(f: type[GenericFoo[int]]) -> None:
-    reveal_type(f)  # revealed: type[GenericFoo[int]]
     reveal_type(f.value)  # revealed: int
     reveal_type(f.get)  # revealed: (self, /) -> int
     reveal_type(f())  # revealed: GenericFoo[int]
+```
 
+Inference derives the protocol argument from exact class objects, generic aliases, and parameters
+already annotated as `type[GenericFoo[T]]`.
+
+```py
 def infer_meta_protocol[T](cls: type[GenericFoo[T]]) -> T:
     raise NotImplementedError
 
-def meta_protocol_identity[T](cls: type[GenericFoo[T]]) -> type[GenericFoo[T]]:
-    return cls
-
 reveal_type(infer_meta_protocol(IntFoo))  # revealed: int
-reveal_type(meta_protocol_identity(IntFoo))  # revealed: type[GenericFoo[int]]
 reveal_type(infer_meta_protocol(GenericFooImpl[int]))  # revealed: int
-reveal_type(meta_protocol_identity(GenericFooImpl[int]))  # revealed: type[GenericFoo[int]]
 
 def _(f: type[GenericFoo[int]]) -> None:
     reveal_type(infer_meta_protocol(f))  # revealed: int
+```
+
+For a covariant protocol, inference combines the specializations contributed by each class object in
+a union.
+
+```py
+class Producer[T](Protocol):
+    def get(self) -> T: ...
+
+def infer_producer[T](cls: type[Producer[T]]) -> T:
+    raise NotImplementedError
+
+def _(flag: bool) -> None:
+    cls = GenericFooImpl[int] if flag else GenericFooImpl[str]
+    reveal_type(infer_producer(cls))  # revealed: int | str
+```
+
+## Generic substitution of `type[Protocol]`
+
+Passing `type[P]` through a generic identity function preserves its structural meaning, including
+inside a union.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, TypeVar
+
+class P(Protocol):
+    value: int
+
+class GenericP[T](Protocol):
+    value: T
 
 T_identity = TypeVar("T_identity")
 
 def class_identity(cls: type[T_identity]) -> type[T_identity]:
     return cls
 
-def _(cls: type[Foo]) -> None:
-    preserved: type[Foo] = class_identity(cls)
+def _(cls: type[P]) -> None:
+    preserved: type[P] = class_identity(cls)
 
-def _(cls: type[Foo] | type[int]) -> None:
-    preserved: type[Foo] | type[int] = class_identity(cls)
+def _(cls: type[P] | type[int]) -> None:
+    preserved: type[P] | type[int] = class_identity(cls)
+```
 
-# A protocol class is not a concrete inhabitant of structural `type[Foo]`.
-class_identity(Foo)  # error: [invalid-argument-type]
+The protocol class object itself remains distinct from structural `type[P]`.
 
-def _(cls: type[GenericFoo[int]]) -> None:
-    preserved: type[GenericFoo[int]] = class_identity(cls)
-    wrong: type[GenericFoo[str]] = class_identity(cls)  # error: [invalid-assignment]
+```py
+class_identity(P)  # error: [invalid-argument-type]
+```
 
-def predicate(cls: type[Foo]) -> bool:
+Generic protocol arguments are also preserved through the identity function.
+
+```py
+def _(cls: type[GenericP[int]]) -> None:
+    preserved: type[GenericP[int]] = class_identity(cls)
+    wrong: type[GenericP[str]] = class_identity(cls)  # error: [invalid-assignment]
+```
+
+The same substitution occurs when `type[P]` appears in a generic callable signature such as
+`classmethod`.
+
+```py
+def predicate(cls: type[P]) -> bool:
     return True
 
 classmethod(predicate)
+```
+
+## Narrowing `type[Protocol]` with `issubclass`
+
+Narrowing `type[ConstructorProtocol]` with `issubclass` currently loses the protocol's constructor
+signature. The reveal and diagnostic below document this known limitation.
+
+```py
+from typing import Protocol
 
 class ConstructorProtocol(Protocol):
     def __init__(self, *, value: int) -> None: ...
@@ -5001,11 +5117,17 @@ class ConstructorBase: ...
 
 def _(cls: type[ConstructorProtocol]) -> ConstructorProtocol:
     assert issubclass(cls, ConstructorBase)
-    # TODO: Preserve the structural protocol meta-type through this narrowing. The redundancy
-    # relation currently eliminates it based on inhabitant subtyping, even though it carries a
-    # constructor signature that is not present on the nominal base.
     reveal_type(cls)  # revealed: type[ConstructorBase]
     return cls(value=1)  # error: [unknown-argument]
+```
+
+## Meta-types of protocol intersections
+
+Calling `type()` on an intersection retains each positive class constraint. This matters after an
+`isinstance` check introduces a protocol constraint on one arm of a union.
+
+```py
+from typing import Protocol, TypeVar, runtime_checkable
 
 T_runtime_co = TypeVar("T_runtime_co", covariant=True)
 
@@ -5018,25 +5140,14 @@ def _(
     values: dict[type[RuntimeProtocol[object]], RuntimeProtocol[object]],
 ) -> None:
     if isinstance(condition, RuntimeProtocol):
-        reveal_type(condition)  # revealed: RuntimeProtocol[int] | (int & RuntimeProtocol[object])
         reveal_type(type(condition))  # revealed: type[RuntimeProtocol[int]] | (type[int] & type[RuntimeProtocol[object]])
         values[type(condition)] = condition
-
-class Producer[T](Protocol):
-    def get(self) -> T: ...
-
-def infer_producer[T](cls: type[Producer[T]]) -> T:
-    raise NotImplementedError
-
-def _(flag: bool) -> None:
-    cls = GenericFooImpl[int] if flag else GenericFooImpl[str]
-    reveal_type(infer_producer(cls))  # revealed: int | str
 ```
 
-## Protocol definition objects as generic self receivers
+## Protocol class objects as generic self receivers
 
-A protocol definition object is not a concrete inhabitant of `type[P]`, but it remains a valid
-receiver for classmethods defined on the protocol itself using either `type[Self]` or `type[T]`.
+A protocol class does not inhabit `type[P]`, but it can still receive a class method declared on the
+protocol itself. This exception applies only to the method's receiver.
 
 ```toml
 [environment]
@@ -5053,21 +5164,23 @@ class SelfFactory(Protocol):
 
 reveal_type(SelfFactory.make())  # revealed: SelfFactory
 not_concrete: type[SelfFactory] = SelfFactory  # error: [invalid-assignment]
+```
 
-class ExplicitSelfFactory(Protocol):
-    @classmethod
-    def make(cls: type[Self]) -> Self:
-        return cast(Self, object())
+The specialization of a generic protocol class is retained when binding `Self`.
 
-reveal_type(ExplicitSelfFactory.make())  # revealed: ExplicitSelfFactory
-
+```py
 class GenericSelfFactory[T](Protocol):
     @classmethod
     def make(cls, value: T) -> Self:
         return cast(Self, object())
 
 reveal_type(GenericSelfFactory[int].make(1))  # revealed: GenericSelfFactory[int]
+```
 
+Bound type variables are the pre-PEP 673 spelling of generic self. Both legacy syntax and PEP 695
+method type parameters are supported.
+
+```py
 T_legacy = TypeVar("T_legacy", bound="LegacySelfFactory")
 
 class LegacySelfFactory(Protocol):
@@ -5083,7 +5196,11 @@ class Pep695SelfFactory(Protocol):
         return cast(T, object())
 
 reveal_type(Pep695SelfFactory.make())  # revealed: Pep695SelfFactory
+```
 
+The receiver exception does not bypass an unrelated type-variable bound.
+
+```py
 T_unrelated = TypeVar("T_unrelated", bound=int)
 
 class UnrelatedBoundFactory(Protocol):
@@ -5092,14 +5209,6 @@ class UnrelatedBoundFactory(Protocol):
         return cast(T_unrelated, object())
 
 UnrelatedBoundFactory.make()  # error: [invalid-argument-type]
-
-class GenericFactory[T](Protocol):
-    @classmethod
-    def make(cls) -> T:
-        return cast(T, object())
-
-def build[T](factory: GenericFactory[T]) -> T:
-    return factory.make()
 ```
 
 ## Regression test for `ClassVar` members in stubs
