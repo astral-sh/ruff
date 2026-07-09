@@ -1241,6 +1241,50 @@ impl<'db> Signature<'db> {
         }
     }
 
+    fn typevars(&self, db: &'db dyn Db) -> Vec<BoundTypeVarInstance<'db>> {
+        self.generic_context
+            .into_iter()
+            .flat_map(|context| context.variables(db))
+            .collect()
+    }
+
+    /// Returns the PEP 695 type variables lexically bound by this function.
+    ///
+    /// Legacy variables, caller-owned inference variables, `Self`, and ParamSpecs retain the
+    /// existing callable relation until their binder ownership can be represented precisely.
+    fn higher_rank_typevars(
+        &self,
+        db: &'db dyn Db,
+        caller_inferable: InferableTypeVars<'db>,
+    ) -> Option<Vec<BoundTypeVarInstance<'db>>> {
+        let typevars = self.typevars(db);
+        (!typevars.is_empty()
+            && typevars.iter().all(|typevar| {
+                typevar.kind(db) == TypeVarKind::Pep695TypeVar
+                    && !typevar.is_inferable(db, caller_inferable)
+                    && !typevar.is_paramspec(db)
+                    && !typevar.typevar(db).is_self(db)
+                    && match self.definition {
+                        Some(definition) => {
+                            typevar.binding_context(db).definition() == Some(definition)
+                        }
+                        None => typevar
+                            .binding_context(db)
+                            .definition()
+                            .is_some_and(|definition| definition.kind(db).is_function_def()),
+                    }
+            }))
+        .then_some(typevars)
+    }
+
+    fn has_paramspec_or_self_typevar(&self, db: &'db dyn Db) -> bool {
+        self.generic_context.is_some_and(|context| {
+            context
+                .variables(db)
+                .any(|typevar| typevar.is_paramspec(db) || typevar.typevar(db).is_self(db))
+        })
+    }
+
     pub(crate) fn is_non_generic(&self) -> bool {
         self.generic_context.is_none()
     }
@@ -1793,38 +1837,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // used only inside a returned `Callable` is moved onto that callable's synthetic
         // signature, but retains the enclosing function as its binding context.
         let target_context = target.generic_context?;
-        let target_typevars = target_context.variables(db).collect::<Vec<_>>();
-        if target_typevars.is_empty()
-            || target_typevars.iter().any(|typevar| {
-                typevar.kind(db) != TypeVarKind::Pep695TypeVar
-                    || typevar.is_inferable(db, self.inferable)
-                    || typevar.is_paramspec(db)
-                    || typevar.typevar(db).is_self(db)
-                    || match target.definition {
-                        Some(definition) => {
-                            typevar.binding_context(db).definition() != Some(definition)
-                        }
-                        None => !typevar
-                            .binding_context(db)
-                            .definition()
-                            .is_some_and(|definition| definition.kind(db).is_function_def()),
-                    }
-            })
-        {
-            return None;
-        }
+        let target_typevars = target.higher_rank_typevars(db, self.inferable)?;
 
         // ParamSpecs and `Self` retain the existing callable relation until their binder ownership
         // can be represented independently from an ordinary method-local type variable.
         if source_signatures
             .iter()
-            .flat_map(|source| {
-                source
-                    .generic_context
-                    .into_iter()
-                    .flat_map(|context| context.variables(db))
-            })
-            .any(|typevar| typevar.is_paramspec(db) || typevar.typevar(db).is_self(db))
+            .any(|source| source.has_paramspec_or_self_typevar(db))
         {
             return None;
         }
@@ -1832,7 +1851,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Freshen the target once for the whole overload set. Its identity must remain stable
         // across source alternatives so overload selection stays inside target quantification.
         let freshened_target;
-        let target = if let Some(delta) = source_signatures
+        let (target, target_typevars) = if let Some(delta) = source_signatures
             .iter()
             .filter_map(|source| {
                 source.max_typevar_freshness_matching_generic_context(db, target_context)
@@ -1841,35 +1860,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             .map(|freshness| freshness.increment().value())
         {
             freshened_target = target.freshen_bound_typevars(db, delta);
-            &freshened_target
+            let target_typevars = freshened_target.typevars(db);
+            (&freshened_target, target_typevars)
         } else {
-            target
+            (target, target_typevars)
         };
 
-        let target_typevars = target
-            .generic_context
-            .into_iter()
-            .flat_map(|context| context.variables(db))
-            .collect::<Vec<_>>();
-        let quantified_locals = |typevars: &[BoundTypeVarInstance<'db>]| {
-            InferableTypeVars::from_typevars(
-                db,
-                typevars
-                    .iter()
-                    .map(|typevar| typevar.identity(db))
-                    .collect(),
-            )
-        };
-        let valid_domain = |typevars: &[BoundTypeVarInstance<'db>]| {
-            typevars
-                .iter()
-                .copied()
-                .when_all(db, self.constraints, |typevar| {
-                    ConstraintSet::valid_specializations(db, self.constraints, typevar)
-                })
-        };
-        let target_locals = quantified_locals(&target_typevars);
-        let target_domain = valid_domain(&target_typevars);
+        let target_locals =
+            InferableTypeVars::from_bound_typevars(db, target_typevars.iter().copied());
+        let target_domain = ConstraintSet::valid_specializations(
+            db,
+            self.constraints,
+            target_typevars.iter().copied(),
+        );
         let checker = self
             .with_universally_quantified_typevars(db, target_locals)
             .with_lazy_typevar_evaluation();
@@ -1890,19 +1893,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     } else {
                         source
                     };
-                    let source_typevars = source
-                        .generic_context
-                        .into_iter()
-                        .flat_map(|context| context.variables(db))
-                        .collect::<Vec<_>>();
-                    let source_locals = quantified_locals(&source_typevars);
+                    let source_typevars = source.typevars(db);
+                    let source_locals =
+                        InferableTypeVars::from_bound_typevars(db, source_typevars.iter().copied());
                     let source_checker =
                         checker.with_inferable_typevars(self.inferable.merge(db, source_locals));
                     let relation =
                         source_checker.with_signature_recursion_guard(source, target, || {
                             source_checker.check_signature_pair_inner(db, source, target)
                         });
-                    let source_domain = valid_domain(&source_typevars);
+                    let source_domain = ConstraintSet::valid_specializations(
+                        db,
+                        self.constraints,
+                        source_typevars.iter().copied(),
+                    );
                     let with_source_domain = source_domain.and(db, self.constraints, || relation);
                     with_source_domain
                         .try_exists_assuming(db, self.constraints, source_locals, target_domain)

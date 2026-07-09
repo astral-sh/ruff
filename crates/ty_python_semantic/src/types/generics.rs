@@ -252,6 +252,19 @@ pub(crate) enum InferableTypeVars<'db> {
 }
 
 impl<'db> InferableTypeVars<'db> {
+    pub(crate) fn from_bound_typevars(
+        db: &'db dyn Db,
+        typevars: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
+    ) -> Self {
+        Self::from_typevars(
+            db,
+            typevars
+                .into_iter()
+                .map(|typevar| typevar.identity(db))
+                .collect(),
+        )
+    }
+
     pub(crate) fn from_typevars(
         db: &'db dyn Db,
         mut typevars: FxOrderSet<BoundTypeVarIdentity<'db>>,
