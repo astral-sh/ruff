@@ -530,6 +530,7 @@ fn lax_input_type_impl<'db>(
     let builtin_alias = match known_class {
         Some(KnownClass::Bool) => Some("LaxBool"),
         Some(KnownClass::Bytes) => Some("LaxBytes"),
+        Some(KnownClass::Float) => Some("LaxFloat"),
         Some(KnownClass::Int) => Some("LaxInt"),
         Some(KnownClass::Str) => Some("LaxStr"),
         Some(KnownClass::Path) => Some("LaxPath"),

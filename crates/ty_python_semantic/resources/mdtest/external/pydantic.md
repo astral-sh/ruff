@@ -543,6 +543,33 @@ LaxNestedList(value=1)  # error: [invalid-argument-type]
 LaxNestedList(value=[1, [2, None]])
 ```
 
+We support validation of `JsonValue` fields in lax mode:
+
+```py
+from pydantic import JsonValue
+
+class JsonValueModel(BaseModel):
+    value: JsonValue
+
+JsonValueModel(value=[1, 2])
+JsonValueModel(value={"key": 1})
+JsonValueModel(value="value")
+JsonValueModel(value=1)
+JsonValueModel(value=1.0)
+JsonValueModel(value=True)
+JsonValueModel(value=None)
+JsonValueModel(value={"outer": [1, {"inner": "value"}]})
+
+class SomethingElse: ...
+
+JsonValueModel(value=object())  # error: [invalid-argument-type]
+JsonValueModel(value=...)  # error: [invalid-argument-type]
+JsonValueModel(value=SomethingElse())  # error: [invalid-argument-type]
+
+# TODO: this should be an error once we support recursive types
+JsonValueModel(value={"outer": [1, {"inner": SomethingElse()}]})
+```
+
 ### Changing a specific field
 
 Strict mode can also be activated for a specific field only:
