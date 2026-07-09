@@ -1893,20 +1893,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let relation = checker.with_signature_recursion_guard(source, target, || {
             checker.check_signature_pair_inner(db, source, target)
         });
-        let target_domain =
-            target_typevars
+        let valid_domain = |typevars: &[BoundTypeVarInstance<'db>]| {
+            typevars
                 .iter()
                 .copied()
                 .when_all(db, self.constraints, |typevar| {
                     ConstraintSet::valid_specializations(db, self.constraints, typevar)
-                });
-        let source_domain =
-            source_typevars
-                .iter()
-                .copied()
-                .when_all(db, self.constraints, |typevar| {
-                    ConstraintSet::valid_specializations(db, self.constraints, typevar)
-                });
+                })
+        };
+        let target_domain = valid_domain(target_typevars);
+        let source_domain = valid_domain(source_typevars);
 
         // TODO: A gradual target constraint requires `for all constraint choices, there exists a
         // materialization`. Treating its top-materialized range as one universal domain is
