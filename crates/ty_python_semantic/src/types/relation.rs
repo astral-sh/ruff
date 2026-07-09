@@ -1131,6 +1131,16 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             });
         }
 
+        // Normalize direct alias elements together before lazy type-variable evaluation so the
+        // expanded union, rather than an opaque alias, becomes the constraint bound.
+        if let Type::Union(union) = target
+            && union.has_aliases(db)
+        {
+            return self.with_recursion_guard(source, target, || {
+                self.check_type_pair(db, source, union.expand_aliases(db))
+            });
+        }
+
         let should_expand_intersection = |intersection: IntersectionType<'db>| {
             intersection
                 .positive(db)
@@ -1257,15 +1267,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (_, Type::TypeAlias(target_alias)) => self.with_recursion_guard(source, target, || {
                 self.check_type_pair(db, source, target_alias.value_type(db))
             }),
-
-            // Annotation unions retain type aliases so recursive aliases can be represented.
-            // Normalize direct alias elements together before checking the union so reductions
-            // that depend on multiple elements, such as all members of an enum, are visible.
-            (_, Type::Union(union)) if union.has_aliases(db) => {
-                self.with_recursion_guard(source, target, || {
-                    self.check_type_pair(db, source, union.expand_aliases(db))
-                })
-            }
 
             (Type::TypeForm(source_typeform), Type::TypeForm(target_typeform)) => self
                 .with_recursion_guard(source, target, || {

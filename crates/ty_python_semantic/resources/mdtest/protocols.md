@@ -3284,6 +3284,12 @@ class ObjectConsumer:
     def f(self, value: object) -> None:
         return None
 
+type ObjectAlias = object
+
+class AliasedOptionalConsumer:
+    def f(self, value: ObjectAlias | None) -> None:
+        return None
+
 class GradualOptionalConsumer:
     def f(self, value: Any | None) -> None:
         return None
@@ -3347,6 +3353,10 @@ class IntersectionSequenceSource:
 # A non-generic source is valid when its single signature covers every target specialization.
 static_assert(is_assignable_to(ObjectConsumer, ArbitraryConsumerProtocol))
 static_assert(is_subtype_of(ObjectConsumer, ArbitraryConsumerProtocol))
+
+# Alias transparency is preserved inside a union before the target variable is quantified.
+static_assert(is_assignable_to(AliasedOptionalConsumer, ArbitraryConsumerProtocol))
+static_assert(is_subtype_of(AliasedOptionalConsumer, ArbitraryConsumerProtocol))
 
 # The dynamic arm makes the union assignable from every target specialization. A fully static
 # union does not have the same gradual behavior.
