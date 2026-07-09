@@ -183,7 +183,11 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                 range: _,
                 node_index: _,
             }) => {
-                self.counter_stack.push(Vec::with_capacity(cases.len()));
+                let mut match_stack = Vec::with_capacity(1 + cases.len());
+                // Initialize with a counter for the subject expression,
+                // similar to how the `if` handler initializes its stack.
+                match_stack.push(0);
+                self.counter_stack.push(match_stack);
                 self.visit_expr(subject);
                 for match_case in cases {
                     self.counter_stack.last_mut().unwrap().push(0);
