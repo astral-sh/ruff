@@ -2194,40 +2194,6 @@ impl OptionDiagnostic {
     }
 }
 
-/// This is a wrapper for options that actually get loaded from configuration files
-/// and the CLI, which also includes a `config_file_override` option that overrides
-/// default configuration discovery with an explicitly-provided path to a configuration file
-#[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct ProjectOptionsOverrides {
-    pub config_file_override: Option<SystemPathBuf>,
-    pub fallback_python_version: Option<RangedValue<SupportedPythonVersion>>,
-    pub fallback_python: Option<RelativePathBuf>,
-    pub options: Options,
-}
-
-impl ProjectOptionsOverrides {
-    pub fn new(config_file_override: Option<SystemPathBuf>, options: Options) -> Self {
-        Self {
-            config_file_override,
-            options,
-            ..Self::default()
-        }
-    }
-
-    pub fn apply_to(&self, options: Options) -> Options {
-        let mut combined = self.options.clone().combine(options);
-
-        // Set the fallback python version and path if set
-        combined.environment.combine_with(Some(EnvironmentOptions {
-            python_version: self.fallback_python_version.clone(),
-            python: self.fallback_python.clone(),
-            ..EnvironmentOptions::default()
-        }));
-
-        combined
-    }
-}
-
 trait OrDefault {
     type Target: ToOwned;
 

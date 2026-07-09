@@ -85,7 +85,7 @@ fn setup_tomllib_case() -> Case {
 
     let src_root = SystemPath::new("/src");
     let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
-    metadata.apply_options(Options {
+    metadata.apply_override_options(Options {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(SupportedPythonVersion::Py312)),
             ..EnvironmentOptions::default()
@@ -267,7 +267,7 @@ fn setup_micro_case_inner(code: &str, venv_path: Option<&Path>) -> Case {
 
     let src_root = SystemPath::new("/src");
     let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
-    metadata.apply_options(Options {
+    metadata.apply_override_options(Options {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(SupportedPythonVersion::Py312)),
             python,
@@ -1725,7 +1725,7 @@ impl<'a> ProjectBenchmark<'a> {
         let src_root = SystemPath::new("/");
         let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
 
-        metadata.apply_options(Options {
+        metadata.apply_override_options(Options {
             environment: Some(EnvironmentOptions {
                 python_version: Some(RangedValue::cli(self.project.config.python_version)),
                 python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
