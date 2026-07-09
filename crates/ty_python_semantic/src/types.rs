@@ -2839,12 +2839,9 @@ impl<'db> Type<'db> {
 
             let class_member = self.class_member_with_policy(db, name.into(), policy);
             let alternative_member = |alternative: &Type<'db>| {
-                let alternative = alternative.resolve_type_alias(db);
                 alternative
-                    .class_member_with_policy(db, name.into(), policy)
-                    .or_fall_back_to(db, || {
-                        alternative.generated_namespace_member(db, name, policy)
-                    })
+                    .resolve_type_alias(db)
+                    .instance_lookup_class_member_with_policy(db, name, policy)
             };
             let member = match bound_or_constraints {
                 TypeVarBoundOrConstraints::UpperBound(Type::Union(union)) => {
@@ -2875,32 +2872,6 @@ impl<'db> Type<'db> {
         }
 
         self.class_member_with_policy(db, name.into(), policy)
-    }
-
-    /// Look up a member stored in the namespace of an instance-like type's nominal class.
-    fn generated_namespace_member(
-        self,
-        db: &'db dyn Db,
-        name: &str,
-        policy: MemberLookupPolicy,
-    ) -> PlaceAndQualifiers<'db> {
-        match self {
-            Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |element| {
-                element.generated_namespace_member(db, name, policy)
-            }),
-            Type::TypeAlias(alias) => alias
-                .value_type(db)
-                .generated_namespace_member(db, name, policy),
-            Type::NewTypeInstance(newtype) => newtype
-                .concrete_base_type(db)
-                .generated_namespace_member(db, name, policy),
-            _ => self
-                .nominal_class(db)
-                .map_or_else(PlaceAndQualifiers::default, |class| {
-                    self.to_meta_type(db)
-                        .class_namespace_member(db, class, name, policy)
-                }),
-        }
     }
 
     /// Look up attributes stored in the namespace of a class object.

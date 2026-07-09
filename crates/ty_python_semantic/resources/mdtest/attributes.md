@@ -1390,6 +1390,24 @@ def read_generated_union_bound(value: TGeneratedUnionBound) -> None:
     reveal_type(value.generated)  # revealed: int
 ```
 
+Wrapper-aware lookup composes when `NewType`s are type-variable alternatives:
+
+```py
+class OtherNewTypeGeneratedClass(NewTypeGeneratedBase, metaclass=StoringMeta): ...
+
+OtherInheritedGeneratedNewType = NewType("OtherInheritedGeneratedNewType", OtherNewTypeGeneratedClass)
+
+TNewTypeConstraints = TypeVar("TNewTypeConstraints", InheritedGeneratedNewType, OtherInheritedGeneratedNewType)
+
+def read_newtype_constraints(value: TNewTypeConstraints) -> None:
+    reveal_type(value.generated)  # revealed: int
+
+TNewTypeUnionBound = TypeVar("TNewTypeUnionBound", bound=InheritedGeneratedNewType | OtherInheritedGeneratedNewType)
+
+def read_newtype_union_bound(value: TNewTypeUnionBound) -> None:
+    reveal_type(value.generated)  # revealed: int
+```
+
 Ordinary and generated attributes are combined across constraints and union-bound alternatives:
 
 ```py
