@@ -602,15 +602,22 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// Positive facts derived during projection are rebuilt through the canonical constraint
     /// constructor. This makes the result independent of type-variable interning order, at the
     /// cost of using a separate, uncached path from [`Self::reduce_inferable`].
-    pub(crate) fn try_exists(
+    ///
+    /// `assumptions` must not mention any variable in `to_remove`. They are used when determining
+    /// whether a nested relationship can be projected exactly, but are only conjoined with the
+    /// result when projection needs them. This keeps independent domains factored in the common
+    /// case while still allowing an outer domain to make a projection representable.
+    pub(crate) fn try_exists_assuming(
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         to_remove: InferableTypeVars<'db>,
+        assumptions: Self,
     ) -> Option<Self> {
         self.verify_builder(builder);
+        assumptions.verify_builder(builder);
         self.node
-            .try_exists_normalized(db, builder, to_remove)
+            .try_exists_normalized(db, builder, to_remove, assumptions.node)
             .map(|node| Self::from_node(builder, node))
     }
 
@@ -2952,6 +2959,7 @@ impl NodeId {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         bound_typevars: InferableTypeVars<'db>,
+        assumptions: Self,
     ) -> Option<Self> {
         if bound_typevars == InferableTypeVars::None {
             return Some(self);
@@ -2984,11 +2992,13 @@ impl NodeId {
             return Some(self.exists_normalized(db, builder, bound_typevars));
         }
 
+        let constrained = assumptions.and(builder, self);
+
         // A nested relationship can still be projected when the formula itself restricts its
         // subject to concrete alternatives. Collect those alternatives here; below, we verify
         // that the complete formula implies their disjunction before relying on them.
         let mut concrete_domains = FxHashMap::default();
-        self.for_each_unique_constraint(builder, &mut |constraint, source_order| {
+        constrained.for_each_unique_constraint(builder, &mut |constraint, source_order| {
             let data = builder.constraint_data(constraint);
             if !nested_subjects.contains(&data.typevar) {
                 return;
@@ -3015,7 +3025,7 @@ impl NodeId {
 
         let mut subjects_with_concrete_domains = FxHashMap::default();
         let mut requires_unrepresentable_residual = false;
-        self.for_each_unique_constraint(builder, &mut |constraint, _| {
+        constrained.for_each_unique_constraint(builder, &mut |constraint, _| {
             if requires_unrepresentable_residual {
                 return;
             }
@@ -3038,7 +3048,8 @@ impl NodeId {
                     concrete_domains
                         .get(&constraint.typevar)
                         .is_some_and(|domain| {
-                            self.implies(builder, *domain)
+                            constrained
+                                .implies(builder, *domain)
                                 .is_always_satisfied(db, builder)
                         })
                 });
@@ -3085,7 +3096,7 @@ impl NodeId {
             return None;
         }
 
-        Some(self.exists_normalized(db, builder, bound_typevars))
+        Some(constrained.exists_normalized(db, builder, bound_typevars))
     }
 
     /// Existentially abstracts all `bound_typevars` in one traversal, normalizing facts derived
@@ -7806,7 +7817,12 @@ mod tests {
 
         // Every target specialization has some equal source specialization.
         let forall_target_exists_source = equal
-            .try_exists(&db, &builder, source_locals)
+            .try_exists_assuming(
+                &db,
+                &builder,
+                source_locals,
+                ConstraintSet::always(&builder),
+            )
             .expect("equality can be projected exactly")
             .try_for_all(&db, &builder, target_locals)
             .expect("existential abstraction removes the free source variable");
@@ -7816,7 +7832,12 @@ mod tests {
         let exists_source_forall_target = equal
             .try_for_all(&db, &builder, target_locals)
             .unwrap_or_else(|| ConstraintSet::never(&builder))
-            .try_exists(&db, &builder, source_locals)
+            .try_exists_assuming(
+                &db,
+                &builder,
+                source_locals,
+                ConstraintSet::always(&builder),
+            )
             .expect("the terminal constraint set can be projected exactly");
         assert!(exists_source_forall_target.is_never_satisfied(&db));
     }
@@ -7882,10 +7903,11 @@ mod tests {
             // For every `T`, choosing `S = T` satisfies the union upper bound. The unrelated
             // `S ≤ V` alternative must not cause abstraction to discard the `S = T` solution.
             let quantified = relation
-                .try_exists(
+                .try_exists_assuming(
                     &db,
                     &builder,
                     quantified_typevars(&db, [source.identity(&db)]),
+                    ConstraintSet::always(&builder),
                 )
                 .expect("bare type-variable bounds can be projected exactly");
             assert!(quantified.is_always_satisfied(&db));
@@ -7913,10 +7935,11 @@ mod tests {
         );
         let relation = target_below_source.and(&db, &builder, || source_below_value);
         let quantified = relation
-            .try_exists(
+            .try_exists_assuming(
                 &db,
                 &builder,
                 quantified_typevars(&db, [source.identity(&db)]),
+                ConstraintSet::always(&builder),
             )
             .expect("bare type-variable bounds can be projected exactly");
         let expected = ConstraintSet::constrain_typevar_upper_bound(
@@ -7947,10 +7970,11 @@ mod tests {
 
         assert!(
             relation
-                .try_exists(
+                .try_exists_assuming(
                     &db,
                     &builder,
                     quantified_typevars(&db, [source.identity(&db)]),
+                    ConstraintSet::always(&builder),
                 )
                 .is_none()
         );
@@ -7980,13 +8004,12 @@ mod tests {
         .or(&db, &builder, || {
             ConstraintSet::constrain_typevar(&db, &builder, target, list_of_str, list_of_str)
         });
-        let relation_in_domain = target_domain.and(&db, &builder, || relation);
-
-        let quantified = relation_in_domain
-            .try_exists(
+        let quantified = relation
+            .try_exists_assuming(
                 &db,
                 &builder,
                 quantified_typevars(&db, [source.identity(&db)]),
+                target_domain,
             )
             .expect("the concrete subject domain makes projection representable");
         assert!(

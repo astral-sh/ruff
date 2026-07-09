@@ -3214,6 +3214,28 @@ class PiecewiseSource:
 # while `T = str` chooses `S = str`.
 static_assert(is_assignable_to(PiecewiseSource, PiecewiseProtocol))
 static_assert(is_subtype_of(PiecewiseSource, PiecewiseProtocol))
+
+class IndependentConstrainedProtocol(Protocol):
+    def f[
+        T1: (bool, str),
+        T2: (bool, str),
+        T3: (bool, str),
+        T4: (bool, str),
+    ](self, a: T1, b: T2, c: T3, d: T4) -> None: ...
+
+class IndependentConstrainedSource:
+    def f[
+        S1: (int, str),
+        S2: (int, str),
+        S3: (int, str),
+        S4: (int, str),
+    ](self, a: S1, b: S2, c: S3, d: S4) -> None:
+        return None
+
+# Keep the independent target domains out of source projection to avoid constructing their
+# Cartesian product before either quantifier is applied.
+static_assert(is_assignable_to(IndependentConstrainedSource, IndependentConstrainedProtocol))
+static_assert(is_subtype_of(IndependentConstrainedSource, IndependentConstrainedProtocol))
 ```
 
 ## Subtyping of protocols with `@classmethod` or `@staticmethod` members

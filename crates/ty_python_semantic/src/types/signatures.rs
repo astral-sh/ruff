@@ -1908,18 +1908,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // materialization`. Treating its top-materialized range as one universal domain is
         // conservative but can reject a valid relation.
 
-        // Target-domain constraints can participate in source inference. This is equivalent to
-        // adding the domain only as the implication below because target variables are not
-        // existentially quantified, but retaining it here preserves correlations while source
-        // variables are abstracted.
-        let with_domains = target_domain
-            .and(db, self.constraints, || source_domain)
-            .and(db, self.constraints, || relation);
+        // Target-domain constraints can participate in source inference. Pass them as assumptions
+        // so nested source relationships can use them without multiplying independent target
+        // alternatives into the source-domain BDD.
+        let with_source_domain = source_domain.and(db, self.constraints, || relation);
 
         // A generic source is an intersection of its specializations. For each target
         // specialization, it is enough for some valid source specialization to satisfy the
         // relation. Quantify the entire source block in a single BDD traversal.
-        let Some(quantified) = with_domains.try_exists(db, self.constraints, source_locals) else {
+        let Some(quantified) = with_source_domain.try_exists_assuming(
+            db,
+            self.constraints,
+            source_locals,
+            target_domain,
+        ) else {
             return self.never();
         };
 
