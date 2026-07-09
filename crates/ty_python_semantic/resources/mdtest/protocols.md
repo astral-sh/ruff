@@ -2929,6 +2929,40 @@ class GenericIdentity:
 static_assert(is_assignable_to(GenericIdentity, IdentityProtocol))
 static_assert(is_subtype_of(GenericIdentity, IdentityProtocol))
 
+class ExplicitReceiverProtocol(Protocol):
+    def compare[T](self: T, other: T) -> bool: ...
+
+class ExplicitReceiverImplementation:
+    def compare(self, other: "ExplicitReceiverImplementation") -> bool:
+        return True
+
+class WrongExplicitReceiverImplementation:
+    def compare(self, other: int) -> bool:
+        return True
+
+# `T` is fixed by the bound receiver rather than universally quantified as a method-local variable.
+static_assert(is_assignable_to(ExplicitReceiverImplementation, ExplicitReceiverProtocol))
+static_assert(is_subtype_of(ExplicitReceiverImplementation, ExplicitReceiverProtocol))
+static_assert(not is_assignable_to(WrongExplicitReceiverImplementation, ExplicitReceiverProtocol))
+static_assert(not is_subtype_of(WrongExplicitReceiverImplementation, ExplicitReceiverProtocol))
+
+class ReceiverAndMethodProtocol(Protocol):
+    def f[T, U](self: T, value: U) -> U: ...
+
+class ReceiverAndMethodImplementation:
+    def f[V](self, value: V) -> V:
+        return value
+
+class ConcreteReceiverAndMethodImplementation:
+    def f(self, value: int) -> int:
+        return value
+
+# Binding the receiver variable does not make the ordinary method variable existential.
+static_assert(is_assignable_to(ReceiverAndMethodImplementation, ReceiverAndMethodProtocol))
+static_assert(is_subtype_of(ReceiverAndMethodImplementation, ReceiverAndMethodProtocol))
+static_assert(not is_assignable_to(ConcreteReceiverAndMethodImplementation, ReceiverAndMethodProtocol))
+static_assert(not is_subtype_of(ConcreteReceiverAndMethodImplementation, ReceiverAndMethodProtocol))
+
 type IdentityAlias[X] = X
 type ListAlias[X] = list[X]
 

@@ -385,9 +385,11 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    /// Binds the first (presumably `self`) parameter of this signature. If a `self_type` is
-    /// provided, we will replace any occurrences of `typing.Self` in the parameter and return
-    /// annotations with that type.
+    /// Binds the first (presumably `self`) parameter of this signature.
+    ///
+    /// A direct PEP 695 receiver variable becomes `Self`, or the concrete receiver when one is
+    /// provided. A concrete receiver also replaces existing `typing.Self` occurrences in the
+    /// remaining parameter and return annotations.
     pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
         Self {
             overloads: self
@@ -948,19 +950,25 @@ impl<'db> Signature<'db> {
     }
 
     pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
-        let removed_receiver = self.parameters.get(0).is_some_and(Parameter::is_positional);
+        let bound_receiver = self.bind_pep695_receiver_typevar(db, self_type);
+        let signature = bound_receiver.as_ref().unwrap_or(self);
+
+        let removed_receiver = signature
+            .parameters
+            .get(0)
+            .is_some_and(Parameter::is_positional);
 
         // TODO: Theoretically, for a signature like `f(*args: *tuple[MyClass, int, *tuple[str, ...]])` with
         // a variadic first parameter, we should also "skip the first parameter" by modifying the tuple type.
         let mut parameters = if removed_receiver {
-            self.parameters.without_first()
+            signature.parameters.without_first()
         } else {
-            self.parameters.clone()
+            signature.parameters.clone()
         };
-        let mut return_ty = self.return_ty;
-        let binding_context = self.definition.map(BindingContext::Definition);
+        let mut return_ty = signature.return_ty;
+        let binding_context = signature.definition.map(BindingContext::Definition);
         if let Some(self_type) = self_type
-            && self.needs_self_mapping(db, removed_receiver)
+            && signature.needs_self_mapping(db, removed_receiver)
         {
             let self_mapping =
                 TypeMapping::BindSelf(SelfBinding::new(db, self_type, binding_context));
@@ -973,13 +981,56 @@ impl<'db> Signature<'db> {
             return_ty = return_ty.apply_type_mapping(db, &self_mapping, TypeContext::default());
         }
         Self {
-            generic_context: self
+            generic_context: signature
                 .generic_context
                 .map(|generic_context| generic_context.remove_self(db, binding_context)),
-            definition: self.definition,
+            definition: signature.definition,
             parameters,
             return_ty,
         }
+    }
+
+    /// Binds a PEP 695 type variable used directly by an explicit receiver annotation.
+    fn bind_pep695_receiver_typevar(
+        &self,
+        db: &'db dyn Db,
+        self_type: Option<Type<'db>>,
+    ) -> Option<Self> {
+        let receiver = self.parameters.get(0)?;
+        if !receiver.is_positional() || receiver.inferred_annotation {
+            return None;
+        }
+
+        let typevar = match receiver.annotated_type() {
+            Type::TypeVar(typevar) => typevar,
+            Type::SubclassOf(subclass_of) => subclass_of.into_type_var()?,
+            _ => return None,
+        };
+        if typevar.kind(db) != TypeVarKind::Pep695TypeVar
+            || !self.definition.is_some_and(|definition| {
+                typevar.binding_context(db).definition() == Some(definition)
+            })
+        {
+            return None;
+        }
+
+        let receiver_type = self_type.unwrap_or_else(|| {
+            Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+                db,
+                typevar
+                    .typevar(db)
+                    .bound_or_constraints(db)
+                    .map(|bound| bound.as_type(db))
+                    .unwrap_or(Type::object()),
+                typevar.binding_context(db),
+            ))
+        });
+        Some(self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(typevar, receiver_type)),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        ))
     }
 
     /// Returns `true` if this signature's first parameter can accept the bound `self` type.
