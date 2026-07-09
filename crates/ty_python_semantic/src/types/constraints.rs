@@ -1360,6 +1360,24 @@ impl<'db> Constraint<'db> {
         u8::try_from(max_typevar_depth.saturating_add(1)).unwrap_or(u8::MAX)
     }
 
+    /// Returns whether this constraint is produced by dropping exactly one bound from
+    /// `antecedent`, without changing its typevar or retained bound.
+    fn is_bound_projection_of(self, db: &'db dyn Db, antecedent: Self) -> bool {
+        if !self.typevar.is_same_typevar_as(db, antecedent.typevar) {
+            return false;
+        }
+
+        let keeps_lower = self.bounds.lower.is_some()
+            && self.bounds.lower == antecedent.bounds.lower
+            && self.bounds.upper.is_none()
+            && antecedent.bounds.upper.is_some();
+        let keeps_upper = self.bounds.upper.is_some()
+            && self.bounds.upper == antecedent.bounds.upper
+            && self.bounds.lower.is_none()
+            && antecedent.bounds.lower.is_some();
+        keeps_lower || keeps_upper
+    }
+
     /// Returns a new range constraint.
     ///
     /// Panics if `lower` and `upper` are not both fully static.
@@ -6576,8 +6594,14 @@ impl PathAssignments {
             let Some(available_fuel) = self.fuel_for(ante.when_true()) else {
                 continue;
             };
+            let ante_data = builder.constraint_data(*ante);
             for post in posts {
-                let fuel_cost = builder.constraint_data(*post).sequent_fuel_cost(db);
+                let post_data = builder.constraint_data(*post);
+                let fuel_cost = if post_data.is_bound_projection_of(db, ante_data) {
+                    1
+                } else {
+                    post_data.sequent_fuel_cost(db)
+                };
                 let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) else {
                     continue;
                 };
