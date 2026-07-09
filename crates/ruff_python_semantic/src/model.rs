@@ -2774,7 +2774,7 @@ bitflags! {
 
 
         /// The context is in any type annotation.
-        const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();
+        const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits() | Self::RUNTIME_AMBIGUOUS_ANNOTATION.bits();
 
         /// The context is in any string type definition.
         const STRING_TYPE_DEFINITION = Self::SIMPLE_STRING_TYPE_DEFINITION.bits()
