@@ -738,17 +738,26 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if source_kind == CallableTypeKind::ParamSpecValue
             || target_kind == CallableTypeKind::ParamSpecValue
         {
-            let source_signatures = source.signatures(db);
-            let target_signatures = target.signatures(db);
-            let inferable = self
-                .inferable
-                .merge(db, source_signatures.inferable_typevars(db))
-                .merge(db, target_signatures.inferable_typevars(db));
-            return self
-                .with_inferable_typevars(inferable)
-                .check_callable_signature_pair(db, source_signatures, target_signatures);
+            return self.check_paramspec_value_pair(db, source, target);
         }
         self.check_callable_signature_pair(db, source.signatures(db), target.signatures(db))
+    }
+
+    /// Unifies the retained generic contexts of two callable-shaped ParamSpec values.
+    fn check_paramspec_value_pair(
+        &self,
+        db: &'db dyn Db,
+        source: CallableType<'db>,
+        target: CallableType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let source_signatures = source.signatures(db);
+        let target_signatures = target.signatures(db);
+        let inferable = self
+            .inferable
+            .merge(db, source_signatures.inferable_typevars(db))
+            .merge(db, target_signatures.inferable_typevars(db));
+        self.with_inferable_typevars(inferable)
+            .check_callable_signature_pair(db, source_signatures, target_signatures)
     }
 
     pub(super) fn check_callables_vs_callable(
