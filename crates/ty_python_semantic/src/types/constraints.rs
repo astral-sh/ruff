@@ -1343,6 +1343,23 @@ impl ConstraintId {
 }
 
 impl<'db> Constraint<'db> {
+    /// Returns how much sequent fuel is needed to derive this constraint.
+    ///
+    /// Nested types containing typevars can produce increasingly complex families of derived
+    /// constraints. Charge more fuel for those constraints so that each additional level of
+    /// nesting shortens the remaining derivation chain.
+    fn sequent_fuel_cost(self, db: &'db dyn Db) -> u8 {
+        let max_typevar_depth = self
+            .bounds
+            .lower
+            .into_iter()
+            .chain(self.bounds.upper)
+            .filter_map(|bound| bound.max_typevar_depth(db))
+            .max()
+            .unwrap_or_default();
+        u8::try_from(max_typevar_depth.saturating_add(1)).unwrap_or(u8::MAX)
+    }
+
     /// Returns a new range constraint.
     ///
     /// Panics if `lower` and `upper` are not both fully static.
@@ -6545,22 +6562,25 @@ impl PathAssignments {
             let Some(ante2_fuel) = self.fuel_for(ante2.when_true()) else {
                 continue;
             };
-            let Some(post_fuel) = ante1_fuel.min(ante2_fuel).checked_sub(1) else {
-                continue;
-            };
+            let available_fuel = ante1_fuel.min(ante2_fuel);
             for post in posts {
+                let fuel_cost = builder.constraint_data(*post).sequent_fuel_cost(db);
+                let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) else {
+                    continue;
+                };
                 add_new_constraint(*post, post_fuel);
             }
         }
 
         for (ante, posts) in &self.map.single_implications {
-            let Some(post_fuel) = self
-                .fuel_for(ante.when_true())
-                .and_then(|ante_fuel| ante_fuel.checked_sub(1))
-            else {
+            let Some(available_fuel) = self.fuel_for(ante.when_true()) else {
                 continue;
             };
             for post in posts {
+                let fuel_cost = builder.constraint_data(*post).sequent_fuel_cost(db);
+                let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) else {
+                    continue;
+                };
                 add_new_constraint(*post, post_fuel);
             }
         }
