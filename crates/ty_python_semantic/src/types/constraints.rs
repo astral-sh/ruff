@@ -591,7 +591,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// true whenever there was _any_ specialization of those typevars that returned true before.
     ///
     /// This cached path retains the existing encoding of facts derived during projection.
-    /// Higher-rank comparison uses [`Self::try_exists`] to normalize those residual facts instead.
+    /// Higher-rank comparison uses [`Self::try_exists_assuming`] to normalize those residual facts
+    /// instead.
     pub(crate) fn reduce_inferable(
         self,
         db: &'db dyn Db,
