@@ -34,6 +34,7 @@ use crate::types::{
 use crate::{Db, FxOrderSet};
 use ty_python_core::SemanticIndex;
 use ty_python_core::definition::Definition;
+use ty_python_core::expression::ExpressionKind;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
 use ty_python_core::scope::FileScopeId;
 
@@ -243,7 +244,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(
                 _,
             ))) => {
-                let slice_ty = self.infer_expression(slice, TypeContext::default());
+                let slice_ty = self
+                    .with_expression_kind(ExpressionKind::TypeExpression, |builder| {
+                        builder.infer_expression(slice, TypeContext::default())
+                    });
                 let mut variables = FxOrderSet::default();
                 slice_ty.bind_and_find_all_legacy_typevars(
                     db,
@@ -344,7 +348,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return union_type;
                     }
                     _ => {
-                        return self.infer_expression(slice, TypeContext::default());
+                        return self
+                            .with_expression_kind(ExpressionKind::TypeExpression, |builder| {
+                                builder.infer_expression(slice, TypeContext::default())
+                            });
                     }
                 },
                 SpecialFormType::Type => {
@@ -426,7 +433,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => {}
         }
 
-        let slice_ty = self.infer_expression(slice, TypeContext::default());
+        let slice_ty = if matches!(
+            value_ty,
+            Type::SpecialForm(SpecialFormType::Generic | SpecialFormType::Protocol)
+        ) {
+            self.with_expression_kind(ExpressionKind::TypeExpression, |builder| {
+                builder.infer_expression(slice, TypeContext::default())
+            })
+        } else {
+            self.infer_expression(slice, TypeContext::default())
+        };
         let result_ty = self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
         self.narrow_expr_with_applicable_constraints(subscript, result_ty, &constraint_keys)
     }
@@ -2011,9 +2027,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .context
             .inference_flags
             .replace(InferenceFlags::IN_TYPE_ALIAS, false);
-        for metadata_element in &arguments[1..] {
-            self.infer_expression(metadata_element, TypeContext::default());
-        }
+        self.with_expression_kind(ExpressionKind::Normal, |builder| {
+            for metadata_element in &arguments[1..] {
+                builder.infer_expression(metadata_element, TypeContext::default());
+            }
+        });
         self.context
             .inference_flags
             .set(InferenceFlags::IN_TYPE_ALIAS, previous_in_type_alias);

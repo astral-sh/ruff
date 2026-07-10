@@ -18,10 +18,11 @@ use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{
-    CycleDetector, SpecialFormType, Type, TypeQualifiers, binding_type, infer_complete_scope_types,
-    inferred_declaration,
+    CycleDetector, SpecialFormType, Type, TypeExpressionFlags, TypeQualifiers, binding_type,
+    infer_complete_scope_types, inferred_declaration,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::expression::ExpressionKind;
 use ty_python_core::place_table;
 use ty_python_core::scope::{FileScopeId, Scope};
 use ty_python_core::semantic_index;
@@ -471,6 +472,25 @@ impl<'db> SemanticModel<'db> {
         )
     }
 
+    /// Returns whether inference interprets `expression` as a normal or type expression.
+    pub fn expression_kind(&self, expression: ExprRef<'_>) -> ExpressionKind {
+        let index = semantic_index(self.db, self.file);
+        let Some(file_scope) = index.try_expression_scope_id(&self.expr_ref_in_ast(expression))
+        else {
+            return ExpressionKind::Normal;
+        };
+        let scope = file_scope.to_scope_id(self.db, self.file);
+
+        if infer_complete_scope_types(self.db, scope)
+            .type_expression_flags(expression)
+            .contains(TypeExpressionFlags::TYPE_EXPRESSION)
+        {
+            ExpressionKind::TypeExpression
+        } else {
+            ExpressionKind::Normal
+        }
+    }
+
     /// Returns whether `definition` defines a PEP 613 or PEP 695 type alias.
     pub fn is_type_alias_definition(&self, definition: Definition<'db>) -> bool {
         match definition.kind(self.db) {
@@ -494,19 +514,7 @@ impl<'db> SemanticModel<'db> {
                 else {
                     return TypeQualifiers::empty();
                 };
-                let definition_file = definition.file(self.db);
-                let module = parsed_module(self.db, definition_file).load(self.db);
-                if !definition
-                    .kind(self.db)
-                    .category(definition_file.is_stub(self.db), &module)
-                    .is_declaration()
-                {
-                    return TypeQualifiers::empty();
-                }
-                let Some(declared) = inferred_declaration(self.db, definition).declared() else {
-                    return TypeQualifiers::empty();
-                };
-                declared.qualifiers()
+                self.definition_type_qualifiers(definition)
             }
             ExprRef::Attribute(attr) => {
                 let Some(value_ty) = attr.value.inferred_type(self) else {
@@ -522,6 +530,22 @@ impl<'db> SemanticModel<'db> {
             }
             _ => TypeQualifiers::empty(),
         }
+    }
+
+    /// Returns the qualifiers declared by a definition.
+    pub fn definition_type_qualifiers(&self, definition: Definition<'db>) -> TypeQualifiers {
+        let definition_file = definition.file(self.db);
+        let module = parsed_module(self.db, definition_file).load(self.db);
+        if !definition
+            .kind(self.db)
+            .category(definition_file.is_stub(self.db), &module)
+            .is_declaration()
+        {
+            return TypeQualifiers::empty();
+        }
+        inferred_declaration(self.db, definition)
+            .declared()
+            .map_or_else(TypeQualifiers::empty, |declared| declared.qualifiers())
     }
 
     /// Returns completion candidates for a string-literal expression based on its expected type.
@@ -849,6 +873,8 @@ mod tests {
     use crate::{HasType, SemanticModel};
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
+    use ruff_python_ast::ExprRef;
+    use ty_python_core::expression::ExpressionKind;
 
     #[test]
     fn function_type() -> anyhow::Result<()> {
@@ -884,6 +910,469 @@ mod tests {
         let ty = class.inferred_type(&model).unwrap();
 
         assert!(ty.is_class_literal());
+
+        Ok(())
+    }
+
+    #[test]
+    fn expression_kinds_follow_inference_context() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+                from typing import Annotated, TypeAlias
+
+                normal = int
+                annotation: list[int]
+                metadata = 1
+                annotated: Annotated[int, metadata]
+                Alias: TypeAlias = list[int]
+
+                class Decorator[T]:
+                    def __init__(self, target): ...
+
+                @Decorator[int]
+                def decorated(): ...
+
+                @Decorator["int"]
+                def string_decorated(): ...
+
+                string_annotated: "Annotated[int, metadata]"
+                QuotedAlias: TypeAlias = "list[int]"
+                "#,
+            )
+            .build()?;
+
+        let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let module = parsed_module(&db, foo).load(&db);
+        let model = SemanticModel::new(&db, foo);
+
+        let normal = module.suite()[1].as_assign_stmt().unwrap();
+        assert_eq!(
+            model.expression_kind(ExprRef::from(normal.value.as_ref())),
+            ExpressionKind::Normal
+        );
+
+        let annotation = module.suite()[2].as_ann_assign_stmt().unwrap();
+        assert_eq!(
+            model.expression_kind(ExprRef::from(annotation.annotation.as_ref())),
+            ExpressionKind::TypeExpression
+        );
+
+        let annotated = module.suite()[4].as_ann_assign_stmt().unwrap();
+        let arguments = annotated
+            .annotation
+            .as_subscript_expr()
+            .unwrap()
+            .slice
+            .as_tuple_expr()
+            .unwrap();
+        assert_eq!(
+            model.expression_kind(ExprRef::from(&arguments.elts[0])),
+            ExpressionKind::TypeExpression
+        );
+        assert_eq!(
+            model.expression_kind(ExprRef::from(&arguments.elts[1])),
+            ExpressionKind::Normal
+        );
+
+        let alias = module.suite()[5].as_ann_assign_stmt().unwrap();
+        assert_eq!(
+            model.expression_kind(ExprRef::from(alias.value.as_deref().unwrap())),
+            ExpressionKind::TypeExpression
+        );
+
+        let decorated = module.suite()[7].as_function_def_stmt().unwrap();
+        let decorator_argument = decorated.decorator_list[0]
+            .expression
+            .as_subscript_expr()
+            .unwrap()
+            .slice
+            .as_ref();
+        assert_eq!(
+            model.expression_kind(ExprRef::from(decorator_argument)),
+            ExpressionKind::TypeExpression
+        );
+
+        let string_decorated = module.suite()[8].as_function_def_stmt().unwrap();
+        let string_decorator_argument = string_decorated.decorator_list[0]
+            .expression
+            .as_subscript_expr()
+            .unwrap()
+            .slice
+            .as_string_literal_expr()
+            .unwrap();
+        let (parsed, string_model) = model
+            .enter_string_annotation(string_decorator_argument)
+            .unwrap();
+        assert_eq!(
+            string_model.expression_kind(ExprRef::from(&parsed.syntax().body)),
+            ExpressionKind::TypeExpression
+        );
+
+        let string_annotated = module.suite()[9].as_ann_assign_stmt().unwrap();
+        let string_annotation = string_annotated
+            .annotation
+            .as_string_literal_expr()
+            .unwrap();
+        let (parsed, string_model) = model.enter_string_annotation(string_annotation).unwrap();
+        let string_arguments = parsed
+            .syntax()
+            .body
+            .as_subscript_expr()
+            .unwrap()
+            .slice
+            .as_tuple_expr()
+            .unwrap();
+        assert_eq!(
+            string_model.expression_kind(ExprRef::from(&string_arguments.elts[0])),
+            ExpressionKind::TypeExpression
+        );
+        assert_eq!(
+            string_model.expression_kind(ExprRef::from(&string_arguments.elts[1])),
+            ExpressionKind::Normal
+        );
+
+        let quoted_alias = module.suite()[10]
+            .as_ann_assign_stmt()
+            .unwrap()
+            .value
+            .as_deref()
+            .unwrap()
+            .as_string_literal_expr()
+            .unwrap();
+        let (parsed, string_model) = model.enter_string_annotation(quoted_alias).unwrap();
+        assert!(parsed.syntax().body.inferred_type(&string_model).is_some());
+        assert_eq!(
+            string_model.expression_kind(ExprRef::from(&parsed.syntax().body)),
+            ExpressionKind::TypeExpression
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn expression_kinds_follow_compound_annotations_and_selected_overloads() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+                from typing import Any, TypeVar, overload
+                from typing_extensions import TypeForm
+
+                module: Any
+                qualified: module.Missing[int]
+                quoted: "module.Missing[int]"
+
+                T = TypeVar("T")
+
+                @overload
+                def accepts(value: TypeForm[Any], discriminator: int) -> None: ...
+                @overload
+                def accepts(value: int, discriminator: str) -> None: ...
+                def accepts(value, discriminator): ...
+
+                accepts(T, 1)
+                accepts(module, 1)
+                accepts("int", 1)
+                accepts(module.inner.Nested | int, 1)
+                "#,
+            )
+            .build()?;
+
+        let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let module = parsed_module(&db, foo).load(&db);
+        let model = SemanticModel::new(&db, foo);
+
+        let qualified = module.suite()[3]
+            .as_ann_assign_stmt()
+            .unwrap()
+            .annotation
+            .as_subscript_expr()
+            .unwrap();
+        let qualified_attribute = qualified.value.as_attribute_expr().unwrap();
+        assert_eq!(
+            model.expression_kind(ExprRef::from(qualified)),
+            ExpressionKind::TypeExpression
+        );
+        assert_eq!(
+            model.expression_kind(ExprRef::from(qualified_attribute)),
+            ExpressionKind::TypeExpression
+        );
+        assert_eq!(
+            model.expression_kind(ExprRef::from(qualified_attribute.value.as_ref())),
+            ExpressionKind::TypeExpression
+        );
+
+        let quoted = module.suite()[4]
+            .as_ann_assign_stmt()
+            .unwrap()
+            .annotation
+            .as_string_literal_expr()
+            .unwrap();
+        let (parsed, string_model) = model.enter_string_annotation(quoted).unwrap();
+        let quoted_attribute = parsed
+            .syntax()
+            .body
+            .as_subscript_expr()
+            .unwrap()
+            .value
+            .as_attribute_expr()
+            .unwrap();
+        assert_eq!(
+            string_model.expression_kind(ExprRef::from(quoted_attribute)),
+            ExpressionKind::TypeExpression
+        );
+        assert_eq!(
+            string_model.expression_kind(ExprRef::from(quoted_attribute.value.as_ref())),
+            ExpressionKind::TypeExpression
+        );
+
+        let call = module.suite()[9]
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap();
+        assert_eq!(
+            model.expression_kind(ExprRef::from(&call.arguments.args[0])),
+            ExpressionKind::TypeExpression
+        );
+        assert_eq!(
+            model.expression_kind(ExprRef::from(&call.arguments.args[1])),
+            ExpressionKind::Normal
+        );
+
+        let ambiguous_call = module.suite()[10]
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap();
+        assert_eq!(
+            model.expression_kind(ExprRef::from(&ambiguous_call.arguments.args[0])),
+            ExpressionKind::Normal
+        );
+
+        let string_call = module.suite()[11]
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap();
+        let string_argument = string_call.arguments.args[0]
+            .as_string_literal_expr()
+            .unwrap();
+        assert!(
+            string_argument
+                .inferred_type(&model)
+                .unwrap()
+                .is_string_literal()
+        );
+        let (parsed, string_model) = model.enter_string_annotation(string_argument).unwrap();
+        assert!(parsed.syntax().body.inferred_type(&string_model).is_some());
+        assert_eq!(
+            string_model.expression_kind(ExprRef::from(&parsed.syntax().body)),
+            ExpressionKind::TypeExpression
+        );
+
+        let compound_call = module.suite()[12]
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap();
+        let compound_argument = &compound_call.arguments.args[0];
+        assert_eq!(
+            model.expression_kind(ExprRef::from(compound_argument)),
+            ExpressionKind::TypeExpression
+        );
+        let compound_attribute = compound_argument
+            .as_bin_op_expr()
+            .unwrap()
+            .left
+            .as_attribute_expr()
+            .unwrap();
+        assert_eq!(
+            model.expression_kind(ExprRef::from(compound_attribute)),
+            ExpressionKind::TypeExpression
+        );
+        let compound_inner_attribute = compound_attribute.value.as_attribute_expr().unwrap();
+        assert_eq!(
+            model.expression_kind(ExprRef::from(compound_inner_attribute)),
+            ExpressionKind::TypeExpression
+        );
+        let compound_base = compound_inner_attribute.value.as_ref();
+        assert_eq!(
+            model.expression_kind(ExprRef::from(compound_base)),
+            ExpressionKind::TypeExpression
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn expression_kinds_preserve_fallback_value_positions() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+                def unreachable():
+                    literal_value = 1
+                    metadata = 1
+                    return
+                    from typing import Annotated, Literal
+                    literal: Literal[literal_value]
+                    annotated: Annotated[int, metadata]
+
+                from ty_extensions._internal import CallableTypeOf, RegularCallableTypeOf, TypeOf
+
+                first = 1
+                second = 2
+                type_of: TypeOf[first, second]
+                callable_type_of: CallableTypeOf[first, second]
+                regular_callable_type_of: RegularCallableTypeOf[first, second]
+                "#,
+            )
+            .build()?;
+
+        let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let module = parsed_module(&db, foo).load(&db);
+        let model = SemanticModel::new(&db, foo);
+
+        let function = module.suite()[0].as_function_def_stmt().unwrap();
+        let literal_value = function.body[4]
+            .as_ann_assign_stmt()
+            .unwrap()
+            .annotation
+            .as_subscript_expr()
+            .unwrap()
+            .slice
+            .as_ref();
+        assert_eq!(
+            model.expression_kind(ExprRef::from(literal_value)),
+            ExpressionKind::Normal
+        );
+
+        let metadata = &function.body[5]
+            .as_ann_assign_stmt()
+            .unwrap()
+            .annotation
+            .as_subscript_expr()
+            .unwrap()
+            .slice
+            .as_tuple_expr()
+            .unwrap()
+            .elts[1];
+        assert_eq!(
+            model.expression_kind(ExprRef::from(metadata)),
+            ExpressionKind::Normal
+        );
+
+        for statement in &module.suite()[4..=6] {
+            let first_argument = &statement
+                .as_ann_assign_stmt()
+                .unwrap()
+                .annotation
+                .as_subscript_expr()
+                .unwrap()
+                .slice
+                .as_tuple_expr()
+                .unwrap()
+                .elts[0];
+            assert_eq!(
+                model.expression_kind(ExprRef::from(first_argument)),
+                ExpressionKind::Normal
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn expression_kinds_are_independent_of_inference_strategy() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+                from typing import Annotated, Generic, Literal, Protocol, TypeVar, Union
+                from typing_extensions import TypeAliasType
+
+                T = TypeVar("T")
+                metadata = 1
+                singleton = Union[T]
+                nested = Union[Annotated[T, metadata]]
+                literal: Literal[metadata]
+
+                class GenericClass(Generic[T]): ...
+                class ProtocolClass(Protocol[T]): ...
+
+                Manual = TypeAliasType("Manual", T, type_params=(T,))
+                specialized = Manual[T]
+                "#,
+            )
+            .build()?;
+
+        let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let module = parsed_module(&db, foo).load(&db);
+        let model = SemanticModel::new(&db, foo);
+
+        let singleton = module.suite()[4].as_assign_stmt().unwrap();
+        let singleton_argument = singleton.value.as_subscript_expr().unwrap().slice.as_ref();
+        assert_eq!(
+            model.expression_kind(ExprRef::from(singleton_argument)),
+            ExpressionKind::TypeExpression
+        );
+
+        let nested = module.suite()[5].as_assign_stmt().unwrap();
+        let nested_annotated = nested.value.as_subscript_expr().unwrap().slice.as_ref();
+        let nested_arguments = nested_annotated
+            .as_subscript_expr()
+            .unwrap()
+            .slice
+            .as_tuple_expr()
+            .unwrap();
+        assert_eq!(
+            model.expression_kind(ExprRef::from(&nested_arguments.elts[0])),
+            ExpressionKind::TypeExpression
+        );
+        assert_eq!(
+            model.expression_kind(ExprRef::from(&nested_arguments.elts[1])),
+            ExpressionKind::Normal
+        );
+
+        let literal = module.suite()[6].as_ann_assign_stmt().unwrap();
+        let literal_argument = literal
+            .annotation
+            .as_subscript_expr()
+            .unwrap()
+            .slice
+            .as_ref();
+        assert_eq!(
+            model.expression_kind(ExprRef::from(literal_argument)),
+            ExpressionKind::Normal
+        );
+
+        for class in &module.suite()[7..=8] {
+            let class = class.as_class_def_stmt().unwrap();
+            let base_argument = class.bases()[0].as_subscript_expr().unwrap().slice.as_ref();
+            assert_eq!(
+                model.expression_kind(ExprRef::from(base_argument)),
+                ExpressionKind::TypeExpression
+            );
+        }
+
+        let specialized = module.suite()[10].as_assign_stmt().unwrap();
+        let specialized_argument = specialized
+            .value
+            .as_subscript_expr()
+            .unwrap()
+            .slice
+            .as_ref();
+        assert_eq!(
+            model.expression_kind(ExprRef::from(specialized_argument)),
+            ExpressionKind::TypeExpression
+        );
 
         Ok(())
     }

@@ -4,7 +4,7 @@ use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, global_symbol};
 use crate::types::{KnownClass, KnownInstanceType, check_types};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
-use ruff_db::files::{File, system_path_to_file};
+use ruff_db::files::{File, system_path_to_file, vendored_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 use ty_python_core::definition::Definition;
@@ -110,6 +110,98 @@ fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
     assert_eq!(
         non_owner.bindings(first).collect::<Vec<_>>(),
         [(second, owner_type)]
+    );
+
+    Ok(())
+}
+
+#[test]
+fn type_expression_metadata_uses_compact_definition_extra() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented("/src/annotation.py", "value: list[int]")?;
+
+    let file = system_path_to_file(&db, "/src/annotation.py")?;
+    let module = parsed_module(&db, file).load(&db);
+    let assignment = module.syntax().body[0].as_ann_assign_stmt().unwrap();
+    let definition = semantic_index(&db, file).expect_single_definition(assignment);
+    let inference = infer_definition_types(&db, definition);
+
+    assert!(matches!(
+        inference.extra.as_deref(),
+        Some(DefinitionInferenceExtra::TypeExpressionFlags(_))
+    ));
+
+    Ok(())
+}
+
+#[test]
+fn combined_annotation_metadata_uses_compact_definition_extra() -> anyhow::Result<()> {
+    assert!(
+        std::mem::size_of::<DefinitionAnnotationMetadata>()
+            < std::mem::size_of::<OtherDefinitionInferenceExtra>()
+    );
+
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/annotations.py",
+        r#"
+        from typing import Final
+
+        string_value: "list[int]"
+        final_value: Final[int]
+        "#,
+    )?;
+
+    let file = system_path_to_file(&db, "/src/annotations.py")?;
+    let module = parsed_module(&db, file).load(&db);
+    for statement in &module.syntax().body[1..] {
+        let assignment = statement.as_ann_assign_stmt().unwrap();
+        let definition = semantic_index(&db, file).expect_single_definition(assignment);
+        let inference = infer_definition_types(&db, definition);
+
+        assert!(matches!(
+            inference.extra.as_deref(),
+            Some(DefinitionInferenceExtra::AnnotationMetadata(_))
+        ));
+    }
+
+    Ok(())
+}
+
+#[test]
+fn function_decorator_metadata_is_allocated_on_demand() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/decorated.py",
+        r#"
+        @staticmethod
+        def decorated(): ...
+        "#,
+    )?;
+
+    let file = system_path_to_file(&db, "/src/decorated.py")?;
+    let module = parsed_module(&db, file).load(&db);
+    let function = module.syntax().body[0].as_function_def_stmt().unwrap();
+    let definition = semantic_index(&db, file).expect_single_definition(function);
+    let inference = function_known_decorators(&db, definition);
+
+    assert!(inference.extra.is_none());
+
+    Ok(())
+}
+
+#[test]
+fn type_expression_metadata_is_inferred_for_unchecked_file() -> anyhow::Result<()> {
+    let db = setup_db();
+    let file = vendored_path_to_file(&db, "stdlib/_remote_debugging.pyi")?;
+    let module = parsed_module(&db, file).load(&db);
+    let assignment = module.syntax().body[4].as_ann_assign_stmt().unwrap();
+    let inference = infer_complete_scope_types(&db, global_scope(&db, file));
+
+    assert!(
+        inference
+            .type_expression_flags(assignment.value.as_deref().unwrap())
+            .contains(TypeExpressionFlags::TYPE_EXPRESSION)
     );
 
     Ok(())

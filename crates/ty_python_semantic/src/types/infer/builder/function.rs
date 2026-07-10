@@ -316,6 +316,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.context.extend(decorator_inference.diagnostics());
             self.expressions
                 .extend(decorator_inference.expression_types());
+            self.type_expression_flags
+                .extend(decorator_inference.type_expression_flags());
+            self.string_annotations
+                .extend(decorator_inference.string_annotations());
             self.bindings.extend(decorator_inference.bindings());
             self.called_functions
                 .extend(decorator_inference.called_functions().iter().copied());

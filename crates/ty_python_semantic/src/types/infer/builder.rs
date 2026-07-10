@@ -23,11 +23,12 @@ use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
 use super::{
-    DeferredAndUndecorated, DefinitionInference, DefinitionInferenceExtra, DefinitionTypes,
-    ExpressionInference, ExpressionInferenceExtra, FrozenMap, FrozenSet, FrozenValueMap,
-    FunctionDecoratorInference, InferenceRegion, OtherDefinitionInferenceExtra, ScopeInference,
-    ScopeInferenceExtra, infer_deferred_types, infer_definition_types, infer_expression_types,
-    infer_same_file_expression_type, infer_unpack_types,
+    DeferredAndUndecorated, DefinitionAnnotationMetadata, DefinitionInference,
+    DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
+    FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference,
+    FunctionDecoratorInferenceExtra, InferenceRegion, OtherDefinitionInferenceExtra,
+    ScopeInference, ScopeInferenceExtra, infer_deferred_types, infer_definition_types,
+    infer_expression_types, infer_same_file_expression_type, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -359,7 +360,94 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 }
 
 /// An expression cache shared across builders during multi-inference.
+///
+/// Type-expression traversals bypass this cache because recording semantic metadata for every
+/// descendant is part of their result.
 type ExpressionCache<'db> = FxHashMap<(ExpressionNodeKey, TypeContext<'db>), Type<'db>>;
+
+/// Expression results produced by contextual inference that can be merged without replacing
+/// results from ordinary inference.
+#[derive(Debug, Clone, Default)]
+struct ContextualExpressionMetadata<'db> {
+    expression_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
+    string_annotations: FxHashSet<ExpressionNodeKey>,
+}
+
+impl<'db> ContextualExpressionMetadata<'db> {
+    fn take_from_builder(builder: &mut TypeInferenceBuilder<'db, '_>) -> Self {
+        Self {
+            expression_types: std::mem::take(&mut builder.expressions),
+            type_expression_flags: std::mem::take(&mut builder.type_expression_flags),
+            string_annotations: std::mem::take(&mut builder.string_annotations),
+        }
+    }
+
+    fn intersect_with(&mut self, other: &Self) {
+        self.expression_types
+            .retain(|expression, ty| other.expression_types.get(expression) == Some(ty));
+        self.type_expression_flags.retain(|expression, flags| {
+            let Some(other_flags) = other.type_expression_flags.get(expression) else {
+                return false;
+            };
+            *flags &= *other_flags;
+            !flags.is_empty()
+        });
+        self.string_annotations
+            .retain(|expression| other.string_annotations.contains(expression));
+    }
+
+    fn extend_into(self, builder: &mut TypeInferenceBuilder<'db, '_>) {
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "types for distinct expressions are merged independently"
+        )]
+        for (expression, ty) in self.expression_types {
+            builder.expressions.entry(expression).or_insert(ty);
+        }
+
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "metadata for distinct expressions is merged independently"
+        )]
+        for (expression, flags) in self.type_expression_flags {
+            builder
+                .type_expression_flags
+                .entry(expression)
+                .or_default()
+                .insert(flags);
+        }
+        builder.string_annotations.extend(self.string_annotations);
+    }
+}
+
+/// Semantic metadata from speculative call-argument inference, keyed by argument and context.
+#[derive(Debug, Default)]
+struct CallArgumentInferenceMetadata<'db> {
+    by_context: FxHashMap<(usize, Type<'db>), ContextualExpressionMetadata<'db>>,
+}
+
+impl<'db> CallArgumentInferenceMetadata<'db> {
+    fn insert(
+        &mut self,
+        argument_index: usize,
+        inference_cache_key: Type<'db>,
+        builder: &mut TypeInferenceBuilder<'db, '_>,
+    ) {
+        self.by_context.insert(
+            (argument_index, inference_cache_key),
+            ContextualExpressionMetadata::take_from_builder(builder),
+        );
+    }
+
+    fn get(
+        &self,
+        argument_index: usize,
+        inference_cache_key: Type<'db>,
+    ) -> Option<&ContextualExpressionMetadata<'db>> {
+        self.by_context.get(&(argument_index, inference_cache_key))
+    }
+}
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// How big a string do we build before bailing?
@@ -495,6 +583,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 DefinitionInferenceExtra::StringAnnotations(string_annotations) => {
                     self.string_annotations
                         .extend(string_annotations.iter().copied());
+                }
+                DefinitionInferenceExtra::TypeExpressionFlags(type_expression_flags) => {
+                    self.type_expression_flags
+                        .extend(type_expression_flags.iter().copied());
+                }
+                DefinitionInferenceExtra::AnnotationMetadata(metadata) => {
+                    self.string_annotations
+                        .extend(metadata.string_annotations.iter().copied());
+                    self.qualifiers.extend(metadata.qualifiers.iter().copied());
+                    self.type_expression_flags
+                        .extend(metadata.type_expression_flags.iter().copied());
                 }
                 DefinitionInferenceExtra::Undecorated(_)
                 | DefinitionInferenceExtra::DiscardsDictKeyAssignments => {}
@@ -810,6 +909,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .insert(flags);
     }
 
+    /// Runs inference while recording whether value-inferred expressions are semantic type
+    /// expressions.
+    fn with_expression_kind<T>(
+        &mut self,
+        kind: ExpressionKind,
+        infer: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        let previous = self.context.inference_flags.replace(
+            InferenceFlags::INHERITED_TYPE_EXPRESSION,
+            kind == ExpressionKind::TypeExpression,
+        );
+        let result = infer(self);
+        self.context
+            .inference_flags
+            .set(InferenceFlags::INHERITED_TYPE_EXPRESSION, previous);
+        result
+    }
+
+    fn current_expression_kind(&self) -> ExpressionKind {
+        if self
+            .inference_flags()
+            .contains(InferenceFlags::INHERITED_TYPE_EXPRESSION)
+        {
+            ExpressionKind::TypeExpression
+        } else {
+            ExpressionKind::Normal
+        }
+    }
+
     /// Get metadata for a type expression from the current inference result.
     fn type_expression_flags(&self, expr: impl Into<ExpressionNodeKey>) -> TypeExpressionFlags {
         self.type_expression_flags
@@ -930,7 +1058,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "Inferring deferred types should not add more deferred definitions"
         );
 
-        if self.db().should_check_file(self.file()) {
+        let should_check_file = self.db().should_check_file(self.file());
+        let annotated_assignments = self
+            .declarations
+            .iter()
+            .filter_map(|(definition, _)| match definition.kind(self.db()) {
+                DefinitionKind::AnnotatedAssignment(assignment) => Some((assignment, *definition)),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        for (assignment, definition) in annotated_assignments {
+            post_inference::pep_613_alias::analyze_pep_613_alias(
+                assignment,
+                definition,
+                self,
+                should_check_file,
+            );
+        }
+
+        if should_check_file {
             let mut seen_overloaded_places = FxHashSet::default();
             let mut seen_public_functions = FxHashSet::default();
 
@@ -973,15 +1119,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             self.index,
                             &|expr| self.file_expression_type(expr),
                         );
-                    }
-                    DefinitionKind::AnnotatedAssignment(assignment) => {
-                        if let Some(diagnostics) =
-                            post_inference::pep_613_alias::check_pep_613_alias(
-                                assignment, definition, self,
-                            )
-                        {
-                            self.context.extend(&diagnostics);
-                        }
                     }
                     _ => {}
                 }
@@ -4951,7 +5088,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut speculative_builder = self.speculate();
 
             // Attempt to infer the argument types using the narrowed type context.
-            speculative_builder.infer_all_argument_types(
+            let argument_metadata = speculative_builder.infer_all_argument_types(
                 ast_arguments.clone(),
                 argument_types,
                 infer_argument_ty,
@@ -4972,6 +5109,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 return None;
             }
+
+            speculative_builder.extend_selected_call_argument_metadata(
+                &speculative_bindings,
+                argument_types,
+                &argument_metadata,
+                narrowed_tcx,
+                &constraints,
+            );
 
             // Ensure the inferred return type is assignable to the narrowed declared type.
             //
@@ -5021,7 +5166,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         //
         // TODO: We could also attempt an inference without type context, but this
         // leads to similar performance issues.
-        self.infer_all_argument_types(
+        let argument_metadata = self.infer_all_argument_types(
             ast_arguments,
             argument_types,
             infer_argument_ty,
@@ -5029,13 +5174,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             call_expression_tcx,
         );
 
-        bindings.check_types_impl(
+        let result = bindings.check_types_impl(
             db,
             &constraints,
             argument_types,
             call_expression_tcx,
             &self.dataclass_field_specifiers,
-        )
+        );
+        if result.is_ok() {
+            self.extend_selected_call_argument_metadata(
+                bindings,
+                argument_types,
+                &argument_metadata,
+                call_expression_tcx,
+                &constraints,
+            );
+        }
+        result
     }
 
     /// Infer the argument types for all bindings.
@@ -5050,7 +5205,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
         bindings: &'bindings Bindings<'db>,
         call_expression_tcx: TypeContext<'db>,
-    ) {
+    ) -> CallArgumentInferenceMetadata<'db> {
         fn add_overloads_from_binding<'a, 'db>(
             overloads_with_binding: &mut Vec<(&'a Binding<'db>, &'a CallableBinding<'db>)>,
             binding: &'a CallableBinding<'db>,
@@ -5076,6 +5231,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let constraints = ConstraintSetBuilder::new();
+        let mut argument_metadata = CallArgumentInferenceMetadata::default();
 
         let mut overloads_with_binding: Vec<(&Binding<'db>, &CallableBinding<'db>)> = Vec::new();
 
@@ -5218,6 +5374,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ),
                     );
 
+                    argument_metadata.insert(
+                        argument_index,
+                        inference_cache_key,
+                        &mut speculative_builder,
+                    );
                     inferred_by_cache_key.insert(inference_cache_key, inferred_ty);
                     self.union_expected_types(&speculative_builder.expected_types);
                     parameter_context.insert_inferred_type(
@@ -5231,6 +5392,54 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.teardown_expression_cache();
                 }
             }
+        }
+
+        argument_metadata
+    }
+
+    /// Retains metadata only when every selected overload interprets an argument the same way.
+    fn extend_selected_call_argument_metadata(
+        &mut self,
+        bindings: &Bindings<'db>,
+        arguments_types: &CallArguments<'_, 'db>,
+        metadata: &CallArgumentInferenceMetadata<'db>,
+        call_expression_tcx: TypeContext<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+    ) {
+        let db = self.db();
+
+        for argument_index in 0..arguments_types.len() {
+            let mut candidates = Vec::new();
+            for binding in bindings.iter_flat() {
+                for (_, overload) in binding.matching_overloads() {
+                    let candidate = overload
+                        .argument_type_context(
+                            db,
+                            constraints,
+                            binding,
+                            arguments_types,
+                            argument_index,
+                            call_expression_tcx,
+                        )
+                        .and_then(|context| {
+                            metadata.get(argument_index, context.inference_cache_key())
+                        });
+                    candidates.push(candidate);
+                }
+            }
+
+            let Some(Some(first)) = candidates.first() else {
+                continue;
+            };
+            let mut common = (*first).clone();
+            for candidate in &candidates[1..] {
+                let Some(candidate) = candidate else {
+                    common = ContextualExpressionMetadata::default();
+                    break;
+                };
+                common.intersect_with(candidate);
+            }
+            common.extend_into(self);
         }
     }
 
@@ -5262,7 +5471,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "Calling `self.infer_expression` on a standalone-expression is not allowed because it can lead to double-inference. Use `self.infer_standalone_expression` instead."
         );
 
+        if self
+            .inference_flags()
+            .contains(InferenceFlags::INHERITED_TYPE_EXPRESSION)
+        {
+            self.store_type_expression_flags(expression, TypeExpressionFlags::TYPE_EXPRESSION);
+        }
+
         self.infer_expression_impl(expression, tcx)
+    }
+
+    /// Infers an expression as a value even during a type-expression traversal.
+    fn infer_normal_expression(
+        &mut self,
+        expression: &ast::Expr,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        self.with_expression_kind(ExpressionKind::Normal, |builder| {
+            builder.infer_expression(expression, tcx)
+        })
     }
 
     fn infer_expression_with_state(
@@ -5389,12 +5616,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        if let Some(ty) = self.expression_cache.as_ref().and_then(|expression_cache| {
-            expression_cache
-                .borrow()
-                .get(&(expression.into(), tcx))
-                .copied()
-        }) {
+        let use_expression_cache = self.current_expression_kind() == ExpressionKind::Normal;
+        if use_expression_cache
+            && let Some(ty) = self.expression_cache.as_ref().and_then(|expression_cache| {
+                expression_cache
+                    .borrow()
+                    .get(&(expression.into(), tcx))
+                    .copied()
+            })
+        {
             self.store_expression_type(expression, ty);
             return ty;
         }
@@ -5404,7 +5634,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             self.store_expression_type(expression, ty);
 
-            if let Some(expression_cache) = &self.expression_cache {
+            if use_expression_cache && let Some(expression_cache) = &self.expression_cache {
                 expression_cache
                     .borrow_mut()
                     .insert((expression.into(), tcx), ty);
@@ -5479,7 +5709,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ty = self.apply_type_context(expression, ty, tcx);
         self.store_expression_type(expression, ty);
 
-        if let Some(expression_cache) = &self.expression_cache {
+        if self.current_expression_kind() == ExpressionKind::Normal
+            && let Some(expression_cache) = &self.expression_cache
+        {
             expression_cache
                 .borrow_mut()
                 .insert((expression.into(), tcx), ty);
@@ -10335,7 +10567,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             declarations: _,
             deferred: _,
             scope: _,
-            string_annotations: _,
+            string_annotations,
             expected_types: _,
             return_types_and_ranges: _,
             collection_use_constraints: _,
@@ -10348,12 +10580,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             region: _,
             cycle_recovery: _,
             qualifiers: _,
-            type_expression_flags: _,
+            type_expression_flags,
         } = self;
         let diagnostics = context.finish();
+        let extra =
+            (!type_expression_flags.is_empty() || !string_annotations.is_empty()).then(|| {
+                Box::new(FunctionDecoratorInferenceExtra {
+                    type_expression_flags: FrozenMap::from(type_expression_flags),
+                    string_annotations: FrozenSet::from(string_annotations),
+                })
+            });
 
         FunctionDecoratorInference {
             expression_types: FrozenMap::from(expressions),
+            extra,
             bindings: bindings.into_boxed_slice(),
             called_functions: called_functions
                 .into_iter()
@@ -10401,19 +10641,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let diagnostics = context.finish();
 
-        let non_undecorated_extra_field_count = usize::from(!string_annotations.is_empty())
+        let annotation_metadata_field_count = usize::from(!string_annotations.is_empty())
+            + usize::from(!type_expression_flags.is_empty())
+            + usize::from(!qualifiers.is_empty());
+        let non_undecorated_extra_field_count = usize::from(annotation_metadata_field_count > 0)
             + usize::from(!expected_types.is_empty())
             + usize::from(!collection_use_constraints.is_empty())
             + usize::from(!called_functions.is_empty())
-            + usize::from(!type_expression_flags.is_empty())
             + usize::from(cycle_recovery.is_some())
             + usize::from(!deferred.is_empty())
             + usize::from(!diagnostics.is_empty())
-            + usize::from(discards_dict_key_assignments)
-            + usize::from(!qualifiers.is_empty());
+            + usize::from(discards_dict_key_assignments);
 
         let extra = match (non_undecorated_extra_field_count, undecorated_type) {
             (0, None) => None,
+            (1, None) if annotation_metadata_field_count > 1 => {
+                Some(Box::new(DefinitionInferenceExtra::AnnotationMetadata(
+                    Box::new(DefinitionAnnotationMetadata {
+                        string_annotations: FrozenSet::from(string_annotations),
+                        qualifiers: FrozenMap::from(qualifiers),
+                        type_expression_flags: FrozenMap::from(type_expression_flags),
+                    }),
+                )))
+            }
             (1, None) if !qualifiers.is_empty() => Some(Box::new(
                 DefinitionInferenceExtra::Qualifiers(FrozenMap::from(qualifiers)),
             )),
@@ -10437,6 +10687,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (1, None) if !string_annotations.is_empty() => Some(Box::new(
                 DefinitionInferenceExtra::StringAnnotations(FrozenSet::from(string_annotations)),
             )),
+            (1, None) if !type_expression_flags.is_empty() => {
+                Some(Box::new(DefinitionInferenceExtra::TypeExpressionFlags(
+                    FrozenMap::from(type_expression_flags),
+                )))
+            }
             (1, None) if discards_dict_key_assignments => Some(Box::new(
                 DefinitionInferenceExtra::DiscardsDictKeyAssignments,
             )),
