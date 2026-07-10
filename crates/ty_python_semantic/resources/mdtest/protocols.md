@@ -2697,6 +2697,44 @@ def update_value(value: HasValue) -> None:
     value.value = "bad"  # error: [invalid-assignment]
 ```
 
+### Descriptor setters on union protocol receivers
+
+When assigning through a union of protocols, each descriptor setter is called with its matching
+union element as the receiver. The other elements of the union do not participate in that call.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class ADescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__(self, instance: A, value: int) -> None: ...
+
+class BDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__(self, instance: B, value: int) -> None: ...
+
+class A(Protocol):
+    @ADescriptor
+    def value(self) -> int: ...
+    def a(self) -> None: ...
+
+class B(Protocol):
+    @BDescriptor
+    def value(self) -> int: ...
+    def b(self) -> None: ...
+
+def update_union_value(value: A | B) -> None:
+    value.value = 1
+```
+
 ### Union descriptor types
 
 If a decorator can return either of two descriptors, an assignment must be accepted by both possible

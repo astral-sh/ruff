@@ -611,6 +611,7 @@ impl<'db> ProtocolMemberWrite<'db> {
             Self::Descriptor { descriptor, domain } => {
                 Some(ProtocolMemberWriteRequirement::Descriptor {
                     descriptor_ty: descriptor.bind_self(db, self_type)?,
+                    receiver_ty: self_type,
                     domain: domain.and_then(|domain| domain.bind_self(db, self_type)),
                 })
             }

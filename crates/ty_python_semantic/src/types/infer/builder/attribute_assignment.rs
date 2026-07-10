@@ -193,6 +193,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 }
                 Some(ProtocolMemberWriteRequirement::Descriptor {
                     descriptor_ty,
+                    receiver_ty,
                     domain,
                 }) => {
                     let value_ty = self.infer_value(
@@ -201,6 +202,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     );
                     self.evaluate_protocol_descriptor_write(
                         *descriptor_ty,
+                        *receiver_ty,
                         value_ty,
                         emit_diagnostics,
                     )
@@ -449,6 +451,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
     fn evaluate_protocol_descriptor_write(
         &mut self,
         descriptor_ty: Type<'db>,
+        receiver_ty: Type<'db>,
         value_ty: Type<'db>,
         emit_diagnostics: bool,
     ) -> bool {
@@ -456,9 +459,19 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         let descriptor_ty = descriptor_ty.resolve_type_alias(db);
         if let Type::Union(union) = descriptor_ty {
             for descriptor_ty in union.elements(db) {
-                if !self.evaluate_protocol_descriptor_write(*descriptor_ty, value_ty, false) {
+                if !self.evaluate_protocol_descriptor_write(
+                    *descriptor_ty,
+                    receiver_ty,
+                    value_ty,
+                    false,
+                ) {
                     if emit_diagnostics {
-                        self.evaluate_protocol_descriptor_write(*descriptor_ty, value_ty, true);
+                        self.evaluate_protocol_descriptor_write(
+                            *descriptor_ty,
+                            receiver_ty,
+                            value_ty,
+                            true,
+                        );
                     }
                     return false;
                 }
@@ -483,7 +496,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         self.evaluate_descriptor_write(
             descriptor_ty,
             setter_ty,
-            self.object_ty,
+            receiver_ty,
             value_ty,
             emit_diagnostics,
         )

@@ -74,6 +74,7 @@ pub(super) enum ProtocolMemberWriteRequirement<'db> {
     /// set-theoretic domain cannot be represented precisely.
     Descriptor {
         descriptor_ty: Type<'db>,
+        receiver_ty: Type<'db>,
         domain: Option<Type<'db>>,
     },
 }
