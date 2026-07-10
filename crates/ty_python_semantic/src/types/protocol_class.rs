@@ -1598,7 +1598,11 @@ fn single_descriptor_setter_domain<'db>(
         definedness: Definedness::AlwaysDefined,
         ..
     }) = descriptor_ty
-        .class_member_with_policy(db, "__set__".into(), MemberLookupPolicy::REQUIRE_CONCRETE)
+        .member_lookup_with_policy(
+            db,
+            "__set__".into(),
+            MemberLookupPolicy::REQUIRE_CONCRETE | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+        )
         .place
     else {
         return DescriptorSetterDomain::Missing;
@@ -1641,12 +1645,15 @@ fn descriptor_setter_signature_domain<'db>(
     receiver_ty: Type<'db>,
 ) -> DescriptorSetterSignatureDomain<'db> {
     let parameters = signature.parameters();
-    let Some(trailing_parameters) = parameters.as_slice().get(3..) else {
-        return if parameters.is_gradual() {
+    let missing_required_parameter = || {
+        if parameters.is_gradual() {
             DescriptorSetterSignatureDomain::Deferred
         } else {
             DescriptorSetterSignatureDomain::Inapplicable
-        };
+        }
+    };
+    let Some(trailing_parameters) = parameters.as_slice().get(2..) else {
+        return missing_required_parameter();
     };
     if !trailing_parameters.iter().all(|parameter| {
         parameter.default_type().is_some()
@@ -1656,31 +1663,21 @@ fn descriptor_setter_signature_domain<'db>(
         return DescriptorSetterSignatureDomain::Inapplicable;
     }
 
-    let Some(descriptor_parameter) = parameters.get_positional(0) else {
-        return DescriptorSetterSignatureDomain::Inapplicable;
-    };
-    let descriptor_parameter = descriptor_parameter
-        .annotated_type()
-        .bind_self_typevars(db, descriptor_ty);
-    let Some(receiver_parameter) = parameters.get_positional(1) else {
-        return DescriptorSetterSignatureDomain::Inapplicable;
+    let Some(receiver_parameter) = parameters.get_positional(0) else {
+        return missing_required_parameter();
     };
     let receiver_parameter = receiver_parameter
         .annotated_type()
         .bind_self_typevars(db, descriptor_ty);
-    if contains_signature_typevar(db, signature, descriptor_parameter)
-        || contains_signature_typevar(db, signature, receiver_parameter)
-    {
+    if contains_signature_typevar(db, signature, receiver_parameter) {
         return DescriptorSetterSignatureDomain::Deferred;
     }
-    if !descriptor_ty.is_assignable_to(db, descriptor_parameter)
-        || !receiver_ty.is_assignable_to(db, receiver_parameter)
-    {
+    if !receiver_ty.is_assignable_to(db, receiver_parameter) {
         return DescriptorSetterSignatureDomain::Inapplicable;
     }
 
-    let Some(write_parameter) = parameters.get_positional(2) else {
-        return DescriptorSetterSignatureDomain::Inapplicable;
+    let Some(write_parameter) = parameters.get_positional(1) else {
+        return missing_required_parameter();
     };
     let write_ty = write_parameter
         .annotated_type()

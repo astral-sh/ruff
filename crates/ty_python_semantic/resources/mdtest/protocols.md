@@ -2742,6 +2742,8 @@ and value directly, while a class setter also receives the descriptor class impl
 
 ```py
 from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 class StaticSetterDescriptor:
     def __init__(self, getter: object) -> None: ...
@@ -2759,6 +2761,16 @@ class ClassSetterDescriptor:
     @classmethod
     def __set__(cls, instance: object, value: int) -> None: ...
 
+class IntSetter:
+    def __call__(self, instance: object, value: int) -> None: ...
+
+class CallableSetterDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    __set__ = IntSetter()
+
 class HasStaticSetter(Protocol):
     @StaticSetterDescriptor
     def value(self) -> int: ...
@@ -2767,11 +2779,45 @@ class HasClassSetter(Protocol):
     @ClassSetterDescriptor
     def value(self) -> int: ...
 
-def update_bound_setters(static: HasStaticSetter, class_: HasClassSetter) -> None:
+class HasCallableSetter(Protocol):
+    @CallableSetterDescriptor
+    def value(self) -> int: ...
+
+class IntPropertySetter:
+    @property
+    def value(self) -> int:
+        return 1
+
+    @value.setter
+    def value(self, new_value: int) -> None: ...
+
+class StrPropertySetter:
+    @property
+    def value(self) -> int:
+        return 1
+
+    @value.setter
+    def value(self, new_value: str) -> None: ...
+
+static_assert(is_subtype_of(IntPropertySetter, HasStaticSetter))
+static_assert(is_subtype_of(IntPropertySetter, HasClassSetter))
+static_assert(is_subtype_of(IntPropertySetter, HasCallableSetter))
+
+static_assert(not is_subtype_of(StrPropertySetter, HasStaticSetter))
+static_assert(not is_subtype_of(StrPropertySetter, HasClassSetter))
+static_assert(not is_subtype_of(StrPropertySetter, HasCallableSetter))
+
+def update_bound_setters(
+    static: HasStaticSetter,
+    class_: HasClassSetter,
+    callable_: HasCallableSetter,
+) -> None:
     static.value = 1
     static.value = "bad"  # error: [invalid-assignment]
     class_.value = 1
     class_.value = "bad"  # error: [invalid-assignment]
+    callable_.value = 1
+    callable_.value = "bad"  # error: [invalid-assignment]
 ```
 
 ### Union descriptor types
