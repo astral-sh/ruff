@@ -1718,7 +1718,7 @@ fn contains_signature_typevar<'db>(
     ty: Type<'db>,
 ) -> bool {
     signature.generic_context.is_some_and(|generic_context| {
-        super::visitor::any_over_type(db, ty, false, |ty| {
+        super::visitor::any_over_type(db, ty, true, |ty| {
             matches!(ty, Type::TypeVar(typevar) if generic_context.contains(db, typevar.identity(db)))
         })
     })

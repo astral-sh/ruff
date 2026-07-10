@@ -3041,6 +3041,50 @@ def update_generic_value(value: HasGenericValue[U], new_value: U) -> None:
     value.value = new_value
 ```
 
+### Setter-local type variables inside aliases
+
+A setter-local type variable remains local when it appears through a PEP 695 alias. Domain
+derivation must defer rather than treating the receiver as inapplicable and the write domain as
+empty.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Never, Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+type Alias[T] = T
+
+class AliasedReceiverDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[T](self, instance: Alias[T], value: int) -> None: ...
+
+class HasAliasedReceiver(Protocol):
+    @AliasedReceiverDescriptor
+    def value(self) -> int: ...
+
+class NeverAliasedReceiver:
+    @property
+    def value(self) -> int:
+        return 1
+
+    @value.setter
+    def value(self, new_value: Never) -> None: ...
+
+static_assert(not is_subtype_of(NeverAliasedReceiver, HasAliasedReceiver))
+
+def update_aliased_receiver(value: HasAliasedReceiver) -> None:
+    value.value = 1
+    value.value = "bad"  # error: [invalid-assignment]
+```
+
 ### Constrained generic setter value types
 
 A constrained method type variable cannot be flattened to the union of its constraints. A call must
