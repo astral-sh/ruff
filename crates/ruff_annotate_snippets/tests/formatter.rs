@@ -5448,18 +5448,18 @@ fn lineno_offset() {
     ];
     let expected_ascii = str![[r#"
 error: oops
- --> <current file>:2:8
-  |
-2 | Second oops line
-  |        ^^^^ oops
-  |
+           --> <current file>:2:8
+            |
+          2 | Second oops line
+            |        ^^^^ oops
+            |
 note: details
- --> <other file>:2:8
-  |
-2 | Second oops line
-  |        ^^^^ oops
+           --> <other file>:2:8
+            |
+          2 | Second oops line
+            |        ^^^^ oops
 help: suggestion
- --> <current file>
+           --> <current file>
 "#]];
 
     let renderer = Renderer::plain();
@@ -5467,18 +5467,18 @@ help: suggestion
 
     let expected_unicode = str![[r#"
 error: oops
-  ╭▸ <current file>:2:8
-  │
-2 │ Second oops line
-  │        ━━━━ oops
-  ╰╴
+            ╭▸ <current file>:2:8
+            │
+          2 │ Second oops line
+            │        ━━━━ oops
+            ╰╴
 note: details
-  ╭▸ <other file>:2:8
-  │
-2 │ Second oops line
-  ╰╴       ━━━━ oops
+            ╭▸ <other file>:2:8
+            │
+          2 │ Second oops line
+            ╰╴       ━━━━ oops
 help: suggestion
-  ─▸ <current file>
+            ─▸ <current file>
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
     assert_data_eq!(renderer.render(input), expected_unicode);

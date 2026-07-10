@@ -30,12 +30,14 @@ pub(crate) fn render(renderer: &Renderer, groups: Report<'_>) -> String {
     if renderer.short_message {
         render_short_message(renderer, groups).unwrap()
     } else {
+        let lineno_offset = groups.iter().map(|g| g.lineno_offset).max().unwrap_or(0);
         let (max_line_num, og_primary_path, groups) = pre_process(groups);
-        let max_line_num_len = if renderer.anonymized_line_numbers {
-            ANONYMIZED_LINE_NUM.len()
-        } else {
-            num_decimal_digits(max_line_num)
-        };
+        let max_line_num_len = lineno_offset
+            + if renderer.anonymized_line_numbers {
+                ANONYMIZED_LINE_NUM.len()
+            } else {
+                num_decimal_digits(max_line_num)
+            };
         let mut out_string = String::new();
         let group_len = groups.len();
         for (
