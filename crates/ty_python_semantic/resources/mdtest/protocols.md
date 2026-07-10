@@ -2816,6 +2816,32 @@ def update_constrained_value(value: HasConstrainedValue, new_value: int | str) -
     value.constrained_value = new_value  # error: [invalid-assignment]
 ```
 
+### `Never` setter domains
+
+A setter that accepts `Never` still makes the protocol member writable. An assignment whose value
+also has type `Never` is valid.
+
+```py
+from typing import Protocol
+from typing_extensions import Never
+
+class NeverDescriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> object:
+        raise NotImplementedError
+
+    def __set__(self, instance: object, value: Never) -> None: ...
+
+def never_descriptor(getter: object) -> NeverDescriptor:
+    raise NotImplementedError
+
+class HasNeverValue(Protocol):
+    @never_descriptor
+    def never_value(self) -> object: ...
+
+def update_never_value(value: HasNeverValue, new_value: Never) -> None:
+    value.never_value = new_value
+```
+
 ### Optional trailing setter parameters
 
 A setter remains callable by the descriptor protocol when parameters after the assigned value can
