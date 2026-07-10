@@ -995,8 +995,12 @@ Settings(port=8000)
 Settings(host="localhost", port=8000)
 Settings(host=None)  # error: [invalid-argument-type]
 
-# `BaseSettings` defines a specialized constructor and forbids extra values by default.
-Settings(host="localhost", port=8000, something_else=7)  # error: [unknown-argument]
+# `BaseSettings.__init__` accepts many additional known keyword arguments:
+Settings(host="localhost", port=8000, _cli_parse_args=False)
+
+# We currently accept this as a know limitation: if unrelated keyword arguments are passed,
+# they are silently ignored.
+Settings(host="localhost", port=8000, something_else=7)
 ```
 
 ## Root models

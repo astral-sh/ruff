@@ -474,6 +474,10 @@ pub(in crate::types) fn constructor_fields_are_optional(
     db: &dyn Db,
     class: StaticClassLiteral<'_>,
 ) -> bool {
+    is_base_settings_model(db, class)
+}
+
+fn is_base_settings_model(db: &dyn Db, class: StaticClassLiteral<'_>) -> bool {
     class
         .iter_mro(db, None)
         .filter_map(ClassBase::into_class)
@@ -908,6 +912,12 @@ pub(in crate::types) fn model_init_accepts_extra(
     class: StaticClassLiteral<'_>,
     metadata: ModelMetadata<'_>,
 ) -> bool {
+    // `BaseSettings.__init__` accepts many additional known keyword arguments which we currently
+    // don't model precisely, so just accept any extra keyword arguments for now.
+    if is_base_settings_model(db, class) {
+        return true;
+    }
+
     if !metadata.accepts_extra(db) {
         return false;
     }
