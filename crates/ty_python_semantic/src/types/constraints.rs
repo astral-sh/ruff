@@ -681,6 +681,46 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         )
     }
 
+    /// Universally abstracts constraints involving the given type variables from this TDD.
+    ///
+    /// This is the Boolean dual of [`Self::reduce_inferable`]. Declared type variable bounds and
+    /// constraints are not applied implicitly, and must be encoded as implications in the input
+    /// constraint set.
+    ///
+    /// # Preconditions
+    ///
+    /// An atomic constraint must not relate a removed type variable to one that remains in the
+    /// result. Callers that need type-level quantification must project those relationships before
+    /// calling this method.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "used by generic signature quantification in the stacked follow-up"
+        )
+    )]
+    pub(crate) fn for_all(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        to_remove: InferableTypeVars<'db>,
+    ) -> Self {
+        self.verify_builder(builder);
+        if to_remove == InferableTypeVars::None {
+            return self;
+        }
+
+        // Universal and existential quantification are duals. Reusing existential abstraction
+        // also keeps this operation on its cached, single-pass implementation.
+        Self::from_node(
+            builder,
+            self.node
+                .negate(builder)
+                .exists(db, builder, to_remove)
+                .negate(builder),
+        )
+    }
+
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
     ///
     /// The `choose` hook is called for each typevar on each BDD path with the typevar's variance
@@ -7149,6 +7189,19 @@ mod tests {
         ConstraintSet::constrain_typevar(db, builder, bound_typevar, ty, ty)
     }
 
+    fn typevar_set<'db>(
+        db: &'db dyn Db,
+        typevars: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
+    ) -> InferableTypeVars<'db> {
+        InferableTypeVars::from_typevars(
+            db,
+            typevars
+                .into_iter()
+                .map(|typevar| typevar.identity(db))
+                .collect(),
+        )
+    }
+
     fn known_instance(db: &dyn Db, class: KnownClass) -> Type<'_> {
         class.to_instance(db)
     }
@@ -7651,6 +7704,79 @@ mod tests {
 
         // T ∨ ¬T == true
         assert!(tdd.or(&db, &builder, || negated).is_always_satisfied(&db));
+    }
+
+    #[test]
+    fn universal_quantification_preserves_uncertain_disjunct() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
+        let u_str = create_constraint(&db, &builder, u, KnownClass::Str);
+
+        // `t_int` is stored in the uncertain branch below `u_str`. It is independent of `U`, so
+        // it must survive universal quantification of `U`.
+        let quantified =
+            t_int
+                .or(&db, &builder, || u_str)
+                .for_all(&db, &builder, typevar_set(&db, [u]));
+        assert!(
+            quantified
+                .iff(&db, &builder, t_int)
+                .is_always_satisfied(&db)
+        );
+    }
+
+    #[test]
+    fn universal_quantification_removes_multiple_typevars() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let builder = ConstraintSetBuilder::new();
+        let relation =
+            create_constraint(&db, &builder, t, KnownClass::Int).or(&db, &builder, || {
+                create_constraint(&db, &builder, u, KnownClass::Str)
+            });
+
+        let quantified = relation.for_all(&db, &builder, typevar_set(&db, [t, u]));
+        assert!(quantified.is_never_satisfied(&db));
+    }
+
+    #[test]
+    fn universal_quantification_of_no_typevars_is_identity() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let constraints = create_constraint(&db, &builder, t, KnownClass::Int);
+
+        let quantified = constraints.for_all(&db, &builder, InferableTypeVars::None);
+        assert_eq!(quantified.node, constraints.node);
+    }
+
+    #[test]
+    fn existential_and_universal_quantifier_order() {
+        let db = setup_db();
+        let source = create_typevar(&db, "S");
+        let target = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let source_is_int = create_constraint(&db, &builder, source, KnownClass::Int);
+        let target_is_int = create_constraint(&db, &builder, target, KnownClass::Int);
+        let equal = source_is_int.iff(&db, &builder, target_is_int);
+
+        // Every truth assignment for the target predicate has some matching truth assignment for
+        // the source predicate.
+        let forall_target_exists_source = equal
+            .reduce_inferable(&db, &builder, typevar_set(&db, [source]))
+            .for_all(&db, &builder, typevar_set(&db, [target]));
+        assert!(forall_target_exists_source.is_always_satisfied(&db));
+
+        // No single truth assignment for the source predicate matches every truth assignment for
+        // the target predicate.
+        let exists_source_forall_target = equal
+            .for_all(&db, &builder, typevar_set(&db, [target]))
+            .reduce_inferable(&db, &builder, typevar_set(&db, [source]));
+        assert!(exists_source_forall_target.is_never_satisfied(&db));
     }
 
     /// Double negation of a TDD with uncertain branches is semantically equivalent to the
