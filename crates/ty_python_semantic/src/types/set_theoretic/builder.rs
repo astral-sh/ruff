@@ -51,7 +51,7 @@ use smallvec::SmallVec;
 
 /// Controls whether a union under construction may ask semantic type-relation questions.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(crate) enum UnionNormalization {
+enum UnionNormalization {
     /// Apply both structural and relation-based simplifications.
     #[default]
     RelationAware,
@@ -637,6 +637,14 @@ impl<'db> UnionBuilder<'db> {
         }
     }
 
+    /// Creates a union builder that never starts a type-relation query.
+    pub(crate) fn structural(db: &'db dyn Db) -> Self {
+        Self {
+            normalization: UnionNormalization::Structural,
+            ..Self::new(db)
+        }
+    }
+
     pub(crate) fn unpack_aliases(mut self, val: bool) -> Self {
         self.unpack_aliases = val;
         self
@@ -647,11 +655,6 @@ impl<'db> UnionBuilder<'db> {
         if self.cycle_recovery {
             self.unpack_aliases = false;
         }
-        self
-    }
-
-    pub(crate) fn normalization(mut self, normalization: UnionNormalization) -> Self {
-        self.normalization = normalization;
         self
     }
 
@@ -708,6 +711,7 @@ impl<'db> UnionBuilder<'db> {
 
     pub(crate) fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         let cycle_recovery = self.cycle_recovery;
+        let uses_relations = self.normalization.uses_relations() && !cycle_recovery;
         let should_widen = |literals, recursively_defined: RecursivelyDefined| {
             if recursively_defined.is_yes() && cycle_recovery {
                 literals >= MAX_RECURSIVE_UNION_LITERALS
@@ -783,7 +787,7 @@ impl<'db> UnionBuilder<'db> {
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing) if !cycle_recovery => {
+                                UnionElement::Type(existing) if uses_relations => {
                                     // e.g. `existing` could be `Literal[""] & Any`,
                                     // and `ty` could be `Literal[""]`
                                     if ty.is_redundant_with(self.db, *existing) {
@@ -836,7 +840,7 @@ impl<'db> UnionBuilder<'db> {
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing) if !cycle_recovery => {
+                                UnionElement::Type(existing) if uses_relations => {
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -891,7 +895,7 @@ impl<'db> UnionBuilder<'db> {
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing) if !cycle_recovery => {
+                                UnionElement::Type(existing) if uses_relations => {
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -967,7 +971,7 @@ impl<'db> UnionBuilder<'db> {
                                 {
                                     return;
                                 }
-                                UnionElement::Type(existing) if !cycle_recovery => {
+                                UnionElement::Type(existing) if uses_relations => {
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -1072,7 +1076,7 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
-            if !self.cycle_recovery && should_preserve_hashable_union(self.db, ty, element_type) {
+            if uses_relations && should_preserve_hashable_union(self.db, ty, element_type) {
                 continue;
             }
 
@@ -1164,6 +1168,7 @@ impl<'db> UnionBuilder<'db> {
         let db = self.db;
         let unpack_aliases = self.unpack_aliases;
         let cycle_recovery = self.cycle_recovery;
+        let uses_relations = self.normalization.uses_relations() && !cycle_recovery;
         let recursively_defined = self.recursively_defined;
 
         let type_count = self.elements.iter().map(UnionElement::type_count).sum();
@@ -1206,7 +1211,7 @@ impl<'db> UnionBuilder<'db> {
             }
         }
 
-        if normalize_enum_complement_unions(db, &mut types) {
+        if uses_relations && normalize_enum_complement_unions(db, &mut types) {
             let builder = UnionBuilder::new(db)
                 .unpack_aliases(unpack_aliases)
                 .cycle_recovery(cycle_recovery)
@@ -2020,6 +2025,58 @@ mod tests {
         let union = UnionType::from_elements(&db, [t0, t1]).expect_union();
 
         assert_eq!(union.elements(&db), &[t0, t1]);
+    }
+
+    #[test]
+    fn structural_union_preserves_relation_redundancies_in_both_orders() {
+        let db = setup_db();
+        let int_instance = KnownClass::Int.to_instance(&db);
+        let int_literal = Type::int_literal(1);
+
+        for [first, second] in [[int_instance, int_literal], [int_literal, int_instance]] {
+            assert_eq!(
+                UnionBuilder::new(&db).add(first).add(second).build(),
+                int_instance
+            );
+
+            let union = UnionBuilder::structural(&db)
+                .add(first)
+                .add(second)
+                .build()
+                .expect_union();
+            assert_eq!(union.elements(&db).len(), 2);
+        }
+    }
+
+    #[test]
+    fn structural_union_skips_enum_complement_normalization() {
+        let db = setup_db();
+        let enum_class = known_module_symbol(&db, KnownModule::Uuid, "SafeUUID")
+            .place
+            .expect_type()
+            .expect_class_literal();
+        let literal = enum_member_literals(&db, enum_class, None)
+            .expect("SafeUUID is an enum")
+            .next()
+            .expect("SafeUUID has members");
+        let enum_instance = literal.expect_enum_literal().enum_class_instance(&db);
+        let complement = IntersectionBuilder::new(&db)
+            .add_positive(enum_instance)
+            .add_negative(literal)
+            .build();
+
+        assert_eq!(
+            UnionBuilder::new(&db).add(complement).add(literal).build(),
+            enum_instance
+        );
+
+        let union = UnionBuilder::structural(&db)
+            .add(complement)
+            .add(literal)
+            .build()
+            .expect_union();
+        assert!(union.elements(&db).contains(&complement));
+        assert!(union.elements(&db).contains(&literal));
     }
 
     #[test]

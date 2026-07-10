@@ -13,7 +13,7 @@ use crate::{Db, FxOrderSet};
 
 pub(crate) mod builder;
 
-pub(crate) use builder::{IntersectionBuilder, UnionBuilder, UnionNormalization};
+pub(crate) use builder::{IntersectionBuilder, UnionBuilder};
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct UnionType<'db> {
@@ -121,10 +121,7 @@ impl<'db> UnionType<'db> {
         self.elements(db)
             .iter()
             .copied()
-            .fold(
-                UnionBuilder::new(db).normalization(UnionNormalization::Structural),
-                UnionBuilder::add,
-            )
+            .fold(UnionBuilder::structural(db), UnionBuilder::add)
             .build()
     }
 
