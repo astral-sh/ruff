@@ -4563,11 +4563,11 @@ impl<'db> Type<'db> {
                         .iter()
                         .all(Signature::has_implicit_positional_receiver_annotation)
                 {
-                    CallableBinding::from_overloads(
-                        self,
-                        bound_method.bound_signatures(db).iter().cloned(),
-                    )
-                    .into()
+                    let mut binding =
+                        CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
+                            .with_bound_type(bound_method.typing_self_type(db));
+                    binding.bake_bound_type_into_overloads(db);
+                    binding.into()
                 } else {
                     CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
                         .with_bound_type(self_instance)
