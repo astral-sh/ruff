@@ -398,6 +398,12 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
+    pub(crate) fn has_parameters(&self) -> bool {
+        self.overloads
+            .iter()
+            .any(|signature| !signature.parameters().as_slice().is_empty())
+    }
+
     /// Replaces any occurrences of `typing.Self` in the parameter and return annotations with the
     /// given type. (Does not bind the `self` parameter; to do that, use
     /// [`bind_self`][Self::bind_self].)

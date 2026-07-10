@@ -282,6 +282,44 @@ class Matrix:
 Matrix() < Matrix()
 ```
 
+The dunder-name heuristic does not apply when the callable takes no arguments, because it cannot
+accept a receiver:
+
+```py
+class Thunk:
+    __value_thunk__: Callable[[], int]
+
+    def replace(self, other: "Thunk") -> None:
+        self.__value_thunk__ = other.__value_thunk__
+
+reveal_type(Thunk().__value_thunk__)  # revealed: () -> int
+```
+
+For other concrete signatures, the heuristic does not check whether the first parameter can accept
+the instance:
+
+```py
+def descriptor_candidate(value: str) -> int:
+    return len(value)
+
+class DescriptorCandidate:
+    __value__: Callable[[str], int] = descriptor_candidate
+
+reveal_type(DescriptorCandidate().__value__)  # revealed: () -> int
+```
+
+A gradual callable signature might accept the receiver, so we preserve the function-descriptor
+heuristic. This also preserves function attributes on class access:
+
+```py
+from typing import Any
+
+class Method:
+    __call__: Callable[..., Any]
+
+Method.__call__.__code__
+```
+
 ## `self`-binding behaviour of function-like `Callable`s
 
 Binding the `self` parameter of a function-like `Callable` creates a new `Callable` that is also

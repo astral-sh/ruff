@@ -11,7 +11,6 @@ use crate::types::attribute_write::{
     FallbackAttributeWriteRequirement, InstanceAttributeWriteMember, attribute_write_requirement,
 };
 use crate::types::call::{CallArguments, CallDunderError};
-use crate::types::callable::CallableTypeKind;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
@@ -2119,7 +2118,8 @@ fn proto_interface_cycle_recover<'db>(
     value.cycle_normalized(db, *previous, cycle)
 }
 
-/// Bind `self`, and *also* discard the functionlike-ness of the callable.
+/// Bind `self` unless this is a `Callable[P, R]` dunder, and *also* discard the functionlike-ness
+/// of the callable.
 ///
 /// This additional upcasting is required in order for protocols with `__call__` method
 /// members to be considered assignable to `Callable` types, since the `Callable` supertype
@@ -2129,12 +2129,7 @@ fn protocol_bind_self<'db>(
     callable: CallableType<'db>,
     self_type: Option<Type<'db>>,
 ) -> CallableType<'db> {
-    CallableType::new(
-        db,
-        callable.signatures(db).bind_self(db, self_type),
-        CallableTypeKind::Regular,
-        callable.provenance(db),
-    )
+    callable.bind_self(db, self_type).into_regular(db)
 }
 
 /// Return the possible output type of a callable unless any overload returns `Never`.
