@@ -65,7 +65,7 @@ static_assert(is_single_valued(Literal[1]))
 static_assert(is_single_valued(Literal[54165]))
 ```
 
-And this can be used for type-narrowing using not-equal comparisons:
+And this can be used for type-narrowing using equality comparisons:
 
 ```py
 def f(x: int):

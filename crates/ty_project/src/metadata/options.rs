@@ -1469,7 +1469,8 @@ pub struct AnalysisOptions {
     ///
     /// By default, ty narrows `value` from `str` to `Literal["a"]` in the positive branch of
     /// `value == "a"`. When this option is enabled, `value` remains `str`.
-    /// This also applies to membership tests and literal patterns, which use equality.
+    /// This also applies to membership tests and literal match patterns, which
+    /// also use equality comparisons.
     ///
     /// ```python
     /// from typing import Literal
@@ -1482,6 +1483,20 @@ pub struct AnalysisOptions {
     ///
     /// This narrowing is unsafe because subclasses of these builtin types may override
     /// `__eq__` to compare equal to a literal without inhabiting the corresponding literal type.
+    /// For example:
+    ///
+    /// ```python
+    /// from typing import Literal
+    ///
+    /// class MisleadingStr(str):
+    ///     def __eq__(self, other: object) -> bool:
+    ///         return True
+    ///
+    /// value: str = MisleadingStr("b")
+    /// if value == "a":
+    ///     literal: Literal["a"] = value  # Accepted, but `literal` contains `"b"`.
+    /// ```
+    ///
     /// Enable this option to preserve the broader builtin type instead.
     ///
     /// Defaults to `false`.
