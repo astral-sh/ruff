@@ -301,6 +301,7 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
 
 /// Walks a type, returning the type when recursion is detected after collecting the exact type.
 #[must_use]
+#[inline]
 pub(crate) fn walk_type_with_recursion_guard_fallback<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
@@ -325,6 +326,7 @@ pub(crate) fn walk_type_with_recursion_guard_fallback<'db>(
 struct TypeCollector<'db>(RefCell<CollectedTypes<'db>>);
 
 impl<'db> TypeCollector<'db> {
+    #[inline]
     fn collect_type(&self, ty: Type<'db>) -> bool {
         self.0.borrow_mut().insert(ty)
     }
@@ -348,6 +350,7 @@ pub(crate) struct RecursionGuard<'db> {
 }
 
 impl<'db> RecursionGuard<'db> {
+    #[inline]
     fn begin_visit(&self, db: &'db dyn Db, ty: Type<'db>) -> RecursionGuardVisit {
         // Collect the exact type before checking for identity recursion. A recursive type keeps
         // the same identity across different expansions, but callers still need each distinct
@@ -370,6 +373,7 @@ impl<'db> RecursionGuard<'db> {
         RecursionGuardVisit::Pending
     }
 
+    #[inline]
     fn finish_visit(&self, db: &'db dyn Db, ty: Type<'db>) {
         if let Some(identity) = ty.recursive_identity(db) {
             debug_assert_eq!(self.active_identities.borrow_mut().pop(), Some(identity));
