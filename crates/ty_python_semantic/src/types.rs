@@ -1125,8 +1125,14 @@ impl<'db> Type<'db> {
     }
 
     /// Returns `true` if this type contains a `Self` type variable.
-    pub(crate) fn contains_self(&self, db: &'db dyn Db) -> bool {
-        any_over_type(db, *self, false, |ty| {
+    pub(crate) fn contains_self(self, db: &'db dyn Db) -> bool {
+        if let Type::NominalInstance(instance) = self
+            && !instance.may_contain_self(db)
+        {
+            return false;
+        }
+
+        any_over_type(db, self, false, |ty| {
             ty.as_typevar().is_some_and(|tv| tv.typevar(db).is_self(db))
         })
     }

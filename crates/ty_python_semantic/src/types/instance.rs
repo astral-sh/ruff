@@ -319,6 +319,15 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
+    /// Returns whether this instance's type structure may contain a `Self` type variable.
+    pub(super) fn may_contain_self(self, db: &'db dyn Db) -> bool {
+        match self.0 {
+            NominalInstanceInner::ExactTuple(_) => true,
+            NominalInstanceInner::SysVersionInfo | NominalInstanceInner::Object => false,
+            NominalInstanceInner::NonTuple(class) => class.class(db).is_generic(),
+        }
+    }
+
     /// If this type is an *exact* tuple type (*not* a subclass of `tuple`), returns the
     /// tuple spec.
     ///
