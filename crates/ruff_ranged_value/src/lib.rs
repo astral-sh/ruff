@@ -9,6 +9,7 @@ use serde::{Deserialize, Deserializer};
 use toml::Spanned;
 
 use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_diagnostics::SourceMap;
 use ruff_text_size::{TextRange, TextSize};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -53,18 +54,41 @@ thread_local! {
     /// Use the [`ValueSourceGuard`] to initialize the thread local before calling into any
     /// deserialization code. It ensures that the thread local variable gets cleaned up
     /// once deserialization is done (once the guard gets dropped).
-    static VALUE_SOURCE: RefCell<Option<(ValueSource, bool)>> = const { RefCell::new(None) };
+    static VALUE_SOURCE: RefCell<Option<ValueSourceContext>> = const { RefCell::new(None) };
+}
+
+struct ValueSourceContext {
+    source: ValueSource,
+    has_span: bool,
+    source_map: Option<SourceMap>,
 }
 
 /// Guard to safely change the [`ValueSource`] for the current thread.
 #[must_use]
 pub struct ValueSourceGuard {
-    prev_value: Option<(ValueSource, bool)>,
+    prev_value: Option<ValueSourceContext>,
 }
 
 impl ValueSourceGuard {
     pub fn new(source: ValueSource, is_toml: bool) -> Self {
-        let prev = VALUE_SOURCE.replace(Some((source, is_toml)));
+        Self::replace(ValueSourceContext {
+            source,
+            has_span: is_toml,
+            source_map: None,
+        })
+    }
+
+    /// Sets the source for deserialized values and maps their TOML spans to ranges in that source.
+    pub fn with_source_map(source: ValueSource, source_map: SourceMap) -> Self {
+        Self::replace(ValueSourceContext {
+            source,
+            has_span: true,
+            source_map: Some(source_map),
+        })
+    }
+
+    fn replace(context: ValueSourceContext) -> Self {
+        let prev = VALUE_SOURCE.replace(Some(context));
         Self { prev_value: prev }
     }
 
@@ -73,7 +97,7 @@ impl ValueSourceGuard {
             current
                 .as_ref()
                 .expect("value source to be set before disabling spans")
-                .0
+                .source
                 .clone()
         });
         Self::new(source, false)
@@ -311,9 +335,12 @@ where
         D: Deserializer<'de>,
     {
         VALUE_SOURCE.with_borrow(|source| {
-            let (source, has_span) = source.clone().unwrap();
+            let context = source
+                .as_ref()
+                .expect("value source to be set before deserializing a ranged value");
+            let source = context.source.clone();
 
-            if has_span {
+            if context.has_span {
                 let spanned: Spanned<T> = Spanned::deserialize(deserializer)?;
                 let span = spanned.span();
                 let range = TextRange::new(
@@ -322,6 +349,12 @@ where
                     TextSize::try_from(span.end)
                         .expect("Configuration file to be smaller than 4GB"),
                 );
+                let range = context.source_map.as_ref().map_or(range, |source_map| {
+                    TextRange::new(
+                        source_map.map_offset(range.start()),
+                        source_map.map_offset(range.end()),
+                    )
+                });
 
                 Ok(Self::with_range(spanned.into_inner(), source, range))
             } else {

@@ -3480,6 +3480,7 @@ dependencies = [
  "is-macro",
  "memchr",
  "ruff_cache",
+ "ruff_diagnostics",
  "ruff_macros",
  "ruff_python_trivia",
  "ruff_source_file",
@@ -3670,6 +3671,7 @@ version = "0.0.4"
 dependencies = [
  "get-size2",
  "ruff_db",
+ "ruff_diagnostics",
  "ruff_text_size",
  "schemars",
  "serde",
@@ -4784,6 +4786,7 @@ dependencies = [
  "regex-automata",
  "ruff_cache",
  "ruff_db",
+ "ruff_diagnostics",
  "ruff_macros",
  "ruff_memory_usage",
  "ruff_options_metadata",

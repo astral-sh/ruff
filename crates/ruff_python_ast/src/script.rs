@@ -1,6 +1,8 @@
 use std::sync::LazyLock;
 
 use memchr::memmem::Finder;
+use ruff_diagnostics::SourceMap;
+use ruff_text_size::TextSize;
 
 static FINDER: LazyLock<Finder> = LazyLock::new(|| Finder::new(b"# /// script"));
 
@@ -15,6 +17,8 @@ pub struct ScriptTag {
     prelude: String,
     /// The metadata block.
     metadata: String,
+    /// Maps offsets in `metadata` back to offsets in the original script.
+    metadata_source_map: SourceMap,
     /// The content of the script after the metadata block.
     postlude: String,
 }
@@ -23,6 +27,11 @@ impl ScriptTag {
     /// Returns the TOML contents of the metadata block.
     pub fn metadata(&self) -> &str {
         &self.metadata
+    }
+
+    /// Returns the map from TOML metadata ranges to ranges in the original script.
+    pub fn metadata_source_map(&self) -> &SourceMap {
+        &self.metadata_source_map
     }
 
     /// Given the contents of a Python file, extract the `script` metadata block with leading
@@ -80,10 +89,10 @@ impl ScriptTag {
         // Decode as UTF-8.
         let contents = std::str::from_utf8(contents).ok()?;
 
-        let mut lines = contents.lines();
+        let mut lines = lines_with_offsets(contents, index);
 
         // Ensure that the first line is exactly `# /// script`.
-        if lines.next().is_none_or(|line| line != "# /// script") {
+        if lines.next().is_none_or(|line| line.text != "# /// script") {
             return None;
         }
 
@@ -99,26 +108,34 @@ impl ScriptTag {
 
         while let Some(line) = lines.next() {
             // Remove the leading `#`.
-            let Some(line) = line.strip_prefix('#') else {
-                python_script.push(line);
-                python_script.extend(lines);
+            let Some(comment) = line.text.strip_prefix('#') else {
+                python_script.push(line.text);
+                python_script.extend(lines.map(|line| line.text));
                 break;
             };
 
             // If the line is empty, continue.
-            if line.is_empty() {
-                toml.push("");
+            if comment.is_empty() {
+                toml.push(ScriptMetadataLine {
+                    text: "",
+                    source_start: line.start + 1,
+                    source_end: line.end,
+                });
                 continue;
             }
 
             // Otherwise, the line _must_ start with ` `.
-            let Some(line) = line.strip_prefix(' ') else {
-                python_script.push(line);
-                python_script.extend(lines);
+            let Some(metadata) = comment.strip_prefix(' ') else {
+                python_script.push(comment);
+                python_script.extend(lines.map(|line| line.text));
                 break;
             };
 
-            toml.push(line);
+            toml.push(ScriptMetadataLine {
+                text: metadata,
+                source_start: line.start + 2,
+                source_end: line.end,
+            });
         }
 
         // Find the closing `# ///`. The precedence is such that we need to identify the _last_ such
@@ -134,7 +151,7 @@ impl ScriptTag {
         // ```
         //
         // The latter `///` is the closing pragma
-        let index = toml.iter().rev().position(|line| *line == "///")?;
+        let index = toml.iter().rev().position(|line| line.text == "///")?;
         let index = toml.len() - index;
 
         // Discard any lines after the closing `# ///`.
@@ -151,15 +168,66 @@ impl ScriptTag {
         // We need to discard the last two lines.
         toml.truncate(index - 1);
 
-        // Join the lines into a single string.
+        // Join the lines into a single string while recording how each line maps to the script.
+        let mut metadata = String::new();
+        let mut source_map = SourceMap::default();
+        for line in &toml {
+            source_map.push_marker(
+                TextSize::try_from(metadata.len()).ok()?,
+                TextSize::try_from(line.source_start).ok()?,
+            );
+            metadata.push_str(line.text);
+            metadata.push('\n');
+        }
+        if let Some(last) = toml.last() {
+            source_map.push_marker(
+                TextSize::try_from(metadata.len()).ok()?,
+                TextSize::try_from(last.source_end).ok()?,
+            );
+        }
+
         let prelude = prelude.to_string();
-        let metadata = toml.join("\n") + "\n";
+        if metadata.is_empty() {
+            metadata.push('\n');
+        }
         let postlude = python_script.join("\n") + "\n";
 
         Some(Self {
             prelude,
             metadata,
+            metadata_source_map: source_map,
             postlude,
         })
     }
+}
+
+struct ScriptLine<'a> {
+    text: &'a str,
+    start: usize,
+    end: usize,
+}
+
+fn lines_with_offsets(source: &str, start: usize) -> impl Iterator<Item = ScriptLine<'_>> {
+    let mut offset = start;
+
+    source.split_inclusive('\n').map(move |raw_line| {
+        let line_start = offset;
+        offset += raw_line.len();
+
+        let text = raw_line
+            .strip_suffix('\n')
+            .map_or(raw_line, |line| line.strip_suffix('\r').unwrap_or(line));
+
+        ScriptLine {
+            text,
+            start: line_start,
+            end: offset,
+        }
+    })
+}
+
+struct ScriptMetadataLine<'a> {
+    text: &'a str,
+    source_start: usize,
+    source_end: usize,
 }
