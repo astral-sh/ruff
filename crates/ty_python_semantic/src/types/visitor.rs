@@ -1,3 +1,4 @@
+use std::cell::{Cell, RefCell};
 use std::hash::Hash;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
@@ -8,16 +9,20 @@ use crate::{
     types::{
         BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
         GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType,
-        NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type,
-        TypeAliasType, TypeFormType, TypeGuardType, TypeIsType, TypedDictType, UnionType,
+        NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, StaticClassLiteral,
+        SubclassOfType, Type, TypeAliasType, TypeFormType, TypeGuardType, TypeIsType,
+        TypedDictType, UnionType,
         bound_super::walk_bound_super_type,
         callable::walk_callable_type,
         class::walk_generic_alias,
+        cyclic::ActiveRecursionDetector,
         function::{FunctionType, walk_function_type},
+        generics::walk_specialization,
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
         known_instance::walk_known_instance_type,
         method::{walk_bound_method_type, walk_method_wrapper_type},
         newtype::{NewType, walk_newtype_instance_type},
+        protocol_class::walk_protocol_interface,
         set_theoretic::{walk_intersection_type, walk_union},
         subclass_of::walk_subclass_of_type,
         type_alias::walk_type_alias_type,
@@ -27,7 +32,6 @@ use crate::{
         walk_property_instance_type, walk_typeguard_type, walk_typeis_type,
     },
 };
-use std::cell::{Cell, RefCell};
 
 /// A visitor trait that recurses into nested types.
 ///
@@ -367,6 +371,99 @@ impl<T, const INLINE_CAPACITY: usize> SmallSet<T, INLINE_CAPACITY> {
     pub(super) const fn is_spilled(&self) -> bool {
         matches!(self, Self::Spilled(_))
     }
+}
+
+/// Whether a type contains a non-`Any` dynamic type.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(super) enum DynamicContent {
+    /// The type was fully inspected and contains no non-`Any` dynamic type.
+    Absent,
+    /// The type contains a non-`Any` dynamic type.
+    Present,
+    /// Recursive specialization prevented the type from being fully inspected.
+    Indeterminate,
+}
+
+impl DynamicContent {
+    pub(super) const fn is_absent(self) -> bool {
+        matches!(self, Self::Absent)
+    }
+}
+
+/// Determine whether `ty` contains a dynamic type other than `Any`.
+///
+/// Class-based protocol interfaces can be recursively specialized. An exact recursive cycle adds
+/// no new information, but revisiting the same protocol definition under a different
+/// specialization may expose different members and is therefore indeterminate.
+pub(super) fn non_any_dynamic_content<'db>(db: &'db dyn Db, ty: Type<'db>) -> DynamicContent {
+    struct DynamicContentVisitor<'db> {
+        recursion_guard: TypeCollector<'db>,
+        active_class_protocols: ActiveRecursionDetector<StaticClassLiteral<'db>>,
+        content: Cell<DynamicContent>,
+    }
+
+    impl DynamicContentVisitor<'_> {
+        fn record(&self, content: DynamicContent) {
+            debug_assert!(self.content.get().is_absent());
+            debug_assert!(!content.is_absent());
+            self.content.set(content);
+        }
+    }
+
+    impl<'db> TypeVisitor<'db> for DynamicContentVisitor<'db> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            true
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            if !self.content.get().is_absent() {
+                return;
+            }
+
+            if ty.is_dynamic() && !matches!(ty, Type::Dynamic(crate::types::DynamicType::Any)) {
+                self.record(DynamicContent::Present);
+                return;
+            }
+
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+
+        fn visit_protocol_instance_type(
+            &self,
+            db: &'db dyn Db,
+            protocol: ProtocolInstanceType<'db>,
+        ) {
+            let Some(class) = protocol.as_class_based() else {
+                walk_protocol_interface(db, protocol.interface(db), self);
+                return;
+            };
+            let Some((origin, specialization)) = class.static_class_literal(db) else {
+                self.record(DynamicContent::Indeterminate);
+                return;
+            };
+
+            if let Some(specialization) = specialization {
+                walk_specialization(db, specialization, self);
+                if !self.content.get().is_absent() {
+                    return;
+                }
+            }
+
+            self.active_class_protocols.visit(
+                &origin,
+                || self.record(DynamicContent::Indeterminate),
+                || walk_protocol_interface(db, protocol.interface(db), self),
+            );
+        }
+    }
+
+    let visitor = DynamicContentVisitor {
+        recursion_guard: TypeCollector::default(),
+        active_class_protocols: ActiveRecursionDetector::default(),
+        content: Cell::new(DynamicContent::Absent),
+    };
+    visitor.visit_type(db, ty);
+    visitor.content.get()
 }
 
 /// Implementation for `any_over_type` and `find_over_type`.
