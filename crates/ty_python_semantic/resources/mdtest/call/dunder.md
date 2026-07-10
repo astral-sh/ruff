@@ -155,6 +155,22 @@ def check(value: C[[str]]) -> None:
     reveal_type(value("value"))  # revealed: int
 ```
 
+The same receiver check applies to concrete callable attributes. These annotations describe regular
+callable objects rather than methods, so the implementation satisfies the protocol without binding
+away the `str` parameter:
+
+```py
+class CallableProtocol(Protocol):
+    __call__: Callable[[str], int]
+
+class CallableImplementation:
+    __call__: Callable[[str], int]
+
+def accepts_callable_protocol(value: CallableProtocol) -> None: ...
+
+accepts_callable_protocol(CallableImplementation())
+```
+
 And of course the same is true if we have only an implicit assignment inside a method:
 
 ```py

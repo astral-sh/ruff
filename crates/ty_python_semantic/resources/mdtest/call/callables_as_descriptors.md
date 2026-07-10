@@ -250,11 +250,11 @@ def check(path: Path) -> None:
     reveal_type(path.write_bytes(b""))  # revealed: int
 ```
 
-## Use case: Treating dunder methods as bound-method descriptors
+## Use case: Binding callable dunders during implicit calls
 
 pytorch defines a `__pow__` dunder attribute on [`TensorBase`] in a similar way to the following
-example. We generally treat dunder attributes as bound-method descriptors since they all take a
-`self` argument. This allows us to type-check the following code correctly:
+example. For implicit special-method calls, we bind the first parameter of a `Callable`-typed dunder
+if it can accept the instance. This allows us to type-check the following code correctly:
 
 ```py
 from typing import Callable
@@ -266,11 +266,12 @@ class Tensor:
     __pow__: Callable[[Tensor, int], Tensor] = pow_impl
 
 Tensor() ** 2
+reveal_type(Tensor().__pow__)  # revealed: (Tensor, int, /) -> Tensor
 ```
 
 The following example is also taken from a real world project. Here, the `__lt__` dunder attribute
-is not declared. The attribute type is inferred as `Callable[…]`, but we still treat it as a
-bound-method descriptor:
+is not declared. The attribute type is inferred as `Callable[…]`, but we still bind its compatible
+receiver for the implicit comparison:
 
 ```py
 def make_comparison_operator(name: str) -> Callable[[Matrix, Matrix], bool]:
@@ -282,8 +283,21 @@ class Matrix:
 Matrix() < Matrix()
 ```
 
-The dunder-name heuristic does not apply when the callable takes no arguments, because it cannot
-accept a receiver:
+This is an implicit-call heuristic, not a claim that every `Callable`-typed dunder is a function
+descriptor. Ordinary attribute access preserves the declared callable type. In particular, it does
+not expose attributes that exist on function objects but not on arbitrary callable objects:
+
+```py
+class Wrapper:
+    __antidote_wrapped__: Callable[..., object]
+
+    def descriptor(self) -> None:
+        # error: [unresolved-attribute]
+        self.__antidote_wrapped__.__get__
+```
+
+A callable with no arguments cannot accept a receiver, so it remains unbound during both ordinary
+attribute access and implicit calls:
 
 ```py
 class Thunk:
@@ -293,23 +307,26 @@ class Thunk:
         self.__value_thunk__ = other.__value_thunk__
 
 reveal_type(Thunk().__value_thunk__)  # revealed: () -> int
+
+class Nullary:
+    __call__: Callable[[], int]
+
+reveal_type(Nullary()())  # revealed: int
 ```
 
-For other concrete signatures, the heuristic does not check whether the first parameter can accept
-the instance:
+The implicit-call heuristic does not bind a concrete first parameter that cannot accept the
+instance:
 
 ```py
-def descriptor_candidate(value: str) -> int:
-    return len(value)
-
 class DescriptorCandidate:
-    __value__: Callable[[str], int] = descriptor_candidate
+    __call__: Callable[[str], int]
 
-reveal_type(DescriptorCandidate().__value__)  # revealed: () -> int
+reveal_type(DescriptorCandidate().__call__)  # revealed: (str, /) -> int
+reveal_type(DescriptorCandidate()("value"))  # revealed: int
 ```
 
-A gradual callable signature might accept the receiver, so we preserve the function-descriptor
-heuristic. This also preserves function attributes on class access:
+A gradual callable signature might accept the receiver, so implicit calls can still bind it. It
+nevertheless remains an ordinary callable under explicit attribute access:
 
 ```py
 from typing import Any
@@ -317,6 +334,9 @@ from typing import Any
 class Method:
     __call__: Callable[..., Any]
 
+Method()()
+
+# error: [unresolved-attribute]
 Method.__call__.__code__
 ```
 

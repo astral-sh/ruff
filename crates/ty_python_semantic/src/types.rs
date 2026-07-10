@@ -4792,6 +4792,8 @@ impl<'db> Type<'db> {
                         definedness: boundness,
                         ..
                     }) => {
+                        let dunder_callable =
+                            dunder_callable.bind_callable_dunder_for_implicit_call(db, self);
                         let mut bindings = dunder_callable.bindings(db);
                         bindings.replace_callable_type(dunder_callable, self);
                         if boundness == Definedness::PossiblyUndefined {
@@ -5503,6 +5505,32 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Bind a regular `Callable`-typed dunder for an implicit special-method call if its first
+    /// parameter can accept the receiver.
+    ///
+    /// Unlike descriptor lookup, this preserves the callable as a regular `Callable`: a dunder
+    /// name is enough evidence to bind a compatible receiver for implicit dispatch, but it is not
+    /// enough evidence that ordinary attribute access should expose function descriptor members.
+    pub(super) fn bind_callable_dunder_for_implicit_call(
+        self,
+        db: &'db dyn Db,
+        receiver: Type<'db>,
+    ) -> Type<'db> {
+        match self {
+            Type::Callable(callable) => callable
+                .try_bind_dunder_self(db, receiver)
+                .map(Type::Callable)
+                .unwrap_or(self),
+            Type::Union(union) => union.map(db, |element| {
+                element.bind_callable_dunder_for_implicit_call(db, receiver)
+            }),
+            Type::Intersection(intersection) => intersection.map_positive(db, |element| {
+                element.bind_callable_dunder_for_implicit_call(db, receiver)
+            }),
+            _ => self,
+        }
+    }
+
     /// Same as `try_call_dunder`, but allows specifying a policy for the member lookup. In
     /// particular, this allows to specify `MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK` to avoid
     /// looking up dunder methods on `object`, which is needed for functions like `__init__`,
@@ -5539,6 +5567,8 @@ impl<'db> Type<'db> {
                 provenance,
                 ..
             }) => {
+                let dunder_callable =
+                    dunder_callable.bind_callable_dunder_for_implicit_call(db, self);
                 let constraints = ConstraintSetBuilder::new();
                 let bindings = dunder_callable
                     .bindings(db)
@@ -5585,6 +5615,8 @@ impl<'db> Type<'db> {
                 provenance,
                 ..
             }) => {
+                let dunder_callable =
+                    dunder_callable.bind_callable_dunder_for_implicit_call(db, self);
                 let constraints = ConstraintSetBuilder::new();
                 let bindings = dunder_callable
                     .bindings(db)
@@ -7440,7 +7472,7 @@ impl<'db> UnionType<'db> {
                     provenance: member_provenance,
                     ..
                 }) => {
-                    builder = builder.add(ty);
+                    builder = builder.add(ty.bind_callable_dunder_for_implicit_call(db, *element));
                     any_defined = true;
                     possibly_undefined = true;
                     provenance = provenance.or(member_provenance);
@@ -7450,7 +7482,7 @@ impl<'db> UnionType<'db> {
                     provenance: member_provenance,
                     ..
                 }) => {
-                    builder = builder.add(ty);
+                    builder = builder.add(ty.bind_callable_dunder_for_implicit_call(db, *element));
                     any_defined = true;
                     provenance = provenance.or(member_provenance);
                 }

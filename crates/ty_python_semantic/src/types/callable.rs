@@ -124,6 +124,7 @@ impl<'db> Type<'db> {
                 {
                     place
                         .ty
+                        .bind_callable_dunder_for_implicit_call(db, self)
                         .try_upcast_to_callable_with_policy_and_context(db, policy, context)
                         // The callable instance itself doesn't inherit the descriptor behavior of
                         // its `__call__` method.
@@ -568,15 +569,6 @@ impl<'db> CallableType<'db> {
         )
     }
 
-    pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(
-            db,
-            self.signatures(db),
-            CallableTypeKind::FunctionLike,
-            self.provenance(db),
-        )
-    }
-
     pub(crate) fn into_dunder_paramspec(self, db: &'db dyn Db) -> CallableType<'db> {
         CallableType::new(
             db,
@@ -584,6 +576,23 @@ impl<'db> CallableType<'db> {
             CallableTypeKind::DunderParamSpec,
             self.provenance(db),
         )
+    }
+
+    pub(crate) fn try_bind_dunder_self(
+        self,
+        db: &'db dyn Db,
+        self_type: Type<'db>,
+    ) -> Option<CallableType<'db>> {
+        if !self.is_regular(db) {
+            return None;
+        }
+
+        Some(CallableType::new(
+            db,
+            self.signatures(db).try_bind_dunder_self(db, self_type)?,
+            CallableTypeKind::Regular,
+            self.provenance(db),
+        ))
     }
 
     pub(crate) fn apply_self(self, db: &'db dyn Db, self_type: Type<'db>) -> CallableType<'db> {
