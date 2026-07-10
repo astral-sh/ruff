@@ -398,6 +398,26 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
+    pub(crate) fn retain_compatible_receiver(
+        &self,
+        db: &'db dyn Db,
+        self_type: Type<'db>,
+    ) -> Option<Self> {
+        let overloads = self
+            .overloads
+            .iter()
+            .filter(|signature| {
+                signature.has_potential_receiver() && signature.can_bind_self_to(db, self_type)
+            })
+            .cloned();
+        let compatible = Self::from_overloads(overloads);
+        (!compatible.overloads.is_empty()).then_some(compatible)
+    }
+
+    pub(crate) fn has_potential_receiver(&self) -> bool {
+        self.overloads.iter().any(Signature::has_potential_receiver)
+    }
+
     /// Replaces any occurrences of `typing.Self` in the parameter and return annotations with the
     /// given type. (Does not bind the `self` parameter; to do that, use
     /// [`bind_self`][Self::bind_self].)
@@ -611,6 +631,15 @@ impl<'db> PartialApplication<'db> {
 }
 
 impl<'db> Signature<'db> {
+    fn has_potential_receiver(&self) -> bool {
+        self.parameters().is_top()
+            || self.parameters().is_gradual()
+            || self
+                .parameters()
+                .get(0)
+                .is_some_and(Parameter::is_positional)
+    }
+
     pub(crate) fn new(parameters: Parameters<'db>, return_ty: Type<'db>) -> Self {
         Self {
             generic_context: None,

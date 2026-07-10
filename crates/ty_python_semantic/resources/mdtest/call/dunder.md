@@ -138,9 +138,9 @@ C()()
 _: Callable[..., None] = C()
 ```
 
-An annotation-only `__call__` can also be generic over a `ParamSpec`. It describes an instance
-member and must not additionally participate in class-namespace descriptor lookup, which would
-incorrectly bind away its first parameter. This is a regression test for
+An annotation-only `__call__` can also be generic over a `ParamSpec`. Once specialized, its first
+parameter might not accept the instance and therefore cannot be a method receiver. In that case, the
+dunder-name heuristic must not bind the parameter away. This is a regression test for
 <https://github.com/astral-sh/ty/issues/3957>.
 
 ```py

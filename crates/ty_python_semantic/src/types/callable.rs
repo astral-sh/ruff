@@ -480,6 +480,10 @@ impl<'db> CallableType<'db> {
         matches!(self.kind(db), CallableTypeKind::FunctionLike)
     }
 
+    pub(crate) fn is_regular(self, db: &'db dyn Db) -> bool {
+        matches!(self.kind(db), CallableTypeKind::Regular)
+    }
+
     pub(crate) fn is_classmethod_like(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::ClassMethodLike)
     }
@@ -548,6 +552,35 @@ impl<'db> CallableType<'db> {
             self.kind(db),
             self.provenance(db),
         )
+    }
+
+    pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(
+            db,
+            self.signatures(db),
+            CallableTypeKind::FunctionLike,
+            self.provenance(db),
+        )
+    }
+
+    pub(crate) fn try_into_function_like_for_receiver(
+        self,
+        db: &'db dyn Db,
+        self_type: Type<'db>,
+    ) -> Option<CallableType<'db>> {
+        if self.is_method_like(db) {
+            return Some(self);
+        }
+        if !self.is_regular(db) {
+            return None;
+        }
+        Some(CallableType::new(
+            db,
+            self.signatures(db)
+                .retain_compatible_receiver(db, self_type)?,
+            CallableTypeKind::FunctionLike,
+            self.provenance(db),
+        ))
     }
 
     pub(crate) fn apply_self(self, db: &'db dyn Db, self_type: Type<'db>) -> CallableType<'db> {

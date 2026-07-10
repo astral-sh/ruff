@@ -282,6 +282,33 @@ class Matrix:
 Matrix() < Matrix()
 ```
 
+The dunder-name heuristic is only evidence that a `Callable` might be a function descriptor. We bind
+the callable only if its first positional parameter can accept the instance. A callable with no
+receiver parameter remains a regular callable attribute, even if its name starts and ends with
+double underscores:
+
+```py
+class Thunk:
+    __value_thunk__: Callable[[], int]
+
+    def replace(self, other: "Thunk") -> None:
+        self.__value_thunk__ = other.__value_thunk__
+
+reveal_type(Thunk().__value_thunk__)  # revealed: () -> int
+```
+
+A gradual callable signature might accept the receiver, so we preserve the function-descriptor
+heuristic. This also preserves function attributes on class access:
+
+```py
+from typing import Any
+
+class Method:
+    __call__: Callable[..., Any]
+
+Method.__call__.__code__
+```
+
 ## `self`-binding behaviour of function-like `Callable`s
 
 Binding the `self` parameter of a function-like `Callable` creates a new `Callable` that is also

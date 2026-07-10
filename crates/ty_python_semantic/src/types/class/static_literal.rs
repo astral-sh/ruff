@@ -1117,12 +1117,12 @@ impl<'db> StaticClassLiteral<'db> {
     ) -> PlaceAndQualifiers<'db> {
         fn into_function_like_callable<'d>(db: &'d dyn Db, ty: Type<'d>) -> Type<'d> {
             match ty {
-                Type::Callable(callable_ty) => Type::Callable(CallableType::new(
-                    db,
-                    callable_ty.signatures(db),
-                    CallableTypeKind::FunctionLike,
-                    callable_ty.provenance(db),
-                )),
+                Type::Callable(callable_ty)
+                    if callable_ty.is_regular(db)
+                        && callable_ty.signatures(db).has_potential_receiver() =>
+                {
+                    Type::Callable(callable_ty.into_function_like(db))
+                }
                 Type::Union(union) => {
                     union.map(db, |element| into_function_like_callable(db, *element))
                 }
@@ -1130,21 +1130,6 @@ impl<'db> StaticClassLiteral<'db> {
                     .map_positive(db, |element| into_function_like_callable(db, *element)),
                 _ => ty,
             }
-        }
-
-        fn is_declaration_only(db: &dyn Db, member: PlaceAndQualifiers<'_>) -> bool {
-            let Place::Defined(DefinedPlace { provenance, .. }) = member.place else {
-                return false;
-            };
-            let Some(definition) = provenance.definition() else {
-                return false;
-            };
-            let file = definition.file(db);
-            let module = parsed_module(db, file).load(db);
-            !definition
-                .kind(db)
-                .category(file.is_stub(db), &module)
-                .is_binding()
         }
 
         let result = MroLookup::new(db, mro_iter).class_member(
@@ -1163,9 +1148,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         // We generally treat dunder attributes with `Callable` types as function-like callables.
         // See `callables_as_descriptors.md` for more details.
-        if name.starts_with("__")
-            && name.ends_with("__")
-            && (member.is_class_var() || !is_declaration_only(db, member))
+        if name.starts_with("__") && name.ends_with("__") && !policy.no_dunder_callable_descriptor()
         {
             member = member.map_type(|ty| into_function_like_callable(db, ty));
         }
