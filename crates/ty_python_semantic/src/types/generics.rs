@@ -1458,10 +1458,17 @@ impl<'db> Specialization<'db> {
     }
 
     /// Merge two specializations that occur as positive elements of an intersection.
+    ///
+    /// Returns `None` if the specializations cannot be represented by a single merged type-argument
+    /// vector.
     pub(super) fn merge_intersection(self, db: &'db dyn Db, other: Self) -> Option<Self> {
         let generic_context = self.generic_context(db);
-        if other.generic_context(db) != generic_context
-            || self.materialization_kind(db).is_some()
+        if other.generic_context(db) != generic_context {
+            return None;
+        }
+
+        // TODO: Merge materialization kinds and tuple specializations instead of discarding them.
+        if self.materialization_kind(db).is_some()
             || other.materialization_kind(db).is_some()
             || self.tuple_inner(db).is_some()
             || other.tuple_inner(db).is_some()
@@ -1469,7 +1476,7 @@ impl<'db> Specialization<'db> {
             return None;
         }
 
-        let types: Option<Box<[_]>> = itertools::izip!(
+        let types: Option<Box<[Option<Type<'db>>]>> = itertools::izip!(
             generic_context.variables(db),
             self.types(db),
             other.types(db)
@@ -1477,18 +1484,22 @@ impl<'db> Specialization<'db> {
         .map(
             |(typevar, left, right)| match specialization_variance(db, typevar) {
                 TypeVarVariance::Covariant => {
-                    Some(IntersectionType::from_two_elements(db, *left, *right))
+                    Some(Some(IntersectionType::from_two_elements(db, *left, *right)))
                 }
                 TypeVarVariance::Contravariant => {
-                    Some(UnionType::from_two_elements(db, *left, *right))
+                    Some(Some(UnionType::from_two_elements(db, *left, *right)))
                 }
-                TypeVarVariance::Invariant if left == right => Some(*left),
-                TypeVarVariance::Invariant | TypeVarVariance::Bivariant => None,
+                TypeVarVariance::Invariant if left == right => Some(Some(*left)),
+                // Distinct invariant arguments have no single sound merged argument.
+                TypeVarVariance::Invariant => None,
+                // Bivariant parameters carry no information, so leave them unmapped instead of
+                // preventing independent parameters from being merged.
+                TypeVarVariance::Bivariant => Some(None),
             },
         )
         .collect();
 
-        Some(Self::new(db, generic_context, types?, None, None))
+        Some(generic_context.specialize_partial(db, types?))
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -2079,6 +2090,9 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     pending: ConstraintSet<'db, 'c>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
     paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
+    /// Whether argument validation should use the original constraint-set relation instead of
+    /// rechecking against the resulting specialization.
+    requires_constraint_set_validation: bool,
 }
 
 /// The result of type variable inference before choosing how to handle unsolved type variables.
@@ -2154,6 +2168,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             pending: ConstraintSet::from_bool(constraints, true),
             types: FxHashMap::default(),
             paramspec_seen: FxHashSet::default(),
+            requires_constraint_set_validation: false,
         }
     }
 
@@ -2829,17 +2844,74 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     }
 
     /// Infer type mappings for the specialization based on a given type and its declared type.
+    ///
+    /// Returns whether validation should use the original constraint-set relation instead of the
+    /// resulting specialization.
     pub(crate) fn infer(
         &mut self,
         formal: Type<'db>,
         actual: Type<'db>,
-    ) -> Result<(), SpecializationError<'db>> {
+    ) -> Result<bool, SpecializationError<'db>> {
+        self.requires_constraint_set_validation = false;
         self.infer_map_impl(
             formal,
             actual,
             TypeVarVariance::Covariant,
             &mut FxHashSet::default(),
-        )
+        )?;
+        Ok(std::mem::take(
+            &mut self.requires_constraint_set_validation,
+        ))
+    }
+
+    /// Project immediate positive elements of an actual intersection to one merged generic view.
+    ///
+    /// This projection only generates inference constraints. It does not establish that the
+    /// original intersection is assignable to the projected type.
+    fn project_intersection_for_constraint_inference(
+        db: &'db dyn Db,
+        intersection: IntersectionType<'db>,
+        target: Type<'db>,
+    ) -> Option<(Type<'db>, Vec<Type<'db>>)> {
+        let target_origin = target
+            .as_nominal_instance()?
+            .class(db)
+            .into_generic_alias()?
+            .origin(db);
+        let mut merged: Option<Specialization<'db>> = None;
+        let mut unmatched = Vec::new();
+
+        for positive in intersection.iter_positive(db) {
+            let positive_class = match positive {
+                Type::NominalInstance(instance) => Some(instance.class(db)),
+                Type::ProtocolInstance(protocol) => protocol
+                    .to_nominal_instance()
+                    .map(|instance| instance.class(db)),
+                _ => None,
+            };
+            let Some(positive_class) = positive_class else {
+                unmatched.push(positive);
+                continue;
+            };
+            let specialization = positive_class
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .filter_map(ClassType::into_generic_alias)
+                .find(|alias| alias.origin(db) == target_origin)
+                .map(|alias| alias.specialization(db));
+            let Some(specialization) = specialization else {
+                unmatched.push(positive);
+                continue;
+            };
+            merged = Some(match merged {
+                Some(existing) => existing.merge_intersection(db, specialization)?,
+                None => specialization,
+            });
+        }
+
+        let merged = merged?;
+        let projected = target_origin.apply_specialization(db, |_| merged);
+        Some((Type::instance(db, projected), unmatched))
     }
 
     fn when_assignable_with_polarity(
@@ -2854,11 +2926,34 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 &source.when_constraint_set_assignable_to_owned(self.db, target),
             )
         };
+        let when_covariantly_assignable = |formal: Type<'db>, actual: Type<'db>| {
+            if let Type::Intersection(intersection) = actual
+                && let Some((projected, unmatched)) =
+                    Self::project_intersection_for_constraint_inference(
+                        self.db,
+                        intersection,
+                        formal,
+                    )
+            {
+                // Matching generic views of the same intersected value contribute one merged
+                // bound, e.g. `Sequence[A] & Sequence[B]` contributes `A & B <= T` when compared
+                // to `Sequence[T]`. Separate arguments still contribute independent bounds.
+                let projected = when_assignable(projected, formal);
+                return projected.or(self.db, self.constraints, || {
+                    unmatched
+                        .into_iter()
+                        .when_any(self.db, self.constraints, |positive| {
+                            when_assignable(positive, formal)
+                        })
+                });
+            }
+            when_assignable(actual, formal)
+        };
         match polarity {
-            TypeVarVariance::Covariant => when_assignable(actual, formal),
+            TypeVarVariance::Covariant => when_covariantly_assignable(formal, actual),
             TypeVarVariance::Contravariant => when_assignable(formal, actual),
             TypeVarVariance::Invariant => {
-                let covariant = when_assignable(actual, formal);
+                let covariant = when_covariantly_assignable(formal, actual);
                 let contravariant = when_assignable(formal, actual);
                 covariant.and(self.db, self.constraints, || contravariant)
             }
@@ -3216,6 +3311,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
             (formal, actual @ Type::Intersection(_)) => {
                 let when = self.when_assignable_with_polarity(formal, actual, polarity);
+                self.requires_constraint_set_validation = true;
                 self.infer_from_constraint_set(when)?;
                 return Ok(());
             }

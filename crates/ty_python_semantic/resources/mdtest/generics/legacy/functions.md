@@ -1350,7 +1350,7 @@ When an actual intersection has multiple specializations of the same covariant g
 combine the type arguments before inferring a bounded typevar:
 
 ```py
-from typing import Sequence, TypeVar
+from typing import Generic, Sequence, TypeVar
 from ty_extensions import Intersection
 
 class Base: ...
@@ -1382,6 +1382,9 @@ def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
     # error: [invalid-argument-type] "Argument to function `first` is incorrect: Argument type `Unrelated1 & Unrelated2` does not satisfy upper bound `Base` of type variable `T`"
     reveal_type(first(x))  # revealed: Unknown
 
+# Constrained typevars use the same merged intersection evidence. A lower bound that rules out every
+# declared constraint should produce the usual constraint violation.
+
 Constrained = TypeVar("Constrained", Sub1, Sub2)
 
 def first_constrained(x: Sequence[Constrained]) -> Constrained:
@@ -1390,4 +1393,132 @@ def first_constrained(x: Sequence[Constrained]) -> Constrained:
 def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
     # error: [invalid-argument-type] "Argument to function `first_constrained` is incorrect: Argument type `Unrelated1 & Unrelated2` does not satisfy constraints (`Sub1`, `Sub2`) of type variable `Constrained`"
     reveal_type(first_constrained(x))  # revealed: Unknown
+
+# The same diagnostic should survive invariant inference, where a path has both lower and upper
+# bounds, if one bound independently rules out every constraint.
+
+InvariantT = TypeVar("InvariantT")
+
+class Box(Generic[InvariantT]):
+    value: InvariantT
+
+class Marker: ...
+
+def unbox(x: Box[Constrained]) -> Constrained:
+    raise NotImplementedError
+
+def _(x: Intersection[Box[Unrelated1], Marker]) -> None:
+    # error: [invalid-argument-type] "Argument to function `unbox` is incorrect: Argument type `Unrelated1` does not satisfy constraints (`Sub1`, `Sub2`) of type variable `Constrained`"
+    reveal_type(unbox(x))  # revealed: Unknown
+
+# Contravariant inference contributes upper-bound evidence instead. If that upper bound rules out
+# every constraint, it should also produce the usual constraint violation.
+
+ContravariantT = TypeVar("ContravariantT", contravariant=True)
+
+class ConstrainedSink(Generic[ContravariantT]):
+    def put(self, value: ContravariantT) -> None: ...
+
+def sink_constrained(x: ConstrainedSink[Constrained]) -> Constrained:
+    raise NotImplementedError
+
+def _(x: Intersection[ConstrainedSink[Unrelated1], ConstrainedSink[Unrelated2]]) -> None:
+    # error: [invalid-argument-type] "Argument to function `sink_constrained` is incorrect: Argument type `Unrelated1 | Unrelated2` does not satisfy constraints (`Sub1`, `Sub2`) of type variable `Constrained`"
+    reveal_type(sink_constrained(x))  # revealed: Unknown
+```
+
+Generic inference should also combine specializations found through the MRO of intersected concrete
+subclasses, rather than only direct generic instances such as `Sequence[Sub1]` above:
+
+```py
+from typing import Generic, TypeVar
+
+SourceT = TypeVar("SourceT", covariant=True)
+ElementT = TypeVar("ElementT")
+
+class Source(Generic[SourceT]):
+    def get(self) -> SourceT:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+class ASource(Source[A]): ...
+class BSource(Source[B]): ...
+
+def element(x: Source[ElementT]) -> ElementT:
+    return x.get()
+
+def f(x: ASource) -> None:
+    if isinstance(x, BSource):
+        reveal_type(x)  # revealed: ASource & BSource
+        reveal_type(element(x))  # revealed: A & B
+```
+
+Generic protocol intersections still consider structural implementations that do not appear in an
+explicit implementation's MRO:
+
+```py
+from typing import Protocol
+
+class SourceProtocol(Protocol[SourceT]):
+    def get(self) -> SourceT: ...
+
+class StructuralBSource:
+    def get(self) -> B:
+        return B()
+
+class ExplicitASource(SourceProtocol[A]): ...
+
+def takes_b_source(x: SourceProtocol[B]) -> None: ...
+def _(x: ExplicitASource) -> None:
+    if isinstance(x, StructuralBSource):
+        takes_b_source(x)
+```
+
+Intersection inference respects both generic variance and the polarity of nested comparisons:
+
+```py
+from ty_extensions import Intersection
+
+def _(x: Intersection[ASource, BSource, object]) -> None:
+    reveal_type(element(x))  # revealed: A & B
+
+def _(x) -> None:
+    assert isinstance(x, ASource)
+    reveal_type(element(x))  # revealed: Unknown
+
+SinkT = TypeVar("SinkT", contravariant=True)
+
+class Sink(Generic[SinkT]):
+    def put(self, value: SinkT) -> None: ...
+
+class ASink(Sink[A]): ...
+class BSink(Sink[B]): ...
+
+def sink_type(x: Sink[ElementT]) -> ElementT:
+    raise NotImplementedError
+
+def _(x: ASink) -> None:
+    if isinstance(x, BSink):
+        reveal_type(sink_type(x))  # revealed: A | B
+
+class C(A, B): ...
+
+def choose(x: ElementT, sink: Sink[Source[ElementT]]) -> ElementT:
+    return x
+
+def _(
+    x: C,
+    sink: Sink[Intersection[Source[A], Source[B]]],
+) -> None:
+    reveal_type(choose(x, sink))  # revealed: C
+```
+
+Protocol inference should preserve gradual types in narrowed intersections:
+
+```py
+def _(x):
+    assert isinstance(x, list)
+    for _, item in enumerate(x):
+        reveal_type(item)  # revealed: Unknown
 ```

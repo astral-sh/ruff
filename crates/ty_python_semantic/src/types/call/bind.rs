@@ -5061,9 +5061,20 @@ struct ArgumentTypeChecker<'a, 'db> {
     /// precise argument mismatch. We can then silence `check_argument_type` for those arguments to
     /// avoid duplicate diagnostics.
     ///
-    /// TODO: Once specialization inference fully owns generic argument validation, this field can
-    /// be removed.
+    /// TODO: Remove this once `check_argument_type` builds the specialization directly from its
+    /// assignability constraint set.
     constraint_set_errors: Vec<bool>,
+
+    /// Temporary exemptions from the assignability check in `check_argument_type`.
+    ///
+    /// Constraint-set inference has already proved the original unspecialized argument relation
+    /// satisfiable for these parameters. The inferred specialization can be more precise than any
+    /// specialization that individually validates the argument, so rechecking against it would
+    /// reject a valid call.
+    ///
+    /// TODO: Remove this once `check_argument_type` builds the specialization directly from its
+    /// assignability constraint set instead of consuming one from the earlier separate step.
+    constraint_set_validations: Vec<FxHashSet<usize>>,
 }
 
 /// Result of checking only the key type of a keyword-unpack argument.
@@ -5135,6 +5146,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             inferable_typevars: InferableTypeVars::None,
             inference: None,
             constraint_set_errors: vec![false; arguments.len()],
+            constraint_set_validations: (0..arguments.len())
+                .map(|_| FxHashSet::default())
+                .collect(),
         }
     }
 
@@ -5344,6 +5358,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         let mut specialization_errors = Vec::new();
         let assignable_to_declared_type = self.infer_argument_constraints(
+            constraints,
             &mut builder,
             &preferred_type_mappings,
             &partially_specialized_declared_type,
@@ -5361,6 +5376,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             self.constraint_set_errors.fill(false);
 
             self.infer_argument_constraints(
+                constraints,
                 &mut builder,
                 &FxHashMap::default(),
                 &FxHashSet::default(),
@@ -5460,6 +5476,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
     fn infer_argument_constraints<'c>(
         &mut self,
+        constraints: &'c ConstraintSetBuilder<'db>,
         builder: &mut SpecializationBuilder<'db, 'c>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
@@ -5495,17 +5512,32 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 }
 
                 let argument_type = argument_types.get_for_declared_type(declared_type);
+                let argument_type = matched_parameter.argument_type.unwrap_or(argument_type);
                 let specialization_result = builder.infer(
                     declared_type,
-                    matched_parameter.argument_type.unwrap_or(argument_type),
+                    argument_type,
                 );
 
-                if let Err(error) = specialization_result {
-                    self.constraint_set_errors[argument_index] = true;
-                    specialization_errors.push(BindingError::SpecializationError {
-                        error,
-                        argument_index: adjusted_argument_index,
-                    });
+                match specialization_result {
+                    Ok(true)
+                        if !argument_type
+                            .when_constraint_set_assignable_to(
+                                self.db,
+                                declared_type,
+                                constraints,
+                            )
+                            .is_never_satisfied(self.db) =>
+                    {
+                        self.constraint_set_validations[argument_index].insert(parameter_index);
+                    }
+                    Ok(_) => {}
+                    Err(error) => {
+                        self.constraint_set_errors[argument_index] = true;
+                        specialization_errors.push(BindingError::SpecializationError {
+                            error,
+                            argument_index: adjusted_argument_index,
+                        });
+                    }
                 }
             }
         }
@@ -5567,10 +5599,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         //
         // TODO: Soon we will go further, and build the actual specializations from the
         // constraint set that we get from this assignability check, instead of inferring and
-        // building them in an earlier separate step.
+        // building them in an earlier separate step. This will also remove the
+        // `constraint_set_validations` suppression markers.
         //
         // TODO: handle starred annotations, e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...]]`
         if !self.constraint_set_errors[argument_index]
+            && !self.constraint_set_validations[argument_index].contains(&parameter_index)
             && !parameter.has_starred_annotation()
             && !is_valid_isinstance_target()
             && argument_type

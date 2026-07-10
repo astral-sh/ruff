@@ -26,7 +26,7 @@ use crate::{
     types::{
         ErrorContext, ErrorContextTree, Type, TypePair,
         constraints::ConstraintSet,
-        generics::{InferableTypeVars, Specialization},
+        generics::InferableTypeVars,
     },
 };
 
@@ -791,52 +791,6 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
 }
 
 impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
-    fn project_intersection_to_generic_target(
-        db: &'db dyn Db,
-        intersection: IntersectionType<'db>,
-        target: Type<'db>,
-    ) -> Option<(Type<'db>, Vec<Type<'db>>)> {
-        let target_origin = target
-            .as_nominal_instance()?
-            .class(db)
-            .into_generic_alias()?
-            .origin(db);
-        let mut merged: Option<Specialization<'db>> = None;
-        let mut unmatched = Vec::new();
-
-        for positive in intersection.iter_positive(db) {
-            let positive_class = match positive {
-                Type::NominalInstance(instance) => Some(instance.class(db)),
-                Type::ProtocolInstance(protocol) => protocol
-                    .to_nominal_instance()
-                    .map(|instance| instance.class(db)),
-                _ => None,
-            };
-            let Some(positive_class) = positive_class else {
-                unmatched.push(positive);
-                continue;
-            };
-            let specialization = positive_class
-                .iter_mro(db)
-                .filter_map(ClassBase::into_class)
-                .filter_map(ClassType::into_generic_alias)
-                .find(|alias| alias.origin(db) == target_origin)
-                .map(|alias| alias.specialization(db));
-            let Some(specialization) = specialization else {
-                unmatched.push(positive);
-                continue;
-            };
-            merged = Some(match merged {
-                Some(existing) => existing.merge_intersection(db, specialization)?,
-                None => specialization,
-            });
-        }
-
-        let merged = merged?;
-        let projected = target_origin.apply_specialization(db, |_| merged);
-        Some((Type::instance(db, projected), unmatched))
-    }
-
     pub(super) fn subtyping(
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,
@@ -1503,9 +1457,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // "collapse to 'object'" in this case is a sound over-approximation.)
             (_, Type::SubclassOf(subclass_of))
                 if let Some(type_var) = subclass_of.into_type_var()
-                    // Converting an entire intersection produces a dynamic fallback. Let the
-                    // intersection arm below check each positive element instead.
-                    && !matches!(source, Type::Intersection(_))
                     && let Some(instance) = source.to_instance_approximation(db) =>
             {
                 self.check_type_pair(db, instance, Type::TypeVar(type_var))
@@ -1796,20 +1747,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 }),
 
             (Type::Intersection(intersection), _) => {
-                if self.relation.is_assignability()
-                    && let Some((projected, unmatched)) =
-                        Self::project_intersection_to_generic_target(db, intersection, target)
-                {
-                    let projected = self.check_type_pair(db, projected, target);
-                    return projected.or(db, self.constraints, || {
-                        unmatched
-                            .into_iter()
-                            .when_any(db, self.constraints, |positive| {
-                                self.check_type_pair(db, positive, target)
-                            })
-                    });
-                }
-
                 if matches!(target, Type::LiteralValue(_))
                     && let Some(alternatives) = intersection.finite_alternative_union(db)
                 {

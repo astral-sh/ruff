@@ -7716,7 +7716,9 @@ mod tests {
             )
         };
 
-        let solutions = set.solutions(&db, &builder, inferable);
+        let solutions = set.solutions_with(&db, &builder, inferable, |_variance, path_bound| {
+            PathBounds::default_solve(&db, &builder, path_bound)
+        });
         assert_eq!(
             solutions,
             Solutions::Constrained(vec![vec![TypeVarSolution {
