@@ -2735,6 +2735,45 @@ def update_union_value(value: A | B) -> None:
     value.value = 1
 ```
 
+### Bound descriptor setters
+
+Descriptor invocation respects the binding mode of `__set__`. A static setter receives the instance
+and value directly, while a class setter also receives the descriptor class implicitly.
+
+```py
+from typing import Protocol
+
+class StaticSetterDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    @staticmethod
+    def __set__(instance: object, value: int) -> None: ...
+
+class ClassSetterDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    @classmethod
+    def __set__(cls, instance: object, value: int) -> None: ...
+
+class HasStaticSetter(Protocol):
+    @StaticSetterDescriptor
+    def value(self) -> int: ...
+
+class HasClassSetter(Protocol):
+    @ClassSetterDescriptor
+    def value(self) -> int: ...
+
+def update_bound_setters(static: HasStaticSetter, class_: HasClassSetter) -> None:
+    static.value = 1
+    static.value = "bad"  # error: [invalid-assignment]
+    class_.value = 1
+    class_.value = "bad"  # error: [invalid-assignment]
+```
+
 ### Union descriptor types
 
 If a decorator can return either of two descriptors, an assignment must be accepted by both possible

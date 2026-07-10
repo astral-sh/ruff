@@ -2,7 +2,7 @@ use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use super::{MultiInferenceGuard, TypeInferenceBuilder};
-use crate::place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers};
+use crate::place::{DefinedPlace, Place, PlaceAndQualifiers};
 use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, ExplicitAttributeWriteRequirement,
     FallbackAttributeWriteRequirement, InstanceAttributeWriteMember,
@@ -479,27 +479,36 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             return true;
         }
 
-        let Place::Defined(DefinedPlace {
-            ty: setter_ty,
-            definedness: Definedness::AlwaysDefined,
-            ..
-        }) = descriptor_ty
-            .class_member_with_policy(db, "__set__".into(), MemberLookupPolicy::REQUIRE_CONCRETE)
-            .place
-        else {
+        if property_setter_returns_never(db, descriptor_ty, receiver_ty, value_ty) {
             if emit_diagnostics {
-                self.report(AssignmentAttributeWriteDiagnostic::CannotAssign);
+                self.report(AssignmentAttributeWriteDiagnostic::TerminalDescriptor);
             }
             return false;
-        };
+        }
 
-        self.evaluate_descriptor_write(
-            descriptor_ty,
-            setter_ty,
-            receiver_ty,
-            value_ty,
-            emit_diagnostics,
-        )
+        match descriptor_ty.try_call_dunder_with_policy(
+            db,
+            "__set__",
+            &mut CallArguments::positional([receiver_ty, value_ty]),
+            TypeContext::default(),
+            MemberLookupPolicy::REQUIRE_CONCRETE,
+        ) {
+            Ok(_) => true,
+            Err(CallDunderError::CallError(kind, bindings, _)) => {
+                if emit_diagnostics {
+                    self.report(AssignmentAttributeWriteDiagnostic::BadDunderSet(CallError(
+                        kind, bindings,
+                    )));
+                }
+                false
+            }
+            Err(CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound { .. }) => {
+                if emit_diagnostics {
+                    self.report(AssignmentAttributeWriteDiagnostic::CannotAssign);
+                }
+                false
+            }
+        }
     }
 
     fn evaluate_descriptor_write(
