@@ -18,6 +18,7 @@ ignored = ["ruff_cache"]
 
 [dependencies]
 ruff_cache = { workspace = true, optional = true }
+ruff_diagnostics = { workspace = true }
 ruff_macros = { workspace = true, optional = true }
 ruff_python_trivia = { workspace = true }
 ruff_source_file = { workspace = true }

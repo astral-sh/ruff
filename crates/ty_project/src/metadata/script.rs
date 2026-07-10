@@ -55,8 +55,65 @@ pub(crate) fn script_metadata(db: &dyn Db, file: File) -> Option<Box<PyProject>>
         })
         .find_map(|opening| ScriptTag::parse_at(source_bytes, opening))?;
     let value_source = ValueSource::File(Arc::new(SystemPathBuf::from(path.as_str())));
+    let source_map = tag.metadata_source_map().clone();
 
-    PyProject::from_toml_str_without_spans(tag.metadata(), value_source)
+    PyProject::from_toml_str_with_source_map(tag.metadata(), value_source, source_map)
         .map(Box::new)
         .ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_python_ast::name::Name;
+    use ruff_text_size::{TextRange, TextSize};
+
+    use crate::ProjectMetadata;
+    use crate::db::testing::TestDb;
+
+    use super::script_metadata;
+
+    fn setup_db() -> TestDb {
+        let project =
+            ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/project"));
+        let mut db = TestDb::new(project);
+        db.memory_file_system()
+            .create_directory_all("/project")
+            .unwrap();
+        db.init_program().unwrap();
+        db
+    }
+
+    fn write_file(db: &mut TestDb, path: &str, contents: &str) -> ruff_db::files::File {
+        let path = SystemPath::new(path);
+        db.write_file(path, contents).unwrap();
+        system_path_to_file(db, path).unwrap()
+    }
+
+    #[test]
+    fn maps_metadata_ranges_to_the_script() {
+        let mut db = setup_db();
+        let contents = "π = 1\r\n# /// script\r\n# [tool.ty.rules]\r\n# unknown-script-rule = \"warn\"\r\n# ///\r\n";
+        let file = write_file(&mut db, "/project/script.py", contents);
+        let metadata = script_metadata(&db, file).as_ref().unwrap();
+        let rules = metadata
+            .ty()
+            .and_then(|options| options.rules.as_ref())
+            .unwrap();
+        let mut diagnostics = Vec::new();
+
+        rules.to_rule_selection(&db, &mut diagnostics);
+
+        let diagnostic = diagnostics.pop().unwrap().to_diagnostic();
+        let range = diagnostic.expect_primary_span().range().unwrap();
+        let start = contents.find("unknown-script-rule").unwrap();
+        assert_eq!(
+            range,
+            TextRange::at(
+                TextSize::try_from(start).unwrap(),
+                TextSize::try_from("unknown-script-rule".len()).unwrap(),
+            )
+        );
+    }
 }

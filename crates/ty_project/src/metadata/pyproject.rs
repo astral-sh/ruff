@@ -1,6 +1,7 @@
 use crate::metadata::options::Options;
 use crate::metadata::python_version::SupportedPythonVersion;
 use pep440_rs::{Version, VersionSpecifiers, release_specifiers_to_ranges};
+use ruff_diagnostics::SourceMap;
 use ruff_python_ast::PythonVersion;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -40,11 +41,12 @@ impl PyProject {
         Self::deserialize_toml(content)
     }
 
-    pub(crate) fn from_toml_str_without_spans(
+    pub(crate) fn from_toml_str_with_source_map(
         content: &str,
         source: ValueSource,
+        source_map: SourceMap,
     ) -> Result<Self, PyProjectError> {
-        let _guard = ValueSourceGuard::new(source, false);
+        let _guard = ValueSourceGuard::with_source_map(source, source_map);
         Self::deserialize_toml(content)
     }
 

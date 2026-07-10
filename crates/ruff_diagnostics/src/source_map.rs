@@ -2,13 +2,12 @@ use ruff_text_size::{Ranged, TextSize};
 
 use crate::Edit;
 
-/// Lightweight sourcemap marker representing the source and destination
-/// position for an [`Edit`].
-#[derive(Debug, PartialEq, Eq)]
+/// Lightweight source map marker representing corresponding source and target positions.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SourceMarker {
-    /// Position of the marker in the original source.
+    /// Position of the marker in the source.
     source: TextSize,
-    /// Position of the marker in the transformed code.
+    /// Corresponding position in the target.
     dest: TextSize,
 }
 
@@ -26,18 +25,31 @@ impl SourceMarker {
     }
 }
 
-/// A collection of [`SourceMarker`].
+/// A collection of [`SourceMarker`]s that maps offsets from one source to another.
 ///
-/// Sourcemaps are used to map positions in the original source to positions in
-/// the transformed code. Here, only the boundaries of edits are tracked instead
-/// of every single character.
+/// Each marker establishes a source-to-target correspondence. Offsets between markers preserve
+/// their displacement from the preceding marker.
 ///
 /// This mapping maintains the invariant that markers are in source order.
-#[derive(Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SourceMap(Vec<SourceMarker>);
 
 impl SourceMap {
-    /// Returns a slice of all the markers in the sourcemap in source order.
+    /// Maps an offset in the source to the corresponding offset in the target.
+    pub fn map_offset(&self, offset: TextSize) -> TextSize {
+        let Some(index) = self
+            .0
+            .partition_point(|marker| marker.source <= offset)
+            .checked_sub(1)
+        else {
+            return offset;
+        };
+        let marker = &self.0[index];
+
+        marker.dest + (offset - marker.source)
+    }
+
+    /// Returns a slice of all the markers in the source map in source order.
     pub fn markers(&self) -> &[SourceMarker] {
         &self.0
     }
@@ -71,20 +83,20 @@ impl SourceMap {
         }
     }
 
-    /// Push a new marker to the sourcemap.
+    /// Push a new marker to the source map.
     ///
     /// ## Panics
     ///
-    /// If `offset` is less than previous markers.
-    pub fn push_marker(&mut self, offset: TextSize, output_length: TextSize) {
+    /// If `source` is less than previous markers.
+    pub fn push_marker(&mut self, source: TextSize, target: TextSize) {
         assert!(
-            self.0.last().is_none_or(|last| offset >= last.source),
+            self.0.last().is_none_or(|last| source >= last.source),
             "Markers must be pushed in source order",
         );
 
         self.0.push(SourceMarker {
-            source: offset,
-            dest: output_length,
+            source,
+            dest: target,
         });
     }
 }
