@@ -107,7 +107,6 @@ use crate::types::typevar::{BoundTypeVarIdentity, walk_bound_type_var_type};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     RecursionGuard, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
-    walk_type_with_recursion_guard,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
@@ -1144,7 +1143,7 @@ impl<'db> ConstraintSetBuilder<'db> {
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+                self.recursion_guard.walk(db, ty, self);
             }
         }
 

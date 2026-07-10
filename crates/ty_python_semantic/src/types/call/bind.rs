@@ -60,7 +60,7 @@ use crate::types::tuple::{TupleLength, TupleSpec, TupleType, VariableSegment};
 use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
 use crate::types::visitor::{
-    RecursionGuard, TypeKind, TypeVisitor, walk_non_atomic_type, walk_type_with_recursion_guard,
+    RecursionGuard, TypeKind, TypeVisitor, walk_non_atomic_type,
 };
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
@@ -120,7 +120,7 @@ fn generic_contexts_mentioned_in_type<'db>(
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            self.recursion_guard.walk(db, ty, self);
         }
     }
 

@@ -53,7 +53,7 @@ use crate::{
         tuple::{FixedLengthTuple, Tuple},
         typed_dict::{TypedDictParams, TypedDictType, typed_dict_params_from_class_def},
         variance::VarianceInferable,
-        visitor::{RecursionGuard, TypeVisitor, walk_type_with_recursion_guard},
+        visitor::{RecursionGuard, TypeVisitor},
     },
 };
 use crate::{attribute_assignments, attribute_declarations};
@@ -393,7 +393,7 @@ impl<'db> StaticClassLiteral<'db> {
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+                self.recursion_guard.walk(db, ty, self);
             }
         }
 

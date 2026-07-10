@@ -287,41 +287,6 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
     }
 }
 
-/// Walks a type while ignoring recursive cycles.
-///
-/// Use `walk_type_with_recursion_guard_fallback` if the cycle needs further processing.
-pub(crate) fn walk_type_with_recursion_guard<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    visitor: &impl TypeVisitor<'db>,
-    recursion_guard: &RecursionGuard<'db>,
-) {
-    let _cycle = walk_type_with_recursion_guard_fallback(db, ty, visitor, recursion_guard);
-}
-
-/// Walks a type, returning the type when recursion is detected after collecting the exact type.
-#[must_use]
-#[inline]
-pub(crate) fn walk_type_with_recursion_guard_fallback<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    visitor: &impl TypeVisitor<'db>,
-    recursion_guard: &RecursionGuard<'db>,
-) -> Option<Type<'db>> {
-    match TypeKind::from(ty) {
-        TypeKind::Atomic => None,
-        TypeKind::NonAtomic(non_atomic_type) => match recursion_guard.begin_visit(db, ty) {
-            RecursionGuardVisit::AlreadyCollected => None,
-            RecursionGuardVisit::Cycle => Some(ty),
-            RecursionGuardVisit::Pending => {
-                walk_non_atomic_type(db, non_atomic_type, visitor);
-                recursion_guard.finish_visit(db, ty);
-                None
-            }
-        },
-    }
-}
-
 #[derive(Default, Debug)]
 struct TypeCollector<'db>(RefCell<CollectedTypes<'db>>);
 
@@ -332,10 +297,24 @@ impl<'db> TypeCollector<'db> {
     }
 }
 
-enum RecursionGuardVisit {
+enum RecursionGuardVisit<'guard, 'db> {
     AlreadyCollected,
     Cycle,
-    Pending,
+    Pending(ActiveIdentityGuard<'guard, 'db>),
+}
+
+struct ActiveIdentityGuard<'guard, 'db> {
+    active_identities: &'guard RefCell<SmallVec<[TypeIdentity<'db>; 4]>>,
+    identity: Option<TypeIdentity<'db>>,
+}
+
+impl Drop for ActiveIdentityGuard<'_, '_> {
+    fn drop(&mut self) {
+        if let Some(identity) = self.identity {
+            let active_identity = self.active_identities.borrow_mut().pop();
+            debug_assert_eq!(active_identity, Some(identity));
+        }
+    }
 }
 
 /// Guards recursive type walks.
@@ -350,8 +329,43 @@ pub(crate) struct RecursionGuard<'db> {
 }
 
 impl<'db> RecursionGuard<'db> {
+    /// Walks a type while ignoring recursive cycles.
+    ///
+    /// Use [`Self::walk_with_fallback`] if the cycle needs further processing.
     #[inline]
-    fn begin_visit(&self, db: &'db dyn Db, ty: Type<'db>) -> RecursionGuardVisit {
+    pub(crate) fn walk(&self, db: &'db dyn Db, ty: Type<'db>, visitor: &impl TypeVisitor<'db>) {
+        let _cycle = self.walk_with_fallback(db, ty, visitor);
+    }
+
+    /// Walks a type, returning the type when recursion is detected after collecting the exact
+    /// type.
+    #[must_use]
+    #[inline]
+    pub(crate) fn walk_with_fallback(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        visitor: &impl TypeVisitor<'db>,
+    ) -> Option<Type<'db>> {
+        match TypeKind::from(ty) {
+            TypeKind::Atomic => None,
+            TypeKind::NonAtomic(non_atomic_type) => match self.begin_visit(db, ty) {
+                RecursionGuardVisit::AlreadyCollected => None,
+                RecursionGuardVisit::Cycle => Some(ty),
+                RecursionGuardVisit::Pending(_active_identity) => {
+                    walk_non_atomic_type(db, non_atomic_type, visitor);
+                    None
+                }
+            },
+        }
+    }
+
+    #[inline]
+    fn begin_visit<'guard>(
+        &'guard self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> RecursionGuardVisit<'guard, 'db> {
         // Collect the exact type before checking for identity recursion. A recursive type keeps
         // the same identity across different expansions, but callers still need each distinct
         // expanded type to be collected.
@@ -370,14 +384,10 @@ impl<'db> RecursionGuard<'db> {
         if let Some(identity) = active_identity {
             self.active_identities.borrow_mut().push(identity);
         }
-        RecursionGuardVisit::Pending
-    }
-
-    #[inline]
-    fn finish_visit(&self, db: &'db dyn Db, ty: Type<'db>) {
-        if let Some(identity) = ty.recursive_identity(db) {
-            debug_assert_eq!(self.active_identities.borrow_mut().pop(), Some(identity));
-        }
+        RecursionGuardVisit::Pending(ActiveIdentityGuard {
+            active_identities: &self.active_identities,
+            identity: active_identity,
+        })
     }
 }
 
@@ -585,7 +595,7 @@ where
             if new_value != default_value {
                 return;
             }
-            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            self.recursion_guard.walk(db, ty, self);
         }
     }
 

@@ -27,10 +27,7 @@ use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
 };
-use crate::types::visitor::{
-    RecursionGuard, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
-    walk_type_with_recursion_guard_fallback,
-};
+use crate::types::visitor::{RecursionGuard, TypeVisitor, any_over_type};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
@@ -489,7 +486,7 @@ impl<'db> GenericContext<'db> {
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+                self.recursion_guard.walk(db, ty, self);
             }
         }
 
@@ -835,8 +832,7 @@ impl<'db> GenericContext<'db> {
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                let cycle =
-                    walk_type_with_recursion_guard_fallback(db, ty, self, &self.recursion_guard);
+                let cycle = self.recursion_guard.walk_with_fallback(db, ty, self);
                 if let Some(Type::TypeAlias(type_alias)) = cycle {
                     // Keep recursive aliases finite while still seeing typevars in their current
                     // specialization.

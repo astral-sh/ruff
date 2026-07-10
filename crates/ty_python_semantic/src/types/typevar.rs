@@ -20,7 +20,7 @@ use crate::{
         any_over_type, binding_type, definition_expression_type,
         tuple::Tuple,
         variance::VarianceInferable,
-        visitor::{self, RecursionGuard, TypeVisitor, walk_type_with_recursion_guard},
+        visitor::{self, RecursionGuard, TypeVisitor},
     },
 };
 use ty_python_core::{
@@ -847,7 +847,7 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            self.recursion_guard.walk(db, ty, self);
         }
     }
 
