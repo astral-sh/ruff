@@ -1465,12 +1465,12 @@ pub struct TerminalOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AnalysisOptions {
-    /// Whether equality-based checks should only narrow to literal types when it is safe to do so.
+    /// Whether equality-based checks should preserve broad builtin types rather than narrow them to
+    /// literal types.
     ///
     /// By default, ty narrows `value` from `str` to `Literal["a"]` in the positive branch of
-    /// `value == "a"`. When this option is enabled, `value` remains `str`.
-    /// This also applies to membership tests and literal match patterns, which
-    /// also use equality comparisons.
+    /// `value == "a"`. When this option is enabled, `value` remains `str`. This also applies to
+    /// membership tests and literal match patterns, which use equality comparisons.
     ///
     /// ```python
     /// from typing import Literal
@@ -1481,7 +1481,7 @@ pub struct AnalysisOptions {
     ///     return None
     /// ```
     ///
-    /// This narrowing is unsafe because subclasses of these builtin types may override
+    /// This narrowing is unsound because subclasses of these builtin types may override
     /// `__eq__` to compare equal to a literal without inhabiting the corresponding literal type.
     /// For example:
     ///
