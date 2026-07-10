@@ -483,6 +483,10 @@ bitflags! {
         /// This is used when detecting descriptors. An `Any` or `Unknown` base can provide any
         /// member, but that does not mean that every subclass should be treated as a descriptor.
         const REQUIRE_CONCRETE = 1 << 5;
+
+        /// Bind a compatible receiver on a regular `Callable` class member before applying the
+        /// descriptor protocol. This is used for implicit dunder calls only.
+        const BIND_DUNDER_CALLABLE_RECEIVER = 1 << 6;
     }
 }
 
@@ -519,6 +523,11 @@ impl MemberLookupPolicy {
     /// Ignore members that are only available through a dynamic type.
     pub(crate) const fn require_concrete(self) -> bool {
         self.contains(Self::REQUIRE_CONCRETE)
+    }
+
+    /// Bind a compatible receiver on a regular `Callable` before descriptor resolution.
+    pub(crate) const fn bind_dunder_callable_receiver(self) -> bool {
+        self.contains(Self::BIND_DUNDER_CALLABLE_RECEIVER)
     }
 }
 
@@ -3617,6 +3626,14 @@ impl<'db> Type<'db> {
         policy: InstanceFallbackShadowsNonDataDescriptor,
         member_policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
+        let class_member =
+            self.instance_lookup_class_member_with_policy(db, name.into(), member_policy);
+        let class_member = if member_policy.bind_dunder_callable_receiver() {
+            class_member.map_type(|ty| ty.bind_callable_dunder_for_implicit_call(db, receiver))
+        } else {
+            class_member
+        };
+
         let (
             PlaceAndQualifiers {
                 place: meta_attr,
@@ -3625,7 +3642,7 @@ impl<'db> Type<'db> {
             meta_attr_kind,
         ) = Self::try_call_dunder_get_on_attribute(
             db,
-            self.instance_lookup_class_member_with_policy(db, name.into(), member_policy),
+            class_member,
             Some(receiver),
             self.to_meta_type(db),
         );
@@ -4320,6 +4337,12 @@ impl<'db> Type<'db> {
                     );
                     let class_attr_plain =
                         class_attr_plain.map_type(|ty| ty.bind_self_typevars(db, self_instance));
+                    let class_attr_plain = if policy.bind_dunder_callable_receiver() {
+                        class_attr_plain
+                            .map_type(|ty| ty.bind_callable_dunder_for_implicit_call(db, receiver))
+                    } else {
+                        class_attr_plain
+                    };
 
                     let class_attr_fallback = Type::try_call_dunder_get_on_attribute(
                         db,
@@ -4783,7 +4806,8 @@ impl<'db> Type<'db> {
                     .member_lookup_with_policy(
                         db,
                         Name::new_static("__call__"),
-                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                            | MemberLookupPolicy::BIND_DUNDER_CALLABLE_RECEIVER,
                     )
                     .place
                 {
@@ -4792,8 +4816,6 @@ impl<'db> Type<'db> {
                         definedness: boundness,
                         ..
                     }) => {
-                        let dunder_callable =
-                            dunder_callable.bind_callable_dunder_for_implicit_call(db, self);
                         let mut bindings = dunder_callable.bindings(db);
                         bindings.replace_callable_type(dunder_callable, self);
                         if boundness == Definedness::PossiblyUndefined {
@@ -5505,8 +5527,8 @@ impl<'db> Type<'db> {
         )
     }
 
-    /// Bind a regular `Callable`-typed dunder for an implicit special-method call if its first
-    /// parameter can accept the receiver.
+    /// Bind a regular `Callable`-typed class member for an implicit special-method call if its
+    /// first parameter can accept the receiver.
     ///
     /// Unlike descriptor lookup, this preserves the callable as a regular `Callable`: a dunder
     /// name is enough evidence to bind a compatible receiver for implicit dispatch, but it is not
@@ -5556,7 +5578,9 @@ impl<'db> Type<'db> {
 
         // Implicit calls to dunder methods never access instance members, so we pass
         // `NO_INSTANCE_FALLBACK` here in addition to other policies:
-        let policy = policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK;
+        let policy = policy
+            | MemberLookupPolicy::NO_INSTANCE_FALLBACK
+            | MemberLookupPolicy::BIND_DUNDER_CALLABLE_RECEIVER;
         match self
             .member_lookup_with_policy(db, name.into(), policy)
             .place
@@ -5567,8 +5591,6 @@ impl<'db> Type<'db> {
                 provenance,
                 ..
             }) => {
-                let dunder_callable =
-                    dunder_callable.bind_callable_dunder_for_implicit_call(db, self);
                 let constraints = ConstraintSetBuilder::new();
                 let bindings = dunder_callable
                     .bindings(db)
@@ -5608,15 +5630,20 @@ impl<'db> Type<'db> {
         argument_types: &CallArguments<'_, 'db>,
         tcx: TypeContext<'db>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
-        match self.member(db, name).place {
+        match self
+            .member_lookup_with_policy(
+                db,
+                name.into(),
+                MemberLookupPolicy::BIND_DUNDER_CALLABLE_RECEIVER,
+            )
+            .place
+        {
             Place::Defined(DefinedPlace {
                 ty: dunder_callable,
                 definedness: boundness,
                 provenance,
                 ..
             }) => {
-                let dunder_callable =
-                    dunder_callable.bind_callable_dunder_for_implicit_call(db, self);
                 let constraints = ConstraintSetBuilder::new();
                 let bindings = dunder_callable
                     .bindings(db)
@@ -7462,7 +7489,9 @@ impl<'db> UnionType<'db> {
                 .member_lookup_with_policy(
                     db,
                     name.into(),
-                    policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    policy
+                        | MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                        | MemberLookupPolicy::BIND_DUNDER_CALLABLE_RECEIVER,
                 )
                 .place
             {
@@ -7472,7 +7501,7 @@ impl<'db> UnionType<'db> {
                     provenance: member_provenance,
                     ..
                 }) => {
-                    builder = builder.add(ty.bind_callable_dunder_for_implicit_call(db, *element));
+                    builder = builder.add(ty);
                     any_defined = true;
                     possibly_undefined = true;
                     provenance = provenance.or(member_provenance);
@@ -7482,7 +7511,7 @@ impl<'db> UnionType<'db> {
                     provenance: member_provenance,
                     ..
                 }) => {
-                    builder = builder.add(ty.bind_callable_dunder_for_implicit_call(db, *element));
+                    builder = builder.add(ty);
                     any_defined = true;
                     provenance = provenance.or(member_provenance);
                 }

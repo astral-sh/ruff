@@ -296,6 +296,24 @@ class Wrapper:
         self.__antidote_wrapped__.__get__
 ```
 
+The receiver heuristic applies to the class member before descriptor resolution. A callable returned
+by a custom descriptor has already been resolved and is not bound again:
+
+```py
+class Descriptor:
+    def __get__(self, instance: C | None, owner: type[C]) -> Callable[[C, int], C]:
+        return implementation
+
+def implementation(instance: C, value: int) -> C:
+    return instance
+
+class C:
+    __pow__ = Descriptor()
+
+# error: [unsupported-operator]
+C() ** 1
+```
+
 A callable with no arguments cannot accept a receiver, so it remains unbound during both ordinary
 attribute access and implicit calls:
 

@@ -115,7 +115,8 @@ impl<'db> Type<'db> {
                     .member_lookup_with_policy(
                         db,
                         Name::new_static("__call__"),
-                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                            | MemberLookupPolicy::BIND_DUNDER_CALLABLE_RECEIVER,
                     )
                     .place;
 
@@ -124,7 +125,6 @@ impl<'db> Type<'db> {
                 {
                     place
                         .ty
-                        .bind_callable_dunder_for_implicit_call(db, self)
                         .try_upcast_to_callable_with_policy_and_context(db, policy, context)
                         // The callable instance itself doesn't inherit the descriptor behavior of
                         // its `__call__` method.
