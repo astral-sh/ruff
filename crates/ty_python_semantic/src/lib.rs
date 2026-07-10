@@ -91,7 +91,8 @@ pub fn register_lints(registry: &mut LintRegistryBuilder) {
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct AnalysisSettings {
-    /// Whether equality-based checks should only narrow to literal types when it is safe to do so.
+    /// Whether equality-based checks preserve broad builtin types rather than narrow them to
+    /// literal types.
     pub strict_literal_narrowing: bool,
 
     /// Whether errors can be suppressed with `type: ignore` comments.

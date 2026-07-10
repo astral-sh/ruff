@@ -1481,20 +1481,26 @@ pub struct AnalysisOptions {
     ///     return None
     /// ```
     ///
-    /// This narrowing is unsound because subclasses of these builtin types may override
-    /// `__eq__` to compare equal to a literal without inhabiting the corresponding literal type.
-    /// For example:
+    /// Broad builtin types include subclasses, but literal types distinguish values by both their
+    /// runtime type and value. This makes the narrowing unsound even for subclasses that inherit
+    /// builtin equality. For example:
     ///
     /// ```python
-    /// from typing import Literal
+    /// class StringSubclass(str): ...
     ///
+    /// result = parse(StringSubclass("a"))
+    /// # Statically `Literal["a"] | None`, but `result` has runtime type `StringSubclass`.
+    /// ```
+    ///
+    /// A subclass can also override `__eq__` to compare equal to a literal with a different value:
+    ///
+    /// ```python
     /// class MisleadingStr(str):
     ///     def __eq__(self, other: object) -> bool:
     ///         return True
     ///
-    /// value: str = MisleadingStr("b")
-    /// if value == "a":
-    ///     literal: Literal["a"] = value  # Accepted, but `literal` contains `"b"`.
+    /// result = parse(MisleadingStr("b"))
+    /// # Statically `Literal["a"] | None`, but `result` contains `"b"` at runtime.
     /// ```
     ///
     /// Enable this option to preserve the broader builtin type instead.
@@ -1504,7 +1510,7 @@ pub struct AnalysisOptions {
         default = r#"false"#,
         value_type = "bool",
         example = r#"
-        # Only narrow to literals when it is safe to do so
+        # Preserve broad builtin types instead of narrowing them to literals
         strict-literal-narrowing = true
         "#
     )]
