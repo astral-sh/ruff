@@ -3720,6 +3720,48 @@ def func(t: _T) -> _T:
     );
 }
 
+/// Test that `noqa` comments with rule codes
+/// 1. Get replaced with Ruff-specific suppression comments (RUF105)
+/// 2. Use human-readable rule names instead of codes (RUF106)
+#[test]
+fn noqa_comments_to_human_readable_ruff_ignores() -> Result<()> {
+    let fixture = CliTest::new()?;
+    let source = "# ruff: noqa: F401
+import os
+
+def foo():
+    value = 1  # noqa: F841
+";
+
+    assert_cmd_snapshot!(
+        fixture
+            .check_command()
+            .args([
+                "--select=F401,F841,RUF105,RUF106",
+                "--stdin-filename=test.py",
+                "--fix",
+                "--preview",
+                "-",
+            ])
+            .pass_stdin(source),
+        @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        # ruff:file-ignore[unused-import]
+        import os
+
+        def foo():
+            value = 1  # ruff:ignore[unused-variable]
+
+        ----- stderr -----
+        Found 4 errors (4 fixed, 0 remaining).
+        ",
+    );
+
+    Ok(())
+}
+
 /// Test that we do not rename two different type parameters to the same name
 /// in one execution of Ruff (autofixing this to `class Foo[T, T]: ...` would
 /// introduce invalid syntax)

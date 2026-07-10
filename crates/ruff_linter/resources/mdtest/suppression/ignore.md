@@ -226,7 +226,7 @@ values = [
 ```toml
 [lint]
 preview = true
-select = ["E501", "F401", "RUF10"]
+select = ["E501", "F401", "RUF100", "RUF103", "RUF104"]
 ```
 
 An intervening `ruff:ignore` directive shouldn't cause a `disable`/`enable` pair to be reported as
@@ -304,7 +304,7 @@ def f():
 ```toml
 [lint]
 preview = true
-select = ["F401", "RUF10"]
+select = ["F401", "RUF100", "RUF104"]
 ```
 
 A `file-ignore` within a range suppression takes precedence and marks the `disable` as unused:
@@ -568,7 +568,7 @@ help: Remove unused suppression
 ```toml
 [lint]
 preview = true
-select = ["F401", "RUF10"]
+select = ["F401", "RUF103", "RUF104"]
 ```
 
 `ruff:ignore` comments nested within other comments should still work:
@@ -618,7 +618,7 @@ import foo
 ```toml
 [lint]
 preview = true
-select = ["F401", "RUF10"]
+select = ["F401", "RUF103", "RUF104"]
 ```
 
 Nested `disable` and `file-ignore` comments are also invalid and don't suppress diagnostics on the
@@ -700,7 +700,7 @@ a = 10
 ```toml
 [lint]
 preview = true
-select = ["E501", "F821", "RUF10"]
+select = ["E501", "F821", "RUF100", "RUF103"]
 ```
 
 `RUF100` should have an unsafe fix when deleting a leading suppression would change the placement
@@ -774,7 +774,7 @@ note: This is an unsafe fix and may change runtime behavior
 ```toml
 [lint]
 preview = true
-select = ["E501", "RUF10", "FIX002"]
+select = ["E501", "RUF100", "FIX002"]
 ```
 
 Deleting either half of a `disable`/`enable` pair should make the fix unsafe if in a nested context:
@@ -812,7 +812,7 @@ note: This is an unsafe fix and may change runtime behavior
 ```toml
 [lint]
 preview = true
-select = ["E501", "F401", "F821", "RUF10"]
+select = ["E501", "F401", "F821", "RUF100", "RUF103"]
 ```
 
 Removing a code from a multi-code suppression doesn't promote the later suppression, so the fix is
@@ -846,7 +846,7 @@ help: Remove unused suppression
 ```toml
 [lint]
 preview = true
-select = ["F821", "RUF10"]
+select = ["F821", "RUF102", "RUF103"]
 ```
 
 The `RUF102` fix should also be unsafe when it would promote a later suppression:
@@ -882,7 +882,7 @@ note: This is an unsafe fix and may change runtime behavior
 ```toml
 [lint]
 preview = true
-select = ["F401", "F821", "RUF10"]
+select = ["F401", "F821", "RUF100", "RUF103"]
 ```
 
 The same applies to fixes for invalid suppression placement:
