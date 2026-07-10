@@ -777,6 +777,41 @@ class PersonAllowingExtras(BaseModel):
 PersonAllowingExtras(name="Alice", something_else=7)
 ```
 
+## Custom initializers and extra fields
+
+A custom initializer that accepts arbitrary keyword arguments does not prevent a subclass from
+accepting extra data:
+
+```py
+from typing import Any
+
+from pydantic import BaseModel
+
+class FrameworkBase(BaseModel):
+    def __init__(self, **data: Any) -> None:
+        super().__init__(**data)
+
+class User(FrameworkBase):
+    name: str
+
+reveal_type(User.__init__)  # revealed: (self: User, *, name: LaxStr, **extra: Any) -> None
+User(name="Alice", city="Berlin")
+```
+
+A fixed custom initializer continues to control the accepted arguments:
+
+```py
+class RestrictiveBase(BaseModel):
+    def __init__(self, name: str) -> None:
+        super().__init__(name=name)
+
+class RestrictiveUser(RestrictiveBase):
+    name: str
+
+RestrictiveUser(name="Alice")
+RestrictiveUser(name="Alice", city="Berlin")  # error: [unknown-argument]
+```
+
 ## Field named `extra`
 
 The variadic keyword parameter uses a collision-free name when the model already has a field named
