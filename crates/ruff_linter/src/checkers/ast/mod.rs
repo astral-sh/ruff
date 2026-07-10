@@ -1853,64 +1853,66 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }) => {
                 self.visit_expr(func);
 
-                let qualified_name_opt = self.semantic.resolve_qualified_name(func);
-
-                let callable = qualified_name_opt.as_ref().and_then(|qualified_name| {
-                    if self
-                        .semantic
-                        .match_typing_qualified_name(qualified_name, "cast")
-                    {
-                        Some(typing::Callable::Cast)
-                    } else if self
-                        .semantic
-                        .match_typing_qualified_name(qualified_name, "NewType")
-                    {
-                        Some(typing::Callable::NewType)
-                    } else if self
-                        .semantic
-                        .match_typing_qualified_name(qualified_name, "TypeVar")
-                    {
-                        Some(typing::Callable::TypeVar)
-                    } else if self
-                        .semantic
-                        .match_typing_qualified_name(qualified_name, "TypeAliasType")
-                    {
-                        Some(typing::Callable::TypeAliasType)
-                    } else if self
-                        .semantic
-                        .match_typing_qualified_name(qualified_name, "NamedTuple")
-                    {
-                        Some(typing::Callable::NamedTuple)
-                    } else if self
-                        .semantic
-                        .match_typing_qualified_name(qualified_name, "TypedDict")
-                    {
-                        Some(typing::Callable::TypedDict)
-                    } else if matches!(
-                        qualified_name.segments(),
-                        [
-                            "mypy_extensions",
-                            "Arg"
-                                | "DefaultArg"
-                                | "NamedArg"
-                                | "DefaultNamedArg"
-                                | "VarArg"
-                                | "KwArg"
-                        ]
-                    ) {
-                        Some(typing::Callable::MypyExtension)
-                    } else if matches!(qualified_name.segments(), ["" | "builtins", "bool"]) {
-                        Some(typing::Callable::Bool)
-                    } else if !self.settings().extend_type_form_callables.is_empty()
-                        && self.settings().extend_type_form_callables.keys().any(|name_str| {
-                            *qualified_name == QualifiedName::user_defined(name_str)
-                        })
-                    {
-                        Some(typing::Callable::ExtendTypeForm)
-                    } else {
-                        None
-                    }
-                });
+                let callable =
+                    self.semantic
+                        .resolve_qualified_name(func)
+                        .and_then(|qualified_name| {
+                            if self
+                                .semantic
+                                .match_typing_qualified_name(&qualified_name, "cast")
+                            {
+                                Some(typing::Callable::Cast)
+                            } else if self
+                                .semantic
+                                .match_typing_qualified_name(&qualified_name, "NewType")
+                            {
+                                Some(typing::Callable::NewType)
+                            } else if self
+                                .semantic
+                                .match_typing_qualified_name(&qualified_name, "TypeVar")
+                            {
+                                Some(typing::Callable::TypeVar)
+                            } else if self
+                                .semantic
+                                .match_typing_qualified_name(&qualified_name, "TypeAliasType")
+                            {
+                                Some(typing::Callable::TypeAliasType)
+                            } else if self
+                                .semantic
+                                .match_typing_qualified_name(&qualified_name, "NamedTuple")
+                            {
+                                Some(typing::Callable::NamedTuple)
+                            } else if self
+                                .semantic
+                                .match_typing_qualified_name(&qualified_name, "TypedDict")
+                            {
+                                Some(typing::Callable::TypedDict)
+                            } else if matches!(
+                                qualified_name.segments(),
+                                [
+                                    "mypy_extensions",
+                                    "Arg"
+                                        | "DefaultArg"
+                                        | "NamedArg"
+                                        | "DefaultNamedArg"
+                                        | "VarArg"
+                                        | "KwArg"
+                                ]
+                            ) {
+                                Some(typing::Callable::MypyExtension)
+                            } else if matches!(qualified_name.segments(), ["" | "builtins", "bool"])
+                            {
+                                Some(typing::Callable::Bool)
+                            } else if !self.settings().extend_type_form_callables.is_empty()
+                                && self.settings().extend_type_form_callables.keys().any(|name_str| {
+                                    qualified_name == QualifiedName::user_defined(name_str)
+                                })
+                            {
+                                Some(typing::Callable::ExtendTypeForm)
+                            } else {
+                                None
+                            }
+                        });
 
                 match callable {
                     Some(typing::Callable::Bool) => {
@@ -2118,13 +2120,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
                     }
                     Some(typing::Callable::ExtendTypeForm) => {
-                        let qualified_name = qualified_name_opt.as_ref().unwrap();
+                        let qualified_name = self.semantic.resolve_qualified_name(func).unwrap();
                         let args = self
                             .settings()
                             .extend_type_form_callables
                             .iter()
                             .find_map(|(name_str, args)| {
-                                if *qualified_name == QualifiedName::user_defined(name_str) {
+                                if qualified_name == QualifiedName::user_defined(name_str) {
                                     Some(args)
                                 } else {
                                     None
