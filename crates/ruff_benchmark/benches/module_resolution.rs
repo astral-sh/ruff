@@ -62,7 +62,7 @@ fn setup_case(n: usize) -> Case {
     fs.write_file_all(&importing_path, "").unwrap();
 
     let mut metadata = ProjectMetadata::discover(SystemPath::new("/src"), &system).unwrap();
-    metadata.apply_options(Options {
+    metadata.apply_override_options(Options {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(SupportedPythonVersion::Py312)),
             extra_paths: Some(extra_paths),

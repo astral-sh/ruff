@@ -24,7 +24,6 @@ use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ruff_db::{STACK_SIZE, max_parallelism};
 use ruff_diagnostics::Applicability;
 use salsa::Database;
-use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{CollectReporter, Db, watch};
@@ -162,8 +161,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     project_metadata.apply_configuration_files(&system)?;
 
-    let project_options_overrides = ProjectOptionsOverrides::new(config_file, args.into_options());
-    project_metadata.apply_overrides(&project_options_overrides);
+    project_metadata.apply_override_options(args.into_options());
 
     let mut db = ProjectDatabase::fallible(project_metadata, system)?;
     let project = db.project();
@@ -189,8 +187,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         db.freeze();
     }
 
-    let (main_loop, main_loop_cancellation_token) =
-        MainLoop::new(mode, project_options_overrides, printer);
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new(mode, printer);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -280,8 +277,6 @@ struct MainLoop {
     /// Interface for displaying information to the user.
     printer: Printer,
 
-    project_options_overrides: ProjectOptionsOverrides,
-
     /// Cancellation token that gets set by Ctrl+C.
     /// Used for long-running operations on the main thread. Operations on background threads
     /// use Salsa's cancellation mechanism.
@@ -289,11 +284,7 @@ struct MainLoop {
 }
 
 impl MainLoop {
-    fn new(
-        mode: MainLoopMode,
-        project_options_overrides: ProjectOptionsOverrides,
-        printer: Printer,
-    ) -> (Self, MainLoopCancellationToken) {
+    fn new(mode: MainLoopMode, printer: Printer) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
         let cancellation_token_source = CancellationTokenSource::new();
@@ -305,7 +296,6 @@ impl MainLoop {
                 sender: sender.clone(),
                 receiver,
                 watcher: None,
-                project_options_overrides,
                 printer,
                 cancellation_token,
             },
@@ -476,7 +466,7 @@ impl MainLoop {
 
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
-                    db.apply_changes(&changes, Some(&self.project_options_overrides));
+                    db.apply_changes(&changes);
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }

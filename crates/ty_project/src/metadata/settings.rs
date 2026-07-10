@@ -188,12 +188,14 @@ fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<InnerOverrideOptions>>, _: ()
         merged.combine_with((*option).clone());
     }
 
-    let global_options = db.project().metadata(db).options();
+    let metadata = db.project().metadata(db);
 
-    merged.rules.combine_with(global_options.rules.clone());
-    merged
-        .analysis
-        .combine_with(global_options.analysis.clone());
+    // Merge with the project level options by replaying the individual options
+    // in the correct precedence order.
+    for options in metadata.options_in_precedence_order(metadata.options()) {
+        merged.rules.combine_with(options.rules.clone());
+        merged.analysis.combine_with(options.analysis.clone());
+    }
 
     if merged.rules.is_none() && merged.analysis.is_none() {
         return FileSettings::Global;
