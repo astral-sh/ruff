@@ -199,6 +199,10 @@ impl SemanticDb for Db {
         self.settings().verbose(self)
     }
 
+    fn is_open_file(&self, _file: File) -> bool {
+        false
+    }
+
     fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
         self.settings().analysis(self)
     }

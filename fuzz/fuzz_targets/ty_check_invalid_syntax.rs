@@ -127,6 +127,10 @@ impl SemanticDb for TestDb {
         false
     }
 
+    fn is_open_file(&self, _file: File) -> bool {
+        false
+    }
+
     fn dyn_clone(&self) -> Box<dyn ty_python_semantic::Db> {
         Box::new(self.clone())
     }

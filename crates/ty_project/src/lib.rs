@@ -51,10 +51,10 @@ pub mod watch;
 #[salsa::input(heap_size=ruff_memory_usage::heap_size)]
 #[derive(Debug)]
 pub struct Project {
-    /// The files that are open in the project, [`None`] if there are no open files.
+    /// The files that are open in the project.
     #[returns(ref)]
     #[default]
-    open_fileset: FxHashSet<File>,
+    open_fileset: OpenFileSet,
 
     /// The first-party files of this project.
     #[default]
@@ -122,6 +122,81 @@ pub struct Project {
     #[returns(copy)]
     force_exclude_flag: bool,
 }
+
+/// The set of files that are open in the editor.
+///
+/// Defaults to [`AlwaysEmpty`] with a `HIGH` durability so that batch runs, which never open
+/// files, don't take a low-durability dependency in every type-inference query that asks
+/// whether a file is open. The language server switches to [`Files`] (with `LOW` durability)
+/// immediately after creating the database, before running any inference, so that later
+/// open/close events never invalidate high-durability memos.
+///
+/// [`AlwaysEmpty`]: OpenFileSet::AlwaysEmpty
+/// [`Files`]: OpenFileSet::Files
+#[derive(Debug, Clone, PartialEq, Eq, Default, get_size2::GetSize)]
+pub enum OpenFileSet {
+    /// No files are open and the set never changes.
+    #[default]
+    AlwaysEmpty,
+
+    /// The files currently open in the editor.
+    Files(FxHashSet<File>),
+}
+
+impl OpenFileSet {
+    pub fn contains(&self, file: File) -> bool {
+        match self {
+            OpenFileSet::AlwaysEmpty => false,
+            OpenFileSet::Files(files) => files.contains(&file),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            OpenFileSet::AlwaysEmpty => 0,
+            OpenFileSet::Files(files) => files.len(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn iter(&self) -> OpenFileSetIter<'_> {
+        match self {
+            OpenFileSet::AlwaysEmpty => OpenFileSetIter(None),
+            OpenFileSet::Files(files) => OpenFileSetIter(Some(files.iter())),
+        }
+    }
+
+    fn into_files(self) -> FxHashSet<File> {
+        match self {
+            OpenFileSet::AlwaysEmpty => FxHashSet::default(),
+            OpenFileSet::Files(files) => files,
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a OpenFileSet {
+    type Item = File;
+    type IntoIter = OpenFileSetIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+pub struct OpenFileSetIter<'a>(Option<hash_set::Iter<'a, File>>);
+
+impl Iterator for OpenFileSetIter<'_> {
+    type Item = File;
+
+    fn next(&mut self) -> Option<File> {
+        self.0.as_mut()?.next().copied()
+    }
+}
+
+impl FusedIterator for OpenFileSetIter<'_> {}
 
 /// A progress reporter.
 pub trait ProgressReporter: Send + Sync {
@@ -191,7 +266,7 @@ impl Project {
 
         Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
             .durability(Durability::MEDIUM)
-            .open_fileset_durability(Durability::LOW)
+            .open_fileset_durability(Durability::HIGH)
             .file_set_durability(Durability::LOW)
             .new(db)
     }
@@ -403,7 +478,7 @@ impl Project {
 
                         // This is outside `check_file_impl` to avoid that opening or closing
                         // a file invalidates the `check_file_impl` query of every file!
-                        if !open_files.contains(&file) {
+                        if !open_files.contains(file) {
                             // The module has already been parsed by `check_file_impl`.
                             // We only retrieve it here so that we can call `clear` on it.
                             let parsed = parsed_module(db, file);
@@ -490,17 +565,22 @@ impl Project {
         }
     }
 
-    /// Returns the open files in the project or `None` if there are no open files.
-    pub fn open_files(self, db: &dyn Db) -> &FxHashSet<File> {
+    /// Returns the open files in the project.
+    pub fn open_files(self, db: &dyn Db) -> &OpenFileSet {
         self.open_fileset(db)
     }
 
     /// Sets the open files in the project.
+    ///
+    /// This switches the open file set to [`OpenFileSet::Files`] with a `LOW` durability,
+    /// see [`OpenFileSet`].
     #[tracing::instrument(level = "debug", skip(self, db))]
     pub fn set_open_files(self, db: &mut dyn Db, open_files: FxHashSet<File>) {
         tracing::debug!("Set open project files (count: {})", open_files.len());
 
-        self.set_open_fileset(db).to(open_files);
+        self.set_open_fileset(db)
+            .with_durability(Durability::LOW)
+            .to(OpenFileSet::Files(open_files));
     }
 
     /// This takes the open files from the project and returns them.
@@ -509,7 +589,10 @@ impl Project {
 
         // Salsa will cancel any pending queries and remove its own reference to `open_files`
         // so that the reference counter to `open_files` now drops to 1.
-        self.set_open_fileset(db).to(FxHashSet::default())
+        self.set_open_fileset(db)
+            .with_durability(Durability::LOW)
+            .to(OpenFileSet::Files(FxHashSet::default()))
+            .into_files()
     }
 
     #[tracing::instrument(level = "debug", skip(self, db))]
@@ -686,7 +769,7 @@ pub(crate) fn should_check_file(db: &dyn Db, file: File) -> bool {
 
     match project.check_mode(db) {
         CheckMode::OpenFiles => {
-            let should_check = project.open_files(db).contains(&file);
+            let should_check = project.open_files(db).contains(file);
             if !should_check {
                 tracing::trace!(
                     "Not checking {path} because check mode is `OpenFiles` \
@@ -710,7 +793,7 @@ pub(crate) fn should_check_file(db: &dyn Db, file: File) -> bool {
             }
 
             let should_check =
-                project.files(db).contains(&file) || project.open_files(db).contains(&file);
+                project.files(db).contains(&file) || project.open_files(db).contains(file);
             if !should_check {
                 tracing::trace!(
                     "Not checking {path} because check mode is `AllFiles` \
@@ -747,7 +830,7 @@ pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Result<Box<[Diagnostic
 
 #[derive(Debug)]
 enum ProjectFiles<'a> {
-    OpenFiles(&'a FxHashSet<File>),
+    OpenFiles(&'a OpenFileSet),
     Indexed(files::Indexed<'a>),
 }
 
@@ -787,7 +870,7 @@ impl<'a> IntoIterator for &'a ProjectFiles<'a> {
 }
 
 enum ProjectFilesIter<'db> {
-    OpenFiles(hash_set::Iter<'db, File>),
+    OpenFiles(OpenFileSetIter<'db>),
     Indexed(files::IndexedIter<'db>),
 }
 
@@ -796,7 +879,7 @@ impl Iterator for ProjectFilesIter<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            ProjectFilesIter::OpenFiles(files) => files.next().copied(),
+            ProjectFilesIter::OpenFiles(files) => files.next(),
             ProjectFilesIter::Indexed(files) => files.next(),
         }
     }

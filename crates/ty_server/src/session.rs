@@ -21,6 +21,7 @@ use ruff_db::Db;
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
+use rustc_hash::FxHashSet;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
 use ty_project::watch::{ChangeEvent, CreatedKind};
@@ -611,7 +612,7 @@ impl Session {
                 ProjectDatabase::fallible(metadata, system.clone())
             });
 
-        let (root, db) = match project {
+        let (root, mut db) = match project {
             Ok(db) => (root, db),
             Err(err) => {
                 tracing::error!(
@@ -639,6 +640,10 @@ impl Session {
                 (default_root, db_with_default_settings)
             }
         };
+
+        // Switch to editor open-file tracking before running any inference so that later
+        // open/close events never invalidate high-durability memos, see `OpenFileSet`.
+        db.project().set_open_files(&mut db, FxHashSet::default());
 
         // Carry forward diagnostic state if any exists
         let previous = self.projects.remove(&root);
