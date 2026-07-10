@@ -3518,6 +3518,25 @@ impl<'db> Type<'db> {
         self.is_data_descriptor_impl(d, true)
     }
 
+    /// Returns whether this type is known not to be a data descriptor.
+    ///
+    /// Descriptor uncertainty only propagates through outer unions, intersections, and aliases;
+    /// type arguments do not affect the runtime descriptor class.
+    pub(crate) fn is_definitely_non_data_descriptor(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Dynamic(_) | Type::Divergent(_) | Type::TypeVar(_) => false,
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|ty| ty.is_definitely_non_data_descriptor(db)),
+            Type::Intersection(intersection) => intersection
+                .iter_positive(db)
+                .all(|ty| ty.is_definitely_non_data_descriptor(db)),
+            Type::TypeAlias(alias) => alias.value_type(db).is_definitely_non_data_descriptor(db),
+            _ => !self.may_be_data_descriptor(db),
+        }
+    }
+
     fn is_data_descriptor_impl(self, db: &'db dyn Db, any_of_union: bool) -> bool {
         match self {
             Type::Dynamic(_) => !any_of_union,
