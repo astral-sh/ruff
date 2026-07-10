@@ -2845,10 +2845,11 @@ def update_never_value(value: HasNeverValue, new_value: Never) -> None:
 ### Optional trailing setter parameters
 
 A setter remains callable by the descriptor protocol when parameters after the assigned value can
-all be omitted. Required trailing parameters make the setter incompatible with attribute assignment.
+all be omitted. This includes a gradual `*args: Any, **kwargs: Any` tail. Required trailing
+parameters make the setter incompatible with attribute assignment.
 
 ```py
-from typing import Protocol
+from typing import Any, Protocol
 
 class OptionalTrailingDescriptor:
     def __init__(self, getter: object) -> None: ...
@@ -2870,6 +2871,21 @@ class HasOptionalTrailingValue(Protocol):
     def value(self) -> int: ...
 
 def update_optional_trailing_value(value: HasOptionalTrailingValue) -> None:
+    value.value = 1
+    value.value = "bad"  # error: [invalid-assignment]
+
+class GradualTrailingDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        raise NotImplementedError
+
+    def __set__(self, instance: object, value: int, *args: Any, **kwargs: Any) -> None: ...
+
+class HasGradualTrailingValue(Protocol):
+    @GradualTrailingDescriptor
+    def value(self) -> int: ...
+
+def update_gradual_trailing_value(value: HasGradualTrailingValue) -> None:
     value.value = 1
     value.value = "bad"  # error: [invalid-assignment]
 

@@ -1430,7 +1430,7 @@ fn descriptor_setter_signature_write_type<'db>(
     let trailing_parameters = parameters.as_slice().get(3..)?;
     if !trailing_parameters.iter().all(|parameter| {
         parameter.default_type().is_some()
-            || (parameters.is_standard()
+            || ((parameters.is_standard() || parameters.is_gradual())
                 && (parameter.is_variadic() || parameter.is_keyword_variadic()))
     }) {
         return None;
