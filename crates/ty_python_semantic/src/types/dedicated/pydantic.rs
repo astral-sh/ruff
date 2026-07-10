@@ -94,6 +94,149 @@ impl Default for FieldMetadata<'_> {
 }
 
 impl<'db> FieldMetadata<'db> {
+    /// Collect Pydantic field metadata from the right-hand side of a field's assignment.
+    ///
+    /// For example, collect the default value and alias from the following field assignment:
+    /// ```py
+    /// field: int = Field(default=0, alias="field_alias")
+    /// ```
+    fn collect_from_rhs_type(
+        &mut self,
+        db: &'db dyn Db,
+        rhs_type: Option<Type<'db>>,
+        specialization: Option<Specialization<'db>>,
+    ) {
+        match rhs_type {
+            Some(Type::KnownInstance(KnownInstanceType::Field(field))) => {
+                self.merge_field(db, field, specialization);
+            }
+            Some(rhs_type) => self.default_ty = Some(rhs_type),
+            None => {}
+        }
+    }
+
+    /// Collect Pydantic field metadata from a field's annotation.
+    ///
+    /// For example, collect the strictness metadata from the following field annotation:
+    /// ```py
+    /// field: Annotated[int, Strict()]
+    /// ```
+    ///
+    /// This method also handles the case where the annotation is an alias to an `Annotated` type, such as:
+    /// ```py
+    /// field: StrictInt
+    /// ```
+    /// where `StrictInt` is defined as `StrictInt = Annotated[int, Strict()]`.
+    fn collect_from_annotation(
+        &mut self,
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+        specialization: Option<Specialization<'db>>,
+    ) {
+        let module = parsed_module(db, definition.file(db)).load(db);
+        let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) else {
+            return;
+        };
+        let annotation = assignment.annotation(&module);
+
+        if self.collect_from_annotated(db, definition, annotation, specialization) {
+            return;
+        }
+
+        let Expr::Name(name) = annotation else {
+            return;
+        };
+
+        // The following part is unfortunate. Pydantic defines `StrictInt` and the other aliases
+        // using `StrictInt = Annotated[int, Strict()]`. Since we don't retain the `Annotated`
+        // metadata, we need to follow the alias back to its definition and parse the metadata
+        // from there.
+        let model = SemanticModel::new(db, definition.file(db));
+        let Some(alias_definition) = definitions_for_name(
+            &model,
+            name.id.as_str(),
+            name.into(),
+            ImportAliasResolution::ResolveAliases,
+        )
+        .into_iter()
+        .find_map(|resolved| resolved.definition()) else {
+            return;
+        };
+
+        let module = parsed_module(db, alias_definition.file(db)).load(db);
+        let kind = alias_definition.kind(db);
+        let value = match &kind {
+            DefinitionKind::Assignment(assignment) => assignment.value(&module),
+            DefinitionKind::AnnotatedAssignment(assignment) => {
+                let Some(value) = assignment.value(&module) else {
+                    return;
+                };
+                value
+            }
+            _ => return,
+        };
+
+        self.collect_from_annotated(db, alias_definition, value, specialization);
+    }
+
+    /// Collect Pydantic field metadata from the `Annotated` part of a field's annotation.
+    fn collect_from_annotated(
+        &mut self,
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+        annotation: &Expr,
+        specialization: Option<Specialization<'db>>,
+    ) -> bool {
+        let Some(subscript) = annotation.as_subscript_expr() else {
+            return false;
+        };
+        if definition_expression_type(db, definition, &subscript.value)
+            != Type::SpecialForm(SpecialFormType::Annotated)
+        {
+            return false;
+        }
+        let Some(arguments) = subscript
+            .slice
+            .as_tuple_expr()
+            .and_then(|tuple| tuple.elts.get(1..))
+        else {
+            return false;
+        };
+
+        for metadata in arguments {
+            let Some(call) = metadata.as_call_expr() else {
+                continue;
+            };
+            let callee = definition_expression_type(db, definition, &call.func);
+
+            if callee
+                .as_class_literal()
+                .is_some_and(|class| class.is_known(db, KnownClass::PydanticStrict))
+            {
+                let strict = call.arguments.find_argument_value("strict", 0).map_or(
+                    ConfigBoolean::Enabled,
+                    |strict| {
+                        ConfigBoolean::from_type(definition_expression_type(db, definition, strict))
+                    },
+                );
+                self.merge_strict(strict);
+            } else if matches!(
+                callee,
+                Type::FunctionLiteral(function)
+                    if function.is_known(db, KnownFunction::PydanticField)
+            ) {
+                let field_type = definition_expression_type(db, definition, metadata);
+                if let Type::KnownInstance(KnownInstanceType::Field(field)) = field_type {
+                    self.merge_field(db, field, specialization);
+                } else {
+                    self.merge_field_call(db, definition, call, field_type, specialization);
+                }
+            }
+        }
+
+        true
+    }
+
     fn merge_strict(&mut self, strict: ConfigBoolean) {
         self.strict = strict;
     }
@@ -156,130 +299,6 @@ impl<'db> FieldMetadata<'db> {
             }
         }
     }
-
-    fn merge_rhs_type(
-        &mut self,
-        db: &'db dyn Db,
-        rhs_type: Option<Type<'db>>,
-        specialization: Option<Specialization<'db>>,
-    ) {
-        match rhs_type {
-            Some(Type::KnownInstance(KnownInstanceType::Field(field))) => {
-                self.merge_field(db, field, specialization);
-            }
-            Some(rhs_type) => self.default_ty = Some(rhs_type),
-            None => {}
-        }
-    }
-
-    fn collect_annotation(
-        &mut self,
-        db: &'db dyn Db,
-        definition: Definition<'db>,
-        specialization: Option<Specialization<'db>>,
-    ) {
-        let module = parsed_module(db, definition.file(db)).load(db);
-        let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) else {
-            return;
-        };
-        let annotation = assignment.annotation(&module);
-
-        if self.collect_from_annotated(db, definition, annotation, specialization) {
-            return;
-        }
-
-        let Expr::Name(name) = annotation else {
-            return;
-        };
-
-        // The following part is unfortunate. Pydantic defines `StrictInt` and the other aliases
-        // using `StrictInt = Annotated[int, Strict()]`. Since we don't retain the `Annotated`
-        // metadata, we need to follow the alias back to its definition and parse the metadata
-        // from there.
-        let model = SemanticModel::new(db, definition.file(db));
-        let Some(alias_definition) = definitions_for_name(
-            &model,
-            name.id.as_str(),
-            name.into(),
-            ImportAliasResolution::ResolveAliases,
-        )
-        .into_iter()
-        .find_map(|resolved| resolved.definition()) else {
-            return;
-        };
-
-        let module = parsed_module(db, alias_definition.file(db)).load(db);
-        let kind = alias_definition.kind(db);
-        let value = match &kind {
-            DefinitionKind::Assignment(assignment) => assignment.value(&module),
-            DefinitionKind::AnnotatedAssignment(assignment) => {
-                let Some(value) = assignment.value(&module) else {
-                    return;
-                };
-                value
-            }
-            _ => return,
-        };
-
-        self.collect_from_annotated(db, alias_definition, value, specialization);
-    }
-
-    fn collect_from_annotated(
-        &mut self,
-        db: &'db dyn Db,
-        definition: Definition<'db>,
-        annotation: &Expr,
-        specialization: Option<Specialization<'db>>,
-    ) -> bool {
-        let Some(subscript) = annotation.as_subscript_expr() else {
-            return false;
-        };
-        if definition_expression_type(db, definition, &subscript.value)
-            != Type::SpecialForm(SpecialFormType::Annotated)
-        {
-            return false;
-        }
-        let Some(arguments) = subscript
-            .slice
-            .as_tuple_expr()
-            .and_then(|tuple| tuple.elts.get(1..))
-        else {
-            return false;
-        };
-
-        for metadata in arguments {
-            let Some(call) = metadata.as_call_expr() else {
-                continue;
-            };
-            let callee = definition_expression_type(db, definition, &call.func);
-
-            if callee
-                .as_class_literal()
-                .is_some_and(|class| class.is_known(db, KnownClass::PydanticStrict))
-            {
-                let strict = call.arguments.find_argument_value("strict", 0).map_or(
-                    ConfigBoolean::Enabled,
-                    |strict| {
-                        ConfigBoolean::from_type(definition_expression_type(db, definition, strict))
-                    },
-                );
-                self.merge_strict(strict);
-            } else if matches!(
-                callee,
-                Type::FunctionLiteral(function)
-                    if function.is_known(db, KnownFunction::PydanticField)
-            ) {
-                let field_type = definition_expression_type(db, definition, metadata);
-                if let Type::KnownInstance(KnownInstanceType::Field(field)) = field_type {
-                    self.merge_field(db, field, specialization);
-                } else {
-                    self.merge_field_call(db, definition, call, field_type, specialization);
-                }
-            }
-        }
-
-        true
-    }
 }
 
 /// Resolve a Pydantic field's metadata from its annotation and right-hand side.
@@ -291,9 +310,9 @@ pub(in crate::types) fn field_metadata<'db>(
 ) -> FieldMetadata<'db> {
     let mut metadata = FieldMetadata::default();
     if let Some(definition) = definition {
-        metadata.collect_annotation(db, definition, specialization);
+        metadata.collect_from_annotation(db, definition, specialization);
     }
-    metadata.merge_rhs_type(db, rhs_type, specialization);
+    metadata.collect_from_rhs_type(db, rhs_type, specialization);
     metadata
 }
 
