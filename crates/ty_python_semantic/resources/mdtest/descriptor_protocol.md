@@ -399,6 +399,7 @@ class C(metaclass=Meta):
     attribute: int = 1
 
 C.attribute = 1  # error: [invalid-assignment]
+C.attribute = Descriptor  # error: [invalid-assignment]
 ```
 
 ### Bounded class-object metaclass attributes
@@ -423,6 +424,7 @@ class C(metaclass=Meta):
     attribute: int = 1
 
 C.attribute = 1  # error: [invalid-assignment]
+C.attribute = Descriptor  # error: [invalid-assignment]
 ```
 
 ### Class objects with unknown metaclasses
