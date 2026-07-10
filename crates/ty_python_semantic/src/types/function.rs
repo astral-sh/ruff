@@ -2373,9 +2373,9 @@ impl KnownFunction {
                     return;
                 };
                 let casted_type = casted_type.project_type_form(db);
-                if non_any_dynamic_content(db, *source_type).is_absent()
+                if source_type.is_equivalent_to(db, casted_type)
+                    && non_any_dynamic_content(db, *source_type).is_absent()
                     && non_any_dynamic_content(db, casted_type).is_absent()
-                    && source_type.is_equivalent_to(db, casted_type)
                 {
                     if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
                         let source_display = source_type.display(db).to_string();

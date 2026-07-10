@@ -4685,9 +4685,9 @@ def f(x: PGconn):
 
 ### Recursive protocols used as the first argument to `cast()`
 
-Checking whether a type contains `Unknown` or `Todo` must terminate for recursive protocols. If
-traversal re-enters the protocol definition under a different specialization, the result is
-indeterminate and `redundant-cast` is conservatively suppressed:
+These caused issues in an early version of our `Protocol` implementation due to the fact that we use
+a recursive function in our `cast()` implementation to check whether a type contains `Unknown` or
+`Todo`. Recklessly recursing into a type causes stack overflows if the type is recursive:
 
 ```toml
 [environment]
@@ -4702,7 +4702,7 @@ class Iterator[T](Protocol):
     def __iter__(self) -> Iterator[T]: ...
 
 def f(value: Iterator[Any]):
-    cast(Iterator[Any], value)
+    cast(Iterator[Any], value)  # error: [redundant-cast]
 ```
 
 ### Recursive generic protocols
