@@ -923,8 +923,23 @@ pub(in crate::types) fn model_init_accepts_extra(
             return true;
         }
 
-        if !class_member(db, base.body_scope(db), "__init__").is_undefined() {
+        // These constructors use variadic keywords for specialized inputs, not arbitrary extras.
+        if base.is_known(db, KnownClass::PydanticRootModel)
+            || base.is_known(db, KnownClass::PydanticBaseSettings)
+        {
             return false;
+        }
+
+        let init = class_member(db, base.body_scope(db), "__init__");
+        if !init.is_undefined() {
+            return init
+                .ignore_possibly_undefined()
+                .and_then(Type::as_function_literal)
+                .is_some_and(|init| {
+                    init.signature(db)
+                        .iter()
+                        .any(|signature| signature.parameters().keyword_variadic().is_some())
+                });
         }
     }
 
