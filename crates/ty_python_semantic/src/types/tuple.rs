@@ -28,8 +28,8 @@ use crate::subscript::{
 };
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
-use crate::types::set_theoretic::RecursivelyDefined;
+use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
+use crate::types::set_theoretic::{RecursivelyDefined, UnionNormalization};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
     IntersectionType, Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
@@ -2307,46 +2307,16 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
     }
 
     pub(crate) fn homogeneous_element_type(&self, db: &'db dyn Db) -> Type<'db> {
-        match self {
-            Tuple::Fixed(tuple) => {
-                UnionType::from_elements_leave_aliases(db, tuple.iter_all_elements())
-            }
-            Tuple::Variable(tuple) => {
-                UnionType::from_elements_leave_aliases(db, tuple.iter_all_elements(db))
-            }
-        }
-    }
-
-    fn tuple_class_type(&self, db: &'db dyn Db) -> Type<'db> {
-        match self {
-            Tuple::Fixed(tuple) => {
-                UnionType::from_elements_leave_aliases(db, tuple.iter_all_elements())
-            }
-            Tuple::Variable(tuple) => UnionType::from_elements_leave_aliases(
-                db,
-                tuple
-                    .iter_prefix_elements()
-                    .chain(std::iter::once(tuple.variable().tuple_class_type()))
-                    .chain(tuple.iter_suffix_elements()),
-            ),
-        }
-    }
-
-    pub(crate) fn variable_element_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        match self {
-            Tuple::Fixed(_) => None,
-            Tuple::Variable(tuple) => Some(tuple.variable().element_type(db)),
-        }
-    }
-
-    pub(crate) fn iter_element_types(
-        &self,
-        db: &'db dyn Db,
-    ) -> impl DoubleEndedIterator<Item = Type<'db>> + '_ {
-        match self {
-            Tuple::Fixed(tuple) => Either::Left(tuple.iter_all_elements()),
-            Tuple::Variable(tuple) => Either::Right(tuple.iter_all_elements(db)),
-        }
+        self.all_elements()
+            .iter()
+            .copied()
+            .fold(
+                UnionBuilder::new(db)
+                    .unpack_aliases(false)
+                    .normalization(UnionNormalization::Structural),
+                UnionBuilder::add,
+            )
+            .build()
     }
 
     /// Returns the type of a static slice into this tuple.

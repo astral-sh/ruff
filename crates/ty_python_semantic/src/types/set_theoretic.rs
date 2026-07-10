@@ -13,7 +13,7 @@ use crate::{Db, FxOrderSet};
 
 pub(crate) mod builder;
 
-pub(crate) use builder::{IntersectionBuilder, UnionBuilder};
+pub(crate) use builder::{IntersectionBuilder, UnionBuilder, UnionNormalization};
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct UnionType<'db> {
@@ -113,8 +113,19 @@ impl<'db> UnionType<'db> {
     ///
     /// Aliases nested inside non-union elements remain part of those elements.
     pub(crate) fn expand_aliases(self, db: &'db dyn Db) -> Type<'db> {
-        // Rebuild the union so that `UnionBuilder` simplifies any redundancies exposed.
         Self::from_elements(db, self.elements(db).iter().copied())
+    }
+
+    /// Expands top-level aliases without starting a nested type-relation query.
+    pub(crate) fn expand_aliases_structurally(self, db: &'db dyn Db) -> Type<'db> {
+        self.elements(db)
+            .iter()
+            .copied()
+            .fold(
+                UnionBuilder::new(db).normalization(UnionNormalization::Structural),
+                UnionBuilder::add,
+            )
+            .build()
     }
 
     pub(crate) fn from_elements_cycle_recovery<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>

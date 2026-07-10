@@ -746,6 +746,11 @@ static_assert(truth)
 one: NonRecursiveId[NonRecursiveId[Literal[1]]] = 1
 reveal_type(one + 1)  # revealed: Literal[2]
 reveal_type(one == 1)  # revealed: Literal[True]
+
+def nested_union(
+    value: list[NonRecursiveId[NonRecursiveId[int]]] | list[int],
+):
+    reveal_type(value)  # revealed: list[NonRecursiveId[NonRecursiveId[int]]]
 ```
 
 ### Subtyping of materializations of cyclic aliases
