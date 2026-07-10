@@ -21,7 +21,7 @@ use crate::{
         known_instance::walk_known_instance_type,
         method::{walk_bound_method_type, walk_method_wrapper_type},
         newtype::{NewType, walk_newtype_instance_type},
-        protocol_class::walk_protocol_interface,
+        protocol_class::walk_protocol_instance_interface,
         set_theoretic::{walk_intersection_type, walk_union},
         subclass_of::walk_subclass_of_type,
         type_alias::walk_type_alias_type,
@@ -433,7 +433,12 @@ pub(super) fn non_any_dynamic_content<'db>(db: &'db dyn Db, ty: Type<'db>) -> Dy
             protocol: ProtocolInstanceType<'db>,
         ) {
             let Some(class) = protocol.as_class_based() else {
-                walk_protocol_interface(db, protocol.interface(db), self);
+                walk_protocol_instance_interface(
+                    db,
+                    protocol.interface(db),
+                    Type::ProtocolInstance(protocol),
+                    self,
+                );
                 return;
             };
             let Some((origin, specialization)) = class.static_class_literal(db) else {
@@ -455,7 +460,14 @@ pub(super) fn non_any_dynamic_content<'db>(db: &'db dyn Db, ty: Type<'db>) -> Dy
             self.active_class_protocols.visit(
                 &origin,
                 || self.record(DynamicContent::Indeterminate),
-                || walk_protocol_interface(db, protocol.interface(db), self),
+                || {
+                    walk_protocol_instance_interface(
+                        db,
+                        protocol.interface(db),
+                        Type::ProtocolInstance(protocol),
+                        self,
+                    );
+                },
             );
         }
     }

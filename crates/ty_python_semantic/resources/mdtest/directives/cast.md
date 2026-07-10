@@ -128,6 +128,33 @@ class DynamicBoundProtocol(Protocol[DynamicBoundT]):
 def protocol_specialization_dynamic_bound(value: DynamicBoundProtocol[int]) -> None:
     cast(DynamicBoundProtocol[int], value)  # error: [redundant-cast]
 
+class MethodProtocol[T](Protocol):
+    def method(self) -> int: ...
+
+def protocol_with_method(value: MethodProtocol[int]) -> None:
+    cast(MethodProtocol[int], value)  # error: [redundant-cast]
+
+class PropertyProtocol[T](Protocol):
+    @property
+    def property(self) -> int: ...
+
+def protocol_with_property(value: PropertyProtocol[int]) -> None:
+    cast(PropertyProtocol[int], value)  # error: [redundant-cast]
+
+class DynamicMembersProtocol[T](Protocol):
+    def method(self) -> Unknown: ...
+    @property
+    def property(self) -> Unknown: ...
+
+def protocol_with_dynamic_members(value: DynamicMembersProtocol[int]) -> None:
+    cast(DynamicMembersProtocol[int], value)
+
+class ExplicitReceiverProtocol[T](Protocol):
+    def method(self: "ExplicitReceiverProtocol[list[T]]") -> int: ...
+
+def protocol_with_explicit_receiver(value: ExplicitReceiverProtocol[int]) -> None:
+    cast(ExplicitReceiverProtocol[int], value)
+
 class RecursiveProtocol(Protocol):
     next: "RecursiveProtocol"
 
