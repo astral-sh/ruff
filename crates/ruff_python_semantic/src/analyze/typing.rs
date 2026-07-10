@@ -30,7 +30,6 @@ pub enum Callable {
     TypedDict,
     MypyExtension,
     TypeAliasType,
-    ExtendTypeForm,
 }
 
 #[derive(Debug, Copy, Clone)]
