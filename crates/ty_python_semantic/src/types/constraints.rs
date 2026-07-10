@@ -1348,7 +1348,7 @@ impl<'db> Constraint<'db> {
     /// Nested types containing typevars can produce increasingly complex families of derived
     /// constraints. Charge more fuel for those constraints so that each additional level of
     /// nesting shortens the remaining derivation chain.
-    fn sequent_fuel_cost(self, db: &'db dyn Db) -> u8 {
+    fn sequent_fuel_cost(self, db: &'db dyn Db) -> u16 {
         let max_typevar_depth = self
             .bounds
             .lower
@@ -1357,7 +1357,7 @@ impl<'db> Constraint<'db> {
             .filter_map(|bound| bound.max_typevar_depth(db))
             .max()
             .unwrap_or_default();
-        u8::try_from(max_typevar_depth.saturating_add(1)).unwrap_or(u8::MAX)
+        u16::try_from(max_typevar_depth.saturating_add(1)).unwrap_or(u16::MAX)
     }
 
     /// Returns whether this constraint is produced by dropping exactly one bound from
@@ -6220,15 +6220,40 @@ impl SequentMap {
 
 /// The collection of constraints that we know to be true or false at a certain point when
 /// traversing a BDD.
+///
+/// An important part of this traversal is that not all of those constraints come directly from the
+/// BDD, since constraints are not independent. In particular, there can be "implications", which
+/// record e.g. when two constraints both being true imply another:
+/// `A ≤ list[B] ∧ B ≤ int → A ≤ list[int]`. If we see `A ≤ list[B]` and `B ≤ int` in a BDD path,
+/// we can _assume_ that `A ≤ lint[int]` also holds, even if it doesn't actually appear in the BDD.
+///
+/// Unfortunately, there are certain implications that are technically true, but not helpful;
+/// for instance, because they cause us to endlessly expand a constraint by substituting a bound
+/// into itself.
+///
+/// We use a "fuel" mechanism to prevent these kinds of situations, without having to play
+/// whack-a-mole to implement detection patterns for all of the pathological patterns. Each
+/// constraint costs a certain amount of fuel, based on the complexity of its lower and upper
+/// bounds. This cost is based on how many typevars the constraint bound contains, and how "deep"
+/// those typevars are. (So `int` has cost 0, `T` has cost 1, `list[T]` has cost 2, and so on.)
+///
+/// We track this fuel in two ways: First, there is a global limit on the total amount of work we
+/// are willing to do for a particular BDD path traversal. Second, there is a more focused
+/// "per-path" limit, which records how far removed a derived constraint is from a constraint that
+/// actually appears in the BDD. If either of those limits are exceeded, we ignore the derived
+/// constraint that we are currently considering.
 #[derive(Debug)]
 pub(crate) struct PathAssignments {
     map: SequentMap,
-    /// Each assignment's source order and the first fuel value with which it was derived.
-    assignments: FxIndexMap<ConstraintAssignment, (usize, u8)>,
-    /// Additional fuel values that can derive an assignment, keyed by its index in `assignments`.
-    /// These are stored separately so that branch-local additions can be rolled back by truncating
-    /// the set. Only the greatest fuel value participates in further derivation.
-    additional_fuels: FxIndexSet<(usize, u8)>,
+    /// Each assignment's source order and the first per-path fuel value with which it was derived.
+    assignments: FxIndexMap<ConstraintAssignment, (usize, u16)>,
+    /// Additional per-path fuel values that can derive an assignment, keyed by its index in
+    /// `assignments`. These are stored separately so that branch-local additions can be rolled
+    /// back by truncating the set. Only the greatest fuel value participates in further
+    /// derivation.
+    additional_fuels: FxIndexSet<(usize, u16)>,
+    /// The amount of global fuel that remains across all assignments and paths.
+    remaining_overall_fuel: u16,
     /// Constraints that we have discovered, mapped to whether we have processed them yet. (This
     /// ensures a stable order for all of the derived constraints that we create, while still
     /// letting us create them lazily.)
@@ -6237,6 +6262,10 @@ pub(crate) struct PathAssignments {
 
 impl PathAssignments {
     fn new(constraints: impl IntoIterator<Item = ConstraintId>) -> Self {
+        /// The total amount of fuel that we are willing to spend for this path traversal. This was
+        /// chosen empirically, to balance performance with accurate ecosystem diagnostics.
+        const OVERALL_FUEL_BUDGET: u16 = 256;
+
         let discovered = constraints
             .into_iter()
             .map(|constraint| (constraint, false))
@@ -6246,6 +6275,7 @@ impl PathAssignments {
             assignments: FxIndexMap::default(),
             additional_fuels: FxIndexSet::default(),
             discovered,
+            remaining_overall_fuel: OVERALL_FUEL_BUDGET,
         }
     }
 
@@ -6279,26 +6309,17 @@ impl PathAssignments {
         source_order: usize,
         f: impl FnOnce(&mut Self, Range<usize>) -> R,
     ) -> Option<R> {
-        /// The maximum number of "trips through the sequent map" for any given assignment in the
-        /// path.
-        ///
-        /// Each assignment that we add to this path either comes directly from the BDD (an
-        /// "origin" constraint) or is derived from the sequent map. Each derived constraint
-        /// depends on its antecedents holding, but those antecedents might themselves be derived.
-        /// In fact, the sequent map can derive an enormous (and in recursive cases unbounded)
-        /// family of increasingly complex constraints.
-        ///
-        /// This fuel budget bounds that expansion, so that we can prevent runaway expansion and
-        /// "too complex to be useful" constraints, without pre-supposing which constraint or
-        /// derivation shapes will lead to problems. This is a heuristic; in the future we might
-        /// consider a more principled way of detecting these cases.
-        const SEQUENT_FUEL_BUDGET: u8 = 4;
+        /// The maximum number of "trips through the sequent map" that we are willing to take for a
+        /// derived constraint. This records how far removed we are from a constraint that comes
+        /// directly from the BDD.
+        const PATH_FUEL_BUDGET: u16 = 8;
 
         // Record a snapshot of the assignments that we already knew held — both so that we can
         // pass along the range of which assignments are new, and so that we can reset back to this
         // point before returning.
         let start = self.assignments.len();
         let additional_fuels_start = self.additional_fuels.len();
+        let previous_remaining_overall_fuel = self.remaining_overall_fuel;
 
         // Add the new assignment and anything we can derive from it.
         tracing::trace!(
@@ -6317,8 +6338,8 @@ impl PathAssignments {
             builder,
             assignment,
             source_order,
-            false,
-            SEQUENT_FUEL_BUDGET,
+            None,
+            PATH_FUEL_BUDGET,
         );
         let result = if found_conflict.is_err() {
             // If that results in the path now being impossible due to a contradiction, return
@@ -6348,6 +6369,7 @@ impl PathAssignments {
         // single instance for the entire BDD traversal.
         self.assignments.truncate(start);
         self.additional_fuels.truncate(additional_fuels_start);
+        self.remaining_overall_fuel = previous_remaining_overall_fuel;
         result
     }
 
@@ -6371,14 +6393,14 @@ impl PathAssignments {
     }
 
     /// Returns the greatest remaining fuel for any derivation of `assignment` on this path.
-    fn fuel_for(&self, assignment: ConstraintAssignment) -> Option<u8> {
+    fn fuel_for(&self, assignment: ConstraintAssignment) -> Option<u16> {
         let (index, _, (_, first_fuel)) = self.assignments.get_full(&assignment)?;
         let max_fuel = self
             .additional_fuels
             .iter()
             .filter(|(fuel_index, _)| *fuel_index == index)
             .map(|(_, fuel)| *fuel)
-            .fold(*first_fuel, u8::max);
+            .fold(*first_fuel, u16::max);
         Some(max_fuel)
     }
 
@@ -6419,8 +6441,8 @@ impl PathAssignments {
         builder: &ConstraintSetBuilder<'db>,
         assignment: ConstraintAssignment,
         source_order: usize,
-        derived: bool,
-        fuel: u8,
+        derived_fuel_cost: Option<u16>,
+        path_fuel: u16,
     ) -> Result<(), PathAssignmentConflict> {
         if matches!(assignment, ConstraintAssignment::Unconstrained(_)) {
             // An `Unconstrained` assignment means "this constraint can go either way". If there is
@@ -6434,7 +6456,8 @@ impl PathAssignments {
             // derive any additional information from the sequent map. We still want to record the
             // assignment, but as an optimization we can return early without actually querying the
             // sequent map.
-            self.assignments.insert(assignment, (source_order, fuel));
+            self.assignments
+                .insert(assignment, (source_order, path_fuel));
             return Ok(());
         }
 
@@ -6456,8 +6479,16 @@ impl PathAssignments {
 
         match self.assignments.entry(assignment) {
             Entry::Vacant(entry) => {
-                entry.insert((source_order, fuel));
+                if let Some(fuel_cost) = derived_fuel_cost {
+                    self.remaining_overall_fuel =
+                        match self.remaining_overall_fuel.checked_sub(fuel_cost) {
+                            Some(updated_fuel) => updated_fuel,
+                            None => return Ok(()),
+                        };
+                }
+                entry.insert((source_order, path_fuel));
             }
+
             Entry::Occupied(mut entry) => {
                 let index = entry.index();
                 let (existing_source_order, existing_fuel) = entry.get_mut();
@@ -6466,7 +6497,7 @@ impl PathAssignments {
                 // the BDD structure) and as a "derived" constraint (we infer it from other
                 // constraints), we should prefer the origin source_order, regardless of which
                 // order we encounter the various constraints in the BDD.
-                if !derived {
+                if derived_fuel_cost.is_none() {
                     *existing_source_order = source_order;
                 }
 
@@ -6478,20 +6509,20 @@ impl PathAssignments {
                 // might be some consequents that were skipped previously due to a lack of fuel,
                 // that can be added now because of the replinished fuel budget.
 
-                // Only origin constraints can replinish the fuel budget for this assignment.
-                if derived {
+                // Only origin constraints can replenish the fuel budget for this assignment.
+                if derived_fuel_cost.is_some() {
                     return Ok(());
                 }
 
                 // There is another derivation of this assignment that already provides at least as
                 // much fuel as this origin constraint. That means replenishing the fuel won't have
                 // any effect.
-                if *existing_fuel >= fuel
+                if *existing_fuel >= path_fuel
                     || self
                         .additional_fuels
                         .iter()
                         .any(|(fuel_index, existing_fuel)| {
-                            *fuel_index == index && *existing_fuel >= fuel
+                            *fuel_index == index && *existing_fuel >= path_fuel
                         })
                 {
                     return Ok(());
@@ -6499,7 +6530,7 @@ impl PathAssignments {
 
                 // Record the replenished fuel separately so that `walk_edge` can restore the
                 // parent branch by truncating `additional_fuels`.
-                self.additional_fuels.insert((index, fuel));
+                self.additional_fuels.insert((index, path_fuel));
             }
         }
 
@@ -6565,12 +6596,16 @@ impl PathAssignments {
             }
         }
 
-        let mut new_constraints: FxIndexMap<ConstraintId, u8> = FxIndexMap::default();
-        let mut add_new_constraint = |constraint, fuel| {
-            new_constraints
-                .entry(constraint)
-                .and_modify(|existing_fuel| *existing_fuel = (*existing_fuel).max(fuel))
-                .or_insert(fuel);
+        let mut new_constraints: FxIndexMap<ConstraintId, (u16, u16)> = FxIndexMap::default();
+        let mut add_new_constraint = |constraint, available_fuel: u16, fuel_cost: u16| {
+            if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
+                new_constraints
+                    .entry(constraint)
+                    .and_modify(|(existing_fuel, _)| {
+                        *existing_fuel = (*existing_fuel).max(post_fuel);
+                    })
+                    .or_insert((post_fuel, fuel_cost));
+            }
         };
 
         for ((ante1, ante2), posts) in &self.map.pair_implications {
@@ -6583,10 +6618,7 @@ impl PathAssignments {
             let available_fuel = ante1_fuel.min(ante2_fuel);
             for post in posts {
                 let fuel_cost = builder.constraint_data(*post).sequent_fuel_cost(db);
-                let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) else {
-                    continue;
-                };
-                add_new_constraint(*post, post_fuel);
+                add_new_constraint(*post, available_fuel, fuel_cost);
             }
         }
 
@@ -6602,21 +6634,18 @@ impl PathAssignments {
                 } else {
                     post_data.sequent_fuel_cost(db)
                 };
-                let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) else {
-                    continue;
-                };
-                add_new_constraint(*post, post_fuel);
+                add_new_constraint(*post, available_fuel, fuel_cost);
             }
         }
 
-        for (new_constraint, fuel) in new_constraints {
+        for (new_constraint, (available_fuel, fuel_cost)) in new_constraints {
             self.add_assignment(
                 db,
                 builder,
                 new_constraint.when_true(),
                 source_order,
-                true,
-                fuel,
+                Some(fuel_cost),
+                available_fuel,
             )?;
         }
 
