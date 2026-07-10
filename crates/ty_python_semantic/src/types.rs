@@ -2819,19 +2819,14 @@ impl<'db> Type<'db> {
     ///
     /// The meta-type of a type variable preserves method binding to that type variable, but it does
     /// not carry attributes stored in a nominal upper-bound class's namespace by its metaclass.
-    /// Add those attributes using the same lookup as a concrete nominal instance. Class-based
-    /// protocol dunders also use this path so that annotation-only callables retain their regular
-    /// signatures.
+    /// Add those attributes using the same lookup as a concrete nominal instance.
     fn instance_lookup_class_member_with_policy(
         self,
         db: &'db dyn Db,
         name: Name,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        if (matches!(self, Type::TypeVar(_))
-            || (matches!(self, Type::ProtocolInstance(_))
-                && name.starts_with("__")
-                && name.ends_with("__")))
+        if let Type::TypeVar(_) = self
             && let Some(class) = self.nominal_class(db)
         {
             self.to_meta_type(db)
@@ -2937,34 +2932,6 @@ impl<'db> Type<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        fn into_regular_callable<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-            match ty {
-                Type::Callable(callable) if callable.is_function_like(db) => {
-                    Type::Callable(callable.into_regular(db))
-                }
-                Type::Union(union) => union.map(db, |element| into_regular_callable(db, *element)),
-                Type::Intersection(intersection) => {
-                    intersection.map_positive(db, |element| into_regular_callable(db, *element))
-                }
-                _ => ty,
-            }
-        }
-
-        fn is_declaration_only(db: &dyn Db, member: PlaceAndQualifiers<'_>) -> bool {
-            let Place::Defined(DefinedPlace { provenance, .. }) = member.place else {
-                return false;
-            };
-            let Some(definition) = provenance.definition() else {
-                return false;
-            };
-            let file = definition.file(db);
-            let module = parsed_module(db, file).load(db);
-            !definition
-                .kind(db)
-                .category(file.is_stub(db), &module)
-                .is_binding()
-        }
-
         let class_attr = self
             .find_name_in_mro_with_policy(db, name, policy)
             .expect("The meta-type of an instance-like type should always have an MRO");
@@ -2977,17 +2944,6 @@ impl<'db> Type<'db> {
         };
         let metaclass_member = metaclass.instance_member(db, name);
         if metaclass_member.is_undefined() {
-            if name.starts_with("__")
-                && name.ends_with("__")
-                && !class_attr.is_class_var()
-                && is_declaration_only(db, class_attr)
-            {
-                return if policy.no_instance_fallback() {
-                    class_attr.map_type(|ty| into_regular_callable(db, ty))
-                } else {
-                    PlaceAndQualifiers::default()
-                };
-            }
             return class_attr;
         }
         let metaclass_member_is_implicit = metaclass_member

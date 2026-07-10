@@ -177,6 +177,19 @@ def inherited_task(ctx: str) -> str:
 reveal_type(inherited_task.__call__)  # revealed: (ctx: str) -> int
 reveal_type(inherited_task(ctx="x"))  # revealed: int
 
+class NominalTask(Generic[P, R]):
+    __call__: Callable[P, int]
+
+def decorate_nominal(fn: Callable[P, R]) -> NominalTask[P, R]:
+    raise NotImplementedError
+
+@decorate_nominal
+def nominal_task(ctx: str) -> str:
+    return ctx
+
+reveal_type(nominal_task.__call__)  # revealed: (ctx: str) -> int
+reveal_type(nominal_task(ctx="x"))  # revealed: int
+
 class ClassVarTask:
     __call__: ClassVar[Callable[["ClassVarTask", str], int]]
 

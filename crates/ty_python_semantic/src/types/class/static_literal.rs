@@ -1132,6 +1132,21 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
+        fn is_declaration_only(db: &dyn Db, member: PlaceAndQualifiers<'_>) -> bool {
+            let Place::Defined(DefinedPlace { provenance, .. }) = member.place else {
+                return false;
+            };
+            let Some(definition) = provenance.definition() else {
+                return false;
+            };
+            let file = definition.file(db);
+            let module = parsed_module(db, file).load(db);
+            !definition
+                .kind(db)
+                .category(file.is_stub(db), &module)
+                .is_binding()
+        }
+
         let result = MroLookup::new(db, mro_iter).class_member(
             name,
             policy,
@@ -1148,7 +1163,10 @@ impl<'db> StaticClassLiteral<'db> {
 
         // We generally treat dunder attributes with `Callable` types as function-like callables.
         // See `callables_as_descriptors.md` for more details.
-        if name.starts_with("__") && name.ends_with("__") {
+        if name.starts_with("__")
+            && name.ends_with("__")
+            && (member.is_class_var() || !is_declaration_only(db, member))
+        {
             member = member.map_type(|ty| into_function_like_callable(db, ty));
         }
 
