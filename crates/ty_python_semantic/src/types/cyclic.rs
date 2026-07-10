@@ -251,7 +251,7 @@ impl<'db, T: HasIdentity<'db>> CyclePolicy<'db, T> for IdentityCyclePolicy {
 }
 
 /// Applies recursive-type semantics to a single type stack.
-pub(crate) struct TypeCyclePolicy;
+pub struct TypeCyclePolicy;
 
 impl<'db> CyclePolicy<'db, Type<'db>> for TypeCyclePolicy {
     fn reentry_index(db: &'db dyn Db, current: &Type<'db>, active: &[Type<'db>]) -> Option<usize> {

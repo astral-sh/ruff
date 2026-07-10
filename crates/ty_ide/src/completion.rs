@@ -20,7 +20,7 @@ use ty_python_semantic::HasType;
 use ty_python_semantic::types::{SpecialFormType, UnionType};
 use ty_python_semantic::{
     Completion as SemanticCompletion, NameKind, SemanticModel,
-    types::{CycleDetector, KnownClass, Type},
+    types::{CycleDetector, KnownClass, Type, TypeCyclePolicy},
 };
 
 use crate::docstring::Docstring;
@@ -3085,7 +3085,7 @@ fn is_name_like_token(token: &Token) -> bool {
 /// on `CompletionBuilder`.
 fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<CompletionKind> {
     type CompletionKindVisitor<'db> =
-        CycleDetector<'db, CompletionKind, Type<'db>, Option<CompletionKind>, 3>;
+        CycleDetector<'db, TypeCyclePolicy, Type<'db>, Option<CompletionKind>, 3>;
 
     fn imp<'db>(
         db: &'db dyn Db,
