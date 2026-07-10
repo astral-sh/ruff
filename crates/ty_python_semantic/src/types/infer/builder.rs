@@ -6321,6 +6321,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let constraints = ConstraintSetBuilder::new();
         let inferable = generic_context.inferable_typevars(self.db());
+        // Reuse the builder to project contextual solutions before using it to infer a precise
+        // type for `T`.
+        let mut builder = SpecializationBuilder::new(self.db(), &constraints, inferable);
         let identity_instance = Type::instance(self.db(), ClassType::Generic(collection_alias));
 
         // Remove any union elements of that are unrelated to the collection type.
@@ -6410,10 +6413,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 // which adds `_KT` to `_VT`'s lower bound. Filter out any
                                 // inferable typevars from the solution, since they represent
                                 // cross-typevar relationships that are resolved independently.
-                                let inferred_ty = binding.solution.filter_union(db, |ty| {
-                                    !ty.as_typevar()
-                                        .is_some_and(|tv| tv.is_inferable(db, inferable))
-                                });
+                                let inferred_ty = builder
+                                    .remove_inferable_typevar_artifacts_from_solution(
+                                        binding.bound_typevar,
+                                        binding.solution,
+                                    );
 
                                 // Avoid inferring a preferred type based on partially specialized
                                 // type context from an outer generic call. If the type context is
@@ -6524,9 +6528,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             pre_inferred_elt_tys = Some(inferred_elts);
         }
-
-        // Create a set of constraints to infer a precise type for `T`.
-        let mut builder = SpecializationBuilder::new(self.db(), &constraints, inferable);
 
         let mut tuple_size_promotion_constraints = TupleSizePromotionConstraints::default();
 

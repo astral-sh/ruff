@@ -567,6 +567,16 @@ x1: dict[Hashable, Callable[..., object]] = {"x": lambda: 1}
 x2: dict[Hashable, Callable[..., object]] = dict(x=lambda: 1)
 ```
 
+Type context for one dictionary type parameter should not pollute another:
+
+```py
+from collections.abc import Hashable, Mapping
+
+def accepts_mapping(value: Mapping[Hashable, list[object]]) -> None: ...
+
+accepts_mapping({"x": [1]})
+```
+
 ## Generic call argument inference
 
 A function's arguments are also inferred using the type context:
