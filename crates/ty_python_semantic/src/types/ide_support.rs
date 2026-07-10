@@ -1003,6 +1003,25 @@ pub fn call_type_simplified_by_overloads(
     )
 }
 
+/// Renders a named, non-overloaded bound method as a declaration-style hover signature.
+pub fn bound_method_hover_signature<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<String> {
+    let Type::BoundMethod(method) = ty else {
+        return None;
+    };
+    let [signature] = method.bound_signatures(db).overloads.as_slice() else {
+        return None;
+    };
+    signature
+        .definition()
+        .and_then(|definition| definition.name(db))?;
+
+    Some(
+        signature
+            .display_with(db, DisplaySettings::default().multiline())
+            .to_string(),
+    )
+}
+
 /// Returns the definitions of the binary operation along with its callable type.
 pub fn definitions_for_bin_op<'db>(
     model: &SemanticModel<'db>,

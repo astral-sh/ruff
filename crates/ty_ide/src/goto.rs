@@ -10,16 +10,17 @@ use crate::stub_mapping::StubMapper;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::token::{Token, TokenAt, TokenKind, Tokens};
-use ruff_python_ast::{self as ast, AnyNodeRef, ExprRef};
+use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::expression::ExpressionKind;
 use ty_python_semantic::ResolvedDefinition;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
     call_signature_details, call_type_simplified_by_overloads, constructor_signature,
     definitions_and_overloads_for_function, definitions_for_keyword_argument,
-    typed_dict_key_definition,
+    resolved_call_signature, typed_dict_key_definition,
 };
 use ty_python_semantic::{
     HasDefinition, HasType, ImportAliasResolution, SemanticModel, TypeQualifiers,
@@ -219,18 +220,17 @@ pub(crate) enum GotoTarget<'a> {
     ///           ^^^^
     /// ```
     ///
-    /// This is equivalent to `GotoTarget::Expression` but the expression
-    /// isn't actually in the AST.
+    /// The target is resolved again inside the parsed string annotation whenever semantic
+    /// information is needed. This preserves target-specific behavior such as overload selection
+    /// for calls without retaining references into the temporary parsed AST.
     StringAnnotationSubexpr {
         /// The string literal that is a string annotation.
         string_expr: &'a ast::ExprStringLiteral,
-        /// The range to query in the sub-AST for the sub-expression.
-        subrange: TextRange,
-        /// "How many levels of sub-ASTs are you on?"
-        /// "idk maybe 1 or 2?"
-        /// "You are like ch-- actually that's the hardcoded limit we don't allow more"
-        levels: usize,
-        /// If the expression is a Name of some kind this is the name (just a cached result).
+        /// The original cursor offset used to resolve the target in the parsed string.
+        offset: TextSize,
+        /// The target range cached for the outer request.
+        range: TextRange,
+        /// The target name cached for consumers that do not have a semantic model.
         name: Option<String>,
     },
 
@@ -400,6 +400,15 @@ impl<'db> Definitions<'db> {
         None
     }
 
+    fn type_qualifiers(&self, model: &SemanticModel<'db>) -> TypeQualifiers {
+        self.iter()
+            .filter_map(ResolvedDefinition::definition)
+            .map(|definition| model.definition_type_qualifiers(definition))
+            .fold(TypeQualifiers::empty(), |qualifiers, declared| {
+                qualifiers | declared
+            })
+    }
+
     /// Return true if `self` and `other` contain at least one shared `definition`.
     ///
     /// A symbol can resolve to multiple definitions (for example, overload groups,
@@ -472,39 +481,12 @@ impl GotoTarget<'_> {
             }
             GotoTarget::StringAnnotationSubexpr {
                 string_expr,
-                subrange,
-                levels,
+                offset,
                 ..
-            } => {
-                let model_to_use;
-                let expr_to_use;
-                let subsubast;
-                let (subast, submodel) = model.enter_string_annotation(string_expr)?;
-                // Must filter to exprs to get ExprStringLiteral over StringLiteral
-                let subexpr = covering_node(subast.syntax().into(), *subrange)
-                    .find_first(AnyNodeRef::is_expression)
-                    .ok()?
-                    .node()
-                    .as_expr_ref()?;
-                if *levels == 2
-                    && let ExprRef::StringLiteral(string_expr) = subexpr
-                {
-                    // Do it again if we're a nested string annotation!
-                    let (new_subast, subsubmodel) =
-                        submodel.enter_string_annotation(string_expr)?;
-                    subsubast = new_subast;
-                    model_to_use = subsubmodel;
-                    expr_to_use = covering_node(subsubast.syntax().into(), *subrange)
-                        .find_first(AnyNodeRef::is_expression)
-                        .ok()?
-                        .node()
-                        .as_expr_ref()?;
-                } else {
-                    model_to_use = submodel;
-                    expr_to_use = subexpr;
-                }
-                expr_to_use.inferred_type(&model_to_use)
-            }
+            } => with_string_annotation_target(model, string_expr, *offset, |target, submodel| {
+                target.inferred_type(submodel)
+            })
+            .flatten(),
             GotoTarget::BinOp { expression, .. } => {
                 let (_, ty) = ty_python_semantic::definitions_for_bin_op(model, expression)?;
                 Some(ty)
@@ -531,18 +513,79 @@ impl GotoTarget<'_> {
     /// Returns the type qualifiers (e.g. `Final`, `ClassVar`) for this goto target.
     pub(crate) fn type_qualifiers(&self, model: &SemanticModel<'_>) -> TypeQualifiers {
         match self {
-            GotoTarget::Expression(expr) => model.type_qualifiers(*expr),
+            GotoTarget::Expression(expr) | GotoTarget::Call { callable: expr, .. } => {
+                model.type_qualifiers(*expr)
+            }
+            GotoTarget::StringAnnotationSubexpr {
+                string_expr,
+                offset,
+                ..
+            } => with_string_annotation_target(model, string_expr, *offset, |target, submodel| {
+                target.type_qualifiers(submodel)
+            })
+            .unwrap_or_default(),
+            GotoTarget::ImportSymbolAlias { .. } | GotoTarget::ImportExportedName { .. } => self
+                .definitions(model, ImportAliasResolution::ResolveAliases)
+                .map_or_else(TypeQualifiers::empty, |definitions| {
+                    definitions.type_qualifiers(model)
+                }),
             _ => TypeQualifiers::empty(),
         }
     }
 
     /// Try to get a call signature for this target.
     pub(crate) fn call_signature(&self, model: &SemanticModel) -> Option<String> {
-        if let GotoTarget::Call { call, .. } = self {
-            constructor_signature(model, call)
-                .or_else(|| call_type_simplified_by_overloads(model, call))
-        } else {
-            None
+        match self {
+            GotoTarget::Call { call, .. } => constructor_signature(model, call)
+                .or_else(|| call_type_simplified_by_overloads(model, call)),
+            GotoTarget::StringAnnotationSubexpr {
+                string_expr,
+                offset,
+                ..
+            } => with_string_annotation_target(model, string_expr, *offset, |target, submodel| {
+                target.call_signature(submodel)
+            })
+            .flatten(),
+            _ => None,
+        }
+    }
+
+    /// Returns the definition selected for this call target.
+    pub(crate) fn call_definition<'db>(
+        &self,
+        model: &SemanticModel<'db>,
+    ) -> Option<Definition<'db>> {
+        match self {
+            GotoTarget::Call { call, .. } => resolved_call_signature(model, call)?.definition,
+            GotoTarget::StringAnnotationSubexpr {
+                string_expr,
+                offset,
+                ..
+            } => with_string_annotation_target(model, string_expr, *offset, |target, submodel| {
+                target.call_definition(submodel)
+            })
+            .flatten(),
+            _ => None,
+        }
+    }
+
+    /// Returns how inference interprets this target's expression.
+    pub(crate) fn expression_kind(&self, model: &SemanticModel<'_>) -> Option<ExpressionKind> {
+        match self {
+            GotoTarget::Expression(expression)
+            | GotoTarget::Call {
+                callable: expression,
+                ..
+            } => Some(model.expression_kind(*expression)),
+            GotoTarget::StringAnnotationSubexpr {
+                string_expr,
+                offset,
+                ..
+            } => with_string_annotation_target(model, string_expr, *offset, |target, submodel| {
+                target.expression_kind(submodel)
+            })
+            .flatten(),
+            _ => None,
         }
     }
 
@@ -726,39 +769,13 @@ impl GotoTarget<'_> {
             // String annotations sub-expressions require us to recurse into the sub-AST
             GotoTarget::StringAnnotationSubexpr {
                 string_expr,
-                subrange,
-                levels,
+                offset,
                 ..
-            } => {
-                let model_to_use;
-                let expr_to_use;
-                let subsubast;
-                let (subast, submodel) = model.enter_string_annotation(string_expr)?;
-                // Must filter to exprs to get ExprStringLiteral over StringLiteral
-                let subexpr = covering_node(subast.syntax().into(), *subrange)
-                    .find_first(AnyNodeRef::is_expression)
-                    .ok()?
-                    .node()
-                    .as_expr_ref()?;
-                if *levels == 2
-                    && let ExprRef::StringLiteral(string_expr) = subexpr
-                {
-                    // Do it again if we're a nested string annotation!
-                    let (new_subast, subsubmodel) =
-                        submodel.enter_string_annotation(string_expr)?;
-                    subsubast = new_subast;
-                    model_to_use = subsubmodel;
-                    expr_to_use = covering_node(subsubast.syntax().into(), *subrange)
-                        .find_first(AnyNodeRef::is_expression)
-                        .ok()?
-                        .node()
-                        .as_expr_ref()?;
-                } else {
-                    model_to_use = submodel;
-                    expr_to_use = subexpr;
-                }
-                definitions_for_expression(&model_to_use, expr_to_use, alias_resolution)
-            }
+            } => with_string_annotation_target(model, string_expr, *offset, |target, submodel| {
+                target.definitions(submodel, alias_resolution)
+            })
+            .flatten()
+            .map(|definitions| definitions.0),
 
             // nonlocal and global are essentially loads, but again they're statements,
             // so we need to look them up by ident
@@ -1179,33 +1196,20 @@ impl GotoTarget<'_> {
                         offset,
                     )
                 {
-                    match sub_goto_target {
-                        // Regrettably, nested string annotations are supported
-                        GotoTarget::StringAnnotationSubexpr {
-                            string_expr: _,
-                            subrange,
-                            levels,
-                            name,
-                        } => Some(GotoTarget::StringAnnotationSubexpr {
+                    if matches!(
+                        &sub_goto_target,
+                        GotoTarget::StringAnnotationSubexpr { .. }
+                            | GotoTarget::Expression(_)
+                            | GotoTarget::Call { .. }
+                    ) {
+                        Some(GotoTarget::StringAnnotationSubexpr {
                             string_expr,
-                            subrange,
-                            levels: levels + 1,
-                            name,
-                        }),
-                        GotoTarget::Expression(subexpr) => {
-                            let name = match subexpr {
-                                ast::ExprRef::Name(name) => Some(name.id.to_string()),
-                                ast::ExprRef::Attribute(attr) => Some(attr.attr.to_string()),
-                                _ => None,
-                            };
-                            Some(GotoTarget::StringAnnotationSubexpr {
-                                string_expr,
-                                subrange: subexpr.range(),
-                                levels: 1,
-                                name,
-                            })
-                        }
-                        _ => node.as_expr_ref().map(GotoTarget::Expression),
+                            offset,
+                            range: sub_goto_target.range(),
+                            name: sub_goto_target.to_string().map(Cow::into_owned),
+                        })
+                    } else {
+                        node.as_expr_ref().map(GotoTarget::Expression)
                     }
                 } else {
                     node.as_expr_ref().map(GotoTarget::Expression)
@@ -1239,6 +1243,17 @@ impl GotoTarget<'_> {
     }
 }
 
+fn with_string_annotation_target<'db, T>(
+    model: &SemanticModel<'db>,
+    string_expr: &ast::ExprStringLiteral,
+    offset: TextSize,
+    use_target: impl FnOnce(&GotoTarget<'_>, &SemanticModel<'db>) -> T,
+) -> Option<T> {
+    let (parsed, submodel) = model.enter_string_annotation(string_expr)?;
+    let target = find_goto_target_impl(&submodel, parsed.tokens(), parsed.syntax().into(), offset)?;
+    Some(use_target(&target, &submodel))
+}
+
 impl Ranged for GotoTarget<'_> {
     fn range(&self) -> TextRange {
         match self {
@@ -1258,7 +1273,7 @@ impl Ranged for GotoTarget<'_> {
             GotoTarget::ImportModuleComponent {
                 component_range, ..
             } => *component_range,
-            GotoTarget::StringAnnotationSubexpr { subrange, .. } => *subrange,
+            GotoTarget::StringAnnotationSubexpr { range, .. } => *range,
             GotoTarget::ImportModuleAlias { asname, .. } => asname.range,
             GotoTarget::ExceptVariable(except) => except
                 .name
