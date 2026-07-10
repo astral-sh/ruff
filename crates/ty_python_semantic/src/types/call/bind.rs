@@ -7128,6 +7128,7 @@ impl<'db> BindingError<'db> {
         }
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn report_diagnostic(
         &self,
         context: &InferContext<'db, '_>,
