@@ -1920,17 +1920,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
-name = "lean_string"
-version = "0.6.1"
-source = "git+https://github.com/astral-sh/lean_string?rev=1f2643ea47e97f6f67393caf734c0bc7795b4f0b#1f2643ea47e97f6f67393caf734c0bc7795b4f0b"
-dependencies = [
- "castaway",
- "itoa",
- "ryu",
- "serde_core",
-]
-
-[[package]]
 name = "leb128fmt"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3525,10 +3514,10 @@ dependencies = [
  "aho-corasick",
  "arrayvec",
  "bitflags 2.13.0",
+ "char_str",
  "compact_str",
  "get-size2",
  "is-macro",
- "lean_string",
  "memchr",
  "ruff_cache",
  "ruff_macros",

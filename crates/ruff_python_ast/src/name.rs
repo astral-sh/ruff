@@ -4,7 +4,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
 use arrayvec::ArrayVec;
-use lean_string::LeanStr;
+use char_str::CharStr;
 
 use crate::Expr;
 use crate::generated::ExprName;
@@ -17,25 +17,25 @@ use crate::generated::ExprName;
     derive(schemars::JsonSchema),
     schemars(with = "String")
 )]
-pub struct Name(LeanStr);
+pub struct Name(CharStr);
 
 impl Name {
     /// The maximum number of UTF-8 bytes stored inline in a name.
-    pub const INLINE_CAPACITY: usize = std::mem::size_of::<LeanStr>();
+    pub const INLINE_CAPACITY: usize = std::mem::size_of::<CharStr>();
 
     #[inline]
     pub fn empty() -> Self {
-        Self(LeanStr::new())
+        Self(CharStr::new())
     }
 
     #[inline]
     pub fn new(name: impl AsRef<str>) -> Self {
-        Self(LeanStr::from(name.as_ref()))
+        Self(CharStr::from(name.as_ref()))
     }
 
     #[inline]
     pub const fn new_static(name: &'static str) -> Self {
-        Self(LeanStr::from_static_str(name))
+        Self(CharStr::from_static_str(name))
     }
 
     pub fn as_str(&self) -> &str {

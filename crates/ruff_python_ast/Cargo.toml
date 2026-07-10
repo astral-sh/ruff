@@ -22,10 +22,10 @@ ruff_text_size = { workspace = true }
 aho-corasick = { workspace = true }
 arrayvec = { workspace = true }
 bitflags = { workspace = true }
+char_str = { workspace = true }
 compact_str = { workspace = true }
 get-size2 = { workspace = true, optional = true }
 is-macro = { workspace = true }
-lean_string = { workspace = true }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true, optional = true }
@@ -43,7 +43,7 @@ serde = [
     "ruff_text_size/serde",
     "dep:ruff_cache",
     "compact_str/serde",
-    "lean_string/serde",
+    "char_str/serde",
     "thin-vec/serde",
 ]
 get-size = ["dep:get-size2", "ruff_text_size/get-size"]
