@@ -369,7 +369,7 @@ pub fn check_path(
     )
 }
 
-const MAX_ITERATIONS: usize = 100;
+pub(crate) const MAX_ITERATIONS: usize = 100;
 
 /// Add any missing suppression comments to the source code at the given `Path`.
 pub fn add_suppressions_to_path(
@@ -676,7 +676,11 @@ where
 }
 
 #[expect(clippy::print_stderr)]
-fn report_failed_to_converge_error(path: &Path, transformed: &str, diagnostics: &[Diagnostic]) {
+pub(crate) fn report_failed_to_converge_error(
+    path: &Path,
+    transformed: &str,
+    diagnostics: &[Diagnostic],
+) {
     let codes = collect_rule_codes(diagnostics.iter().filter_map(Diagnostic::secondary_code));
     if cfg!(debug_assertions) {
         eprintln!(

@@ -205,6 +205,15 @@ pub struct SourceKindDiff<'a> {
     path: Option<&'a Path>,
 }
 
+impl<'a> SourceKindDiff<'a> {
+    pub fn from_text(original: &'a str, modified: &'a str, path: Option<&'a Path>) -> Self {
+        Self {
+            kind: DiffKind::Text(original, modified),
+            path,
+        }
+    }
+}
+
 impl std::fmt::Display for SourceKindDiff<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.kind {

@@ -143,6 +143,8 @@ pub(crate) static INCLUDE: &[FilePattern] = &[
     FilePattern::Builtin("*.pyi"),
     FilePattern::Builtin("*.ipynb"),
     FilePattern::Builtin("**/pyproject.toml"),
+    FilePattern::Builtin("**/ruff.toml"),
+    FilePattern::Builtin("**/.ruff.toml"),
 ];
 pub(crate) static INCLUDE_PREVIEW: &[FilePattern] = &[
     FilePattern::Builtin("*.py"),
@@ -150,6 +152,8 @@ pub(crate) static INCLUDE_PREVIEW: &[FilePattern] = &[
     FilePattern::Builtin("*.pyw"),
     FilePattern::Builtin("*.ipynb"),
     FilePattern::Builtin("**/pyproject.toml"),
+    FilePattern::Builtin("**/ruff.toml"),
+    FilePattern::Builtin("**/.ruff.toml"),
     FilePattern::Builtin("*.md"),
 ];
 

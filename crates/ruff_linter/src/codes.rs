@@ -1093,6 +1093,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "106") => rules::ruff::rules::RuleCodesInSuppressionComments,
 
         (Ruff, "200") => rules::ruff::rules::InvalidPyprojectToml,
+        (Ruff, "201") => rules::ruff::rules::RuleCodesInSelectors,
+
         #[cfg(any(feature = "test-rules", test))]
         (Ruff, "900") => rules::ruff::rules::StableTestRule,
         #[cfg(any(feature = "test-rules", test))]

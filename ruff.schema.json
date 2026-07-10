@@ -465,7 +465,7 @@
       "deprecated": true
     },
     "include": {
-      "description": "A list of file patterns to include when linting.\n\nInclusion are based on globs, and should be single-path patterns, like\n`*.pyw`, to include any file with the `.pyw` extension. `pyproject.toml` is\nincluded here not for configuration but because we lint whether e.g. the\n`[project]` matches the schema.\n\nNotebook files (`.ipynb` extension) are included by default on Ruff 0.6.0+.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+      "description": "A list of file patterns to include when linting.\n\nInclusion are based on globs, and should be single-path patterns, like\n`*.pyw`, to include any file with the `.pyw` extension.\n`pyproject.toml`, `ruff.toml`, and `.ruff.toml` are included here not for\nconfiguration but because we lint whether e.g. the `[project]` matches\nthe schema in `pyproject.toml` or that rule names are used as selectors.\n\nNotebook files (`.ipynb` extension) are included by default on Ruff 0.6.0+.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
       "type": [
         "array",
         "null"
@@ -4270,6 +4270,7 @@
         "RUF2",
         "RUF20",
         "RUF200",
+        "RUF201",
         "S",
         "S1",
         "S10",
@@ -5209,6 +5210,7 @@
         "return-outside-function",
         "reuse-of-groupby-generator",
         "root-logger-call",
+        "rule-codes-in-selectors",
         "rule-codes-in-suppression-comments",
         "run-process-in-async-function",
         "runtime-cast-value",
