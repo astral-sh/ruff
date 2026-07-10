@@ -3180,6 +3180,42 @@ def update_required_trailing_value(value: HasRequiredTrailingValue) -> None:
     value.value = 1  # error: [invalid-assignment]
 ```
 
+### Variadic setter value parameters
+
+A setter can receive the assigned value through a variadic positional parameter. Its write domain
+cannot be treated as empty when checking protocol compatibility.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class VariadicValueDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__(self, instance: object, *values: int) -> None: ...
+
+class HasVariadicValue(Protocol):
+    @VariadicValueDescriptor
+    def value(self) -> int: ...
+
+class StrVariadicValue:
+    @property
+    def value(self) -> int:
+        return 1
+
+    @value.setter
+    def value(self, new_value: str) -> None: ...
+
+static_assert(not is_subtype_of(StrVariadicValue, HasVariadicValue))
+
+def update_variadic_value(value: HasVariadicValue) -> None:
+    value.value = 1
+    value.value = "bad"  # error: [invalid-assignment]
+```
+
 ### Gradual setter signatures
 
 A gradual `__set__` signature has an unknown write domain, not an empty one. Assignments remain

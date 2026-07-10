@@ -24,9 +24,9 @@ use crate::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
         CallableType, ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
         InstanceFallbackShadowsNonDataDescriptor, IntersectionType, KnownFunction,
-        MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SelfBinding, Signature,
-        StaticClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarBoundOrConstraints,
-        TypeVarVariance, UnionType, VarianceInferable,
+        MemberLookupPolicy, Parameter, PropertyInstanceType, ProtocolInstanceType, SelfBinding,
+        Signature, StaticClassLiteral, Type, TypeMapping, TypeQualifiers,
+        TypeVarBoundOrConstraints, TypeVarVariance, UnionType, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
@@ -1646,7 +1646,7 @@ fn descriptor_setter_signature_domain<'db>(
 ) -> DescriptorSetterSignatureDomain<'db> {
     let parameters = signature.parameters();
     let missing_required_parameter = || {
-        if parameters.is_gradual() {
+        if parameters.is_gradual() || parameters.as_slice().iter().any(Parameter::is_variadic) {
             DescriptorSetterSignatureDomain::Deferred
         } else {
             DescriptorSetterSignatureDomain::Inapplicable
