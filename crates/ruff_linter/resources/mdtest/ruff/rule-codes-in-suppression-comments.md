@@ -9,27 +9,44 @@ external = ["EXT"]
 
 ## `ruff:ignore`
 
-Rule names and external or unknown codes are preserved while Ruff rule codes are replaced:
+Each Ruff rule code receives a separate diagnostic. Rule names and external or unknown codes are
+preserved:
 
 ```py
+# snapshot: rule-codes-in-suppression-comments
 # snapshot: rule-codes-in-suppression-comments
 # ruff:ignore[F401, undefined-name, EXT001, UNKNOWN, F841]
 value = 1
 ```
 
 ```snapshot
-error[RUF106]: Rule codes used instead of names in suppression comment
- --> src/mdtest_snippet.py:2:1
+error[RUF106]: Rule code used instead of name in suppression comment
+ --> src/mdtest_snippet.py:3:15
   |
-2 | # ruff:ignore[F401, undefined-name, EXT001, UNKNOWN, F841]
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+3 | # ruff:ignore[F401, undefined-name, EXT001, UNKNOWN, F841]
+  |               ^^^^
   |
-help: Replace rule codes with names
+help: Replace rule code with name
   |
-1 | # snapshot: rule-codes-in-suppression-comments
+2 | # snapshot: rule-codes-in-suppression-comments
   - # ruff:ignore[F401, undefined-name, EXT001, UNKNOWN, F841]
-2 + # ruff:ignore[unused-import, undefined-name, EXT001, UNKNOWN, unused-variable]
-3 | value = 1
+3 + # ruff:ignore[unused-import, undefined-name, EXT001, UNKNOWN, F841]
+4 | value = 1
+  |
+
+
+error[RUF106]: Rule code used instead of name in suppression comment
+ --> src/mdtest_snippet.py:3:54
+  |
+3 | # ruff:ignore[F401, undefined-name, EXT001, UNKNOWN, F841]
+  |                                                      ^^^^
+  |
+help: Replace rule code with name
+  |
+2 | # snapshot: rule-codes-in-suppression-comments
+  - # ruff:ignore[F401, undefined-name, EXT001, UNKNOWN, F841]
+3 + # ruff:ignore[F401, undefined-name, EXT001, UNKNOWN, unused-variable]
+4 | value = 1
   |
 ```
 
@@ -37,21 +54,36 @@ help: Replace rule codes with names
 
 ```py
 # snapshot: rule-codes-in-suppression-comments
+# snapshot: rule-codes-in-suppression-comments
 # ruff:file-ignore[F401, F841]
 ```
 
 ```snapshot
-error[RUF106]: Rule codes used instead of names in suppression comment
- --> src/mdtest_snippet.py:2:1
+error[RUF106]: Rule code used instead of name in suppression comment
+ --> src/mdtest_snippet.py:3:20
   |
-2 | # ruff:file-ignore[F401, F841]
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+3 | # ruff:file-ignore[F401, F841]
+  |                    ^^^^
   |
-help: Replace rule codes with names
+help: Replace rule code with name
   |
-1 | # snapshot: rule-codes-in-suppression-comments
+2 | # snapshot: rule-codes-in-suppression-comments
   - # ruff:file-ignore[F401, F841]
-2 + # ruff:file-ignore[unused-import, unused-variable]
+3 + # ruff:file-ignore[unused-import, F841]
+  |
+
+
+error[RUF106]: Rule code used instead of name in suppression comment
+ --> src/mdtest_snippet.py:3:26
+  |
+3 | # ruff:file-ignore[F401, F841]
+  |                          ^^^^
+  |
+help: Replace rule code with name
+  |
+2 | # snapshot: rule-codes-in-suppression-comments
+  - # ruff:file-ignore[F401, F841]
+3 + # ruff:file-ignore[F401, unused-variable]
   |
 ```
 
@@ -61,29 +93,50 @@ Matching comments are reported and fixed together:
 
 ```py
 # snapshot: rule-codes-in-suppression-comments
+# snapshot: rule-codes-in-suppression-comments
 # ruff:disable[F401, undefined-name, F841]
 value = 1
 # ruff:enable[F401, undefined-name, F841]
 ```
 
 ```snapshot
-error[RUF106]: Rule codes used instead of names in suppression comment
- --> src/mdtest_snippet.py:2:1
+error[RUF106]: Rule code used instead of name in suppression comment
+ --> src/mdtest_snippet.py:3:16
   |
-2 | # ruff:disable[F401, undefined-name, F841]
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-3 | value = 1
-4 | # ruff:enable[F401, undefined-name, F841]
-  | -----------------------------------------
+3 | # ruff:disable[F401, undefined-name, F841]
+  |                ^^^^
+4 | value = 1
+5 | # ruff:enable[F401, undefined-name, F841]
+  |               ----
   |
-help: Replace rule codes with names
+help: Replace rule code with name
   |
-1 | # snapshot: rule-codes-in-suppression-comments
+2 | # snapshot: rule-codes-in-suppression-comments
   - # ruff:disable[F401, undefined-name, F841]
-2 + # ruff:disable[unused-import, undefined-name, unused-variable]
-3 | value = 1
+3 + # ruff:disable[unused-import, undefined-name, F841]
+4 | value = 1
   - # ruff:enable[F401, undefined-name, F841]
-4 + # ruff:enable[unused-import, undefined-name, unused-variable]
+5 + # ruff:enable[unused-import, undefined-name, F841]
+  |
+
+
+error[RUF106]: Rule code used instead of name in suppression comment
+ --> src/mdtest_snippet.py:3:38
+  |
+3 | # ruff:disable[F401, undefined-name, F841]
+  |                                      ^^^^
+4 | value = 1
+5 | # ruff:enable[F401, undefined-name, F841]
+  |                                     ----
+  |
+help: Replace rule code with name
+  |
+2 | # snapshot: rule-codes-in-suppression-comments
+  - # ruff:disable[F401, undefined-name, F841]
+3 + # ruff:disable[F401, undefined-name, unused-variable]
+4 | value = 1
+  - # ruff:enable[F401, undefined-name, F841]
+5 + # ruff:enable[F401, undefined-name, unused-variable]
   |
 ```
 
@@ -98,13 +151,13 @@ level:
 ```
 
 ```snapshot
-error[RUF106]: Rule codes used instead of names in suppression comment
- --> src/mdtest_snippet.py:2:1
+error[RUF106]: Rule code used instead of name in suppression comment
+ --> src/mdtest_snippet.py:2:16
   |
 2 | # ruff:disable[F401]
-  | ^^^^^^^^^^^^^^^^^^^^
+  |                ^^^^
   |
-help: Replace rule codes with names
+help: Replace rule code with name
   |
 1 | # snapshot: rule-codes-in-suppression-comments
   - # ruff:disable[F401]
@@ -131,13 +184,13 @@ value = 1
 ```
 
 ```snapshot
-error[RUF106]: Rule codes used instead of names in suppression comment
- --> src/mdtest_snippet.py:2:1
+error[RUF106]: Rule code used instead of name in suppression comment
+ --> src/mdtest_snippet.py:2:15
   |
 2 | # ruff:ignore[PGH001]
-  | ^^^^^^^^^^^^^^^^^^^^^
+  |               ^^^^^^
   |
-help: Replace rule codes with names
+help: Replace rule code with name
   |
 1 | # snapshot: rule-codes-in-suppression-comments
   - # ruff:ignore[PGH001]
@@ -152,21 +205,36 @@ Only the rule codes within a nested suppression comment are replaced:
 
 ```py
 # snapshot: rule-codes-in-suppression-comments
+# snapshot: rule-codes-in-suppression-comments
 value = 1  # explanation # ruff:ignore[F401, F841] reason # another
 ```
 
 ```snapshot
-error[RUF106]: Rule codes used instead of names in suppression comment
- --> src/mdtest_snippet.py:2:26
+error[RUF106]: Rule code used instead of name in suppression comment
+ --> src/mdtest_snippet.py:3:40
   |
-2 | value = 1  # explanation # ruff:ignore[F401, F841] reason # another
-  |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+3 | value = 1  # explanation # ruff:ignore[F401, F841] reason # another
+  |                                        ^^^^
   |
-help: Replace rule codes with names
+help: Replace rule code with name
   |
-1 | # snapshot: rule-codes-in-suppression-comments
+2 | # snapshot: rule-codes-in-suppression-comments
   - value = 1  # explanation # ruff:ignore[F401, F841] reason # another
-2 + value = 1  # explanation # ruff:ignore[unused-import, unused-variable] reason # another
+3 + value = 1  # explanation # ruff:ignore[unused-import, F841] reason # another
+  |
+
+
+error[RUF106]: Rule code used instead of name in suppression comment
+ --> src/mdtest_snippet.py:3:46
+  |
+3 | value = 1  # explanation # ruff:ignore[F401, F841] reason # another
+  |                                              ^^^^
+  |
+help: Replace rule code with name
+  |
+2 | # snapshot: rule-codes-in-suppression-comments
+  - value = 1  # explanation # ruff:ignore[F401, F841] reason # another
+3 + value = 1  # explanation # ruff:ignore[F401, unused-variable] reason # another
   |
 ```
 

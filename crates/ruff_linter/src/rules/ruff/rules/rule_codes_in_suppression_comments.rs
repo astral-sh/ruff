@@ -31,10 +31,10 @@ pub(crate) struct RuleCodesInSuppressionComments;
 impl AlwaysFixableViolation for RuleCodesInSuppressionComments {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Rule codes used instead of names in suppression comment".to_string()
+        "Rule code used instead of name in suppression comment".to_string()
     }
 
     fn fix_title(&self) -> String {
-        "Replace rule codes with names".to_string()
+        "Replace rule code with name".to_string()
     }
 }

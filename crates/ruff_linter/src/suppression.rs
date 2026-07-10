@@ -413,30 +413,29 @@ impl Suppressions {
             }
 
             let second_comment = suppression.comments.second();
-            let mut edits = first_comment
-                .codes
-                .iter()
-                .chain(
-                    second_comment
-                        .into_iter()
-                        .flat_map(|comment| &comment.codes),
-                )
-                .filter_map(|range| {
-                    let original = locator.slice(range);
-                    let code = get_redirect_target(original).unwrap_or(original);
-                    let rule = Rule::from_code(code).ok()?;
-                    Some(Edit::range_replacement(rule.name().to_string(), *range))
-                });
-            let Some(first_edit) = edits.next() else {
-                continue;
-            };
+            for (index, range) in first_comment.codes.iter().enumerate() {
+                let original = locator.slice(range);
+                let code = get_redirect_target(original).unwrap_or(original);
+                let Ok(rule) = Rule::from_code(code) else {
+                    continue;
+                };
 
-            let mut diagnostic =
-                context.report_diagnostic(RuleCodesInSuppressionComments, first_comment.range);
-            if let Some(second_comment) = second_comment {
-                diagnostic.secondary_annotation_without_message(second_comment.range);
+                let mut diagnostic =
+                    context.report_diagnostic(RuleCodesInSuppressionComments, *range);
+                let name = rule.name().to_string();
+                let fix = if let Some(second_range) =
+                    second_comment.and_then(|comment| comment.codes.get(index))
+                {
+                    diagnostic.secondary_annotation_without_message(*second_range);
+                    Fix::safe_edits(
+                        Edit::range_replacement(name.clone(), *range),
+                        [Edit::range_replacement(name, *second_range)],
+                    )
+                } else {
+                    Fix::safe_edit(Edit::range_replacement(name, *range))
+                };
+                diagnostic.set_fix(fix);
             }
-            diagnostic.set_fix(Fix::safe_edits(first_edit, edits));
         }
     }
 
