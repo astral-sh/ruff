@@ -1642,7 +1642,11 @@ fn descriptor_setter_signature_domain<'db>(
 ) -> DescriptorSetterSignatureDomain<'db> {
     let parameters = signature.parameters();
     let Some(trailing_parameters) = parameters.as_slice().get(3..) else {
-        return DescriptorSetterSignatureDomain::Inapplicable;
+        return if parameters.is_gradual() {
+            DescriptorSetterSignatureDomain::Deferred
+        } else {
+            DescriptorSetterSignatureDomain::Inapplicable
+        };
     };
     if !trailing_parameters.iter().all(|parameter| {
         parameter.default_type().is_some()

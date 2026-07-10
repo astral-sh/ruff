@@ -3134,6 +3134,59 @@ def update_required_trailing_value(value: HasRequiredTrailingValue) -> None:
     value.value = 1  # error: [invalid-assignment]
 ```
 
+### Gradual setter signatures
+
+A gradual `__set__` signature has an unknown write domain, not an empty one. Assignments remain
+valid, but a descriptor that only accepts `int` does not satisfy the broader gradual contract.
+
+```py
+from typing import Any, Callable, Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of, reveal_protocol_interface
+
+class CallableSetterDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    __set__: Callable[..., None]
+
+class AnySetterDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    __set__: Any
+
+class HasCallableSetter(Protocol):
+    @CallableSetterDescriptor
+    def value(self) -> int: ...
+
+class HasAnySetter(Protocol):
+    @AnySetterDescriptor
+    def value(self) -> int: ...
+
+class IntSetter:
+    @property
+    def value(self) -> int:
+        return 1
+
+    @value.setter
+    def value(self, new_value: int) -> None: ...
+
+# revealed: {"value": PropertyMember { read: `int`, write: `Unknown` }}
+reveal_protocol_interface(HasCallableSetter)
+# revealed: {"value": PropertyMember { read: `int`, write: `Unknown` }}
+reveal_protocol_interface(HasAnySetter)
+
+static_assert(not is_subtype_of(IntSetter, HasCallableSetter))
+static_assert(not is_subtype_of(IntSetter, HasAnySetter))
+
+def update_gradual_setters(callable_: HasCallableSetter, any_: HasAnySetter) -> None:
+    callable_.value = object()
+    any_.value = object()
+```
+
 ## Variance of generic protocols with `Final` members
 
 A `Final` attribute is readable but not writable, so it constrains an inferred type parameter
