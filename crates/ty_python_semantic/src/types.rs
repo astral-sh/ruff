@@ -4131,14 +4131,18 @@ impl<'db> Type<'db> {
                     .value_type(db)
                     .member_lookup_with_policy_and_receiver(db, name, policy, receiver),
 
-                _ if policy.no_instance_fallback() => this.invoke_descriptor_protocol(
-                    db,
-                    receiver.unwrap_or(this),
-                    name_str,
-                    Place::Undefined.into(),
-                    InstanceFallbackShadowsNonDataDescriptor::No,
-                    policy,
-                ),
+                _ if policy.no_instance_fallback() => {
+                    let receiver = receiver.unwrap_or(this);
+                    this.invoke_descriptor_protocol(
+                        db,
+                        receiver,
+                        name_str,
+                        Place::Undefined.into(),
+                        InstanceFallbackShadowsNonDataDescriptor::No,
+                        policy,
+                    )
+                    .map_type(|ty| ty.bind_self_typevars(db, receiver))
+                }
 
                 Type::LiteralValue(literal)
                     if matches!(name_str, "name" | "_name_" | "value" | "_value_")
