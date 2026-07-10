@@ -129,6 +129,7 @@ pub(super) fn evaluate_type_equality<'db>(
     left: Type<'db>,
     right: Type<'db>,
     is_positive: bool,
+    soundness_policy: ComparisonSoundnessPolicy,
 ) -> Option<Type<'db>> {
     let branch = ComparisonBranch::from(is_positive);
     let condition_expects_equality =
@@ -157,7 +158,7 @@ pub(super) fn evaluate_type_equality<'db>(
         if comparison_domain(db, left, right, ComparisonOperator::Equality)
             == ComparisonDomain::Known
         {
-            ComparisonEvaluator::new(db)
+            ComparisonEvaluator::new(db, soundness_policy)
                 .evaluate(left, right, branch, ComparisonOperator::Equality)
                 .constraint(branch)
         } else {
@@ -175,7 +176,7 @@ pub(super) fn equality_exclusion_constraint<'db>(
     builtin_literal_constraint(db, ty, ty, ComparisonOperator::Equality, false)
         .or_else(|| ty.is_single_valued(db).then(|| ty.negate(db)))
         .or_else(|| {
-            (ComparisonEvaluator::new(db).evaluate(
+            (ComparisonEvaluator::conservative(db).evaluate(
                 ty,
                 ty,
                 ComparisonBranch::Positive,
@@ -210,6 +211,7 @@ pub(super) fn evaluate_type_inequality<'db>(
     left: Type<'db>,
     right: Type<'db>,
     is_positive: bool,
+    soundness_policy: ComparisonSoundnessPolicy,
 ) -> Option<Type<'db>> {
     let branch = ComparisonBranch::from(is_positive);
     let condition_expects_equality =
@@ -231,7 +233,7 @@ pub(super) fn evaluate_type_inequality<'db>(
         )
     })
     .or_else(|| {
-        ComparisonEvaluator::new(db)
+        ComparisonEvaluator::new(db, soundness_policy)
             .evaluate(left, right, branch, ComparisonOperator::Inequality)
             .constraint(branch)
     })
@@ -307,6 +309,22 @@ enum ComparisonGoal {
     Truthiness,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(super) enum ComparisonSoundnessPolicy {
+    Conservative,
+    UnsafeLiteralNarrowing,
+}
+
+impl ComparisonSoundnessPolicy {
+    pub(super) fn from_strict_literal_narrowing(enabled: bool) -> Self {
+        if enabled {
+            Self::Conservative
+        } else {
+            Self::UnsafeLiteralNarrowing
+        }
+    }
+}
+
 /// Identifies an active comparison evaluation.
 ///
 /// Operand order and branch are significant because the left operand is the narrowing target.
@@ -323,15 +341,21 @@ struct ComparisonEvaluator<'db> {
     db: &'db dyn Db,
     active: FxHashSet<ComparisonKey<'db>>,
     goal: ComparisonGoal,
+    soundness_policy: ComparisonSoundnessPolicy,
 }
 
 impl<'db> ComparisonEvaluator<'db> {
-    fn new(db: &'db dyn Db) -> Self {
+    fn new(db: &'db dyn Db, soundness_policy: ComparisonSoundnessPolicy) -> Self {
         Self {
             db,
             active: FxHashSet::default(),
             goal: ComparisonGoal::Constraint,
+            soundness_policy,
         }
+    }
+
+    fn conservative(db: &'db dyn Db) -> Self {
+        Self::new(db, ComparisonSoundnessPolicy::Conservative)
     }
 
     fn for_truthiness(db: &'db dyn Db) -> Self {
@@ -339,6 +363,7 @@ impl<'db> ComparisonEvaluator<'db> {
             db,
             active: FxHashSet::default(),
             goal: ComparisonGoal::Truthiness,
+            soundness_policy: ComparisonSoundnessPolicy::Conservative,
         }
     }
 
@@ -512,7 +537,7 @@ fn evaluate_comparison_once<'db>(
         }
 
         (Type::LiteralValue(literal), other) => compare_literal_to_other(
-            db,
+            evaluator,
             Type::LiteralValue(literal),
             literal.kind(),
             other,
@@ -521,7 +546,7 @@ fn evaluate_comparison_once<'db>(
             LiteralOperand::Target,
         ),
         (other, Type::LiteralValue(literal)) => compare_literal_to_other(
-            db,
+            evaluator,
             Type::LiteralValue(literal),
             literal.kind(),
             other,
@@ -643,29 +668,18 @@ fn builtin_literal_constraint<'db>(
         return None;
     };
 
-    let mut equal_to_right = match right.kind() {
-        LiteralValueTypeKind::Int(value) => {
-            let mut builder = UnionBuilder::new(db).add(Type::LiteralValue(right));
-            if matches!(value.as_i64(), 0 | 1) {
-                builder = builder.add(Type::bool_literal(value.as_i64() == 1));
-            }
-            builder
-        }
-        LiteralValueTypeKind::Bool(value) => UnionBuilder::new(db)
-            .add(Type::LiteralValue(right))
-            .add(Type::int_literal(i64::from(value))),
-        LiteralValueTypeKind::String(_) | LiteralValueTypeKind::Bytes(_) => {
-            UnionBuilder::new(db).add(Type::LiteralValue(right))
-        }
-        LiteralValueTypeKind::LiteralString | LiteralValueTypeKind::Enum(_) => return None,
-    };
+    let equal_to_right = builtin_literals_equal_to(db, Type::LiteralValue(right), right.kind())?;
 
     if !condition_expects_equality {
-        equal_to_right = add_equal_enum_literals(db, left, right.kind(), operator, equal_to_right);
+        let equal_to_right = add_equal_enum_literals(
+            db,
+            left,
+            right.kind(),
+            operator,
+            UnionBuilder::new(db).add(equal_to_right),
+        );
         return Some(equal_to_right.build().negate(db));
     }
-
-    let equal_to_right = equal_to_right.build();
 
     match left.resolve_type_alias(db) {
         Type::Union(union) => union
@@ -676,6 +690,31 @@ fn builtin_literal_constraint<'db>(
         left => is_builtin_literal_type(db, left),
     }
     .then_some(equal_to_right)
+}
+
+/// Return the builtin literal values that compare equal to `literal_type`.
+fn builtin_literals_equal_to<'db>(
+    db: &'db dyn Db,
+    literal_type: Type<'db>,
+    literal: LiteralValueTypeKind<'db>,
+) -> Option<Type<'db>> {
+    let builder = match literal {
+        LiteralValueTypeKind::Int(value) => {
+            let mut builder = UnionBuilder::new(db).add(literal_type);
+            if matches!(value.as_i64(), 0 | 1) {
+                builder = builder.add(Type::bool_literal(value.as_i64() == 1));
+            }
+            builder
+        }
+        LiteralValueTypeKind::Bool(value) => UnionBuilder::new(db)
+            .add(literal_type)
+            .add(Type::int_literal(i64::from(value))),
+        LiteralValueTypeKind::String(_) | LiteralValueTypeKind::Bytes(_) => {
+            UnionBuilder::new(db).add(literal_type)
+        }
+        LiteralValueTypeKind::LiteralString | LiteralValueTypeKind::Enum(_) => return None,
+    };
+    Some(builder.build())
 }
 
 /// Add finite enum members in `ty` that are known to compare equal to `right`.
@@ -1132,12 +1171,29 @@ fn narrow_literal_string_against_enum<'db>(
     ComparisonResult::CanNarrow(narrowed)
 }
 
+/// Return the builtin comparison semantics assumed by unsafe literal narrowing.
+fn unsafe_narrowable_builtin_semantics(db: &dyn Db, ty: Type) -> Option<KnownComparisonSemantics> {
+    let Type::NominalInstance(instance) = ty.resolve_type_alias(db) else {
+        return None;
+    };
+
+    if instance.has_known_class(db, KnownClass::Int) {
+        Some(KnownComparisonSemantics::Int)
+    } else if instance.has_known_class(db, KnownClass::Str) {
+        Some(KnownComparisonSemantics::Str)
+    } else if instance.has_known_class(db, KnownClass::Bytes) {
+        Some(KnownComparisonSemantics::Bytes)
+    } else {
+        None
+    }
+}
+
 /// Compare a literal with a non-literal type using their known runtime comparison semantics.
 ///
 /// A literal on the non-target side can constrain the target only when the types overlap; matching
 /// comparison implementations alone do not establish that the literal inhabits the target type.
 fn compare_literal_to_other<'db>(
-    db: &'db dyn Db,
+    evaluator: &ComparisonEvaluator<'db>,
     literal_type: Type<'db>,
     literal: LiteralValueTypeKind<'db>,
     other: Type<'db>,
@@ -1145,6 +1201,8 @@ fn compare_literal_to_other<'db>(
     operator: ComparisonOperator,
     literal_operand: LiteralOperand,
 ) -> ComparisonResult<'db> {
+    let db = evaluator.db;
+
     if matches!(literal, LiteralValueTypeKind::LiteralString) {
         return match KnownComparisonSemantics::of_type(db, other, operator) {
             Some(KnownComparisonSemantics::Str) => ComparisonResult::Ambiguous,
@@ -1158,6 +1216,23 @@ fn compare_literal_to_other<'db>(
         return ComparisonResult::Ambiguous;
     };
     let condition_expects_equality = operator.condition_expects_equality(branch);
+
+    // Treat broad builtin types as if they exclude subclasses with custom equality. This is
+    // intentionally unsafe: an instance of such a subclass can compare equal to the literal
+    // without inhabiting its literal type. Explicitly typed subclasses do not take this path.
+    if evaluator.soundness_policy == ComparisonSoundnessPolicy::UnsafeLiteralNarrowing
+        && condition_expects_equality
+        && literal_operand == LiteralOperand::Other
+        && let Some(equal_to_literal) = builtin_literals_equal_to(db, literal_type, literal)
+        && let Some(other_semantics) = unsafe_narrowable_builtin_semantics(db, other)
+    {
+        return if literal_semantics == other_semantics {
+            ComparisonResult::CanNarrow(equal_to_literal)
+        } else {
+            operator.result_from_equality(false)
+        };
+    }
+
     match KnownComparisonSemantics::of_type(db, other, operator) {
         Some(other_semantics) if literal_semantics != other_semantics => {
             ComparisonResult::from_bool(operator == ComparisonOperator::Inequality)

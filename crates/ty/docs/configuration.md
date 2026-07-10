@@ -160,6 +160,74 @@ Defaults to `true`.
 
 ---
 
+### `strict-literal-narrowing`
+
+Whether equality-based checks should preserve broad builtin types rather than narrow them to
+literal types.
+
+By default, ty narrows `value` from `str` to `Literal["a"]` in the positive branch of
+`value == "a"`. When this option is enabled, `value` remains `str`. This also applies to
+membership tests and literal match patterns, which use equality comparisons.
+
+```python
+from typing import Literal
+
+def parse(value: str) -> Literal["a"] | None:
+    if value == "a":
+        return value  # Accepted by default; `value` remains `str` in strict mode.
+    return None
+```
+
+Broad builtin types include subclasses, but literal types distinguish values by both their
+runtime type and value. This makes the narrowing unsound even for subclasses that inherit
+builtin equality. For example:
+
+```python
+class StringSubclass(str): ...
+
+result = parse(StringSubclass("a"))
+# Statically `Literal["a"] | None`, but `result` has runtime type `StringSubclass`.
+```
+
+A subclass can also override `__eq__` to compare equal to a literal with a different value:
+
+```python
+class MisleadingStr(str):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+result = parse(MisleadingStr("b"))
+# Statically `Literal["a"] | None`, but `result` contains `"b"` at runtime.
+```
+
+Enable this option to preserve the broader builtin type instead.
+
+Defaults to `false`.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Preserve broad builtin types instead of narrowing them to literals
+    strict-literal-narrowing = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Preserve broad builtin types instead of narrowing them to literals
+    strict-literal-narrowing = true
+    ```
+
+---
+
 ## `environment`
 
 ### `extra-paths`
@@ -650,6 +718,74 @@ Defaults to `true`.
     [overrides.analysis]
     # Disable support for `type: ignore` comments
     respect-type-ignore-comments = false
+    ```
+
+---
+
+#### `strict-literal-narrowing`
+
+Whether equality-based checks should preserve broad builtin types rather than narrow them to
+literal types.
+
+By default, ty narrows `value` from `str` to `Literal["a"]` in the positive branch of
+`value == "a"`. When this option is enabled, `value` remains `str`. This also applies to
+membership tests and literal match patterns, which use equality comparisons.
+
+```python
+from typing import Literal
+
+def parse(value: str) -> Literal["a"] | None:
+    if value == "a":
+        return value  # Accepted by default; `value` remains `str` in strict mode.
+    return None
+```
+
+Broad builtin types include subclasses, but literal types distinguish values by both their
+runtime type and value. This makes the narrowing unsound even for subclasses that inherit
+builtin equality. For example:
+
+```python
+class StringSubclass(str): ...
+
+result = parse(StringSubclass("a"))
+# Statically `Literal["a"] | None`, but `result` has runtime type `StringSubclass`.
+```
+
+A subclass can also override `__eq__` to compare equal to a literal with a different value:
+
+```python
+class MisleadingStr(str):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+result = parse(MisleadingStr("b"))
+# Statically `Literal["a"] | None`, but `result` contains `"b"` at runtime.
+```
+
+Enable this option to preserve the broader builtin type instead.
+
+Defaults to `false`.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Preserve broad builtin types instead of narrowing them to literals
+    strict-literal-narrowing = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Preserve broad builtin types instead of narrowing them to literals
+    strict-literal-narrowing = true
     ```
 
 ---

@@ -1465,6 +1465,57 @@ pub struct TerminalOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AnalysisOptions {
+    /// Whether equality-based checks should preserve broad builtin types rather than narrow them to
+    /// literal types.
+    ///
+    /// By default, ty narrows `value` from `str` to `Literal["a"]` in the positive branch of
+    /// `value == "a"`. When this option is enabled, `value` remains `str`. This also applies to
+    /// membership tests and literal match patterns, which use equality comparisons.
+    ///
+    /// ```python
+    /// from typing import Literal
+    ///
+    /// def parse(value: str) -> Literal["a"] | None:
+    ///     if value == "a":
+    ///         return value  # Accepted by default; `value` remains `str` in strict mode.
+    ///     return None
+    /// ```
+    ///
+    /// Broad builtin types include subclasses, but literal types distinguish values by both their
+    /// runtime type and value. This makes the narrowing unsound even for subclasses that inherit
+    /// builtin equality. For example:
+    ///
+    /// ```python
+    /// class StringSubclass(str): ...
+    ///
+    /// result = parse(StringSubclass("a"))
+    /// # Statically `Literal["a"] | None`, but `result` has runtime type `StringSubclass`.
+    /// ```
+    ///
+    /// A subclass can also override `__eq__` to compare equal to a literal with a different value:
+    ///
+    /// ```python
+    /// class MisleadingStr(str):
+    ///     def __eq__(self, other: object) -> bool:
+    ///         return True
+    ///
+    /// result = parse(MisleadingStr("b"))
+    /// # Statically `Literal["a"] | None`, but `result` contains `"b"` at runtime.
+    /// ```
+    ///
+    /// Enable this option to preserve the broader builtin type instead.
+    ///
+    /// Defaults to `false`.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+        # Preserve broad builtin types instead of narrowing them to literals
+        strict-literal-narrowing = true
+        "#
+    )]
+    pub strict_literal_narrowing: Option<bool>,
+
     /// Whether ty should respect `type: ignore` comments.
     ///
     /// When set to `false`, `type: ignore` comments are treated like any other normal
@@ -1541,12 +1592,14 @@ impl AnalysisOptions {
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
         let Self {
+            strict_literal_narrowing,
             respect_type_ignore_comments,
             allowed_unresolved_imports,
             replace_imports_with_any,
         } = self;
 
         let AnalysisSettings {
+            strict_literal_narrowing: strict_literal_narrowing_default,
             respect_type_ignore_comments: respect_type_ignore_default,
             allowed_unresolved_imports: allowed_unresolved_imports_default,
             replace_imports_with_any: replace_imports_with_any_default,
@@ -1575,6 +1628,8 @@ impl AnalysisOptions {
             };
 
         AnalysisSettings {
+            strict_literal_narrowing: strict_literal_narrowing
+                .unwrap_or(strict_literal_narrowing_default),
             respect_type_ignore_comments: respect_type_ignore_comments
                 .unwrap_or(respect_type_ignore_default),
             allowed_unresolved_imports,

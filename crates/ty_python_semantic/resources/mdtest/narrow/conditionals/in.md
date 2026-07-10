@@ -5,7 +5,7 @@
 ```py
 def _(x: int):
     if x in (1, 2, 3):
-        reveal_type(x)  # revealed: int
+        reveal_type(x)  # revealed: Literal[1, 2, 3, True]
     else:
         reveal_type(x)  # revealed: int & ~Literal[1] & ~Literal[True] & ~Literal[2] & ~Literal[3]
 ```
@@ -13,9 +13,35 @@ def _(x: int):
 ```py
 def _(x: str):
     if x in ("a", "b", "c"):
-        reveal_type(x)  # revealed: str
+        reveal_type(x)  # revealed: Literal["a", "b", "c"]
     else:
         reveal_type(x)  # revealed: str & ~Literal["a"] & ~Literal["b"] & ~Literal["c"]
+```
+
+```py
+def _(x: bytes):
+    if x in (b"a", b"b"):
+        reveal_type(x)  # revealed: Literal[b"a", b"b"]
+```
+
+Membership in a container with literal elements narrows a broad builtin type to those literals:
+
+```py
+from typing import Literal
+
+MyType = Literal["test1", "test2"]
+
+def from_list(value: str, valid_values: list[MyType]) -> MyType:
+    if value in valid_values:
+        reveal_type(value)  # revealed: Literal["test1", "test2"]
+        return value
+    return "test1"
+
+def from_dict(value: str, valid_values: dict[MyType, int]) -> int | None:
+    if value in valid_values:
+        reveal_type(value)  # revealed: Literal["test1", "test2"]
+        return valid_values[value]
+    return None
 ```
 
 ```py
@@ -86,7 +112,7 @@ type Foo = Literal["a", "b", "c"] | int
 
 def _(x: Foo):
     if x in ("a", "b"):
-        reveal_type(x)  # revealed: Literal["a", "b"] | int
+        reveal_type(x)  # revealed: Literal["a", "b"]
     else:
         reveal_type(x)  # revealed: Literal["c"] | int
 
@@ -94,7 +120,30 @@ def _(x: Foo):
     if x not in ("a", "c"):
         reveal_type(x)  # revealed: Literal["b"] | int
     else:
-        reveal_type(x)  # revealed: Literal["a", "c"] | int
+        reveal_type(x)  # revealed: Literal["a", "c"]
+```
+
+## Enabling strict literal narrowing for membership
+
+With strict literal narrowing enabled, a broad union arm is preserved when a membership test
+succeeds, while literal arms are still narrowed safely:
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-literal-narrowing = true
+```
+
+```py
+from typing import Literal
+
+type Foo = Literal["a", "b", "c"] | int
+
+def _(x: Foo):
+    if x in ("a", "b"):
+        reveal_type(x)  # revealed: Literal["a", "b"] | int
 ```
 
 ## `in` for `str` and literal strings
@@ -296,9 +345,7 @@ from typing import Literal
 
 def test(x: Literal["a", "b", "c"] | None | int = None):
     if x in ("a", "b"):
-        # int is included because custom __eq__ methods could make
-        # an int equal to "a" or "b", so we can't eliminate it
-        reveal_type(x)  # revealed: Literal["a", "b"] | int
+        reveal_type(x)  # revealed: Literal["a", "b"]
     else:
         reveal_type(x)  # revealed: Literal["c"] | None | int
 
@@ -364,11 +411,11 @@ T = TypeVar("T", Literal[1], Literal[2])
 
 def test(x: Literal["a", "b", "c"] | None | int = None):
     if x not in ("a", "c"):
-        # int is included because custom __eq__ methods could make
-        # an int equal to "a" or "c", so we can't eliminate it
+        # Negative narrowing remains conservative because an `int` subclass could compare equal
+        # to a string literal.
         reveal_type(x)  # revealed: Literal["b"] | None | int
     else:
-        reveal_type(x)  # revealed: Literal["a", "c"] | int
+        reveal_type(x)  # revealed: Literal["a", "c"]
 
 def broad_set_element(x: Literal[1, 2], values: set[int]) -> None:
     if x not in values:
@@ -463,7 +510,7 @@ def default_equality(x: Token | Literal[1]):
 
 def overlapping_union_member(x: int | Literal["missing"]):
     if x in ("missing", 1):
-        reveal_type(x)  # revealed: int | Literal["missing"]
+        reveal_type(x)  # revealed: Literal["missing", 1, True]
 
 def custom_equality(x: AlwaysEqual | Literal[1]):
     if x in (1,):
@@ -977,8 +1024,7 @@ def _(x: bool):
 
 def _(x: bool | str):
     if x in (False,):
-        # `str` remains due to possible custom __eq__ methods on a subclass
-        reveal_type(x)  # revealed: Literal[False] | str
+        reveal_type(x)  # revealed: Literal[False]
     else:
         reveal_type(x)  # revealed: Literal[True] | str
 ```
@@ -996,7 +1042,7 @@ def _(x: LiteralString):
 
 def _(x: LiteralString | int):
     if x in ("a", "b", "c"):
-        reveal_type(x)  # revealed: Literal["a", "b", "c"] | int
+        reveal_type(x)  # revealed: Literal["a", "b", "c"]
     else:
         reveal_type(x)  # revealed: (LiteralString & ~Literal["a"] & ~Literal["b"] & ~Literal["c"]) | int
 ```

@@ -2244,9 +2244,22 @@ Source with applied edits:
         def my_func(command: str):
             match command.split():
                 case ["get", ("a" | "b") as ab]:
-                    x[: str] = ab
+                    x[: Literal["a", "b"]] = ab
 
         ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/typing.pyi:LL:1
+           |
+        LL | Literal: _SpecialForm
+           | ^^^^^^^
+           |
+        info: Source
+          --> main2.py:LL:17
+           |
+        LL |             x[: Literal["a", "b"]] = ab
+           |                 ^^^^^^^
+           |
+
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
            |
@@ -2254,19 +2267,36 @@ Source with applied edits:
            |       ^^^
            |
         info: Source
-          --> main2.py:LL:17
+          --> main2.py:LL:25
            |
-        LL |             x[: str] = ab
-           |                 ^^^
+        LL |             x[: Literal["a", "b"]] = ab
+           |                         ^^^
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ^^^
+           |
+        info: Source
+          --> main2.py:LL:30
+           |
+        LL |             x[: Literal["a", "b"]] = ab
+           |                              ^^^
            |
 
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
           |
-        4 |         case ["get", ("a" | "b") as ab]:
+        1 + from typing import Literal
+        2 |
+        3 | def my_func(command: str):
+        4 |     match command.split():
+        5 |         case ["get", ("a" | "b") as ab]:
           -             x = ab
-        5 +             x: str = ab
+        6 +             x: Literal["a", "b"] = ab
           |
         "#);
     }

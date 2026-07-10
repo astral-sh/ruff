@@ -42,8 +42,8 @@ use super::UnionType;
 use super::call::CallArguments;
 use super::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
 use super::equality::{
-    equality_exclusion_constraint, equality_truthiness, evaluate_type_equality,
-    evaluate_type_inequality,
+    ComparisonSoundnessPolicy, equality_exclusion_constraint, equality_truthiness,
+    evaluate_type_equality, evaluate_type_inequality,
 };
 use super::variance::TypeVarVariance;
 use itertools::Itertools;
@@ -1349,6 +1349,14 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         Self { db, scope }
     }
 
+    fn comparison_soundness_policy(&self) -> ComparisonSoundnessPolicy {
+        ComparisonSoundnessPolicy::from_strict_literal_narrowing(
+            self.db
+                .analysis_settings(self.scope.file(self.db))
+                .strict_literal_narrowing,
+        )
+    }
+
     fn merge_binding(
         bindings: &mut BTreeMap<ScopedPlaceId, PatternBindingTypes<'db>>,
         place: ScopedPlaceId,
@@ -1542,9 +1550,15 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         subject_ty: Type<'db>,
     ) -> Type<'db> {
         let value_ty = infer_same_file_expression_type(self.db, value, TypeContext::default());
-        evaluate_type_equality(self.db, subject_ty, value_ty, true)
-            .map(|constraint| self.intersect_types(subject_ty, constraint))
-            .unwrap_or(subject_ty)
+        evaluate_type_equality(
+            self.db,
+            subject_ty,
+            value_ty,
+            true,
+            self.comparison_soundness_policy(),
+        )
+        .map(|constraint| self.intersect_types(subject_ty, constraint))
+        .unwrap_or(subject_ty)
     }
 
     fn analyze_successful_or_pattern(
@@ -2629,6 +2643,14 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         }
     }
 
+    fn comparison_soundness_policy(&self) -> ComparisonSoundnessPolicy {
+        ComparisonSoundnessPolicy::from_strict_literal_narrowing(
+            self.db
+                .analysis_settings(self.scope().file(self.db))
+                .strict_literal_narrowing,
+        )
+    }
+
     #[track_caller]
     fn expect_place(&self, place_expr: &PlaceExpr) -> ScopedPlaceId {
         self.places()
@@ -2899,6 +2921,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     ) -> Option<Type<'db>> {
         let lhs_ty = lhs_ty.resolve_type_alias(self.db);
         let rhs_ty = rhs_ty.resolve_type_alias(self.db);
+        let soundness_policy = self.comparison_soundness_policy();
 
         // Preserve the shared specialization of a constrained TypeVar. Expanding the TypeVar
         // before comparing it with `lhs_ty` would lose the correlation between this occurrence
@@ -2907,7 +2930,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             && let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
                 typevar.typevar(self.db).bound_or_constraints(self.db)
             && constraints.elements(self.db).iter().all(|constraint| {
-                evaluate_type_equality(self.db, lhs_ty, *constraint, true)
+                evaluate_type_equality(self.db, lhs_ty, *constraint, true, soundness_policy)
                     .is_some_and(|narrowed| narrowed.is_equivalent_to(self.db, *constraint))
             })
         {
@@ -2922,13 +2945,13 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             _ => lhs_ty.is_single_valued(self.db),
         };
         if !has_single_valued_component {
-            return evaluate_type_equality(self.db, lhs_ty, rhs_ty, true);
+            return evaluate_type_equality(self.db, lhs_ty, rhs_ty, true, soundness_policy);
         }
 
         let mut builder = UnionBuilder::new(self.db);
         let add_lhs_element = |builder: UnionBuilder<'db>, element: Type<'db>| {
             let element = element.resolve_type_alias(self.db);
-            match evaluate_type_equality(self.db, element, rhs_ty, true) {
+            match evaluate_type_equality(self.db, element, rhs_ty, true, soundness_policy) {
                 Some(Type::Never) => builder,
                 Some(constraint) => builder.add(constraint),
                 None if !element.is_single_valued(self.db) => builder.add(element),
@@ -2979,10 +3002,22 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         is_positive: bool,
     ) -> Option<Type<'db>> {
         if op == ast::CmpOp::Eq {
-            return evaluate_type_equality(self.db, lhs_ty, rhs_ty, is_positive);
+            return evaluate_type_equality(
+                self.db,
+                lhs_ty,
+                rhs_ty,
+                is_positive,
+                self.comparison_soundness_policy(),
+            );
         }
         if op == ast::CmpOp::NotEq {
-            return evaluate_type_inequality(self.db, lhs_ty, rhs_ty, is_positive);
+            return evaluate_type_inequality(
+                self.db,
+                lhs_ty,
+                rhs_ty,
+                is_positive,
+                self.comparison_soundness_policy(),
+            );
         }
 
         let op = if is_positive { op } else { op.negate() };

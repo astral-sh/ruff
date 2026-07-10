@@ -1137,6 +1137,61 @@ def _(value: Right | None):
         reveal_type(value)  # revealed: Right | None
 ```
 
+## Narrowing builtin types to literals
+
+Equality with a literal narrows broad `str`, `int`, and `bytes` types to the values that compare
+equal to that literal:
+
+```py
+def narrow_string(value: str):
+    if value == "a":
+        reveal_type(value)  # revealed: Literal["a"]
+    else:
+        reveal_type(value)  # revealed: str & ~Literal["a"]
+
+def narrow_reversed_string(value: str):
+    if "a" == value:
+        reveal_type(value)  # revealed: Literal["a"]
+
+def narrow_integer(value: int):
+    if value == 1:
+        # `True == 1` at runtime.
+        reveal_type(value)  # revealed: Literal[1, True]
+
+def narrow_bytes(value: bytes):
+    if value == b"a":
+        reveal_type(value)  # revealed: Literal[b"a"]
+
+def narrow_mixed_builtins(value: str | int | bytes):
+    if value == "a":
+        reveal_type(value)  # revealed: Literal["a"]
+
+def narrow_inequality_else(value: str):
+    if value != "a":
+        reveal_type(value)  # revealed: str & ~Literal["a"]
+    else:
+        reveal_type(value)  # revealed: Literal["a"]
+```
+
+The narrowing only treats the broad builtin types optimistically. Explicit subclass and custom
+comparison arms are preserved:
+
+```py
+class StringSubclass(str): ...
+
+class AlwaysEqual:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def preserve_subclass(value: StringSubclass):
+    if value == "a":
+        reveal_type(value)  # revealed: StringSubclass
+
+def preserve_custom_comparison(value: str | AlwaysEqual):
+    if value == "a":
+        reveal_type(value)  # revealed: Literal["a"] | AlwaysEqual
+```
+
 ## `x != y` where `y` is of literal type
 
 ```py
@@ -1560,4 +1615,34 @@ def _(x: A | B):
         reveal_type(x)  # revealed: A
     else:
         reveal_type(x)  # revealed: B
+```
+
+## Enabling strict literal narrowing
+
+The `strict-literal-narrowing` option can be enabled to preserve broad builtin types after equality
+comparisons. Narrowing types that are already literal unions remains safe and is unaffected.
+
+```toml
+[analysis]
+strict-literal-narrowing = true
+```
+
+```py
+from typing import Literal
+
+def broad(value: str):
+    if value == "a":
+        reveal_type(value)  # revealed: str
+    else:
+        reveal_type(value)  # revealed: str & ~Literal["a"]
+
+def inequality(value: str):
+    if value != "a":
+        reveal_type(value)  # revealed: str & ~Literal["a"]
+    else:
+        reveal_type(value)  # revealed: str
+
+def literal(value: Literal["a", "b"]):
+    if value == "a":
+        reveal_type(value)  # revealed: Literal["a"]
 ```
