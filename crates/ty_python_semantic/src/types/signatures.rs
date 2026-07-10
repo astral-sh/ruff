@@ -34,11 +34,12 @@ use crate::types::relation::{
 };
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
 use crate::types::typevar::max_typevar_freshness_matching_generic_context;
+use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
     MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
-    TypeMapping, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
+    TypeMapping, TypeVarKind, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
     infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
@@ -518,7 +519,7 @@ impl<'db> CallableSignature<'db> {
             &signature_relation_visitor,
             &materialization_visitor,
         );
-        checker.check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
+        checker.check_callable_signature_pair(db, self, other)
     }
 }
 
@@ -749,7 +750,6 @@ impl<'db> Signature<'db> {
             pep695_generic_context,
             legacy_generic_context,
         );
-
         let (generic_context, return_ty) = match return_callable_typevar_scope {
             ReturnCallableTypeVarScope::Lexical => (full_generic_context, return_ty),
             ReturnCallableTypeVarScope::Public => {
@@ -1458,6 +1458,60 @@ impl<'db> Signature<'db> {
         }
     }
 
+    fn is_supported_higher_rank_concrete_type(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        match ty {
+            Type::Never => true,
+            Type::NominalInstance(instance) => {
+                !instance.inherits_from_explicit_any()
+                    && !ty.has_dynamic(db)
+                    && !ty.has_typevar_or_typevar_instance(db)
+                    && !any_over_type(db, ty, false, |nested| matches!(nested, Type::TypeAlias(_)))
+            }
+            _ => false,
+        }
+    }
+
+    fn has_only_supported_higher_rank_concrete_types(&self, db: &'db dyn Db) -> bool {
+        self.parameters
+            .iter()
+            .map(Parameter::annotated_type)
+            .chain(std::iter::once(self.return_ty))
+            .all(|ty| Self::is_supported_higher_rank_concrete_type(db, ty))
+    }
+
+    /// Return the single callable-local variable supported by the initial higher-rank relation.
+    fn bare_unbounded_pep695_typevar(&self, db: &'db dyn Db) -> Option<BoundTypeVarInstance<'db>> {
+        if !self.parameters.is_standard() {
+            return None;
+        }
+
+        let definition = self.definition?;
+        let mut typevars = self.generic_context?.variables(db);
+        let typevar = typevars.next()?;
+        if typevars.next().is_some()
+            || typevar.kind(db) != TypeVarKind::Pep695TypeVar
+            || typevar.binding_context(db).definition() != Some(definition)
+            || typevar.typevar(db).bound_or_constraints(db).is_some()
+        {
+            return None;
+        }
+
+        let identity = typevar.typevar(db).identity(db);
+        self.parameters
+            .iter()
+            .map(Parameter::annotated_type)
+            .chain(std::iter::once(self.return_ty))
+            .all(|ty| {
+                if ty.references_typevar(db, identity) {
+                    ty.as_typevar()
+                        .is_some_and(|inner| inner.is_same_typevar_as(db, typevar))
+                } else {
+                    Self::is_supported_higher_rank_concrete_type(db, ty)
+                }
+            })
+            .then_some(typevar)
+    }
+
     pub(crate) fn is_non_generic(&self) -> bool {
         self.generic_context.is_none()
     }
@@ -1767,7 +1821,54 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &CallableSignature<'db>,
         target: &CallableSignature<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if let ([source], [target]) = (source.overloads.as_slice(), target.overloads.as_slice())
+            && let Some(relation) =
+                self.try_check_nongeneric_source_with_universal_target(db, source, target)
+        {
+            return relation;
+        }
+
         self.check_callable_signature_pair_inner(db, &source.overloads, &target.overloads)
+    }
+
+    /// Check the initial closed fragment of higher-rank generic callable relations.
+    ///
+    /// A non-generic source must satisfy every receiver-compatible specialization of an unbounded
+    /// target-local type variable. Generic sources, overloads, declared domains, nested
+    /// occurrences, and enclosing inference variables remain on the existing relation path.
+    fn try_check_nongeneric_source_with_universal_target(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        if self.inferable != InferableTypeVars::None
+            || source.generic_context.is_some()
+            || !source.parameters.is_standard()
+            || !source.has_only_supported_higher_rank_concrete_types(db)
+        {
+            return None;
+        }
+
+        let target_typevar = target.bare_unbounded_pep695_typevar(db)?;
+        let target_local = InferableTypeVars::from_typevars(
+            db,
+            std::iter::once(target_typevar.identity(db)).collect(),
+        );
+        let mut checker = self.with_inferable_typevars(target_local);
+        checker.typevar_evaluation = TypeVarEvaluation::Lazy;
+        let relation = checker.with_signature_recursion_guard(source, target, || {
+            target
+                .receiver_bindings_when_satisfied(&checker, db)
+                .implies(db, self.constraints, || {
+                    source.receiver_bindings_when_satisfied(&checker, db).and(
+                        db,
+                        self.constraints,
+                        || checker.check_signature_pair_inner(db, source, target),
+                    )
+                })
+        });
+        Some(relation.for_all(db, self.constraints, target_local))
     }
 
     /// Implementation of subtyping and assignability between two, possible overloaded, callable

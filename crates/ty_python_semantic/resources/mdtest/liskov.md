@@ -880,10 +880,9 @@ class C(A):
     def method(self, x: object) -> Never: ...  # fine
 
 class D(A):
-    # TODO: we should emit [invalid-method-override] here:
     # `A.method` accepts an argument of any type,
     # but `D.method` only accepts `int`s
-    def method(self, x: int) -> int: ...
+    def method(self, x: int) -> int: ...  # error: [invalid-method-override]
 
 class A2:
     def method(self, x: int) -> int: ...

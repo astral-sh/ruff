@@ -593,7 +593,6 @@ impl<'db> OverloadLiteral<'db> {
             file_scope_id,
             index,
         );
-
         let mut raw_signature = Signature::from_function(
             db,
             pep695_ctx,
