@@ -108,6 +108,30 @@ def _(a: int) -> TypeIs[str]: ...
 def _(a: bool | str) -> TypeIs[int]: ...
 ```
 
+## Overloaded definitions
+
+Each overload is checked exactly once, and distinct invalid overloads each report their own
+diagnostic.
+
+```pyi
+from typing import overload
+from typing_extensions import Never, TypeIs
+
+@overload
+# error: [invalid-type-guard-definition] "Narrowed type `bool` is not assignable to the declared parameter type `Never`"
+def one_invalid(value: Never) -> TypeIs[bool]: ...
+@overload
+def one_invalid(value: object) -> TypeIs[str]: ...
+
+# Two distinct invalid overloads should each report their own diagnostic.
+@overload
+# error: [invalid-type-guard-definition] "Narrowed type `bool` is not assignable to the declared parameter type `Never`"
+def two_invalid(value: Never) -> TypeIs[bool]: ...
+@overload
+# error: [invalid-type-guard-definition] "Narrowed type `str` is not assignable to the declared parameter type `int`"
+def two_invalid(value: int) -> TypeIs[str]: ...
+```
+
 ## Methods
 
 Methods narrow the first positional argument after `self` or `cls`
