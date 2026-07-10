@@ -3450,7 +3450,6 @@ name = "ruff_notebook"
 version = "0.0.4"
 dependencies = [
  "anyhow",
- "itertools 0.15.0",
  "rand 0.10.1",
  "ruff_diagnostics",
  "ruff_source_file",
