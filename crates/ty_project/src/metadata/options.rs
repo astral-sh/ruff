@@ -1492,6 +1492,19 @@ pub struct AnalysisOptions {
     /// # Statically `Literal["a"] | None`, but `result` has runtime type `StringSubclass`.
     /// ```
     ///
+    /// The standard library's `StrEnum` and `IntEnum` types are also subclasses of `str` and `int`,
+    /// respectively. This means enum members can encounter the same unsoundness:
+    ///
+    /// ```python
+    /// from enum import StrEnum
+    ///
+    /// class Choice(StrEnum):
+    ///     A = "a"
+    ///
+    /// result = parse(Choice.A)
+    /// # Statically `Literal["a"] | None`, but `result` has runtime type `Choice`.
+    /// ```
+    ///
     /// A subclass can also override `__eq__` to compare equal to a literal with a different value:
     ///
     /// ```python
