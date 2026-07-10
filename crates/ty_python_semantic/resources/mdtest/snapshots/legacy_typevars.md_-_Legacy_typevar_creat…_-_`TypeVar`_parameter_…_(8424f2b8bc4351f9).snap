@@ -27,6 +27,5 @@ warning[mismatched-type-name]: The name passed to `TypeVar` must match the varia
   |
 4 | T = TypeVar("Q")
   |             ^^^ Expected "T", got "Q"
-  |
 
 ```

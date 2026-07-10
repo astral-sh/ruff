@@ -267,7 +267,6 @@ B006 Do not use mutable data structures for argument defaults
    |
 67 | def import_module_wrong(value: dict[str, str] = {}): import os
    |                                                 ^^
-   |
 help: Replace with `None`; initialize within function
 
 B006 Do not use mutable data structures for argument defaults
@@ -275,7 +274,6 @@ B006 Do not use mutable data structures for argument defaults
    |
 70 | def import_module_wrong(value: dict[str, str] = {}): import os; import sys
    |                                                 ^^
-   |
 help: Replace with `None`; initialize within function
 
 B006 Do not use mutable data structures for argument defaults

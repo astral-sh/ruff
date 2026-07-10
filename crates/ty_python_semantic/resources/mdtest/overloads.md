@@ -847,7 +847,6 @@ error[invalid-overload]: Implementation does not accept all arguments of this ov
    |         ^^^^^^^^
 10 |     def _extract(self, row_key: int | None = None, column_key: int | None = None) -> object:
    |         -------- Implementation defined here
-   |
 info: Implementation signature `(self, row_key: int | None = None, column_key: int | None = None) -> object` is not assignable to overload signature `(self, column_key: int) -> object`
 info: the parameter named `row_key` does not match `column_key` (and can be used as a keyword parameter)
 
@@ -859,7 +858,6 @@ error[invalid-overload]: Implementation does not accept all arguments of this ov
    |         ^^^^^^
 19 |     def update(self, params=(), /, **kwds) -> None:
    |         ------ Implementation defined here
-   |
 info: Implementation signature `(self, params=..., /, **kwds) -> None` is not assignable to overload signature `(self, **kwds: Iterable[str]) -> None`
 info: parameter `self` is positional-only but must also accept keyword arguments
 ```
@@ -896,7 +894,6 @@ error[invalid-overload]: Overload return type is not assignable to implementatio
 7 | def return_tuple(x: str) -> tuple[int]: ...
 8 | def return_tuple(x: int | str) -> tuple[int]:
   |     ------------ Implementation defined here
-  |
 info: Overload returns `tuple[str]`, which is not assignable to implementation return type `tuple[int]`
 info: the first tuple element is not compatible: `str` is not assignable to `int`
 ```

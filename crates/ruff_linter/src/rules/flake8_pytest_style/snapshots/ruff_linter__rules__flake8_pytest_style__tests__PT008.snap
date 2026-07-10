@@ -123,4 +123,3 @@ PT008 Use `return_value=` instead of patching with `lambda`
 47 | mocker.patch.object(obj, "attr", lambda *args, **kwargs: None)
 48 | module_mocker.patch.object(obj, "attr", lambda *args, **kwargs: None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |

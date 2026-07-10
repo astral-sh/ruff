@@ -124,7 +124,6 @@ error[shadowed-type-variable]: Generic class `InnerClass` uses ParamSpec `P` alr
 71 |     # snapshot: shadowed-type-variable
 72 |     class InnerClass(SingleParamSpec[P]): ...
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `P` used in class definition here
-   |
 ```
 
 If you don't specialize a generic base class, we use the default specialization, which maps each

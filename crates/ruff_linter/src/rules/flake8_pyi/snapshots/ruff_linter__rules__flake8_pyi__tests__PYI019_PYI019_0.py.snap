@@ -7,7 +7,6 @@ PYI019 [*] Use `Self` instead of custom TypeVar `_S`
 6 | class BadClass:
 7 |     def __new__(cls: type[_S], *args: str, **kwargs: int) -> _S: ...  # PYI019
   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Replace TypeVar `_S` with `Self`
   |
 6 | class BadClass:
@@ -21,7 +20,6 @@ PYI019 [*] Use `Self` instead of custom TypeVar `_S`
    |
 10 |     def bad_instance_method(self: _S, arg: bytes) -> _S: ...  # PYI019
    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace TypeVar `_S` with `Self`
    |
 9  |
@@ -36,7 +34,6 @@ PYI019 [*] Use `Self` instead of custom TypeVar `_S`
 13 |     @classmethod
 14 |     def bad_class_method(cls: type[_S], arg: int) -> _S: ...  # PYI019
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace TypeVar `_S` with `Self`
    |
 13 |     @classmethod
@@ -51,7 +48,6 @@ PYI019 [*] Use `Self` instead of custom TypeVar `_S`
 17 |     @classmethod
 18 |     def bad_posonly_class_method(cls: type[_S], /) -> _S: ...  # PYI019
    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace TypeVar `_S` with `Self`
    |
 17 |     @classmethod
@@ -67,7 +63,6 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 38 | class PEP695BadDunderNew[T]:
 39 |   def __new__[S](cls: type[S], *args: Any, ** kwargs: Any) -> S: ...  # PYI019
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace TypeVar `S` with `Self`
    |
 38 | class PEP695BadDunderNew[T]:
@@ -81,7 +76,6 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
    |
 42 |   def generic_instance_method[S](self: S) -> S: ...  # PYI019
    |                              ^^^^^^^^^^^^^^^^^
-   |
 help: Replace TypeVar `S` with `Self`
    |
 41 |
@@ -97,7 +91,6 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 53 |    @foo_classmethod
 54 |    def foo[S](cls: type[S]) -> S: ...  # PYI019
    |           ^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace TypeVar `S` with `Self`
    |
 53 |    @foo_classmethod
@@ -344,7 +337,6 @@ PYI019 [*] Use `Self` instead of custom TypeVar `_S695`
 88 |
 89 |     def mixing_old_and_new_style_type_vars[T](self: _S695, a: T, b: T) -> _S695: ...
    |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace TypeVar `_S695` with `Self`
    |
 88 |
@@ -377,7 +369,6 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 113 |     @classmethod
 114 |     def m[S](cls: type[S]) -> type[S]: ...  # PYI019
     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace TypeVar `S` with `Self`
     |
 113 |     @classmethod
@@ -410,7 +401,6 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 119 |     @classmethod
 120 |     def n[S](cls: type[S], other: S) -> int: ...
     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace TypeVar `S` with `Self`
     |
 119 |     @classmethod
@@ -613,7 +603,6 @@ PYI019 [*] Use `Self` instead of custom TypeVar `_S`
 191 |     @classmethod
 192 |     def bad_class_method_with_string_annotations(cls: "type[_S]") -> "_S": ... # PYI019
     |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace TypeVar `_S` with `Self`
     |
 191 |     @classmethod
@@ -628,7 +617,6 @@ PYI019 [*] Use `Self` instead of custom TypeVar `_S`
 195 |     @classmethod
 196 |     def bad_class_method_with_mixed_annotations_1(cls: "type[_S]") -> _S: ... # PYI019
     |                                                  ^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace TypeVar `_S` with `Self`
     |
 195 |     @classmethod
@@ -643,7 +631,6 @@ PYI019 [*] Use `Self` instead of custom TypeVar `_S`
 199 |     @classmethod
 200 |     def bad_class_method_with_mixed_annotations_1(cls: type[_S]) -> "_S": ... # PYI019
     |                                                  ^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace TypeVar `_S` with `Self`
     |
 199 |     @classmethod
@@ -659,7 +646,6 @@ PYI019 [*] Use `Self` instead of custom TypeVar `S`
 204 |     @classmethod
 205 |     def m[S](cls: "type[S]") -> "type[S]": ...  # PYI019
     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace TypeVar `S` with `Self`
     |
 204 |     @classmethod

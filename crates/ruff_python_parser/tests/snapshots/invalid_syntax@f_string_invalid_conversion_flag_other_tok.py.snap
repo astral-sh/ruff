@@ -121,4 +121,3 @@ Module(
 1 | f"{x!123}"
 2 | f"{x!'a'}"
   |      ^^^ Syntax Error: f-string: invalid conversion character
-  |

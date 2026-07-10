@@ -260,7 +260,6 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
 34 | / getattr("foo"
 35 | |         "bar", "real")
    | |______________________^
-   |
 help: Replace `getattr` with attribute access
    |
 33 | getattr(x + y, "real")
@@ -352,7 +351,6 @@ B009 [*] Do not call `getattr` with a constant attribute value. It is not any sa
 87 | |     "foo",
 88 | | )
    | |_^
-   |
 help: Replace `getattr` with attribute access
    |
 83 |

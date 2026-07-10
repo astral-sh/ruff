@@ -8,4 +8,3 @@ F404 `from __future__` imports must occur at the beginning of the file
 4 |
 5 | from __future__ import absolute_import
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |

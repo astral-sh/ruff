@@ -9,7 +9,6 @@ TC004 [*] Move import `datetime.datetime` out of type-checking block. Import is 
   |                          ^^^^^^^^
 5 | x = datetime
   |     -------- Used at runtime here
-  |
 help: Move out of type-checking block
   |
 1 | from typing import TYPE_CHECKING

@@ -41,6 +41,5 @@ error[abstract-method-in-final-class]: Final class `Derived` has unimplemented a
    |   ------
 10 |   class Derived(Base):  # error: [abstract-method-in-final-class] "Final class `Derived` has unimplemented abstract method `foo`"
    |         ^^^^^^^ `foo` is unimplemented
-   |
 
 ```

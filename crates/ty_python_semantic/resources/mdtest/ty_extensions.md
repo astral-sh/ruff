@@ -294,7 +294,6 @@ error[static-assert-error]: Static assertion error: argument evaluates to `False
   | ^^^^^^^^^^^^^^-----^
   |               |
   |               Inferred type of argument is `Literal[False]`
-  |
 ```
 
 With a custom message:
@@ -312,7 +311,6 @@ error[static-assert-error]: Static assertion error: with a message
   | ^^^^^^^^^^^^^^-----^^^^^^^^^^^^^^^^^^^
   |               |
   |               Inferred type of argument is `Literal[False]`
-  |
 ```
 
 When it evaluates to something falsy:
@@ -330,7 +328,6 @@ error[static-assert-error]: Static assertion error: argument of type `Literal[""
    | ^^^^^^^^^^^^^^--^
    |               |
    |               Inferred type of argument is `Literal[""]`
-   |
 ```
 
 When it evaluates to something that is not statically known to be truthy or falsy:
@@ -348,7 +345,6 @@ error[static-assert-error]: Static assertion error: argument of type `int` has a
    | ^^^^^^^^^^^^^^--------------------^
    |               |
    |               Inferred type of argument is `int`
-   |
 ```
 
 ## Type predicates

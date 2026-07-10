@@ -139,7 +139,6 @@ B043 [*] Do not call `delattr` with a constant attribute value. It is not any sa
 37 | import builtins
 38 | builtins.delattr(foo, "bar")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace `delattr` with `del` statement
    |
 37 | import builtins

@@ -63,7 +63,6 @@ B904 Within an `except` clause, raise exceptions with `raise ... from err` or `r
 64 |     else:
 65 |         raise RuntimeError("bang!")
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
   --> B904.py:73:13

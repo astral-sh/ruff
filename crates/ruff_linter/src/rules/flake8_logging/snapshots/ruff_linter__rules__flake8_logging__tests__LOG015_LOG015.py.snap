@@ -90,7 +90,6 @@ LOG015 `exception()` call on root logger
 10 | logging.log("adipiscing")
 11 | logging.exception("elit.")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Use own logger instead
 
 LOG015 `debug()` call on root logger
@@ -182,5 +181,4 @@ LOG015 `exception()` call on root logger
 32 | log("adipiscing")
 33 | exception("elit.")
    | ^^^^^^^^^^^^^^^^^^
-   |
 help: Use own logger instead

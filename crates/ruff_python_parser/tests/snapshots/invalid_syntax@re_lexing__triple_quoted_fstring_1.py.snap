@@ -77,14 +77,12 @@ Module(
   |  ___________________________^
 6 | | y = 1
   | |_____^ Syntax Error: f-string: unterminated triple-quoted string
-  |
 
 
   |
 5 | f"""hello {x # comment    
 6 | y = 1
   | ^ Syntax Error: f-string: expecting `}`
-  |
 
 
   |
@@ -94,11 +92,9 @@ Module(
   |  ___________________________^
 6 | | y = 1
   | |_____^ Syntax Error: Expected FStringEnd, found FStringMiddle
-  |
 
 
   |
 5 | f"""hello {x # comment    
 6 | y = 1
   |      ^ Syntax Error: Expected a statement
-  |

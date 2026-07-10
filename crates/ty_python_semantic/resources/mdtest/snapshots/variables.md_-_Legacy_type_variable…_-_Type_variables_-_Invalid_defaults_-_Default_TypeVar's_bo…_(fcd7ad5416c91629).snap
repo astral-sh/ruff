@@ -42,6 +42,5 @@ error[invalid-type-variable-default]: TypeVar default is not assignable to the T
    |
  5 | T3 = TypeVar("T3", bound=str)
    | ----------------------------- `T3` defined here
-   |
 
 ```

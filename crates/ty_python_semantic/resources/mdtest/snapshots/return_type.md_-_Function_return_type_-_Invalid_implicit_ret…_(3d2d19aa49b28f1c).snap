@@ -26,7 +26,6 @@ error[invalid-return-type]: Function always implicitly returns `None`, which is 
   |
 2 | def f() -> int:
   |            ^^^
-  |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
 
 ```

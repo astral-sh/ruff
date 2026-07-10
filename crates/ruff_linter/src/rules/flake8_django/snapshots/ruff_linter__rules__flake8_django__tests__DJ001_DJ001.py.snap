@@ -61,7 +61,6 @@ DJ001 Avoid using `null=True` on string-based fields such as `URLField`
 11 |     filepathfield = models.FilePathField(max_length=255, null=True)
 12 |     urlfield = models.URLField(max_length=255, null=True)
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 DJ001 Avoid using `null=True` on string-based fields such as `CharField`
   --> DJ001.py:16:17
@@ -123,7 +122,6 @@ DJ001 Avoid using `null=True` on string-based fields such as `URLField`
 20 |     filepathfield = models.FilePathField(max_length=255, null=True)
 21 |     urlfield = models.URLField(max_length=255, null=True)
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 DJ001 Avoid using `null=True` on string-based fields such as `CharField`
   --> DJ001.py:25:17
@@ -185,7 +183,6 @@ DJ001 Avoid using `null=True` on string-based fields such as `URLField`
 29 |     filepathfield = models.FilePathField(max_length=255, null=True)
 30 |     urlfield = models.URLField(max_length=255, null=True)
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 DJ001 Avoid using `null=True` on string-based fields such as `CharField`
   --> DJ001.py:52:35
@@ -214,4 +211,3 @@ DJ001 Avoid using `null=True` on string-based fields such as `SlugField`
 53 |     textfield: models.TextField = models.TextField(max_length=255, null=True)
 54 |     slugfield: models.SlugField = models.SlugField(max_length=255, null=True)
    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |

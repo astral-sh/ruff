@@ -90,4 +90,3 @@ INT002 `format` method argument is resolved before function call; consider `_("s
 36 |     print(_(a))
 37 |     print(_("{}".format(a)))
    |             ^^^^^^^^^^^^^^
-   |

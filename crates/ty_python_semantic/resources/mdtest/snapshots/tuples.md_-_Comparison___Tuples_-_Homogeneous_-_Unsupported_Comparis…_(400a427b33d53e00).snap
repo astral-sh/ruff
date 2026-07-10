@@ -65,7 +65,6 @@ error[unsupported-operator]: Unsupported `<` operation
    |     |   |
    |     |   Has type `tuple[str, ...]`
    |     Has type `tuple[int, ...]`
-   |
 info: Operation fails because operator `<` is not supported between objects of type `int` and `str`
 
 ```
@@ -79,7 +78,6 @@ error[unsupported-operator]: Unsupported `<` operation
    |     |   |
    |     |   Has type `tuple[int, ...]`
    |     Has type `tuple[str, ...]`
-   |
 info: Operation fails because operator `<` is not supported between objects of type `str` and `int`
 
 ```
@@ -93,7 +91,6 @@ error[unsupported-operator]: Unsupported `<` operation
    |     |   |
    |     |   Has type `tuple[str]`
    |     Has type `tuple[int, ...]`
-   |
 info: Operation fails because operator `<` is not supported between objects of type `int` and `str`
 
 ```
@@ -107,7 +104,6 @@ error[unsupported-operator]: Unsupported `<` operation
    |     |   |
    |     |   Has type `tuple[int, ...]`
    |     Has type `tuple[str]`
-   |
 info: Operation fails because operator `<` is not supported between objects of type `str` and `int`
 
 ```
@@ -121,7 +117,6 @@ error[unsupported-operator]: Unsupported `<` operation
    |     |               |
    |     |               Has type `tuple[int, ...]`
    |     Has type `tuple[int, str]`
-   |
 info: Operation fails because operator `<` is not supported between objects of type `str` and `int`
 
 ```
@@ -135,7 +130,6 @@ error[unsupported-operator]: Unsupported `<` operation
    |     |         |
    |     |         Has type `tuple[int, str]`
    |     Has type `tuple[int, ...]`
-   |
 info: Operation fails because operator `<` is not supported between objects of type `int` and `str`
 
 ```
@@ -149,7 +143,6 @@ error[unsupported-operator]: Unsupported `<` operation
    |     |         |
    |     |         Has type `tuple[int, str]`
    |     Has type `tuple[str, ...]`
-   |
 info: Operation fails because operator `<` is not supported between objects of type `str` and `int`
 
 ```

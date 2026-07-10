@@ -12,7 +12,6 @@ AIR004 `@task.branch` can be replaced with `@task.short_circuit`
 17 | |         return ["my_downstream_task"]
 18 | |     return []
    | |_____________^
-   |
 
 AIR004 `@task.branch` can be replaced with `@task.short_circuit`
   --> AIR004.py:21:1
@@ -25,7 +24,6 @@ AIR004 `@task.branch` can be replaced with `@task.short_circuit`
 26 | |         return ["another_downstream_task"]
 27 | |     return []
    | |_____________^
-   |
 
 AIR004 `@task.branch` can be replaced with `@task.short_circuit`
   --> AIR004.py:30:1
@@ -38,7 +36,6 @@ AIR004 `@task.branch` can be replaced with `@task.short_circuit`
 35 | |         return ["downstream_task"]
 36 | |     return []
    | |_____________^
-   |
 
 AIR004 `@task.branch` can be replaced with `@task.short_circuit`
   --> AIR004.py:39:1
@@ -49,7 +46,6 @@ AIR004 `@task.branch` can be replaced with `@task.short_circuit`
 42 | |         return ["downstream_task"]
 43 | |     return []
    | |_____________^
-   |
 
 AIR004 `@task.branch` can be replaced with `@task.short_circuit`
   --> AIR004.py:46:1
@@ -60,7 +56,6 @@ AIR004 `@task.branch` can be replaced with `@task.short_circuit`
 49 | |         return ["downstream_task"]
 50 | |     return
    | |__________^
-   |
 
 AIR004 `@task.branch` can be replaced with `@task.short_circuit`
   --> AIR004.py:53:1
@@ -71,14 +66,12 @@ AIR004 `@task.branch` can be replaced with `@task.short_circuit`
 56 | |         return ["downstream_task"]
 57 | |     return None
    | |_______________^
-   |
 
 AIR004 `BranchPythonOperator` can be replaced with `ShortCircuitOperator`
    --> AIR004.py:107:1
     |
 107 | BranchPythonOperator(task_id="task", python_callable=operator_short_circuit_candidate)  # AIR004
     | ^^^^^^^^^^^^^^^^^^^^
-    |
 
 AIR004 `BranchPythonOperator` can be replaced with `ShortCircuitOperator`
    --> AIR004.py:116:1

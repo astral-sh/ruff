@@ -10,7 +10,6 @@ F811 Redefinition of unused `bar` from line 7
 8 |
 9 |     def bar(self): ...
   |         ^^^ `bar` redefined here
-  |
 help: Remove definition: `bar`
 
 F811 Redefinition of unused `bar` from line 3
@@ -25,5 +24,4 @@ F811 Redefinition of unused `bar` from line 3
  2 |
  3 | from foo import bar
    |                 --- previous definition of `bar` here
-   |
 help: Remove definition: `bar`

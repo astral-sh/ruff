@@ -121,7 +121,6 @@ ISC001 Implicitly concatenated string literals on one line
 6 | f"" f"
 7 | f"" f"" f"
   | ^^^^^^^
-  |
 help: Combine string literals
 
 invalid-syntax: f-string: unterminated string
@@ -131,4 +130,3 @@ invalid-syntax: f-string: unterminated string
 6 | f"" f"
 7 | f"" f"" f"
   |           ^
-  |

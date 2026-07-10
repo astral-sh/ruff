@@ -40,7 +40,6 @@ fn project_settings_and_overrides_do_not_apply() -> anyhow::Result<()> {
       |
     7 | print(missing)
       |       ^^^^^^^
-      |
 
     Found 1 diagnostic
 
@@ -87,7 +86,6 @@ fn metadata_without_tool_ty_uses_default_settings() -> anyhow::Result<()> {
       |        ---   ^^^^^^^^^^^^ Incompatible value of type `Literal["not an int"]`
       |        |
       |        Declared type
-      |
 
     Found 1 diagnostic
 
@@ -135,7 +133,6 @@ fn environment_options() -> anyhow::Result<()> {
        |
     12 | reveal_type(sys.version_info[:2] == (3, 12))
        |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Literal[True]`
-       |
 
     Found 1 diagnostic
 
@@ -175,7 +172,6 @@ fn inline_overrides_are_ignored() -> anyhow::Result<()> {
        |
     13 | print(missing)
        |       ^^^^^^^
-       |
 
     Found 1 diagnostic
 
@@ -212,7 +208,6 @@ fn inline_terminal_settings_do_not_apply() -> anyhow::Result<()> {
        |
     10 | print(missing)
        |       ^^^^^^^
-       |
 
     Found 1 diagnostic
 
@@ -258,7 +253,6 @@ fn inline_settings_override_user_configuration() -> anyhow::Result<()> {
        |
     10 | print(missing)  # type: ignore
        |       ^^^^^^^
-       |
 
     Found 1 diagnostic
 
@@ -301,14 +295,12 @@ fn user_configuration_applies() -> anyhow::Result<()> {
       |
     6 | print(missing)
       |       ^^^^^^^
-      |
 
     warning[unresolved-reference]: Name `suppressed` used when not defined
      --> script.py:7:7
       |
     7 | print(suppressed)  # type: ignore
       |       ^^^^^^^^^^
-      |
 
     Found 2 diagnostics
 
@@ -351,7 +343,6 @@ fn cli_arguments_override_script_options() -> anyhow::Result<()> {
        |
     10 | print(missing)
        |       ^^^^^^^
-       |
 
     Found 1 diagnostic
 
@@ -403,7 +394,6 @@ fn explicit_config_replaces_inline_metadata() -> anyhow::Result<()> {
        |
     10 | print(missing)
        |       ^^^^^^^
-       |
 
     Found 1 diagnostic
 

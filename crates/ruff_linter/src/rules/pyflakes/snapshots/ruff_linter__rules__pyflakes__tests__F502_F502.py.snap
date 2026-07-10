@@ -73,4 +73,3 @@ F502 `%`-format string expected mapping but got sequence
 12 | "%(bob)s" % ("bob" for _ in range(1))  # F202
 13 | "%(bob)s" % {"bob" for _ in range(1)}  # F202
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |

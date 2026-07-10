@@ -461,5 +461,4 @@ ASYNC105 Call to `trio.open_file` is not immediately awaited
 63 |     # ASYNC105 (without fix)
 64 |     trio.open_file(foo)
    |     ^^^^^^^^^^^^^^^^^^^
-   |
 help: Add `await`

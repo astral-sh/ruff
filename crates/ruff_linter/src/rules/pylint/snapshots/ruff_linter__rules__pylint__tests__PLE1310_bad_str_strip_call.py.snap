@@ -229,4 +229,3 @@ PLE1310 String `lstrip` call contains duplicate characters (did you mean `remove
 89 | foo.rstrip("//")
 90 | bar.lstrip(b"//")
    |            ^^^^^
-   |

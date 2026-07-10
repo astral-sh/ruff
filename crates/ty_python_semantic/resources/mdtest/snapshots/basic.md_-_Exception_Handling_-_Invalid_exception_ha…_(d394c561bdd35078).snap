@@ -57,7 +57,6 @@ error[invalid-exception-caught]: Invalid object caught in an exception handler
   |
 4 | except 3 as e:
   |        ^ Object has type `Literal[3]`
-  |
 info: Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses
 
 ```
@@ -71,7 +70,6 @@ error[invalid-exception-caught]: Invalid tuple caught in an exception handler
    |                              |      |
    |                              |      Invalid element of type `Literal[b"bar"]`
    |                              Invalid element of type `Literal["foo"]`
-   |
 info: Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses
 
 ```
@@ -82,7 +80,6 @@ error[invalid-exception-caught]: Invalid object caught in an exception handler
    |
 21 |     except x as e:
    |            ^ Object has type `type[str]`
-   |
 info: Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses
 
 ```
@@ -93,7 +90,6 @@ error[invalid-exception-caught]: Invalid tuple caught in an exception handler
    |
 24 |     except y as f:
    |            ^ Object has type `tuple[type[OSError], type[RuntimeError], int]`
-   |
 info: Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses
 
 ```
@@ -104,7 +100,6 @@ error[invalid-exception-caught]: Invalid tuple caught in an exception handler
    |
 27 |     except z as g:
    |            ^ Object has type `tuple[type[str], ...]`
-   |
 info: Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses
 
 ```
@@ -115,7 +110,6 @@ error[invalid-exception-caught]: Invalid object caught in an exception handler
    |
 33 | except int:
    |        ^^^ Object has type `<class 'int'>`
-   |
 info: Can only catch a subclass of `BaseException` or tuple of `BaseException` subclasses
 
 ```

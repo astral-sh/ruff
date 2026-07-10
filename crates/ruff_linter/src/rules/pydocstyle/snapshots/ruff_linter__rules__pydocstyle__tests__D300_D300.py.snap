@@ -7,7 +7,6 @@ D300 Use triple double quotes `"""`
 5 | def ends_in_quote():
 6 |     'Sum\\mary."'
   |     ^^^^^^^^^^^^^
-  |
 help: Convert to triple double quotes
 
 D300 [*] Use triple double quotes `"""`
@@ -16,7 +15,6 @@ D300 [*] Use triple double quotes `"""`
  9 | def contains_quote():
 10 |     'Sum"\\mary.'
    |     ^^^^^^^^^^^^^
-   |
 help: Convert to triple double quotes
    |
 9  | def contains_quote():

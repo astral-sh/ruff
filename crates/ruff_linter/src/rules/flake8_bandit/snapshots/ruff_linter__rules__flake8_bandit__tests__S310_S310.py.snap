@@ -244,7 +244,6 @@ S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom sch
 41 | urllib.request.urlopen(urllib.request.Request('file:///foo/bar/baz'))
 42 | urllib.request.urlopen(urllib.request.Request(url))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
   --> S310.py:42:24
@@ -253,7 +252,6 @@ S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom sch
 41 | urllib.request.urlopen(urllib.request.Request('file:///foo/bar/baz'))
 42 | urllib.request.urlopen(urllib.request.Request(url))
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
   --> S310.py:51:1
@@ -334,4 +332,3 @@ S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom sch
 65 | urllib.request.urlopen(nested_concatenated)
 66 | urllib.request.Request(nested_concatenated)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |

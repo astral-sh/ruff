@@ -255,4 +255,3 @@ Module(
 5 | x += pass
 6 | (x + y) += 1
   |  ^^^^^ Syntax Error: Invalid augmented assignment target
-  |

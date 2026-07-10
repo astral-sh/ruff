@@ -39,7 +39,6 @@ RUF069 Unreliable floating point equality comparison `x == 0.42`
 14 | if x == 0.3: ...
 15 | if x ==       0.42: ...
    |    ^^^^^^^^^^^^^^^
-   |
 
 RUF069 Unreliable floating point equality comparison `a == b - 0.1`
   --> RUF069.py:19:12
@@ -235,4 +234,3 @@ RUF069 Unreliable floating point equality comparison `0.3 if x > 0 else 1 == 0.1
 47 |
 48 | assert (0.3 if x > 0 else 1) == 0.1 + 0.2
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |

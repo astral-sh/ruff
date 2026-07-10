@@ -17,4 +17,3 @@ D402 First line should not be the function's signature
 7 | def foo():
 8 |     """"Use this function; foo()."""
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |

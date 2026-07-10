@@ -45,7 +45,6 @@ FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
 20 | def remove_extension_via_ternary(filename: str) -> str:
 21 |     return filename[:-4] if filename.endswith(".txt") else filename
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Use removesuffix instead of ternary expression conditional upon endswith.
    |
 20 | def remove_extension_via_ternary(filename: str) -> str:
@@ -60,7 +59,6 @@ FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
 24 | def remove_extension_via_ternary_with_len(filename: str, extension: str) -> str:
 25 |     return filename[:-len(extension)] if filename.endswith(extension) else filename
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Use removesuffix instead of ternary expression conditional upon endswith.
    |
 24 | def remove_extension_via_ternary_with_len(filename: str, extension: str) -> str:
@@ -75,7 +73,6 @@ FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
 28 | def remove_prefix(filename: str) -> str:
 29 |     return filename[4:] if filename.startswith("abc-") else filename
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Use removeprefix instead of ternary expression conditional upon startswith.
    |
 28 | def remove_prefix(filename: str) -> str:
@@ -90,7 +87,6 @@ FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
 32 | def remove_prefix_via_len(filename: str, prefix: str) -> str:
 33 |     return filename[len(prefix):] if filename.startswith(prefix) else filename
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Use removeprefix instead of ternary expression conditional upon startswith.
    |
 32 | def remove_prefix_via_len(filename: str, prefix: str) -> str:
@@ -219,7 +215,6 @@ FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
 183 | /     if text.startswith("ř"): 
 184 | |         text = text[1:]
     | |_______________________^
-    |
 help: Use removeprefix instead of assignment conditional upon startswith.
     |
 182 |     text = "řetězec"

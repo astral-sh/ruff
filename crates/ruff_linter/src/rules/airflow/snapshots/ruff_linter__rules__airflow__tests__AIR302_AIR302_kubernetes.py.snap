@@ -197,7 +197,6 @@ AIR302 [*] `airflow.kubernetes.kubernetes_helper_functions.create_pod_id` is mov
 33 | annotations_for_logging_task_metadata()
 34 | create_pod_id()
    | ^^^^^^^^^^^^^
-   |
 help: Install `apache-airflow-providers-cncf-kubernetes>=10.0.0` and use `create_unique_id` from `airflow.providers.cncf.kubernetes.kubernetes_helper_functions` instead.
    |
 20 | )
@@ -772,7 +771,6 @@ AIR302 [*] `airflow.kubernetes.pod_generator.PodGeneratorDeprecated` is moved in
 112 |
 113 | PodGeneratorDeprecated()
     | ^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `PodGenerator` from `airflow.providers.cncf.kubernetes.pod_generator` instead.
     |
 111 | from airflow.kubernetes.pod_generator import PodGeneratorDeprecated

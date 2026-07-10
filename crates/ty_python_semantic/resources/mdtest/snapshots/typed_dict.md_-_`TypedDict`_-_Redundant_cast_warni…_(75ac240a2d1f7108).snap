@@ -34,7 +34,6 @@ warning[redundant-cast]: Value is already of type `Foo2`
    |
 10 | _ = cast(Foo2, foo)  # error: [redundant-cast]
    |     ^^^^^^^^^^^^^^^
-   |
 help: Remove the redundant `cast`
    |
 9  | foo: Foo2 = {"x": 1}
@@ -51,7 +50,6 @@ warning[redundant-cast]: Value is already of type `Bar2`
    |
 11 | _ = cast(Bar2, foo)  # error: [redundant-cast]
    |     ^^^^^^^^^^^^^^^
-   |
 info: `Bar2` is equivalent to `Foo2`
 help: Remove the redundant `cast`
    |

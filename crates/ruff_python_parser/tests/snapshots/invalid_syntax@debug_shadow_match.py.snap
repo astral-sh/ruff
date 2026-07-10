@@ -69,4 +69,3 @@ Module(
 1 | match x:
 2 |     case __debug__: ...
   |          ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
-  |

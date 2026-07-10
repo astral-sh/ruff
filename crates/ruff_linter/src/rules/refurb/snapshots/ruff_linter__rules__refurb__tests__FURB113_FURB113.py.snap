@@ -132,7 +132,6 @@ FURB113 [*] Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.app
 63 | | nums.append(2)
 64 | | nums.append(3)
    | |______________^
-   |
 help: Replace with `nums.extend((1, 2, 3))`
    |
 61 | # FURB113
@@ -152,7 +151,6 @@ FURB113 [*] Use `nums.extend((1, 2))` instead of repeatedly calling `nums.append
 69 | /     nums.append(1)
 70 | |     nums.append(2)
    | |__________________^
-   |
 help: Replace with `nums.extend((1, 2))`
    |
 68 |     # FURB113
@@ -193,7 +191,6 @@ FURB113 Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append(
 84 | |     nums.append(2)
 85 | |     nums.append(3)
    | |__________________^
-   |
 help: Replace with `nums.extend((1, 2, 3))`
 
 FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
@@ -204,7 +201,6 @@ FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
 90 | /     x.append(1)
 91 | |     x.append(2)
    | |_______________^
-   |
 help: Replace with `x.extend((1, 2))`
    |
 89 |     # FURB113
@@ -223,7 +219,6 @@ FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
 96 | /     x.append(1)
 97 | |     x.append(2)
    | |_______________^
-   |
 help: Replace with `x.extend((1, 2))`
    |
 95 |     # FURB113
@@ -242,7 +237,6 @@ FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
 102 | /     x.append(1)
 103 | |     x.append(2)
     | |_______________^
-    |
 help: Replace with `x.extend((1, 2))`
     |
 101 |     # FURB113
@@ -261,7 +255,6 @@ FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
 108 | /     x.append(1)
 109 | |     x.append(2)
     | |_______________^
-    |
 help: Replace with `x.extend((1, 2))`
     |
 107 |     # FURB113
@@ -282,7 +275,6 @@ FURB113 Use `x.extend((1, 2, 3))` instead of repeatedly calling `x.append()`
 116 | |     y.append(1)
 117 | |     x.append(3)
     | |_______________^
-    |
 help: Replace with `x.extend((1, 2, 3))`
 
 FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
@@ -293,7 +285,6 @@ FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
 122 | /     x.append(1)
 123 | |     x.append(2)
     | |_______________^
-    |
 help: Replace with `x.extend((1, 2))`
     |
 121 |     # FURB113
@@ -315,5 +306,4 @@ FURB113 Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append(
 131 | |     # comment
 132 | |     nums.append(3)
     | |__________________^
-    |
 help: Replace with `nums.extend((1, 2, 3))`

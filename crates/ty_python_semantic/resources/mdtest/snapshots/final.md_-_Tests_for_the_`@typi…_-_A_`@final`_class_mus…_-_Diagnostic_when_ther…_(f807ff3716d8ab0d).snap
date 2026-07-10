@@ -55,7 +55,6 @@ error[abstract-method-in-final-class]: Final class `Abstract` has unimplemented 
 7 | /     @abstractmethod
 8 | |     def aaaaaaaaaa(self) -> int: ...
   | |____________________________________- `aaaaaaaaaa` declared as abstract
-  |
 info: Use `--verbose` to see all 10 unimplemented abstract methods
 
 ```

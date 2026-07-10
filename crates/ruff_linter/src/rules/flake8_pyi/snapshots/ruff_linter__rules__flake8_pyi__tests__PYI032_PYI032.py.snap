@@ -24,7 +24,6 @@ PYI032 [*] Prefer `object` to `Any` for the second parameter to `__ne__`
 6 |     def __eq__(self, other: Any) -> bool: ...  # PYI032
 7 |     def __ne__(self, other: typing.Any) -> typing.Any: ...  # PYI032
   |                             ^^^^^^^^^^
-  |
 help: Replace with `object`
   |
 6 |     def __eq__(self, other: Any) -> bool: ...  # PYI032
@@ -56,7 +55,6 @@ PYI032 [*] Prefer `object` to `Any` for the second parameter to `__ne__`
 27 |    def __eq__(self, other: "Any") -> bool: ...  # PYI032
 28 |    def __ne__(self, other: "Any") -> bool: ...  # PYI032
    |                            ^^^^^
-   |
 help: Replace with `object`
    |
 27 |    def __eq__(self, other: "Any") -> bool: ...  # PYI032

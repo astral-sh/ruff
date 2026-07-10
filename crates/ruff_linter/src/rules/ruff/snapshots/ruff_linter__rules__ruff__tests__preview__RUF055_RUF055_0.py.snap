@@ -7,7 +7,6 @@ RUF055 [*] Plain string pattern passed to `re` function
 5 | # this should be replaced with `s.replace("abc", "")`
 6 | re.sub("abc", "", s)
   | ^^^^^^^^^^^^^^^^^^^^
-  |
 help: Replace with `s.replace("abc", "")`
   |
 5 | # this should be replaced with `s.replace("abc", "")`

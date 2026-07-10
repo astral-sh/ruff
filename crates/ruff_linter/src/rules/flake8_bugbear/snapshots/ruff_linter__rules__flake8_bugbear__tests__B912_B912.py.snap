@@ -139,7 +139,6 @@ B912 [*] `map()` without an explicit `strict=` parameter
 35 | # Regression https://github.com/astral-sh/ruff/issues/20997
 36 | map(f, *lots_of_iterators)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Add explicit value for parameter `strict=`
    |
 35 | # Regression https://github.com/astral-sh/ruff/issues/20997

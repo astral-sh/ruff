@@ -159,13 +159,11 @@ error[invalid-argument-type]: Argument to function `foo` is incorrect
   |
 5 | foo("foo")  # error: [invalid-argument-type]
   |     ^^^^^ Expected `int`, found `Literal["foo"]`
-  |
 info: Matching overload defined here
  --> src/overloaded.pyi:4:5
   |
 4 | def foo(a: int): ...
   |     ^^^ ------ Parameter declared here
-  |
 info: Non-matching overloads for function `foo`:
 info:   (a: int, b: int, c: int) -> Unknown
 info:   (a: str, b: int, c: int) -> Unknown

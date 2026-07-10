@@ -799,7 +799,6 @@ E231 [*] Missing whitespace after `:`
 160 | #: E231
 161 | {len(t's3://{self.s3_bucket_name}/'):1}
     |                                     ^
-    |
 help: Add missing whitespace
     |
 160 | #: E231

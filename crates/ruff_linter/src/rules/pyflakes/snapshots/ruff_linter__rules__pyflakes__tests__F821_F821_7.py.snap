@@ -28,4 +28,3 @@ F821 Undefined name `Undefined`
 12 | _ = DefaultNamedArg(type="Undefined", name="some_prop_name")
 13 | _ = DefaultNamedArg("Undefined", "some_prop_name")
    |                      ^^^^^^^^^
-   |

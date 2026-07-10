@@ -7,7 +7,6 @@ PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusi
  9 | def f():
 10 |     from collections.abc import Set  # PYI025
    |                                 ^^^
-   |
 help: Alias `Set` to `AbstractSet`
    |
 9  | def f():

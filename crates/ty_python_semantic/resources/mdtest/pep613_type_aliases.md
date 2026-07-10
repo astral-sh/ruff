@@ -519,7 +519,6 @@ error[invalid-type-form]: `Unpack` is not allowed in type alias values
    |
 14 | differently_bad: TypeAlias = Unpack[tuple[int, ...]]  # snapshot: invalid-type-form
    |                              ^^^^^^^^^^^^^^^^^^^^^^^
-   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```

@@ -310,7 +310,6 @@ error[shadowed-type-variable]: Generic function `bad` uses TypeVarTuple `Ts` alr
   |
 1 | def outer[*Ts](*args: *Ts) -> None:
   |     ------------------------------ TypeVarTuple `Ts` is bound in this enclosing scope
-  |
 ```
 
 ### Generic method within generic class

@@ -135,4 +135,3 @@ S603 `subprocess` call: check for execution of untrusted input
 40 | (e := "echo")
 41 | run(e)
    | ^^^
-   |

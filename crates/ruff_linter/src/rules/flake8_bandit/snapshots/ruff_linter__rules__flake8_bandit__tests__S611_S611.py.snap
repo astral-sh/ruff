@@ -61,4 +61,3 @@ S611 Use of `RawSQL` can lead to SQL injection vulnerabilities
 12 | User.objects.annotate(val=RawSQL(sql='{}secure'.format('no'), params=[]))
 13 | User.objects.annotate(val=RawSQL(params=[], sql='{}secure'.format('no')))
    |                           ^^^^^^
-   |

@@ -224,7 +224,6 @@ PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `typ
 30 | |         type[requests_mock.Mocker], # another comment
 31 | |         type[httpretty], type[str]] = requests_mock.Mocker
    | |___________________________________^
-   |
 help: Combine multiple `type` members
    |
 28 |     item2: Union[type[requests_mock.Mocker], type[httpretty], type[str]] = requests_mock.Mocker

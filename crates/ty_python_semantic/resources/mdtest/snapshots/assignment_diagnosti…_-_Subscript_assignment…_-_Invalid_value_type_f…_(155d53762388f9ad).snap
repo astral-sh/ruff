@@ -33,12 +33,10 @@ error[invalid-assignment]: Invalid assignment to key "retries" with declared typ
   |     |      |
   |     |      key has declared type `int`
   |     TypedDict `Config`
-  |
 info: Item declaration
  --> src/mdtest_snippet.py:4:5
   |
 4 |     retries: int
   |     ------------ Item declared here
-  |
 
 ```

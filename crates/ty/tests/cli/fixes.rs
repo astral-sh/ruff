@@ -140,21 +140,18 @@ fn add_ignore_unfixable() -> anyhow::Result<()> {
       |
     6 | reveal_type(x)  # ty:ignore[undefined-reveal]
       |             ^ `Unknown`
-      |
 
     error[unresolved-reference]: Name `x` used when not defined
      --> has_syntax_error.py:1:7
       |
     1 | print(x  # [unresolved-reference]
       |       ^
-      |
 
     error[invalid-syntax]: unexpected EOF while parsing
      --> has_syntax_error.py:1:34
       |
     1 | print(x  # [unresolved-reference]
       |                                  ^
-      |
 
     Found 3 diagnostics
     Added 5 ignore comments
@@ -225,8 +222,6 @@ fn fix_unfixable() -> anyhow::Result<()> {
     ----- stdout -----
     error[invalid-syntax]: unexpected EOF while parsing
     --> has_syntax_error.py:1:1
-     |
-     |
 
     Found 2 diagnostics (1 fixed, 1 remaining).
 

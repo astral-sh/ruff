@@ -6,7 +6,6 @@ I001 [*] Import block is un-sorted or un-formatted
   |
 1 | from .subscription import * # type: ignore  # some very long comment explaining why this needs a type ignore
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Organize imports
   |
   - from .subscription import * # type: ignore  # some very long comment explaining why this needs a type ignore

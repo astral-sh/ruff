@@ -696,7 +696,6 @@ error[invalid-legacy-type-variable]: A `TypeVar` cannot specify variance when `i
    |
 48 | CovariantAndInferred = TypeVar("CovariantAndInferred", covariant=True, infer_variance=True)
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 ```
 
 ### Boolean parameters must be unambiguous

@@ -8,7 +8,6 @@ PLE0303 `__len__` does not return a non-negative integer
 5 |     def __len__(self):
 6 |         return True  # [invalid-length-return]
   |                ^^^^
-  |
 
 PLE0303 `__len__` does not return a non-negative integer
   --> invalid_return_type_length.py:11:16
@@ -17,7 +16,6 @@ PLE0303 `__len__` does not return a non-negative integer
 10 |     def __len__(self):
 11 |         return 3.05  # [invalid-length-return]
    |                ^^^^
-   |
 
 PLE0303 `__len__` does not return a non-negative integer
   --> invalid_return_type_length.py:16:16
@@ -26,7 +24,6 @@ PLE0303 `__len__` does not return a non-negative integer
 15 |     def __len__(self):
 16 |         return "ruff"  # [invalid-length-return]
    |                ^^^^^^
-   |
 
 PLE0303 `__len__` does not return a non-negative integer
   --> invalid_return_type_length.py:20:9
@@ -44,4 +41,3 @@ PLE0303 `__len__` does not return a non-negative integer
 25 |     def __len__(self):
 26 |         return -42  # [invalid-length-return]
    |                ^^^
-   |

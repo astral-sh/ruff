@@ -693,7 +693,6 @@ PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
 62 | foo = Foo(1)
 63 | foo.__add__(2).get_v()  # PLC2801
    | ^^^^^^^^^^^^^^
-   |
 help: Use `+` operator
    |
 62 | foo = Foo(1)
@@ -1208,7 +1207,6 @@ PLC2801 [*] Unnecessary dunder call to `__imatmul__`. Use `@=` operator.
 142 | foo.__rmatmul__(a)  # PLC2801
 143 | foo.__imatmul__(foo)  # PLC2801
     | ^^^^^^^^^^^^^^^^^^^^
-    |
 help: Use `@=` operator
     |
 142 | foo.__rmatmul__(a)  # PLC2801

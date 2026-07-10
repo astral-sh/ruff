@@ -8,7 +8,6 @@ B012 `return` inside `finally` blocks cause exceptions to be silenced
 4 |     finally:
 5 |         return  # warning
   |         ^^^^^^
-  |
 
 B012 `return` inside `finally` blocks cause exceptions to be silenced
   --> B012.py:13:13
@@ -17,7 +16,6 @@ B012 `return` inside `finally` blocks cause exceptions to be silenced
 12 |         if 1 + 0 == 2 - 1:
 13 |             return  # warning
    |             ^^^^^^
-   |
 
 B012 `return` inside `finally` blocks cause exceptions to be silenced
   --> B012.py:21:13
@@ -81,7 +79,6 @@ B012 `return` inside `finally` blocks cause exceptions to be silenced
 93 |         while True:
 94 |             return  # warning
    |             ^^^^^^
-   |
 
 B012 `continue` inside `finally` blocks cause exceptions to be silenced
    --> B012.py:101:9
@@ -101,7 +98,6 @@ B012 `break` inside `finally` blocks cause exceptions to be silenced
 106 |     finally:
 107 |         break  # warning
     |         ^^^^^
-    |
 
 B012 `break` inside `finally` blocks cause exceptions to be silenced
    --> B012.py:118:17
@@ -110,4 +106,3 @@ B012 `break` inside `finally` blocks cause exceptions to be silenced
 117 |             case 0, *x:
 118 |                 break  # warning
     |                 ^^^^^
-    |

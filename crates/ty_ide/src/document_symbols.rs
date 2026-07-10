@@ -37,7 +37,6 @@ class World:
           |
         2 | def hello():
           |     ^^^^^
-          |
         info: Function hello
 
         info[document-symbols]: SymbolInfo
@@ -45,7 +44,6 @@ class World:
           |
         5 | class World:
           |       ^^^^^
-          |
         info: Class World
 
         info[document-symbols]: SymbolInfo
@@ -53,7 +51,6 @@ class World:
           |
         6 |     def method(self):
           |         ^^^^^^
-          |
         info: Method method
         ");
     }
@@ -96,7 +93,6 @@ def standalone_function():
           |
         5 | CONSTANT = 42
           | ^^^^^^^^
-          |
         info: Constant CONSTANT
 
         info[document-symbols]: SymbolInfo
@@ -104,7 +100,6 @@ def standalone_function():
           |
         6 | variable = 'hello'
           | ^^^^^^^^
-          |
         info: Variable variable
 
         info[document-symbols]: SymbolInfo
@@ -112,7 +107,6 @@ def standalone_function():
           |
         7 | typed_global: str = 'typed'
           | ^^^^^^^^^^^^
-          |
         info: Variable typed_global
 
         info[document-symbols]: SymbolInfo
@@ -120,7 +114,6 @@ def standalone_function():
           |
         8 | annotated_only: int
           | ^^^^^^^^^^^^^^
-          |
         info: Variable annotated_only
 
         info[document-symbols]: SymbolInfo
@@ -128,7 +121,6 @@ def standalone_function():
            |
         10 | class MyClass:
            |       ^^^^^^^
-           |
         info: Class MyClass
 
         info[document-symbols]: SymbolInfo
@@ -136,7 +128,6 @@ def standalone_function():
            |
         11 |     class_var = 100
            |     ^^^^^^^^^
-           |
         info: Field class_var
 
         info[document-symbols]: SymbolInfo
@@ -144,7 +135,6 @@ def standalone_function():
            |
         12 |     typed_class_var: str = 'class_typed'
            |     ^^^^^^^^^^^^^^^
-           |
         info: Field typed_class_var
 
         info[document-symbols]: SymbolInfo
@@ -152,7 +142,6 @@ def standalone_function():
            |
         13 |     annotated_class_var: float
            |     ^^^^^^^^^^^^^^^^^^^
-           |
         info: Field annotated_class_var
 
         info[document-symbols]: SymbolInfo
@@ -160,7 +149,6 @@ def standalone_function():
            |
         15 |     def __init__(self):
            |         ^^^^^^^^
-           |
         info: Constructor __init__
 
         info[document-symbols]: SymbolInfo
@@ -168,7 +156,6 @@ def standalone_function():
            |
         18 |     def public_method(self):
            |         ^^^^^^^^^^^^^
-           |
         info: Method public_method
 
         info[document-symbols]: SymbolInfo
@@ -176,7 +163,6 @@ def standalone_function():
            |
         21 |     def _private_method(self):
            |         ^^^^^^^^^^^^^^^
-           |
         info: Method _private_method
 
         info[document-symbols]: SymbolInfo
@@ -184,7 +170,6 @@ def standalone_function():
            |
         24 | def standalone_function():
            |     ^^^^^^^^^^^^^^^^^^^
-           |
         info: Function standalone_function
         ");
     }
@@ -211,7 +196,6 @@ class OuterClass:
           |
         2 | class OuterClass:
           |       ^^^^^^^^^^
-          |
         info: Class OuterClass
 
         info[document-symbols]: SymbolInfo
@@ -219,7 +203,6 @@ class OuterClass:
           |
         3 |     OUTER_CONSTANT = 100
           |     ^^^^^^^^^^^^^^
-          |
         info: Constant OUTER_CONSTANT
 
         info[document-symbols]: SymbolInfo
@@ -227,7 +210,6 @@ class OuterClass:
           |
         5 |     def outer_method(self):
           |         ^^^^^^^^^^^^
-          |
         info: Method outer_method
 
         info[document-symbols]: SymbolInfo
@@ -235,7 +217,6 @@ class OuterClass:
           |
         8 |     class InnerClass:
           |           ^^^^^^^^^^
-          |
         info: Class InnerClass
 
         info[document-symbols]: SymbolInfo
@@ -243,7 +224,6 @@ class OuterClass:
           |
         9 |         def inner_method(self):
           |             ^^^^^^^^^^^^
-          |
         info: Method inner_method
         ");
     }
@@ -265,7 +245,6 @@ class Aliases:
           |
         2 | type IntList = list[int]
           |      ^^^^^^^
-          |
         info: Variable IntList
 
         info[document-symbols]: SymbolInfo
@@ -273,7 +252,6 @@ class Aliases:
           |
         4 | class Aliases:
           |       ^^^^^^^
-          |
         info: Class Aliases
 
         info[document-symbols]: SymbolInfo
@@ -281,7 +259,6 @@ class Aliases:
           |
         5 |     type Item = int
           |          ^^^^
-          |
         info: Variable Item
         ");
     }

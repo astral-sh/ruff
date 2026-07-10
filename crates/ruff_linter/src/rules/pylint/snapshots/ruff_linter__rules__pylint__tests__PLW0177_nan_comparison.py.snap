@@ -138,4 +138,3 @@ PLW0177 Comparing against a NaN value; use `math.isnan` instead
 98 | assert x == float("-NaN ")
 99 | assert x == float(" \n+nan   \t")
    |             ^^^^^^^^^^^^^^^^^^^^^
-   |

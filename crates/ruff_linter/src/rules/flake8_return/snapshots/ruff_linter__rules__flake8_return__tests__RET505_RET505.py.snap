@@ -271,7 +271,6 @@ RET505 [*] Unnecessary `else` after `return` statement
 176 |         return
 177 |     else: pass
     |     ^^^^
-    |
 help: Remove unnecessary `else`
     |
 176 |         return
@@ -305,7 +304,6 @@ RET505 [*] Unnecessary `else` after `return` statement
 199 |     if self._sb is not None: return self._sb
 200 |     else: self._sb = '\033[01;%dm'; self._sa = '\033[0;0m';
     |     ^^^^
-    |
 help: Remove unnecessary `else`
     |
 199 |     if self._sb is not None: return self._sb

@@ -104,7 +104,6 @@ RUF017 [*] Avoid quadratic list summation
 20 |
 21 |     sum([x, y], [])
    |     ^^^^^^^^^^^^^^^
-   |
 help: Replace with a starred list comprehension
    |
 20 |
@@ -121,7 +120,6 @@ RUF017 [*] Avoid quadratic list summation
 25 | def func():
 26 |     sum((factor.dims for factor in bases), [])
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with a starred list comprehension
    |
 25 | def func():

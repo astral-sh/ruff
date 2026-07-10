@@ -141,7 +141,6 @@ RUF032 [*] `Decimal()` called with float literal argument
 57 |
 58 | val = Decimal(-+--++--4.0) # Suggest `Decimal("-4.0")` 
    |               ^^^^^^^^^^^
-   |
 help: Replace with string literal
    |
 57 |

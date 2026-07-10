@@ -55,7 +55,6 @@ F401 [*] `datastructures` imported but unused
 18 | # F401 `datastructures` imported but unused
 19 | import datastructures as structures
    |                          ^^^^^^^^^^
-   |
 help: Remove unused import: `datastructures`
    |
 18 | # F401 `datastructures` imported but unused

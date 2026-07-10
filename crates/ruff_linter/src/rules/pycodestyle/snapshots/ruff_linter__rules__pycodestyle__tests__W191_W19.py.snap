@@ -271,7 +271,6 @@ W191 Indentation contains tabs
 94 |     return options.max_line_length, \
 95 |         "E501 line too long (%d characters)" % length
    | ^^^^^^^^
-   |
 
 W191 Indentation contains tabs
    --> W19.py:101:1
@@ -302,7 +301,6 @@ W191 Indentation contains tabs
 127 |         blah == 'yeah':
 128 |     blah = 'yeahnah'
     | ^^^^
-    |
 
 W191 Indentation contains tabs
    --> W19.py:134:1

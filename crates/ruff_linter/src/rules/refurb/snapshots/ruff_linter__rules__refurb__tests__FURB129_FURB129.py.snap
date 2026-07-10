@@ -229,7 +229,6 @@ FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
 96 | with open("furb129.py") as f:
 97 |     [line for line in (f).readlines()]
    |                       ^^^^^^^^^^^^^^^
-   |
 help: Remove `readlines()`
    |
 96 | with open("furb129.py") as f:

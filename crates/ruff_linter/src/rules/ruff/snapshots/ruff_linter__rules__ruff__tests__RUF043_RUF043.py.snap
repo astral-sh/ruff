@@ -112,7 +112,6 @@ RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped
 21 |     # https://github.com/astral-sh/ruff/issues/15316
 22 |     with pytest.raises(ClosingParenthesis, match="foo)"): ...
    |                                                  ^^^^^^
-   |
 help: Use a raw string or `re.escape()` to make the intention explicit
 
 RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
@@ -346,7 +345,6 @@ RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped
 46 |     with pytest.raises(NonWordCharacter2, match="foobar\\W"): ...
 47 |     with pytest.raises(EndOfInput2, match="foobar\\z"): ...
    |                                           ^^^^^^^^^^^
-   |
 help: Use a raw string or `re.escape()` to make the intention explicit
 
 RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
@@ -356,5 +354,4 @@ RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped
 51 |
 52 |     with pytest.raises(NameEscape, match="\\N{EN DASH}"): ...
    |                                          ^^^^^^^^^^^^^^
-   |
 help: Use a raw string or `re.escape()` to make the intention explicit

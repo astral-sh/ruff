@@ -37,4 +37,3 @@ S405 `xml.etree` methods are vulnerable to XML attacks
 3 | import xml.etree.ElementTree  # S405
 4 | from xml.etree import ElementTree  # S405
   |      ^^^^^^^^^
-  |

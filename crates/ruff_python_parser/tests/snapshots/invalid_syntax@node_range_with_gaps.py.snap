@@ -125,11 +125,9 @@ Module(
 2 | def bar(): ...
 3 | def baz
   |        ^ Syntax Error: Expected `(`, found newline
-  |
 
 
   |
 2 | def bar(): ...
 3 | def baz
   |        ^ Syntax Error: Expected `)`, found end of file
-  |

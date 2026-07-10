@@ -8,7 +8,6 @@ PLW0602 Using global for `X` but no assignment is done
 4 | def f():
 5 |     global X
   |            ^
-  |
 
 PLW0602 Using global for `X` but no assignment is done
   --> global_variable_not_assigned.py:9:12

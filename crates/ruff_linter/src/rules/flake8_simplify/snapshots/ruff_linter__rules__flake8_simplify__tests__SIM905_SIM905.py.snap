@@ -1174,7 +1174,6 @@ SIM905 [*] Consider using a list literal instead of `str.split`
 156 | | "Fred\ Bloggs"@example.com
 157 | | "Joe.\\Blow"@example.com""".split("\n")
     | |_______________________________________^
-    |
 help: Replace with list literal
     |
 134 | # https://github.com/astral-sh/ruff/issues/19581 - embedded quotes in raw strings
@@ -1320,7 +1319,6 @@ SIM905 [*] Consider using a list literal instead of `str.split`
 172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
 173 | "a  b".split(maxsplit=1)  # ["a", "b"]
     | ^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace with list literal
     |
 172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]

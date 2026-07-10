@@ -51,4 +51,3 @@ TD004 Missing colon in TODO
 7 | # foo # TODO add a colon
 8 | # TODO this has a colon but it doesn't terminate the tag, so this should throw. https://www.google.com
   |   ^^^^
-  |

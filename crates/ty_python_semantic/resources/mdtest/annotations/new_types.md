@@ -201,7 +201,6 @@ warning[mismatched-type-name]: The name passed to `NewType` must match the varia
   |
 5 | UserId = NewType("Id", int)
   |                  ^^^^ Expected "UserId", got "Id"
-  |
 ```
 
 ```py
@@ -217,7 +216,6 @@ warning[mismatched-type-name]: The name passed to `NewType` must match the varia
    |
 10 | UsesExistingId = NewType("Id", "Id")
    |                          ^^^^ Expected "UsesExistingId", got "Id"
-   |
 ```
 
 ## The base must be a class type or another newtype
@@ -645,7 +643,6 @@ error[invalid-base]: Cannot subclass an instance of NewType
   |
 6 | class Foo(X): ...
   |           ^
-  |
 info: Perhaps you were looking for: `Foo = NewType('Foo', X)`
 info: Definition of class `Foo` will raise `TypeError` at runtime
 ```
@@ -692,7 +689,6 @@ error[invalid-newtype]: invalid base for `typing.NewType`
   |
 7 | UserId = NewType("UserId", Id)
   |                            ^^ type `Id`
-  |
 info: The base of a `NewType` is not allowed to be a protocol class.
 ```
 
@@ -710,7 +706,6 @@ error[invalid-newtype]: invalid base for `typing.NewType`
    |
 12 | Bar = NewType("Bar", Foo)
    |                      ^^^ type `Foo`
-   |
 info: The base of a `NewType` is not allowed to be a `TypedDict`.
 ```
 

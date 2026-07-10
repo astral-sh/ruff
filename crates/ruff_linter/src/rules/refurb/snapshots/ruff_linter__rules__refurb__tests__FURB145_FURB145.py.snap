@@ -116,7 +116,6 @@ FURB145 [*] Prefer `copy` method over slicing
 26 | |     :
 27 | | ]
    | |_^
-   |
 help: Replace with `copy()`
    |
 23 |

@@ -774,7 +774,6 @@ PYI016 [*] Duplicate union member `int`
 114 |
 115 | field35: "int | str | int"  # Error
     |                       ^^^
-    |
 help: Remove duplicate union member `int`
     |
 114 |

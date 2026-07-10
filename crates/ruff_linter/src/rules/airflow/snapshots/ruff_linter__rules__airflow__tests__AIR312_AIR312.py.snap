@@ -703,7 +703,6 @@ AIR312 [*] `airflow.triggers.temporal.TimeDeltaTrigger` is deprecated and moved 
 88 | DateTimeTrigger()
 89 | TimeDeltaTrigger()
    | ^^^^^^^^^^^^^^^^
-   |
 help: Install `apache-airflow-providers-standard>=0.0.3` and use `TimeDeltaTrigger` from `airflow.providers.standard.triggers.temporal` instead.
    |
 78 |     DateTimeTrigger,

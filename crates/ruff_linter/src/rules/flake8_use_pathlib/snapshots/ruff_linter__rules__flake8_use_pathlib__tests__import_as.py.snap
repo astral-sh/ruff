@@ -290,4 +290,3 @@ PTH122 `os.path.splitext()` should be replaced by `Path.suffix`, `Path.stem`, an
 30 | foo_p.samefile(p)
 31 | foo_p.splitext(p)
    | ^^^^^^^^^^^^^^
-   |

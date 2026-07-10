@@ -34,4 +34,3 @@ PLW0101 Unreachable code in `multiple_returns`
 29 | |     return 2
 30 | |     print("unreachable range should include above return")
    | |__________________________________________________________^
-   |

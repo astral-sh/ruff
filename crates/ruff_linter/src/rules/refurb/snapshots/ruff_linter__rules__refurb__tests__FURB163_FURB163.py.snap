@@ -156,7 +156,6 @@ FURB163 [*] Prefer `math.log(yield)` over `math.log` with a redundant base
 48 | def log():
 49 |     yield math.log((yield), math.e)
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `math.log(yield)`
    |
 48 | def log():
@@ -301,7 +300,6 @@ FURB163 [*] Prefer `math.log10(4.14e223)` over `math.log` with a redundant base
 74 | math.log(4.13e223, 2)
 75 | math.log(4.14e223, 10)
    | ^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `math.log10(4.14e223)`
    |
 74 | math.log(4.13e223, 2)

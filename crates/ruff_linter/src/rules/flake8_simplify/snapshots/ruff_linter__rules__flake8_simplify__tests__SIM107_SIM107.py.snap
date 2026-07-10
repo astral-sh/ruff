@@ -8,4 +8,3 @@ SIM107 Don't use `return` in `try`-`except` and `finally`
 8 |     finally:
 9 |         return "3"
   |         ^^^^^^^^^^
-  |

@@ -176,7 +176,6 @@ Module(
 2 | t"{x! s}"
 3 | f"{x! z}"
   |      ^ Syntax Error: f-string: conversion type must come right after the exclamation mark
-  |
 
 
   |
@@ -184,4 +183,3 @@ Module(
 2 | t"{x! s}"
 3 | f"{x! z}"
   |       ^ Syntax Error: f-string: invalid conversion character
-  |

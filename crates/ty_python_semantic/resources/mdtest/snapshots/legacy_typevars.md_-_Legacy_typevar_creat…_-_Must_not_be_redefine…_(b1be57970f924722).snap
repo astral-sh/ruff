@@ -33,6 +33,5 @@ error[invalid-legacy-type-variable]: Cannot redefine `T` as a type variable
 5 | # error: [invalid-legacy-type-variable]
 6 | T = TypeVar("T")
   | ^
-  |
 
 ```

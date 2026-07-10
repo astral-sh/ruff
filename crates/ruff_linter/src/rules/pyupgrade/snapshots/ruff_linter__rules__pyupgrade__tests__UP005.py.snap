@@ -61,7 +61,6 @@ UP005 [*] `assertNotRegexpMatches` is deprecated, use `assertNotRegex`
  9 |         self.failUnlessAlmostEqual(1, 1.1)
 10 |         self.assertNotRegexpMatches("a", "b")
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace `assertNotRegex` with `assertNotRegexpMatches`
    |
 9  |         self.failUnlessAlmostEqual(1, 1.1)

@@ -8,7 +8,6 @@ C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instea
 5 |     numbers = [1, 2, 3]
 6 |     {n: None for n in numbers}  # RUF025
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Replace with `dict.fromkeys(iterable, value)`)
   |
 5 |     numbers = [1, 2, 3]
@@ -39,7 +38,6 @@ C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instea
 14 | def func():
 15 |     {n: 1.1 for n in [1, 2, 3]}  # RUF025
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `dict.fromkeys(iterable)`)
    |
 14 | def func():
@@ -55,7 +53,6 @@ C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instea
 25 |
 26 |     f({c: "a" for c in "12345"})  # RUF025
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `dict.fromkeys(iterable)`)
    |
 25 |
@@ -70,7 +67,6 @@ C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instea
 29 | def func():
 30 |     {n: True for n in [1, 2, 2]}  # RUF025
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `dict.fromkeys(iterable)`)
    |
 29 | def func():
@@ -85,7 +81,6 @@ C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instea
 33 | def func():
 34 |     {n: b"hello" for n in (1, 2, 2)}  # RUF025
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `dict.fromkeys(iterable)`)
    |
 33 | def func():
@@ -100,7 +95,6 @@ C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instea
 37 | def func():
 38 |     {n: ... for n in [1, 2, 3]}  # RUF025
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `dict.fromkeys(iterable)`)
    |
 37 | def func():
@@ -115,7 +109,6 @@ C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instea
 41 | def func():
 42 |     {n: False for n in {1: "a", 2: "b"}}  # RUF025
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `dict.fromkeys(iterable)`)
    |
 41 | def func():
@@ -130,7 +123,6 @@ C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instea
 45 | def func():
 46 |     {(a, b): 1 for (a, b) in [(1, 2), (3, 4)]}  # RUF025
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `dict.fromkeys(iterable)`)
    |
 45 | def func():
@@ -145,7 +137,6 @@ C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instea
 53 |     a = f()
 54 |     {n: a for n in [1, 2, 3]}  # RUF025
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `dict.fromkeys(iterable)`)
    |
 53 |     a = f()
@@ -161,7 +152,6 @@ C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instea
 58 |     values = ["a", "b", "c"]
 59 |     [{n: values for n in [1, 2, 3]}]  # RUF025
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `dict.fromkeys(iterable)`)
    |
 58 |     values = ["a", "b", "c"]
@@ -184,7 +174,6 @@ C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instea
 102 | | iterable # 8
 103 | | } # 9
     | |_^
-    |
 help: Replace with `dict.fromkeys(iterable, value)`)
    |
 94 | # https://github.com/astral-sh/ruff/issues/18764

@@ -320,7 +320,6 @@ error[unsupported-operator]: Unsupported `+` operation
    |             ---^^^---
    |             |
    |             Both operands have type `<class 'Yes'>`
-   |
 ```
 
 ```py
@@ -336,7 +335,6 @@ error[unsupported-operator]: Unsupported `+` operation
    |             ---^^^---
    |             |
    |             Both operands have type `<class 'Sub'>`
-   |
 ```
 
 ```py
@@ -352,7 +350,6 @@ error[unsupported-operator]: Unsupported `+` operation
    |             --^^^--
    |             |
    |             Both operands have type `<class 'No'>`
-   |
 ```
 
 ## Subclass
@@ -449,5 +446,4 @@ error[unsupported-operator]: Unsupported `+` operation
   | |     |
   | |     Has type `mod1.A`
   | Has type `mod2.A`
-  |
 ```

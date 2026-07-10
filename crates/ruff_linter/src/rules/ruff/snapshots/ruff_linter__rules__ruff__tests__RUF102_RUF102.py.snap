@@ -216,7 +216,6 @@ RUF102 [*] Invalid rule code in `# noqa`: INVALID123
 21 | # Invalid code with trailing reason (single comment)
 22 | import pathlib  # noqa: INVALID123 some reason
    |                 ^^^^^^^^^^^^^^^^^^
-   |
 help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the `# noqa` comment
    |

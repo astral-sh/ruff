@@ -37,7 +37,6 @@ error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to 
  9 | |     B,
 10 | | ): ...
    | |_^ Bases `A` and `B` cannot be combined in multiple inheritance
-   |
 info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
  --> src/mdtest_snippet.py:8:5
   |
@@ -45,6 +44,5 @@ info: Two classes cannot coexist in a class's MRO if their instances have incomp
   |     - `A` instances have a distinct memory layout because `A` defines non-empty `__slots__`
 9 |     B,
   |     - `B` instances have a distinct memory layout because `B` defines non-empty `__slots__`
-  |
 
 ```

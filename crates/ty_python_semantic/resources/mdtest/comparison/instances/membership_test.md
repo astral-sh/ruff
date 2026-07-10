@@ -226,7 +226,6 @@ error[unsupported-bool-conversion]: Boolean conversion is not supported for type
   |
 9 | 10 in WithContains()
   | ^^^^^^^^^^^^^^^^^^^^
-  |
 info: `__bool__` on `NotBoolable` must be callable
 ```
 
@@ -241,6 +240,5 @@ error[unsupported-bool-conversion]: Boolean conversion is not supported for type
    |
 11 | 10 not in WithContains()
    | ^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 info: `__bool__` on `NotBoolable` must be callable
 ```

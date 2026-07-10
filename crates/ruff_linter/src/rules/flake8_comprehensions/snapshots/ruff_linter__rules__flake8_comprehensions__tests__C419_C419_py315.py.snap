@@ -18,5 +18,4 @@ C419 Unnecessary set comprehension
 3 | all([*x for x in xs])
 4 | any({*x for x in xs})
   |     ^^^^^^^^^^^^^^^^
-  |
 help: Remove unnecessary comprehension

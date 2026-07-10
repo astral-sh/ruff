@@ -28,7 +28,6 @@ RUF072 [*] Empty `finally` clause
  9 | / finally:
 10 | |     pass
    | |________^
-   |
 help: Remove the `finally` clause
   |
 8 |     pass

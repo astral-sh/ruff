@@ -10,5 +10,4 @@ F811 Redefinition of unused `foo` from line 3
   |               --- previous definition of `foo` here
 4 | import bar as foo
   |               ^^^ `foo` redefined here
-  |
 help: Remove definition: `foo`

@@ -8,7 +8,6 @@ PLE0308 `__bytes__` does not return `bytes`
 5 |     def __bytes__(self):
 6 |         return 3.05  # [invalid-bytes-return]
   |                ^^^^
-  |
 
 PLE0308 `__bytes__` does not return `bytes`
   --> invalid_return_type_bytes.py:11:16
@@ -17,7 +16,6 @@ PLE0308 `__bytes__` does not return `bytes`
 10 |     def __bytes__(self):
 11 |         return 0  # [invalid-bytes-return]
    |                ^
-   |
 
 PLE0308 `__bytes__` does not return `bytes`
   --> invalid_return_type_bytes.py:16:16
@@ -26,7 +24,6 @@ PLE0308 `__bytes__` does not return `bytes`
 15 |     def __bytes__(self):
 16 |         return "some bytes"  # [invalid-bytes-return]
    |                ^^^^^^^^^^^^
-   |
 
 PLE0308 `__bytes__` does not return `bytes`
   --> invalid_return_type_bytes.py:20:9

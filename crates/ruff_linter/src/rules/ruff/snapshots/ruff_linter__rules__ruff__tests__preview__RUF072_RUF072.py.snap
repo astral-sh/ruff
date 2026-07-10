@@ -319,7 +319,6 @@ RUF072 [*] Empty `finally` clause
 178 | / finally:
 179 | |     pass
     | |________^
-    |
 help: Remove the `finally` clause
     |
 174 | # Bare try finally with line starting with a formfeed
@@ -341,7 +340,6 @@ RUF072 [*] Empty `finally` clause
 186 | / finally:
 187 | |     pass
     | |________^
-    |
 help: Remove the `finally` clause
     |
 183 | # (`try` is preceded by a form feed below)

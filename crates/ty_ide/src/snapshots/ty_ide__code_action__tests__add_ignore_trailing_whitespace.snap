@@ -8,7 +8,6 @@ info[code-action]: Ignore 'unresolved-reference' for this line
 1 | b = a / 10  
   |     ^
   |
-  |
   - b = a / 10  
 1 + b = a / 10  # ty:ignore[unresolved-reference]
   |

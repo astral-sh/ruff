@@ -616,7 +616,6 @@ AIR311 [*] `airflow.decorators.base.task_decorator_factory` is removed in Airflo
 90 | get_unique_task_id()
 91 | task_decorator_factory()
    | ^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: `task_decorator_factory` has been moved to `airflow.sdk.bases.decorator` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
    |
 82 |     get_unique_task_id,
@@ -672,7 +671,6 @@ AIR311 [*] `airflow.models.ParamsDict` is removed in Airflow 3.0; It still works
 98 | DagParam()
 99 | ParamsDict()
    | ^^^^^^^^^^
-   |
 help: `ParamsDict` has been moved to `airflow.sdk.definitions.param` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
    |
 93 |
@@ -728,7 +726,6 @@ AIR311 [*] `airflow.models.param.ParamsDict` is removed in Airflow 3.0; It still
 106 | DagParam()
 107 | ParamsDict()
     | ^^^^^^^^^^
-    |
 help: `ParamsDict` has been moved to `airflow.sdk.definitions.param` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
     |
 101 |
@@ -787,7 +784,6 @@ AIR311 [*] `airflow.sensors.base.poke_mode_only` is removed in Airflow 3.0; It s
 118 | PokeReturnValue()
 119 | poke_mode_only()
     | ^^^^^^^^^^^^^^
-    |
 help: `poke_mode_only` has been moved to `airflow.sdk.bases.sensor` since Airflow 3.0 (with apache-airflow-task-sdk>=1.0.0).
     |
 112 |     PokeReturnValue,

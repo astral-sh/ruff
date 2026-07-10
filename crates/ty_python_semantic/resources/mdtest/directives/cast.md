@@ -113,7 +113,6 @@ warning[redundant-cast]: Value is already of type `int`
   |
 5 | cast(int, secrets.randbelow(10))
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove the redundant `cast`
   |
 4 | # snapshot: redundant-cast
@@ -134,7 +133,6 @@ warning[redundant-cast]: Value is already of type `int`
   |
 7 | cast(val=secrets.randbelow(10), typ=int)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove the redundant `cast`
   |
 6 | # snapshot: redundant-cast
@@ -156,7 +154,6 @@ warning[redundant-cast]: Value is already of type `int`
    |
 10 |     return cast(int, x + y) * z
    |            ^^^^^^^^^^^^^^^^
-   |
 help: Remove the redundant `cast`
    |
 9  |     # snapshot: redundant-cast
@@ -178,7 +175,6 @@ warning[redundant-cast]: Value is already of type `int`
    |
 13 |     return -cast(int, x + y)
    |             ^^^^^^^^^^^^^^^^
-   |
 help: Remove the redundant `cast`
    |
 12 |     # snapshot: redundant-cast
@@ -200,7 +196,6 @@ warning[redundant-cast]: Value is already of type `int`
    |
 16 |     print(cast(int, x + y))
    |           ^^^^^^^^^^^^^^^^
-   |
 help: Remove the redundant `cast`
    |
 15 |     # snapshot: redundant-cast

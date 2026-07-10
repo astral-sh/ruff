@@ -8,7 +8,6 @@ AIR302 [*] `airflow.hooks.samba_hook.SambaHook` is moved into `samba` provider i
 4 |
 5 | SambaHook()
   | ^^^^^^^^^
-  |
 help: Install `apache-airflow-providers-samba>=1.0.0` and use `SambaHook` from `airflow.providers.samba.hooks.samba` instead.
   |
 2 |

@@ -250,7 +250,6 @@ error[invalid-assignment]: Object of type `CallableSubclassOfAny | IncompatibleC
     |              --------------------   ^^^^^^ Incompatible value of type `CallableSubclassOfAny | IncompatibleCallable`
     |              |
     |              Declared type
-    |
 info: element `IncompatibleCallable` of union `CallableSubclassOfAny | IncompatibleCallable` is not assignable to `(int, /) -> int`
 info: └── type `IncompatibleCallable` has inferred callable type `(x: int) -> bytes`
 info:     └── incompatible return types: `bytes` is not assignable to `int`

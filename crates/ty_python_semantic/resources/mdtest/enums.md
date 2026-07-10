@@ -2443,7 +2443,6 @@ warning[mismatched-type-name]: The name passed to `Enum` must match the variable
   |
 8 | Mismatch = Enum("WrongName", "A B")
   |                 ^^^^^^^^^^^ Expected "Mismatch", got "WrongName"
-  |
 ```
 
 If the name is not a string literal, we also emit a diagnostic:
@@ -2460,7 +2459,6 @@ warning[mismatched-type-name]: The name passed to `Enum` must match the variable
    |
 11 |     DynamicMismatch = Enum(name, "A B")
    |                            ^^^^ Expected "DynamicMismatch", got variable of type `str`
-   |
 ```
 
 ### List/tuple of tuples

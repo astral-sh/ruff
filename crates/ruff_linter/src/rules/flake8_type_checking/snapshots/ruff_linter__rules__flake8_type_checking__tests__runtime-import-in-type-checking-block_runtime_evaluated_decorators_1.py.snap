@@ -15,7 +15,6 @@ TC004 [*] Move import `datetime` out of type-checking block. Import is used for 
 20 | class A:
 21 |     x: datetime.datetime
    |        -------- Used at runtime here
-   |
 help: Move out of type-checking block
    |
 9  | import numpy
@@ -43,7 +42,6 @@ TC004 [*] Move import `array.array` out of type-checking block. Import is used f
 35 | class D:
 36 |     x: array
    |        ----- Used at runtime here
-   |
 help: Move out of type-checking block
    |
 9  | import numpy
@@ -71,7 +69,6 @@ TC004 [*] Move import `pandas` out of type-checking block. Import is used for mo
 25 | class B:
 26 |     x: pandas.DataFrame
    |        ------ Used at runtime here
-   |
 help: Move out of type-checking block
    |
 9  | import numpy

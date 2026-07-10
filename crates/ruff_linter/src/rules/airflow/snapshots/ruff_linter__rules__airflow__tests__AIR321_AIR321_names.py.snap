@@ -451,7 +451,6 @@ AIR321 [*] `airflow.hooks.base.BaseHook` is moved in Airflow 3.1
 101 | from airflow.hooks.base import BaseHook
 102 | BaseHook()
     | ^^^^^^^^
-    |
 help: `BaseHook` has been moved to `airflow.sdk` since Airflow 3.1 (with apache-airflow-task-sdk>=1.1.0).
     |
 100 | # airflow.hooks

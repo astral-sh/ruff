@@ -43,7 +43,6 @@ I001 [*] Import block is un-sorted or un-formatted
 37 | |     member3,
 38 | | )
    | |_^
-   |
 help: Organize imports
    |
 1  | # This has a magic trailing comma, will be sorted, but not rolled into one line

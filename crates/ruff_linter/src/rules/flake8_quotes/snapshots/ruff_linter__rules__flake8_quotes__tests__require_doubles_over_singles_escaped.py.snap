@@ -179,7 +179,6 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
 38 | f"\"normal\" {f"\"nested\" {"other"} normal"} 'single quotes'"  # Q003
 39 | f"\"normal\" {f"\"nested\" {"other"} 'single quotes'"} normal"  # Q003
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Change outer quotes to avoid escaping inner quotes
    |
 38 | f"\"normal\" {f"\"nested\" {"other"} normal"} 'single quotes'"  # Q003
@@ -335,7 +334,6 @@ Q003 [*] Change outer quotes to avoid escaping inner quotes
 60 | t"\"normal\" {t"\"nested\" {"other"} normal"} 'single quotes'"  # Q003
 61 | t"\"normal\" {t"\"nested\" {"other"} 'single quotes'"} normal"  # Q003
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Change outer quotes to avoid escaping inner quotes
    |
 60 | t"\"normal\" {t"\"nested\" {"other"} normal"} 'single quotes'"  # Q003

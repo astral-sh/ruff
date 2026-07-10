@@ -100,7 +100,6 @@ FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
 11 |
 12 | _ = int(b"0xFFFF"[2:], 16)
    |     ^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `base=0`
    |
 11 |

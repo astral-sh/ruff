@@ -172,5 +172,4 @@ PLW0642 Reassigned `cls` variable in `__new__` method
 49 |     def __new__(cls):
 50 |         cls = "apple" # PLW0642
    |         ^^^
-   |
 help: Consider using a different variable name

@@ -577,13 +577,11 @@ mod tests {
           |
         6 |     foo()
           |     ^^^ Call site
-          |
         info: Function: `caller` (`main`)
          --> main.py:5:5
           |
         5 | def caller():
           |     ^^^^^^
-          |
         ");
     }
 
@@ -605,13 +603,11 @@ mod tests {
           |
         7 |     foo()     # this is a call — should appear once
           |     ^^^ Call site
-          |
         info: Function: `caller` (`main`)
          --> main.py:5:5
           |
         5 | def caller():
           |     ^^^^^^
-          |
         ");
     }
 
@@ -641,13 +637,11 @@ def use():
           |
         5 |     foo()
           |     ^^^ Call site
-          |
         info: Function: `use` (`caller`)
          --> caller.py:4:5
           |
         4 | def use():
           |     ^^^
-          |
         ");
     }
 
@@ -677,13 +671,11 @@ def use():
           |
         5 |     bar()
           |     ^^^ Call site
-          |
         info: Function: `use` (`caller`)
          --> caller.py:4:5
           |
         4 | def use():
           |     ^^^
-          |
         ");
     }
 
@@ -714,13 +706,11 @@ def invoke(value: Callable) -> int:
           |
         5 |     return value()
           |            ^^^^^ Call site
-          |
         info: Function: `invoke` (`caller`)
          --> caller.py:4:5
           |
         4 | def invoke(value: Callable) -> int:
           |     ^^^^^^
-          |
         ");
     }
 
@@ -741,13 +731,11 @@ def invoke(value: Callable) -> int:
           |
         6 |     foo(x=1)
           |     ^^^ Call site
-          |
         info: Function: `caller` (`main`)
          --> main.py:5:5
           |
         5 | def caller():
           |     ^^^^^^
-          |
         ");
     }
 
@@ -767,7 +755,6 @@ def invoke(value: Callable) -> int:
           |
         5 | foo()
           | ^^^ Call site
-          |
         info: Module: `main`
         --> main.py:1:1
         ");
@@ -792,7 +779,6 @@ def invoke(value: Callable) -> int:
           |
         5 | @foo
           |  ^^^ Call site
-          |
         info: Module: `main`
         --> main.py:1:1
         ");
@@ -823,13 +809,11 @@ class C:
           |
         9 |         def method(self, value=default()):
           |                                ^^^^^^^ Call site
-          |
         info: Class: `C` (`main`)
          --> main.py:7:7
           |
         7 | class C:
           |       ^
-          |
         ");
     }
 
@@ -857,13 +841,11 @@ class C:
            |
         11 |     a.foo()
            |       ^^^ Call site
-           |
         info: Function: `use` (`main`)
           --> main.py:10:5
            |
         10 | def use(a: A, b: B):
            |     ^^^
-           |
         ");
     }
 
@@ -888,13 +870,11 @@ class C:
           |
         8 |         super().m()
           |                 ^ Call site
-          |
         info: Method: `m` (`main`)
          --> main.py:7:9
           |
         7 |     def m(self):
           |         ^
-          |
         ");
     }
 
@@ -925,13 +905,11 @@ def make() -> C:
           |
         5 |     return C()
           |            ^ Call site
-          |
         info: Function: `make` (`caller`)
          --> caller.py:4:5
           |
         4 | def make() -> C:
           |     ^^^^
-          |
         ");
     }
 
@@ -960,13 +938,11 @@ def make() -> C:
           |
         8 |     return c.prop
           |              ^^^^ Call site
-          |
         info: Function: `read` (`main`)
          --> main.py:7:5
           |
         7 | def read(c: C) -> int:
           |     ^^^^
-          |
         ");
     }
 
@@ -998,13 +974,11 @@ def make() -> C:
            |
         12 |     c.prop = 5
            |       ^^^^ Call site
-           |
         info: Function: `write` (`main`)
           --> main.py:11:5
            |
         11 | def write(c: C) -> None:
            |     ^^^^^
-           |
         ");
     }
 
@@ -1034,13 +1008,11 @@ def make() -> C:
            |
         12 |     del c.prop
            |           ^^^^ Call site
-           |
         info: Function: `remove` (`main`)
           --> main.py:11:5
            |
         11 | def remove(c: C) -> None:
            |     ^^^^^^
-           |
         ");
     }
 
@@ -1097,13 +1069,11 @@ def make() -> C:
           |
         7 |     return c.method()
           |              ^^^^^^ Call site
-          |
         info: Function: `use` (`main`)
          --> main.py:6:5
           |
         6 | def use(c: C) -> int:
           |     ^^^
-          |
         ");
     }
 
@@ -1146,13 +1116,11 @@ def make() -> C:
           |
         5 | f = lambda x: target(x)
           |               ^^^^^^ Call site
-          |
         info: Function: `(lambda)` (`main`)
          --> main.py:5:5
           |
         5 | f = lambda x: target(x)
           |     ^^^^^^^^
-          |
         ");
         let Some(target) = test
             .prepare_calls()
@@ -1189,26 +1157,22 @@ def make() -> C:
           |
         5 | a = lambda x: target(x)
           |               ^^^^^^ Call site
-          |
         info: Function: `(lambda)` (`main`)
          --> main.py:5:5
           |
         5 | a = lambda x: target(x)
           |     ^^^^^^^^
-          |
 
         info[incoming-calls]: Incoming calls to `target`
          --> main.py:6:13
           |
         6 | b = lambda: target(0)
           |             ^^^^^^ Call site
-          |
         info: Function: `(lambda)` (`main`)
          --> main.py:6:5
           |
         6 | b = lambda: target(0)
           |     ^^^^^^
-          |
         ");
     }
 
@@ -1233,13 +1197,11 @@ def make() -> C:
           |
         6 |     f = lambda x: target(x)
           |                   ^^^^^^ Call site
-          |
         info: Function: `(lambda)` (`main`)
          --> main.py:6:9
           |
         6 |     f = lambda x: target(x)
           |         ^^^^^^^^
-          |
         ");
     }
 
@@ -1263,13 +1225,11 @@ def make() -> C:
           |
         6 |     return [target(x) for x in xs]
           |             ^^^^^^ Call site
-          |
         info: Function: `caller` (`main`)
          --> main.py:5:5
           |
         5 | def caller(xs):
           |     ^^^^^^
-          |
         ");
     }
 

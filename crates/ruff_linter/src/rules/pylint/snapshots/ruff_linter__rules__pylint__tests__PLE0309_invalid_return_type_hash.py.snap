@@ -8,7 +8,6 @@ PLE0309 `__hash__` does not return an integer
 5 |     def __hash__(self):
 6 |         return True  # [invalid-hash-return]
   |                ^^^^
-  |
 
 PLE0309 `__hash__` does not return an integer
   --> invalid_return_type_hash.py:11:16
@@ -17,7 +16,6 @@ PLE0309 `__hash__` does not return an integer
 10 |     def __hash__(self):
 11 |         return 3.05  # [invalid-hash-return]
    |                ^^^^
-   |
 
 PLE0309 `__hash__` does not return an integer
   --> invalid_return_type_hash.py:16:16
@@ -26,7 +24,6 @@ PLE0309 `__hash__` does not return an integer
 15 |     def __hash__(self):
 16 |         return "ruff"  # [invalid-hash-return]
    |                ^^^^^^
-   |
 
 PLE0309 `__hash__` does not return an integer
   --> invalid_return_type_hash.py:20:9

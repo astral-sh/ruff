@@ -85,28 +85,24 @@ x = 1 + <CURSOR>2
         1 | /
         2 | | x = 1 + 2
           | |__________^
-          |
 
         info[selection-range]: Selection Range 1
          --> main.py:2:1
           |
         2 | x = 1 + 2
           | ^^^^^^^^^
-          |
 
         info[selection-range]: Selection Range 2
          --> main.py:2:5
           |
         2 | x = 1 + 2
           |     ^^^^^
-          |
 
         info[selection-range]: Selection Range 3
          --> main.py:2:9
           |
         2 | x = 1 + 2
           |         ^
-          |
         ");
     }
 
@@ -129,35 +125,30 @@ print(\"he<CURSOR>llo\")
         1 | /
         2 | | print("hello")
           | |_______________^
-          |
 
         info[selection-range]: Selection Range 1
          --> main.py:2:1
           |
         2 | print("hello")
           | ^^^^^^^^^^^^^^
-          |
 
         info[selection-range]: Selection Range 2
          --> main.py:2:6
           |
         2 | print("hello")
           |      ^^^^^^^^^
-          |
 
         info[selection-range]: Selection Range 3
          --> main.py:2:7
           |
         2 | print("hello")
           |       ^^^^^^^
-          |
 
         info[selection-range]: Selection Range 4
          --> main.py:2:8
           |
         2 | print("hello")
           |        ^^^^^
-          |
         "#);
     }
 
@@ -180,14 +171,12 @@ r<CURSOR>"hello"
         1 | /
         2 | | r"hello"
           | |_________^
-          |
 
         info[selection-range]: Selection Range 1
          --> main.py:2:1
           |
         2 | r"hello"
           | ^^^^^^^^
-          |
         "#);
     }
 
@@ -204,14 +193,12 @@ r<CURSOR>"hello"
           |
         1 | f"foo" b"bar"
           | ^^^^^^^^^^^^^
-          |
 
         info[selection-range]: Selection Range 1
          --> main.py:1:8
           |
         1 | f"foo" b"bar"
           |        ^^^^^^
-          |
         "#);
     }
 
@@ -236,7 +223,6 @@ def my_<CURSOR>function():
         2 | | def my_function():
         3 | |     return 42
           | |______________^
-          |
 
         info[selection-range]: Selection Range 1
          --> main.py:2:1
@@ -244,14 +230,12 @@ def my_<CURSOR>function():
         2 | / def my_function():
         3 | |     return 42
           | |_____________^
-          |
 
         info[selection-range]: Selection Range 2
          --> main.py:2:5
           |
         2 | def my_function():
           |     ^^^^^^^^^^^
-          |
         ");
     }
 
@@ -278,7 +262,6 @@ class My<CURSOR>Class:
         3 | |     def __init__(self):
         4 | |         self.value = 1
           | |_______________________^
-          |
 
         info[selection-range]: Selection Range 1
          --> main.py:2:1
@@ -287,14 +270,12 @@ class My<CURSOR>Class:
         3 | |     def __init__(self):
         4 | |         self.value = 1
           | |______________________^
-          |
 
         info[selection-range]: Selection Range 2
          --> main.py:2:7
           |
         2 | class MyClass:
           |       ^^^^^^^
-          |
         ");
     }
 
@@ -317,56 +298,48 @@ result = [(lambda x: x[key.<CURSOR>attr])(item) for item in data if item is not 
         1 | /
         2 | | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           | |______________________________________________________________________________^
-          |
 
         info[selection-range]: Selection Range 1
          --> main.py:2:1
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-          |
 
         info[selection-range]: Selection Range 2
          --> main.py:2:10
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-          |
 
         info[selection-range]: Selection Range 3
          --> main.py:2:11
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-          |
 
         info[selection-range]: Selection Range 4
          --> main.py:2:12
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           |            ^^^^^^^^^^^^^^^^^^^^^
-          |
 
         info[selection-range]: Selection Range 5
          --> main.py:2:22
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           |                      ^^^^^^^^^^^
-          |
 
         info[selection-range]: Selection Range 6
          --> main.py:2:24
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           |                        ^^^^^^^^
-          |
 
         info[selection-range]: Selection Range 7
          --> main.py:2:28
           |
         2 | result = [(lambda x: x[key.attr])(item) for item in data if item is not None]
           |                            ^^^^
-          |
         ");
     }
 
@@ -389,14 +362,12 @@ result = [(lambda x: x[key.<CURSOR>attr])(item) for item in data if item is not 
         1 | /
         2 | | ""
           | |___^
-          |
 
         info[selection-range]: Selection Range 1
          --> main.py:2:1
           |
         2 | ""
           | ^^
-          |
         "#);
     }
 
@@ -419,21 +390,18 @@ b"he<CURSOR>llo"
         1 | /
         2 | | b"hello"
           | |_________^
-          |
 
         info[selection-range]: Selection Range 1
          --> main.py:2:1
           |
         2 | b"hello"
           | ^^^^^^^^
-          |
 
         info[selection-range]: Selection Range 2
          --> main.py:2:3
           |
         2 | b"hello"
           |   ^^^^^
-          |
         "#);
     }
 
@@ -456,14 +424,12 @@ b"123a𝐁<CURSOR>c"
         1 | /
         2 | | b"123a𝐁c"
           | |__________^
-          |
 
         info[selection-range]: Selection Range 1
          --> main.py:2:1
           |
         2 | b"123a𝐁c"
           | ^^^^^^^^^
-          |
         "#);
     }
 

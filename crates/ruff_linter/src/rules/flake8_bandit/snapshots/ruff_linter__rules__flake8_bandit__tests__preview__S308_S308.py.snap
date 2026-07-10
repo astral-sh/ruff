@@ -69,4 +69,3 @@ S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
 42 | map(mark_safe, [])
 43 | foo = mark_safe
    |       ^^^^^^^^^
-   |

@@ -37,7 +37,6 @@ error[invalid-type-variable-default]: Invalid use of type variable `T2`
 7 |     # error: [invalid-type-variable-default] "Invalid use of type variable `T2`: default of `T2` refers to out-of-scope type variable `…
 8 |     def method(self, x: T2) -> T2:
   |                         ^^ Default of `T2` references out-of-scope type variable `T1`
-  |
 info: See https://typing.python.org/en/latest/spec/generics.html#scoping-rules
 
 ```

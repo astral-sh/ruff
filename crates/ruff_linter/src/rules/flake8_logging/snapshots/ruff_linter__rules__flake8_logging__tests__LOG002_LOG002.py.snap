@@ -61,7 +61,6 @@ LOG002 [*] Use `__name__` with `logging.getLogger()`
 14 | logging.getLogger(__cached__)
 15 | getLogger(name=__cached__)
    |                ^^^^^^^^^^
-   |
 help: Replace with `__name__`
    |
 14 | logging.getLogger(__cached__)

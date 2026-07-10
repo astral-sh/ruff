@@ -174,7 +174,6 @@ RUF050 [*] Empty `if` statement
 43 | /     if obj1:
 44 | |         pass
    | |____________^
-   |
 help: Remove the `if` statement
    |
 42 | with pytest.raises(ValueError, match=msg):
@@ -339,7 +338,6 @@ RUF050 [*] Empty `if` statement
 85 | /     if foo():
 86 | |         pass
    | |____________^
-   |
 help: Remove the `if` statement
    |
 84 | class Foo:

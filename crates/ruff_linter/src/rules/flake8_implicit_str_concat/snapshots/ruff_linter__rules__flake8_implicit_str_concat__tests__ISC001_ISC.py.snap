@@ -436,7 +436,6 @@ ISC001 [*] Implicitly concatenated string literals on one line
 92 | _ = "\12""foo" # fix should be "\12foo"
 93 | _ = "\12" ""  # fix should be "\12"
    |     ^^^^^^^^
-   |
 help: Combine string literals
    |
 92 | _ = "\12""foo" # fix should be "\12foo"

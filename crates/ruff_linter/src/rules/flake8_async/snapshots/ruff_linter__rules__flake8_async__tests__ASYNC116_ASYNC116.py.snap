@@ -99,7 +99,6 @@ ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep
 49 |     # also checks that we don't break visit_Call
 50 |     trio.run(trio.sleep(86401))  # error: 116, "async"
    |              ^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `trio.sleep_forever()`
    |
 49 |     # also checks that we don't break visit_Call
@@ -115,7 +114,6 @@ ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep
 56 |     # catch from import
 57 |     await sleep(86401)  # error: 116, "async"
    |           ^^^^^^^^^^^^
-   |
 help: Replace with `trio.sleep_forever()`
    |
 4  | from math import inf
@@ -227,7 +225,6 @@ ASYNC116 [*] `anyio.sleep()` with >24 hour interval should usually be `anyio.sle
 102 |     # also checks that we don't break visit_Call
 103 |     anyio.run(anyio.sleep(86401))  # error: 116, "async"
     |               ^^^^^^^^^^^^^^^^^^
-    |
 help: Replace with `anyio.sleep_forever()`
     |
 102 |     # also checks that we don't break visit_Call
@@ -243,7 +240,6 @@ ASYNC116 [*] `anyio.sleep()` with >24 hour interval should usually be `anyio.sle
 109 |     # catch from import
 110 |     await sleep(86401)  # error: 116, "async"
     |           ^^^^^^^^^^^^
-    |
 help: Replace with `anyio.sleep_forever()`
     |
 4   | from math import inf
@@ -317,7 +313,6 @@ ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep
 137 |     await sleep(18446744073709551616)
 138 |     await trio.sleep(99999999999999999999)
     |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 help: Replace with `trio.sleep_forever()`
     |
 137 |     await sleep(18446744073709551616)

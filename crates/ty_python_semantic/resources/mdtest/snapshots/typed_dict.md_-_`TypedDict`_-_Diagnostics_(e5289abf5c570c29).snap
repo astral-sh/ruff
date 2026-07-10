@@ -83,7 +83,6 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
   |     |
   |     TypedDict `Person`
   |
-  |
 7 | def access_invalid_literal_string_key(person: Person):
   -     person["nane"]  # error: [invalid-key]
 8 +     person["name"]  # error: [invalid-key]
@@ -101,7 +100,6 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
    |     ------ ^^^^^^^^ Unknown key "nane" - did you mean "name"?
    |     |
    |     TypedDict `Person`
-   |
 
 ```
 
@@ -111,7 +109,6 @@ error[invalid-key]: TypedDict `Person` can only be subscripted with a string lit
    |
 16 |     person[str_key]  # error: [invalid-key]
    |            ^^^^^^^
-   |
 
 ```
 
@@ -124,13 +121,11 @@ error[invalid-assignment]: Invalid assignment to key "age" with declared type `i
    |     |      |
    |     |      key has declared type `int | None`
    |     TypedDict `Person`
-   |
 info: Item declaration
  --> src/mdtest_snippet.py:5:5
   |
 5 |     age: int | None
   |     --------------- Item declared here
-  |
 
 ```
 
@@ -142,7 +137,6 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
    |     ------ ^^^^^^ Did you mean "name"?
    |     |
    |     TypedDict `Person`
-   |
    |
 21 | def write_to_non_existing_key(person: Person):
    -     person["nane"] = "Alice"  # error: [invalid-key]
@@ -159,7 +153,6 @@ error[invalid-key]: TypedDict `Person` can only be subscripted with a string lit
    |
 25 |     person[str_key] = "Alice"  # error: [invalid-key]
    |            ^^^^^^^
-   |
 
 ```
 
@@ -172,7 +165,6 @@ error[invalid-key]: Unknown key "unknown" for TypedDict `Person`
    |                     |                            |
    |                     |                            Unknown key "unknown"
    |                     TypedDict `Person`
-   |
 
 ```
 
@@ -182,7 +174,6 @@ error[invalid-key]: Unknown key "unknown" for TypedDict `Person`
    |
 32 |     bob = Person(name="Bob", age=25, unknown="Bar")
    |           ------ TypedDict `Person`  ^^^^^^^^^^^^^ Unknown key "unknown"
-   |
 
 ```
 
@@ -194,13 +185,11 @@ error[invalid-assignment]: Cannot assign to key "id" on TypedDict `Employee`
    |     -------- ^^^^ key is marked read-only
    |     |
    |     TypedDict `Employee`
-   |
 info: Item declaration
   --> src/mdtest_snippet.py:36:5
    |
 36 |     id: ReadOnly[int]
    |     ----------------- Read-only item declared here
-   |
 
 ```
 
@@ -212,7 +201,6 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
    |     ------ ^^^^^^ Did you mean 'name'?
    |     |
    |     TypedDict `Person`
-   |
    |
 42 |     # error: [invalid-key]
    -     person['nane'] = "Alice"  # fmt: skip
@@ -229,13 +217,11 @@ error[invalid-typed-dict-field]: Cannot overwrite TypedDict field `name`
    |
 48 |     name: int  # error: [invalid-typed-dict-field]
    |     ^^^^^^^^^ Inherited mutable field type `str` is incompatible with `int`
-   |
 info: Field declaration
   --> src/mdtest_snippet.py:45:5
    |
 45 |     name: str
    |     --------- Inherited field `name` declared here on base `MovieBase`
-   |
 
 ```
 
@@ -245,18 +231,15 @@ error[invalid-typed-dict-field]: Cannot overwrite TypedDict field `value` while 
    |
 56 | class BadMerge(LeftBase, RightBase):  # error: [invalid-typed-dict-field]
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inherited mutable field type `str` is incompatible with `int`
-   |
 info: Field declaration
   --> src/mdtest_snippet.py:51:5
    |
 51 |     value: int
    |     ---------- Field `value` already inherited from another base here
-   |
 info: Field declaration
   --> src/mdtest_snippet.py:54:5
    |
 54 |     value: str
    |     ---------- Inherited field `value` declared here on base `RightBase`
-   |
 
 ```

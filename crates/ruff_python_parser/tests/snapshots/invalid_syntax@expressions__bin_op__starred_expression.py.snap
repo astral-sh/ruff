@@ -99,4 +99,3 @@ Module(
 1 | x + *y
 2 | x ** *y
   |      ^^ Syntax Error: Starred expression cannot be used here
-  |

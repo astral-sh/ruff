@@ -8,7 +8,6 @@ RUF033 `__post_init__` method with argument defaults
 18 |
 19 |     def __post_init__(self, bar = 11, baz = 11) -> None: ...
    |                                   ^^
-   |
 help: Use `dataclasses.InitVar` instead
 
 RUF033 `__post_init__` method with argument defaults
@@ -18,7 +17,6 @@ RUF033 `__post_init__` method with argument defaults
 18 |
 19 |     def __post_init__(self, bar = 11, baz = 11) -> None: ...
    |                                             ^^
-   |
 help: Use `dataclasses.InitVar` instead
 
 RUF033 [*] `__post_init__` method with argument defaults
@@ -28,7 +26,6 @@ RUF033 [*] `__post_init__` method with argument defaults
 24 | class Foo:
 25 |     def __post_init__(self, bar = 11, baz = 11) -> None: ...
    |                                   ^^
-   |
 help: Use `dataclasses.InitVar` instead
    |
 24 | class Foo:
@@ -46,7 +43,6 @@ RUF033 [*] `__post_init__` method with argument defaults
 24 | class Foo:
 25 |     def __post_init__(self, bar = 11, baz = 11) -> None: ...
    |                                             ^^
-   |
 help: Use `dataclasses.InitVar` instead
    |
 24 | class Foo:
@@ -64,7 +60,6 @@ RUF033 [*] `__post_init__` method with argument defaults
 45 | class Foo:
 46 |     def __post_init__(self, bar: int = 11, baz: Something[Whatever | None] = 11) -> None: ...
    |                                        ^^
-   |
 help: Use `dataclasses.InitVar` instead
    |
 45 | class Foo:
@@ -82,7 +77,6 @@ RUF033 [*] `__post_init__` method with argument defaults
 45 | class Foo:
 46 |     def __post_init__(self, bar: int = 11, baz: Something[Whatever | None] = 11) -> None: ...
    |                                                                              ^^
-   |
 help: Use `dataclasses.InitVar` instead
    |
 45 | class Foo:
@@ -100,7 +94,6 @@ RUF033 [*] `__post_init__` method with argument defaults
 58 |
 59 |     def __post_init__(self, bar: int = 11, baz: int = 12) -> None: ...
    |                                        ^^
-   |
 help: Use `dataclasses.InitVar` instead
    |
 58 |
@@ -118,7 +111,6 @@ RUF033 [*] `__post_init__` method with argument defaults
 58 |
 59 |     def __post_init__(self, bar: int = 11, baz: int = 12) -> None: ...
    |                                                       ^^
-   |
 help: Use `dataclasses.InitVar` instead
    |
 58 |
@@ -136,7 +128,6 @@ RUF033 `__post_init__` method with argument defaults
 66 |
 67 |     def __post_init__(self, bar: str = "ahhh", baz: str = "hmm") -> None: ...
    |                                        ^^^^^^
-   |
 help: Use `dataclasses.InitVar` instead
 
 RUF033 `__post_init__` method with argument defaults
@@ -146,7 +137,6 @@ RUF033 `__post_init__` method with argument defaults
 66 |
 67 |     def __post_init__(self, bar: str = "ahhh", baz: str = "hmm") -> None: ...
    |                                                           ^^^^^
-   |
 help: Use `dataclasses.InitVar` instead
 
 RUF033 [*] `__post_init__` method with argument defaults

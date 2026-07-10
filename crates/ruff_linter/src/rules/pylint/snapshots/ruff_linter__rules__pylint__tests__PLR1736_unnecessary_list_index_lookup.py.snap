@@ -146,7 +146,6 @@ PLR1736 [*] List index lookup in `enumerate()` loop
 18 |         blah = letters[index]  # PLR1736
 19 |         assert letters[index]  == "d"  # PLR1736
    |                ^^^^^^^^^^^^^^
-   |
 help: Use the loop variable directly
    |
 18 |         blah = letters[index]  # PLR1736
@@ -180,7 +179,6 @@ PLR1736 [*] List index lookup in `enumerate()` loop
 77 |     for index, list_item in enumerate(some_list):
 78 |         print(some_list[index])
    |               ^^^^^^^^^^^^^^^^
-   |
 help: Use the loop variable directly
    |
 77 |     for index, list_item in enumerate(some_list):
@@ -196,7 +194,6 @@ PLR1736 [*] List index lookup in `enumerate()` loop
 84 |     for index, column_name in enumerate(column_names):
 85 |         _ = data[column_names[index]]  # PLR1736
    |                  ^^^^^^^^^^^^^^^^^^^
-   |
 help: Use the loop variable directly
    |
 84 |     for index, column_name in enumerate(column_names):

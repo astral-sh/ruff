@@ -17,4 +17,3 @@ F842 Local variable `age` is annotated but never used
 2 |     name: str
 3 |     age: int
   |     ^^^
-  |

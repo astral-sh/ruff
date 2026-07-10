@@ -6,7 +6,6 @@ F401 [*] `sys` imported but unused
    |
 19 | import sys  # F401: remove unused
    |        ^^^
-   |
 help: Remove unused import: `sys`
    |
 18 |
@@ -20,7 +19,6 @@ F401 [*] `.unused` imported but unused; consider removing, adding to `__all__`, 
    |
 36 | from . import unused  # F401: add to __all__
    |               ^^^^^^
-   |
 help: Remove unused import: `.unused`
    |
 35 |
@@ -34,7 +32,6 @@ F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`,
    |
 39 | from . import renamed as bees  # F401: add to __all__
    |                          ^^^^
-   |
 help: Remove unused import: `.renamed`
    |
 38 |

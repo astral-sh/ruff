@@ -41,6 +41,5 @@ error[invalid-type-variable-default]: TypeVar default is inconsistent with the T
    |
  3 | T1 = TypeVar("T1", int, str)
    | ---------------------------- `T1` defined here
-   |
 
 ```

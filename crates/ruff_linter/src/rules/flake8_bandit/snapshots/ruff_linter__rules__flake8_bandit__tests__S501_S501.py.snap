@@ -204,4 +204,3 @@ S501 Probable use of `httpx` call with `verify=False` disabling SSL certificate 
 41 | httpx.AsyncClient()
 42 | httpx.AsyncClient(verify=False)
    |                   ^^^^^^^^^^^^
-   |

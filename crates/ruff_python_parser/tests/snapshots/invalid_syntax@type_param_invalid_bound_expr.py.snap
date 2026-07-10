@@ -289,7 +289,6 @@ Module(
 3 | type X[T: yield from x] = int
 4 | type X[T: x := int] = int
   |             ^^ Syntax Error: Expected `,`, found `:=`
-  |
 
 
 ## Semantic Syntax Errors

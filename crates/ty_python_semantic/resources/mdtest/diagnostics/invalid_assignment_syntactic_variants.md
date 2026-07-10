@@ -19,7 +19,6 @@ error[invalid-assignment]: Object of type `Literal["three"]` is not assignable t
   |    ---   ^^^^^^^ Incompatible value of type `Literal["three"]`
   |    |
   |    Declared type
-  |
 ```
 
 ## Unannotated assignment
@@ -40,7 +39,6 @@ error[invalid-assignment]: Object of type `Literal["three"]` is not assignable t
   | -   ^^^^^^^ Incompatible value of type `Literal["three"]`
   | |
   | Declared type `int`
-  |
 ```
 
 ## Named expression
@@ -61,7 +59,6 @@ error[invalid-assignment]: Object of type `Literal["three"]` is not assignable t
   |  -    ^^^^^^^ Incompatible value of type `Literal["three"]`
   |  |
   |  Declared type `int`
-  |
 ```
 
 ## Multiline expressions
@@ -90,7 +87,6 @@ error[invalid-assignment]: Object of type `Literal[15]` is not assignable to `st
 7 | |     )
 8 | | )
   | |_^ Incompatible value of type `Literal[15]`
-  |
 ```
 
 ## Multiple targets
@@ -115,7 +111,6 @@ error[invalid-assignment]: Object of type `Literal["a"]` is not assignable to `i
   | -      ^^^^^^^^^^ Incompatible value of type `Literal["a"]`
   | |
   | Declared type `int`
-  |
 
 
 error[invalid-assignment]: Object of type `Literal[0]` is not assignable to `str`
@@ -125,7 +120,6 @@ error[invalid-assignment]: Object of type `Literal[0]` is not assignable to `str
   |    -   ^^^^^^ Incompatible value of type `Literal[0]`
   |    |
   |    Declared type `str`
-  |
 ```
 
 ## Shadowing of classes and functions

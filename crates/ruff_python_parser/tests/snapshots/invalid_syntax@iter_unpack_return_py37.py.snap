@@ -160,4 +160,3 @@ Module(
 2 | rest = (4, 5, 6)
 3 | def f(): return 1, 2, 3, *rest
   |                          ^^^^^ Syntax Error: Cannot use iterable unpacking in return statements on Python 3.7 (syntax was added in Python 3.8)
-  |

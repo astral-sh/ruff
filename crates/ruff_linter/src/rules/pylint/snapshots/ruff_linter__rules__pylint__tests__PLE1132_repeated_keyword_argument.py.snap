@@ -83,4 +83,3 @@ PLE1132 Repeated keyword argument: `c`
 19 | func(a=11, b=21, **{"c": 31}, **{"c": 32})
 20 | func(a=11, b=21, **{"c": 31, "c": 32})
    |                              ^^^
-   |

@@ -75,7 +75,6 @@ F401 [*] `foo5` imported but unused
 13 | if True:
 14 |     x = 1; import foo5
    |                   ^^^^
-   |
 help: Remove unused import: `foo5`
    |
 13 | if True:
@@ -216,7 +215,6 @@ F401 [*] `foo13` imported but unused
 46 | \
 47 |     import foo13
    |            ^^^^^
-   |
 help: Remove unused import: `foo13`
    |
 44 | if True:
@@ -270,7 +268,6 @@ F401 [*] `foo16` imported but unused
 61 | x = 1; \
 62 | import foo16
    |        ^^^^^
-   |
 help: Remove unused import: `foo16`
    |
 60 | # error.)

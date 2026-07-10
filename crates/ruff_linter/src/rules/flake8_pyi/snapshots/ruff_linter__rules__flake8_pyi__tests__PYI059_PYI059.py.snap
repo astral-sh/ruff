@@ -102,7 +102,6 @@ PYI059 `Generic[]` should always be the last base class
 44 | # in case of multiple Generic[] inheritance, don't fix it.
 45 | class C(Generic[T], Generic[K, V]): ...  # PYI059
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Move `Generic[]` to the end
 
 PYI059 [*] `Generic[]` should always be the last base class

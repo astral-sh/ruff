@@ -96,7 +96,6 @@ S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom sch
 65 | urllib.request.urlopen(nested_concatenated)
 66 | urllib.request.Request(nested_concatenated)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 
 

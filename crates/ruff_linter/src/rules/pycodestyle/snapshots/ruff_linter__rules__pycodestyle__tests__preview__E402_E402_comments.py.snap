@@ -136,7 +136,6 @@ E402 [*] Module level import not at top of file
 24 | |     value3,
 25 | | )
    | |_^
-   |
 help: Move module level imports to top of file
    |
 1  + from late_paren4 import (

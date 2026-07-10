@@ -8,7 +8,6 @@ PLW1507 [*] Shallow copy of `os.environ` via `copy.copy(os.environ)`
 3 |
 4 | copied_env = copy.copy(os.environ)  # [shallow-copy-environ]
   |              ^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Replace with `os.environ.copy()`
   |
 3 |

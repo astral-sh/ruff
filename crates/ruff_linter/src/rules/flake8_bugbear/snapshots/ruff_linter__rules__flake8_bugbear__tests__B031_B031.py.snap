@@ -30,7 +30,6 @@ B031 Using the generator returned from `itertools.groupby()` more than once will
 32 |     collect_shop_items("Jane", section_items)
 33 |     collect_shop_items("Joe", section_items)  # B031
    |                               ^^^^^^^^^^^^^
-   |
 
 B031 Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage
   --> B031.py:40:37

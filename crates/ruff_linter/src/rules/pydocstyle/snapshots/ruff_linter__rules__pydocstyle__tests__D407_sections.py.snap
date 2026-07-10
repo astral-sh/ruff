@@ -41,7 +41,6 @@ D407 [*] Missing dashed underline after section ("Returns")
 66 |
 67 |     Returns"""
    |     ^^^^^^^
-   |
 help: Add dashed line under "Returns"
    |
 66 |

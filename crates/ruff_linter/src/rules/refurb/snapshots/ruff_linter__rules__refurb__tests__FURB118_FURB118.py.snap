@@ -709,7 +709,6 @@ FURB118 [*] Use `operator.itemgetter((0, 1))` instead of defining a lambda
 34 | op_itemgetter = lambda x: x[0, 1]
 35 | op_itemgetter = lambda x: x[(0, 1)]
    |                 ^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `operator.itemgetter((0, 1))`
    |
 1  | # Errors.
@@ -813,7 +812,6 @@ FURB118 [*] Use `operator.itemgetter((1,          2))` instead of defining a lam
 94 | # Without a slice, trivia is retained
 95 | op_itemgetter = lambda x: x[1,          2]
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with `operator.itemgetter((1,          2))`
    |
 1  | # Errors.

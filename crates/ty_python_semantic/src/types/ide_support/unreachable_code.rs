@@ -188,7 +188,6 @@ mod tests {
           |
         4 |     print("dead")
           |     ^^^^^^^^^^^^^
-          |
         "#);
         Ok(())
     }
@@ -208,7 +207,6 @@ mod tests {
           |
         5 |     print("dead")
           |     ^^^^^^^^^^^^^
-          |
         "#);
         Ok(())
     }
@@ -233,7 +231,6 @@ mod tests {
           |
         7 |         print("dead")
           |         ^^^^^^^^^^^^^
-          |
         "#);
         Ok(())
     }
@@ -254,7 +251,6 @@ mod tests {
         4 | /     print("dead")
         5 | |     print("still dead")
           | |_______________________^
-          |
         "#);
         Ok(())
     }
@@ -273,7 +269,6 @@ mod tests {
           |
         4 |     print("dead")
           |     ^^^^^^^^^^^^^
-          |
         "#);
         Ok(())
     }
@@ -295,7 +290,6 @@ mod tests {
           |
         5 |         print("dead")
           |         ^^^^^^^^^^^^^
-          |
         "#);
         Ok(())
     }
@@ -314,7 +308,6 @@ mod tests {
           |
         4 |     print("dead")
           |     ^^^^^^^^^^^^^
-          |
         "#);
         Ok(())
     }
@@ -334,7 +327,6 @@ mod tests {
           |
         5 |         print("dead")
           |         ^^^^^^^^^^^^^
-          |
         "#);
         Ok(())
     }
@@ -354,7 +346,6 @@ mod tests {
           |
         5 |         print("dead")
           |         ^^^^^^^^^^^^^
-          |
         "#);
         Ok(())
     }
@@ -374,7 +365,6 @@ mod tests {
           |
         5 |     print("dead")
           |     ^^^^^^^^^^^^^
-          |
         "#);
         Ok(())
     }
@@ -392,7 +382,6 @@ mod tests {
           |
         3 |     print("dead")
           |     ^^^^^^^^^^^^^
-          |
         "#);
         Ok(())
     }
@@ -413,14 +402,12 @@ mod tests {
           |
         3 |     print("dead")
           |     ^^^^^^^^^^^^^
-          |
 
         info[unreachable-code]: Code is always unreachable
          --> src/main.py:6:5
           |
         6 |     print("also dead")
           |     ^^^^^^^^^^^^^^^^^^
-          |
         "#);
         Ok(())
     }
@@ -438,7 +425,6 @@ mod tests {
           |
         3 |     print("dead")
           |     ^^^^^^^^^^^^^
-          |
         "#);
         Ok(())
     }
@@ -458,7 +444,6 @@ mod tests {
           |
         5 |     print("dead")
           |     ^^^^^^^^^^^^^
-          |
         "#);
         Ok(())
     }
@@ -478,7 +463,6 @@ mod tests {
           |
         5 |     print("dead")
           |     ^^^^^^^^^^^^^
-          |
         "#);
         Ok(())
     }
@@ -502,7 +486,6 @@ mod tests {
           |
         4 |         return
           |         ^^^^^^
-          |
 
         info[unreachable-code]: Code is always unreachable
          --> src/main.py:8:9
@@ -510,7 +493,6 @@ mod tests {
         8 | /         pass
         9 | |     print("dead")
           | |_________________^
-          |
         "#);
         Ok(())
     }
@@ -530,7 +512,6 @@ mod tests {
           |
         5 |     print("dead")
           |     ^^^^^^^^^^^^^
-          |
         "#);
         Ok(())
     }
@@ -547,7 +528,6 @@ mod tests {
           |
         2 | x = "yes" if True else "no"
           |                        ^^^^
-          |
         "#);
         Ok(())
     }
@@ -568,14 +548,12 @@ mod tests {
           |
         3 |     x = 1
           |     ^^^^^
-          |
 
         info[unreachable-code]: Code is always unreachable
          --> src/main.py:6:5
           |
         6 |     y = 2
           |     ^^^^^
-          |
         ");
         Ok(())
     }
@@ -593,7 +571,6 @@ mod tests {
           |
         3 |     x = lambda: 1
           |     ^^^^^^^^^^^^^
-          |
         ");
         Ok(())
     }
@@ -613,7 +590,6 @@ mod tests {
         3 | /     def f():
         4 | |         pass
           | |____________^
-          |
         ");
         Ok(())
     }
@@ -633,7 +609,6 @@ mod tests {
         3 | /     class Foo:
         4 | |         pass
           | |____________^
-          |
         ");
         Ok(())
     }
@@ -651,7 +626,6 @@ mod tests {
           |
         3 |     x = [i for i in range(10)]
           |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
-          |
         ");
         Ok(())
     }
@@ -675,21 +649,18 @@ mod tests {
           |
         3 |     x = {k: v for k, v in {}.items()}
           |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-          |
 
         info[unreachable-code]: Code is always unreachable
          --> src/main.py:6:5
           |
         6 |     y = {i for i in range(10)}
           |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
-          |
 
         info[unreachable-code]: Code is always unreachable
          --> src/main.py:9:5
           |
         9 |     z = (i for i in range(10))
           |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
-          |
         ");
         Ok(())
     }
@@ -710,7 +681,6 @@ mod tests {
           |
         3 |     type Alias[T] = list[T]
           |     ^^^^^^^^^^^^^^^^^^^^^^^
-          |
         ");
         Ok(())
     }
@@ -733,7 +703,6 @@ mod tests {
           |
         5 |     from typing import Self
           |     ^^^^^^^^^^^^^^^^^^^^^^^
-          |
         ");
         Ok(())
     }
@@ -756,7 +725,6 @@ mod tests {
           |
         5 |     import winreg
           |     ^^^^^^^^^^^^^
-          |
         ");
         Ok(())
     }
@@ -780,7 +748,6 @@ mod tests {
           |
         9 |     print("dead")
           |     ^^^^^^^^^^^^^
-          |
         "#);
         Ok(())
     }
@@ -826,7 +793,6 @@ mod tests {
         5 | /     if False:
         6 | |         x = lambda: 1
           | |_____________________^
-          |
         ");
         Ok(())
     }

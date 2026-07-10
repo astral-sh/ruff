@@ -8,5 +8,4 @@ AIR003 `Variable.get()` outside of a task
 3 |
 4 | var = Variable.get("foo")  # AIR003
   |       ^^^^^^^^^^^^^^^^^^^
-  |
 help: Use Jinja templates instead

@@ -26,7 +26,6 @@ UP037 [*] Remove quotes from type annotation
 16 |     # the behavior of _singleton above should match a non-ClassVar
 17 |     _doubleton: "EmptyCell"
    |                 ^^^^^^^^^^^
-   |
 help: Remove quotes
    |
 16 |     # the behavior of _singleton above should match a non-ClassVar

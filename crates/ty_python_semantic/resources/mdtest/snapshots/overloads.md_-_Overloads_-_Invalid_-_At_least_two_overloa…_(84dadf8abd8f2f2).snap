@@ -43,7 +43,6 @@ error[invalid-overload]: Overloaded function `func` requires at least two overlo
 4 | # error: [invalid-overload]
 5 | def func(x: int) -> int: ...
   |     ^^^^ Only one overload defined here
-  |
 
 ```
 
@@ -56,6 +55,5 @@ error[invalid-overload]: Overloaded function `func` requires at least two overlo
 4 | # error: [invalid-overload]
 5 | def func(x: int) -> int: ...
   |     ^^^^ Only one overload defined here
-  |
 
 ```

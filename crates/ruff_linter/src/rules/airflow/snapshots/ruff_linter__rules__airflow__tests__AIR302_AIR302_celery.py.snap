@@ -49,7 +49,6 @@ AIR302 [*] `airflow.executors.celery_executor.CeleryExecutor` is moved into `cel
 11 | app
 12 | CeleryExecutor()
    | ^^^^^^^^^^^^^^
-   |
 help: Install `apache-airflow-providers-celery>=3.3.0` and use `CeleryExecutor` from `airflow.providers.celery.executors.celery_executor` instead.
   |
 4 | from airflow.executors.celery_executor import (

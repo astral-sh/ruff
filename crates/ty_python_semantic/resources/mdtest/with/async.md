@@ -174,7 +174,6 @@ error[invalid-context-manager]: Object of type `Manager` cannot be used with `as
   |
 7 |     async with Manager():
   |                ^^^^^^^^^
-  |
 info: Objects of type `Manager` can be used as sync context managers
 info: Consider using `with` here
 ```

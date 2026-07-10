@@ -396,7 +396,6 @@ mod tests {
           |
         1 | import os
           |        ^^
-          |
         help: Remove unused import: `os`
 
         error[F841]: Local variable `x` is assigned to but never used
@@ -416,7 +415,6 @@ mod tests {
           |
         1 | if a == 1: pass
           |    ^
-          |
 
         error[F821]: Undefined name `fibonaccii`
           --> fib.py:12:16
@@ -425,7 +423,6 @@ mod tests {
         11 |     else:
         12 |         return fibonaccii(n - 1) + fibonacci(n - 2)
            |                ^^^^^^^^^^          -
-           |
         info: Did you mean to import it from `/some/path/def.py`?
          --> fib.py:4:5
           |
@@ -478,7 +475,6 @@ mod tests {
           |
         1 | import os
           |        ^^
-          |
         help: Remove unused import: `os`
 
         F841 [*] Local variable `x` is assigned to but never used
@@ -498,7 +494,6 @@ mod tests {
           |
         1 | if a == 1: pass
           |    ^
-          |
 
         F821 Undefined name `fibonaccii`
           --> fib.py:12:16
@@ -507,7 +502,6 @@ mod tests {
         11 |     else:
         12 |         return fibonaccii(n - 1) + fibonacci(n - 2)
            |                ^^^^^^^^^^          -
-           |
         info: Did you mean to import it from `/some/path/def.py`?
          --> fib.py:4:5
           |
@@ -592,7 +586,6 @@ print()
         2 | if False:
         3 | print()
           | ^
-          |
         ");
     }
 
@@ -632,7 +625,6 @@ print()
           |
         1 | nested_fstrings = f'␈{f'␚{f'␛'}'}'
           |                         ^
-          |
         "#);
     }
 
@@ -657,7 +649,6 @@ print()
           |
         1 | ␈␚␛
           |  ^
-          |
         "#);
 
         Ok(())
@@ -680,7 +671,6 @@ print()
         1 | def foo():
         2 |     return 1
           |     ^^^^^^^^
-          |
         ");
     }
 
@@ -716,7 +706,6 @@ print()
         1 | # cell 1
         2 | import os
           |        ^^
-          |
         help: Remove unused import: `os`
 
         error[F401][*]: `math` imported but unused
@@ -737,7 +726,6 @@ print()
         3 |     print()
         4 |     x = 1
           |     ^
-          |
         help: Remove assignment to unused variable `x`
         "###);
     }
@@ -800,7 +788,6 @@ print()
         3 |     print()
         4 |     x = 1
           |     - second cell
-          |
         help: Remove unused import: `os`
 
         error[test-diagnostic]: main diagnostic message
@@ -812,7 +799,6 @@ print()
         3 |
         4 | print('hello world')
           | ----- print statement
-          |
         help: Remove `print` statement
         ");
     }
@@ -899,7 +885,6 @@ print()
           |
         1 | import foo
           | ^
-          |
         ");
     }
 
@@ -920,7 +905,6 @@ print()
           |
         1 | import foo
           | ^
-          |
         ");
     }
 
@@ -947,7 +931,6 @@ print()
           |
         1 | unexpected eof
           |               ^
-          |
         ");
     }
 
@@ -1065,7 +1048,6 @@ line 13
           |
         2 | line 2
           | ^^^^^^
-          |
         help: Replace three lines
            |
         1  | line 1

@@ -47,7 +47,6 @@ PTH202 [*] `os.path.getsize` should be replaced by `Path.stat().st_size`
 4 | os.path.getsize(filename=b"filename")
 5 | os.path.getsize(filename=__file__)
   | ^^^^^^^^^^^^^^^
-  |
 help: Replace with `Path(...).stat().st_size`
   |
 1 | import os

@@ -24,14 +24,12 @@ N803 Argument name `A` should be lowercase
 21 | @override  # Incorrect usage
 22 | def func(_, a, A): ...
    |                ^
-   |
 
 N803 Argument name `A` should be lowercase
   --> N803.py:25:21
    |
 25 | func = lambda _, a, A: ...
    |                     ^
-   |
 
 N803 Argument name `A` should be lowercase
   --> N803.py:29:42
@@ -39,4 +37,3 @@ N803 Argument name `A` should be lowercase
 28 | class Extended(Class):
 29 |     method = override(lambda self, _, a, A: ...)  # Incorrect usage
    |                                          ^
-   |

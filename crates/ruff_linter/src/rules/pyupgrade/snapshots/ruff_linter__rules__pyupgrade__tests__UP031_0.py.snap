@@ -455,7 +455,6 @@ UP031 [*] Use format specifiers instead of percent format
 57 |
 58 | print("%(a)s" % {"a"  :  1})
    |       ^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace with format specifiers
    |
 57 |
@@ -815,7 +814,6 @@ UP031 [*] Use format specifiers instead of percent format
 112 | |     x,  # comment
 113 | | )
     | |_^
-    |
 help: Replace with format specifiers
     |
 110 |
@@ -1214,5 +1212,4 @@ UP031 Use format specifiers instead of percent format
 170 |
 171 | "%(and)s" % {"and": 2}
     | ^^^^^^^^^
-    |
 help: Replace with format specifiers

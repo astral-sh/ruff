@@ -291,7 +291,6 @@ PLW3301 [*] Nested `min` calls can be flattened
 43 | import builtins
 44 | builtins.min(1, min(2, 3))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Flatten nested `min` calls
    |
 43 | import builtins

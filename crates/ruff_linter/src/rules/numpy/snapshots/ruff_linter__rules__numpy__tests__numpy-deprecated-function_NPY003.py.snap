@@ -78,7 +78,6 @@ NPY003 [*] `np.alltrue` is deprecated; use `np.all` instead
 7 |     np.sometrue(np.random.rand(5, 5))
 8 |     np.alltrue(np.random.rand(5, 5))
   |     ^^^^^^^^^^
-  |
 help: Replace with `np.all`
   |
 7 |     np.sometrue(np.random.rand(5, 5))
@@ -176,7 +175,6 @@ NPY003 [*] `np.alltrue` is deprecated; use `np.all` instead
 17 |     sometrue(np.random.rand(5, 5))
 18 |     alltrue(np.random.rand(5, 5))
    |     ^^^^^^^
-   |
 help: Replace with `np.all`
    |
 1  + from numpy import all

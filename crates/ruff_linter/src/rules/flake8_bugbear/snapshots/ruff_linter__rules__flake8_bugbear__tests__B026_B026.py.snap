@@ -72,4 +72,3 @@ B026 Star-arg unpacking after a keyword argument is strongly discouraged
 20 | foo(bam="bam", *["bar"], *["baz"])
 21 | foo(*["bar"], bam="bam", *["baz"])
    |                          ^^^^^^^^
-   |

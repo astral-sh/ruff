@@ -90,4 +90,3 @@ INT001 f-string is resolved before function call; consider `_("string %s") % arg
 40 |     print(_(a))
 41 |     print(_(f"{a}"))
    |             ^^^^^^
-   |

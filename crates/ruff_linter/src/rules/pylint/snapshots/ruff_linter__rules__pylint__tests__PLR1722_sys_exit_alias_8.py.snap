@@ -7,7 +7,6 @@ PLR1722 [*] Use `sys.exit()` instead of `exit`
 4 | def main():
 5 |     exit(0)
   |     ^^^^
-  |
 help: Replace `exit` with `sys.exit()`
   |
   - from sys import argv

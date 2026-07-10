@@ -120,4 +120,3 @@ Module(
 2 | rb"a𝐁c123"
 3 | b"""123a𝐁c"""
   |         ^ Syntax Error: bytes can only contain ASCII literal characters
-  |

@@ -8,5 +8,4 @@ C411 Unnecessary `list()` call (remove the outer call to `list()`)
 2 |
 3 | list([*x for x in xs])
   | ^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove outer `list()` call

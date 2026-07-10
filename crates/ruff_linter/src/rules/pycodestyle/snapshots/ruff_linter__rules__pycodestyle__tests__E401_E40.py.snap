@@ -61,7 +61,6 @@ E401 [*] Multiple imports on one line
 67 |
 68 | x = 1; import re as regex, string
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Split imports
    |
 67 |
@@ -147,7 +146,6 @@ E401 [*] Multiple imports on one line
 79 |
 80 |     if True: import re as regex, string
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Split imports
    |
 79 |

@@ -124,4 +124,3 @@ Module(
 1 | type X[**P =] = int
 2 | type X[**P =, T2] = int
   |             ^ Syntax Error: Expected an expression
-  |

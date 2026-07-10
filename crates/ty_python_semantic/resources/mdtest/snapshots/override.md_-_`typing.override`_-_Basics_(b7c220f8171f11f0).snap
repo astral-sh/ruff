@@ -200,7 +200,6 @@ error[invalid-explicit-override]: Method `___reprrr__` is decorated with `@overr
    |     ---------
 99 |     def ___reprrr__(self): ...  # error: [invalid-explicit-override]
    |         ^^^^^^^^^^^
-   |
 info: No `___reprrr__` definitions were found on any superclasses of `Invalid`
 
 ```
@@ -214,7 +213,6 @@ error[invalid-explicit-override]: Method `foo` is decorated with `@override` but
 101 |     @classmethod
 102 |     def foo(self): ...  # error: [invalid-explicit-override]
     |         ^^^
-    |
 info: No `foo` definitions were found on any superclasses of `Invalid`
 
 ```
@@ -227,7 +225,6 @@ error[invalid-explicit-override]: Method `bar` is decorated with `@override` but
     |     ---------
 105 |     def bar(self): ...  # error: [invalid-explicit-override]
     |         ^^^
-    |
 info: No `bar` definitions were found on any superclasses of `Invalid`
 
 ```
@@ -240,7 +237,6 @@ error[invalid-explicit-override]: Method `baz` is decorated with `@override` but
     |     ---------
 108 |     def baz(): ...  # error: [invalid-explicit-override]
     |         ^^^
-    |
 info: No `baz` definitions were found on any superclasses of `Invalid`
 
 ```
@@ -254,7 +250,6 @@ error[invalid-explicit-override]: Method `eggs` is decorated with `@override` bu
 110 |     @staticmethod
 111 |     def eggs(): ...  # error: [invalid-explicit-override]
     |         ^^^^
-    |
 info: No `eggs` definitions were found on any superclasses of `Invalid`
 
 ```
@@ -267,7 +262,6 @@ error[invalid-explicit-override]: Method `bad_property1` is decorated with `@ove
     |     ---------
 114 |     def bad_property1(self) -> int: ...  # error: [invalid-explicit-override]
     |         ^^^^^^^^^^^^^
-    |
 info: No `bad_property1` definitions were found on any superclasses of `Invalid`
 
 ```
@@ -281,7 +275,6 @@ error[invalid-explicit-override]: Method `bad_property2` is decorated with `@ove
 116 |     @property
 117 |     def bad_property2(self) -> int: ...  # error: [invalid-explicit-override]
     |         ^^^^^^^^^^^^^
-    |
 info: No `bad_property2` definitions were found on any superclasses of `Invalid`
 
 ```
@@ -294,7 +287,6 @@ error[invalid-explicit-override]: Method `bad_settable_property` is decorated wi
     |     ---------
 120 |     def bad_settable_property(self) -> int: ...  # error: [invalid-explicit-override]
     |         ^^^^^^^^^^^^^^^^^^^^^
-    |
 info: No `bad_settable_property` definitions were found on any superclasses of `Invalid`
 
 ```
@@ -307,7 +299,6 @@ error[invalid-explicit-override]: Method `lossy` is decorated with `@override` b
     |     ---------
 125 |     def lossy(self): ...  # error: [invalid-explicit-override]
     |         ^^^^^
-    |
 info: No `lossy` definitions were found on any superclasses of `Invalid`
 
 ```
@@ -321,7 +312,6 @@ error[invalid-explicit-override]: Method `lossy2` is decorated with `@override` 
 127 |     @lossy_decorator
 128 |     def lossy2(self): ...  # error: [invalid-explicit-override]
     |         ^^^^^^
-    |
 info: No `lossy2` definitions were found on any superclasses of `Invalid`
 
 ```
@@ -337,7 +327,6 @@ error[invalid-method-override]: Invalid override of method `class_method1`
     |
  20 |     def class_method1(cls) -> int: ...
     |         ------------------------- `Parent.class_method1` defined here
-    |
 info: `LiskovViolatingButNotOverrideViolating.class_method1` is a staticmethod but `Parent.class_method1` is a classmethod
 info: This violates the Liskov Substitution Principle
 
@@ -354,7 +343,6 @@ error[invalid-explicit-override]: Method `bar` is decorated with `@override` but
     |
 156 |     @override
     |     ---------
-    |
 info: No `bar` definitions were found on any superclasses of `Foo`
 
 ```

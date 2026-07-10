@@ -11,7 +11,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 202 | |
 203 | |     """
     | |_______^
-    |
 help: Insert line break and indentation after opening quotes
     |
 199 | def multi_line_zero_separating_blanks():
@@ -33,7 +32,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 214 | |
 215 | |     """
     | |_______^
-    |
 help: Insert line break and indentation after opening quotes
     |
 209 | def multi_line_two_separating_blanks():
@@ -54,7 +52,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 223 | |
 224 | |     """
     | |_______^
-    |
 help: Insert line break and indentation after opening quotes
     |
 219 | def multi_line_one_separating_blanks():
@@ -75,7 +72,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 233 | |
 234 | |     """
     | |_______^
-    |
 help: Insert line break and indentation after opening quotes
     |
 229 | def asdfsdf():
@@ -96,7 +92,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 243 | |
 244 | | """
     | |___^
-    |
 help: Insert line break and indentation after opening quotes
     |
 239 | def asdsdfsdffsdf():
@@ -117,7 +112,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 253 | |
 254 | |     """
     | |_______^
-    |
 help: Insert line break and indentation after opening quotes
     |
 249 | def asdfsdsdf24():
@@ -138,7 +132,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 263 | |
 264 | |         """
     | |___________^
-    |
 help: Insert line break and indentation after opening quotes
     |
 259 | def asdfsdsdfsdf24():
@@ -159,7 +152,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 273 | |
 274 | |     """
     | |_______^
-    |
 help: Insert line break and indentation after opening quotes
     |
 269 | def asdfsdfsdsdsdfsdf24():
@@ -178,7 +170,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 282 | |
 283 | |     Description."""
     | |___________________^
-    |
 help: Insert line break and indentation after opening quotes
     |
 280 | def asdfljdf24():
@@ -198,7 +189,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 301 | |     This is the end.
 302 | |     """
     | |_______^
-    |
 help: Insert line break and indentation after opening quotes
     |
 298 | def multiline():
@@ -220,7 +210,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 347 | |     They are considered to be intentionally unescaped.
 348 | |     """
     | |_______^
-    |
 help: Insert line break and indentation after opening quotes
     |
 342 | def exceptions_of_D301():
@@ -262,7 +251,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 395 | |
 396 | |     """
     | |_______^
-    |
 help: Insert line break and indentation after opening quotes
     |
 391 | def old_209():
@@ -283,7 +271,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 440 | |     Second Line
 441 | |     """
     | |_______^
-    |
 help: Insert line break and indentation after opening quotes
     |
 437 | @expect('D213: Multi-line docstring summary should start at the second line')
@@ -304,7 +291,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 453 | |
 454 | |     """
     | |_______^
-    |
 help: Insert line break and indentation after opening quotes
     |
 449 | def a_following_valid_function(x=None):
@@ -349,7 +335,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 548 | |     More content.
 549 | |     """
     | |_______^
-    |
 help: Insert line break and indentation after opening quotes
     |
 545 |
@@ -412,7 +397,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 589 | |
 590 | |     Description.  """
     | |_____________________^
-    |
 help: Insert line break and indentation after opening quotes
     |
 587 | def asdfljdjgf24():
@@ -431,7 +415,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 607 | |
 608 | |     """
     | |_______^
-    |
 help: Insert line break and indentation after opening quotes
     |
 605 | def one_liner():
@@ -450,7 +433,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 616 | |
 617 | |     """
     | |_______^
-    |
 help: Insert line break and indentation after opening quotes
     |
 614 | def one_liner():
@@ -471,7 +453,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 675 | |             to the one before
 676 | |     """
     | |_______^
-    |
 help: Insert line break and indentation after opening quotes
     |
 670 | def retain_extra_whitespace():
@@ -495,7 +476,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 687 | |             to the one before
 688 | |     """
     | |_______^
-    |
 help: Insert line break and indentation after opening quotes
     |
 679 | def retain_extra_whitespace_multiple():
@@ -541,7 +521,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 707 | |         This is overindented
 708 | |     """
     | |_______^
-    |
 help: Insert line break and indentation after opening quotes
     |
 701 | def retain_extra_whitespace_followed_by_same_offset():
@@ -562,7 +541,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 716 | |             And so is this, but it we should preserve the extra space on this line relative
 717 | |     """
     | |_______^
-    |
 help: Insert line break and indentation after opening quotes
     |
 711 | def retain_extra_whitespace_not_overindented():
@@ -581,7 +559,6 @@ D213 [*] Multi-line docstring summary should start at the second line
 723 | |        Returns:
 724 | |     """
     | |_______^
-    |
 help: Insert line break and indentation after opening quotes
     |
 720 | def inconsistent_indent_byte_size():

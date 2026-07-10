@@ -8,7 +8,6 @@ PIE796 Enum contains duplicate value: `"B"`
 7 |     B = "B"
 8 |     C = "B"  # PIE796
   |     ^^^^^^^
-  |
 
 PIE796 Enum contains duplicate value: `2`
   --> PIE796.py:14:5
@@ -17,7 +16,6 @@ PIE796 Enum contains duplicate value: `2`
 13 |     B = 2
 14 |     C = 2  # PIE796
    |     ^^^^^
-   |
 
 PIE796 Enum contains duplicate value: `"2"`
   --> PIE796.py:20:5
@@ -26,7 +24,6 @@ PIE796 Enum contains duplicate value: `"2"`
 19 |     B = "2"
 20 |     C = "2"  # PIE796
    |     ^^^^^^^
-   |
 
 PIE796 Enum contains duplicate value: `2.5`
   --> PIE796.py:26:5
@@ -35,7 +32,6 @@ PIE796 Enum contains duplicate value: `2.5`
 25 |     B = 2.5
 26 |     C = 2.5  # PIE796
    |     ^^^^^^^
-   |
 
 PIE796 Enum contains duplicate value: `False`
   --> PIE796.py:33:5
@@ -44,7 +40,6 @@ PIE796 Enum contains duplicate value: `False`
 32 |     C = False
 33 |     D = False  # PIE796
    |     ^^^^^^^^^
-   |
 
 PIE796 Enum contains duplicate value: `None`
   --> PIE796.py:40:5
@@ -53,7 +48,6 @@ PIE796 Enum contains duplicate value: `None`
 39 |     C = None
 40 |     D = None  # PIE796
    |     ^^^^^^^^
-   |
 
 PIE796 Enum contains duplicate value: `2`
   --> PIE796.py:54:5
@@ -62,7 +56,6 @@ PIE796 Enum contains duplicate value: `2`
 53 |     B = 2
 54 |     C = 2  # PIE796
    |     ^^^^^
-   |
 
 PIE796 Enum contains duplicate value: `...`
   --> PIE796.py:71:5
@@ -81,7 +74,6 @@ PIE796 Enum contains duplicate value: `...`
 71 |     B = ...  # PIE796
 72 |     C = ...  # PIE796
    |     ^^^^^^^
-   |
 
 PIE796 Enum contains duplicate value: `cast(SomeType, ...)`
   --> PIE796.py:79:5
@@ -100,4 +92,3 @@ PIE796 Enum contains duplicate value: `cast(SomeType, ...)`
 79 |     B = cast(SomeType, ...)  # PIE796
 80 |     C = cast(SomeType, ...)  # PIE796
    |     ^^^^^^^^^^^^^^^^^^^^^^^
-   |

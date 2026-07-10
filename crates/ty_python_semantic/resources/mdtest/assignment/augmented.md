@@ -68,7 +68,6 @@ error[unsupported-operator]: Unsupported `-=` operation
   | |    |
   | |    Has type `Literal[1]`
   | Has type `C`
-  |
 ```
 
 ## Method union

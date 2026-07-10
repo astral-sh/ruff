@@ -799,7 +799,6 @@ error[invalid-assignment]: Cannot assign to read-only property `immutable` on ob
 5 | # snapshot: invalid-assignment
 6 | DontAssignToMe().immutable = "the properties, they are a-changing"
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Attempted assignment to `DontAssignToMe.immutable` here
-  |
 ```
 
 ### Built-in `classmethod` descriptor

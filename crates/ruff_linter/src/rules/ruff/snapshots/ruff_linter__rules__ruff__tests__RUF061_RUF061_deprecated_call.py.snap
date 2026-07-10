@@ -7,7 +7,6 @@ RUF061 [*] Use context-manager form of `pytest.deprecated_call()`
 15 | def test_error_trivial():
 16 |     pytest.deprecated_call(raise_deprecation_warning, "deprecated")
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Use `pytest.deprecated_call()` as a context-manager
    |
 15 | def test_error_trivial():
@@ -42,7 +41,6 @@ RUF061 [*] Use context-manager form of `pytest.deprecated_call()`
 24 | def test_error_lambda():
 25 |     pytest.deprecated_call(lambda: warnings.warn("", DeprecationWarning))
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Use `pytest.deprecated_call()` as a context-manager
    |
 24 | def test_error_lambda():

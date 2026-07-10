@@ -223,7 +223,6 @@ D403 [*] First word of the docstring should be capitalized: `singleword` -> `Sin
 88 | |     This is more text.
 89 | |     """
    | |_______^
-   |
 help: Capitalize `singleword` to `Singleword`
    |
 85 |     """

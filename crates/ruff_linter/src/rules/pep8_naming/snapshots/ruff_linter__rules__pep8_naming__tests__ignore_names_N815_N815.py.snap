@@ -59,4 +59,3 @@ N815 Variable `still_Bad` in class scope should not be mixedCase
 18 |     bad_Allowed: set
 19 |     still_Bad: set
    |     ^^^^^^^^^
-   |

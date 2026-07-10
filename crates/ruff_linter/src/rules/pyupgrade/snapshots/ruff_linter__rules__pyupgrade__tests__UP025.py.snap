@@ -323,7 +323,6 @@ UP025 [*] Remove unicode literals from strings
 33 | """"""""""""""""""""u"hi"
 34 | ""U"helloooo"
    |   ^^^^^^^^^^^
-   |
 help: Remove unicode prefix
    |
 33 | """"""""""""""""""""u"hi"

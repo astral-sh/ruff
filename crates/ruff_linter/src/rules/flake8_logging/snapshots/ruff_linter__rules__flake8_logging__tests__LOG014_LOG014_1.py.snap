@@ -6,7 +6,6 @@ LOG014 [*] `exc_info=` outside exception handlers
   |
 4 | logger.info("", exc_info=True)
   |                 ^^^^^^^^^^^^^
-  |
 help: Remove `exc_info=`
   |
 3 |

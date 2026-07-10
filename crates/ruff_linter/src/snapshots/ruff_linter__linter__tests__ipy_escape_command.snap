@@ -25,7 +25,6 @@ F401 [*] `sys` imported but unused
 1 | %%timeit
 2 | import sys
   |        ^^^
-  |
 help: Remove unused import: `sys`
  ::: cell 2
   |

@@ -8,7 +8,6 @@ AIR302 [*] `airflow.executors.dask_executor.DaskExecutor` is moved into `daskexe
 4 |
 5 | DaskExecutor()
   | ^^^^^^^^^^^^
-  |
 help: Install `apache-airflow-providers-daskexecutor>=1.0.0` and use `DaskExecutor` from `airflow.providers.daskexecutor.executors.dask_executor` instead.
   |
 2 |

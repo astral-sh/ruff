@@ -96,4 +96,3 @@ Module(
 5 | # No member access after the dot.
 6 | last.
   |      ^ Syntax Error: Expected an identifier
-  |

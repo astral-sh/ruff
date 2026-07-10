@@ -235,7 +235,6 @@ S105 Possible hardcoded password assigned to: "password"
 34 | safe = d["password"] = "s3cr3t"
 35 | d["password"] = safe = "s3cr3t"
    |                        ^^^^^^^^
-   |
 
 S105 Possible hardcoded password assigned to: "password"
   --> S105.py:39:16
