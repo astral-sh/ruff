@@ -1148,6 +1148,11 @@ fn protocol_member_read_type<'db>(
     }
 
     let place = if access == ProtocolMemberAccessMode::Instance && member.is_method() {
+        let policy = if member.name.starts_with("__") && member.name.ends_with("__") {
+            MemberLookupPolicy::IMPLICIT_DUNDER_CALL
+        } else {
+            MemberLookupPolicy::NO_INSTANCE_FALLBACK
+        };
         ty.invoke_descriptor_protocol(
             db,
             ty,
@@ -1156,7 +1161,7 @@ fn protocol_member_read_type<'db>(
             InstanceFallbackShadowsNonDataDescriptor::No,
             // The undefined fallback excludes instance members. Keep the class
             // member lookup from reintroducing dynamic instance fallbacks.
-            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            policy,
         )
         .place
     } else {

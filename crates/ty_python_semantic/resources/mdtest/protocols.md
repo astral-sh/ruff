@@ -2840,6 +2840,37 @@ class Foo:
 static_assert(not is_assignable_to(Foo, Iterable[Any]))
 ```
 
+A callable-typed dunder class attribute can satisfy a protocol method if its first parameter can
+accept the receiver. The receiver heuristic applies only while checking the implicit dunder
+operation; ordinary attribute access still preserves the full callable signature.
+
+```py
+from typing import Callable, ContextManager, Iterable, Iterator, SupportsIndex
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+class CallableIterable:
+    __iter__: Callable[["CallableIterable"], Iterator[int]]
+
+class CallableContextManager:
+    __enter__: Callable[["CallableContextManager"], "CallableContextManager"]
+
+    def __exit__(self, *args: object) -> None: ...
+
+class CallableSupportsIndex:
+    __index__: Callable[["CallableSupportsIndex"], int]
+
+class WrongReceiver:
+    __iter__: Callable[[str], Iterator[int]]
+
+static_assert(is_assignable_to(CallableIterable, Iterable[int]))
+static_assert(is_assignable_to(CallableContextManager, ContextManager[CallableContextManager]))
+static_assert(is_assignable_to(CallableSupportsIndex, SupportsIndex))
+static_assert(not is_assignable_to(WrongReceiver, Iterable[int]))
+
+reveal_type(CallableIterable().__iter__)  # revealed: (CallableIterable, /) -> Iterator[int]
+```
+
 Because method members are always looked up on the meta-type of an object when testing assignability
 and subtyping, we understand that `IterableClass` here is a subtype of `Iterable[int]` even though
 `IterableClass.__iter__` has the wrong signature:
