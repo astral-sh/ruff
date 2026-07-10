@@ -2548,7 +2548,8 @@ reveal_protocol_interface(StoresDescriptor)
 
 An overloaded `__set__` method can accept different values for different receiver types. For
 `HasValue`, the overloads with an `object` receiver accept `int` and `bytes`; the overload for
-`Other` does not apply.
+`Other` does not apply. Until these overloads can be analyzed, `Unknown` is used as the write type.
+This preserves the writable requirement without rejecting assignments.
 
 ```py
 from typing import Protocol, final, overload
@@ -2573,11 +2574,18 @@ class HasValue(Protocol):
     @ReceiverSensitiveDescriptor
     def value(self) -> int: ...
 
+class ReadOnlyValue:
+    @property
+    def value(self) -> int:
+        return 1
+
+read_only: HasValue = ReadOnlyValue()  # error: [invalid-assignment]
+
 def update_value(value: HasValue) -> None:
-    # TODO: These assignments should be accepted.
-    value.value = 1  # error: [invalid-assignment]
-    value.value = b"valid"  # error: [invalid-assignment]
-    value.value = "bad"  # error: [invalid-assignment]
+    value.value = 1
+    value.value = b"valid"
+    # TODO: This assignment should be rejected.
+    value.value = "bad"
 ```
 
 ### Union descriptor types
@@ -2604,9 +2612,9 @@ class HasEitherValue(Protocol):
     def either_value(self) -> object: ...
 
 def update_either_value(value: HasEitherValue) -> None:
-    # TODO: This assignment should be accepted.
-    value.either_value = "valid"  # error: [invalid-assignment]
-    value.either_value = 1  # error: [invalid-assignment]
+    value.either_value = "valid"
+    # TODO: This assignment should be rejected.
+    value.either_value = 1
 ```
 
 ### Overloaded setters selected by descriptor type
@@ -2639,9 +2647,9 @@ class HasIntValue(Protocol):
     def int_value(self) -> int: ...
 
 def update_int_value(value: HasIntValue) -> None:
-    # TODO: This assignment should be accepted.
-    value.int_value = 1  # error: [invalid-assignment]
-    value.int_value = "bad"  # error: [invalid-assignment]
+    value.int_value = 1
+    # TODO: This assignment should be rejected.
+    value.int_value = "bad"
 ```
 
 ### Generic setter value types
@@ -2668,9 +2676,9 @@ class HasBoundedValue(Protocol):
     def bounded_value(self) -> int: ...
 
 def update_bounded_value(value: HasBoundedValue) -> None:
-    # TODO: This assignment should be accepted.
-    value.bounded_value = 1  # error: [invalid-assignment]
-    value.bounded_value = "bad"  # error: [invalid-assignment]
+    value.bounded_value = 1
+    # TODO: This assignment should be rejected.
+    value.bounded_value = "bad"
 ```
 
 ## Variance of generic protocols with `Final` members

@@ -1061,8 +1061,11 @@ fn descriptor_decorated_protocol_member<'db>(
         .class_member_with_policy(db, "__set__".into(), MemberLookupPolicy::REQUIRE_CONCRETE)
         .place
     {
-        descriptor_setter_write_type(db, setter_ty, descriptor_ty, receiver_ty)
-            .map(|write_ty| ProtocolMemberType::with_definition(write_ty, definition))
+        Some(ProtocolMemberType::with_definition(
+            descriptor_setter_write_type(db, setter_ty, descriptor_ty, receiver_ty)
+                .unwrap_or_else(Type::unknown),
+            definition,
+        ))
     } else {
         None
     };
