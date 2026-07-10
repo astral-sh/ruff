@@ -2726,6 +2726,107 @@ def update_either_value(value: HasEitherValue) -> None:
     value.either_value = 1  # error: [invalid-assignment]
 ```
 
+### Aliased union descriptor types
+
+Top-level PEP 695 aliases do not change a descriptor union's write contract. As with the unaliased
+form above, only `str` is accepted by both possible descriptors, and the member remains writable.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Descriptor(Generic[T]):
+    def __get__(self, instance: object, owner: type | None = None) -> T:
+        raise NotImplementedError
+
+    def __set__(self, instance: object, value: T) -> None: ...
+
+type DescriptorAlias = Descriptor[int | str] | Descriptor[str | bytes]
+
+def aliased_descriptor(getter: object) -> DescriptorAlias:
+    raise NotImplementedError
+
+class HasAliasedValue(Protocol):
+    @aliased_descriptor
+    def value(self) -> object: ...
+
+class ReadOnlyAliasedValue:
+    @property
+    def value(self) -> object:
+        return "value"
+
+read_only: HasAliasedValue = ReadOnlyAliasedValue()  # error: [invalid-assignment]
+
+def update_aliased_value(value: HasAliasedValue) -> None:
+    value.value = "valid"
+    value.value = 1  # error: [invalid-assignment]
+```
+
+### Descriptor intersections beyond the type budget
+
+The write contract remains available when materializing its exact intersection type would exceed the
+set-theoretic expansion budget. Assignments are checked directly against every possible descriptor,
+and a read-only implementation still cannot satisfy the protocol.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, Protocol, TypeVar
+from ty_extensions._internal import reveal_protocol_interface
+
+T = TypeVar("T")
+
+class A: ...
+class B: ...
+class C: ...
+class X: ...
+class Y: ...
+class Z: ...
+class AX(A, X): ...
+
+class Descriptor(Generic[T]):
+    def __get__(self, instance: object, owner: type | None = None) -> object:
+        raise NotImplementedError
+
+    def __set__(self, instance: object, value: T) -> None: ...
+
+def large_intersection_descriptor(
+    getter: object,
+) -> Descriptor[A | B | C] | Descriptor[X | Y | Z]:
+    raise NotImplementedError
+
+class HasLargeIntersectionValue(Protocol):
+    @large_intersection_descriptor
+    def value(self) -> object: ...
+
+# revealed: {"value": PropertyMember { read: `object`, write: `Unknown` }}
+reveal_protocol_interface(HasLargeIntersectionValue)
+
+class ReadOnlyLargeIntersectionValue:
+    @property
+    def value(self) -> object:
+        return "value"
+
+read_only: HasLargeIntersectionValue = ReadOnlyLargeIntersectionValue()  # error: [invalid-assignment]
+
+def update_large_intersection_value(
+    value: HasLargeIntersectionValue,
+    valid: AX,
+    invalid: A,
+) -> None:
+    value.value = valid
+    value.value = invalid  # error: [invalid-assignment]
+```
+
 ### Overloaded setters selected by descriptor type
 
 An overload can also restrict the type of the descriptor itself. The decorator below returns
@@ -2788,6 +2889,35 @@ def update_bounded_value(value: HasBoundedValue) -> None:
     value.bounded_value = "bad"  # error: [invalid-assignment]
 ```
 
+### Caller type variables in descriptor setters
+
+A type variable owned by the caller does not require setter-local inference. The generic protocol
+member remains writable just as it does after specialization to a concrete type.
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Descriptor(Generic[T]):
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> T:
+        raise NotImplementedError
+
+    def __set__(self, instance: object, value: T) -> None: ...
+
+class HasGenericValue(Protocol[T]):
+    @Descriptor[T]
+    def value(self) -> T: ...
+
+def update_concrete_generic_value(value: HasGenericValue[int]) -> None:
+    value.value = 1
+
+def update_generic_value(value: HasGenericValue[U], new_value: U) -> None:
+    value.value = new_value
+```
+
 ### Constrained generic setter value types
 
 A constrained method type variable cannot be flattened to the union of its constraints. A call must
@@ -2812,7 +2942,16 @@ class HasConstrainedValue(Protocol):
     @constrained_descriptor
     def constrained_value(self) -> int | str: ...
 
+class ReadOnlyConstrainedValue:
+    @property
+    def constrained_value(self) -> int | str:
+        return "value"
+
+read_only: HasConstrainedValue = ReadOnlyConstrainedValue()  # error: [invalid-assignment]
+
 def update_constrained_value(value: HasConstrainedValue, new_value: int | str) -> None:
+    value.constrained_value = 1
+    value.constrained_value = "valid"
     value.constrained_value = new_value  # error: [invalid-assignment]
 ```
 
@@ -2837,6 +2976,13 @@ def never_descriptor(getter: object) -> NeverDescriptor:
 class HasNeverValue(Protocol):
     @never_descriptor
     def never_value(self) -> object: ...
+
+class ReadOnlyNeverValue:
+    @property
+    def never_value(self) -> object:
+        return "value"
+
+read_only: HasNeverValue = ReadOnlyNeverValue()  # error: [invalid-assignment]
 
 def update_never_value(value: HasNeverValue, new_value: Never) -> None:
     value.never_value = new_value
@@ -2884,6 +3030,13 @@ class GradualTrailingDescriptor:
 class HasGradualTrailingValue(Protocol):
     @GradualTrailingDescriptor
     def value(self) -> int: ...
+
+class ReadOnlyGradualTrailingValue:
+    @property
+    def value(self) -> int:
+        return 1
+
+read_only: HasGradualTrailingValue = ReadOnlyGradualTrailingValue()  # error: [invalid-assignment]
 
 def update_gradual_trailing_value(value: HasGradualTrailingValue) -> None:
     value.value = 1

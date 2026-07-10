@@ -8,7 +8,8 @@ use rustc_hash::FxHashMap;
 
 use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, ExplicitAttributeWriteRequirement,
-    FallbackAttributeWriteRequirement, InstanceAttributeWriteMember, attribute_write_requirement,
+    FallbackAttributeWriteRequirement, InstanceAttributeWriteMember,
+    ProtocolMemberWriteRequirement, attribute_write_requirement,
 };
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
@@ -243,7 +244,14 @@ pub(super) fn walk_protocol_instance_interface<
                 }
             }
             ProtocolMemberKind::Property { read, write } => {
-                for member_type in [read, write].into_iter().flatten() {
+                for member_type in [
+                    read,
+                    write.and_then(ProtocolMemberWrite::domain),
+                    write.and_then(ProtocolMemberWrite::descriptor_type),
+                ]
+                .into_iter()
+                .flatten()
+                {
                     if let Some(ty) = member_type.bind_self(db, receiver_ty) {
                         visitor.visit_type(db, ty);
                     }
@@ -353,21 +361,21 @@ impl<'db> ProtocolInterface<'db> {
     /// Returns the declared instance-write requirement for a protocol member.
     ///
     /// `None` means that the protocol does not declare `name`; `Some((None, _))` means that the
-    /// member exists but is read-only. A writable member's type is bound to `receiver_ty` before
-    /// it is returned.
+    /// member exists but is read-only. A writable member's requirement is bound to `receiver_ty`
+    /// before it is returned.
     pub(super) fn instance_write_requirement(
         self,
         db: &'db dyn Db,
         receiver_ty: Type<'db>,
         name: &str,
-    ) -> Option<(Option<Type<'db>>, TypeQualifiers)> {
+    ) -> Option<(Option<ProtocolMemberWriteRequirement<'db>>, TypeQualifiers)> {
         self.member_by_name(db, name).map(|member| {
             let capabilities = member.capabilities(db);
             (
                 capabilities
                     .instance
                     .write
-                    .and_then(|write| write.bind_self(db, receiver_ty)),
+                    .and_then(|write| write.bind_requirement(db, receiver_ty)),
                 member.qualifiers(),
             )
         })
@@ -388,7 +396,7 @@ impl<'db> ProtocolInterface<'db> {
                 member
                     .meta_access(db)?
                     .write
-                    .and_then(|write| write.bind_self(db, receiver_ty)),
+                    .and_then(|write| write.bind_compatibility_type(db, receiver_ty)),
                 member.qualifiers(),
             ))
         })
@@ -532,6 +540,165 @@ impl<'db> ProtocolInterface<'db> {
         ProtocolInterfaceDisplay {
             db,
             interface: self,
+        }
+    }
+}
+
+/// A protocol member's write capability.
+///
+/// Descriptor setters retain their call contract even when their accepted values cannot be
+/// represented by a single [`Type`]. This keeps an unrepresentable domain distinct from an absent
+/// setter and lets real assignments use normal call binding.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+enum ProtocolMemberWrite<'db> {
+    Type(ProtocolMemberType<'db>),
+    Descriptor {
+        descriptor: ProtocolMemberType<'db>,
+        domain: Option<ProtocolMemberType<'db>>,
+    },
+}
+
+impl<'db> ProtocolMemberWrite<'db> {
+    const fn from_type(member: ProtocolMemberType<'db>) -> Self {
+        Self::Type(member)
+    }
+
+    fn descriptor(
+        descriptor_ty: Type<'db>,
+        domain: Option<Type<'db>>,
+        definition: Option<Definition<'db>>,
+    ) -> Self {
+        Self::Descriptor {
+            descriptor: ProtocolMemberType::with_definition(descriptor_ty, definition),
+            domain: domain.map(|ty| ProtocolMemberType::with_definition(ty, definition)),
+        }
+    }
+
+    const fn domain(self) -> Option<ProtocolMemberType<'db>> {
+        match self {
+            Self::Type(member) => Some(member),
+            Self::Descriptor { domain, .. } => domain,
+        }
+    }
+
+    const fn descriptor_type(self) -> Option<ProtocolMemberType<'db>> {
+        match self {
+            Self::Type(_) => None,
+            Self::Descriptor { descriptor, .. } => Some(descriptor),
+        }
+    }
+
+    fn display_type(self, db: &'db dyn Db) -> Option<ProtocolMemberType<'db>> {
+        match self {
+            Self::Type(member) => member.resolve(db),
+            Self::Descriptor {
+                domain: Some(domain),
+                ..
+            } => domain.resolve(db),
+            Self::Descriptor { domain: None, .. } => Some(ProtocolMemberType::new(Type::unknown())),
+        }
+    }
+
+    fn bind_requirement(
+        self,
+        db: &'db dyn Db,
+        self_type: Type<'db>,
+    ) -> Option<ProtocolMemberWriteRequirement<'db>> {
+        match self {
+            Self::Type(member) => Some(ProtocolMemberWriteRequirement::AssignableTo(
+                member.bind_self(db, self_type)?,
+            )),
+            Self::Descriptor { descriptor, domain } => {
+                Some(ProtocolMemberWriteRequirement::Descriptor {
+                    descriptor_ty: descriptor.bind_self(db, self_type)?,
+                    domain: domain.and_then(|domain| domain.bind_self(db, self_type)),
+                })
+            }
+        }
+    }
+
+    fn bind_compatibility_type(self, db: &'db dyn Db, self_type: Type<'db>) -> Option<Type<'db>> {
+        match self {
+            Self::Type(member) => member.bind_self(db, self_type),
+            Self::Descriptor { domain, .. } => Some(
+                domain
+                    .and_then(|domain| domain.bind_self(db, self_type))
+                    .unwrap_or_else(Type::unknown),
+            ),
+        }
+    }
+
+    fn cycle_normalized(self, db: &'db dyn Db, previous: Self, cycle: &salsa::Cycle) -> Self {
+        match (self, previous) {
+            (Self::Type(current), Self::Type(previous)) => {
+                Self::Type(current.cycle_normalized(db, previous, cycle))
+            }
+            (
+                Self::Descriptor {
+                    descriptor: current_descriptor,
+                    domain: current_domain,
+                },
+                Self::Descriptor {
+                    descriptor: previous_descriptor,
+                    domain: previous_domain,
+                },
+            ) => Self::Descriptor {
+                descriptor: current_descriptor.cycle_normalized(db, previous_descriptor, cycle),
+                domain: cycle_normalized_optional_type(db, current_domain, previous_domain, cycle),
+            },
+            (current, _) => current,
+        }
+    }
+
+    fn cycle_normalized_without_previous(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
+        let normalize = |member: ProtocolMemberType<'db>| {
+            member.with_ty(member.ty().recursive_type_normalized(db, cycle))
+        };
+        match self {
+            Self::Type(member) => Self::Type(normalize(member)),
+            Self::Descriptor { descriptor, domain } => Self::Descriptor {
+                descriptor: normalize(descriptor),
+                domain: domain.map(normalize),
+            },
+        }
+    }
+
+    fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        Some(match self {
+            Self::Type(member) => {
+                Self::Type(member.recursive_type_normalized_impl(db, div, nested)?)
+            }
+            Self::Descriptor { descriptor, domain } => Self::Descriptor {
+                descriptor: descriptor.recursive_type_normalized_impl(db, div, nested)?,
+                domain: match domain {
+                    Some(domain) => Some(domain.recursive_type_normalized_impl(db, div, nested)?),
+                    None => None,
+                },
+            },
+        })
+    }
+
+    fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        match self {
+            Self::Type(member) => {
+                Self::Type(member.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+            }
+            Self::Descriptor { descriptor, domain } => Self::Descriptor {
+                descriptor: descriptor.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                domain: domain
+                    .map(|domain| domain.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+            },
         }
     }
 }
@@ -685,7 +852,7 @@ impl<'db> ProtocolMemberType<'db> {
 /// an instance cannot write a `ClassVar`, while a normal instance attribute has no class access.
 struct ProtocolMemberAccess<'db> {
     read: Option<ProtocolMemberType<'db>>,
-    write: Option<ProtocolMemberType<'db>>,
+    write: Option<ProtocolMemberWrite<'db>>,
 }
 
 impl<'db> ProtocolMemberAccess<'db> {
@@ -696,7 +863,7 @@ impl<'db> ProtocolMemberAccess<'db> {
 
     const fn new(
         read: Option<ProtocolMemberType<'db>>,
-        write: Option<ProtocolMemberType<'db>>,
+        write: Option<ProtocolMemberWrite<'db>>,
     ) -> Self {
         Self { read, write }
     }
@@ -708,6 +875,7 @@ impl<'db> ProtocolMemberAccess<'db> {
             .into_iter()
             .chain(
                 self.write
+                    .and_then(ProtocolMemberWrite::domain)
                     .and_then(|member| member.resolve(db))
                     .map(|member| (member.ty(), TypeVarVariance::Contravariant)),
             )
@@ -782,7 +950,7 @@ impl<'db> ProtocolMemberData<'db> {
 
     fn property(
         read: Option<ProtocolMemberType<'db>>,
-        write: Option<ProtocolMemberType<'db>>,
+        write: Option<ProtocolMemberWrite<'db>>,
         definition: Option<Definition<'db>>,
     ) -> Self {
         Self {
@@ -837,12 +1005,14 @@ impl<'db> ProtocolMemberData<'db> {
                 ProtocolMemberCapabilities {
                     instance: ProtocolMemberAccess::new(
                         Some(member_ty),
-                        (!is_class_var && !is_final && !is_todo).then_some(member_ty),
+                        (!is_class_var && !is_final && !is_todo)
+                            .then_some(ProtocolMemberWrite::from_type(member_ty)),
                     ),
                     class: if is_class_var {
                         ProtocolMemberAccess::new(
                             Some(member_ty),
-                            (!is_final && !is_todo).then_some(member_ty),
+                            (!is_final && !is_todo)
+                                .then_some(ProtocolMemberWrite::from_type(member_ty)),
                         )
                     } else {
                         ProtocolMemberAccess::NONE
@@ -921,7 +1091,7 @@ impl<'db> ProtocolMemberData<'db> {
                         if let Some(read) = read.and_then(|read| read.resolve(self.db)) {
                             d.field("read", &format_args!("`{}`", read.ty().display(self.db)));
                         }
-                        if let Some(write) = write.and_then(|write| write.resolve(self.db)) {
+                        if let Some(write) = write.and_then(|write| write.display_type(self.db)) {
                             d.field("write", &format_args!("`{}`", write.ty().display(self.db)));
                         }
                         d.finish()
@@ -951,7 +1121,7 @@ enum ProtocolMemberKind<'db> {
     Method(ProtocolMemberType<'db>, ProtocolMethodKind),
     Property {
         read: Option<ProtocolMemberType<'db>>,
-        write: Option<ProtocolMemberType<'db>>,
+        write: Option<ProtocolMemberWrite<'db>>,
     },
     Attribute(ProtocolMemberType<'db>),
 }
@@ -966,9 +1136,13 @@ enum ProtocolMethodKind {
 impl<'db> ProtocolMemberKind<'db> {
     fn member_types(self) -> impl Iterator<Item = ProtocolMemberType<'db>> {
         match self {
-            Self::Method(member, _) => [Some(member), None],
-            Self::Property { read, write } => [read, write],
-            Self::Attribute(attribute) => [Some(attribute), None],
+            Self::Method(method, _) => [Some(method), None, None],
+            Self::Property { read, write } => [
+                read,
+                write.and_then(ProtocolMemberWrite::domain),
+                write.and_then(ProtocolMemberWrite::descriptor_type),
+            ],
+            Self::Attribute(attribute) => [Some(attribute), None, None],
         }
         .into_iter()
         .flatten()
@@ -1009,7 +1183,15 @@ impl<'db> ProtocolMemberKind<'db> {
                 },
             ) => Self::Property {
                 read: cycle_normalized_optional_type(db, current_read, previous_read, cycle),
-                write: cycle_normalized_optional_type(db, current_write, previous_write, cycle),
+                write: match (current_write, previous_write) {
+                    (Some(current), Some(previous)) => {
+                        Some(current.cycle_normalized(db, previous, cycle))
+                    }
+                    (Some(current), None) => {
+                        Some(current.cycle_normalized_without_previous(db, cycle))
+                    }
+                    (None, _) => None,
+                },
             },
             (Self::Attribute(current), Self::Attribute(previous)) => {
                 Self::Attribute(current.cycle_normalized(db, previous, cycle))
@@ -1330,6 +1512,8 @@ fn descriptor_decorated_protocol_member<'db>(
     protocol: ClassType<'db>,
     definition: Option<Definition<'db>>,
 ) -> Option<ProtocolMemberData<'db>> {
+    let descriptor_ty = descriptor_ty.resolve_type_alias(db);
+
     // Applying a generic descriptor decorator to a method that refers to an enclosing type
     // variable can currently materialize that variable as `Unknown`. Reducing the descriptor to
     // its `__get__` result would then erase the remaining descriptor structure and weaken the
@@ -1353,39 +1537,61 @@ fn descriptor_decorated_protocol_member<'db>(
         descriptor_ty.try_call_dunder_get(db, Some(receiver_ty), receiver_ty.to_meta_type(db))?;
     let read = Some(ProtocolMemberType::with_definition(read_ty, definition));
 
-    let write = descriptor_setter_write_type(db, descriptor_ty, receiver_ty)
-        .map(|write_ty| ProtocolMemberType::with_definition(write_ty, definition));
+    let write = match descriptor_setter_domain(db, descriptor_ty, receiver_ty) {
+        DescriptorSetterDomain::Missing => None,
+        DescriptorSetterDomain::Known(domain) => Some(ProtocolMemberWrite::descriptor(
+            descriptor_ty,
+            Some(domain),
+            definition,
+        )),
+        DescriptorSetterDomain::Deferred => Some(ProtocolMemberWrite::descriptor(
+            descriptor_ty,
+            None,
+            definition,
+        )),
+    };
 
     Some(ProtocolMemberData::property(read, write, definition))
 }
 
-/// Derive the values accepted by every possible descriptor setter.
-fn descriptor_setter_write_type<'db>(
+#[derive(Copy, Clone)]
+enum DescriptorSetterDomain<'db> {
+    Missing,
+    Known(Type<'db>),
+    Deferred,
+}
+
+/// Derive the values accepted by every possible descriptor setter when they fit in [`Type`].
+fn descriptor_setter_domain<'db>(
     db: &'db dyn Db,
     descriptor_ty: Type<'db>,
     receiver_ty: Type<'db>,
-) -> Option<Type<'db>> {
+) -> DescriptorSetterDomain<'db> {
     match descriptor_ty {
         Type::Union(union) => {
-            let write_types = union
-                .elements(db)
-                .iter()
-                .map(|descriptor_ty| {
-                    descriptor_setter_write_type_for_alternative(db, *descriptor_ty, receiver_ty)
-                })
-                .collect::<Option<Vec<_>>>()?;
-            IntersectionType::bounded_from_elements(db, write_types)
+            let mut write_types = Vec::with_capacity(union.elements(db).len());
+            for descriptor_ty in union.elements(db) {
+                match single_descriptor_setter_domain(db, *descriptor_ty, receiver_ty) {
+                    DescriptorSetterDomain::Missing => return DescriptorSetterDomain::Missing,
+                    DescriptorSetterDomain::Known(write_ty) => write_types.push(write_ty),
+                    DescriptorSetterDomain::Deferred => return DescriptorSetterDomain::Deferred,
+                }
+            }
+            IntersectionType::bounded_from_elements(db, write_types).map_or(
+                DescriptorSetterDomain::Deferred,
+                DescriptorSetterDomain::Known,
+            )
         }
-        _ => descriptor_setter_write_type_for_alternative(db, descriptor_ty, receiver_ty),
+        _ => single_descriptor_setter_domain(db, descriptor_ty, receiver_ty),
     }
 }
 
 /// Derive the values accepted by one possible runtime descriptor.
-fn descriptor_setter_write_type_for_alternative<'db>(
+fn single_descriptor_setter_domain<'db>(
     db: &'db dyn Db,
     descriptor_ty: Type<'db>,
     receiver_ty: Type<'db>,
-) -> Option<Type<'db>> {
+) -> DescriptorSetterDomain<'db> {
     let Place::Defined(DefinedPlace {
         ty: setter_ty,
         definedness: Definedness::AlwaysDefined,
@@ -1394,93 +1600,126 @@ fn descriptor_setter_write_type_for_alternative<'db>(
         .class_member_with_policy(db, "__set__".into(), MemberLookupPolicy::REQUIRE_CONCRETE)
         .place
     else {
-        return None;
+        return DescriptorSetterDomain::Missing;
     };
 
-    let callables = setter_ty.try_upcast_to_callable(db)?;
-    let write_types = callables
-        .iter()
-        .map(|callable| {
-            let write_types = callable
-                .signatures(db)
-                .iter()
-                .filter_map(|signature| {
-                    descriptor_setter_signature_write_type(
-                        db,
-                        signature,
-                        descriptor_ty,
-                        receiver_ty,
-                    )
-                })
-                .collect::<Vec<_>>();
-            (!write_types.is_empty()).then(|| UnionType::from_elements(db, write_types))
-        })
-        .collect::<Option<Vec<_>>>()?;
-    IntersectionType::bounded_from_elements(db, write_types)
+    let Some(callables) = setter_ty.try_upcast_to_callable(db) else {
+        return DescriptorSetterDomain::Deferred;
+    };
+    let mut callable_domains = Vec::with_capacity(callables.iter().len());
+    for callable in &callables {
+        let mut write_types = Vec::new();
+        for signature in callable.signatures(db) {
+            match descriptor_setter_signature_domain(db, signature, descriptor_ty, receiver_ty) {
+                DescriptorSetterSignatureDomain::Inapplicable => {}
+                DescriptorSetterSignatureDomain::Known(write_ty) => write_types.push(write_ty),
+                DescriptorSetterSignatureDomain::Deferred => {
+                    return DescriptorSetterDomain::Deferred;
+                }
+            }
+        }
+        callable_domains.push(UnionType::from_elements(db, write_types));
+    }
+    IntersectionType::bounded_from_elements(db, callable_domains).map_or(
+        DescriptorSetterDomain::Deferred,
+        DescriptorSetterDomain::Known,
+    )
 }
 
-/// Derive the values accepted by one applicable `__set__` overload.
-fn descriptor_setter_signature_write_type<'db>(
+enum DescriptorSetterSignatureDomain<'db> {
+    Inapplicable,
+    Known(Type<'db>),
+    Deferred,
+}
+
+/// Derive the values accepted by one `__set__` overload when they fit in [`Type`].
+fn descriptor_setter_signature_domain<'db>(
     db: &'db dyn Db,
     signature: &Signature<'db>,
     descriptor_ty: Type<'db>,
     receiver_ty: Type<'db>,
-) -> Option<Type<'db>> {
+) -> DescriptorSetterSignatureDomain<'db> {
     let parameters = signature.parameters();
-    let trailing_parameters = parameters.as_slice().get(3..)?;
+    let Some(trailing_parameters) = parameters.as_slice().get(3..) else {
+        return DescriptorSetterSignatureDomain::Inapplicable;
+    };
     if !trailing_parameters.iter().all(|parameter| {
         parameter.default_type().is_some()
             || ((parameters.is_standard() || parameters.is_gradual())
                 && (parameter.is_variadic() || parameter.is_keyword_variadic()))
     }) {
-        return None;
+        return DescriptorSetterSignatureDomain::Inapplicable;
     }
 
-    let descriptor_parameter = parameters
-        .get_positional(0)?
+    let Some(descriptor_parameter) = parameters.get_positional(0) else {
+        return DescriptorSetterSignatureDomain::Inapplicable;
+    };
+    let descriptor_parameter = descriptor_parameter
         .annotated_type()
         .bind_self_typevars(db, descriptor_ty);
-    let receiver_parameter = parameters
-        .get_positional(1)?
+    let Some(receiver_parameter) = parameters.get_positional(1) else {
+        return DescriptorSetterSignatureDomain::Inapplicable;
+    };
+    let receiver_parameter = receiver_parameter
         .annotated_type()
         .bind_self_typevars(db, descriptor_ty);
-    if descriptor_parameter.has_typevar(db)
-        || receiver_parameter.has_typevar(db)
-        || !descriptor_ty.is_assignable_to(db, descriptor_parameter)
+    if contains_signature_typevar(db, signature, descriptor_parameter)
+        || contains_signature_typevar(db, signature, receiver_parameter)
+    {
+        return DescriptorSetterSignatureDomain::Deferred;
+    }
+    if !descriptor_ty.is_assignable_to(db, descriptor_parameter)
         || !receiver_ty.is_assignable_to(db, receiver_parameter)
     {
-        return None;
+        return DescriptorSetterSignatureDomain::Inapplicable;
     }
 
-    let write_ty = parameters
-        .get_positional(2)?
+    let Some(write_parameter) = parameters.get_positional(2) else {
+        return DescriptorSetterSignatureDomain::Inapplicable;
+    };
+    let write_ty = write_parameter
         .annotated_type()
         .bind_self_typevars(db, descriptor_ty);
-    if !write_ty.has_typevar(db) {
-        return Some(write_ty);
+    if !contains_signature_typevar(db, signature, write_ty) {
+        return DescriptorSetterSignatureDomain::Known(write_ty);
     }
 
     let Type::TypeVar(typevar) = write_ty else {
-        return None;
+        return DescriptorSetterSignatureDomain::Deferred;
     };
-    let generic_context = signature.generic_context?;
+    let Some(generic_context) = signature.generic_context else {
+        return DescriptorSetterSignatureDomain::Deferred;
+    };
     if !generic_context.contains(db, typevar.identity(db))
         || !typevar
             .binding_context(db)
             .definition()
             .is_some_and(|definition| definition.kind(db).is_function_def())
     {
-        return None;
+        return DescriptorSetterSignatureDomain::Deferred;
     }
 
-    Some(
-        match typevar.typevar(db).bound_or_constraints(db) {
-            None => Type::object(),
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound,
-            Some(TypeVarBoundOrConstraints::Constraints(_)) => return None,
+    match typevar.typevar(db).bound_or_constraints(db) {
+        None => DescriptorSetterSignatureDomain::Known(Type::object()),
+        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+            DescriptorSetterSignatureDomain::Known(bound.bind_self_typevars(db, descriptor_ty))
         }
-        .bind_self_typevars(db, descriptor_ty),
-    )
+        Some(TypeVarBoundOrConstraints::Constraints(_)) => {
+            DescriptorSetterSignatureDomain::Deferred
+        }
+    }
+}
+
+fn contains_signature_typevar<'db>(
+    db: &'db dyn Db,
+    signature: &Signature<'db>,
+    ty: Type<'db>,
+) -> bool {
+    signature.generic_context.is_some_and(|generic_context| {
+        super::visitor::any_over_type(db, ty, false, |ty| {
+            matches!(ty, Type::TypeVar(typevar) if generic_context.contains(db, typevar.identity(db)))
+        })
+    })
 }
 
 fn property_set_type<'db>(
@@ -1607,13 +1846,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
             AttributeWriteRequirement::Unconstrained => self.always(),
             AttributeWriteRequirement::CannotAssign => self.never(),
-            AttributeWriteRequirement::Module(Some(write_ty))
-            | AttributeWriteRequirement::ProtocolMember {
-                write_ty: Some(write_ty),
+            AttributeWriteRequirement::Module(Some(write_ty)) => {
+                self.check_type_pair(db, value_ty, *write_ty)
+            }
+            AttributeWriteRequirement::ProtocolMember {
+                write: Some(ProtocolMemberWriteRequirement::AssignableTo(write_ty)),
                 ..
             } => self.check_type_pair(db, value_ty, *write_ty),
+            AttributeWriteRequirement::ProtocolMember {
+                write: Some(ProtocolMemberWriteRequirement::Descriptor { domain, .. }),
+                ..
+            } => self.check_type_pair(db, value_ty, domain.unwrap_or_else(Type::unknown)),
             AttributeWriteRequirement::Module(None)
-            | AttributeWriteRequirement::ProtocolMember { write_ty: None, .. } => self.never(),
+            | AttributeWriteRequirement::ProtocolMember { write: None, .. } => self.never(),
             AttributeWriteRequirement::Instance { object_ty, member } => {
                 self.check_instance_property_write(db, *object_ty, member, member_name, value_ty)
             }
@@ -2022,7 +2267,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         read_result.and(db, self.constraints, || {
             required.write.map_or_else(
                 || self.always(),
-                |write_ty| {
+                |write| {
                     let fallback_ty = ty.literal_fallback_instance(db).unwrap_or(ty);
                     let receiver_ty = if access == ProtocolMemberAccessMode::Instance
                         && matches!(ty, Type::LiteralValue(_))
@@ -2031,10 +2276,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     } else {
                         receiver_ty
                     };
-                    write_ty.bind_self(db, fallback_ty).when_some_and(
-                        db,
-                        self.constraints,
-                        |write_ty| {
+                    write
+                        .bind_compatibility_type(db, fallback_ty)
+                        .when_some_and(db, self.constraints, |write_ty| {
                             let result =
                                 self.check_property_write(db, receiver_ty, member.name, write_ty);
                             if let Some(context) = self.report_context()
@@ -2045,8 +2289,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 });
                             }
                             result
-                        },
-                    )
+                        })
                 },
             )
         })
@@ -2263,8 +2506,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
                 (Some(source), Some(target)) => {
                     let (Some(target), Some(source)) = (
-                        target.bind_self(db, source_type),
-                        source.bind_self(db, source_type),
+                        target.bind_compatibility_type(db, source_type),
+                        source.bind_compatibility_type(db, source_type),
                     ) else {
                         return self.never();
                     };
@@ -2579,7 +2822,10 @@ fn cached_protocol_interface<'db>(
             let member = match ty {
                 Type::PropertyInstance(property) => ProtocolMemberData::property(
                     property.getter(db).map(ProtocolMemberType::property_getter),
-                    property.setter(db).map(ProtocolMemberType::property_setter),
+                    property
+                        .setter(db)
+                        .map(ProtocolMemberType::property_setter)
+                        .map(ProtocolMemberWrite::from_type),
                     definition,
                 ),
                 Type::Callable(callable)
