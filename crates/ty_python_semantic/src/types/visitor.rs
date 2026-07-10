@@ -348,27 +348,13 @@ pub(crate) struct RecursionGuard<'db> {
 }
 
 impl<'db> RecursionGuard<'db> {
-    /// Reduce costs by tracking only recursive types.
-    fn active_identity(db: &'db dyn Db, ty: Type<'db>) -> Option<TypeIdentity<'db>> {
-        match ty {
-            Type::FunctionLiteral(function) => {
-                Some(TypeIdentity::FunctionLiteral(function.literal(db)))
-            }
-            Type::NewTypeInstance(newtype) => {
-                Some(TypeIdentity::NewTypeInstance(newtype.definition(db)))
-            }
-            Type::TypeAlias(alias) => Some(TypeIdentity::TypeAlias(alias.definition(db))),
-            _ => None,
-        }
-    }
-
     fn begin_visit(&self, db: &'db dyn Db, ty: Type<'db>) -> RecursionGuardVisit {
         // Collect the exact type before checking for identity recursion. A recursive type keeps
         // the same identity across different expansions, but callers still need each distinct
         // expanded type to be collected.
         let was_collected = self.collected_types.collect_type(ty);
 
-        let active_identity = Self::active_identity(db, ty);
+        let active_identity = ty.recursive_identity(db);
         if let Some(identity) = active_identity {
             if self.active_identities.borrow().contains(&identity) {
                 return RecursionGuardVisit::Cycle;
@@ -385,7 +371,7 @@ impl<'db> RecursionGuard<'db> {
     }
 
     fn finish_visit(&self, db: &'db dyn Db, ty: Type<'db>) {
-        if let Some(identity) = Self::active_identity(db, ty) {
+        if let Some(identity) = ty.recursive_identity(db) {
             debug_assert_eq!(self.active_identities.borrow_mut().pop(), Some(identity));
         }
     }
