@@ -50,6 +50,46 @@ help: Replace rule code with name
   |
 ```
 
+Valid human-readable names are unaffected:
+
+```py
+# snapshot: rule-codes-in-suppression-comments
+# snapshot: rule-codes-in-suppression-comments
+# ruff:ignore[F401, undefined-name, F841]
+value = 1
+```
+
+```snapshot
+error[RUF106]: Rule code used instead of name in suppression comment
+ --> src/mdtest_snippet.py:7:15
+  |
+7 | # ruff:ignore[F401, undefined-name, F841]
+  |               ^^^^
+  |
+help: Replace rule code with name
+  |
+6 | # snapshot: rule-codes-in-suppression-comments
+  - # ruff:ignore[F401, undefined-name, F841]
+7 + # ruff:ignore[unused-import, undefined-name, F841]
+8 | value = 1
+  |
+
+
+error[RUF106]: Rule code used instead of name in suppression comment
+ --> src/mdtest_snippet.py:7:37
+  |
+7 | # ruff:ignore[F401, undefined-name, F841]
+  |                                     ^^^^
+  |
+help: Replace rule code with name
+  |
+6 | # snapshot: rule-codes-in-suppression-comments
+  - # ruff:ignore[F401, undefined-name, F841]
+7 + # ruff:ignore[F401, undefined-name, unused-variable]
+8 | value = 1
+  |
+```
+
 ## `ruff:file-ignore`
 
 ```py
