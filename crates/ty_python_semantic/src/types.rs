@@ -4551,9 +4551,28 @@ impl<'db> Type<'db> {
 
             Type::BoundMethod(bound_method) => {
                 let signature = bound_method.function(db).signature(db);
-                CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
-                    .with_bound_type(bound_method.self_instance(db))
+                let self_instance = bound_method.self_instance(db);
+                // Class-based protocol member lookup has already specialized the method for this
+                // receiver. Bake an implicit positional receiver into the signature instead of
+                // checking it structurally again during call inference.
+                if self_instance
+                    .as_protocol_instance()
+                    .is_some_and(|protocol| protocol.to_nominal_instance().is_some())
+                    && signature
+                        .overloads
+                        .iter()
+                        .all(Signature::has_implicit_positional_receiver_annotation)
+                {
+                    CallableBinding::from_overloads(
+                        self,
+                        bound_method.bound_signatures(db).iter().cloned(),
+                    )
                     .into()
+                } else {
+                    CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
+                        .with_bound_type(self_instance)
+                        .into()
+                }
             }
 
             Type::KnownBoundMethod(method) => {
