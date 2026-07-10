@@ -31,6 +31,11 @@ use resolve_definition::{find_symbol_in_scope, resolve_definition};
 pub use unreachable_code::{UnreachableKind, UnreachableRange, unreachable_ranges};
 pub use unused_binding_support::{UnusedBinding, unused_bindings};
 
+/// Returns `true` if this type is an enum class with known members.
+pub fn is_enum_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    crate::types::enums::is_enum_class(db, ty)
+}
+
 /// Get the primary definition kind for a name expression within a specific file.
 /// Returns the first definition kind that is reachable for this name in its scope.
 /// This is useful for IDE features like semantic tokens.
