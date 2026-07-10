@@ -10,8 +10,8 @@ use crate::types::constraints::{
     OwnedConstraintSet,
 };
 use crate::types::cyclic::{
-    CycleDetectorVisit, HasIdentity, PairVisitor, TypeIdentity,
-    type_pair_has_recursive_identity_cycle,
+    CycleDetectorReentry, CycleDetectorVisit, HasIdentity, PairVisitor, TypeIdentity,
+    TypePairCyclePolicy, TypePairItem,
 };
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
@@ -718,7 +718,7 @@ impl<'db> Type<'db> {
 /// A [`PairVisitor`] that is used in `has_relation_to` methods.
 pub(crate) type HasRelationToVisitor<'db, 'c> = CycleDetector<
     'db,
-    TypeRelation,
+    TypePairCyclePolicy,
     (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation),
     ConstraintSet<'db, 'c>,
     1,
@@ -740,17 +740,11 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvalu
             self.3,
         )
     }
+}
 
-    fn needs_recursive_identity(&self) -> bool {
-        self.0.needs_recursive_identity() || self.1.needs_recursive_identity()
-    }
-
-    fn has_recursive_identity_cycle(&self, db: &'db dyn Db, seen: &[Self]) -> bool {
-        let identity = self.to_identity(db);
-        seen.iter().any(|active| {
-            active.to_identity(db) == identity
-                && type_pair_has_recursive_identity_cycle(db, self.0, self.1, active.0, active.1)
-        })
+impl<'db> TypePairItem<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation) {
+    fn type_pair(&self) -> (Type<'db>, Type<'db>) {
+        (self.0, self.1)
     }
 }
 
@@ -761,10 +755,7 @@ impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
 }
 
 /// A [`PairVisitor`] that is used in `is_disjoint_from` methods.
-pub(crate) type IsDisjointVisitor<'db, 'c> = PairVisitor<'db, IsDisjoint, ConstraintSet<'db, 'c>>;
-
-#[derive(Debug)]
-pub(crate) struct IsDisjoint;
+pub(crate) type IsDisjointVisitor<'db, 'c> = PairVisitor<'db, ConstraintSet<'db, 'c>>;
 
 impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
     pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
@@ -973,9 +964,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             .begin_visit(db, (source, target, self.relation, self.typevar_evaluation))
         {
             CycleDetectorVisit::Ready(result) => result,
-            CycleDetectorVisit::Cycle(current) => {
-                self.recursive_type_pair_fallback(db, current.0, current.1)
-            }
+            CycleDetectorVisit::Cycle(reentry) => self.recursive_type_pair_fallback(db, &reentry),
             CycleDetectorVisit::Pending(item) => {
                 let result = work();
                 self.relation_visitor.finish_visit(item, result)
@@ -986,10 +975,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     fn recursive_type_pair_fallback(
         &self,
         _db: &'db dyn Db,
-        source: Type<'db>,
-        target: Type<'db>,
+        reentry: &CycleDetectorReentry<(Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation)>,
     ) -> ConstraintSet<'db, 'c> {
-        if matches!((source, target), (Type::TypeAlias(_), Type::TypeAlias(_))) {
+        let current_is_alias_pair = matches!(
+            (reentry.current.0, reentry.current.1),
+            (Type::TypeAlias(_), Type::TypeAlias(_))
+        );
+        let active_is_alias_pair = matches!(
+            (reentry.active.0, reentry.active.1),
+            (Type::TypeAlias(_), Type::TypeAlias(_))
+        );
+        if current_is_alias_pair && active_is_alias_pair {
             return self.never();
         }
 

@@ -1,7 +1,7 @@
 use super::variance::VarianceInferable;
 use super::{
-    BoundTypeVarIdentity, CycleDetector, IntersectionType, Type, TypeVarVariance, UnionType,
-    visitor,
+    BoundTypeVarIdentity, CycleDetector, IntersectionType, Type, TypeCyclePolicy, TypeVarVariance,
+    UnionType, visitor,
 };
 use crate::Db;
 
@@ -37,9 +37,8 @@ impl<'db> Type<'db> {
     /// elements that do not represent type forms are ignored, as are negative intersection
     /// elements. If no type-form component can be projected, this returns the original type.
     pub(crate) fn project_type_form(self, db: &'db dyn Db) -> Type<'db> {
-        struct TypeFormArgument;
         type TypeFormArgumentVisitor<'db> =
-            CycleDetector<'db, TypeFormArgument, Type<'db>, Option<Type<'db>>, 3>;
+            CycleDetector<'db, TypeCyclePolicy, Type<'db>, Option<Type<'db>>, 3>;
 
         fn project<'db>(
             db: &'db dyn Db,

@@ -5,9 +5,7 @@ use super::TypeInferenceBuilder;
 use crate::Db;
 use crate::types::call::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
-use crate::types::cyclic::{
-    CycleDetector, HasIdentity, TypeIdentity, type_pair_has_recursive_identity_cycle,
-};
+use crate::types::cyclic::{CycleDetector, TypePairCyclePolicy};
 use crate::types::diagnostic::{
     DIVISION_BY_ZERO, report_unsupported_augmented_assignment, report_unsupported_binary_operation,
 };
@@ -24,24 +22,13 @@ enum BinaryExpressionOperandTypes<'db> {
     TypedDictResult(Type<'db>),
 }
 
-type BinaryExpressionVisitor<'db> =
-    CycleDetector<'db, ast::Operator, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>, 1>;
-
-impl<'db> HasIdentity<'db> for (Type<'db>, ast::Operator, Type<'db>) {
-    type Id = (TypeIdentity<'db>, ast::Operator, TypeIdentity<'db>);
-
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
-        (self.0.to_identity(db), self.1, self.2.to_identity(db))
-    }
-
-    fn has_recursive_identity_cycle(&self, db: &'db dyn Db, seen: &[Self]) -> bool {
-        let identity = self.to_identity(db);
-        seen.iter().any(|active| {
-            active.to_identity(db) == identity
-                && type_pair_has_recursive_identity_cycle(db, self.0, self.2, active.0, active.2)
-        })
-    }
-}
+type BinaryExpressionVisitor<'db> = CycleDetector<
+    'db,
+    TypePairCyclePolicy,
+    (Type<'db>, ast::Operator, Type<'db>),
+    Option<Type<'db>>,
+    1,
+>;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_binary_expression(

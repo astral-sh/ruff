@@ -5,8 +5,9 @@ use crate::{
     Db,
     types::{
         CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, SubclassOfInner, Type, TypeContext, TypeVarBoundOrConstraints,
-        UnionType, call::CallErrorKind, constraints::ConstraintSetBuilder, context::InferContext,
+        LiteralValueTypeKind, SubclassOfInner, Type, TypeContext, TypeCyclePolicy,
+        TypeVarBoundOrConstraints, UnionType, call::CallErrorKind,
+        constraints::ConstraintSetBuilder, context::InferContext,
         diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
     },
 };
@@ -339,8 +340,7 @@ impl<'db> Type<'db> {
 
 /// A [`CycleDetector`] that is used in `try_bool` methods.
 pub(crate) type TryBoolVisitor<'db> =
-    CycleDetector<'db, TryBool, Type<'db>, Result<Truthiness, BoolError<'db>>, 3>;
-pub(crate) struct TryBool;
+    CycleDetector<'db, TypeCyclePolicy, Type<'db>, Result<Truthiness, BoolError<'db>>, 3>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum BoolError<'db> {

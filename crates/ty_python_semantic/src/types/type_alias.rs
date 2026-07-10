@@ -283,6 +283,17 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
+    /// Returns this alias application with its default specialization filled in.
+    pub(crate) fn application(self, db: &'db dyn Db) -> Option<TypeAliasApplication<'db>> {
+        let generic_context = self.generic_context(db)?;
+        Some(TypeAliasApplication {
+            alias: self,
+            specialization: self
+                .specialization(db)
+                .unwrap_or_else(|| generic_context.default_specialization(db, None)),
+        })
+    }
+
     pub(crate) fn apply_specialization(
         self,
         db: &'db dyn Db,
@@ -299,6 +310,63 @@ impl<'db> TypeAliasType<'db> {
     /// Returns a struct that can display the fully qualified name of this type alias.
     pub(crate) fn qualified_name(self, db: &'db dyn Db) -> QualifiedTypeAliasName<'db> {
         QualifiedTypeAliasName::from_type_alias(db, self)
+    }
+}
+
+/// A generic type alias together with the specialization applied at this occurrence.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TypeAliasApplication<'db> {
+    alias: TypeAliasType<'db>,
+    specialization: Specialization<'db>,
+}
+
+impl<'db> TypeAliasApplication<'db> {
+    pub(crate) fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+        let Type::TypeAlias(alias) = ty else {
+            return None;
+        };
+        alias.application(db)
+    }
+
+    pub(crate) fn contains_type(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        self.specialization
+            .types(db)
+            .iter()
+            .copied()
+            .any(|argument| visitor::any_over_type(db, argument, false, |nested| nested == ty))
+    }
+
+    pub(crate) fn is_nested_within(
+        self,
+        db: &'db dyn Db,
+        active: Type<'db>,
+        current: Type<'db>,
+    ) -> bool {
+        let Some(active) = Self::from_type(db, active) else {
+            return false;
+        };
+        active.alias.definition(db) == self.alias.definition(db)
+            && active.contains_type(db, current)
+    }
+
+    pub(crate) fn contains_recursive_identity_from(
+        self,
+        db: &'db dyn Db,
+        active: &[Type<'db>],
+    ) -> bool {
+        self.specialization
+            .types(db)
+            .iter()
+            .copied()
+            .any(|argument| {
+                visitor::any_over_type(db, argument, false, |nested| {
+                    nested.recursive_identity(db).is_some_and(|identity| {
+                        active
+                            .iter()
+                            .any(|active| active.recursive_identity(db) == Some(identity))
+                    })
+                })
+            })
     }
 }
 

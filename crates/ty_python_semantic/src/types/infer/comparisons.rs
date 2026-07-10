@@ -6,9 +6,7 @@ use crate::Db;
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
-use crate::types::cyclic::{
-    CycleDetector, HasIdentity, TypeIdentity, type_pair_has_recursive_identity_cycle,
-};
+use crate::types::cyclic::{CycleDetector, TypePairCyclePolicy};
 use crate::types::equality::{equality_truthiness, inequality_truthiness};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
@@ -28,27 +26,11 @@ enum IntersectionOn {
 /// A [`CycleDetector`] that is used in [`infer_binary_type_comparison`].
 pub(super) type BinaryComparisonVisitor<'db> = CycleDetector<
     'db,
-    ast::CmpOp,
+    TypePairCyclePolicy,
     (Type<'db>, ast::CmpOp, Type<'db>),
     Result<Type<'db>, UnsupportedComparisonError<'db>>,
     1,
 >;
-
-impl<'db> HasIdentity<'db> for (Type<'db>, ast::CmpOp, Type<'db>) {
-    type Id = (TypeIdentity<'db>, ast::CmpOp, TypeIdentity<'db>);
-
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
-        (self.0.to_identity(db), self.1, self.2.to_identity(db))
-    }
-
-    fn has_recursive_identity_cycle(&self, db: &'db dyn Db, seen: &[Self]) -> bool {
-        let identity = self.to_identity(db);
-        seen.iter().any(|active| {
-            active.to_identity(db) == identity
-                && type_pair_has_recursive_identity_cycle(db, self.0, self.2, active.0, active.2)
-        })
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RichCompareOperator {

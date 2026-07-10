@@ -31,10 +31,9 @@ use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
 use crate::Db;
+use crate::types::Type;
 use crate::types::function::FunctionLiteral;
-use crate::types::generics::Specialization;
-use crate::types::visitor::any_over_type;
-use crate::types::{Type, TypeAliasType};
+use crate::types::type_alias::TypeAliasApplication;
 
 /// The type identity used for recursive checks/transformations.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
@@ -67,38 +66,12 @@ impl<'db> Type<'db> {
             _ => None,
         }
     }
-
-    const fn needs_recursive_identity(self) -> bool {
-        matches!(
-            self,
-            Type::FunctionLiteral(_) | Type::NewTypeInstance(_) | Type::TypeAlias(_)
-        )
-    }
 }
 
 pub trait HasIdentity<'db> {
     type Id: Sized + PartialEq;
 
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id;
-
-    /// Return `true` if an in-progress item with the same identity should be treated as a cycle.
-    fn needs_recursive_identity(&self) -> bool {
-        true
-    }
-
-    /// Return `true` if `self` should use the recursive fallback for the active stack.
-    fn has_recursive_identity_cycle(&self, db: &'db dyn Db, seen: &[Self]) -> bool
-    where
-        Self: Sized,
-    {
-        if !self.needs_recursive_identity() {
-            return false;
-        }
-
-        let identity = self.to_identity(db);
-        seen.iter()
-            .any(|active| active.needs_recursive_identity() && active.to_identity(db) == identity)
-    }
 }
 
 impl<'db> HasIdentity<'db> for Type<'db> {
@@ -107,22 +80,10 @@ impl<'db> HasIdentity<'db> for Type<'db> {
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
         self.to_type_identity(db)
     }
-
-    fn needs_recursive_identity(&self) -> bool {
-        Type::needs_recursive_identity(*self)
-    }
-
-    fn has_recursive_identity_cycle(&self, db: &'db dyn Db, seen: &[Self]) -> bool {
-        type_has_recursive_identity_cycle_in_stack(
-            db,
-            *self,
-            seen,
-            NonNestedAliasCyclePolicy::Immediate,
-        )
-    }
 }
 
-pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<'db, Tag, (Type<'db>, Type<'db>), C, 1>;
+pub(crate) type PairVisitor<'db, C> =
+    CycleDetector<'db, TypePairCyclePolicy, (Type<'db>, Type<'db>), C, 1>;
 
 impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>) {
     type Id = (TypeIdentity<'db>, TypeIdentity<'db>);
@@ -130,186 +91,200 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>) {
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
         (self.0.to_identity(db), self.1.to_identity(db))
     }
+}
 
-    fn needs_recursive_identity(&self) -> bool {
-        self.0.needs_recursive_identity() || self.1.needs_recursive_identity()
-    }
+impl<'db, Context> HasIdentity<'db> for (Type<'db>, Context, Type<'db>)
+where
+    Context: Copy + PartialEq,
+{
+    type Id = (TypeIdentity<'db>, Context, TypeIdentity<'db>);
 
-    fn has_recursive_identity_cycle(&self, db: &'db dyn Db, seen: &[Self]) -> bool {
-        let identity = self.to_identity(db);
-        seen.iter().any(|active| {
-            active.to_identity(db) == identity
-                && type_pair_has_recursive_identity_cycle(db, self.0, self.1, active.0, active.1)
-        })
+    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
+        (self.0.to_identity(db), self.1, self.2.to_identity(db))
     }
 }
 
-/// Return `true` if either type should use the recursive fallback for the active pair.
-pub(crate) fn type_pair_has_recursive_identity_cycle<'db>(
-    db: &'db dyn Db,
-    current_left: Type<'db>,
-    current_right: Type<'db>,
-    active_left: Type<'db>,
-    active_right: Type<'db>,
-) -> bool {
-    type_has_recursive_identity_cycle_for_active(db, current_left, active_left)
-        || type_has_recursive_identity_cycle_for_active(db, current_right, active_right)
+/// An item whose recursive identity is determined by a pair of types.
+pub(crate) trait TypePairItem<'db>: HasIdentity<'db> {
+    fn type_pair(&self) -> (Type<'db>, Type<'db>);
+}
+
+impl<'db> TypePairItem<'db> for (Type<'db>, Type<'db>) {
+    fn type_pair(&self) -> (Type<'db>, Type<'db>) {
+        *self
+    }
+}
+
+impl<'db, Context> TypePairItem<'db> for (Type<'db>, Context, Type<'db>)
+where
+    Context: Copy + PartialEq,
+{
+    fn type_pair(&self) -> (Type<'db>, Type<'db>) {
+        (self.0, self.2)
+    }
+}
+
+/// Decides when an abstract-identity reentry requires the recursive fallback.
+pub trait CyclePolicy<'db, T: HasIdentity<'db>> {
+    fn reentry_index(db: &'db dyn Db, current: &T, active: &[T]) -> Option<usize>;
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-enum NonNestedAliasCyclePolicy {
+enum AliasCycleThreshold {
     Immediate,
     AfterSecondUnfold,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy)]
 enum ActiveRecursiveIdentityRelation<'db> {
     None,
     DirectCycle,
     Alias(ActiveAliasRecursiveIdentityRelation<'db>),
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy)]
 struct ActiveAliasRecursiveIdentityRelation<'db> {
-    specialization: Specialization<'db>,
+    application: TypeAliasApplication<'db>,
     nested_application: bool,
 }
 
-fn type_has_recursive_identity_cycle_in_stack<'db>(
+/// The active type stack used to classify recursive-identity reentries.
+pub(crate) struct RecursiveTypeStack<'a, 'db> {
     db: &'db dyn Db,
-    ty: Type<'db>,
-    seen: &[Type<'db>],
-    policy: NonNestedAliasCyclePolicy,
-) -> bool {
-    let mut active_alias_count = 0;
-    let mut specialization = None;
+    active: &'a [Type<'db>],
+}
 
-    for active in seen {
-        match recursive_identity_relation_to_active(db, ty, *active) {
-            ActiveRecursiveIdentityRelation::None => {}
-            ActiveRecursiveIdentityRelation::DirectCycle => return true,
-            ActiveRecursiveIdentityRelation::Alias(relation) => {
-                if relation.nested_application {
-                    return false;
+impl<'a, 'db> RecursiveTypeStack<'a, 'db> {
+    pub(crate) const fn new(db: &'db dyn Db, active: &'a [Type<'db>]) -> Self {
+        Self { db, active }
+    }
+
+    pub(crate) fn contains_immediate_reentry(self, current: Type<'db>) -> bool {
+        self.reentry_index(current, AliasCycleThreshold::Immediate)
+            .is_some()
+    }
+
+    fn reentry_index(self, current: Type<'db>, threshold: AliasCycleThreshold) -> Option<usize> {
+        let mut first_alias_index = None;
+        let mut active_alias_count = 0;
+        let mut application = None;
+
+        for (index, active) in self.active.iter().copied().enumerate() {
+            match current.recursive_identity_relation_to(self.db, active) {
+                ActiveRecursiveIdentityRelation::None => {}
+                ActiveRecursiveIdentityRelation::DirectCycle => return Some(index),
+                ActiveRecursiveIdentityRelation::Alias(relation) => {
+                    if relation.nested_application {
+                        return None;
+                    }
+                    active_alias_count += 1;
+                    first_alias_index.get_or_insert(index);
+                    application.get_or_insert(relation.application);
                 }
-                active_alias_count += 1;
-                specialization.get_or_insert(relation.specialization);
+            }
+        }
+
+        let (Some(first_alias_index), Some(application)) = (first_alias_index, application) else {
+            return None;
+        };
+
+        if application.contains_recursive_identity_from(self.db, self.active) {
+            return Some(first_alias_index);
+        }
+
+        match threshold {
+            AliasCycleThreshold::Immediate => Some(first_alias_index),
+            AliasCycleThreshold::AfterSecondUnfold => {
+                (active_alias_count > 1).then_some(first_alias_index)
             }
         }
     }
 
-    let Some(specialization) = specialization else {
-        return false;
-    };
-
-    if specialization_contains_recursive_identity_from_stack(db, specialization, seen) {
-        return true;
-    }
-
-    match policy {
-        NonNestedAliasCyclePolicy::Immediate => true,
-        NonNestedAliasCyclePolicy::AfterSecondUnfold => active_alias_count > 1,
+    fn has_immediate_reentry_to(db: &'db dyn Db, current: Type<'db>, active: Type<'db>) -> bool {
+        match current.recursive_identity_relation_to(db, active) {
+            ActiveRecursiveIdentityRelation::None => false,
+            ActiveRecursiveIdentityRelation::DirectCycle => true,
+            ActiveRecursiveIdentityRelation::Alias(relation) => !relation.nested_application,
+        }
     }
 }
 
-/// Return `true` if `ty` re-enters an active recursive type identity in `seen`.
-pub(crate) fn type_has_immediate_recursive_identity_cycle<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    seen: &[Type<'db>],
-) -> bool {
-    type_has_recursive_identity_cycle_in_stack(db, ty, seen, NonNestedAliasCyclePolicy::Immediate)
-}
+impl<'db> Type<'db> {
+    fn recursive_identity_relation_to(
+        self,
+        db: &'db dyn Db,
+        active: Type<'db>,
+    ) -> ActiveRecursiveIdentityRelation<'db> {
+        let Some(identity) = self.recursive_identity(db) else {
+            return ActiveRecursiveIdentityRelation::None;
+        };
 
-fn type_has_recursive_identity_cycle_for_active<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    active: Type<'db>,
-) -> bool {
-    match recursive_identity_relation_to_active(db, ty, active) {
-        ActiveRecursiveIdentityRelation::None => false,
-        ActiveRecursiveIdentityRelation::DirectCycle => true,
-        ActiveRecursiveIdentityRelation::Alias(relation) => !relation.nested_application,
-    }
-}
+        if active.recursive_identity(db) != Some(identity) {
+            return ActiveRecursiveIdentityRelation::None;
+        }
 
-fn recursive_identity_relation_to_active<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    active: Type<'db>,
-) -> ActiveRecursiveIdentityRelation<'db> {
-    let Some(identity) = ty.recursive_identity(db) else {
-        return ActiveRecursiveIdentityRelation::None;
-    };
+        let Type::TypeAlias(alias) = self else {
+            return ActiveRecursiveIdentityRelation::DirectCycle;
+        };
 
-    if active.recursive_identity(db) != Some(identity) {
-        return ActiveRecursiveIdentityRelation::None;
-    }
+        let Some(application) = alias.application(db) else {
+            return ActiveRecursiveIdentityRelation::DirectCycle;
+        };
 
-    let Type::TypeAlias(alias) = ty else {
-        return ActiveRecursiveIdentityRelation::DirectCycle;
-    };
-
-    let Some(specialization) = type_alias_cycle_specialization(db, alias) else {
-        return ActiveRecursiveIdentityRelation::DirectCycle;
-    };
-
-    ActiveRecursiveIdentityRelation::Alias(ActiveAliasRecursiveIdentityRelation {
-        specialization,
-        nested_application: active_alias_specialization_contains_type(db, active, ty),
-    })
-}
-
-fn type_alias_cycle_specialization<'db>(
-    db: &'db dyn Db,
-    alias: TypeAliasType<'db>,
-) -> Option<Specialization<'db>> {
-    let generic_context = alias.generic_context(db)?;
-    Some(
-        alias
-            .specialization(db)
-            .unwrap_or_else(|| generic_context.default_specialization(db, None)),
-    )
-}
-
-fn active_alias_specialization_contains_type<'db>(
-    db: &'db dyn Db,
-    active: Type<'db>,
-    ty: Type<'db>,
-) -> bool {
-    let Type::TypeAlias(active_alias) = active else {
-        return false;
-    };
-    let Some(specialization) = type_alias_cycle_specialization(db, active_alias) else {
-        return false;
-    };
-
-    specialization
-        .types(db)
-        .iter()
-        .copied()
-        .any(|argument| any_over_type(db, argument, false, |nested| nested == ty))
-}
-
-fn specialization_contains_recursive_identity_from_stack<'db>(
-    db: &'db dyn Db,
-    specialization: Specialization<'db>,
-    seen: &[Type<'db>],
-) -> bool {
-    specialization.types(db).iter().copied().any(|argument| {
-        any_over_type(db, argument, false, |nested| {
-            nested.recursive_identity(db).is_some_and(|identity| {
-                seen.iter()
-                    .any(|active| active.recursive_identity(db) == Some(identity))
-            })
+        ActiveRecursiveIdentityRelation::Alias(ActiveAliasRecursiveIdentityRelation {
+            application,
+            nested_application: application.is_nested_within(db, active, self),
         })
-    })
+    }
+}
+
+/// Uses the first repeated abstract identity as the recursive fallback boundary.
+pub(crate) struct IdentityCyclePolicy;
+
+impl<'db, T: HasIdentity<'db>> CyclePolicy<'db, T> for IdentityCyclePolicy {
+    fn reentry_index(db: &'db dyn Db, current: &T, active: &[T]) -> Option<usize> {
+        let identity = current.to_identity(db);
+        active
+            .iter()
+            .position(|active| active.to_identity(db) == identity)
+    }
+}
+
+/// Applies recursive-type semantics to a single type stack.
+pub(crate) struct TypeCyclePolicy;
+
+impl<'db> CyclePolicy<'db, Type<'db>> for TypeCyclePolicy {
+    fn reentry_index(db: &'db dyn Db, current: &Type<'db>, active: &[Type<'db>]) -> Option<usize> {
+        RecursiveTypeStack::new(db, active).reentry_index(*current, AliasCycleThreshold::Immediate)
+    }
+}
+
+/// Applies recursive-type semantics to an item containing a pair of types.
+pub(crate) struct TypePairCyclePolicy;
+
+impl<'db, T> CyclePolicy<'db, T> for TypePairCyclePolicy
+where
+    T: TypePairItem<'db>,
+{
+    fn reentry_index(db: &'db dyn Db, current: &T, active: &[T]) -> Option<usize> {
+        let identity = current.to_identity(db);
+        let (current_left, current_right) = current.type_pair();
+
+        active.iter().position(|active| {
+            if active.to_identity(db) != identity {
+                return false;
+            }
+            let (active_left, active_right) = active.type_pair();
+            RecursiveTypeStack::has_immediate_reentry_to(db, current_left, active_left)
+                || RecursiveTypeStack::has_immediate_reentry_to(db, current_right, active_right)
+        })
+    }
 }
 
 /// `CycleDetector` is temporary, so callers should choose the capacity that keeps observed cycle
 /// paths inline even when that makes `seen` slightly larger than an `FxIndexSet<T>`.
 #[derive(Debug)]
-pub struct CycleDetector<'db, Tag, T: HasIdentity<'db>, R, const INLINE_CAPACITY: usize> {
+pub struct CycleDetector<'db, Policy, T: HasIdentity<'db>, R, const INLINE_CAPACITY: usize> {
     /// The active recursion stack. Completed visits are removed from the end of the stack.
     seen: RefCell<SmallVec<[T; INLINE_CAPACITY]>>,
 
@@ -318,27 +293,30 @@ pub struct CycleDetector<'db, Tag, T: HasIdentity<'db>, R, const INLINE_CAPACITY
 
     fallback: R,
 
-    _tag: PhantomData<fn(&'db ()) -> Tag>,
+    _policy: PhantomData<fn(&'db ()) -> Policy>,
 }
 
-impl<'db, Tag, T, R, const INLINE_CAPACITY: usize> CycleDetector<'db, Tag, T, R, INLINE_CAPACITY>
+impl<'db, Policy, T, R, const INLINE_CAPACITY: usize>
+    CycleDetector<'db, Policy, T, R, INLINE_CAPACITY>
 where
     T: HasIdentity<'db>,
+    Policy: CyclePolicy<'db, T>,
 {
     pub fn new(fallback: R) -> Self {
         CycleDetector {
             seen: RefCell::new(SmallVec::new()),
             cache: RefCell::new(CycleDetectorCache::new()),
             fallback,
-            _tag: PhantomData,
+            _policy: PhantomData,
         }
     }
 }
 
-impl<'db, Tag, T, R: Clone, const INLINE_CAPACITY: usize>
-    CycleDetector<'db, Tag, T, R, INLINE_CAPACITY>
+impl<'db, Policy, T, R: Clone, const INLINE_CAPACITY: usize>
+    CycleDetector<'db, Policy, T, R, INLINE_CAPACITY>
 where
     T: Hash + Eq + Clone + HasIdentity<'db>,
+    Policy: CyclePolicy<'db, T>,
 {
     #[inline]
     pub fn visit(&self, db: &'db dyn Db, item: T, compute: impl FnOnce() -> R) -> R {
@@ -364,8 +342,11 @@ where
             return CycleDetectorVisit::Ready(self.fallback.clone());
         }
 
-        if item.has_recursive_identity_cycle(db, &seen) {
-            return CycleDetectorVisit::Cycle(item);
+        if let Some(active_index) = Policy::reentry_index(db, &item, &seen) {
+            return CycleDetectorVisit::Cycle(CycleDetectorReentry {
+                current: item,
+                active: seen[active_index].clone(),
+            });
         }
         drop(seen);
 
@@ -389,10 +370,15 @@ pub(crate) enum CycleDetectorVisit<T, R> {
     /// The item already has a completed result or hit an exact recursive edge.
     Ready(R),
     /// A different item with the same abstract identity is already pending.
-    /// The item is the input that hit the active obligation.
-    Cycle(T),
+    Cycle(CycleDetectorReentry<T>),
     /// The caller should compute the result and pass it to [`CycleDetector::finish_visit`].
     Pending(T),
+}
+
+/// The current item that re-entered an active abstract identity.
+pub(crate) struct CycleDetectorReentry<T> {
+    pub(crate) current: T,
+    pub(crate) active: T,
 }
 
 /// Guards recursive type transformations.
@@ -444,7 +430,11 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         }
 
         let seen = self.seen.borrow();
-        if seen.contains(&ty) || type_transformer_needs_recursive_fallback(db, ty, &seen) {
+        if seen.contains(&ty)
+            || RecursiveTypeStack::new(db, &seen)
+                .reentry_index(ty, AliasCycleThreshold::AfterSecondUnfold)
+                .is_some()
+        {
             return TypeTransformerVisit::Return(ty);
         }
         drop(seen);
@@ -460,28 +450,16 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
     }
 }
 
-fn type_transformer_needs_recursive_fallback<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    seen: &[Type<'db>],
-) -> bool {
-    type_has_recursive_identity_cycle_in_stack(
-        db,
-        ty,
-        seen,
-        NonNestedAliasCyclePolicy::AfterSecondUnfold,
-    )
-}
-
 enum TypeTransformerVisit<'db> {
     Return(Type<'db>),
     Pending(Type<'db>),
 }
 
-impl<'db, Tag, T, R: Default, const INLINE_CAPACITY: usize> Default
-    for CycleDetector<'db, Tag, T, R, INLINE_CAPACITY>
+impl<'db, Policy, T, R: Default, const INLINE_CAPACITY: usize> Default
+    for CycleDetector<'db, Policy, T, R, INLINE_CAPACITY>
 where
     T: HasIdentity<'db>,
+    Policy: CyclePolicy<'db, T>,
 {
     fn default() -> Self {
         CycleDetector::new(R::default())
@@ -612,12 +590,13 @@ impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CycleDetector, CycleDetectorVisit, Db, HasIdentity};
+    use super::{
+        CycleDetector, CycleDetectorVisit, CyclePolicy, Db, HasIdentity, IdentityCyclePolicy,
+    };
     use crate::db::tests::setup_db;
 
-    struct TestCycleDetector;
-    type Detector<'db> = CycleDetector<'db, TestCycleDetector, u8, u8, 1>;
-    type IdentityDetector<'db> = CycleDetector<'db, TestCycleDetector, TestItem, u8, 1>;
+    type Detector<'db> = CycleDetector<'db, IdentityCyclePolicy, u8, u8, 1>;
+    type IdentityDetector<'db> = CycleDetector<'db, IdentityCyclePolicy, TestItem, u8, 1>;
 
     impl<'db> HasIdentity<'db> for u8 {
         type Id = u8;
@@ -641,8 +620,10 @@ mod tests {
         }
     }
 
+    struct ConditionalIdentityCyclePolicy;
+
     type ExactIdentityDetector<'db> =
-        CycleDetector<'db, TestCycleDetector, ExactIdentityItem, u8, 1>;
+        CycleDetector<'db, ConditionalIdentityCyclePolicy, ExactIdentityItem, u8, 1>;
 
     #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
     struct ExactIdentityItem {
@@ -657,9 +638,21 @@ mod tests {
         fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
             self.identity
         }
+    }
 
-        fn needs_recursive_identity(&self) -> bool {
-            self.recursive_identity
+    impl<'db> CyclePolicy<'db, ExactIdentityItem> for ConditionalIdentityCyclePolicy {
+        fn reentry_index(
+            db: &'db dyn Db,
+            current: &ExactIdentityItem,
+            active: &[ExactIdentityItem],
+        ) -> Option<usize> {
+            if !current.recursive_identity {
+                return None;
+            }
+            let identity = current.to_identity(db);
+            active
+                .iter()
+                .position(|active| active.recursive_identity && active.to_identity(db) == identity)
         }
     }
 
@@ -769,10 +762,11 @@ mod tests {
             panic!("first visit should be pending");
         };
 
-        let CycleDetectorVisit::Cycle(current) = detector.begin_visit(&db, second) else {
+        let CycleDetectorVisit::Cycle(reentry) = detector.begin_visit(&db, second) else {
             panic!("second visit should detect an identity cycle");
         };
-        assert_eq!(current, second);
+        assert_eq!(reentry.current, second);
+        assert_eq!(reentry.active, first);
 
         detector.finish_visit(active_item, 10);
     }

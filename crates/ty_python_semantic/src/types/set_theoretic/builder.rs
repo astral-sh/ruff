@@ -37,7 +37,7 @@
 //! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
 use super::RecursivelyDefined;
-use crate::types::cyclic::type_has_immediate_recursive_identity_cycle;
+use crate::types::cyclic::RecursiveTypeStack;
 use crate::types::enums::EnumComplement;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
@@ -745,7 +745,7 @@ impl<'db> UnionBuilder<'db> {
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
             Type::TypeAlias(alias) if self.unpack_aliases => {
-                if type_has_immediate_recursive_identity_cycle(self.db, ty, seen_aliases) {
+                if RecursiveTypeStack::new(self.db, seen_aliases).contains_immediate_reentry(ty) {
                     // Union contains itself recursively via a type alias. This is an error, just
                     // leave out the recursive alias. TODO surface this error.
                 } else {
@@ -1277,7 +1277,7 @@ impl<'db> IntersectionBuilder<'db> {
     ) -> Self {
         match ty {
             Type::TypeAlias(alias) => {
-                if type_has_immediate_recursive_identity_cycle(self.db, ty, seen_aliases) {
+                if RecursiveTypeStack::new(self.db, seen_aliases).contains_immediate_reentry(ty) {
                     // Recursive alias, add it without expanding to avoid infinite recursion.
                     for inner in &mut self.intersections {
                         inner.positive.insert(ty);
@@ -1347,7 +1347,7 @@ impl<'db> IntersectionBuilder<'db> {
         // See comments above in `add_positive`; this is just the negated version.
         match ty {
             Type::TypeAlias(alias) => {
-                if type_has_immediate_recursive_identity_cycle(self.db, ty, seen_aliases) {
+                if RecursiveTypeStack::new(self.db, seen_aliases).contains_immediate_reentry(ty) {
                     // Recursive alias, add it without expanding to avoid infinite recursion.
                     for inner in &mut self.intersections {
                         inner.negative.insert(ty);

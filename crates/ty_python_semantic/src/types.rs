@@ -24,7 +24,9 @@ use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
 pub(crate) use self::callable::UpcastPolicy;
 pub use self::cyclic::CycleDetector;
-pub(crate) use self::cyclic::{ActiveRecursionDetector, TypeTransformer};
+pub(crate) use self::cyclic::{
+    ActiveRecursionDetector, TypeCyclePolicy, TypePairCyclePolicy, TypeTransformer,
+};
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
@@ -291,10 +293,8 @@ fn definition_expression_annotation<'db>(
 }
 
 struct ApplyTypeMappingTag;
-struct ApplyMaterializationEquivalence;
-
 type MaterializationEquivalenceVisitor<'db> =
-    Rc<CycleDetector<'db, ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
+    Rc<CycleDetector<'db, TypePairCyclePolicy, (Type<'db>, Type<'db>), bool, 1>>;
 
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
@@ -373,15 +373,10 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
 
 /// A [`CycleDetector`] that is used in `find_legacy_typevars` methods.
 pub(crate) type FindLegacyTypeVarsVisitor<'db> =
-    CycleDetector<'db, FindLegacyTypeVars, Type<'db>, (), 3>;
-
-#[derive(Debug)]
-pub(crate) struct FindLegacyTypeVars;
+    CycleDetector<'db, TypeCyclePolicy, Type<'db>, (), 3>;
 
 /// A [`CycleDetector`] that is used in `visit_specialization` methods.
-pub(crate) type SpecializationVisitor<'db> =
-    CycleDetector<'db, VisitSpecialization, Type<'db>, (), 3>;
-pub(crate) struct VisitSpecialization;
+pub(crate) type SpecializationVisitor<'db> = CycleDetector<'db, TypeCyclePolicy, Type<'db>, (), 3>;
 
 /// How a generic type has been specialized.
 ///
