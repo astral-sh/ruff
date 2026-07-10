@@ -17,7 +17,6 @@ use crate::{
         class::walk_generic_alias,
         cyclic::ActiveRecursionDetector,
         function::{FunctionType, walk_function_type},
-        generics::walk_specialization,
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
         known_instance::walk_known_instance_type,
         method::{walk_bound_method_type, walk_method_wrapper_type},
@@ -443,9 +442,13 @@ pub(super) fn non_any_dynamic_content<'db>(db: &'db dyn Db, ty: Type<'db>) -> Dy
             };
 
             if let Some(specialization) = specialization {
-                walk_specialization(db, specialization, self);
-                if !self.content.get().is_absent() {
-                    return;
+                // Bounds and defaults in the generic context do not describe the specialized
+                // instance; only inspect the types assigned to its parameters.
+                for ty in specialization.types(db) {
+                    self.visit_type(db, *ty);
+                    if !self.content.get().is_absent() {
+                        return;
+                    }
                 }
             }
 
