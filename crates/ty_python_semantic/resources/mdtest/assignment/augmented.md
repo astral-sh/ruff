@@ -43,6 +43,15 @@ class C:
 x = C()
 x += "Hello"
 reveal_type(x)  # revealed: int
+
+from typing import Callable
+
+class CallableIAdd:
+    __iadd__: Callable[["CallableIAdd", int], str]
+
+callable_iadd = CallableIAdd()
+callable_iadd += 1
+reveal_type(callable_iadd)  # revealed: str
 ```
 
 ## Unsupported types

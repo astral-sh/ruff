@@ -2049,7 +2049,7 @@ impl<'db> ClassType<'db> {
             .member_lookup_with_policy(
                 db,
                 "__call__".into(),
-                MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                MemberLookupPolicy::IMPLICIT_DUNDER_CALL
                     | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
             )
             .place;

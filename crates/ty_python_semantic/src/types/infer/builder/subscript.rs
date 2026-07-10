@@ -1279,7 +1279,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .member_lookup_with_policy(
                     db,
                     "__setitem__".into(),
-                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    MemberLookupPolicy::IMPLICIT_DUNDER_CALL,
                 )
                 .place
             {

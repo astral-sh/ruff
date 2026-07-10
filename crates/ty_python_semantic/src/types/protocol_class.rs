@@ -1396,7 +1396,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 db,
                 "__setattr__".into(),
                 MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                    | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    | MemberLookupPolicy::IMPLICIT_DUNDER_CALL,
             )
             .place
         else {

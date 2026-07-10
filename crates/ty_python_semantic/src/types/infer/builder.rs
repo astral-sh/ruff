@@ -4865,7 +4865,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_expression_tcx: TypeContext<'db>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         match object
-            .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NO_INSTANCE_FALLBACK)
+            .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::IMPLICIT_DUNDER_CALL)
             .place
         {
             Place::Defined(DefinedPlace {

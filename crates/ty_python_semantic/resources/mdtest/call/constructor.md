@@ -1380,6 +1380,30 @@ def _(flag: bool) -> None:
     reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
+## Callable-typed constructor dunders
+
+Callable-typed `__init__` attributes use the same receiver heuristic as other implicit dunder calls:
+
+```py
+from typing import Callable
+
+class CallableInit:
+    __init__: Callable[["CallableInit", int], None]
+
+reveal_type(CallableInit(1))  # revealed: CallableInit
+```
+
+The same is true for a callable-typed `__call__` on the metaclass:
+
+```py
+class Meta(type):
+    __call__: Callable[[type, int], object]
+
+class WithMeta(metaclass=Meta): ...
+
+reveal_type(WithMeta(1))  # revealed: object
+```
+
 ## A descriptor in place of `__init__`
 
 ```py

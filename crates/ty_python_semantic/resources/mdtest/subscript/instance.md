@@ -197,6 +197,13 @@ class Identity:
 
 a = Identity()
 a[0] = 0
+
+from typing import Callable
+
+class CallableSetItem:
+    __setitem__: Callable[["CallableSetItem", int, str], None]
+
+CallableSetItem()[0] = "value"
 ```
 
 ## `__setitem__` with invalid index argument

@@ -665,7 +665,7 @@ impl ClassDecoratorUnknownResultPolicy {
                     .member_lookup_with_policy(
                         db,
                         Name::new_static("__call__"),
-                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        MemberLookupPolicy::IMPLICIT_DUNDER_CALL,
                     )
                     .place;
 

@@ -487,6 +487,10 @@ bitflags! {
         /// Bind a compatible receiver on a regular `Callable` class member before applying the
         /// descriptor protocol. This is used for implicit dunder calls only.
         const BIND_DUNDER_CALLABLE_RECEIVER = 1 << 6;
+
+        /// The standard policy for an implicit dunder call on an instance.
+        const IMPLICIT_DUNDER_CALL =
+            Self::NO_INSTANCE_FALLBACK.bits() | Self::BIND_DUNDER_CALLABLE_RECEIVER.bits();
     }
 }
 
@@ -4483,7 +4487,7 @@ impl<'db> Type<'db> {
             .member_lookup_with_policy(
                 db,
                 Name::new_static("__getitem__"),
-                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                MemberLookupPolicy::IMPLICIT_DUNDER_CALL,
             )
             .place
         {
@@ -4806,8 +4810,7 @@ impl<'db> Type<'db> {
                     .member_lookup_with_policy(
                         db,
                         Name::new_static("__call__"),
-                        MemberLookupPolicy::NO_INSTANCE_FALLBACK
-                            | MemberLookupPolicy::BIND_DUNDER_CALLABLE_RECEIVER,
+                        MemberLookupPolicy::IMPLICIT_DUNDER_CALL,
                     )
                     .place
                 {
@@ -5338,7 +5341,7 @@ impl<'db> Type<'db> {
         let metaclass_dunder_call = self_type.member_lookup_with_policy(
             db,
             "__call__".into(),
-            MemberLookupPolicy::NO_INSTANCE_FALLBACK
+            MemberLookupPolicy::IMPLICIT_DUNDER_CALL
                 | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
         );
 
@@ -5351,7 +5354,7 @@ impl<'db> Type<'db> {
         let init_method_no_object = constructor_instance_ty.member_lookup_with_policy(
             db,
             "__init__".into(),
-            MemberLookupPolicy::NO_INSTANCE_FALLBACK | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+            MemberLookupPolicy::IMPLICIT_DUNDER_CALL | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
         );
 
         let (new_bindings, has_any_new) = match new_method.as_ref().map(|method| method.place) {
@@ -5400,7 +5403,7 @@ impl<'db> Type<'db> {
                 let init_method_with_object = constructor_instance_ty.member_lookup_with_policy(
                     db,
                     "__init__".into(),
-                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    MemberLookupPolicy::IMPLICIT_DUNDER_CALL,
                 );
                 match init_method_with_object.place {
                     Place::Defined(DefinedPlace {
@@ -5578,9 +5581,7 @@ impl<'db> Type<'db> {
 
         // Implicit calls to dunder methods never access instance members, so we pass
         // `NO_INSTANCE_FALLBACK` here in addition to other policies:
-        let policy = policy
-            | MemberLookupPolicy::NO_INSTANCE_FALLBACK
-            | MemberLookupPolicy::BIND_DUNDER_CALLABLE_RECEIVER;
+        let policy = policy | MemberLookupPolicy::IMPLICIT_DUNDER_CALL;
         match self
             .member_lookup_with_policy(db, name.into(), policy)
             .place
@@ -7489,9 +7490,7 @@ impl<'db> UnionType<'db> {
                 .member_lookup_with_policy(
                     db,
                     name.into(),
-                    policy
-                        | MemberLookupPolicy::NO_INSTANCE_FALLBACK
-                        | MemberLookupPolicy::BIND_DUNDER_CALLABLE_RECEIVER,
+                    policy | MemberLookupPolicy::IMPLICIT_DUNDER_CALL,
                 )
                 .place
             {
