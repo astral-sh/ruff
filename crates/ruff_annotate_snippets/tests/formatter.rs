@@ -5427,3 +5427,59 @@ error[E0038]: the trait alias `EqAlias` is not dyn compatible
     let renderer = renderer.decor_style(DecorStyle::Unicode);
     assert_data_eq!(renderer.render(input), expected_unicode);
 }
+
+#[test]
+fn lineno_offset() {
+    let input = &[
+        Level::ERROR.primary_title("oops").element(
+            Snippet::source("First line\r\nSecond oops line")
+                .path("<current file>")
+                .annotation(AnnotationKind::Primary.span(19..23).label("oops")),
+        ),
+        Level::NOTE.secondary_title("details").element(
+            Snippet::source("First line\r\nSecond oops line")
+                .path("<other file>")
+                .annotation(AnnotationKind::Primary.span(19..23).label("oops")),
+        ),
+        Level::HELP
+            .secondary_title("suggestion")
+            .element(Origin::path("<current file>"))
+            .lineno_offset(10),
+    ];
+    let expected_ascii = str![[r#"
+error: oops
+ --> <current file>:2:8
+  |
+2 | Second oops line
+  |        ^^^^ oops
+  |
+note: details
+ --> <other file>:2:8
+  |
+2 | Second oops line
+  |        ^^^^ oops
+help: suggestion
+ --> <current file>
+"#]];
+
+    let renderer = Renderer::plain();
+    assert_data_eq!(renderer.render(input), expected_ascii);
+
+    let expected_unicode = str![[r#"
+error: oops
+  ╭▸ <current file>:2:8
+  │
+2 │ Second oops line
+  │        ━━━━ oops
+  ╰╴
+note: details
+  ╭▸ <other file>:2:8
+  │
+2 │ Second oops line
+  ╰╴       ━━━━ oops
+help: suggestion
+  ─▸ <current file>
+"#]];
+    let renderer = renderer.decor_style(DecorStyle::Unicode);
+    assert_data_eq!(renderer.render(input), expected_unicode);
+}
