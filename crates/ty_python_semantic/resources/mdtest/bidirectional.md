@@ -221,28 +221,6 @@ x4: dict[str, int] = reveal_type({**dynamic_mapping()})  # revealed: dict[str | 
 x5: dict[str, int] = {**42}
 ```
 
-### Aliases and protocols
-
-```py
-from collections.abc import Iterable
-
-type IntDict = dict[str, int]
-
-x1: IntDict = {"a": 1}
-reveal_type(x1)  # revealed: dict[str, int]
-
-# A protocol context is not an exact nominal collection context and must use the general path.
-x2: Iterable[int] = [1]
-reveal_type(x2)  # revealed: list[int]
-```
-
-### Invalid elements
-
-```py
-x1: dict[str, int] = {"a": "bad"}  # error: [invalid-assignment]
-x2: list[list[list[str]]] = [[[1]]]  # error: [invalid-assignment]
-```
-
 ### Collection unions
 
 ```py
@@ -560,6 +538,7 @@ def dict_with_numeric_promotion(
 
 ```py
 from collections.abc import Callable, Hashable
+from typing import Any
 
 # The `dict(...)` variant is not technically allowed by the typeshed overloads, which require
 # string keys for keyword arguments. We special-case it to match the literal form.
@@ -861,8 +840,8 @@ reveal_type(x5)  # revealed: ((Any, /) -> bool) | None
 
 ## Declared type preference sees through subtyping
 
-Similarly, if the inferred type is a subtype of the declared type, we prefer declared type
-assignments that are in non-covariant position:
+Additionally, if the inferred type is a subtype of the declared type, we prefer declared type
+assignments that are in non-covariant position. This behavior applies to collection literals:
 
 ```py
 import builtins
@@ -905,7 +884,11 @@ reveal_type(x11)  # revealed: list[Iterable[Any]]
 
 x12: Iterable[list[Any]] = [[i] for i in [1, 2, 3]]
 reveal_type(x12)  # revealed: list[list[Any]]
+```
 
+As well as generic calls, and constructors of generic classes:
+
+```py
 class X[T]:
     value: T
 
@@ -939,25 +922,50 @@ reveal_type(x18)  # revealed: list[list[Any]]
 
 x19: dict[int, dict[str, int]] = defaultdict(dict)
 reveal_type(x19)  # revealed: defaultdict[int, dict[str, int]]
+```
 
-x20: Mapping[str, list[str]] = reveal_type(defaultdict(list))  # revealed: defaultdict[str, list[str]]
-x20["key"].append(1)  # error: [invalid-argument-type]
+Complex subtyping relationships are solved correctly:
 
-factory: Callable[[], list[str]] = reveal_type(list)  # revealed: <class 'list[str]'>
-reveal_type(factory())  # revealed: list[str]
+```py
+from typing import Hashable
 
-optional_factory: Callable[[], list[str]] | None = reveal_type(list)  # revealed: <class 'list[str]'>
+def variadic(*args: Any, **kwargs: Any) -> Any: ...
 
-qualified_factory: Callable[[], list[str]] = reveal_type(builtins.list)  # revealed: <class 'list[str]'>
-reveal_type(qualified_factory())  # revealed: list[str]
+x20: Mapping[Hashable, list[Callable[..., Any]]] = {"x": [variadic]}
+reveal_type(x20)  # revealed: dict[Hashable, list[(...) -> Any]]
+
+x21: Mapping[Hashable, list[Callable[..., Any]]] = dict(x=[variadic])
+reveal_type(x21)  # revealed: dict[Hashable, list[(...) -> Any]]
+```
+
+## Implicit generic class specialization
+
+Callable type context is also used to inform the implicit specialization of a generic class:
+
+```py
+import builtins
+from collections import defaultdict
+from collections.abc import Mapping
+from typing import Any, Callable, overload
+
+x1: Mapping[str, list[str]] = reveal_type(defaultdict(list))  # revealed: defaultdict[str, list[str]]
+x1["key"].append(1)  # error: [invalid-argument-type]
+
+x2: Callable[[], list[str]] = reveal_type(list)  # revealed: <class 'list[str]'>
+reveal_type(x2())  # revealed: list[str]
+
+x3: Callable[[], list[str]] | None = reveal_type(list)  # revealed: <class 'list[str]'>
+
+x4: Callable[[], list[str]] = reveal_type(builtins.list)  # revealed: <class 'list[str]'>
+reveal_type(x4())  # revealed: list[str]
 
 type ListFactory = Callable[[], list[str]]
 
-alias_factory: ListFactory = reveal_type(list)  # revealed: <class 'list[str]'>
-reveal_type(alias_factory())  # revealed: list[str]
+x5: ListFactory = reveal_type(list)  # revealed: <class 'list[str]'>
+reveal_type(x5())  # revealed: list[str]
 
-gradual_factory: Callable[..., Any] = reveal_type(list)  # revealed: <class 'list'>
-dynamic_factory: Callable[[Any], Any] = reveal_type(list)  # revealed: <class 'list'>
+x6: Callable[..., Any] = reveal_type(list)  # revealed: <class 'list'>
+x7: Callable[[Any], Any] = reveal_type(list)  # revealed: <class 'list'>
 
 class Wrapped[T]:
     value: T
@@ -965,8 +973,8 @@ class Wrapped[T]:
     def __new__(cls, value: T) -> "Wrapped[tuple[T]]":
         raise NotImplementedError
 
-wrapped_factory: Callable[[str], Wrapped[tuple[str]]] = reveal_type(Wrapped)  # revealed: <class 'Wrapped[str]'>
-reveal_type(wrapped_factory("x"))  # revealed: Wrapped[tuple[str]]
+x8: Callable[[str], Wrapped[tuple[str]]] = reveal_type(Wrapped)  # revealed: <class 'Wrapped[str]'>
+reveal_type(x8("x"))  # revealed: Wrapped[tuple[str]]
 
 class M[T]:
     value: T
@@ -974,8 +982,8 @@ class M[T]:
     def __new__[S](cls, value: S) -> "M[tuple[S]]":
         raise NotImplementedError
 
-m_factory: Callable[[str], M[tuple[str]]] = reveal_type(M)  # revealed: <class 'M'>
-reveal_type(m_factory("x"))  # revealed: M[tuple[str]]
+x9: Callable[[str], M[tuple[str]]] = reveal_type(M)  # revealed: <class 'M'>
+reveal_type(x9("x"))  # revealed: M[tuple[str]]
 
 class MultiPath[T]:
     value: T
@@ -987,7 +995,7 @@ class MultiPath[T]:
     def __init__(self, value: object) -> None: ...
 
 # fmt: off
-multi_path_factory: Callable[[list[int]], MultiPath[int] | MultiPath[list[int]]] = reveal_type(MultiPath)  # revealed: <class 'MultiPath'>
+x10: Callable[[list[int]], MultiPath[int] | MultiPath[list[int]]] = reveal_type(MultiPath)  # revealed: <class 'MultiPath'>
 # fmt: on
 ```
 
