@@ -1683,11 +1683,36 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     return aggregate_relation;
                 }
 
+                // Recursive protocol relations often revisit the same overloaded method under a
+                // new specialization. Try an active signature pair first so that the existing
+                // per-signature recursion guard can close that branch before we explore the other
+                // overloads again. In eager mode, that arm is guaranteed to saturate the
+                // disjunction, so moving it first cannot affect constraint solution ordering.
+                let active_source_index = if self.typevar_evaluation == TypeVarEvaluation::Eager
+                    && self.signature_relation_visitor.has_active_visits()
+                {
+                    source_overloads
+                        .iter()
+                        .position(|source_signature| {
+                            SignatureRelationKey::from_signatures(
+                                source_signature,
+                                target_signature,
+                                self.relation,
+                                self.typevar_evaluation,
+                            )
+                            .is_some_and(|key| self.signature_relation_visitor.is_active(&key))
+                        })
+                        .unwrap_or(0)
+                } else {
+                    0
+                };
+
                 // TODO: Similar to how we do this for unions, we should collect error
                 // context for all elements and report it if *all* checks fail.
                 self.without_context_collection(|| {
-                    source_overloads
+                    source_overloads[active_source_index..]
                         .iter()
+                        .chain(source_overloads[..active_source_index].iter())
                         .when_any(db, self.constraints, |self_signature| {
                             self.check_callable_signature_pair_inner(
                                 db,
