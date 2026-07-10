@@ -86,8 +86,9 @@ pub(super) enum InstanceAttributeWriteMember<'db> {
 
 /// The member that governs a write through a class object.
 ///
-/// The primary lookup is on the metaclass. If that lookup is absent or possibly undefined, the
-/// class object's own attributes form the fallback.
+/// A data descriptor on the metaclass takes precedence over the class object's own attributes,
+/// which in turn take precedence over definitely non-data metaclass members. If the metaclass
+/// member is absent or possibly undefined, the class object's own attributes form the fallback.
 pub(super) enum ClassAttributeWriteMember<'db> {
     /// A metaclass member governs the write, optionally alongside a class-attribute fallback.
     Explicit {
