@@ -366,7 +366,7 @@ fn section_item_indent(header: SectionHeader, line: ParsedLine<'_>) -> Option<Te
             split_once_unbracketed_colon(trimmed).is_some_and(|(name, _)| !name.trim().is_empty())
         }
         HeaderKind::Structured(SectionKind::Returns | SectionKind::Yields) => !trimmed.is_empty(),
-        HeaderKind::Container => false,
+        HeaderKind::Opaque => false,
     };
     is_item.then_some(line.raw_indent)
 }
@@ -402,7 +402,7 @@ struct SectionHeader {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HeaderKind {
     Structured(SectionKind),
-    Container,
+    Opaque,
 }
 
 impl HeaderKind {
@@ -424,7 +424,7 @@ impl HeaderKind {
             "raise" | "raises" => Self::Structured(SectionKind::Raises),
             "attention" | "caution" | "danger" | "error" | "example" | "examples" | "hint"
             | "important" | "methods" | "note" | "notes" | "references" | "see also" | "tip"
-            | "todo" | "todos" | "warning" | "warnings" | "warns" => Self::Container,
+            | "todo" | "todos" | "warning" | "warnings" | "warns" => Self::Opaque,
             _ => return None,
         })
     }
