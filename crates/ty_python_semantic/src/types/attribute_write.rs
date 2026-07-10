@@ -144,14 +144,35 @@ pub(super) enum FallbackAttributeWriteRequirement<'db> {
 }
 
 /// The members that can govern an attribute write.
+///
+/// For a class-object receiver, the type member is found on the metaclass while the receiver member
+/// is found on the class's own MRO:
+///
+/// ```python
+/// class Descriptor:
+///     def __set__(self, instance: object, value: object) -> None: ...
+///
+/// class Meta(type):
+///     data = Descriptor()  # Type member: Meta.data
+///     plain = object()  # Type member: Meta.plain
+///
+/// class C(metaclass=Meta):
+///     data: int  # Receiver member: C.data
+///     plain: int  # Receiver member: C.plain
+///
+/// C.data = 1
+/// C.plain = 1
+/// ```
 pub(super) enum AssignmentAttributeMembers<'db> {
-    /// A member found on the receiver's type governs the write, together with a receiver member
-    /// when the type member may be missing.
+    /// The type member governs the write, as `Meta.data` does above because it is a data descriptor.
+    /// If the type member may be missing, the corresponding receiver member (`C.data`) is retained
+    /// as `receiver_fallback`.
     TypeMember {
         member: PlaceAndQualifiers<'db>,
         receiver_fallback: Option<PlaceAndQualifiers<'db>>,
     },
-    /// A receiver-level member governs the write.
+    /// The receiver member governs the write, as `C.plain` does above because `Meta.plain` is
+    /// definitely not a data descriptor.
     ReceiverMember(PlaceAndQualifiers<'db>),
 }
 
