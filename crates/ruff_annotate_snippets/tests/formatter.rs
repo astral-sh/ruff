@@ -377,16 +377,16 @@ fn test_format_footer_title() {
         .element(Level::ERROR.message("This __is__ a title"))];
     let expected_ascii = str![[r#"
 error: 
-  |
-  = error: This __is__ a title
+ |
+ = error: This __is__ a title
 "#]];
     let renderer = Renderer::plain();
     assert_data_eq!(renderer.render(input), expected_ascii);
 
     let expected_unicode = str![[r#"
 error: 
-  │
-  ╰ error: This __is__ a title
+ │
+ ╰ error: This __is__ a title
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
     assert_data_eq!(renderer.render(input), expected_unicode);
@@ -401,7 +401,7 @@ fn test_multi_group_no_snippet() {
     ];
     let expected_ascii = str![[r#"
 error: the core problem
-  |
+ |
 note: more information
 help: a way to fix this
 "#]];
@@ -410,7 +410,7 @@ help: a way to fix this
 
     let expected_unicode = str![[r#"
 error: the core problem
-  ╰╴
+ ╰╴
 note: more information
 help: a way to fix this
 "#]];
@@ -5492,7 +5492,7 @@ fn main() {
         )];
     let expected_ascii = str![[r#"
 error[E0038]: the trait alias `EqAlias` is not dyn compatible
- --> $DIR/object-fail.rs:7:17
+--> $DIR/object-fail.rs:7:17
 "#]];
 
     let renderer = Renderer::plain();
@@ -5500,7 +5500,7 @@ error[E0038]: the trait alias `EqAlias` is not dyn compatible
 
     let expected_unicode = str![[r#"
 error[E0038]: the trait alias `EqAlias` is not dyn compatible
-  ─▸ $DIR/object-fail.rs:7:17
+ ─▸ $DIR/object-fail.rs:7:17
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
     assert_data_eq!(renderer.render(input), expected_unicode);
@@ -5518,7 +5518,7 @@ fn only_origin() {
         )];
     let expected_ascii = str![[r#"
 error[E0038]: the trait alias `EqAlias` is not dyn compatible
- --> $SRC_DIR/core/src/cmp.rs:334:14
+--> $SRC_DIR/core/src/cmp.rs:334:14
 "#]];
 
     let renderer = Renderer::plain();
@@ -5526,7 +5526,7 @@ error[E0038]: the trait alias `EqAlias` is not dyn compatible
 
     let expected_unicode = str![[r#"
 error[E0038]: the trait alias `EqAlias` is not dyn compatible
-  ─▸ $SRC_DIR/core/src/cmp.rs:334:14
+ ─▸ $SRC_DIR/core/src/cmp.rs:334:14
 "#]];
     let renderer = renderer.decor_style(DecorStyle::Unicode);
     assert_data_eq!(renderer.render(input), expected_unicode);
