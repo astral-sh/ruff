@@ -86,7 +86,7 @@ protocol is encountered under a different specialization, the check is indetermi
 conservatively suppresses the diagnostic.
 
 ```py
-from typing import Any, Protocol, cast
+from typing import Any, Protocol, TypeVar, cast
 
 from ty_extensions import Unknown
 
@@ -119,6 +119,14 @@ class GenericProtocol[T](Protocol):
 
 def protocol_specialization_unknown(value: GenericProtocol[Unknown]) -> None:
     cast(GenericProtocol[Unknown], value)
+
+DynamicBoundT = TypeVar("DynamicBoundT", bound=Unknown)
+
+class DynamicBoundProtocol(Protocol[DynamicBoundT]):
+    value: DynamicBoundT
+
+def protocol_specialization_dynamic_bound(value: DynamicBoundProtocol[int]) -> None:
+    cast(DynamicBoundProtocol[int], value)  # error: [redundant-cast]
 
 class RecursiveProtocol(Protocol):
     next: "RecursiveProtocol"
