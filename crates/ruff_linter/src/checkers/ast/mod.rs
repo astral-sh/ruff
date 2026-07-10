@@ -1854,14 +1854,20 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit_expr(func);
 
                 
-                enum TypeCallable<'a> {
-                    Typing(typing::Callable),
-                    ExtendTypeForm(&'a [crate::settings::types::CallArgument]),
-                }
+
 
                 
-                enum TypeCallable<'a> {
-                    Typing(typing::Callable),
+
+
+                enum Callable<'a> {
+                    Bool,
+                    Cast,
+                    NewType,
+                    TypeVar,
+                    NamedTuple,
+                    TypedDict,
+                    MypyExtension,
+                    TypeAliasType,
                     ExtendTypeForm(&'a [crate::settings::types::CallArgument]),
                 }
 
@@ -1873,32 +1879,32 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 .semantic
                                 .match_typing_qualified_name(&qualified_name, "cast")
                             {
-                                Some(TypeCallable::Typing(typing::Callable::Cast))
+                                Some(Callable::Cast))
                             } else if self
                                 .semantic
                                 .match_typing_qualified_name(&qualified_name, "NewType")
                             {
-                                Some(TypeCallable::Typing(typing::Callable::NewType))
+                                Some(Callable::NewType))
                             } else if self
                                 .semantic
                                 .match_typing_qualified_name(&qualified_name, "TypeVar")
                             {
-                                Some(TypeCallable::Typing(typing::Callable::TypeVar))
+                                Some(Callable::TypeVar))
                             } else if self
                                 .semantic
                                 .match_typing_qualified_name(&qualified_name, "TypeAliasType")
                             {
-                                Some(TypeCallable::Typing(typing::Callable::TypeAliasType))
+                                Some(Callable::TypeAliasType))
                             } else if self
                                 .semantic
                                 .match_typing_qualified_name(&qualified_name, "NamedTuple")
                             {
-                                Some(TypeCallable::Typing(typing::Callable::NamedTuple))
+                                Some(Callable::NamedTuple))
                             } else if self
                                 .semantic
                                 .match_typing_qualified_name(&qualified_name, "TypedDict")
                             {
-                                Some(TypeCallable::Typing(typing::Callable::TypedDict))
+                                Some(Callable::TypedDict))
                             } else if matches!(
                                 qualified_name.segments(),
                                 [
@@ -1911,10 +1917,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                         | "KwArg"
                                 ]
                             ) {
-                                Some(TypeCallable::Typing(typing::Callable::MypyExtension))
+                                Some(Callable::MypyExtension))
                             } else if matches!(qualified_name.segments(), ["" | "builtins", "bool"])
                             {
-                                Some(TypeCallable::Typing(typing::Callable::Bool))
+                                Some(Callable::Bool))
                             } else if let Some(args) = self.settings().extend_type_form_callables.iter().find_map(|(name_str, args)| {
                                 if qualified_name == QualifiedName::user_defined(name_str) {
                                     Some(args.as_slice())
@@ -1922,14 +1928,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                     None
                                 }
                             }) {
-                                Some(TypeCallable::ExtendTypeForm(args))
+                                Some(Callable::ExtendTypeForm(args))
                             } else {
                                 None
                             }
                         });
 
                 match callable {
-                    Some(TypeCallable::Typing(typing::Callable::Bool)) => {
+                    Some(Callable::Bool)) => {
                         let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_boolean_test(arg);
@@ -1938,7 +1944,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             self.visit_expr(arg);
                         }
                     }
-                    Some(TypeCallable::Typing(typing::Callable::Cast)) => {
+                    Some(Callable::Cast)) => {
                         for (i, arg) in arguments.iter_source_order().enumerate() {
                             match (i, arg) {
                                 (0, ArgOrKeyword::Arg(arg)) => self.visit_cast_type_argument(arg),
@@ -1955,7 +1961,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             }
                         }
                     }
-                    Some(TypeCallable::Typing(typing::Callable::NewType)) => {
+                    Some(Callable::NewType)) => {
                         for (i, arg) in arguments.iter_source_order().enumerate() {
                             match (i, arg) {
                                 (1, ArgOrKeyword::Arg(arg)) => self.visit_type_definition(arg),
@@ -1972,7 +1978,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             }
                         }
                     }
-                    Some(TypeCallable::Typing(typing::Callable::TypeVar)) => {
+                    Some(Callable::TypeVar)) => {
                         let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
@@ -1999,7 +2005,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             }
                         }
                     }
-                    Some(TypeCallable::Typing(typing::Callable::TypeAliasType)) => {
+                    Some(Callable::TypeAliasType)) => {
                         // Ex) TypeAliasType("Json", "Union[dict[str, Json]]", type_params=())
                         for (i, arg) in arguments.iter_source_order().enumerate() {
                             match (i, arg) {
@@ -2017,7 +2023,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             }
                         }
                     }
-                    Some(TypeCallable::Typing(typing::Callable::NamedTuple)) => {
+                    Some(Callable::NamedTuple)) => {
                         // Ex) NamedTuple("a", [("a", int)])
                         let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
@@ -2073,7 +2079,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             }
                         }
                     }
-                    Some(TypeCallable::Typing(typing::Callable::TypedDict)) => {
+                    Some(Callable::TypedDict)) => {
                         // Ex) TypedDict("a", {"a": int})
                         let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
@@ -2103,7 +2109,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             self.visit_type_definition(value);
                         }
                     }
-                    Some(TypeCallable::Typing(typing::Callable::MypyExtension)) => {
+                    Some(Callable::MypyExtension)) => {
                         let mut args = arguments.args.iter();
                         if let Some(arg) = args.next() {
                             // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
@@ -2133,7 +2139,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             }
                         }
                     }
-                    Some(TypeCallable::ExtendTypeForm(args)) => {
+                    Some(Callable::ExtendTypeForm(args)) => {
                         let args = self
                             .settings()
                             .extend_type_form_callables
